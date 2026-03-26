@@ -287,7 +287,7 @@ function formatIndustry(industry: string): string {
             <span class="summary-icon">📋</span>
             <h3>{{ t('onboarding.summary') }}</h3>
           </div>
-          <p>{{ t('onboarding.summaryText', { company: companyName, city: selectedCity.name, industry: formatIndustry(selectedIndustry) }) }}</p>
+          <p>{{ t('onboarding.summaryText', { company: companyName, city: selectedCity!.name, industry: formatIndustry(selectedIndustry) }) }}</p>
           <div class="summary-details">
             <div class="summary-item">
               <span class="summary-label">🏭</span>
@@ -299,7 +299,7 @@ function formatIndustry(industry: string): string {
             </div>
             <div class="summary-item">
               <span class="summary-label">📦</span>
-              <span>{{ selectedProduct.name }} — ${{ selectedProduct.basePrice }}</span>
+              <span>{{ selectedProduct!.name }} — ${{ selectedProduct!.basePrice }}</span>
             </div>
           </div>
         </div>

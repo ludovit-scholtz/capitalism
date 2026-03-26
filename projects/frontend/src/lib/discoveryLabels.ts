@@ -35,7 +35,7 @@ export function formatDiscoveryChipLabel(
 ): string {
   switch (chip.key) {
     case 'search':
-      return t('filters.chipKeyword', { value: filters.search.trim() })
+      return t('filters.chipKeyword', { value: filters.search!.trim() })
     case 'domain': {
       const domainSlug = filters.domain
       const domainName = domainSlug ? resolveDomainName?.(domainSlug) ?? domainSlug : ''
@@ -46,7 +46,7 @@ export function formatDiscoveryChipLabel(
     case 'dateTo':
       return t('filters.chipTo', { value: filters.dateTo })
     case 'location':
-      return t('filters.chipLocation', { value: filters.location.trim() })
+      return t('filters.chipLocation', { value: filters.location!.trim() })
     case 'priceType':
       return filters.priceType === 'FREE' ? t('filters.chipPriceFree') : t('filters.chipPricePaid')
     case 'priceMin':
@@ -67,9 +67,9 @@ export function formatDiscoveryChipLabel(
       if (filters.attendanceMode === 'ONLINE') return t('filters.chipModeOnline')
       return t('filters.chipModeHybrid')
     case 'language':
-      return t('filters.chipLanguage', { value: getLanguageLabel(filters.language.trim(), t) })
+      return t('filters.chipLanguage', { value: getLanguageLabel(filters.language!.trim(), t) })
     case 'timezone':
-      return t('filters.chipTimezone', { value: filters.timezone.trim() })
+      return t('filters.chipTimezone', { value: filters.timezone!.trim() })
     default:
       return ''
   }
