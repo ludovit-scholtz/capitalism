@@ -3,7 +3,7 @@
  * Covers: registration, login, onboarding wizard, and dashboard verification.
  */
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makePlayer, makeChairProduct } from './helpers/mock-api'
+import { setupMockApi, makePlayer } from './helpers/mock-api'
 
 test.describe('Authentication', () => {
   test('register new account and redirect to home', async ({ page }) => {
