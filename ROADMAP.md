@@ -75,6 +75,12 @@ Public sales unit - allows to sell products directly to general public. The sale
 
 Each change - new building, change of the building unit plan, or upgrade of the unit takes specific number of ticks to be executed.
 
+## Building modification
+
+Building unit configuration can be modified. User can edit the building and prepare all building modifications on frontend. When building is done being modified by user, user confirms his selection. Each unit can have different suspend time. For example upgrade unit from level 1 to 2 may take 10 ticks. Upgrade from level 2 to 3 may take 100 ticks. Upgrade from level 3 to 4 may take 1000 ticks. Change in the links between the units takes one tick to apply. Each item the unit or link acts separately. User cannot change the building attributes directly. Everything must be scheduled by the tick resolve engine.
+
+When unit is being modified user can still change it. For example when user upgrades the unit and it will take 100 ticks to process, when user cancel it revert the action back in 10% of ticks.
+
 ## The onboarding 
 
 New players when comes to the web first select the industry type they want to start with. The Furniture, Food processing, or Healthcare.

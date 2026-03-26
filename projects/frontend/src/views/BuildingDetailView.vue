@@ -72,7 +72,7 @@ const allowedUnits = computed(() => {
   return allowedUnitsMap[building.value.type] || []
 })
 const isUpgradeInProgress = computed(() => pendingConfiguration.value !== null)
-const showPlanningSection = computed(() => isUpgradeInProgress.value || isEditing.value)
+const showPlanningSection = computed(() => isEditing.value)
 const remainingUpgradeTicks = computed(() => {
   if (!pendingConfiguration.value) return 0
   return Math.max(pendingConfiguration.value.appliesAtTick - currentTick.value, 0)
@@ -126,7 +126,6 @@ function setDraftUnitsFrom(sourceUnits: GridUnit[]) {
 }
 
 function startEditing() {
-  if (isUpgradeInProgress.value) return
 
   setDraftUnitsFrom(activeUnits.value)
   isEditing.value = true
@@ -142,7 +141,7 @@ function cancelEditing() {
 }
 
 function clickDraftCell(x: number, y: number) {
-  if (isUpgradeInProgress.value || !isEditing.value) {
+  if (!isEditing.value) {
     return
   }
 
@@ -152,7 +151,7 @@ function clickDraftCell(x: number, y: number) {
 }
 
 function placeUnit(unitType: string) {
-  if (!selectedCell.value || isUpgradeInProgress.value || !isEditing.value) return
+  if (!selectedCell.value || !isEditing.value) return
 
   const newUnit: EditableGridUnit = {
     id: `draft-${selectedCell.value.x}-${selectedCell.value.y}-${Date.now()}`,
@@ -196,7 +195,7 @@ function clearConnectionsAround(x: number, y: number) {
 }
 
 function removeDraftUnit(x: number, y: number) {
-  if (isUpgradeInProgress.value || !isEditing.value) return
+  if (!isEditing.value) return
 
   clearConnectionsAround(x, y)
   draftUnits.value = draftUnits.value.filter((unit) => !(unit.gridX === x && unit.gridY === y))
@@ -205,7 +204,7 @@ function removeDraftUnit(x: number, y: number) {
 }
 
 function toggleHorizontalLink(x: number, y: number) {
-  if (isUpgradeInProgress.value || !isEditing.value) return
+  if (!isEditing.value) return
 
   const left = getDraftUnitAt(x, y)
   const right = getDraftUnitAt(x + 1, y)
@@ -217,7 +216,7 @@ function toggleHorizontalLink(x: number, y: number) {
 }
 
 function toggleVerticalLink(x: number, y: number) {
-  if (isUpgradeInProgress.value || !isEditing.value) return
+  if (!isEditing.value) return
 
   const top = getDraftUnitAt(x, y)
   const bottom = getDraftUnitAt(x, y + 1)
@@ -253,7 +252,7 @@ function getDiagonalStateFor(units: GridUnit[], x: number, y: number): 'none' | 
 }
 
 function toggleDiagonalLink(x: number, y: number) {
-  if (isUpgradeInProgress.value || !isEditing.value) return
+  if (!isEditing.value) return
 
   const topLeft = getDraftUnitAt(x, y)
   const topRight = getDraftUnitAt(x + 1, y)
@@ -544,7 +543,7 @@ onMounted(async () => {
             <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
             <p class="section-subtitle">{{ t('buildingDetail.activeConfigurationHelp') }}</p>
           </div>
-          <button v-if="!isUpgradeInProgress && !isEditing" class="btn btn-secondary" @click="startEditing">
+          <button v-if="!isEditing" class="btn btn-secondary" @click="startEditing">
             {{ t('buildingDetail.editConfiguration') }}
           </button>
         </div>
@@ -612,8 +611,8 @@ onMounted(async () => {
               {{ isUpgradeInProgress ? t('buildingDetail.queuedConfigurationHelp') : t('buildingDetail.plannedConfigurationHelp') }}
             </p>
           </div>
-          <div v-if="!isUpgradeInProgress" class="grid-actions">
-            <button class="btn btn-secondary" @click="cancelEditing">
+          <div class="grid-actions">
+            <button v-if="hasDraftChanges" class="btn btn-secondary" @click="cancelEditing">
               {{ t('buildingDetail.cancelEditing') }}
             </button>
             <button
