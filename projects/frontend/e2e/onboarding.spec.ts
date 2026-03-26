@@ -101,7 +101,7 @@ test.describe('Onboarding wizard', () => {
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
 
     // Verify summary appears
-    await expect(page.getByText('My Empire Inc')).toBeVisible()
+    await expect(page.locator('.summary', { hasText: 'My Empire Inc' })).toBeVisible()
     await expect(page.getByText('Bratislava')).toBeVisible()
 
     // Complete onboarding
@@ -207,7 +207,8 @@ test.describe('Dashboard', () => {
     const companyCard = page.locator('.company-card').first()
     await expect(companyCard.getByRole('heading', { name: 'Test Corp' })).toBeVisible()
     await expect(companyCard.getByText('$500,000')).toBeVisible()
-    await expect(companyCard.locator('.building-type', { hasText: 'FACTORY' })).toBeVisible()
+    await expect(companyCard.locator('.building-card', { hasText: 'Test Corp Factory' })).toBeVisible()
+    await expect(companyCard.locator('.building-type-label', { hasText: 'Factory' })).toBeVisible()
   })
 
   test('redirects to login if not authenticated', async ({ page }) => {

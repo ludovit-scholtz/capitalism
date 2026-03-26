@@ -27,6 +27,7 @@ const companyName = ref('')
 
 const selectedCity = computed(() => cities.value.find((c) => c.id === selectedCityId.value))
 const selectedProduct = computed(() => products.value.find((p) => p.id === selectedProductId.value))
+const canShowSummary = computed(() => !!selectedCity.value && !!companyName.value && !!selectedProduct.value)
 
 const canProceedStep1 = computed(() => !!selectedIndustry.value)
 const canProceedStep2 = computed(() => !!selectedCityId.value)
@@ -259,7 +260,7 @@ function formatIndustry(industry: string): string {
         </div>
 
         <div class="form-group">
-          <label>{{ t('onboarding.selectProduct') }}</label>
+          <span class="form-section-title">{{ t('onboarding.selectProduct') }}</span>
           <div class="product-grid">
             <button
               v-for="prod in products"
@@ -281,7 +282,7 @@ function formatIndustry(industry: string): string {
           </div>
         </div>
 
-        <div v-if="selectedCity && companyName && selectedProduct" class="summary">
+        <div v-if="canShowSummary" class="summary">
           <div class="summary-header">
             <span class="summary-icon">📋</span>
             <h3>{{ t('onboarding.summary') }}</h3>
@@ -597,6 +598,12 @@ function formatIndustry(industry: string): string {
 }
 
 .form-group label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.form-section-title {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--color-text);

@@ -45,7 +45,7 @@ onMounted(async () => {
     const data = await gqlRequest<{ myCompanies: Company[] }>(
       `{ myCompanies {
         id name cash foundedAtUtc
-        buildings { id name type level cityId units { id unitType gridX gridY level } }
+        buildings { id name type level units { id unitType gridX gridY level } }
       } }`,
     )
     companies.value = data.myCompanies

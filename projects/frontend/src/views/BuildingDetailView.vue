@@ -66,6 +66,7 @@ function clickCell(x: number, y: number) {
   }
 }
 
+// Place a unit on the grid (client-side preview; persisted when backend mutation is implemented)
 async function placeUnit(unitType: string) {
   if (!selectedCell.value || !building.value) return
   showUnitPicker.value = false
@@ -87,6 +88,7 @@ async function placeUnit(unitType: string) {
   selectedCell.value = null
 }
 
+// Remove a unit from the grid (client-side preview; persisted when backend mutation is implemented)
 function removeUnit(x: number, y: number) {
   if (!building.value) return
   building.value.units = building.value.units.filter((u) => !(u.gridX === x && u.gridY === y))
