@@ -21,6 +21,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Units within building 4x4 grids.</summary>
     public DbSet<BuildingUnit> BuildingUnits => Set<BuildingUnit>();
 
+    /// <summary>Queued building configuration upgrades.</summary>
+    public DbSet<BuildingConfigurationPlan> BuildingConfigurationPlans => Set<BuildingConfigurationPlan>();
+
+    /// <summary>Queued unit snapshots for building configuration upgrades.</summary>
+    public DbSet<BuildingConfigurationPlanUnit> BuildingConfigurationPlanUnits => Set<BuildingConfigurationPlanUnit>();
+
     /// <summary>Cities on the game map.</summary>
     public DbSet<City> Cities => Set<City>();
 
@@ -87,6 +93,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(b => b.InterestRate).HasPrecision(5, 2);
             e.HasOne(b => b.Company).WithMany(c => c.Buildings).HasForeignKey(b => b.CompanyId);
             e.HasOne(b => b.City).WithMany(c => c.Buildings).HasForeignKey(b => b.CityId);
+            e.HasOne(b => b.PendingConfiguration)
+                .WithOne(plan => plan.Building)
+                .HasForeignKey<BuildingConfigurationPlan>(plan => plan.BuildingId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // BuildingUnit
@@ -95,6 +105,26 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasKey(u => u.Id);
             e.Property(u => u.UnitType).HasMaxLength(30);
             e.HasOne(u => u.Building).WithMany(b => b.Units).HasForeignKey(u => u.BuildingId);
+        });
+
+        // BuildingConfigurationPlan
+        modelBuilder.Entity<BuildingConfigurationPlan>(e =>
+        {
+            e.HasKey(plan => plan.Id);
+            e.HasOne(plan => plan.Building)
+                .WithOne(building => building.PendingConfiguration)
+                .HasForeignKey<BuildingConfigurationPlan>(plan => plan.BuildingId);
+        });
+
+        // BuildingConfigurationPlanUnit
+        modelBuilder.Entity<BuildingConfigurationPlanUnit>(e =>
+        {
+            e.HasKey(unit => unit.Id);
+            e.Property(unit => unit.UnitType).HasMaxLength(30);
+            e.HasOne(unit => unit.BuildingConfigurationPlan)
+                .WithMany(plan => plan.Units)
+                .HasForeignKey(unit => unit.BuildingConfigurationPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         // City

@@ -51,6 +51,37 @@ export interface Building {
   interestRate: number | null
   builtAtUtc: string
   units: BuildingUnit[]
+  pendingConfiguration: BuildingConfigurationPlan | null
+}
+
+/** Queued building configuration that becomes active on a future tick. */
+export interface BuildingConfigurationPlan {
+  id: string
+  buildingId: string
+  submittedAtUtc: string
+  submittedAtTick: number
+  appliesAtTick: number
+  totalTicksRequired: number
+  units: BuildingConfigurationPlanUnit[]
+}
+
+/** Pending unit snapshot inside a queued building configuration. */
+export interface BuildingConfigurationPlanUnit {
+  id: string
+  unitType: string
+  gridX: number
+  gridY: number
+  level: number
+  linkUp: boolean
+  linkDown: boolean
+  linkLeft: boolean
+  linkRight: boolean
+  linkUpLeft: boolean
+  linkUpRight: boolean
+  linkDownLeft: boolean
+  linkDownRight: boolean
+  ticksRequired: number
+  isChanged: boolean
 }
 
 /** Matches backend BuildingUnit entity */

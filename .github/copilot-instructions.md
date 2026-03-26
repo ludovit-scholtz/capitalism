@@ -66,6 +66,12 @@ The game is seeded with:
   - **Mutations**: `register(input)`, `login(input)`, `createCompany(input)`, `placeBuilding(input)`, `completeOnboarding(input)`
 - The `completeOnboarding` mutation creates a company with $500K starting capital, a factory (4 default units), and a sales shop (3 default units) in the chosen city.
 
+## Server-controlled game state
+- Never trust client-provided values for derived or economy-sensitive fields. Activation ticks, upgrade durations, ownership, IDs, server timestamps, levels, prices, balances, and similar progression state must be computed or validated on the backend.
+- GraphQL input types should expose only player-editable fields. For building configuration flows, the client may submit layout choices and link booleans, but the backend must own pending-upgrade state such as `appliesAtTick`, `totalTicksRequired`, `isChanged`, and any queued configuration metadata.
+- When adding or changing frontend types, distinguish clearly between active state and pending/planned state. Do not let the UI mutate live building state directly when the game rules require a queued upgrade.
+- If a field could be abused to bypass ticks, ownership checks, prices, cooldowns, or other game rules, keep it server-controlled and cover the rule with backend tests.
+
 ## Authentication
 - JWT tokens are obtained via `register` or `login` GraphQL mutations.
 - Tokens are stored in `localStorage` under `auth_token` and `auth_expires` keys.
@@ -85,7 +91,7 @@ The game is seeded with:
 ### Structure
 - Tests live in `projects/frontend/e2e/`.
 - Shared API mock helpers are in `e2e/helpers/mock-api.ts`.
-- Active test files: `home.spec.ts` (home page + header nav), `onboarding.spec.ts` (auth, onboarding wizard, dashboard, full journey).
+- Active test files: `home.spec.ts` (home page + header nav), `onboarding.spec.ts` (auth, onboarding wizard, dashboard, full journey), `building-detail.spec.ts` (queued building upgrades and unit-link behavior).
 - Old events-specific spec files (`auth.spec.ts`, `category.spec.ts`, etc.) contain `test.skip` placeholders.
 
 ### Always use the shared mock helper

@@ -41,7 +41,17 @@ export type MockBuilding = {
   level: number
   powerConsumption: number
   isForSale: boolean
+  askingPrice?: number | null
+  pricePerSqm?: number | null
+  occupancyPercent?: number | null
+  totalAreaSqm?: number | null
+  powerPlantType?: string | null
+  powerOutput?: number | null
+  mediaType?: string | null
+  interestRate?: number | null
+  builtAtUtc?: string
   units: MockBuildingUnit[]
+  pendingConfiguration: MockBuildingConfigurationPlan | null
 }
 
 export type MockBuildingUnit = {
@@ -51,10 +61,29 @@ export type MockBuildingUnit = {
   gridX: number
   gridY: number
   level: number
-  linkRight: boolean
+  linkUp: boolean
   linkDown: boolean
-  linkDiagonalDown: boolean
-  linkDiagonalUp: boolean
+  linkLeft: boolean
+  linkRight: boolean
+  linkUpLeft: boolean
+  linkUpRight: boolean
+  linkDownLeft: boolean
+  linkDownRight: boolean
+}
+
+export type MockBuildingConfigurationPlanUnit = MockBuildingUnit & {
+  ticksRequired: number
+  isChanged: boolean
+}
+
+export type MockBuildingConfigurationPlan = {
+  id: string
+  buildingId: string
+  submittedAtUtc: string
+  submittedAtTick: number
+  appliesAtTick: number
+  totalTicksRequired: number
+  units: MockBuildingConfigurationPlanUnit[]
 }
 
 export type MockCity = {
@@ -98,6 +127,48 @@ export type MockState = {
   currentUserId: string | null
   currentToken: string | null
   gameState: { currentTick: number; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
+}
+
+function cloneUnit(unit: MockBuildingUnit): MockBuildingUnit {
+  return { ...unit }
+}
+
+function calculateUnitTicks(currentUnit: MockBuildingUnit | undefined, nextUnit: MockBuildingUnit): number {
+  if (!currentUnit) {
+    return 3
+  }
+
+  if (currentUnit.unitType !== nextUnit.unitType) {
+    return 3
+  }
+
+  if (
+    currentUnit.linkUp !== nextUnit.linkUp
+    || currentUnit.linkDown !== nextUnit.linkDown
+    || currentUnit.linkLeft !== nextUnit.linkLeft
+    || currentUnit.linkRight !== nextUnit.linkRight
+    || currentUnit.linkUpLeft !== nextUnit.linkUpLeft
+    || currentUnit.linkUpRight !== nextUnit.linkUpRight
+    || currentUnit.linkDownLeft !== nextUnit.linkDownLeft
+    || currentUnit.linkDownRight !== nextUnit.linkDownRight
+  ) {
+    return 1
+  }
+
+  return 0
+}
+
+function applyDueBuildingUpgrades(state: MockState): void {
+  for (const player of state.players) {
+    for (const company of player.companies) {
+      for (const building of company.buildings) {
+        if (building.pendingConfiguration && building.pendingConfiguration.appliesAtTick <= state.gameState.currentTick) {
+          building.units = building.pendingConfiguration.units.map((unit) => cloneUnit(unit))
+          building.pendingConfiguration = null
+        }
+      }
+    }
+  }
 }
 
 // ── Factory functions ────────────────────────────────────────────────────────
@@ -331,8 +402,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         cash: 500000,
         foundedAtUtc: new Date().toISOString(),
         buildings: [
-          { id: `building-factory-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'FACTORY', name: `${input.companyName} Factory`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [] },
-          { id: `building-shop-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'SALES_SHOP', name: `${input.companyName} Shop`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 1, isForSale: false, units: [] },
+          { id: `building-factory-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'FACTORY', name: `${input.companyName} Factory`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, builtAtUtc: new Date().toISOString(), units: [], pendingConfiguration: null },
+          { id: `building-shop-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'SALES_SHOP', name: `${input.companyName} Shop`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 1, isForSale: false, builtAtUtc: new Date().toISOString(), units: [], pendingConfiguration: null },
         ],
       }
       player.companies.push(company)
@@ -396,13 +467,74 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         level: 1,
         powerConsumption: 1,
         isForSale: false,
+        builtAtUtc: new Date().toISOString(),
         units: [],
+        pendingConfiguration: null,
       }
       company.buildings.push(newBuilding)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { placeBuilding: newBuilding } }),
+      })
+    }
+
+    if (query.includes('StoreBuildingConfiguration')) {
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
+
+      if (!building) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building not found' }] }) })
+      }
+
+      if (building.pendingConfiguration) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'This building already has an upgrade in progress.' }] }) })
+      }
+
+      const nextUnits: MockBuildingUnit[] = (input.units ?? []).map((unit: MockBuildingUnit, index: number) => ({
+        id: `pending-unit-${index}-${Date.now()}`,
+        buildingId: building.id,
+        unitType: unit.unitType,
+        gridX: unit.gridX,
+        gridY: unit.gridY,
+        level: building.units.find((current) => current.gridX === unit.gridX && current.gridY === unit.gridY)?.level ?? 1,
+        linkUp: unit.linkUp,
+        linkDown: unit.linkDown,
+        linkLeft: unit.linkLeft,
+        linkRight: unit.linkRight,
+        linkUpLeft: unit.linkUpLeft,
+        linkUpRight: unit.linkUpRight,
+        linkDownLeft: unit.linkDownLeft,
+        linkDownRight: unit.linkDownRight,
+      }))
+
+      const totalTicksRequired = Math.max(
+        0,
+        ...nextUnits.map((unit) => calculateUnitTicks(building.units.find((current) => current.gridX === unit.gridX && current.gridY === unit.gridY), unit)),
+        ...building.units
+          .filter((unit) => !nextUnits.find((candidate) => candidate.gridX === unit.gridX && candidate.gridY === unit.gridY))
+          .map(() => 3),
+      )
+
+      building.pendingConfiguration = {
+        id: `plan-${Date.now()}`,
+        buildingId: building.id,
+        submittedAtUtc: new Date().toISOString(),
+        submittedAtTick: state.gameState.currentTick,
+        appliesAtTick: state.gameState.currentTick + totalTicksRequired,
+        totalTicksRequired,
+        units: nextUnits.map((unit) => ({
+          ...cloneUnit(unit),
+          ticksRequired: calculateUnitTicks(building.units.find((current) => current.gridX === unit.gridX && current.gridY === unit.gridY), unit),
+          isChanged: calculateUnitTicks(building.units.find((current) => current.gridX === unit.gridX && current.gridY === unit.gridY), unit) > 0,
+        })),
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { storeBuildingConfiguration: building.pendingConfiguration } }),
       })
     }
 
@@ -428,6 +560,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     if (query.includes('myCompanies')) {
+      applyDueBuildingUpgrades(state)
       const player = state.players.find((p) => p.id === state.currentUserId)
       return route.fulfill({
         status: 200,
@@ -454,6 +587,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     if (query.includes('gameState')) {
+      applyDueBuildingUpgrades(state)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',

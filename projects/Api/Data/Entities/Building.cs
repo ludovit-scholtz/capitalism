@@ -77,4 +77,7 @@ public sealed class Building
 
     /// <summary>Units installed in this building's 4x4 grid.</summary>
     public ICollection<BuildingUnit> Units { get; set; } = [];
+
+    /// <summary>Queued building configuration that will replace the active units on a future tick.</summary>
+    public BuildingConfigurationPlan? PendingConfiguration { get; set; }
 }

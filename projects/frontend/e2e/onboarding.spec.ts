@@ -190,7 +190,7 @@ test.describe('Dashboard', () => {
       cash: 500000,
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [
-        { id: 'b1', companyId: 'comp-1', cityId: 'city-ba', type: 'FACTORY', name: 'Test Corp Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [] },
+        { id: 'b1', companyId: 'comp-1', cityId: 'city-ba', type: 'FACTORY', name: 'Test Corp Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [], pendingConfiguration: null },
       ],
     })
     const state = setupMockApi(page, { players: [player] })

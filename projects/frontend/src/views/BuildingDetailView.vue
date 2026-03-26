@@ -1,27 +1,47 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
-import type { Building, BuildingUnit } from '@/types'
+import type { Building, BuildingConfigurationPlanUnit, BuildingUnit } from '@/types'
+
+type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
+
+type EditableGridUnit = {
+  id: string
+  unitType: string
+  gridX: number
+  gridY: number
+  level: number
+  linkUp: boolean
+  linkDown: boolean
+  linkLeft: boolean
+  linkRight: boolean
+  linkUpLeft: boolean
+  linkUpRight: boolean
+  linkDownLeft: boolean
+  linkDownRight: boolean
+}
+
+const LINK_CHANGE_TICKS = 1
+const UNIT_PLAN_CHANGE_TICKS = 3
+const gridIndexes = [0, 1, 2, 3] as const
 
 const { t } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
-const gridIndexes = [0, 1, 2, 3] as const
-const connectorIndexes = [0, 1, 2] as const
-
 const buildingId = computed(() => route.params.id as string)
 const building = ref<Building | null>(null)
+const currentTick = ref(0)
 const loading = ref(true)
+const saving = ref(false)
 const error = ref<string | null>(null)
 const selectedCell = ref<{ x: number; y: number } | null>(null)
 const showUnitPicker = ref(false)
-const editMode = ref(false)
-const pendingTicks = ref<Record<string, number>>({})
+const draftUnits = ref<EditableGridUnit[]>([])
 
 const allowedUnitsMap: Record<string, string[]> = {
   MINE: ['MINING', 'STORAGE', 'B2B_SALES'],
@@ -31,62 +51,97 @@ const allowedUnitsMap: Record<string, string[]> = {
 }
 
 const unitColors: Record<string, string> = {
-  MINING: '#FF6D00',
-  STORAGE: '#8B949E',
-  B2B_SALES: '#00C853',
-  PURCHASE: '#0047FF',
-  MANUFACTURING: '#FF6D00',
-  BRANDING: '#9333EA',
-  MARKETING: '#EC4899',
-  PUBLIC_SALES: '#00C853',
-  PRODUCT_QUALITY: '#0047FF',
-  BRAND_QUALITY: '#9333EA',
+  MINING: '#ff6d00',
+  STORAGE: '#8b949e',
+  B2B_SALES: '#00c853',
+  PURCHASE: '#0047ff',
+  MANUFACTURING: '#ff6d00',
+  BRANDING: '#9333ea',
+  MARKETING: '#ec4899',
+  PUBLIC_SALES: '#00c853',
+  PRODUCT_QUALITY: '#0047ff',
+  BRAND_QUALITY: '#9333ea',
 }
 
+const activeUnits = computed(() => building.value?.units ?? [])
+const pendingConfiguration = computed(() => building.value?.pendingConfiguration ?? null)
+const plannedUnits = computed<GridUnit[]>(() => pendingConfiguration.value?.units ?? draftUnits.value)
 const allowedUnits = computed(() => {
   if (!building.value) return []
   return allowedUnitsMap[building.value.type] || []
 })
+const isUpgradeInProgress = computed(() => pendingConfiguration.value !== null)
+const remainingUpgradeTicks = computed(() => {
+  if (!pendingConfiguration.value) return 0
+  return Math.max(pendingConfiguration.value.appliesAtTick - currentTick.value, 0)
+})
+const draftTotalTicks = computed(() => {
+  const unitTicks = draftUnits.value.map((unit) => getDraftTicksForUnit(unit))
+  const removedTicks = activeUnits.value
+    .filter((unit) => !getUnitAtFrom(draftUnits.value, unit.gridX, unit.gridY))
+    .map(() => UNIT_PLAN_CHANGE_TICKS)
 
-function getUnitAt(x: number, y: number): BuildingUnit | undefined {
-  return building.value?.units.find((u) => u.gridX === x && u.gridY === y)
+  return [...unitTicks, ...removedTicks].reduce((maxTicks, ticks) => Math.max(maxTicks, ticks), 0)
+})
+const hasDraftChanges = computed(() => draftTotalTicks.value > 0)
+
+function formatBuildingType(type: string): string {
+  return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
 function getUnitColor(unitType: string): string {
-  return unitColors[unitType] || '#8B949E'
+  return unitColors[unitType] || '#8b949e'
 }
 
-function formatBuildingType(type: string): string {
-  return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+function getUnitAtFrom(units: GridUnit[], x: number, y: number): GridUnit | undefined {
+  return units.find((unit) => unit.gridX === x && unit.gridY === y)
 }
 
-function clickCell(x: number, y: number) {
-  if (editMode.value) {
-    // In edit mode, clicking cells does nothing, links are toggled separately
+function getDraftUnitAt(x: number, y: number): EditableGridUnit | undefined {
+  return draftUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
+}
+
+function cloneUnit(unit: GridUnit): EditableGridUnit {
+  return {
+    id: unit.id,
+    unitType: unit.unitType,
+    gridX: unit.gridX,
+    gridY: unit.gridY,
+    level: unit.level,
+    linkUp: unit.linkUp,
+    linkDown: unit.linkDown,
+    linkLeft: unit.linkLeft,
+    linkRight: unit.linkRight,
+    linkUpLeft: unit.linkUpLeft,
+    linkUpRight: unit.linkUpRight,
+    linkDownLeft: unit.linkDownLeft,
+    linkDownRight: unit.linkDownRight,
+  }
+}
+
+function setDraftUnitsFrom(sourceUnits: GridUnit[]) {
+  draftUnits.value = sourceUnits.map((unit) => cloneUnit(unit))
+}
+
+function clickDraftCell(x: number, y: number) {
+  if (isUpgradeInProgress.value) {
     return
   }
-  const existing = getUnitAt(x, y)
-  if (existing) {
-    selectedCell.value = { x, y }
-    showUnitPicker.value = false
-  } else {
-    selectedCell.value = { x, y }
-    showUnitPicker.value = true
-  }
+
+  const existing = getDraftUnitAt(x, y)
+  selectedCell.value = { x, y }
+  showUnitPicker.value = !existing
 }
 
-// Place a unit on the grid (client-side preview; persisted when backend mutation is implemented)
-async function placeUnit(unitType: string) {
-  if (!selectedCell.value || !building.value) return
-  showUnitPicker.value = false
+function placeUnit(unitType: string) {
+  if (!selectedCell.value || isUpgradeInProgress.value) return
 
-  const newUnit: BuildingUnit = {
-    id: `unit-${Date.now()}`,
-    buildingId: building.value.id,
+  const newUnit: EditableGridUnit = {
+    id: `draft-${selectedCell.value.x}-${selectedCell.value.y}-${Date.now()}`,
     unitType,
     gridX: selectedCell.value.x,
     gridY: selectedCell.value.y,
-    level: 1,
+    level: getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y)?.level ?? 1,
     linkUp: false,
     linkDown: false,
     linkLeft: false,
@@ -97,40 +152,69 @@ async function placeUnit(unitType: string) {
     linkDownRight: false,
   }
 
-  building.value.units = [...building.value.units, newUnit]
+  draftUnits.value = [...draftUnits.value.filter((unit) => !(unit.gridX === newUnit.gridX && unit.gridY === newUnit.gridY)), newUnit]
   selectedCell.value = null
+  showUnitPicker.value = false
 }
 
-// Remove a unit from the grid (client-side preview; persisted when backend mutation is implemented)
-function removeUnit(x: number, y: number) {
-  if (!building.value) return
-  building.value.units = building.value.units.filter((u) => !(u.gridX === x && u.gridY === y))
+function clearConnectionsAround(x: number, y: number) {
+  const left = getDraftUnitAt(x - 1, y)
+  const right = getDraftUnitAt(x + 1, y)
+  const up = getDraftUnitAt(x, y - 1)
+  const down = getDraftUnitAt(x, y + 1)
+  const upLeft = getDraftUnitAt(x - 1, y - 1)
+  const upRight = getDraftUnitAt(x + 1, y - 1)
+  const downLeft = getDraftUnitAt(x - 1, y + 1)
+  const downRight = getDraftUnitAt(x + 1, y + 1)
+
+  if (left) left.linkRight = false
+  if (right) right.linkLeft = false
+  if (up) up.linkDown = false
+  if (down) down.linkUp = false
+  if (upLeft) upLeft.linkDownRight = false
+  if (upRight) upRight.linkDownLeft = false
+  if (downLeft) downLeft.linkUpRight = false
+  if (downRight) downRight.linkUpLeft = false
+}
+
+function removeDraftUnit(x: number, y: number) {
+  if (isUpgradeInProgress.value) return
+
+  clearConnectionsAround(x, y)
+  draftUnits.value = draftUnits.value.filter((unit) => !(unit.gridX === x && unit.gridY === y))
   selectedCell.value = null
+  showUnitPicker.value = false
 }
 
 function toggleHorizontalLink(x: number, y: number) {
-  const unit1 = getUnitAt(x, y)
-  const unit2 = getUnitAt(x + 1, y)
-  if (unit1 && unit2) {
-    unit1.linkRight = !unit1.linkRight
-    unit2.linkLeft = !unit2.linkLeft
-  }
+  if (isUpgradeInProgress.value) return
+
+  const left = getDraftUnitAt(x, y)
+  const right = getDraftUnitAt(x + 1, y)
+  if (!left || !right) return
+
+  const next = !left.linkRight
+  left.linkRight = next
+  right.linkLeft = next
 }
 
 function toggleVerticalLink(x: number, y: number) {
-  const unit1 = getUnitAt(x, y)
-  const unit2 = getUnitAt(x, y + 1)
-  if (unit1 && unit2) {
-    unit1.linkDown = !unit1.linkDown
-    unit2.linkUp = !unit2.linkUp
-  }
+  if (isUpgradeInProgress.value) return
+
+  const top = getDraftUnitAt(x, y)
+  const bottom = getDraftUnitAt(x, y + 1)
+  if (!top || !bottom) return
+
+  const next = !top.linkDown
+  top.linkDown = next
+  bottom.linkUp = next
 }
 
-function clearDiagonalState(x: number, y: number) {
-  const topLeft = getUnitAt(x, y)
-  const topRight = getUnitAt(x + 1, y)
-  const bottomLeft = getUnitAt(x, y + 1)
-  const bottomRight = getUnitAt(x + 1, y + 1)
+function clearDiagonalState(units: EditableGridUnit[], x: number, y: number) {
+  const topLeft = getUnitAtFrom(units, x, y) as EditableGridUnit | undefined
+  const topRight = getUnitAtFrom(units, x + 1, y) as EditableGridUnit | undefined
+  const bottomLeft = getUnitAtFrom(units, x, y + 1) as EditableGridUnit | undefined
+  const bottomRight = getUnitAtFrom(units, x + 1, y + 1) as EditableGridUnit | undefined
 
   if (topLeft) topLeft.linkDownRight = false
   if (bottomRight) bottomRight.linkUpLeft = false
@@ -138,9 +222,9 @@ function clearDiagonalState(x: number, y: number) {
   if (bottomLeft) bottomLeft.linkUpRight = false
 }
 
-function getDiagonalState(x: number, y: number): 'none' | 'tl-br' | 'tr-bl' {
-  const topLeft = getUnitAt(x, y)
-  const topRight = getUnitAt(x + 1, y)
+function getDiagonalStateFor(units: GridUnit[], x: number, y: number): 'none' | 'tl-br' | 'tr-bl' {
+  const topLeft = getUnitAtFrom(units, x, y)
+  const topRight = getUnitAtFrom(units, x + 1, y)
 
   if (topLeft?.linkDownRight) return 'tl-br'
   if (topRight?.linkDownLeft) return 'tr-bl'
@@ -148,14 +232,16 @@ function getDiagonalState(x: number, y: number): 'none' | 'tl-br' | 'tr-bl' {
 }
 
 function toggleDiagonalLink(x: number, y: number) {
-  const topLeft = getUnitAt(x, y)
-  const topRight = getUnitAt(x + 1, y)
-  const bottomLeft = getUnitAt(x, y + 1)
-  const bottomRight = getUnitAt(x + 1, y + 1)
+  if (isUpgradeInProgress.value) return
+
+  const topLeft = getDraftUnitAt(x, y)
+  const topRight = getDraftUnitAt(x + 1, y)
+  const bottomLeft = getDraftUnitAt(x, y + 1)
+  const bottomRight = getDraftUnitAt(x + 1, y + 1)
   if (!topLeft || !topRight || !bottomLeft || !bottomRight) return
 
-  const currentState = getDiagonalState(x, y)
-  clearDiagonalState(x, y)
+  const currentState = getDiagonalStateFor(draftUnits.value, x, y)
+  clearDiagonalState(draftUnits.value, x, y)
 
   if (currentState === 'none') {
     topLeft.linkDownRight = true
@@ -169,33 +255,198 @@ function toggleDiagonalLink(x: number, y: number) {
   }
 }
 
-function isHorizontalLinkActive(x: number, y: number): boolean {
-  return getUnitAt(x, y)?.linkRight || false
+function isHorizontalLinkActiveFor(units: GridUnit[], x: number, y: number): boolean {
+  return getUnitAtFrom(units, x, y)?.linkRight || false
 }
 
-function isVerticalLinkActive(x: number, y: number): boolean {
-  return getUnitAt(x, y)?.linkDown || false
+function isVerticalLinkActiveFor(units: GridUnit[], x: number, y: number): boolean {
+  return getUnitAtFrom(units, x, y)?.linkDown || false
 }
 
-function canToggleHorizontalLink(x: number, y: number): boolean {
-  return !!getUnitAt(x, y) && !!getUnitAt(x + 1, y)
+function canToggleHorizontalLink(units: GridUnit[], x: number, y: number): boolean {
+  return !!getUnitAtFrom(units, x, y) && !!getUnitAtFrom(units, x + 1, y)
 }
 
-function canToggleVerticalLink(x: number, y: number): boolean {
-  return !!getUnitAt(x, y) && !!getUnitAt(x, y + 1)
+function canToggleVerticalLink(units: GridUnit[], x: number, y: number): boolean {
+  return !!getUnitAtFrom(units, x, y) && !!getUnitAtFrom(units, x, y + 1)
 }
 
-function canToggleDiagonalLink(x: number, y: number): boolean {
-  return !!getUnitAt(x, y) && !!getUnitAt(x + 1, y) && !!getUnitAt(x, y + 1) && !!getUnitAt(x + 1, y + 1)
+function canToggleDiagonalLink(units: GridUnit[], x: number, y: number): boolean {
+  return !!getUnitAtFrom(units, x, y)
+    && !!getUnitAtFrom(units, x + 1, y)
+    && !!getUnitAtFrom(units, x, y + 1)
+    && !!getUnitAtFrom(units, x + 1, y + 1)
 }
 
-function saveChanges() {
-  // TODO: send to backend
-  // For now, simulate pending ticks
-  building.value?.units.forEach(unit => {
-    pendingTicks.value[unit.id] = 1 // Assume 1 tick for link changes
-  })
-  editMode.value = false
+function getDraftTicksForUnit(unit: EditableGridUnit): number {
+  const activeUnit = getUnitAtFrom(activeUnits.value, unit.gridX, unit.gridY) as BuildingUnit | undefined
+  if (!activeUnit) return UNIT_PLAN_CHANGE_TICKS
+
+  if (activeUnit.unitType !== unit.unitType) {
+    return UNIT_PLAN_CHANGE_TICKS
+  }
+
+  if (
+    activeUnit.linkUp !== unit.linkUp
+    || activeUnit.linkDown !== unit.linkDown
+    || activeUnit.linkLeft !== unit.linkLeft
+    || activeUnit.linkRight !== unit.linkRight
+    || activeUnit.linkUpLeft !== unit.linkUpLeft
+    || activeUnit.linkUpRight !== unit.linkUpRight
+    || activeUnit.linkDownLeft !== unit.linkDownLeft
+    || activeUnit.linkDownRight !== unit.linkDownRight
+  ) {
+    return LINK_CHANGE_TICKS
+  }
+
+  return 0
+}
+
+function getDisplayedTicks(unit: GridUnit): number {
+  return 'ticksRequired' in unit ? unit.ticksRequired : getDraftTicksForUnit(unit)
+}
+
+function storeConfiguration() {
+  if (!building.value || saving.value || !hasDraftChanges.value) return
+
+  saving.value = true
+  error.value = null
+
+  gqlRequest<{
+    storeBuildingConfiguration: {
+      id: string
+      appliesAtTick: number
+      totalTicksRequired: number
+    }
+  }>(
+    `mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+      storeBuildingConfiguration(input: $input) {
+        id
+        appliesAtTick
+        totalTicksRequired
+      }
+    }`,
+    {
+      input: {
+        buildingId: building.value.id,
+        units: draftUnits.value.map((unit) => ({
+          unitType: unit.unitType,
+          gridX: unit.gridX,
+          gridY: unit.gridY,
+          linkUp: unit.linkUp,
+          linkDown: unit.linkDown,
+          linkLeft: unit.linkLeft,
+          linkRight: unit.linkRight,
+          linkUpLeft: unit.linkUpLeft,
+          linkUpRight: unit.linkUpRight,
+          linkDownLeft: unit.linkDownLeft,
+          linkDownRight: unit.linkDownRight,
+        })),
+      },
+    },
+  )
+    .then(() => loadBuilding())
+    .catch((reason: unknown) => {
+      error.value = reason instanceof Error ? reason.message : t('buildingDetail.storeUpgradeFailed')
+    })
+    .finally(() => {
+      saving.value = false
+    })
+}
+
+async function loadBuilding() {
+  try {
+    loading.value = true
+    error.value = null
+
+    const [companiesData, gameStateData] = await Promise.all([
+      gqlRequest<{ myCompanies: { buildings: Building[] }[] }>(
+        `{ myCompanies {
+          buildings {
+            id
+            companyId
+            cityId
+            type
+            name
+            latitude
+            longitude
+            level
+            powerConsumption
+            isForSale
+            askingPrice
+            pricePerSqm
+            occupancyPercent
+            totalAreaSqm
+            powerPlantType
+            powerOutput
+            mediaType
+            interestRate
+            builtAtUtc
+            units {
+              id
+              buildingId
+              unitType
+              gridX
+              gridY
+              level
+              linkUp
+              linkDown
+              linkLeft
+              linkRight
+              linkUpLeft
+              linkUpRight
+              linkDownLeft
+              linkDownRight
+            }
+            pendingConfiguration {
+              id
+              buildingId
+              submittedAtUtc
+              submittedAtTick
+              appliesAtTick
+              totalTicksRequired
+              units {
+                id
+                unitType
+                gridX
+                gridY
+                level
+                linkUp
+                linkDown
+                linkLeft
+                linkRight
+                linkUpLeft
+                linkUpRight
+                linkDownLeft
+                linkDownRight
+                ticksRequired
+                isChanged
+              }
+            }
+          }
+        } }`,
+      ),
+      gqlRequest<{ gameState: { currentTick: number } | null }>(`{ gameState { currentTick } }`),
+    ])
+
+    currentTick.value = gameStateData.gameState?.currentTick ?? 0
+
+    const allBuildings = companiesData.myCompanies.flatMap((company) => company.buildings)
+    building.value = allBuildings.find((candidate) => candidate.id === buildingId.value) || null
+
+    if (!building.value) {
+      error.value = t('buildingDetail.notFound')
+      return
+    }
+
+    setDraftUnitsFrom(pendingConfiguration.value?.units ?? building.value.units)
+    selectedCell.value = null
+    showUnitPicker.value = false
+  } catch (reason: unknown) {
+    error.value = reason instanceof Error ? reason.message : t('buildingDetail.loadFailed')
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -204,25 +455,7 @@ onMounted(async () => {
     return
   }
 
-  try {
-    const data = await gqlRequest<{ myCompanies: { buildings: Building[] }[] }>(
-      `{ myCompanies {
-        buildings {
-          id name type level powerConsumption isForSale cityId
-          units { id unitType gridX gridY level linkUp linkDown linkLeft linkRight linkUpLeft linkUpRight linkDownLeft linkDownRight }
-        }
-      } }`,
-    )
-    const allBuildings = data.myCompanies.flatMap((c) => c.buildings)
-    building.value = allBuildings.find((b) => b.id === buildingId.value) || null
-    if (!building.value) {
-      error.value = 'Building not found'
-    }
-  } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'Failed to load building'
-  } finally {
-    loading.value = false
-  }
+  await loadBuilding()
 })
 </script>
 
@@ -262,51 +495,138 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Unit Grid -->
+      <div v-if="isUpgradeInProgress" class="upgrade-banner" role="status">
+        <div>
+          <strong>{{ t('buildingDetail.upgradeQueuedTitle') }}</strong>
+          <p>{{ t('buildingDetail.upgradeQueuedBody', { ticks: remainingUpgradeTicks }) }}</p>
+        </div>
+        <div class="upgrade-pill">
+          {{ t('buildingDetail.upgradeAppliesAt', { tick: pendingConfiguration!.appliesAtTick }) }}
+        </div>
+      </div>
+
       <div class="grid-section">
         <div class="grid-header">
-          <h2>{{ t('buildingDetail.unitGrid') }}</h2>
-          <div class="grid-actions">
-            <button v-if="!editMode" class="btn btn-primary" @click="editMode = true">{{ t('buildingDetail.editLinks') }}</button>
-            <button v-else class="btn btn-success" @click="saveChanges">{{ t('buildingDetail.saveChanges') }}</button>
-            <button v-if="editMode" class="btn btn-secondary" @click="editMode = false">{{ t('common.cancel') }}</button>
+          <div>
+            <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
+            <p class="section-subtitle">{{ t('buildingDetail.activeConfigurationHelp') }}</p>
           </div>
         </div>
 
-        <div class="unit-grid" :class="{ 'edit-mode': editMode }">
-          <template v-for="y in gridIndexes" :key="`row-${y}`">
+        <div class="unit-grid readonly-grid">
+          <template v-for="y in gridIndexes" :key="`active-row-${y}`">
             <div class="grid-row unit-row">
-              <template v-for="x in gridIndexes" :key="`unit-${x}-${y}`">
+              <template v-for="x in gridIndexes" :key="`active-unit-${x}-${y}`">
+                <div
+                  class="grid-cell readonly"
+                  :class="{ occupied: !!getUnitAtFrom(activeUnits, x, y) }"
+                  :style="getUnitAtFrom(activeUnits, x, y)
+                    ? { borderColor: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType) + '18' }
+                    : {}"
+                >
+                  <template v-if="getUnitAtFrom(activeUnits, x, y)">
+                    <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
+                    <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="cell-empty">+</span>
+                  </template>
+                </div>
+
+                <div
+                  v-if="x < 3"
+                  :key="`active-horizontal-${x}-${y}`"
+                  class="link-toggle horizontal readonly"
+                  :class="{ active: isHorizontalLinkActiveFor(activeUnits, x, y), disabled: !canToggleHorizontalLink(activeUnits, x, y) }"
+                >
+                  <span class="link-line"></span>
+                </div>
+              </template>
+            </div>
+
+            <div v-if="y < 3" class="grid-row connector-row">
+              <template v-for="x in gridIndexes" :key="`active-connector-${x}-${y}`">
+                <div
+                  class="link-toggle vertical readonly"
+                  :class="{ active: isVerticalLinkActiveFor(activeUnits, x, y), disabled: !canToggleVerticalLink(activeUnits, x, y) }"
+                >
+                  <span class="link-line"></span>
+                </div>
+
+                <div
+                  v-if="x < 3"
+                  :key="`active-diagonal-${x}-${y}`"
+                  class="link-toggle diagonal readonly"
+                  :class="[`state-${getDiagonalStateFor(activeUnits, x, y)}`, { disabled: !canToggleDiagonalLink(activeUnits, x, y) }]"
+                >
+                  <span class="diag-line diag-line-primary"></span>
+                  <span class="diag-line diag-line-secondary"></span>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div class="grid-section">
+        <div class="grid-header plan-header">
+          <div>
+            <h2>{{ isUpgradeInProgress ? t('buildingDetail.queuedConfiguration') : t('buildingDetail.plannedConfiguration') }}</h2>
+            <p class="section-subtitle">
+              {{ isUpgradeInProgress ? t('buildingDetail.queuedConfigurationHelp') : t('buildingDetail.plannedConfigurationHelp') }}
+            </p>
+          </div>
+          <button
+            v-if="!isUpgradeInProgress"
+            class="btn btn-primary"
+            :disabled="saving || !hasDraftChanges"
+            @click="storeConfiguration"
+          >
+            {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
+          </button>
+        </div>
+
+        <div v-if="!isUpgradeInProgress" class="upgrade-summary">
+          <span class="upgrade-summary-pill">{{ t('buildingDetail.currentTickLabel', { tick: currentTick }) }}</span>
+          <span class="upgrade-summary-pill">{{ t('buildingDetail.totalUpgradeTicks', { ticks: draftTotalTicks }) }}</span>
+        </div>
+
+        <div class="unit-grid">
+          <template v-for="y in gridIndexes" :key="`planned-row-${y}`">
+            <div class="grid-row unit-row">
+              <template v-for="x in gridIndexes" :key="`planned-unit-${x}-${y}`">
                 <button
-              class="grid-cell"
-              :class="{
-                occupied: !!getUnitAt(x, y),
-                selected: selectedCell?.x === x && selectedCell?.y === y,
-              }"
-              :style="getUnitAt(x, y)
-                ? { borderColor: getUnitColor(getUnitAt(x, y)!.unitType), background: getUnitColor(getUnitAt(x, y)!.unitType) + '18' }
-                : {}"
-              @click="clickCell(x, y)"
-            >
-              <template v-if="getUnitAt(x, y)">
-                <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAt(x, y)!.unitType}`) }}</span>
-                <span class="cell-level">Lv.{{ getUnitAt(x, y)!.level }}</span>
-                <span v-if="pendingTicks[getUnitAt(x, y)!.id]" class="cell-pending">{{ pendingTicks[getUnitAt(x, y)!.id] }} ticks</span>
-              </template>
-              <template v-else>
-                <span class="cell-empty">+</span>
-              </template>
-            </button>
+                  class="grid-cell"
+                  :class="{
+                    occupied: !!getUnitAtFrom(plannedUnits, x, y),
+                    selected: selectedCell?.x === x && selectedCell?.y === y,
+                    readonly: isUpgradeInProgress,
+                    changed: !!getUnitAtFrom(plannedUnits, x, y) && getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0,
+                  }"
+                  :style="getUnitAtFrom(plannedUnits, x, y)
+                    ? { borderColor: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType) + '18' }
+                    : {}"
+                  :disabled="isUpgradeInProgress"
+                  @click="clickDraftCell(x, y)"
+                >
+                  <template v-if="getUnitAtFrom(plannedUnits, x, y)">
+                    <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, x, y)!.unitType}`) }}</span>
+                    <span class="cell-level">Lv.{{ getUnitAtFrom(plannedUnits, x, y)!.level }}</span>
+                    <span v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0" class="cell-pending">
+                      {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) }) }}
+                    </span>
+                  </template>
+                  <template v-else>
+                    <span class="cell-empty">+</span>
+                  </template>
+                </button>
 
                 <button
                   v-if="x < 3"
-                  :key="`horizontal-${x}-${y}`"
+                  :key="`planned-horizontal-${x}-${y}`"
                   class="link-toggle horizontal"
-                  :class="{
-                    active: isHorizontalLinkActive(x, y),
-                    disabled: !canToggleHorizontalLink(x, y),
-                  }"
-                  :disabled="!editMode || !canToggleHorizontalLink(x, y)"
+                  :class="{ active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) || isUpgradeInProgress }"
+                  :disabled="isUpgradeInProgress || !canToggleHorizontalLink(plannedUnits, x, y)"
                   :aria-label="t('buildingDetail.linkRight')"
                   @click="toggleHorizontalLink(x, y)"
                 >
@@ -316,14 +636,11 @@ onMounted(async () => {
             </div>
 
             <div v-if="y < 3" class="grid-row connector-row">
-              <template v-for="x in gridIndexes" :key="`connector-${x}-${y}`">
+              <template v-for="x in gridIndexes" :key="`planned-connector-${x}-${y}`">
                 <button
                   class="link-toggle vertical"
-                  :class="{
-                    active: isVerticalLinkActive(x, y),
-                    disabled: !canToggleVerticalLink(x, y),
-                  }"
-                  :disabled="!editMode || !canToggleVerticalLink(x, y)"
+                  :class="{ active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) || isUpgradeInProgress }"
+                  :disabled="isUpgradeInProgress || !canToggleVerticalLink(plannedUnits, x, y)"
                   :aria-label="t('buildingDetail.linkDown')"
                   @click="toggleVerticalLink(x, y)"
                 >
@@ -332,13 +649,10 @@ onMounted(async () => {
 
                 <button
                   v-if="x < 3"
-                  :key="`diagonal-${x}-${y}`"
+                  :key="`planned-diagonal-${x}-${y}`"
                   class="link-toggle diagonal"
-                  :class="[
-                    `state-${getDiagonalState(x, y)}`,
-                    { disabled: !canToggleDiagonalLink(x, y) },
-                  ]"
-                  :disabled="!editMode || !canToggleDiagonalLink(x, y)"
+                  :class="[`state-${getDiagonalStateFor(plannedUnits, x, y)}`, { disabled: !canToggleDiagonalLink(plannedUnits, x, y) || isUpgradeInProgress }]"
+                  :disabled="isUpgradeInProgress || !canToggleDiagonalLink(plannedUnits, x, y)"
                   :aria-label="t('buildingDetail.links')"
                   @click="toggleDiagonalLink(x, y)"
                 >
@@ -350,7 +664,6 @@ onMounted(async () => {
           </template>
         </div>
 
-        <!-- Link indicators between cells -->
         <div class="grid-legend">
           <div v-for="unitType in allowedUnits" :key="unitType" class="legend-item">
             <span class="legend-color" :style="{ background: getUnitColor(unitType) }"></span>
@@ -359,8 +672,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Unit Picker Modal -->
-      <div v-if="showUnitPicker && selectedCell" class="unit-picker-overlay" @click.self="showUnitPicker = false">
+      <div v-if="showUnitPicker && selectedCell && !isUpgradeInProgress" class="unit-picker-overlay" @click.self="showUnitPicker = false">
         <div class="unit-picker">
           <div class="picker-header">
             <h3>{{ t('buildingDetail.selectUnitType') }}</h3>
@@ -368,12 +680,7 @@ onMounted(async () => {
           </div>
           <p class="picker-subtitle">{{ t('buildingDetail.allowedUnits') }}</p>
           <div class="picker-grid">
-            <button
-              v-for="unitType in allowedUnits"
-              :key="unitType"
-              class="picker-option"
-              @click="placeUnit(unitType)"
-            >
+            <button v-for="unitType in allowedUnits" :key="unitType" class="picker-option" @click="placeUnit(unitType)">
               <span class="picker-color" :style="{ background: getUnitColor(unitType) }"></span>
               <div class="picker-info">
                 <span class="picker-name">{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
@@ -384,27 +691,29 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Selected unit detail -->
-      <div v-if="selectedCell && getUnitAt(selectedCell.x, selectedCell.y) && !showUnitPicker" class="unit-detail">
-        <h3>{{ t(`buildingDetail.unitTypes.${getUnitAt(selectedCell.x, selectedCell.y)!.unitType}`) }}</h3>
-        <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAt(selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
+      <div v-if="selectedCell && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) && !showUnitPicker" class="unit-detail">
+        <h3>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h3>
+        <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
         <div class="unit-stats">
-          <span class="stat">{{ t('common.level') }}: {{ getUnitAt(selectedCell.x, selectedCell.y)!.level }}</span>
-          <span class="stat">Grid: ({{ selectedCell.x }}, {{ selectedCell.y }})</span>
+          <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.level }}</span>
+          <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+          <span class="stat" v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) > 0">
+            {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) }) }}
+          </span>
         </div>
         <div class="unit-links">
           <span class="link-label">{{ t('buildingDetail.links') }}:</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
         </div>
-        <div class="unit-actions">
-          <button class="btn btn-danger btn-sm" @click="removeUnit(selectedCell.x, selectedCell.y)">
+        <div class="unit-actions" v-if="!isUpgradeInProgress">
+          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
             {{ t('buildingDetail.removeUnit') }}
           </button>
         </div>
@@ -416,7 +725,7 @@ onMounted(async () => {
 <style scoped>
 .building-detail-view {
   padding: 2rem 1rem;
-  max-width: 800px;
+  max-width: 1100px;
 }
 
 .page-nav {
@@ -437,10 +746,19 @@ onMounted(async () => {
   text-decoration: none;
 }
 
-.building-header {
+.building-header,
+.grid-section,
+.unit-detail,
+.upgrade-banner {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+}
+
+.building-header,
+.grid-section,
+.unit-detail {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
@@ -465,17 +783,24 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.building-meta {
+.building-meta,
+.upgrade-summary,
+.grid-legend,
+.unit-stats,
+.unit-links,
+.unit-actions {
   display: flex;
-  gap: 0.5rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.meta-pill {
+.meta-pill,
+.upgrade-summary-pill,
+.upgrade-pill {
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.25rem 0.75rem;
+  padding: 0.35rem 0.85rem;
   background: var(--color-bg);
   border-radius: 9999px;
   font-size: 0.8125rem;
@@ -486,8 +811,18 @@ onMounted(async () => {
   color: var(--color-secondary);
 }
 
-.meta-label {
+.meta-label,
+.section-subtitle,
+.stat,
+.link-label,
+.picker-subtitle,
+.legend-item,
+.unit-desc,
+.loading {
   color: var(--color-text-secondary);
+}
+
+.meta-label {
   font-size: 0.75rem;
 }
 
@@ -495,31 +830,50 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.grid-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
+.upgrade-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
   margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, rgba(19, 127, 236, 0.09), rgba(0, 200, 83, 0.08));
 }
 
-.grid-section h2 {
-  font-size: 1.125rem;
+.upgrade-banner p {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+}
+
+.grid-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.grid-header h2 {
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+.section-subtitle {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
 }
 
 .unit-grid {
   display: grid;
-  gap: 1rem;
+  gap: 0.9rem;
   margin-bottom: 1rem;
 }
 
 .grid-row {
   display: grid;
-  grid-template-columns: minmax(92px, 1fr) 44px minmax(92px, 1fr) 44px minmax(92px, 1fr) 44px minmax(92px, 1fr);
+  grid-template-columns: minmax(92px, 1fr) 46px minmax(92px, 1fr) 46px minmax(92px, 1fr) 46px minmax(92px, 1fr);
   align-items: center;
   justify-items: center;
-  column-gap: 0;
 }
 
 .connector-row {
@@ -528,19 +882,60 @@ onMounted(async () => {
 
 .grid-cell {
   aspect-ratio: 1;
+  width: 100%;
+  min-height: 86px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
+  padding: 0.6rem;
   border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  cursor: pointer;
-  transition: all 0.15s ease;
-  padding: 0.5rem;
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 247, 251, 0.92));
   color: var(--color-text);
-  min-height: 80px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.grid-cell:not(:disabled):hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(19, 127, 236, 0.1);
+}
+
+.grid-cell.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px rgba(19, 127, 236, 0.12);
+}
+
+.grid-cell.readonly,
+.readonly-grid .grid-cell {
+  cursor: default;
+}
+
+.grid-cell.changed {
+  box-shadow: inset 0 0 0 2px rgba(19, 127, 236, 0.14);
+}
+
+.cell-type {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.cell-level,
+.cell-pending {
+  font-size: 0.625rem;
+}
+
+.cell-pending {
+  color: #b45309;
+  text-align: center;
+}
+
+.cell-empty {
+  font-size: 1.35rem;
+  opacity: 0.45;
 }
 
 .link-toggle {
@@ -550,36 +945,39 @@ onMounted(async () => {
   justify-content: center;
   padding: 0;
   border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
-  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 92%, white 8%);
-  cursor: pointer;
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 94%, white 6%);
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
 }
 
-.link-toggle:disabled {
+.link-toggle:disabled,
+.link-toggle.readonly {
   cursor: default;
-  opacity: 0.45;
 }
 
-.link-toggle:not(:disabled):hover {
+.link-toggle:not(:disabled):not(.readonly):hover {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(19, 127, 236, 0.12);
 }
 
+.link-toggle.disabled {
+  opacity: 0.28;
+}
+
 .link-toggle.horizontal {
-  width: 36px;
+  width: 38px;
   height: 18px;
   border-radius: 999px;
 }
 
 .link-toggle.vertical {
   width: 18px;
-  height: 36px;
+  height: 38px;
   border-radius: 999px;
 }
 
 .link-toggle.diagonal {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 14px;
 }
 
@@ -608,8 +1006,8 @@ onMounted(async () => {
   width: 26px;
   height: 3px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-border) 82%, transparent);
-  opacity: 0;
+  background: color-mix(in srgb, var(--color-border) 78%, transparent);
+  opacity: 0.18;
 }
 
 .diag-line-primary {
@@ -626,71 +1024,15 @@ onMounted(async () => {
   background: var(--color-primary);
 }
 
-.diagonal.state-none .diag-line-primary,
-.diagonal.state-none .diag-line-secondary {
-  opacity: 0.35;
-}
-
-.grid-cell:hover {
-  border-color: var(--color-primary);
-}
-
-.grid-cell.selected {
-  box-shadow: 0 0 0 2px var(--color-primary);
-}
-
-.grid-cell.occupied {
-  background: var(--color-surface-raised);
-}
-
-.cell-type {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  text-align: center;
-  line-height: 1.2;
-}
-
-.cell-level {
-  font-size: 0.625rem;
-  color: var(--color-text-secondary);
-}
-
-.cell-pending {
-  color: orange;
-  font-size: 0.625rem;
-  margin-top: 0.125rem;
-}
-
-.cell-empty {
-  font-size: 1.25rem;
-  color: var(--color-text-secondary);
-  opacity: 0.5;
-}
-
-.grid-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+.readonly-grid .link-toggle.active,
+.link-toggle.readonly.active {
+  background: rgba(19, 127, 236, 0.08);
 }
 
 .unit-picker-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(15, 23, 42, 0.58);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -702,30 +1044,25 @@ onMounted(async () => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
-  width: 90%;
-  max-width: 480px;
+  width: min(92vw, 520px);
 }
 
 .picker-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 1rem;
   margin-bottom: 0.5rem;
 }
 
-.picker-header h3 {
+.picker-header h3,
+.unit-detail h3 {
   font-size: 1.125rem;
-}
-
-.picker-subtitle {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 1rem;
+  margin: 0;
 }
 
 .picker-grid {
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 0.5rem;
 }
 
@@ -733,14 +1070,13 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.75rem;
+  padding: 0.8rem;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-bg);
-  cursor: pointer;
-  transition: all 0.15s ease;
   color: var(--color-text);
   text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .picker-option:hover {
@@ -748,11 +1084,20 @@ onMounted(async () => {
   background: rgba(0, 71, 255, 0.04);
 }
 
+.picker-color,
+.legend-color {
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+
 .picker-color {
   width: 16px;
   height: 16px;
-  border-radius: 4px;
-  flex-shrink: 0;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
 }
 
 .picker-info {
@@ -771,60 +1116,18 @@ onMounted(async () => {
   color: var(--color-text-secondary);
 }
 
-.unit-detail {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-}
-
-.unit-detail h3 {
-  font-size: 1.125rem;
-  margin-bottom: 0.25rem;
-}
-
 .unit-desc {
+  margin: 0.35rem 0 0.85rem;
   font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.unit-stats {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.stat {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-
-.unit-links {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
-  flex-wrap: wrap;
-}
-
-.link-label {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
 }
 
 .link-badge {
-  background: rgba(0, 71, 255, 0.1);
+  background: rgba(0, 71, 255, 0.08);
   color: var(--color-primary);
-  padding: 0.125rem 0.5rem;
+  padding: 0.15rem 0.55rem;
   border-radius: 9999px;
   font-size: 0.6875rem;
-  font-weight: 500;
-}
-
-.unit-actions {
-  display: flex;
-  gap: 0.5rem;
+  font-weight: 600;
 }
 
 .btn-sm {
@@ -845,30 +1148,45 @@ onMounted(async () => {
 .loading {
   text-align: center;
   padding: 3rem;
-  color: var(--color-text-secondary);
+}
+
+@media (max-width: 920px) {
+  .building-detail-view {
+    max-width: 100%;
+  }
 }
 
 @media (max-width: 720px) {
   .grid-row {
-    grid-template-columns: minmax(68px, 1fr) 34px minmax(68px, 1fr) 34px minmax(68px, 1fr) 34px minmax(68px, 1fr);
+    grid-template-columns: minmax(62px, 1fr) 30px minmax(62px, 1fr) 30px minmax(62px, 1fr) 30px minmax(62px, 1fr);
   }
 
   .grid-cell {
     min-height: 68px;
-    padding: 0.375rem;
+    padding: 0.35rem;
   }
 
   .link-toggle.horizontal {
-    width: 28px;
+    width: 26px;
   }
 
   .link-toggle.vertical {
-    height: 28px;
+    height: 26px;
   }
 
   .link-toggle.diagonal {
-    width: 30px;
-    height: 30px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .diag-line {
+    width: 18px;
+  }
+
+  .upgrade-banner,
+  .grid-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
