@@ -662,7 +662,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="grid-section">
+      <div v-if="!isEditing" class="grid-section">
         <div class="grid-header">
           <div>
             <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
