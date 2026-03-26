@@ -61,10 +61,14 @@ export interface BuildingUnit {
   gridX: number
   gridY: number
   level: number
-  linkRight: boolean
+  linkUp: boolean
   linkDown: boolean
-  linkDiagonalDown: boolean
-  linkDiagonalUp: boolean
+  linkLeft: boolean
+  linkRight: boolean
+  linkUpLeft: boolean
+  linkUpRight: boolean
+  linkDownLeft: boolean
+  linkDownRight: boolean
 }
 
 /** Matches backend ApplicationUser entity */

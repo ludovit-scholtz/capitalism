@@ -37,17 +37,29 @@ public sealed class BuildingUnit
     /// <summary>Current upgrade level of this unit.</summary>
     public int Level { get; set; } = 1;
 
-    /// <summary>Whether the link to the unit on the right is active.</summary>
-    public bool LinkRight { get; set; }
+    /// <summary>Whether the link to the unit above is active.</summary>
+    public bool LinkUp { get; set; }
 
     /// <summary>Whether the link to the unit below is active.</summary>
     public bool LinkDown { get; set; }
 
-    /// <summary>Whether the diagonal link (top-left to bottom-right) is active.</summary>
-    public bool LinkDiagonalDown { get; set; }
+    /// <summary>Whether the link to the unit on the left is active.</summary>
+    public bool LinkLeft { get; set; }
 
-    /// <summary>Whether the diagonal link (top-right to bottom-left) is active.</summary>
-    public bool LinkDiagonalUp { get; set; }
+    /// <summary>Whether the link to the unit on the right is active.</summary>
+    public bool LinkRight { get; set; }
+
+    /// <summary>Whether the diagonal link to the unit above-left is active.</summary>
+    public bool LinkUpLeft { get; set; }
+
+    /// <summary>Whether the diagonal link to the unit above-right is active.</summary>
+    public bool LinkUpRight { get; set; }
+
+    /// <summary>Whether the diagonal link to the unit below-left is active.</summary>
+    public bool LinkDownLeft { get; set; }
+
+    /// <summary>Whether the diagonal link to the unit below-right is active.</summary>
+    public bool LinkDownRight { get; set; }
 }
 
 /// <summary>Defines valid unit types for each building type.</summary>

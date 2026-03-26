@@ -71,6 +71,9 @@ Marketing unit - allows to set budget for the linked products. The money is paid
 
 Public sales unit - allows to sell products directly to general public. The sales capacity can be increased by upgrading the unit. The player can set the minimum price for the products sold in this unit. The sales can be limited to specific company or open to all players.
 
+## Timing
+
+Each change - new building, change of the building unit plan, or upgrade of the unit takes specific number of ticks to be executed.
 
 ## The onboarding 
 

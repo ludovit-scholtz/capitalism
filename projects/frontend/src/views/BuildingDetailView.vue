@@ -11,12 +11,17 @@ const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
 
+const gridIndexes = [0, 1, 2, 3] as const
+const connectorIndexes = [0, 1, 2] as const
+
 const buildingId = computed(() => route.params.id as string)
 const building = ref<Building | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
 const selectedCell = ref<{ x: number; y: number } | null>(null)
 const showUnitPicker = ref(false)
+const editMode = ref(false)
+const pendingTicks = ref<Record<string, number>>({})
 
 const allowedUnitsMap: Record<string, string[]> = {
   MINE: ['MINING', 'STORAGE', 'B2B_SALES'],
@@ -56,6 +61,10 @@ function formatBuildingType(type: string): string {
 }
 
 function clickCell(x: number, y: number) {
+  if (editMode.value) {
+    // In edit mode, clicking cells does nothing, links are toggled separately
+    return
+  }
   const existing = getUnitAt(x, y)
   if (existing) {
     selectedCell.value = { x, y }
@@ -78,10 +87,14 @@ async function placeUnit(unitType: string) {
     gridX: selectedCell.value.x,
     gridY: selectedCell.value.y,
     level: 1,
-    linkRight: false,
+    linkUp: false,
     linkDown: false,
-    linkDiagonalDown: false,
-    linkDiagonalUp: false,
+    linkLeft: false,
+    linkRight: false,
+    linkUpLeft: false,
+    linkUpRight: false,
+    linkDownLeft: false,
+    linkDownRight: false,
   }
 
   building.value.units = [...building.value.units, newUnit]
@@ -95,6 +108,96 @@ function removeUnit(x: number, y: number) {
   selectedCell.value = null
 }
 
+function toggleHorizontalLink(x: number, y: number) {
+  const unit1 = getUnitAt(x, y)
+  const unit2 = getUnitAt(x + 1, y)
+  if (unit1 && unit2) {
+    unit1.linkRight = !unit1.linkRight
+    unit2.linkLeft = !unit2.linkLeft
+  }
+}
+
+function toggleVerticalLink(x: number, y: number) {
+  const unit1 = getUnitAt(x, y)
+  const unit2 = getUnitAt(x, y + 1)
+  if (unit1 && unit2) {
+    unit1.linkDown = !unit1.linkDown
+    unit2.linkUp = !unit2.linkUp
+  }
+}
+
+function clearDiagonalState(x: number, y: number) {
+  const topLeft = getUnitAt(x, y)
+  const topRight = getUnitAt(x + 1, y)
+  const bottomLeft = getUnitAt(x, y + 1)
+  const bottomRight = getUnitAt(x + 1, y + 1)
+
+  if (topLeft) topLeft.linkDownRight = false
+  if (bottomRight) bottomRight.linkUpLeft = false
+  if (topRight) topRight.linkDownLeft = false
+  if (bottomLeft) bottomLeft.linkUpRight = false
+}
+
+function getDiagonalState(x: number, y: number): 'none' | 'tl-br' | 'tr-bl' {
+  const topLeft = getUnitAt(x, y)
+  const topRight = getUnitAt(x + 1, y)
+
+  if (topLeft?.linkDownRight) return 'tl-br'
+  if (topRight?.linkDownLeft) return 'tr-bl'
+  return 'none'
+}
+
+function toggleDiagonalLink(x: number, y: number) {
+  const topLeft = getUnitAt(x, y)
+  const topRight = getUnitAt(x + 1, y)
+  const bottomLeft = getUnitAt(x, y + 1)
+  const bottomRight = getUnitAt(x + 1, y + 1)
+  if (!topLeft || !topRight || !bottomLeft || !bottomRight) return
+
+  const currentState = getDiagonalState(x, y)
+  clearDiagonalState(x, y)
+
+  if (currentState === 'none') {
+    topLeft.linkDownRight = true
+    bottomRight.linkUpLeft = true
+    return
+  }
+
+  if (currentState === 'tl-br') {
+    topRight.linkDownLeft = true
+    bottomLeft.linkUpRight = true
+  }
+}
+
+function isHorizontalLinkActive(x: number, y: number): boolean {
+  return getUnitAt(x, y)?.linkRight || false
+}
+
+function isVerticalLinkActive(x: number, y: number): boolean {
+  return getUnitAt(x, y)?.linkDown || false
+}
+
+function canToggleHorizontalLink(x: number, y: number): boolean {
+  return !!getUnitAt(x, y) && !!getUnitAt(x + 1, y)
+}
+
+function canToggleVerticalLink(x: number, y: number): boolean {
+  return !!getUnitAt(x, y) && !!getUnitAt(x, y + 1)
+}
+
+function canToggleDiagonalLink(x: number, y: number): boolean {
+  return !!getUnitAt(x, y) && !!getUnitAt(x + 1, y) && !!getUnitAt(x, y + 1) && !!getUnitAt(x + 1, y + 1)
+}
+
+function saveChanges() {
+  // TODO: send to backend
+  // For now, simulate pending ticks
+  building.value?.units.forEach(unit => {
+    pendingTicks.value[unit.id] = 1 // Assume 1 tick for link changes
+  })
+  editMode.value = false
+}
+
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -106,7 +209,7 @@ onMounted(async () => {
       `{ myCompanies {
         buildings {
           id name type level powerConsumption isForSale cityId
-          units { id unitType gridX gridY level linkRight linkDown linkDiagonalDown linkDiagonalUp }
+          units { id unitType gridX gridY level linkUp linkDown linkLeft linkRight linkUpLeft linkUpRight linkDownLeft linkDownRight }
         }
       } }`,
     )
@@ -161,32 +264,90 @@ onMounted(async () => {
 
       <!-- Unit Grid -->
       <div class="grid-section">
-        <h2>{{ t('buildingDetail.unitGrid') }}</h2>
+        <div class="grid-header">
+          <h2>{{ t('buildingDetail.unitGrid') }}</h2>
+          <div class="grid-actions">
+            <button v-if="!editMode" class="btn btn-primary" @click="editMode = true">{{ t('buildingDetail.editLinks') }}</button>
+            <button v-else class="btn btn-success" @click="saveChanges">{{ t('buildingDetail.saveChanges') }}</button>
+            <button v-if="editMode" class="btn btn-secondary" @click="editMode = false">{{ t('common.cancel') }}</button>
+          </div>
+        </div>
 
-        <div class="unit-grid">
-          <div v-for="y in 4" :key="y" class="grid-row">
-            <button
-              v-for="x in 4"
-              :key="x"
+        <div class="unit-grid" :class="{ 'edit-mode': editMode }">
+          <template v-for="y in gridIndexes" :key="`row-${y}`">
+            <div class="grid-row unit-row">
+              <template v-for="x in gridIndexes" :key="`unit-${x}-${y}`">
+                <button
               class="grid-cell"
               :class="{
-                occupied: !!getUnitAt(x - 1, y - 1),
-                selected: selectedCell?.x === x - 1 && selectedCell?.y === y - 1,
+                occupied: !!getUnitAt(x, y),
+                selected: selectedCell?.x === x && selectedCell?.y === y,
               }"
-              :style="getUnitAt(x - 1, y - 1)
-                ? { borderColor: getUnitColor(getUnitAt(x - 1, y - 1)!.unitType), background: getUnitColor(getUnitAt(x - 1, y - 1)!.unitType) + '18' }
+              :style="getUnitAt(x, y)
+                ? { borderColor: getUnitColor(getUnitAt(x, y)!.unitType), background: getUnitColor(getUnitAt(x, y)!.unitType) + '18' }
                 : {}"
-              @click="clickCell(x - 1, y - 1)"
+              @click="clickCell(x, y)"
             >
-              <template v-if="getUnitAt(x - 1, y - 1)">
-                <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAt(x - 1, y - 1)!.unitType}`) }}</span>
-                <span class="cell-level">Lv.{{ getUnitAt(x - 1, y - 1)!.level }}</span>
+              <template v-if="getUnitAt(x, y)">
+                <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAt(x, y)!.unitType}`) }}</span>
+                <span class="cell-level">Lv.{{ getUnitAt(x, y)!.level }}</span>
+                <span v-if="pendingTicks[getUnitAt(x, y)!.id]" class="cell-pending">{{ pendingTicks[getUnitAt(x, y)!.id] }} ticks</span>
               </template>
               <template v-else>
                 <span class="cell-empty">+</span>
               </template>
             </button>
-          </div>
+
+                <button
+                  v-if="x < 3"
+                  :key="`horizontal-${x}-${y}`"
+                  class="link-toggle horizontal"
+                  :class="{
+                    active: isHorizontalLinkActive(x, y),
+                    disabled: !canToggleHorizontalLink(x, y),
+                  }"
+                  :disabled="!editMode || !canToggleHorizontalLink(x, y)"
+                  :aria-label="t('buildingDetail.linkRight')"
+                  @click="toggleHorizontalLink(x, y)"
+                >
+                  <span class="link-line"></span>
+                </button>
+              </template>
+            </div>
+
+            <div v-if="y < 3" class="grid-row connector-row">
+              <template v-for="x in gridIndexes" :key="`connector-${x}-${y}`">
+                <button
+                  class="link-toggle vertical"
+                  :class="{
+                    active: isVerticalLinkActive(x, y),
+                    disabled: !canToggleVerticalLink(x, y),
+                  }"
+                  :disabled="!editMode || !canToggleVerticalLink(x, y)"
+                  :aria-label="t('buildingDetail.linkDown')"
+                  @click="toggleVerticalLink(x, y)"
+                >
+                  <span class="link-line"></span>
+                </button>
+
+                <button
+                  v-if="x < 3"
+                  :key="`diagonal-${x}-${y}`"
+                  class="link-toggle diagonal"
+                  :class="[
+                    `state-${getDiagonalState(x, y)}`,
+                    { disabled: !canToggleDiagonalLink(x, y) },
+                  ]"
+                  :disabled="!editMode || !canToggleDiagonalLink(x, y)"
+                  :aria-label="t('buildingDetail.links')"
+                  @click="toggleDiagonalLink(x, y)"
+                >
+                  <span class="diag-line diag-line-primary"></span>
+                  <span class="diag-line diag-line-secondary"></span>
+                </button>
+              </template>
+            </div>
+          </template>
         </div>
 
         <!-- Link indicators between cells -->
@@ -233,10 +394,14 @@ onMounted(async () => {
         </div>
         <div class="unit-links">
           <span class="link-label">{{ t('buildingDetail.links') }}:</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
           <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDiagonalDown" class="link-badge">{{ t('buildingDetail.linkDiagDown') }}</span>
-          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDiagonalUp" class="link-badge">{{ t('buildingDetail.linkDiagUp') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
+          <span v-if="getUnitAt(selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
         </div>
         <div class="unit-actions">
           <button class="btn btn-danger btn-sm" @click="removeUnit(selectedCell.x, selectedCell.y)">
@@ -344,16 +509,21 @@ onMounted(async () => {
 }
 
 .unit-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  gap: 1rem;
   margin-bottom: 1rem;
 }
 
 .grid-row {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
+  grid-template-columns: minmax(92px, 1fr) 44px minmax(92px, 1fr) 44px minmax(92px, 1fr) 44px minmax(92px, 1fr);
+  align-items: center;
+  justify-items: center;
+  column-gap: 0;
+}
+
+.connector-row {
+  min-height: 44px;
 }
 
 .grid-cell {
@@ -371,6 +541,94 @@ onMounted(async () => {
   padding: 0.5rem;
   color: var(--color-text);
   min-height: 80px;
+}
+
+.link-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 92%, white 8%);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.link-toggle:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.link-toggle:not(:disabled):hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(19, 127, 236, 0.12);
+}
+
+.link-toggle.horizontal {
+  width: 36px;
+  height: 18px;
+  border-radius: 999px;
+}
+
+.link-toggle.vertical {
+  width: 18px;
+  height: 36px;
+  border-radius: 999px;
+}
+
+.link-toggle.diagonal {
+  width: 36px;
+  height: 36px;
+  border-radius: 14px;
+}
+
+.link-line {
+  display: block;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 82%, transparent);
+}
+
+.horizontal .link-line {
+  width: 24px;
+  height: 4px;
+}
+
+.vertical .link-line {
+  width: 4px;
+  height: 24px;
+}
+
+.link-toggle.active .link-line {
+  background: var(--color-primary);
+}
+
+.diag-line {
+  position: absolute;
+  width: 26px;
+  height: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-border) 82%, transparent);
+  opacity: 0;
+}
+
+.diag-line-primary {
+  transform: rotate(45deg);
+}
+
+.diag-line-secondary {
+  transform: rotate(-45deg);
+}
+
+.diagonal.state-tl-br .diag-line-primary,
+.diagonal.state-tr-bl .diag-line-secondary {
+  opacity: 1;
+  background: var(--color-primary);
+}
+
+.diagonal.state-none .diag-line-primary,
+.diagonal.state-none .diag-line-secondary {
+  opacity: 0.35;
 }
 
 .grid-cell:hover {
@@ -395,6 +653,12 @@ onMounted(async () => {
 .cell-level {
   font-size: 0.625rem;
   color: var(--color-text-secondary);
+}
+
+.cell-pending {
+  color: orange;
+  font-size: 0.625rem;
+  margin-top: 0.125rem;
 }
 
 .cell-empty {
@@ -582,5 +846,29 @@ onMounted(async () => {
   text-align: center;
   padding: 3rem;
   color: var(--color-text-secondary);
+}
+
+@media (max-width: 720px) {
+  .grid-row {
+    grid-template-columns: minmax(68px, 1fr) 34px minmax(68px, 1fr) 34px minmax(68px, 1fr) 34px minmax(68px, 1fr);
+  }
+
+  .grid-cell {
+    min-height: 68px;
+    padding: 0.375rem;
+  }
+
+  .link-toggle.horizontal {
+    width: 28px;
+  }
+
+  .link-toggle.vertical {
+    height: 28px;
+  }
+
+  .link-toggle.diagonal {
+    width: 30px;
+    height: 30px;
+  }
 }
 </style>
