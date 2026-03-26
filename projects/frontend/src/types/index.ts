@@ -86,6 +86,17 @@ export interface BuildingConfigurationPlanUnit {
   ticksRequired: number
   isChanged: boolean
   isReverting: boolean
+  resourceTypeId: string | null
+  productTypeId: string | null
+  minPrice: number | null
+  maxPrice: number | null
+  purchaseSource: string | null
+  saleVisibility: string | null
+  budget: number | null
+  mediaHouseBuildingId: string | null
+  minQuality: number | null
+  brandScope: string | null
+  vendorLockCompanyId: string | null
 }
 
 export interface BuildingConfigurationPlanRemoval {
@@ -114,6 +125,17 @@ export interface BuildingUnit {
   linkUpRight: boolean
   linkDownLeft: boolean
   linkDownRight: boolean
+  resourceTypeId: string | null
+  productTypeId: string | null
+  minPrice: number | null
+  maxPrice: number | null
+  purchaseSource: string | null
+  saleVisibility: string | null
+  budget: number | null
+  mediaHouseBuildingId: string | null
+  minQuality: number | null
+  brandScope: string | null
+  vendorLockCompanyId: string | null
 }
 
 /** Matches backend ApplicationUser entity */

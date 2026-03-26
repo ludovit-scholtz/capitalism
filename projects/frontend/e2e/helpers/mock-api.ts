@@ -69,6 +69,17 @@ export type MockBuildingUnit = {
   linkUpRight: boolean
   linkDownLeft: boolean
   linkDownRight: boolean
+  resourceTypeId?: string | null
+  productTypeId?: string | null
+  minPrice?: number | null
+  maxPrice?: number | null
+  purchaseSource?: string | null
+  saleVisibility?: string | null
+  budget?: number | null
+  mediaHouseBuildingId?: string | null
+  minQuality?: number | null
+  brandScope?: string | null
+  vendorLockCompanyId?: string | null
 }
 
 export type MockBuildingConfigurationPlanUnit = MockBuildingUnit & {
@@ -163,6 +174,17 @@ function areUnitsEquivalent(currentUnit: MockBuildingUnit | undefined, nextUnit:
     && currentUnit.linkUpRight === nextUnit.linkUpRight
     && currentUnit.linkDownLeft === nextUnit.linkDownLeft
     && currentUnit.linkDownRight === nextUnit.linkDownRight
+    && (currentUnit.resourceTypeId ?? null) === (nextUnit.resourceTypeId ?? null)
+    && (currentUnit.productTypeId ?? null) === (nextUnit.productTypeId ?? null)
+    && (currentUnit.minPrice ?? null) === (nextUnit.minPrice ?? null)
+    && (currentUnit.maxPrice ?? null) === (nextUnit.maxPrice ?? null)
+    && (currentUnit.purchaseSource ?? null) === (nextUnit.purchaseSource ?? null)
+    && (currentUnit.saleVisibility ?? null) === (nextUnit.saleVisibility ?? null)
+    && (currentUnit.budget ?? null) === (nextUnit.budget ?? null)
+    && (currentUnit.mediaHouseBuildingId ?? null) === (nextUnit.mediaHouseBuildingId ?? null)
+    && (currentUnit.minQuality ?? null) === (nextUnit.minQuality ?? null)
+    && (currentUnit.brandScope ?? null) === (nextUnit.brandScope ?? null)
+    && (currentUnit.vendorLockCompanyId ?? null) === (nextUnit.vendorLockCompanyId ?? null)
 }
 
 function arePendingUnitsEquivalent(currentUnit: MockBuildingConfigurationPlanUnit | undefined, nextUnit: MockBuildingUnit): boolean {
@@ -211,6 +233,22 @@ function calculateUnitTicks(currentUnit: MockBuildingUnit | undefined, nextUnit:
     || currentUnit.linkUpRight !== nextUnit.linkUpRight
     || currentUnit.linkDownLeft !== nextUnit.linkDownLeft
     || currentUnit.linkDownRight !== nextUnit.linkDownRight
+  ) {
+    return 1
+  }
+
+  if (
+    (currentUnit.resourceTypeId ?? null) !== (nextUnit.resourceTypeId ?? null)
+    || (currentUnit.productTypeId ?? null) !== (nextUnit.productTypeId ?? null)
+    || (currentUnit.minPrice ?? null) !== (nextUnit.minPrice ?? null)
+    || (currentUnit.maxPrice ?? null) !== (nextUnit.maxPrice ?? null)
+    || (currentUnit.purchaseSource ?? null) !== (nextUnit.purchaseSource ?? null)
+    || (currentUnit.saleVisibility ?? null) !== (nextUnit.saleVisibility ?? null)
+    || (currentUnit.budget ?? null) !== (nextUnit.budget ?? null)
+    || (currentUnit.mediaHouseBuildingId ?? null) !== (nextUnit.mediaHouseBuildingId ?? null)
+    || (currentUnit.minQuality ?? null) !== (nextUnit.minQuality ?? null)
+    || (currentUnit.brandScope ?? null) !== (nextUnit.brandScope ?? null)
+    || (currentUnit.vendorLockCompanyId ?? null) !== (nextUnit.vendorLockCompanyId ?? null)
   ) {
     return 1
   }
@@ -597,6 +635,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             linkUpRight: unit.linkUpRight,
             linkDownLeft: unit.linkDownLeft,
             linkDownRight: unit.linkDownRight,
+            resourceTypeId: unit.resourceTypeId ?? null,
+            productTypeId: unit.productTypeId ?? null,
+            minPrice: unit.minPrice ?? null,
+            maxPrice: unit.maxPrice ?? null,
+            purchaseSource: unit.purchaseSource ?? null,
+            saleVisibility: unit.saleVisibility ?? null,
+            budget: unit.budget ?? null,
+            mediaHouseBuildingId: unit.mediaHouseBuildingId ?? null,
+            minQuality: unit.minQuality ?? null,
+            brandScope: unit.brandScope ?? null,
+            vendorLockCompanyId: unit.vendorLockCompanyId ?? null,
           } satisfies MockBuildingUnit]
         }),
       )
@@ -726,6 +775,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { storeBuildingConfiguration: building.pendingConfiguration } }),
+      })
+    }
+
+    if (query.includes('SetBuildingForSale') || query.includes('setBuildingForSale')) {
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
+
+      if (!building) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building not found' }] }) })
+      }
+
+      building.isForSale = input.isForSale
+      building.askingPrice = input.isForSale ? input.askingPrice : null
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setBuildingForSale: { id: building.id, isForSale: building.isForSale, askingPrice: building.askingPrice } } }),
       })
     }
 

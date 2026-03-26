@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
-import type { Building, BuildingConfigurationPlanRemoval, BuildingConfigurationPlanUnit, BuildingUnit } from '@/types'
+import type { Building, BuildingConfigurationPlanRemoval, BuildingConfigurationPlanUnit, BuildingUnit, ResourceType, ProductType } from '@/types'
 
 type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
 
@@ -22,6 +22,17 @@ type EditableGridUnit = {
   linkUpRight: boolean
   linkDownLeft: boolean
   linkDownRight: boolean
+  resourceTypeId: string | null
+  productTypeId: string | null
+  minPrice: number | null
+  maxPrice: number | null
+  purchaseSource: string | null
+  saleVisibility: string | null
+  budget: number | null
+  mediaHouseBuildingId: string | null
+  minQuality: number | null
+  brandScope: string | null
+  vendorLockCompanyId: string | null
 }
 
 const LINK_CHANGE_TICKS = 1
@@ -44,6 +55,15 @@ const selectedCell = ref<{ x: number; y: number } | null>(null)
 const showUnitPicker = ref(false)
 const draftUnits = ref<EditableGridUnit[]>([])
 const editBaselineUnits = ref<EditableGridUnit[]>([])
+const resourceTypes = ref<ResourceType[]>([])
+const productTypes = ref<ProductType[]>([])
+const showSaleDialog = ref(false)
+const salePrice = ref<number | null>(null)
+const savingSale = ref(false)
+const layoutName = ref('')
+const showLayoutDialog = ref(false)
+
+const LAYOUT_STORAGE_KEY = 'capitalism_building_layouts'
 
 const allowedUnitsMap: Record<string, string[]> = {
   MINE: ['MINING', 'STORAGE', 'B2B_SALES'],
@@ -134,6 +154,17 @@ function cloneUnit(unit: GridUnit): EditableGridUnit {
     linkUpRight: unit.linkUpRight,
     linkDownLeft: unit.linkDownLeft,
     linkDownRight: unit.linkDownRight,
+    resourceTypeId: ('resourceTypeId' in unit ? unit.resourceTypeId : null) ?? null,
+    productTypeId: ('productTypeId' in unit ? unit.productTypeId : null) ?? null,
+    minPrice: ('minPrice' in unit ? unit.minPrice : null) ?? null,
+    maxPrice: ('maxPrice' in unit ? unit.maxPrice : null) ?? null,
+    purchaseSource: ('purchaseSource' in unit ? unit.purchaseSource : null) ?? null,
+    saleVisibility: ('saleVisibility' in unit ? unit.saleVisibility : null) ?? null,
+    budget: ('budget' in unit ? unit.budget : null) ?? null,
+    mediaHouseBuildingId: ('mediaHouseBuildingId' in unit ? unit.mediaHouseBuildingId : null) ?? null,
+    minQuality: ('minQuality' in unit ? unit.minQuality : null) ?? null,
+    brandScope: ('brandScope' in unit ? unit.brandScope : null) ?? null,
+    vendorLockCompanyId: ('vendorLockCompanyId' in unit ? unit.vendorLockCompanyId : null) ?? null,
   }
 }
 
@@ -194,6 +225,17 @@ function placeUnit(unitType: string) {
     linkUpRight: false,
     linkDownLeft: false,
     linkDownRight: false,
+    resourceTypeId: null,
+    productTypeId: null,
+    minPrice: null,
+    maxPrice: null,
+    purchaseSource: null,
+    saleVisibility: null,
+    budget: null,
+    mediaHouseBuildingId: null,
+    minQuality: null,
+    brandScope: null,
+    vendorLockCompanyId: null,
   }
 
   draftUnits.value = [...draftUnits.value.filter((unit) => !(unit.gridX === newUnit.gridX && unit.gridY === newUnit.gridY)), newUnit]
@@ -369,6 +411,22 @@ function getDraftTicksForUnit(unit: EditableGridUnit): number {
     return LINK_CHANGE_TICKS
   }
 
+  if (
+    activeUnit.resourceTypeId !== unit.resourceTypeId
+    || activeUnit.productTypeId !== unit.productTypeId
+    || activeUnit.minPrice !== unit.minPrice
+    || activeUnit.maxPrice !== unit.maxPrice
+    || activeUnit.purchaseSource !== unit.purchaseSource
+    || activeUnit.saleVisibility !== unit.saleVisibility
+    || activeUnit.budget !== unit.budget
+    || activeUnit.mediaHouseBuildingId !== unit.mediaHouseBuildingId
+    || activeUnit.minQuality !== unit.minQuality
+    || activeUnit.brandScope !== unit.brandScope
+    || activeUnit.vendorLockCompanyId !== unit.vendorLockCompanyId
+  ) {
+    return LINK_CHANGE_TICKS
+  }
+
   return 0
 }
 
@@ -408,8 +466,8 @@ function getCancelTicks(baseTicks: number): number {
 }
 
 function areUnitsEquivalent(
-  left: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight'>,
-  right: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight'>,
+  left: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight' | 'resourceTypeId' | 'productTypeId' | 'minPrice' | 'maxPrice' | 'purchaseSource' | 'saleVisibility' | 'budget' | 'mediaHouseBuildingId' | 'minQuality' | 'brandScope' | 'vendorLockCompanyId'>,
+  right: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight' | 'resourceTypeId' | 'productTypeId' | 'minPrice' | 'maxPrice' | 'purchaseSource' | 'saleVisibility' | 'budget' | 'mediaHouseBuildingId' | 'minQuality' | 'brandScope' | 'vendorLockCompanyId'>,
 ): boolean {
   return left.unitType === right.unitType
     && left.gridX === right.gridX
@@ -422,6 +480,17 @@ function areUnitsEquivalent(
     && left.linkUpRight === right.linkUpRight
     && left.linkDownLeft === right.linkDownLeft
     && left.linkDownRight === right.linkDownRight
+    && left.resourceTypeId === right.resourceTypeId
+    && left.productTypeId === right.productTypeId
+    && left.minPrice === right.minPrice
+    && left.maxPrice === right.maxPrice
+    && left.purchaseSource === right.purchaseSource
+    && left.saleVisibility === right.saleVisibility
+    && left.budget === right.budget
+    && left.mediaHouseBuildingId === right.mediaHouseBuildingId
+    && left.minQuality === right.minQuality
+    && left.brandScope === right.brandScope
+    && left.vendorLockCompanyId === right.vendorLockCompanyId
 }
 
 function areUnitCollectionsEqual(left: EditableGridUnit[], right: EditableGridUnit[]): boolean {
@@ -476,6 +545,17 @@ function storeConfiguration() {
           linkUpRight: unit.linkUpRight,
           linkDownLeft: unit.linkDownLeft,
           linkDownRight: unit.linkDownRight,
+          resourceTypeId: unit.resourceTypeId,
+          productTypeId: unit.productTypeId,
+          minPrice: unit.minPrice,
+          maxPrice: unit.maxPrice,
+          purchaseSource: unit.purchaseSource,
+          saleVisibility: unit.saleVisibility,
+          budget: unit.budget,
+          mediaHouseBuildingId: unit.mediaHouseBuildingId,
+          minQuality: unit.minQuality,
+          brandScope: unit.brandScope,
+          vendorLockCompanyId: unit.vendorLockCompanyId,
         })),
       },
     },
@@ -492,12 +572,287 @@ function storeConfiguration() {
     })
 }
 
+// ── Resource path validation ──
+
+type ValidationWarning = { key: string; params?: Record<string, unknown> }
+
+function getLinkedUnits(unit: EditableGridUnit, units: EditableGridUnit[]): EditableGridUnit[] {
+  const linked: EditableGridUnit[] = []
+  const byPos = new Map(units.map((u) => [`${u.gridX},${u.gridY}`, u]))
+
+  if (unit.linkUp) { const u = byPos.get(`${unit.gridX},${unit.gridY - 1}`); if (u) linked.push(u) }
+  if (unit.linkDown) { const u = byPos.get(`${unit.gridX},${unit.gridY + 1}`); if (u) linked.push(u) }
+  if (unit.linkLeft) { const u = byPos.get(`${unit.gridX - 1},${unit.gridY}`); if (u) linked.push(u) }
+  if (unit.linkRight) { const u = byPos.get(`${unit.gridX + 1},${unit.gridY}`); if (u) linked.push(u) }
+  if (unit.linkUpLeft) { const u = byPos.get(`${unit.gridX - 1},${unit.gridY - 1}`); if (u) linked.push(u) }
+  if (unit.linkUpRight) { const u = byPos.get(`${unit.gridX + 1},${unit.gridY - 1}`); if (u) linked.push(u) }
+  if (unit.linkDownLeft) { const u = byPos.get(`${unit.gridX - 1},${unit.gridY + 1}`); if (u) linked.push(u) }
+  if (unit.linkDownRight) { const u = byPos.get(`${unit.gridX + 1},${unit.gridY + 1}`); if (u) linked.push(u) }
+
+  return linked
+}
+
+const configWarnings = computed<ValidationWarning[]>(() => {
+  const units = isEditing.value ? draftUnits.value : (pendingConfiguration.value?.units ?? activeUnits.value).map(cloneUnit)
+  const warnings: ValidationWarning[] = []
+  if (!building.value || units.length === 0) return warnings
+
+  const purchaseUnits = units.filter((u) => u.unitType === 'PURCHASE')
+  const manufacturingUnits = units.filter((u) => u.unitType === 'MANUFACTURING')
+  const publicSalesUnits = units.filter((u) => u.unitType === 'PUBLIC_SALES')
+  const b2bSalesUnits = units.filter((u) => u.unitType === 'B2B_SALES')
+  const marketingUnits = units.filter((u) => u.unitType === 'MARKETING')
+  const brandingUnits = units.filter((u) => u.unitType === 'BRANDING')
+  const miningUnits = units.filter((u) => u.unitType === 'MINING')
+  const storageUnits = units.filter((u) => u.unitType === 'STORAGE')
+
+  // Check unit-specific configuration
+  for (const unit of purchaseUnits) {
+    if (!unit.resourceTypeId && !unit.productTypeId) {
+      warnings.push({ key: 'buildingDetail.warnings.purchaseNoItem', params: { x: unit.gridX, y: unit.gridY } })
+    }
+  }
+  for (const unit of manufacturingUnits) {
+    if (!unit.productTypeId) {
+      warnings.push({ key: 'buildingDetail.warnings.manufacturingNoProduct', params: { x: unit.gridX, y: unit.gridY } })
+    }
+  }
+  for (const unit of publicSalesUnits) {
+    if (!unit.productTypeId && !unit.resourceTypeId) {
+      warnings.push({ key: 'buildingDetail.warnings.salesNoItem', params: { x: unit.gridX, y: unit.gridY } })
+    }
+  }
+  for (const unit of marketingUnits) {
+    if (!unit.budget || unit.budget <= 0) {
+      warnings.push({ key: 'buildingDetail.warnings.marketingNoBudget', params: { x: unit.gridX, y: unit.gridY } })
+    }
+    if (!unit.mediaHouseBuildingId) {
+      warnings.push({ key: 'buildingDetail.warnings.marketingNoMediaHouse', params: { x: unit.gridX, y: unit.gridY } })
+    }
+  }
+  for (const unit of brandingUnits) {
+    if (!unit.brandScope) {
+      warnings.push({ key: 'buildingDetail.warnings.brandingNoScope', params: { x: unit.gridX, y: unit.gridY } })
+    }
+  }
+
+  // Check resource flow connectivity
+  if (building.value.type === 'FACTORY') {
+    for (const pu of purchaseUnits) {
+      const linked = getLinkedUnits(pu, units)
+      const hasConsumer = linked.some((u) => ['MANUFACTURING', 'STORAGE'].includes(u.unitType))
+      if (!hasConsumer) {
+        warnings.push({ key: 'buildingDetail.warnings.purchaseNotLinked', params: { x: pu.gridX, y: pu.gridY } })
+      }
+    }
+    for (const mu of manufacturingUnits) {
+      const linked = getLinkedUnits(mu, units)
+      const hasOutput = linked.some((u) => ['STORAGE', 'B2B_SALES'].includes(u.unitType))
+      if (!hasOutput) {
+        warnings.push({ key: 'buildingDetail.warnings.manufacturingNotLinked', params: { x: mu.gridX, y: mu.gridY } })
+      }
+    }
+  }
+
+  if (building.value.type === 'MINE') {
+    for (const mu of miningUnits) {
+      const linked = getLinkedUnits(mu, units)
+      const hasOutput = linked.some((u) => ['STORAGE', 'B2B_SALES'].includes(u.unitType))
+      if (!hasOutput) {
+        warnings.push({ key: 'buildingDetail.warnings.miningNotLinked', params: { x: mu.gridX, y: mu.gridY } })
+      }
+    }
+  }
+
+  if (building.value.type === 'SALES_SHOP') {
+    for (const pu of purchaseUnits) {
+      const linked = getLinkedUnits(pu, units)
+      const hasConsumer = linked.some((u) => ['PUBLIC_SALES', 'MARKETING'].includes(u.unitType))
+      if (!hasConsumer) {
+        warnings.push({ key: 'buildingDetail.warnings.purchaseNotLinked', params: { x: pu.gridX, y: pu.gridY } })
+      }
+    }
+  }
+
+  // Check unlinked storage/sales units
+  for (const su of storageUnits) {
+    const linked = getLinkedUnits(su, units)
+    if (linked.length === 0) {
+      warnings.push({ key: 'buildingDetail.warnings.storageNotLinked', params: { x: su.gridX, y: su.gridY } })
+    }
+  }
+  for (const su of b2bSalesUnits) {
+    const linked = getLinkedUnits(su, units)
+    if (linked.length === 0) {
+      warnings.push({ key: 'buildingDetail.warnings.b2bSalesNotLinked', params: { x: su.gridX, y: su.gridY } })
+    }
+  }
+
+  return warnings
+})
+
+// ── Building sale ──
+
+function openSaleDialog() {
+  salePrice.value = building.value?.askingPrice ?? null
+  showSaleDialog.value = true
+}
+
+function closeSaleDialog() {
+  showSaleDialog.value = false
+}
+
+async function setBuildingForSale(forSale: boolean) {
+  if (!building.value || savingSale.value) return
+  savingSale.value = true
+  try {
+    await gqlRequest<{ setBuildingForSale: { id: string } }>(
+      `mutation SetBuildingForSale($input: SetBuildingForSaleInput!) {
+        setBuildingForSale(input: $input) { id isForSale askingPrice }
+      }`,
+      {
+        input: {
+          buildingId: building.value.id,
+          isForSale: forSale,
+          askingPrice: forSale ? salePrice.value : null,
+        },
+      },
+    )
+    showSaleDialog.value = false
+    await loadBuilding()
+  } catch (reason: unknown) {
+    error.value = reason instanceof Error ? reason.message : t('buildingDetail.saleFailed')
+  } finally {
+    savingSale.value = false
+  }
+}
+
+// ── Layout save/load ──
+
+type SavedLayout = {
+  name: string
+  buildingType: string
+  units: Array<{
+    unitType: string
+    gridX: number
+    gridY: number
+    linkUp: boolean
+    linkDown: boolean
+    linkLeft: boolean
+    linkRight: boolean
+    linkUpLeft: boolean
+    linkUpRight: boolean
+    linkDownLeft: boolean
+    linkDownRight: boolean
+    resourceTypeId: string | null
+    productTypeId: string | null
+    minPrice: number | null
+    maxPrice: number | null
+    purchaseSource: string | null
+    saleVisibility: string | null
+    budget: number | null
+    mediaHouseBuildingId: string | null
+    minQuality: number | null
+    brandScope: string | null
+    vendorLockCompanyId: string | null
+  }>
+}
+
+function getSavedLayouts(): SavedLayout[] {
+  try {
+    return JSON.parse(localStorage.getItem(LAYOUT_STORAGE_KEY) || '[]') as SavedLayout[]
+  } catch {
+    return []
+  }
+}
+
+const savedLayouts = computed(() => {
+  if (!building.value) return []
+  return getSavedLayouts().filter((layout) => layout.buildingType === building.value!.type)
+})
+
+function saveLayout() {
+  if (!building.value || !layoutName.value.trim()) return
+  const layout: SavedLayout = {
+    name: layoutName.value.trim(),
+    buildingType: building.value.type,
+    units: draftUnits.value.map((u) => ({
+      unitType: u.unitType,
+      gridX: u.gridX,
+      gridY: u.gridY,
+      linkUp: u.linkUp,
+      linkDown: u.linkDown,
+      linkLeft: u.linkLeft,
+      linkRight: u.linkRight,
+      linkUpLeft: u.linkUpLeft,
+      linkUpRight: u.linkUpRight,
+      linkDownLeft: u.linkDownLeft,
+      linkDownRight: u.linkDownRight,
+      resourceTypeId: u.resourceTypeId,
+      productTypeId: u.productTypeId,
+      minPrice: u.minPrice,
+      maxPrice: u.maxPrice,
+      purchaseSource: u.purchaseSource,
+      saleVisibility: u.saleVisibility,
+      budget: u.budget,
+      mediaHouseBuildingId: u.mediaHouseBuildingId,
+      minQuality: u.minQuality,
+      brandScope: u.brandScope,
+      vendorLockCompanyId: u.vendorLockCompanyId,
+    })),
+  }
+  const layouts = getSavedLayouts()
+  layouts.push(layout)
+  localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(layouts))
+  layoutName.value = ''
+  showLayoutDialog.value = false
+}
+
+function loadLayout(layout: SavedLayout) {
+  draftUnits.value = layout.units.map((u, i) => ({
+    id: `layout-${i}-${Date.now()}`,
+    ...u,
+    level: 1,
+  }))
+}
+
+function deleteLayout(index: number) {
+  const allLayouts = getSavedLayouts()
+  const filtered = allLayouts.filter((l) => l.buildingType === building.value?.type)
+  const toDelete = filtered[index]
+  if (!toDelete) return
+  const globalIndex = allLayouts.indexOf(toDelete)
+  if (globalIndex !== -1) {
+    allLayouts.splice(globalIndex, 1)
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(allLayouts))
+  }
+}
+
+// ── Unit config helpers ──
+
+function getResourceName(id: string | null): string {
+  if (!id) return '—'
+  return resourceTypes.value.find((r) => r.name === id)?.name ?? id
+}
+
+function getProductName(id: string | null): string {
+  if (!id) return '—'
+  return productTypes.value.find((p) => p.id === id)?.name ?? id
+}
+
+function updateSelectedUnitConfig(field: string, value: unknown) {
+  if (!selectedCell.value || !isEditing.value) return
+  const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+  if (!unit) return
+  ;(unit as Record<string, unknown>)[field] = value
+}
+
 async function loadBuilding() {
   try {
     loading.value = true
     error.value = null
 
-    const [companiesData, gameStateData] = await Promise.all([
+    const [companiesData, gameStateData, resourceData, productData] = await Promise.all([
       gqlRequest<{ myCompanies: { buildings: Building[] }[] }>(
         `{ myCompanies {
           buildings {
@@ -535,6 +890,17 @@ async function loadBuilding() {
               linkUpRight
               linkDownLeft
               linkDownRight
+              resourceTypeId
+              productTypeId
+              minPrice
+              maxPrice
+              purchaseSource
+              saleVisibility
+              budget
+              mediaHouseBuildingId
+              minQuality
+              brandScope
+              vendorLockCompanyId
             }
             pendingConfiguration {
               id
@@ -571,15 +937,30 @@ async function loadBuilding() {
                 ticksRequired
                 isChanged
                 isReverting
+                resourceTypeId
+                productTypeId
+                minPrice
+                maxPrice
+                purchaseSource
+                saleVisibility
+                budget
+                mediaHouseBuildingId
+                minQuality
+                brandScope
+                vendorLockCompanyId
               }
             }
           }
         } }`,
       ),
       gqlRequest<{ gameState: { currentTick: number } | null }>(`{ gameState { currentTick } }`),
+      gqlRequest<{ resourceTypes: ResourceType[] }>(`{ resourceTypes { name } }`),
+      gqlRequest<{ productTypes: ProductType[] }>(`{ productTypes { id name slug industry basePrice baseCraftTicks description recipes { resourceType { name } quantity } } }`),
     ])
 
     currentTick.value = gameStateData.gameState?.currentTick ?? 0
+    resourceTypes.value = resourceData.resourceTypes ?? []
+    productTypes.value = productData.productTypes ?? []
 
     const allBuildings = companiesData.myCompanies.flatMap((company) => company.buildings)
     building.value = allBuildings.find((candidate) => candidate.id === buildingId.value) || null
@@ -645,7 +1026,57 @@ onMounted(async () => {
           <span class="meta-pill" :class="building.isForSale ? 'for-sale' : ''">
             {{ building.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
           </span>
+          <button class="btn btn-secondary btn-sm" @click="openSaleDialog">
+            {{ building.isForSale ? t('buildingDetail.editSale') : t('buildingDetail.sellBuilding') }}
+          </button>
         </div>
+      </div>
+
+      <!-- Sale dialog -->
+      <div v-if="showSaleDialog" class="sale-dialog">
+        <div class="sale-dialog-header">
+          <h3>{{ t('buildingDetail.sellBuilding') }}</h3>
+          <button class="btn btn-ghost" @click="closeSaleDialog">{{ t('common.close') }}</button>
+        </div>
+        <div class="sale-dialog-body">
+          <label class="form-label">{{ t('buildingDetail.askingPrice') }}</label>
+          <input
+            type="number"
+            class="form-input"
+            :placeholder="t('buildingDetail.askingPricePlaceholder')"
+            :value="salePrice"
+            @input="salePrice = ($event.target as HTMLInputElement).valueAsNumber || null"
+            min="0"
+            step="1000"
+          />
+          <div class="sale-dialog-actions">
+            <button
+              class="btn btn-primary"
+              :disabled="savingSale || !salePrice || salePrice <= 0"
+              @click="setBuildingForSale(true)"
+            >
+              {{ t('buildingDetail.listForSale') }}
+            </button>
+            <button
+              v-if="building.isForSale"
+              class="btn btn-danger"
+              :disabled="savingSale"
+              @click="setBuildingForSale(false)"
+            >
+              {{ t('buildingDetail.cancelSale') }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Configuration warnings -->
+      <div v-if="configWarnings.length > 0" class="config-warnings" role="alert">
+        <strong>{{ t('buildingDetail.warnings.title') }}</strong>
+        <ul>
+          <li v-for="(warning, i) in configWarnings" :key="i">
+            {{ t(warning.key, warning.params || {}) }}
+          </li>
+        </ul>
       </div>
 
       <div v-if="isUpgradeInProgress" class="upgrade-banner" role="status">
@@ -676,11 +1107,12 @@ onMounted(async () => {
                 <div class="grid-row unit-row">
                   <template v-for="x in gridIndexes" :key="`active-unit-${x}-${y}`">
                     <div
-                      class="grid-cell readonly"
-                      :class="{ occupied: !!getUnitAtFrom(activeUnits, x, y) }"
+                      class="grid-cell readonly clickable"
+                      :class="{ occupied: !!getUnitAtFrom(activeUnits, x, y), selected: selectedCell?.x === x && selectedCell?.y === y }"
                       :style="getUnitAtFrom(activeUnits, x, y)
                         ? { borderColor: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType) + '18' }
                         : {}"
+                      @click="selectedCell = getUnitAtFrom(activeUnits, x, y) ? { x, y } : null"
                     >
                       <template v-if="getUnitAtFrom(activeUnits, x, y)">
                         <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
@@ -877,10 +1309,217 @@ onMounted(async () => {
                 <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
                 <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
               </div>
+
+              <!-- Unit-specific configuration -->
+              <div class="unit-config-fields" v-if="isEditing && getDraftUnitAt(selectedCell.x, selectedCell.y)">
+                <h5>{{ t('buildingDetail.unitSettings') }}</h5>
+
+                <!-- Purchase unit config -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'PURCHASE'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.resourceType') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.resourceTypeId ?? ''" @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option v-for="rt in resourceTypes" :key="rt.name" :value="rt.name">{{ rt.name }}</option>
+                    </select>
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
+                    </select>
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.maxPrice') }}</label>
+                    <input type="number" class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.maxPrice" @input="updateSelectedUnitConfig('maxPrice', ($event.target as HTMLInputElement).valueAsNumber || null)" min="0" step="0.01" />
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.minQuality') }}</label>
+                    <input type="number" class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.minQuality" @input="updateSelectedUnitConfig('minQuality', ($event.target as HTMLInputElement).valueAsNumber || null)" min="0" max="1" step="0.01" />
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.purchaseSource') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.purchaseSource ?? ''" @change="updateSelectedUnitConfig('purchaseSource', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option value="EXCHANGE">{{ t('buildingDetail.config.sourceExchange') }}</option>
+                      <option value="LOCAL">{{ t('buildingDetail.config.sourceLocal') }}</option>
+                      <option value="OPTIMAL">{{ t('buildingDetail.config.sourceOptimal') }}</option>
+                    </select>
+                  </div>
+                </template>
+
+                <!-- Manufacturing unit config -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'MANUFACTURING'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
+                    </select>
+                  </div>
+                </template>
+
+                <!-- B2B Sales unit config -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'B2B_SALES'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.minPrice') }}</label>
+                    <input type="number" class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.minPrice" @input="updateSelectedUnitConfig('minPrice', ($event.target as HTMLInputElement).valueAsNumber || null)" min="0" step="0.01" />
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.saleVisibility') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.saleVisibility ?? ''" @change="updateSelectedUnitConfig('saleVisibility', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option value="PUBLIC">{{ t('buildingDetail.config.visibilityPublic') }}</option>
+                      <option value="COMPANY">{{ t('buildingDetail.config.visibilityCompany') }}</option>
+                      <option value="GROUP">{{ t('buildingDetail.config.visibilityGroup') }}</option>
+                    </select>
+                  </div>
+                </template>
+
+                <!-- Public Sales unit config -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'PUBLIC_SALES'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
+                    </select>
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.minPrice') }}</label>
+                    <input type="number" class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.minPrice" @input="updateSelectedUnitConfig('minPrice', ($event.target as HTMLInputElement).valueAsNumber || null)" min="0" step="0.01" />
+                  </div>
+                </template>
+
+                <!-- Marketing unit config -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'MARKETING'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.budget') }}</label>
+                    <input type="number" class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.budget" @input="updateSelectedUnitConfig('budget', ($event.target as HTMLInputElement).valueAsNumber || null)" min="0" step="100" />
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.mediaHouse') }}</label>
+                    <input type="text" class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId ?? ''" @input="updateSelectedUnitConfig('mediaHouseBuildingId', ($event.target as HTMLInputElement).value || null)" :placeholder="t('buildingDetail.config.mediaHousePlaceholder')" />
+                  </div>
+                </template>
+
+                <!-- Branding unit config -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'BRANDING'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.brandScope') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.brandScope ?? ''" @change="updateSelectedUnitConfig('brandScope', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option value="PRODUCT">{{ t('buildingDetail.config.scopeProduct') }}</option>
+                      <option value="CATEGORY">{{ t('buildingDetail.config.scopeCategory') }}</option>
+                      <option value="COMPANY">{{ t('buildingDetail.config.scopeCompany') }}</option>
+                    </select>
+                  </div>
+                </template>
+
+                <!-- Storage unit config (read-only info) -->
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'STORAGE'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.resourceType') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.resourceTypeId ?? ''" @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.anyResource') }}</option>
+                      <option v-for="rt in resourceTypes" :key="rt.name" :value="rt.name">{{ rt.name }}</option>
+                    </select>
+                  </div>
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.anyProduct') }}</option>
+                      <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
+                    </select>
+                  </div>
+                </template>
+              </div>
+
+              <!-- Read-only unit details for non-editing mode -->
+              <div class="unit-config-readonly" v-if="!isEditing && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)">
+                <template v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType === 'PURCHASE' && ('resourceTypeId' in getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!)">
+                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).resourceTypeId">{{ t('buildingDetail.config.resourceType') }}: {{ getResourceName((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).resourceTypeId) }}</span>
+                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId">{{ t('buildingDetail.config.productType') }}: {{ getProductName((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId) }}</span>
+                </template>
+              </div>
+
               <div class="unit-actions" v-if="isEditing">
                 <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
                   {{ t('buildingDetail.removeUnit') }}
                 </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Layout save/load -->
+          <div v-if="isEditing" class="layout-section">
+            <div class="layout-header">
+              <h4>{{ t('buildingDetail.layouts.title') }}</h4>
+            </div>
+            <div class="layout-save">
+              <input
+                type="text"
+                class="form-input"
+                v-model="layoutName"
+                :placeholder="t('buildingDetail.layouts.namePlaceholder')"
+              />
+              <button class="btn btn-secondary btn-sm" :disabled="!layoutName.trim()" @click="saveLayout">
+                {{ t('buildingDetail.layouts.save') }}
+              </button>
+            </div>
+            <div v-if="savedLayouts.length > 0" class="layout-list">
+              <div v-for="(layout, i) in savedLayouts" :key="i" class="layout-item">
+                <span class="layout-name">{{ layout.name }} ({{ layout.units.length }} {{ t('buildingDetail.layouts.units') }})</span>
+                <div class="layout-item-actions">
+                  <button class="btn btn-ghost btn-sm" @click="loadLayout(layout)">{{ t('buildingDetail.layouts.load') }}</button>
+                  <button class="btn btn-ghost btn-sm" @click="deleteLayout(i)">{{ t('buildingDetail.layouts.delete') }}</button>
+                </div>
+              </div>
+            </div>
+            <p v-else class="layout-empty">{{ t('buildingDetail.layouts.empty') }}</p>
+          </div>
+        </div>
+
+        <!-- Read-only unit detail sidebar (click on active grid) -->
+        <div class="sidebar" v-else-if="selectedCell && !isEditing && getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)">
+          <div class="unit-config">
+            <div class="unit-config-header">
+              <h3>{{ t('buildingDetail.unitDetails') }}</h3>
+              <button class="btn btn-ghost" @click="selectedCell = null">{{ t('common.close') }}</button>
+            </div>
+            <div class="unit-detail">
+              <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
+              <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
+              <div class="unit-stats">
+                <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.level }}</span>
+                <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+              </div>
+              <div class="unit-config-readonly-details">
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).resourceTypeId">
+                  {{ t('buildingDetail.config.resourceType') }}: {{ getResourceName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).resourceTypeId) }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId">
+                  {{ t('buildingDetail.config.productType') }}: {{ getProductName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId) }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice != null">
+                  {{ t('buildingDetail.config.minPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice != null">
+                  {{ t('buildingDetail.config.maxPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource">
+                  {{ t('buildingDetail.config.purchaseSource') }}: {{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility">
+                  {{ t('buildingDetail.config.saleVisibility') }}: {{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget != null">
+                  {{ t('buildingDetail.config.budget') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope">
+                  {{ t('buildingDetail.config.brandScope') }}: {{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope }}
+                </span>
               </div>
             </div>
           </div>
@@ -1475,5 +2114,178 @@ onMounted(async () => {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+/* Sale dialog */
+.sale-dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.sale-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.sale-dialog-header h3 {
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+.sale-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sale-dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.form-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.1);
+}
+
+/* Config warnings */
+.config-warnings {
+  background: rgba(255, 109, 0, 0.08);
+  border: 1px solid rgba(255, 109, 0, 0.3);
+  border-radius: var(--radius-lg);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  color: #b45309;
+}
+
+.config-warnings strong {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.config-warnings ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.config-warnings li {
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+/* Unit config fields */
+.unit-config-fields {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.unit-config-fields h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+}
+
+.config-field {
+  margin-bottom: 0.75rem;
+}
+
+.config-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.unit-config-readonly-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+}
+
+/* Layout section */
+.layout-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  margin-top: 1rem;
+}
+
+.layout-header {
+  margin-bottom: 0.75rem;
+}
+
+.layout-header h4 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.layout-save {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.layout-save .form-input {
+  flex: 1;
+}
+
+.layout-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.layout-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: var(--color-bg);
+  border-radius: var(--radius-md, 8px);
+}
+
+.layout-name {
+  font-size: 0.8125rem;
+}
+
+.layout-item-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.layout-empty {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.grid-cell.clickable {
+  cursor: pointer;
 }
 </style>
