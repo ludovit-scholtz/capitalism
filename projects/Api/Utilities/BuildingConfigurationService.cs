@@ -15,6 +15,9 @@ public static class BuildingConfigurationService
     public const int UnitPlanChangeTicks = 3;
     private const decimal CancelTicksMultiplier = 0.1m;
 
+    /// <summary>Normalizes null and empty strings to null for consistent comparison.</summary>
+    private static string? NormalizeString(string? value) => string.IsNullOrEmpty(value) ? null : value;
+
     public static async Task<BuildingConfigurationPlan> StoreConfigurationAsync(
         AppDbContext db,
         Building building,
@@ -445,12 +448,12 @@ public static class BuildingConfigurationService
             || currentUnit.ProductTypeId != input.ProductTypeId
             || currentUnit.MinPrice != input.MinPrice
             || currentUnit.MaxPrice != input.MaxPrice
-            || !string.Equals(currentUnit.PurchaseSource, input.PurchaseSource, StringComparison.Ordinal)
-            || !string.Equals(currentUnit.SaleVisibility, input.SaleVisibility, StringComparison.Ordinal)
+            || !string.Equals(NormalizeString(currentUnit.PurchaseSource), NormalizeString(input.PurchaseSource), StringComparison.Ordinal)
+            || !string.Equals(NormalizeString(currentUnit.SaleVisibility), NormalizeString(input.SaleVisibility), StringComparison.Ordinal)
             || currentUnit.Budget != input.Budget
             || currentUnit.MediaHouseBuildingId != input.MediaHouseBuildingId
             || currentUnit.MinQuality != input.MinQuality
-            || !string.Equals(currentUnit.BrandScope, input.BrandScope, StringComparison.Ordinal)
+            || !string.Equals(NormalizeString(currentUnit.BrandScope), NormalizeString(input.BrandScope), StringComparison.Ordinal)
             || currentUnit.VendorLockCompanyId != input.VendorLockCompanyId)
         {
             return LinkChangeTicks;
@@ -486,12 +489,12 @@ public static class BuildingConfigurationService
             && currentUnit.ProductTypeId == desiredUnit.ProductTypeId
             && currentUnit.MinPrice == desiredUnit.MinPrice
             && currentUnit.MaxPrice == desiredUnit.MaxPrice
-            && string.Equals(currentUnit.PurchaseSource, desiredUnit.PurchaseSource, StringComparison.Ordinal)
-            && string.Equals(currentUnit.SaleVisibility, desiredUnit.SaleVisibility, StringComparison.Ordinal)
+            && string.Equals(NormalizeString(currentUnit.PurchaseSource), NormalizeString(desiredUnit.PurchaseSource), StringComparison.Ordinal)
+            && string.Equals(NormalizeString(currentUnit.SaleVisibility), NormalizeString(desiredUnit.SaleVisibility), StringComparison.Ordinal)
             && currentUnit.Budget == desiredUnit.Budget
             && currentUnit.MediaHouseBuildingId == desiredUnit.MediaHouseBuildingId
             && currentUnit.MinQuality == desiredUnit.MinQuality
-            && string.Equals(currentUnit.BrandScope, desiredUnit.BrandScope, StringComparison.Ordinal)
+            && string.Equals(NormalizeString(currentUnit.BrandScope), NormalizeString(desiredUnit.BrandScope), StringComparison.Ordinal)
             && currentUnit.VendorLockCompanyId == desiredUnit.VendorLockCompanyId;
     }
 
@@ -512,12 +515,12 @@ public static class BuildingConfigurationService
             && pendingUnit.ProductTypeId == desiredUnit.ProductTypeId
             && pendingUnit.MinPrice == desiredUnit.MinPrice
             && pendingUnit.MaxPrice == desiredUnit.MaxPrice
-            && string.Equals(pendingUnit.PurchaseSource, desiredUnit.PurchaseSource, StringComparison.Ordinal)
-            && string.Equals(pendingUnit.SaleVisibility, desiredUnit.SaleVisibility, StringComparison.Ordinal)
+            && string.Equals(NormalizeString(pendingUnit.PurchaseSource), NormalizeString(desiredUnit.PurchaseSource), StringComparison.Ordinal)
+            && string.Equals(NormalizeString(pendingUnit.SaleVisibility), NormalizeString(desiredUnit.SaleVisibility), StringComparison.Ordinal)
             && pendingUnit.Budget == desiredUnit.Budget
             && pendingUnit.MediaHouseBuildingId == desiredUnit.MediaHouseBuildingId
             && pendingUnit.MinQuality == desiredUnit.MinQuality
-            && string.Equals(pendingUnit.BrandScope, desiredUnit.BrandScope, StringComparison.Ordinal)
+            && string.Equals(NormalizeString(pendingUnit.BrandScope), NormalizeString(desiredUnit.BrandScope), StringComparison.Ordinal)
             && pendingUnit.VendorLockCompanyId == desiredUnit.VendorLockCompanyId;
     }
 

@@ -465,9 +465,11 @@ function getCancelTicks(baseTicks: number): number {
   return Math.max(Math.ceil(baseTicks * 0.1), 1)
 }
 
+type UnitComparisonKeys = 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight' | 'resourceTypeId' | 'productTypeId' | 'minPrice' | 'maxPrice' | 'purchaseSource' | 'saleVisibility' | 'budget' | 'mediaHouseBuildingId' | 'minQuality' | 'brandScope' | 'vendorLockCompanyId'
+
 function areUnitsEquivalent(
-  left: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight' | 'resourceTypeId' | 'productTypeId' | 'minPrice' | 'maxPrice' | 'purchaseSource' | 'saleVisibility' | 'budget' | 'mediaHouseBuildingId' | 'minQuality' | 'brandScope' | 'vendorLockCompanyId'>,
-  right: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight' | 'resourceTypeId' | 'productTypeId' | 'minPrice' | 'maxPrice' | 'purchaseSource' | 'saleVisibility' | 'budget' | 'mediaHouseBuildingId' | 'minQuality' | 'brandScope' | 'vendorLockCompanyId'>,
+  left: Pick<EditableGridUnit, UnitComparisonKeys>,
+  right: Pick<EditableGridUnit, UnitComparisonKeys>,
 ): boolean {
   return left.unitType === right.unitType
     && left.gridX === right.gridX
@@ -844,7 +846,8 @@ function updateSelectedUnitConfig(field: string, value: unknown) {
   if (!selectedCell.value || !isEditing.value) return
   const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
   if (!unit) return
-  ;(unit as Record<string, unknown>)[field] = value
+  const sanitized = typeof value === 'number' && isNaN(value) ? null : value
+  ;(unit as Record<string, unknown>)[field] = sanitized
 }
 
 async function loadBuilding() {
@@ -1045,7 +1048,7 @@ onMounted(async () => {
             class="form-input"
             :placeholder="t('buildingDetail.askingPricePlaceholder')"
             :value="salePrice"
-            @input="salePrice = ($event.target as HTMLInputElement).valueAsNumber || null"
+            @input="salePrice = isNaN(($event.target as HTMLInputElement).valueAsNumber) ? null : ($event.target as HTMLInputElement).valueAsNumber"
             min="0"
             step="1000"
           />
