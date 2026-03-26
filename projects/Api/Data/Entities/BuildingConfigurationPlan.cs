@@ -28,6 +28,9 @@ public sealed class BuildingConfigurationPlan
     /// <summary>Total ticks required for the whole configuration to apply.</summary>
     public int TotalTicksRequired { get; set; }
 
-    /// <summary>Snapshot of units that will become active once the upgrade is applied.</summary>
+    /// <summary>Target layout snapshot for all occupied unit positions in the planned configuration.</summary>
     public ICollection<BuildingConfigurationPlanUnit> Units { get; set; } = [];
+
+    /// <summary>Pending removals for grid positions that should become empty after their own timers complete.</summary>
+    public ICollection<BuildingConfigurationPlanRemoval> Removals { get; set; } = [];
 }

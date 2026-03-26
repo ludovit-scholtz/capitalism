@@ -10,7 +10,7 @@ function getGridCell(section: ReturnType<typeof getGridSection>, x: number, y: n
 }
 
 test.describe('Building detail upgrades', () => {
-  test('shows planning only in edit mode and supports crossed diagonal links', async ({ page }) => {
+  test('allows revising links while a unit upgrade is still pending', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-1',
@@ -124,39 +124,65 @@ test.describe('Building detail upgrades', () => {
 
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     const plannedDiagonal = plannedSection.locator('.link-toggle.diagonal').first()
+    const plannedTopLeftCell = getGridCell(plannedSection, 0, 0)
 
     await expect(plannedDiagonal).toHaveClass(/state-none/)
     await expect(plannedSection.getByText('Upgrade time: 0 ticks')).toBeVisible()
 
-    await plannedDiagonal.click()
+    await plannedTopLeftCell.click()
+    await page.getByRole('button', { name: 'Remove' }).click()
+    await plannedTopLeftCell.click()
+    await page.getByRole('button', { name: 'Branding' }).click()
 
-    await expect(plannedDiagonal).toHaveClass(/state-tl-br/)
-
-    await plannedDiagonal.click()
-
-    await expect(plannedDiagonal).toHaveClass(/state-tr-bl/)
-
-    await plannedDiagonal.click()
-
-    await expect(plannedDiagonal).toHaveClass(/state-cross/)
-    await expect(plannedSection.getByText('Upgrade time: 1 ticks')).toBeVisible()
+    await expect(plannedTopLeftCell).toContainText('Branding')
+    await expect(plannedSection.getByText('Upgrade time: 3 ticks')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Store Upgrade' })).toBeEnabled()
 
     await page.getByRole('button', { name: 'Store Upgrade' }).click()
 
-    await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 1 ticks.')
-    await expect(getGridSection(page, 'Queued Upgrade')).toBeVisible()
+    await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 3 ticks.')
+    await expect(page.getByRole('heading', { name: 'Queued Upgrade' })).toHaveCount(0)
     await expect(currentDiagonal).toHaveClass(/state-none/)
-    await expect(getGridSection(page, 'Queued Upgrade').locator('.link-toggle.diagonal').first()).toHaveClass(/state-cross/)
+
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const queuedSection = getGridSection(page, 'Queued Upgrade')
+    const queuedTopLeftCell = getGridCell(queuedSection, 0, 0)
+    const queuedDiagonal = queuedSection.locator('.link-toggle.diagonal').first()
+
+    await expect(queuedTopLeftCell).toContainText('Branding')
+
+    await queuedDiagonal.click()
+    await queuedDiagonal.click()
+    await queuedDiagonal.click()
+
+    await expect(queuedDiagonal).toHaveClass(/state-cross/)
+    await expect(queuedSection.getByText('Upgrade time: 3 ticks')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Store Upgrade' }).click()
+
+    await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 3 ticks.')
 
     state.gameState.currentTick += 1
     await page.reload()
 
     const refreshedCurrentSection = getGridSection(page, 'Current Configuration')
+    await expect(page.getByRole('status')).toContainText('The current building keeps running until the queued layout activates in 2 ticks.')
+    await expect(refreshedCurrentSection).toContainText('Purchase')
+
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const refreshedQueuedSection = getGridSection(page, 'Queued Upgrade')
+    await expect(getGridCell(refreshedQueuedSection, 0, 0)).toContainText('Branding')
+    await expect(refreshedQueuedSection.locator('.link-toggle.diagonal').first()).toHaveClass(/state-cross/)
+
+    state.gameState.currentTick += 2
+    await page.reload()
 
     await expect(page.getByText('Building upgrade in progress')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toHaveCount(0)
     await expect(refreshedCurrentSection.locator('.link-toggle.diagonal').first()).toHaveClass(/state-cross/)
+
+    const finalCurrentSection = getGridSection(page, 'Current Configuration')
+    await expect(getGridCell(finalCurrentSection, 0, 0)).toContainText('Branding')
 
     await page.getByRole('button', { name: 'Edit Building' }).click()
     const refreshedPlannedSection = getGridSection(page, 'Planned Upgrade')

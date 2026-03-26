@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
-import type { Building, BuildingConfigurationPlanUnit, BuildingUnit } from '@/types'
+import type { Building, BuildingConfigurationPlanRemoval, BuildingConfigurationPlanUnit, BuildingUnit } from '@/types'
 
 type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
 
@@ -43,6 +43,7 @@ const isEditing = ref(false)
 const selectedCell = ref<{ x: number; y: number } | null>(null)
 const showUnitPicker = ref(false)
 const draftUnits = ref<EditableGridUnit[]>([])
+const editBaselineUnits = ref<EditableGridUnit[]>([])
 
 const allowedUnitsMap: Record<string, string[]> = {
   MINE: ['MINING', 'STORAGE', 'B2B_SALES'],
@@ -66,7 +67,9 @@ const unitColors: Record<string, string> = {
 
 const activeUnits = computed(() => building.value?.units ?? [])
 const pendingConfiguration = computed(() => building.value?.pendingConfiguration ?? null)
-const plannedUnits = computed<GridUnit[]>(() => pendingConfiguration.value?.units ?? draftUnits.value)
+const pendingUnits = computed(() => pendingConfiguration.value?.units ?? [])
+const pendingRemovals = computed(() => pendingConfiguration.value?.removals ?? [])
+const plannedUnits = computed<GridUnit[]>(() => (isEditing.value ? draftUnits.value : pendingUnits.value))
 const allowedUnits = computed(() => {
   if (!building.value) return []
   return allowedUnitsMap[building.value.type] || []
@@ -78,14 +81,19 @@ const remainingUpgradeTicks = computed(() => {
   return Math.max(pendingConfiguration.value.appliesAtTick - currentTick.value, 0)
 })
 const draftTotalTicks = computed(() => {
-  const unitTicks = draftUnits.value.map((unit) => getDraftTicksForUnit(unit))
-  const removedTicks = activeUnits.value
-    .filter((unit) => !getUnitAtFrom(draftUnits.value, unit.gridX, unit.gridY))
-    .map(() => UNIT_PLAN_CHANGE_TICKS)
+  const positions = new Set<string>()
 
-  return [...unitTicks, ...removedTicks].reduce((maxTicks, ticks) => Math.max(maxTicks, ticks), 0)
+  for (const unit of activeUnits.value) positions.add(`${unit.gridX},${unit.gridY}`)
+  for (const unit of draftUnits.value) positions.add(`${unit.gridX},${unit.gridY}`)
+  for (const unit of pendingUnits.value) positions.add(`${unit.gridX},${unit.gridY}`)
+  for (const removal of pendingRemovals.value) positions.add(`${removal.gridX},${removal.gridY}`)
+
+  return Array.from(positions).reduce((maxTicks, position) => {
+    const [gridX = 0, gridY = 0] = position.split(',').map(Number)
+    return Math.max(maxTicks, getDraftTicksAt(gridX, gridY))
+  }, 0)
 })
-const hasDraftChanges = computed(() => draftTotalTicks.value > 0)
+const hasDraftChanges = computed(() => !areUnitCollectionsEqual(draftUnits.value, editBaselineUnits.value))
 
 function formatBuildingType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
@@ -101,6 +109,18 @@ function getUnitAtFrom(units: GridUnit[], x: number, y: number): GridUnit | unde
 
 function getDraftUnitAt(x: number, y: number): EditableGridUnit | undefined {
   return draftUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
+}
+
+function getEditBaselineUnitAt(x: number, y: number): EditableGridUnit | undefined {
+  return editBaselineUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
+}
+
+function getPendingUnitAt(x: number, y: number): BuildingConfigurationPlanUnit | undefined {
+  return pendingUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
+}
+
+function getPendingRemovalAt(x: number, y: number): BuildingConfigurationPlanRemoval | undefined {
+  return pendingRemovals.value.find((removal) => removal.gridX === x && removal.gridY === y)
 }
 
 function cloneUnit(unit: GridUnit): EditableGridUnit {
@@ -125,16 +145,27 @@ function setDraftUnitsFrom(sourceUnits: GridUnit[]) {
   draftUnits.value = sourceUnits.map((unit) => cloneUnit(unit))
 }
 
-function startEditing() {
+function setEditBaselineFrom(sourceUnits: GridUnit[]) {
+  editBaselineUnits.value = sourceUnits.map((unit) => cloneUnit(unit))
+}
 
-  setDraftUnitsFrom(activeUnits.value)
+function getEditingSourceUnits(): GridUnit[] {
+  return pendingConfiguration.value?.units ?? activeUnits.value
+}
+
+function startEditing() {
+  const sourceUnits = getEditingSourceUnits()
+  setDraftUnitsFrom(sourceUnits)
+  setEditBaselineFrom(sourceUnits)
   isEditing.value = true
   selectedCell.value = null
   showUnitPicker.value = false
 }
 
 function cancelEditing() {
-  setDraftUnitsFrom(activeUnits.value)
+  const sourceUnits = getEditingSourceUnits()
+  setDraftUnitsFrom(sourceUnits)
+  setEditBaselineFrom(sourceUnits)
   isEditing.value = false
   selectedCell.value = null
   showUnitPicker.value = false
@@ -307,7 +338,22 @@ function canToggleDiagonalLink(units: GridUnit[], x: number, y: number): boolean
 }
 
 function getDraftTicksForUnit(unit: EditableGridUnit): number {
+  const baselinePendingUnit = getPendingUnitAt(unit.gridX, unit.gridY)
+  const baselinePendingRemoval = getPendingRemovalAt(unit.gridX, unit.gridY)
   const activeUnit = getUnitAtFrom(activeUnits.value, unit.gridX, unit.gridY) as BuildingUnit | undefined
+
+  if (baselinePendingUnit && areUnitsEquivalent(baselinePendingUnit, unit)) {
+    return getRemainingTicksFromApplyTick(baselinePendingUnit.appliesAtTick)
+  }
+
+  if (baselinePendingRemoval && activeUnit && areUnitsEquivalent(activeUnit, unit)) {
+    return getCancelTicks(baselinePendingRemoval.ticksRequired)
+  }
+
+  if (baselinePendingUnit && activeUnit && areUnitsEquivalent(activeUnit, unit)) {
+    return getCancelTicks(baselinePendingUnit.ticksRequired)
+  }
+
   if (!activeUnit) return UNIT_PLAN_CHANGE_TICKS
 
   if (activeUnit.unitType !== unit.unitType) {
@@ -330,8 +376,73 @@ function getDraftTicksForUnit(unit: EditableGridUnit): number {
   return 0
 }
 
+function getDraftTicksAt(x: number, y: number): number {
+  const draftUnit = getDraftUnitAt(x, y)
+  if (draftUnit) {
+    return getDraftTicksForUnit(draftUnit)
+  }
+
+  const pendingRemoval = getPendingRemovalAt(x, y)
+  if (pendingRemoval) {
+    return getRemainingTicksFromApplyTick(pendingRemoval.appliesAtTick)
+  }
+
+  const pendingUnit = getPendingUnitAt(x, y)
+  if (pendingUnit) {
+    return getCancelTicks(pendingUnit.ticksRequired)
+  }
+
+  return getUnitAtFrom(activeUnits.value, x, y) ? UNIT_PLAN_CHANGE_TICKS : 0
+}
+
 function getDisplayedTicks(unit: GridUnit): number {
-  return 'ticksRequired' in unit ? unit.ticksRequired : getDraftTicksForUnit(unit)
+  if ('appliesAtTick' in unit && 'isChanged' in unit && unit.isChanged) {
+    return getRemainingTicksFromApplyTick(unit.appliesAtTick)
+  }
+
+  return getDraftTicksForUnit(unit as EditableGridUnit)
+}
+
+function getRemainingTicksFromApplyTick(appliesAtTick: number): number {
+  return Math.max(appliesAtTick - currentTick.value, 0)
+}
+
+function getCancelTicks(baseTicks: number): number {
+  return Math.max(Math.ceil(baseTicks * 0.1), 1)
+}
+
+function areUnitsEquivalent(
+  left: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight'>,
+  right: Pick<EditableGridUnit, 'unitType' | 'gridX' | 'gridY' | 'linkUp' | 'linkDown' | 'linkLeft' | 'linkRight' | 'linkUpLeft' | 'linkUpRight' | 'linkDownLeft' | 'linkDownRight'>,
+): boolean {
+  return left.unitType === right.unitType
+    && left.gridX === right.gridX
+    && left.gridY === right.gridY
+    && left.linkUp === right.linkUp
+    && left.linkDown === right.linkDown
+    && left.linkLeft === right.linkLeft
+    && left.linkRight === right.linkRight
+    && left.linkUpLeft === right.linkUpLeft
+    && left.linkUpRight === right.linkUpRight
+    && left.linkDownLeft === right.linkDownLeft
+    && left.linkDownRight === right.linkDownRight
+}
+
+function areUnitCollectionsEqual(left: EditableGridUnit[], right: EditableGridUnit[]): boolean {
+  if (left.length !== right.length) {
+    return false
+  }
+
+  const sortedLeft = [...left].sort(compareUnits)
+  const sortedRight = [...right].sort(compareUnits)
+
+  return sortedLeft.every((unit, index) => areUnitsEquivalent(unit, sortedRight[index]!))
+}
+
+function compareUnits(left: EditableGridUnit, right: EditableGridUnit): number {
+  if (left.gridY !== right.gridY) return left.gridY - right.gridY
+  if (left.gridX !== right.gridX) return left.gridX - right.gridX
+  return left.unitType.localeCompare(right.unitType)
 }
 
 function storeConfiguration() {
@@ -436,6 +547,15 @@ async function loadBuilding() {
               submittedAtTick
               appliesAtTick
               totalTicksRequired
+              removals {
+                id
+                gridX
+                gridY
+                startedAtTick
+                appliesAtTick
+                ticksRequired
+                isReverting
+              }
               units {
                 id
                 unitType
@@ -450,8 +570,11 @@ async function loadBuilding() {
                 linkUpRight
                 linkDownLeft
                 linkDownRight
+                startedAtTick
+                appliesAtTick
                 ticksRequired
                 isChanged
+                isReverting
               }
             }
           }
@@ -470,7 +593,9 @@ async function loadBuilding() {
       return
     }
 
-    setDraftUnitsFrom(pendingConfiguration.value?.units ?? building.value.units)
+    const sourceUnits = pendingConfiguration.value?.units ?? building.value.units
+    setDraftUnitsFrom(sourceUnits)
+    setEditBaselineFrom(sourceUnits)
     isEditing.value = false
     selectedCell.value = null
     showUnitPicker.value = false
@@ -537,7 +662,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="!showPlanningSection" class="grid-section">
+      <div class="grid-section">
         <div class="grid-header">
           <div>
             <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
@@ -603,7 +728,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-else class="grid-section">
+      <div v-if="showPlanningSection" class="grid-section">
         <div class="grid-header plan-header">
           <div>
             <h2>{{ isUpgradeInProgress ? t('buildingDetail.queuedConfiguration') : t('buildingDetail.plannedConfiguration') }}</h2>
@@ -612,7 +737,7 @@ onMounted(async () => {
             </p>
           </div>
           <div class="grid-actions">
-            <button v-if="hasDraftChanges" class="btn btn-secondary" @click="cancelEditing">
+            <button class="btn btn-secondary" @click="cancelEditing">
               {{ t('buildingDetail.cancelEditing') }}
             </button>
             <button
@@ -625,7 +750,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div v-if="!isUpgradeInProgress" class="upgrade-summary">
+        <div class="upgrade-summary">
           <span class="upgrade-summary-pill">{{ t('buildingDetail.currentTickLabel', { tick: currentTick }) }}</span>
           <span class="upgrade-summary-pill">{{ t('buildingDetail.totalUpgradeTicks', { ticks: draftTotalTicks }) }}</span>
         </div>
@@ -639,13 +764,11 @@ onMounted(async () => {
                   :class="{
                     occupied: !!getUnitAtFrom(plannedUnits, x, y),
                     selected: selectedCell?.x === x && selectedCell?.y === y,
-                    readonly: isUpgradeInProgress,
                     changed: !!getUnitAtFrom(plannedUnits, x, y) && getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0,
                   }"
                   :style="getUnitAtFrom(plannedUnits, x, y)
                     ? { borderColor: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType) + '18' }
                     : {}"
-                  :disabled="isUpgradeInProgress"
                   @click="clickDraftCell(x, y)"
                 >
                   <template v-if="getUnitAtFrom(plannedUnits, x, y)">
@@ -664,8 +787,8 @@ onMounted(async () => {
                   v-if="x < 3"
                   :key="`planned-horizontal-${x}-${y}`"
                   class="link-toggle horizontal"
-                  :class="{ active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) || isUpgradeInProgress }"
-                  :disabled="isUpgradeInProgress || !canToggleHorizontalLink(plannedUnits, x, y)"
+                  :class="{ active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) }"
+                  :disabled="!canToggleHorizontalLink(plannedUnits, x, y)"
                   :aria-label="t('buildingDetail.linkRight')"
                   @click="toggleHorizontalLink(x, y)"
                 >
@@ -678,8 +801,8 @@ onMounted(async () => {
               <template v-for="x in gridIndexes" :key="`planned-connector-${x}-${y}`">
                 <button
                   class="link-toggle vertical"
-                  :class="{ active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) || isUpgradeInProgress }"
-                  :disabled="isUpgradeInProgress || !canToggleVerticalLink(plannedUnits, x, y)"
+                  :class="{ active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) }"
+                  :disabled="!canToggleVerticalLink(plannedUnits, x, y)"
                   :aria-label="t('buildingDetail.linkDown')"
                   @click="toggleVerticalLink(x, y)"
                 >
@@ -690,8 +813,8 @@ onMounted(async () => {
                   v-if="x < 3"
                   :key="`planned-diagonal-${x}-${y}`"
                   class="link-toggle diagonal"
-                  :class="[`state-${getDiagonalStateFor(plannedUnits, x, y)}`, { disabled: !canToggleDiagonalLink(plannedUnits, x, y) || isUpgradeInProgress }]"
-                  :disabled="isUpgradeInProgress || !canToggleDiagonalLink(plannedUnits, x, y)"
+                  :class="[`state-${getDiagonalStateFor(plannedUnits, x, y)}`, { disabled: !canToggleDiagonalLink(plannedUnits, x, y) }]"
+                  :disabled="!canToggleDiagonalLink(plannedUnits, x, y)"
                   :aria-label="t('buildingDetail.links')"
                   @click="toggleDiagonalLink(x, y)"
                 >
@@ -711,7 +834,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="showUnitPicker && selectedCell && isEditing && !isUpgradeInProgress" class="unit-picker-overlay" @click.self="showUnitPicker = false">
+      <div v-if="showUnitPicker && selectedCell && isEditing" class="unit-picker-overlay" @click.self="showUnitPicker = false">
         <div class="unit-picker">
           <div class="picker-header">
             <h3>{{ t('buildingDetail.selectUnitType') }}</h3>
@@ -751,7 +874,7 @@ onMounted(async () => {
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
         </div>
-        <div class="unit-actions" v-if="!isUpgradeInProgress">
+        <div class="unit-actions" v-if="isEditing">
           <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
             {{ t('buildingDetail.removeUnit') }}
           </button>

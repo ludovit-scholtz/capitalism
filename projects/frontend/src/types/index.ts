@@ -63,6 +63,7 @@ export interface BuildingConfigurationPlan {
   appliesAtTick: number
   totalTicksRequired: number
   units: BuildingConfigurationPlanUnit[]
+  removals: BuildingConfigurationPlanRemoval[]
 }
 
 /** Pending unit snapshot inside a queued building configuration. */
@@ -80,8 +81,21 @@ export interface BuildingConfigurationPlanUnit {
   linkUpRight: boolean
   linkDownLeft: boolean
   linkDownRight: boolean
+  startedAtTick: number
+  appliesAtTick: number
   ticksRequired: number
   isChanged: boolean
+  isReverting: boolean
+}
+
+export interface BuildingConfigurationPlanRemoval {
+  id: string
+  gridX: number
+  gridY: number
+  startedAtTick: number
+  appliesAtTick: number
+  ticksRequired: number
+  isReverting: boolean
 }
 
 /** Matches backend BuildingUnit entity */

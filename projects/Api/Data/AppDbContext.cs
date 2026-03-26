@@ -27,6 +27,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Queued unit snapshots for building configuration upgrades.</summary>
     public DbSet<BuildingConfigurationPlanUnit> BuildingConfigurationPlanUnits => Set<BuildingConfigurationPlanUnit>();
 
+    /// <summary>Queued empty-slot transitions for building configuration upgrades.</summary>
+    public DbSet<BuildingConfigurationPlanRemoval> BuildingConfigurationPlanRemovals => Set<BuildingConfigurationPlanRemoval>();
+
     /// <summary>Cities on the game map.</summary>
     public DbSet<City> Cities => Set<City>();
 
@@ -124,6 +127,16 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasOne(unit => unit.BuildingConfigurationPlan)
                 .WithMany(plan => plan.Units)
                 .HasForeignKey(unit => unit.BuildingConfigurationPlanId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // BuildingConfigurationPlanRemoval
+        modelBuilder.Entity<BuildingConfigurationPlanRemoval>(e =>
+        {
+            e.HasKey(removal => removal.Id);
+            e.HasOne(removal => removal.BuildingConfigurationPlan)
+                .WithMany(plan => plan.Removals)
+                .HasForeignKey(removal => removal.BuildingConfigurationPlanId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 

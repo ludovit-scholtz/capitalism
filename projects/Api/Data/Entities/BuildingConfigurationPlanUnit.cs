@@ -53,9 +53,18 @@ public sealed class BuildingConfigurationPlanUnit
     /// <summary>Whether the diagonal link to the unit below-right is active.</summary>
     public bool LinkDownRight { get; set; }
 
-    /// <summary>Ticks this unit is unavailable while the upgrade is processed.</summary>
+    /// <summary>The tick when this pending work started.</summary>
+    public long StartedAtTick { get; set; }
+
+    /// <summary>The tick when this target state becomes active.</summary>
+    public long AppliesAtTick { get; set; }
+
+    /// <summary>Total ticks required for this pending unit change.</summary>
     public int TicksRequired { get; set; }
 
     /// <summary>Whether this snapshot differs from the currently active unit at the same grid position.</summary>
     public bool IsChanged { get; set; }
+
+    /// <summary>Whether this entry represents canceling a previously queued change back to the current live state.</summary>
+    public bool IsReverting { get; set; }
 }

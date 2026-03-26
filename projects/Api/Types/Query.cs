@@ -52,6 +52,9 @@ public sealed class Query
             .ThenInclude(b => b.PendingConfiguration)
             .ThenInclude(plan => plan!.Units)
             .Include(c => c.Buildings)
+            .ThenInclude(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
+            .Include(c => c.Buildings)
             .ThenInclude(b => b.Units)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
@@ -121,6 +124,9 @@ public sealed class Query
             .Include(c => c.Buildings)
             .ThenInclude(b => b.PendingConfiguration)
             .ThenInclude(plan => plan!.Units)
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
             .Where(c => c.PlayerId == userId)
             .OrderBy(c => c.Name)
             .ToListAsync();

@@ -318,6 +318,8 @@ public sealed class Mutation
             .Include(candidate => candidate.Units)
             .Include(candidate => candidate.PendingConfiguration)
             .ThenInclude(plan => plan!.Units)
+            .Include(candidate => candidate.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
             .FirstOrDefaultAsync(candidate => candidate.Id == input.BuildingId);
 
         if (building is null || building.Company.PlayerId != userId)
@@ -338,12 +340,13 @@ public sealed class Mutation
                     .Build());
         }
 
-        await BuildingConfigurationService.QueueConfigurationAsync(db, building, input.Units, gameState.CurrentTick);
+        var plan = await BuildingConfigurationService.StoreConfigurationAsync(db, building, input.Units, gameState.CurrentTick);
         await db.SaveChangesAsync();
 
         return await db.BuildingConfigurationPlans
-            .Include(plan => plan.Units)
-            .FirstAsync(plan => plan.BuildingId == building.Id);
+            .Include(candidate => candidate.Units)
+            .Include(candidate => candidate.Removals)
+            .FirstAsync(candidate => candidate.Id == plan.Id);
     }
 
     private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)
