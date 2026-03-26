@@ -412,17 +412,17 @@ function getDraftTicksForUnit(unit: EditableGridUnit): number {
   }
 
   if (
-    activeUnit.resourceTypeId !== unit.resourceTypeId
-    || activeUnit.productTypeId !== unit.productTypeId
-    || activeUnit.minPrice !== unit.minPrice
-    || activeUnit.maxPrice !== unit.maxPrice
-    || activeUnit.purchaseSource !== unit.purchaseSource
-    || activeUnit.saleVisibility !== unit.saleVisibility
-    || activeUnit.budget !== unit.budget
-    || activeUnit.mediaHouseBuildingId !== unit.mediaHouseBuildingId
-    || activeUnit.minQuality !== unit.minQuality
-    || activeUnit.brandScope !== unit.brandScope
-    || activeUnit.vendorLockCompanyId !== unit.vendorLockCompanyId
+    (activeUnit.resourceTypeId ?? null) !== (unit.resourceTypeId ?? null)
+    || (activeUnit.productTypeId ?? null) !== (unit.productTypeId ?? null)
+    || (activeUnit.minPrice ?? null) !== (unit.minPrice ?? null)
+    || (activeUnit.maxPrice ?? null) !== (unit.maxPrice ?? null)
+    || (activeUnit.purchaseSource ?? null) !== (unit.purchaseSource ?? null)
+    || (activeUnit.saleVisibility ?? null) !== (unit.saleVisibility ?? null)
+    || (activeUnit.budget ?? null) !== (unit.budget ?? null)
+    || (activeUnit.mediaHouseBuildingId ?? null) !== (unit.mediaHouseBuildingId ?? null)
+    || (activeUnit.minQuality ?? null) !== (unit.minQuality ?? null)
+    || (activeUnit.brandScope ?? null) !== (unit.brandScope ?? null)
+    || (activeUnit.vendorLockCompanyId ?? null) !== (unit.vendorLockCompanyId ?? null)
   ) {
     return LINK_CHANGE_TICKS
   }
@@ -480,17 +480,17 @@ function areUnitsEquivalent(
     && left.linkUpRight === right.linkUpRight
     && left.linkDownLeft === right.linkDownLeft
     && left.linkDownRight === right.linkDownRight
-    && left.resourceTypeId === right.resourceTypeId
-    && left.productTypeId === right.productTypeId
-    && left.minPrice === right.minPrice
-    && left.maxPrice === right.maxPrice
-    && left.purchaseSource === right.purchaseSource
-    && left.saleVisibility === right.saleVisibility
-    && left.budget === right.budget
-    && left.mediaHouseBuildingId === right.mediaHouseBuildingId
-    && left.minQuality === right.minQuality
-    && left.brandScope === right.brandScope
-    && left.vendorLockCompanyId === right.vendorLockCompanyId
+    && (left.resourceTypeId ?? null) === (right.resourceTypeId ?? null)
+    && (left.productTypeId ?? null) === (right.productTypeId ?? null)
+    && (left.minPrice ?? null) === (right.minPrice ?? null)
+    && (left.maxPrice ?? null) === (right.maxPrice ?? null)
+    && (left.purchaseSource ?? null) === (right.purchaseSource ?? null)
+    && (left.saleVisibility ?? null) === (right.saleVisibility ?? null)
+    && (left.budget ?? null) === (right.budget ?? null)
+    && (left.mediaHouseBuildingId ?? null) === (right.mediaHouseBuildingId ?? null)
+    && (left.minQuality ?? null) === (right.minQuality ?? null)
+    && (left.brandScope ?? null) === (right.brandScope ?? null)
+    && (left.vendorLockCompanyId ?? null) === (right.vendorLockCompanyId ?? null)
 }
 
 function areUnitCollectionsEqual(left: EditableGridUnit[], right: EditableGridUnit[]): boolean {
