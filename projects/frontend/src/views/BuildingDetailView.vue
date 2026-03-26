@@ -111,10 +111,6 @@ function getDraftUnitAt(x: number, y: number): EditableGridUnit | undefined {
   return draftUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
 }
 
-function getEditBaselineUnitAt(x: number, y: number): EditableGridUnit | undefined {
-  return editBaselineUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
-}
-
 function getPendingUnitAt(x: number, y: number): BuildingConfigurationPlanUnit | undefined {
   return pendingUnits.value.find((unit) => unit.gridX === x && unit.gridY === y)
 }
