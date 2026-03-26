@@ -147,6 +147,8 @@ export default {
     plannedConfigurationHelp: 'Bearbeiten Sie hier die komplette Zielkonfiguration. Sie wird erst nach Ablauf der ben\u00f6tigten Ticks aktiv.',
     queuedConfiguration: 'Geplanter Ausbau in Warteschlange',
     queuedConfigurationHelp: 'Dieses Ziel-Layout ist gesperrt, bis der Ausbau abgeschlossen ist.',
+    editConfiguration: 'Gebäude bearbeiten',
+    cancelEditing: 'Bearbeitung abbrechen',
     storeConfiguration: 'Ausbau speichern',
     upgradeQueuedTitle: 'Geb\u00e4ude wird ausgebaut',
     upgradeQueuedBody: 'Die aktuelle Konfiguration bleibt aktiv, bis das neue Layout in {ticks} Ticks freigeschaltet wird.',

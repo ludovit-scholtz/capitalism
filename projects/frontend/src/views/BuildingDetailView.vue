@@ -39,6 +39,7 @@ const currentTick = ref(0)
 const loading = ref(true)
 const saving = ref(false)
 const error = ref<string | null>(null)
+const isEditing = ref(false)
 const selectedCell = ref<{ x: number; y: number } | null>(null)
 const showUnitPicker = ref(false)
 const draftUnits = ref<EditableGridUnit[]>([])
@@ -71,6 +72,7 @@ const allowedUnits = computed(() => {
   return allowedUnitsMap[building.value.type] || []
 })
 const isUpgradeInProgress = computed(() => pendingConfiguration.value !== null)
+const showPlanningSection = computed(() => isUpgradeInProgress.value || isEditing.value)
 const remainingUpgradeTicks = computed(() => {
   if (!pendingConfiguration.value) return 0
   return Math.max(pendingConfiguration.value.appliesAtTick - currentTick.value, 0)
@@ -123,8 +125,24 @@ function setDraftUnitsFrom(sourceUnits: GridUnit[]) {
   draftUnits.value = sourceUnits.map((unit) => cloneUnit(unit))
 }
 
+function startEditing() {
+  if (isUpgradeInProgress.value) return
+
+  setDraftUnitsFrom(activeUnits.value)
+  isEditing.value = true
+  selectedCell.value = null
+  showUnitPicker.value = false
+}
+
+function cancelEditing() {
+  setDraftUnitsFrom(activeUnits.value)
+  isEditing.value = false
+  selectedCell.value = null
+  showUnitPicker.value = false
+}
+
 function clickDraftCell(x: number, y: number) {
-  if (isUpgradeInProgress.value) {
+  if (isUpgradeInProgress.value || !isEditing.value) {
     return
   }
 
@@ -134,7 +152,7 @@ function clickDraftCell(x: number, y: number) {
 }
 
 function placeUnit(unitType: string) {
-  if (!selectedCell.value || isUpgradeInProgress.value) return
+  if (!selectedCell.value || isUpgradeInProgress.value || !isEditing.value) return
 
   const newUnit: EditableGridUnit = {
     id: `draft-${selectedCell.value.x}-${selectedCell.value.y}-${Date.now()}`,
@@ -178,7 +196,7 @@ function clearConnectionsAround(x: number, y: number) {
 }
 
 function removeDraftUnit(x: number, y: number) {
-  if (isUpgradeInProgress.value) return
+  if (isUpgradeInProgress.value || !isEditing.value) return
 
   clearConnectionsAround(x, y)
   draftUnits.value = draftUnits.value.filter((unit) => !(unit.gridX === x && unit.gridY === y))
@@ -187,7 +205,7 @@ function removeDraftUnit(x: number, y: number) {
 }
 
 function toggleHorizontalLink(x: number, y: number) {
-  if (isUpgradeInProgress.value) return
+  if (isUpgradeInProgress.value || !isEditing.value) return
 
   const left = getDraftUnitAt(x, y)
   const right = getDraftUnitAt(x + 1, y)
@@ -199,7 +217,7 @@ function toggleHorizontalLink(x: number, y: number) {
 }
 
 function toggleVerticalLink(x: number, y: number) {
-  if (isUpgradeInProgress.value) return
+  if (isUpgradeInProgress.value || !isEditing.value) return
 
   const top = getDraftUnitAt(x, y)
   const bottom = getDraftUnitAt(x, y + 1)
@@ -222,17 +240,20 @@ function clearDiagonalState(units: EditableGridUnit[], x: number, y: number) {
   if (bottomLeft) bottomLeft.linkUpRight = false
 }
 
-function getDiagonalStateFor(units: GridUnit[], x: number, y: number): 'none' | 'tl-br' | 'tr-bl' {
+function getDiagonalStateFor(units: GridUnit[], x: number, y: number): 'none' | 'tl-br' | 'tr-bl' | 'cross' {
   const topLeft = getUnitAtFrom(units, x, y)
   const topRight = getUnitAtFrom(units, x + 1, y)
+  const hasTopLeftToBottomRight = !!topLeft?.linkDownRight
+  const hasTopRightToBottomLeft = !!topRight?.linkDownLeft
 
-  if (topLeft?.linkDownRight) return 'tl-br'
-  if (topRight?.linkDownLeft) return 'tr-bl'
+  if (hasTopLeftToBottomRight && hasTopRightToBottomLeft) return 'cross'
+  if (hasTopLeftToBottomRight) return 'tl-br'
+  if (hasTopRightToBottomLeft) return 'tr-bl'
   return 'none'
 }
 
 function toggleDiagonalLink(x: number, y: number) {
-  if (isUpgradeInProgress.value) return
+  if (isUpgradeInProgress.value || !isEditing.value) return
 
   const topLeft = getDraftUnitAt(x, y)
   const topRight = getDraftUnitAt(x + 1, y)
@@ -250,6 +271,14 @@ function toggleDiagonalLink(x: number, y: number) {
   }
 
   if (currentState === 'tl-br') {
+    topRight.linkDownLeft = true
+    bottomLeft.linkUpRight = true
+    return
+  }
+
+  if (currentState === 'tr-bl') {
+    topLeft.linkDownRight = true
+    bottomRight.linkUpLeft = true
     topRight.linkDownLeft = true
     bottomLeft.linkUpRight = true
   }
@@ -345,7 +374,10 @@ function storeConfiguration() {
       },
     },
   )
-    .then(() => loadBuilding())
+    .then(() => {
+      isEditing.value = false
+      return loadBuilding()
+    })
     .catch((reason: unknown) => {
       error.value = reason instanceof Error ? reason.message : t('buildingDetail.storeUpgradeFailed')
     })
@@ -440,6 +472,7 @@ async function loadBuilding() {
     }
 
     setDraftUnitsFrom(pendingConfiguration.value?.units ?? building.value.units)
+    isEditing.value = false
     selectedCell.value = null
     showUnitPicker.value = false
   } catch (reason: unknown) {
@@ -505,12 +538,15 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="grid-section">
+      <div v-if="!showPlanningSection" class="grid-section">
         <div class="grid-header">
           <div>
             <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
             <p class="section-subtitle">{{ t('buildingDetail.activeConfigurationHelp') }}</p>
           </div>
+          <button v-if="!isUpgradeInProgress && !isEditing" class="btn btn-secondary" @click="startEditing">
+            {{ t('buildingDetail.editConfiguration') }}
+          </button>
         </div>
 
         <div class="unit-grid readonly-grid">
@@ -568,7 +604,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div class="grid-section">
+      <div v-else class="grid-section">
         <div class="grid-header plan-header">
           <div>
             <h2>{{ isUpgradeInProgress ? t('buildingDetail.queuedConfiguration') : t('buildingDetail.plannedConfiguration') }}</h2>
@@ -576,14 +612,18 @@ onMounted(async () => {
               {{ isUpgradeInProgress ? t('buildingDetail.queuedConfigurationHelp') : t('buildingDetail.plannedConfigurationHelp') }}
             </p>
           </div>
-          <button
-            v-if="!isUpgradeInProgress"
-            class="btn btn-primary"
-            :disabled="saving || !hasDraftChanges"
-            @click="storeConfiguration"
-          >
-            {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
-          </button>
+          <div v-if="!isUpgradeInProgress" class="grid-actions">
+            <button class="btn btn-secondary" @click="cancelEditing">
+              {{ t('buildingDetail.cancelEditing') }}
+            </button>
+            <button
+              class="btn btn-primary"
+              :disabled="saving || !hasDraftChanges"
+              @click="storeConfiguration"
+            >
+              {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
+            </button>
+          </div>
         </div>
 
         <div v-if="!isUpgradeInProgress" class="upgrade-summary">
@@ -672,7 +712,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="showUnitPicker && selectedCell && !isUpgradeInProgress" class="unit-picker-overlay" @click.self="showUnitPicker = false">
+      <div v-if="showUnitPicker && selectedCell && isEditing && !isUpgradeInProgress" class="unit-picker-overlay" @click.self="showUnitPicker = false">
         <div class="unit-picker">
           <div class="picker-header">
             <h3>{{ t('buildingDetail.selectUnitType') }}</h3>
@@ -691,7 +731,7 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="selectedCell && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) && !showUnitPicker" class="unit-detail">
+      <div v-if="showPlanningSection && selectedCell && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) && !showUnitPicker" class="unit-detail">
         <h3>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h3>
         <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
         <div class="unit-stats">
@@ -851,6 +891,11 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.grid-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
 .grid-header h2 {
@@ -1019,7 +1064,9 @@ onMounted(async () => {
 }
 
 .diagonal.state-tl-br .diag-line-primary,
-.diagonal.state-tr-bl .diag-line-secondary {
+.diagonal.state-tr-bl .diag-line-secondary,
+.diagonal.state-cross .diag-line-primary,
+.diagonal.state-cross .diag-line-secondary {
   opacity: 1;
   background: var(--color-primary);
 }
@@ -1153,6 +1200,15 @@ onMounted(async () => {
 @media (max-width: 920px) {
   .building-detail-view {
     max-width: 100%;
+  }
+
+  .grid-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .grid-actions {
+    width: 100%;
   }
 }
 

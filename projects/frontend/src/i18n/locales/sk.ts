@@ -148,6 +148,8 @@ export default {
     queuedConfiguration: 'Naplanovan\u00fd upgrade',
     queuedConfigurationHelp: 'Toto napl\u00e1novan\u00e9 rozlo\u017eenie je uzamknut\u00e9, k\u00fdm sa upgrade nespracuje.',
     storeConfiguration: 'Ulo\u017ei\u0165 upgrade',
+      editConfiguration: 'Upraviť budovu',
+      cancelEditing: 'Zrušiť úpravy',
     upgradeQueuedTitle: 'Upgrade budovy prebieha',
     upgradeQueuedBody: 'Aktu\u00e1lna budova zost\u00e1va v prev\u00e1dzke, k\u00fdm sa nov\u00e9 rozlo\u017eenie aktivuje o {ticks} tickov.',
     upgradeAppliesAt: 'Aktivuje sa na ticku {tick}',

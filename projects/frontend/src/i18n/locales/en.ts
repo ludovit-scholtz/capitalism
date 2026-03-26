@@ -147,6 +147,8 @@ export default {
     plannedConfigurationHelp: 'Prepare the full replacement layout here. It will only go live after the required ticks pass.',
     queuedConfiguration: 'Queued Upgrade',
     queuedConfigurationHelp: 'This scheduled layout is locked until the upgrade finishes processing.',
+    editConfiguration: 'Edit Building',
+    cancelEditing: 'Cancel Editing',
     storeConfiguration: 'Store Upgrade',
     upgradeQueuedTitle: 'Building upgrade in progress',
     upgradeQueuedBody: 'The current building keeps running until the queued layout activates in {ticks} ticks.',
