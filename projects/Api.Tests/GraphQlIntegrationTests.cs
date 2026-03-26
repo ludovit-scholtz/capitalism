@@ -283,6 +283,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var state = result.GetProperty("data").GetProperty("gameState");
         Assert.Equal(0, state.GetProperty("currentTick").GetInt64());
+        Assert.Equal(60, state.GetProperty("tickIntervalSeconds").GetInt32());
+        Assert.Equal(15m, state.GetProperty("taxRate").GetDecimal());
     }
 
     [Fact]
