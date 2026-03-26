@@ -1,0 +1,56 @@
+{
+  "name": "events-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "run-p type-check \"build-only {@}\" --",
+    "build:ssr": "vite build --ssr src/entry-server.ts",
+    "build:client": "vite build",
+    "build-only": "run-s build:client build:ssr",
+    "preview": "vite preview",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:video": "set VIDEO_RECORDING=true && playwright test --config playwright-video.config.ts",
+    "type-check": "vue-tsc --build",
+    "lint": "run-s lint:*",
+    "lint:oxlint": "oxlint . --fix",
+    "lint:eslint": "eslint . --fix --cache",
+    "format": "prettier --write --experimental-cli src/"
+  },
+  "dependencies": {
+    "@vercel/node": "^5.6.18",
+    "pinia": "^3.0.4",
+    "vue": "^3.5.29",
+    "vue-i18n": "^11.3.0",
+    "vue-router": "^5.0.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@tsconfig/node24": "^24.0.4",
+    "@types/node": "^24.12.0",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vue/eslint-config-typescript": "^14.7.0",
+    "@vue/tsconfig": "^0.8.1",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-oxlint": "~1.50.0",
+    "eslint-plugin-playwright": "^2.10.1",
+    "eslint-plugin-vue": "~10.8.0",
+    "fake-indexeddb": "^6.2.5",
+    "jiti": "^2.6.1",
+    "npm-run-all2": "^8.0.4",
+    "oxlint": "~1.50.0",
+    "prettier": "3.8.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.3.1",
+    "vite-plugin-pwa": "^1.2.0",
+    "vite-plugin-vue-devtools": "^8.1.0",
+    "vitest": "^4.1.0",
+    "vue-tsc": "^3.2.6"
+  },
+  "engines": {
+    "node": "^24.0.0"
+  }
+}

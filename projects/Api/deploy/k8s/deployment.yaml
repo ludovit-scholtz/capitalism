@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capitalism-api
+  namespace: capitalism
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capitalism-api
+  template:
+    metadata:
+      labels:
+        app: capitalism-api
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: capitalism-api
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: Production
+            - name: DOTNET_HOSTBUILDER__RELOADCONFIGONCHANGE
+              value: "false"
+            - name: Jwt__Issuer
+              value: Api
+            - name: Jwt__Audience
+              value: EventsFrontend
+            - name: Jwt__SigningKey
+              valueFrom:
+                secretKeyRef:
+                  name: capitalism-api-secrets
+                  key: jwt-signing-key
+            - name: SeedData__AdminEmail
+              value: admin@events.local
+            - name: SeedData__AdminDisplayName
+              value: Platform Admin
+            - name: SeedData__AdminPassword
+              valueFrom:
+                secretKeyRef:
+                  name: capitalism-api-secrets
+                  key: admin-password
+            - name: Cors__AllowedOrigins__0
+              value: http://localhost:5173
+            - name: Cors__AllowedOrigins__1
+              value: https://capitalism.de-4.biatec.io
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: events-api-data

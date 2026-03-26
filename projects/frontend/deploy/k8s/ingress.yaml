@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: capitalism-frontend
+  namespace: capitalism
+  annotations:
+    cert-manager.io/cluster-issuer: 'letsencrypt-dns'
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - capitalism.de-4.biatec.io
+      secretName: tls-capitalism.biatec.io
+  rules:
+    - host: capitalism.de-4.biatec.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: capitalism-frontend
+                port:
+                  number: 80

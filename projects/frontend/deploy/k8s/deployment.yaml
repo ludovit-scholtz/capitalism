@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: capitalism-frontend
+  namespace: capitalism
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: capitalism-frontend
+  template:
+    metadata:
+      labels:
+        app: capitalism-frontend
+    spec:
+      imagePullSecrets:
+        - name: regcred
+      containers:
+        - name: capitalism-frontend
+          image: IMAGE_PLACEHOLDER
+          ports:
+            - containerPort: 80
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: '80'
+            - name: VITE_GRAPHQL_URL
+              value: https://capitalism-api.de-4.biatec.io/graphql
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 20

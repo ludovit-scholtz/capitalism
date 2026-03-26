@@ -1,0 +1,69 @@
+name: Playwright E2E Tests
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'projects/frontend/**'
+      - '.github/workflows/playwright.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'projects/frontend/**'
+      - '.github/workflows/playwright.yml'
+
+jobs:
+  playwright:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: projects/frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: projects/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers (Chromium only for CI speed)
+        run: npx playwright install --with-deps chromium
+
+      # Build the client for e2e testing.
+      # All API calls are intercepted by page.route() in the tests, so the
+      # GraphQL URL doesn't need to point to a real backend.
+      - name: Build client for e2e
+        run: npm run build:client
+        env:
+          VITE_GRAPHQL_URL: http://localhost:4000/graphql
+
+      - name: Run Playwright tests
+        run: npm run test:e2e -- --project=chromium
+        env:
+          CI: true
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report
+          path: projects/frontend/playwright-report/
+          retention-days: 30
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: test-results
+          path: projects/frontend/test-results/
+          retention-days: 7

@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"name": "Root",
+			"path": "."
+		},
+		{
+			"name": "Frontend",
+			"path": "./projects/frontend"
+		},
+		{
+			"name": "Api",
+			"path": "./projects/Api"
+		},
+		{
+			"name": "Api.Tests",
+			"path": "./projects/Api.Tests"
+		}
+	],
+	"settings": {}
+}
