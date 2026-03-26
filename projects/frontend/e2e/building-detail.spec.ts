@@ -288,7 +288,7 @@ test.describe('Building detail upgrades', () => {
     await getGridCell(plannedSection, 0, 0).click()
     await expect(page.getByText('Unit Configuration')).toBeVisible()
     await expect(page.getByText('Unit Settings')).toBeVisible()
-    await expect(page.getByText('Resource Type')).toBeVisible()
+    await expect(page.getByText('Input Item')).toBeVisible()
     await expect(page.getByText('Max Price')).toBeVisible()
     await expect(page.getByText('Purchase Source')).toBeVisible()
 
@@ -495,5 +495,255 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Lv.2')).toBeVisible()
     await expect(page.getByText('Max Price: $500')).toBeVisible()
     await expect(page.getByText('Purchase Source: EXCHANGE')).toBeVisible()
+  })
+
+  test('factory purchase selector shows raw materials and only intermediate products', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-advanced',
+      playerId: player.id,
+      name: 'Advanced Selector Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-advanced',
+          companyId: 'company-advanced',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Advanced Selector Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'adv-1',
+              buildingId: 'building-advanced',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'adv-2',
+              buildingId: 'building-advanced',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player],
+      resourceTypes: [
+        { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', description: 'Wood', imageUrl: null },
+      ],
+      productTypes: [
+        {
+          id: 'prod-components',
+          name: 'Electronic Components',
+          slug: 'electronic-components',
+          industry: 'ELECTRONICS',
+          basePrice: 50,
+          baseCraftTicks: 3,
+          outputQuantity: 16,
+          energyConsumptionMwh: 1.2,
+          unitName: 'Pack',
+          unitSymbol: 'packs',
+          isProOnly: false,
+          description: 'Intermediate electronics input.',
+          recipes: [],
+        },
+        {
+          id: 'prod-electronic-table',
+          name: 'Electronic Table',
+          slug: 'electronic-table',
+          industry: 'FURNITURE',
+          basePrice: 520,
+          baseCraftTicks: 6,
+          outputQuantity: 1,
+          energyConsumptionMwh: 2,
+          unitName: 'Piece',
+          unitSymbol: 'pcs',
+          isProOnly: false,
+          description: 'Smart table.',
+          recipes: [
+            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 },
+            { resourceType: null, inputProductType: { id: 'prod-components', name: 'Electronic Components', slug: 'electronic-components', unitName: 'Pack', unitSymbol: 'packs' }, quantity: 10 },
+          ],
+        },
+        {
+          id: 'prod-chair-final',
+          name: 'Wooden Chair',
+          slug: 'wooden-chair',
+          industry: 'FURNITURE',
+          basePrice: 45,
+          baseCraftTicks: 2,
+          outputQuantity: 20,
+          energyConsumptionMwh: 1,
+          unitName: 'Chair',
+          unitSymbol: 'chairs',
+          isProOnly: false,
+          description: 'Final product not used as ingredient.',
+          recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+        },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-advanced')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    await expect(page.getByText('Input Item')).toBeVisible()
+    await expect(page.getByText('Electronic Components')).toBeVisible()
+    await expect(page.getByText('Wooden Chair')).toHaveCount(0)
+  })
+
+  test('manufacturing selector only shows outputs supported by linked inputs', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-linked',
+      playerId: player.id,
+      name: 'Linked Inputs Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-linked',
+          companyId: 'company-linked',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Linked Inputs Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'linked-purchase',
+              buildingId: 'building-linked',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-grain',
+            },
+            {
+              id: 'linked-manufacturing',
+              buildingId: 'building-linked',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player],
+      resourceTypes: [
+        { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC', basePrice: 5, weightPerUnit: 2, unitName: 'Ton', unitSymbol: 't', description: 'Grain', imageUrl: null },
+        { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', description: 'Wood', imageUrl: null },
+      ],
+      productTypes: [
+        {
+          id: 'prod-bread-linked',
+          name: 'Bread',
+          slug: 'bread',
+          industry: 'FOOD_PROCESSING',
+          basePrice: 3,
+          baseCraftTicks: 1,
+          outputQuantity: 12,
+          energyConsumptionMwh: 0.5,
+          unitName: 'Loaf',
+          unitSymbol: 'loaves',
+          isProOnly: false,
+          description: 'Bread from grain.',
+          recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+        },
+        {
+          id: 'prod-chair-linked',
+          name: 'Wooden Chair',
+          slug: 'wooden-chair',
+          industry: 'FURNITURE',
+          basePrice: 45,
+          baseCraftTicks: 2,
+          outputQuantity: 20,
+          energyConsumptionMwh: 1,
+          unitName: 'Chair',
+          unitSymbol: 'chairs',
+          isProOnly: false,
+          description: 'Chair from wood.',
+          recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+        },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-linked')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 1, 0).click()
+
+    await expect(page.getByText('Output Product')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Bread/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /Wooden Chair/ })).toHaveCount(0)
   })
 })

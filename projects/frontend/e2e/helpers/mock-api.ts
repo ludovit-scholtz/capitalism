@@ -129,6 +129,9 @@ export type MockResourceType = {
   category: string
   basePrice: number
   weightPerUnit: number
+  unitName: string
+  unitSymbol: string
+  imageUrl?: string | null
   description: string | null
 }
 
@@ -139,9 +142,17 @@ export type MockProductType = {
   industry: string
   basePrice: number
   baseCraftTicks: number
+  outputQuantity?: number
+  energyConsumptionMwh?: number
+  unitName?: string
+  unitSymbol?: string
   isProOnly: boolean
   description: string | null
-  recipes: { resourceType: { id: string; name: string }; quantity: number }[]
+  recipes: {
+    resourceType?: { id: string; name: string; slug?: string; unitName?: string; unitSymbol?: string } | null
+    inputProductType?: { id: string; name: string; slug: string; unitName?: string; unitSymbol?: string } | null
+    quantity: number
+  }[]
 }
 
 export type MockState = {
@@ -328,6 +339,9 @@ const woodResource: MockResourceType = {
   category: 'ORGANIC',
   basePrice: 10,
   weightPerUnit: 5,
+  unitName: 'Ton',
+  unitSymbol: 't',
+  imageUrl: null,
   description: 'Harvested timber.',
 }
 
@@ -338,6 +352,9 @@ const grainResource: MockResourceType = {
   category: 'ORGANIC',
   basePrice: 5,
   weightPerUnit: 2,
+  unitName: 'Ton',
+  unitSymbol: 't',
+  imageUrl: null,
   description: 'Cereal crops.',
 }
 
@@ -348,6 +365,9 @@ const chemResource: MockResourceType = {
   category: 'MINERAL',
   basePrice: 30,
   weightPerUnit: 3,
+  unitName: 'Ton',
+  unitSymbol: 't',
+  imageUrl: null,
   description: 'Raw minerals for pharma.',
 }
 
@@ -398,9 +418,13 @@ export function makeChairProduct(): MockProductType {
     industry: 'FURNITURE',
     basePrice: 45,
     baseCraftTicks: 2,
+    outputQuantity: 20,
+    energyConsumptionMwh: 1,
+    unitName: 'Chair',
+    unitSymbol: 'chairs',
     isProOnly: false,
     description: 'A basic wooden chair.',
-    recipes: [{ resourceType: { id: 'res-wood', name: 'Wood' }, quantity: 3 }],
+    recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
   }
 }
 
@@ -414,9 +438,13 @@ export function makeDefaultProducts(): MockProductType[] {
       industry: 'FOOD_PROCESSING',
       basePrice: 3,
       baseCraftTicks: 1,
+      outputQuantity: 12,
+      energyConsumptionMwh: 0.5,
+      unitName: 'Loaf',
+      unitSymbol: 'loaves',
       isProOnly: false,
       description: 'Basic wheat bread.',
-      recipes: [{ resourceType: { id: 'res-grain', name: 'Grain' }, quantity: 1 }],
+      recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
     },
     {
       id: 'prod-medicine',
@@ -425,9 +453,13 @@ export function makeDefaultProducts(): MockProductType[] {
       industry: 'HEALTHCARE',
       basePrice: 50,
       baseCraftTicks: 3,
+      outputQuantity: 8,
+      energyConsumptionMwh: 1,
+      unitName: 'Bottle',
+      unitSymbol: 'bottles',
       isProOnly: false,
       description: 'Essential pharma product.',
-      recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals' }, quantity: 2 }],
+      recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
     },
   ]
 }

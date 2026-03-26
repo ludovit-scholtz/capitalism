@@ -248,14 +248,18 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             """
             {
               productTypes {
-                name slug industry basePrice baseCraftTicks
-                recipes { resourceType { name } quantity }
+                name slug industry basePrice baseCraftTicks outputQuantity energyConsumptionMwh unitName unitSymbol
+                recipes { quantity resourceType { name } inputProductType { name } }
               }
             }
             """);
 
         var products = result.GetProperty("data").GetProperty("productTypes");
-        Assert.True(products.GetArrayLength() >= 7);
+        Assert.True(products.GetArrayLength() >= 100);
+
+        var electronicTable = products.EnumerateArray().First(product => product.GetProperty("slug").GetString() == "electronic-table");
+        Assert.Equal(2m, electronicTable.GetProperty("energyConsumptionMwh").GetDecimal());
+        Assert.Equal(1m, electronicTable.GetProperty("outputQuantity").GetDecimal());
     }
 
     [Fact]

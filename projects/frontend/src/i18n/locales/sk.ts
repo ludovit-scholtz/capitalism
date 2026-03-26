@@ -27,6 +27,7 @@ export default {
   nav: {
     home: 'Domov',
     dashboard: 'Preh\u013ead',
+    encyclopedia: 'Encyklopédia',
   },
   banners: {
     offline: 'Ste offline - zobrazuje sa ulo\u017een\u00fd obsah.',
@@ -214,6 +215,10 @@ export default {
     cancelSale: 'Zrušiť inzerát',
     saleFailed: 'Nepodarilo sa aktualizovať stav predaja',
     config: {
+      inputItem: 'Vstupná položka',
+      outputProduct: 'Výstupný produkt',
+      outputProductHelp: 'Zobrazujú sa len produkty podporované aktuálne prepojenými vstupmi.',
+      outputResource: 'Výstupná surovina',
       resourceType: 'Typ suroviny',
       productType: 'Typ produktu',
       minPrice: 'Min. cena',
@@ -237,6 +242,14 @@ export default {
       scopeProduct: 'Produkt',
       scopeCategory: 'Kategória',
       scopeCompany: 'Firma',
+    },
+    selector: {
+      rawMaterials: 'Suroviny',
+      products: 'Medziprodukty',
+      availableOutputs: 'Dostupné výstupy',
+      searchPlaceholder: 'Hľadať suroviny alebo produkty',
+      noItems: 'Žiadne položky nezodpovedajú filtru.',
+      noLinkedOutputs: 'Prepojte nákupné, skladové alebo ťažobné vstupy, aby sa odomkli dostupné výstupy.',
     },
     warnings: {
       title: '⚠ Upozornenia konfigurácie',

@@ -232,7 +232,16 @@ export interface Resource {
 }
 
 export interface ResourceType {
+  id: string
   name: string
+  slug: string
+  category: string
+  basePrice: number
+  weightPerUnit: number
+  unitName: string
+  unitSymbol: string
+  imageUrl: string | null
+  description: string | null
 }
 
 export interface ProductType {
@@ -242,12 +251,17 @@ export interface ProductType {
   industry: string
   basePrice: number
   baseCraftTicks: number
-  description: string
+  outputQuantity: number
+  energyConsumptionMwh: number
+  unitName: string
+  unitSymbol: string
+  description: string | null
   recipes: Recipe[]
 }
 
 export interface Recipe {
-  resourceType: ResourceType
+  resourceType: ResourceType | null
+  inputProductType: Pick<ProductType, 'id' | 'name' | 'slug' | 'unitName' | 'unitSymbol'> | null
   quantity: number
 }
 

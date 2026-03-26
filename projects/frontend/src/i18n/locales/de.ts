@@ -27,6 +27,7 @@ export default {
   nav: {
     home: 'Startseite',
     dashboard: '\u00dcbersicht',
+    encyclopedia: 'Enzyklopädie',
   },
   banners: {
     offline: 'Sie sind offline - zwischengespeicherte Inhalte werden angezeigt.',
@@ -214,6 +215,10 @@ export default {
     cancelSale: 'Angebot entfernen',
     saleFailed: 'Verkaufsstatus konnte nicht aktualisiert werden',
     config: {
+      inputItem: 'Eingangsartikel',
+      outputProduct: 'Ausgabeprodukt',
+      outputProductHelp: 'Hier werden nur Produkte angezeigt, die durch die aktuell verknüpften Vorprodukte unterstützt werden.',
+      outputResource: 'Ausgaberohstoff',
       resourceType: 'Rohstofftyp',
       productType: 'Produkttyp',
       minPrice: 'Min. Preis',
@@ -237,6 +242,14 @@ export default {
       scopeProduct: 'Produkt',
       scopeCategory: 'Kategorie',
       scopeCompany: 'Unternehmen',
+    },
+    selector: {
+      rawMaterials: 'Rohstoffe',
+      products: 'Zwischenprodukte',
+      availableOutputs: 'Verfügbare Ausgaben',
+      searchPlaceholder: 'Rohstoffe oder Produkte durchsuchen',
+      noItems: 'Keine passenden Artikel gefunden.',
+      noLinkedOutputs: 'Verknüpfen Sie Einkaufs-, Lager- oder Bergbaueingänge, um verfügbare Ausgaben freizuschalten.',
     },
     warnings: {
       title: '⚠ Konfigurationswarnungen',

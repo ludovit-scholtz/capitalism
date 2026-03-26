@@ -16,10 +16,16 @@ public sealed class ProductRecipe
     public ProductType ProductType { get; set; } = null!;
 
     /// <summary>The raw material required.</summary>
-    public Guid ResourceTypeId { get; set; }
+    public Guid? ResourceTypeId { get; set; }
 
     /// <summary>Navigation property to the resource type.</summary>
-    public ResourceType ResourceType { get; set; } = null!;
+    public ResourceType? ResourceType { get; set; }
+
+    /// <summary>Intermediate manufactured product required as an input ingredient.</summary>
+    public Guid? InputProductTypeId { get; set; }
+
+    /// <summary>Navigation property to the intermediate input product.</summary>
+    public ProductType? InputProductType { get; set; }
 
     /// <summary>Quantity of the resource needed per product unit.</summary>
     public decimal Quantity { get; set; } = 1m;

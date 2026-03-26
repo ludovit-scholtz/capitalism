@@ -2,11 +2,21 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import type { Building, BuildingConfigurationPlanRemoval, BuildingConfigurationPlanUnit, BuildingUnit, ResourceType, ProductType } from '@/types'
 
 type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
+type ItemSelection = { kind: 'resource' | 'product'; id: string } | null
+type SelectorItem = {
+  kind: 'resource' | 'product'
+  id: string
+  name: string
+  description?: string | null
+  groupLabel: string
+  unitSymbol?: string | null
+}
 
 type EditableGridUnit = {
   id: string
@@ -94,6 +104,35 @@ const allowedUnits = computed(() => {
   if (!building.value) return []
   return allowedUnitsMap[building.value.type] || []
 })
+const intermediateProductIds = computed(() => {
+  const ids = new Set<string>()
+  for (const product of productTypes.value) {
+    for (const recipe of product.recipes) {
+      if (recipe.inputProductType?.id) {
+        ids.add(recipe.inputProductType.id)
+      }
+    }
+  }
+  return ids
+})
+const allSelectableItems = computed<SelectorItem[]>(() => [
+  ...resourceTypes.value.map((resource) => ({
+    kind: 'resource' as const,
+    id: resource.id,
+    name: resource.name,
+    description: resource.description,
+    groupLabel: t('buildingDetail.selector.rawMaterials'),
+    unitSymbol: resource.unitSymbol,
+  })),
+  ...productTypes.value.map((product) => ({
+    kind: 'product' as const,
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    groupLabel: t('buildingDetail.selector.products'),
+    unitSymbol: product.unitSymbol,
+  })),
+])
 const isUpgradeInProgress = computed(() => pendingConfiguration.value !== null)
 const showPlanningSection = computed(() => isEditing.value)
 const remainingUpgradeTicks = computed(() => {
@@ -834,12 +873,130 @@ function deleteLayout(index: number) {
 
 function getResourceName(id: string | null): string {
   if (!id) return '—'
-  return resourceTypes.value.find((r) => r.name === id)?.name ?? id
+  return resourceTypes.value.find((r) => r.id === id)?.name ?? id
 }
 
 function getProductName(id: string | null): string {
   if (!id) return '—'
   return productTypes.value.find((p) => p.id === id)?.name ?? id
+}
+
+function getSelectedDraftUnit(): EditableGridUnit | undefined {
+  if (!selectedCell.value) return undefined
+  return getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+}
+
+function getItemSelection(unit: EditableGridUnit | undefined): ItemSelection {
+  if (!unit) return null
+  if (unit.productTypeId) {
+    return { kind: 'product', id: unit.productTypeId }
+  }
+  if (unit.resourceTypeId) {
+    return { kind: 'resource', id: unit.resourceTypeId }
+  }
+  return null
+}
+
+function setItemSelection(unit: EditableGridUnit | undefined, selection: ItemSelection) {
+  if (!unit) return
+  unit.resourceTypeId = selection?.kind === 'resource' ? selection.id : null
+  unit.productTypeId = selection?.kind === 'product' ? selection.id : null
+}
+
+function getFactoryPurchaseSelectableItems(): SelectorItem[] {
+  if (building.value?.type !== 'FACTORY') {
+    return allSelectableItems.value
+  }
+
+  return [
+    ...allSelectableItems.value.filter((item) => item.kind === 'resource'),
+    ...allSelectableItems.value.filter((item) => item.kind === 'product' && intermediateProductIds.value.has(item.id)),
+  ]
+}
+
+function getDirectlyConnectedUnits(unit: EditableGridUnit, units: EditableGridUnit[]): EditableGridUnit[] {
+  return units.filter((candidate) => {
+    if (candidate.id === unit.id) return false
+
+    if (candidate.gridX === unit.gridX && candidate.gridY === unit.gridY - 1) {
+      return unit.linkUp || candidate.linkDown
+    }
+    if (candidate.gridX === unit.gridX && candidate.gridY === unit.gridY + 1) {
+      return unit.linkDown || candidate.linkUp
+    }
+    if (candidate.gridX === unit.gridX - 1 && candidate.gridY === unit.gridY) {
+      return unit.linkLeft || candidate.linkRight
+    }
+    if (candidate.gridX === unit.gridX + 1 && candidate.gridY === unit.gridY) {
+      return unit.linkRight || candidate.linkLeft
+    }
+    if (candidate.gridX === unit.gridX - 1 && candidate.gridY === unit.gridY - 1) {
+      return unit.linkUpLeft || candidate.linkDownRight
+    }
+    if (candidate.gridX === unit.gridX + 1 && candidate.gridY === unit.gridY - 1) {
+      return unit.linkUpRight || candidate.linkDownLeft
+    }
+    if (candidate.gridX === unit.gridX - 1 && candidate.gridY === unit.gridY + 1) {
+      return unit.linkDownLeft || candidate.linkUpRight
+    }
+    if (candidate.gridX === unit.gridX + 1 && candidate.gridY === unit.gridY + 1) {
+      return unit.linkDownRight || candidate.linkUpLeft
+    }
+    return false
+  })
+}
+
+function getReachableInputSelections(unit: EditableGridUnit | undefined): Set<string> {
+  const selected = new Set<string>()
+  if (!unit) return selected
+
+  const queue = [unit]
+  const visited = new Set<string>()
+
+  while (queue.length > 0) {
+    const current = queue.shift()!
+    const key = `${current.gridX},${current.gridY}`
+    if (visited.has(key)) continue
+    visited.add(key)
+
+    if (current.id !== unit.id && ['PURCHASE', 'MINING', 'STORAGE'].includes(current.unitType)) {
+      if (current.resourceTypeId) selected.add(`resource:${current.resourceTypeId}`)
+      if (current.productTypeId) selected.add(`product:${current.productTypeId}`)
+    }
+
+    for (const next of getDirectlyConnectedUnits(current, draftUnits.value)) {
+      const nextKey = `${next.gridX},${next.gridY}`
+      if (!visited.has(nextKey)) {
+        queue.push(next)
+      }
+    }
+  }
+
+  return selected
+}
+
+function getManufacturingSelectableItems(unit: EditableGridUnit | undefined): SelectorItem[] {
+  if (!unit) return []
+  const reachableInputs = getReachableInputSelections(unit)
+  return productTypes.value
+    .filter((product) => product.recipes.length > 0)
+    .filter((product) => product.recipes.every((recipe) => {
+      if (recipe.resourceType?.id) {
+        return reachableInputs.has(`resource:${recipe.resourceType.id}`)
+      }
+      if (recipe.inputProductType?.id) {
+        return reachableInputs.has(`product:${recipe.inputProductType.id}`)
+      }
+      return false
+    }))
+    .map((product) => ({
+      kind: 'product' as const,
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      groupLabel: t('buildingDetail.selector.availableOutputs'),
+      unitSymbol: product.unitSymbol,
+    }))
 }
 
 function updateSelectedUnitConfig(field: string, value: unknown) {
@@ -957,8 +1114,40 @@ async function loadBuilding() {
         } }`,
       ),
       gqlRequest<{ gameState: { currentTick: number } | null }>(`{ gameState { currentTick } }`),
-      gqlRequest<{ resourceTypes: ResourceType[] }>(`{ resourceTypes { name } }`),
-      gqlRequest<{ productTypes: ProductType[] }>(`{ productTypes { id name slug industry basePrice baseCraftTicks description recipes { resourceType { name } quantity } } }`),
+      gqlRequest<{ resourceTypes: ResourceType[] }>(`{
+        resourceTypes {
+          id
+          name
+          slug
+          category
+          basePrice
+          weightPerUnit
+          unitName
+          unitSymbol
+          imageUrl
+          description
+        }
+      }`),
+      gqlRequest<{ productTypes: ProductType[] }>(`{
+        productTypes {
+          id
+          name
+          slug
+          industry
+          basePrice
+          baseCraftTicks
+          outputQuantity
+          energyConsumptionMwh
+          unitName
+          unitSymbol
+          description
+          recipes {
+            quantity
+            resourceType { id name slug unitName unitSymbol }
+            inputProductType { id name slug unitName unitSymbol }
+          }
+        }
+      }`),
     ])
 
     currentTick.value = gameStateData.gameState?.currentTick ?? 0
@@ -1320,18 +1509,14 @@ onMounted(async () => {
                 <!-- Purchase unit config -->
                 <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'PURCHASE'">
                   <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.resourceType') }}</label>
-                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.resourceTypeId ?? ''" @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)">
-                      <option value="">{{ t('buildingDetail.config.none') }}</option>
-                      <option v-for="rt in resourceTypes" :key="rt.name" :value="rt.name">{{ rt.name }}</option>
-                    </select>
-                  </div>
-                  <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
-                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
-                      <option value="">{{ t('buildingDetail.config.none') }}</option>
-                      <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
-                    </select>
+                    <AdvancedItemSelector
+                      :model-value="getItemSelection(getDraftUnitAt(selectedCell.x, selectedCell.y))"
+                      :items="building?.type === 'FACTORY' ? getFactoryPurchaseSelectableItems() : allSelectableItems"
+                      :label="t('buildingDetail.config.inputItem')"
+                      :placeholder="t('buildingDetail.selector.searchPlaceholder')"
+                      :empty-text="t('buildingDetail.selector.noItems')"
+                      @update:model-value="setItemSelection(getDraftUnitAt(selectedCell.x, selectedCell.y), $event)"
+                    />
                   </div>
                   <div class="config-field">
                     <label class="config-label">{{ t('buildingDetail.config.maxPrice') }}</label>
@@ -1355,12 +1540,18 @@ onMounted(async () => {
                 <!-- Manufacturing unit config -->
                 <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'MANUFACTURING'">
                   <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
-                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
-                      <option value="">{{ t('buildingDetail.config.none') }}</option>
-                      <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
-                    </select>
+                    <AdvancedItemSelector
+                      :model-value="getItemSelection(getDraftUnitAt(selectedCell.x, selectedCell.y))"
+                      :items="getManufacturingSelectableItems(getDraftUnitAt(selectedCell.x, selectedCell.y))"
+                      :label="t('buildingDetail.config.outputProduct')"
+                      :placeholder="t('buildingDetail.selector.searchPlaceholder')"
+                      :empty-text="t('buildingDetail.selector.noLinkedOutputs')"
+                      @update:model-value="setItemSelection(getDraftUnitAt(selectedCell.x, selectedCell.y), $event)"
+                    />
                   </div>
+                  <p class="config-help">
+                    {{ t('buildingDetail.config.outputProductHelp') }}
+                  </p>
                 </template>
 
                 <!-- B2B Sales unit config -->
@@ -1426,7 +1617,7 @@ onMounted(async () => {
                     <label class="config-label">{{ t('buildingDetail.config.resourceType') }}</label>
                     <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.resourceTypeId ?? ''" @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)">
                       <option value="">{{ t('buildingDetail.config.anyResource') }}</option>
-                      <option v-for="rt in resourceTypes" :key="rt.name" :value="rt.name">{{ rt.name }}</option>
+                      <option v-for="rt in resourceTypes" :key="rt.id" :value="rt.id">{{ rt.name }}</option>
                     </select>
                   </div>
                   <div class="config-field">
@@ -1434,6 +1625,16 @@ onMounted(async () => {
                     <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? ''" @change="updateSelectedUnitConfig('productTypeId', ($event.target as HTMLSelectElement).value || null)">
                       <option value="">{{ t('buildingDetail.config.anyProduct') }}</option>
                       <option v-for="pt in productTypes" :key="pt.id" :value="pt.id">{{ pt.name }}</option>
+                    </select>
+                  </div>
+                </template>
+
+                <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'MINING'">
+                  <div class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.outputResource') }}</label>
+                    <select class="form-input" :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.resourceTypeId ?? ''" @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)">
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option v-for="rt in resourceTypes" :key="rt.id" :value="rt.id">{{ rt.name }} ({{ rt.unitSymbol }})</option>
                     </select>
                   </div>
                 </template>
@@ -2222,6 +2423,12 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--color-text-secondary);
   margin-bottom: 0.25rem;
+}
+
+.config-help {
+  margin: -0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
 }
 
 .unit-config-readonly-details {

@@ -29,8 +29,22 @@ public sealed class ProductType
     /// <summary>Base manufacturing time in ticks per unit.</summary>
     public int BaseCraftTicks { get; set; } = 1;
 
+    /// <summary>How many sellable units are produced per manufacturing batch.</summary>
+    public decimal OutputQuantity { get; set; } = 1m;
+
+    /// <summary>Electricity consumed by one manufacturing batch in MWh.</summary>
+    public decimal EnergyConsumptionMwh { get; set; }
+
     /// <summary>Whether this product is available to Pro subscribers only.</summary>
     public bool IsProOnly { get; set; }
+
+    /// <summary>Display name for the produced unit (e.g. Piece, Crate).</summary>
+    [MaxLength(50)]
+    public string UnitName { get; set; } = "Piece";
+
+    /// <summary>Short display symbol for the produced unit (e.g. pcs).</summary>
+    [MaxLength(20)]
+    public string UnitSymbol { get; set; } = "pcs";
 
     /// <summary>Description shown in the encyclopaedia.</summary>
     [MaxLength(1000)]

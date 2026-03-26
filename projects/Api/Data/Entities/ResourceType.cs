@@ -29,6 +29,18 @@ public sealed class ResourceType
     /// <summary>Weight per unit in kg (affects transport costs).</summary>
     public decimal WeightPerUnit { get; set; }
 
+    /// <summary>Display name for the base trade unit (e.g. Ton, Kilogram).</summary>
+    [MaxLength(50)]
+    public string UnitName { get; set; } = "Ton";
+
+    /// <summary>Short display symbol for the base trade unit (e.g. t, kg).</summary>
+    [MaxLength(20)]
+    public string UnitSymbol { get; set; } = "t";
+
+    /// <summary>Preview image used in the manufacturing encyclopaedia.</summary>
+    [MaxLength(6000)]
+    public string? ImageUrl { get; set; }
+
     /// <summary>Description shown in the encyclopaedia.</summary>
     [MaxLength(1000)]
     public string? Description { get; set; }
