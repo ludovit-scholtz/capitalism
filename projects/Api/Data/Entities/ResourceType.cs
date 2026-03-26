@@ -38,7 +38,7 @@ public sealed class ResourceType
     public string UnitSymbol { get; set; } = "t";
 
     /// <summary>Preview image used in the manufacturing encyclopaedia.</summary>
-    [MaxLength(6000)]
+    [MaxLength(12000)]
     public string? ImageUrl { get; set; }
 
     /// <summary>Description shown in the encyclopaedia.</summary>

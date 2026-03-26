@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 type SelectorItem = {
   kind: 'resource' | 'product'
@@ -18,6 +19,7 @@ const props = defineProps<{
   emptyText?: string
 }>()
 
+const { t } = useI18n()
 const emit = defineEmits<{
   'update:modelValue': [value: { kind: 'resource' | 'product'; id: string } | null]
 }>()
@@ -85,7 +87,7 @@ function selectItem(item: SelectorItem) {
             @click="selectItem(item)"
           >
             <span class="option-title">{{ item.name }}</span>
-            <span class="option-meta">{{ item.kind === 'resource' ? 'Raw material' : 'Manufactured input' }}<template v-if="item.unitSymbol"> · {{ item.unitSymbol }}</template></span>
+            <span class="option-meta">{{ item.kind === 'resource' ? t('buildingDetail.selector.itemKindResource') : t('buildingDetail.selector.itemKindProduct') }}<template v-if="item.unitSymbol"> · {{ item.unitSymbol }}</template></span>
             <span v-if="item.description" class="option-description">{{ item.description }}</span>
           </button>
         </div>

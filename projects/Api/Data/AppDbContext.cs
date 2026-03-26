@@ -184,7 +184,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(r => r.WeightPerUnit).HasPrecision(18, 4);
             e.Property(r => r.UnitName).HasMaxLength(50);
             e.Property(r => r.UnitSymbol).HasMaxLength(20);
-            e.Property(r => r.ImageUrl).HasMaxLength(6000);
+            e.Property(r => r.ImageUrl).HasMaxLength(12000);
         });
 
         // ProductType

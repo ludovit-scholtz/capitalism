@@ -269,6 +269,8 @@ export default {
       searchPlaceholder: 'Search raw materials or products',
       noItems: 'No items match the current filter.',
       noLinkedOutputs: 'Link purchase, storage, or mining inputs to unlock available manufactured outputs.',
+      itemKindResource: 'Raw material',
+      itemKindProduct: 'Manufactured input',
     },
     warnings: {
       title: '⚠ Configuration Warnings',

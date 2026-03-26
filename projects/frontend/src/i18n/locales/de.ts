@@ -250,6 +250,8 @@ export default {
       searchPlaceholder: 'Rohstoffe oder Produkte durchsuchen',
       noItems: 'Keine passenden Artikel gefunden.',
       noLinkedOutputs: 'Verknüpfen Sie Einkaufs-, Lager- oder Bergbaueingänge, um verfügbare Ausgaben freizuschalten.',
+      itemKindResource: 'Rohstoff',
+      itemKindProduct: 'Gefertigter Eingang',
     },
     warnings: {
       title: '⚠ Konfigurationswarnungen',

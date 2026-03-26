@@ -250,6 +250,8 @@ export default {
       searchPlaceholder: 'Hľadať suroviny alebo produkty',
       noItems: 'Žiadne položky nezodpovedajú filtru.',
       noLinkedOutputs: 'Prepojte nákupné, skladové alebo ťažobné vstupy, aby sa odomkli dostupné výstupy.',
+      itemKindResource: 'Surovina',
+      itemKindProduct: 'Vyrobený vstup',
     },
     warnings: {
       title: '⚠ Upozornenia konfigurácie',

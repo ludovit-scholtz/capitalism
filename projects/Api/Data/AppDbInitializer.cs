@@ -3,6 +3,8 @@ using Api.Data.Entities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Api.Data;
 
@@ -75,7 +77,7 @@ public sealed class AppDbInitializer(
     {
         dbContext.ResourceTypes.AddRange(GetResourceSeeds().Select(seed => new ResourceType
         {
-            Id = Guid.NewGuid(),
+            Id = CreateDeterministicGuid($"resource:{seed.Slug}"),
             Name = seed.Name,
             Slug = seed.Slug,
             Category = seed.Category,
@@ -91,16 +93,16 @@ public sealed class AppDbInitializer(
     private void SeedCities()
     {
         dbContext.Cities.AddRange(
-            new City { Id = Guid.NewGuid(), Name = "Bratislava", CountryCode = "SK", Latitude = 48.1486, Longitude = 17.1077, Population = 475_000, AverageRentPerSqm = 14m },
-            new City { Id = Guid.NewGuid(), Name = "Prague", CountryCode = "CZ", Latitude = 50.0755, Longitude = 14.4378, Population = 1_350_000, AverageRentPerSqm = 18m },
-            new City { Id = Guid.NewGuid(), Name = "Vienna", CountryCode = "AT", Latitude = 48.2082, Longitude = 16.3738, Population = 1_900_000, AverageRentPerSqm = 22m });
+            new City { Id = CreateDeterministicGuid("city:bratislava"), Name = "Bratislava", CountryCode = "SK", Latitude = 48.1486, Longitude = 17.1077, Population = 475_000, AverageRentPerSqm = 14m },
+            new City { Id = CreateDeterministicGuid("city:prague"), Name = "Prague", CountryCode = "CZ", Latitude = 50.0755, Longitude = 14.4378, Population = 1_350_000, AverageRentPerSqm = 18m },
+            new City { Id = CreateDeterministicGuid("city:vienna"), Name = "Vienna", CountryCode = "AT", Latitude = 48.2082, Longitude = 16.3738, Population = 1_900_000, AverageRentPerSqm = 22m });
     }
 
     private void SeedProducts()
     {
         dbContext.ProductTypes.AddRange(GetProductSeeds().Select(seed => new ProductType
         {
-            Id = Guid.NewGuid(),
+            Id = CreateDeterministicGuid($"product:{seed.Slug}"),
             Name = seed.Name,
             Slug = seed.Slug,
             Industry = seed.Industry,
@@ -359,12 +361,14 @@ public sealed class AppDbInitializer(
 
     private static string CreateEmojiImageDataUrl(string icon, string backgroundColor, string accentColor)
     {
+        var safeBackgroundColor = NormalizeHexColor(backgroundColor);
+        var safeAccentColor = NormalizeHexColor(accentColor);
         var svg = $$"""
         <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'>
           <defs>
             <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-              <stop offset='0%' stop-color='{{backgroundColor}}'/>
-              <stop offset='100%' stop-color='{{accentColor}}'/>
+              <stop offset='0%' stop-color='{{safeBackgroundColor}}'/>
+              <stop offset='100%' stop-color='{{safeAccentColor}}'/>
             </linearGradient>
           </defs>
           <rect width='160' height='160' rx='28' fill='url(#g)'/>
@@ -374,6 +378,22 @@ public sealed class AppDbInitializer(
         """;
 
         return $"data:image/svg+xml;utf8,{Uri.EscapeDataString(svg)}";
+    }
+
+    private static string NormalizeHexColor(string value)
+    {
+        if (value.Length == 7 && value[0] == '#' && value.Skip(1).All(Uri.IsHexDigit))
+        {
+            return value;
+        }
+
+        return "#4B5563";
+    }
+
+    private static Guid CreateDeterministicGuid(string key)
+    {
+        var hash = MD5.HashData(Encoding.UTF8.GetBytes(key));
+        return new Guid(hash);
     }
 
     private sealed record ResourceSeed(

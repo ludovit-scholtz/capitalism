@@ -743,7 +743,10 @@ test.describe('Building detail upgrades', () => {
     await getGridCell(plannedSection, 1, 0).click()
 
     await expect(page.getByText('Output Product')).toBeVisible()
-    await expect(page.getByRole('button', { name: /Bread/ })).toBeVisible()
+    const breadOption = page.getByRole('button', { name: /Bread/ })
+    await expect(breadOption).toBeVisible()
     await expect(page.getByRole('button', { name: /Wooden Chair/ })).toHaveCount(0)
+    await breadOption.click()
+    await expect(page.locator('.selected-chip')).toContainText('Bread')
   })
 })

@@ -87,7 +87,7 @@ function formatRecipe(product: ProductType) {
   return product.recipes.map((recipe) => {
     const ingredient = recipe.resourceType?.name ?? recipe.inputProductType?.name ?? ''
     const unitSymbol = recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol ?? ''
-    return `${recipe.quantity} ${unitSymbol}`.trim() + ` ${ingredient}`
+    return [recipe.quantity, unitSymbol, ingredient].filter(Boolean).join(' ')
   }).join(' + ')
 }
 </script>

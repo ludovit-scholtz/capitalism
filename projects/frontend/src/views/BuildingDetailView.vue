@@ -965,10 +965,7 @@ function getReachableInputSelections(unit: EditableGridUnit | undefined): Set<st
     }
 
     for (const next of getDirectlyConnectedUnits(current, draftUnits.value)) {
-      const nextKey = `${next.gridX},${next.gridY}`
-      if (!visited.has(nextKey)) {
-        queue.push(next)
-      }
+      queue.push(next)
     }
   }
 
