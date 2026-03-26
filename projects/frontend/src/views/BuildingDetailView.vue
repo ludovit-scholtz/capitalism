@@ -3,6 +3,12 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
+import {
+  getLocalizedProductDescription,
+  getLocalizedProductName,
+  getLocalizedResourceDescription,
+  getLocalizedResourceName,
+} from '@/lib/catalogPresentation'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import type { Building, BuildingConfigurationPlanRemoval, BuildingConfigurationPlanUnit, BuildingUnit, ResourceType, ProductType } from '@/types'
@@ -49,7 +55,7 @@ const LINK_CHANGE_TICKS = 1
 const UNIT_PLAN_CHANGE_TICKS = 3
 const gridIndexes = [0, 1, 2, 3] as const
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
@@ -119,16 +125,16 @@ const allSelectableItems = computed<SelectorItem[]>(() => [
   ...resourceTypes.value.map((resource) => ({
     kind: 'resource' as const,
     id: resource.id,
-    name: resource.name,
-    description: resource.description,
+    name: getLocalizedResourceName(resource, locale.value),
+    description: getLocalizedResourceDescription(resource, locale.value),
     groupLabel: t('buildingDetail.selector.rawMaterials'),
     unitSymbol: resource.unitSymbol,
   })),
   ...productTypes.value.map((product) => ({
     kind: 'product' as const,
     id: product.id,
-    name: product.name,
-    description: product.description,
+    name: getLocalizedProductName(product, locale.value),
+    description: getLocalizedProductDescription(product, locale.value),
     groupLabel: t('buildingDetail.selector.products'),
     unitSymbol: product.unitSymbol,
   })),
@@ -873,17 +879,14 @@ function deleteLayout(index: number) {
 
 function getResourceName(id: string | null): string {
   if (!id) return '—'
-  return resourceTypes.value.find((r) => r.id === id)?.name ?? id
+  const resource = resourceTypes.value.find((candidate) => candidate.id === id)
+  return resource ? getLocalizedResourceName(resource, locale.value) : id
 }
 
 function getProductName(id: string | null): string {
   if (!id) return '—'
-  return productTypes.value.find((p) => p.id === id)?.name ?? id
-}
-
-function getSelectedDraftUnit(): EditableGridUnit | undefined {
-  if (!selectedCell.value) return undefined
-  return getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+  const product = productTypes.value.find((candidate) => candidate.id === id)
+  return product ? getLocalizedProductName(product, locale.value) : id
 }
 
 function getItemSelection(unit: EditableGridUnit | undefined): ItemSelection {
@@ -989,8 +992,8 @@ function getManufacturingSelectableItems(unit: EditableGridUnit | undefined): Se
     .map((product) => ({
       kind: 'product' as const,
       id: product.id,
-      name: product.name,
-      description: product.description,
+      name: getLocalizedProductName(product, locale.value),
+      description: getLocalizedProductDescription(product, locale.value),
       groupLabel: t('buildingDetail.selector.availableOutputs'),
       unitSymbol: product.unitSymbol,
     }))

@@ -1,15 +1,29 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import {
+  getLocalizedCategory,
+  getLocalizedIndustry,
+  getLocalizedProductDescription,
+  getLocalizedProductName,
+  getLocalizedRecipeIngredientName,
+  getLocalizedRecipeSummary,
+  getLocalizedResourceDescription,
+  getLocalizedResourceName,
+  getLocalizedUnitName,
+  getProductImageUrl,
+  getResourceImageUrl,
+} from '@/lib/catalogPresentation'
 import type { ProductType, ResourceType } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
 const search = ref('')
 const industry = ref('ALL')
+const selectedProductId = ref<string | null>(null)
 const resources = ref<ResourceType[]>([])
 const products = ref<ProductType[]>([])
 
@@ -18,17 +32,30 @@ const industries = computed(() => ['ALL', ...new Set(products.value.map((product
 const filteredProducts = computed(() => {
   const query = search.value.trim().toLowerCase()
   return products.value.filter((product) => {
+    const localizedName = getLocalizedProductName(product, locale.value).toLowerCase()
+    const localizedDescription = getLocalizedProductDescription(product, locale.value).toLowerCase()
     const matchesIndustry = industry.value === 'ALL' || product.industry === industry.value
     const matchesSearch = query.length === 0
-      || product.name.toLowerCase().includes(query)
-      || (product.description ?? '').toLowerCase().includes(query)
-      || product.recipes.some((recipe) =>
-        (recipe.resourceType?.name ?? '').toLowerCase().includes(query)
-        || (recipe.inputProductType?.name ?? '').toLowerCase().includes(query),
-      )
+      || localizedName.includes(query)
+      || localizedDescription.includes(query)
+      || product.recipes.some((recipe) => getLocalizedRecipeIngredientName(recipe, locale.value).toLowerCase().includes(query))
+
     return matchesIndustry && matchesSearch
   })
 })
+
+const selectedProduct = computed(() => filteredProducts.value.find((product) => product.id === selectedProductId.value) ?? filteredProducts.value[0] ?? null)
+
+watch(filteredProducts, (nextProducts) => {
+  if (nextProducts.length === 0) {
+    selectedProductId.value = null
+    return
+  }
+
+  if (!nextProducts.some((product) => product.id === selectedProductId.value)) {
+    selectedProductId.value = nextProducts[0]?.id ?? null
+  }
+}, { immediate: true })
 
 onMounted(async () => {
   try {
@@ -63,7 +90,7 @@ onMounted(async () => {
           description
           recipes {
             quantity
-            resourceType { id name slug unitName unitSymbol }
+            resourceType { id name slug category basePrice weightPerUnit unitName unitSymbol imageUrl description }
             inputProductType { id name slug unitName unitSymbol }
           }
         }
@@ -79,16 +106,57 @@ onMounted(async () => {
   }
 })
 
-function formatIndustry(value: string) {
-  return value.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+function getResourceCardName(resource: ResourceType) {
+  return getLocalizedResourceName(resource, locale.value)
 }
 
-function formatRecipe(product: ProductType) {
-  return product.recipes.map((recipe) => {
-    const ingredient = recipe.resourceType?.name ?? recipe.inputProductType?.name ?? ''
-    const unitSymbol = recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol ?? ''
-    return [recipe.quantity, unitSymbol, ingredient].filter(Boolean).join(' ')
-  }).join(' + ')
+function getResourceCardDescription(resource: ResourceType) {
+  return getLocalizedResourceDescription(resource, locale.value)
+}
+
+function getProductCardName(product: ProductType) {
+  return getLocalizedProductName(product, locale.value)
+}
+
+function getProductCardDescription(product: ProductType) {
+  return getLocalizedProductDescription(product, locale.value)
+}
+
+function getIndustryLabel(value: string) {
+  return getLocalizedIndustry(value, locale.value)
+}
+
+function getCategoryLabel(value: string) {
+  return getLocalizedCategory(value, locale.value)
+}
+
+function getResourceCardImage(resource: ResourceType) {
+  return getResourceImageUrl(resource)
+}
+
+function getProductCardImage(product: ProductType) {
+  return getProductImageUrl(product)
+}
+
+function getRecipeText(product: ProductType) {
+  return getLocalizedRecipeSummary(product, locale.value)
+}
+
+function getIngredientImage(recipe: ProductType['recipes'][number]) {
+  if (recipe.resourceType) {
+    return getResourceImageUrl(recipe.resourceType)
+  }
+
+  if (recipe.inputProductType) {
+    const product = products.value.find((candidate) => candidate.id === recipe.inputProductType?.id)
+    return getProductImageUrl({
+      slug: recipe.inputProductType.slug,
+      name: recipe.inputProductType.name,
+      industry: product?.industry ?? 'ELECTRONICS',
+    })
+  }
+
+  return null
 }
 </script>
 
@@ -122,17 +190,17 @@ function formatRecipe(product: ProductType) {
         </div>
         <div class="resource-grid">
           <article v-for="resource in resources" :key="resource.id" class="resource-card">
-            <img v-if="resource.imageUrl" :src="resource.imageUrl" :alt="resource.name" class="resource-image" />
+            <img v-if="getResourceCardImage(resource)" :src="getResourceCardImage(resource) ?? undefined" :alt="getResourceCardName(resource)" class="resource-image" />
             <div class="resource-body">
               <div class="resource-heading">
-                <h3>{{ resource.name }}</h3>
+                <h3>{{ getResourceCardName(resource) }}</h3>
                 <span class="resource-unit">{{ resource.unitSymbol }}</span>
               </div>
-                <p class="resource-description">{{ resource.description }}</p>
+              <p class="resource-description">{{ getResourceCardDescription(resource) }}</p>
               <div class="resource-meta">
                 <span>{{ t('encyclopedia.basePrice') }}: ${{ resource.basePrice }}</span>
                 <span>{{ t('encyclopedia.weight') }}: {{ resource.weightPerUnit }} kg/{{ resource.unitSymbol }}</span>
-                <span>{{ resource.category }}</span>
+                <span>{{ getCategoryLabel(resource.category) }}</span>
               </div>
             </div>
           </article>
@@ -149,32 +217,75 @@ function formatRecipe(product: ProductType) {
           <input v-model="search" type="search" class="filter-input" :placeholder="t('encyclopedia.searchPlaceholder')" />
           <select v-model="industry" class="filter-select">
             <option v-for="option in industries" :key="option" :value="option">
-              {{ option === 'ALL' ? t('encyclopedia.allIndustries') : formatIndustry(option) }}
+              {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
             </option>
           </select>
         </div>
 
-        <div class="product-grid">
-          <article v-for="product in filteredProducts" :key="product.id" class="product-card">
-            <div class="product-heading">
-              <div>
-                <h3>{{ product.name }}</h3>
-                <p class="product-industry">{{ formatIndustry(product.industry) }}</p>
+        <section v-if="selectedProduct" class="selected-product">
+          <div class="selected-product-main">
+            <img :src="getProductCardImage(selectedProduct)" :alt="getProductCardName(selectedProduct)" class="selected-product-image" />
+            <div class="selected-product-copy">
+              <p class="product-industry">{{ getIndustryLabel(selectedProduct.industry) }}</p>
+              <h3>{{ getProductCardName(selectedProduct) }}</h3>
+              <p class="product-description">{{ getProductCardDescription(selectedProduct) }}</p>
+              <div class="product-meta">
+                <span>{{ t('encyclopedia.basePrice') }}: ${{ selectedProduct.basePrice }}</span>
+                <span>{{ t('encyclopedia.craftTime') }}: {{ selectedProduct.baseCraftTicks }}</span>
+                <span>{{ t('encyclopedia.energy') }}: {{ selectedProduct.energyConsumptionMwh }} MW</span>
+                <span>{{ t('encyclopedia.output') }}: {{ selectedProduct.outputQuantity }} {{ getLocalizedUnitName(selectedProduct.unitName, locale) }}</span>
               </div>
-              <span class="product-batch">{{ product.outputQuantity }} {{ product.unitSymbol }}</span>
             </div>
-            <p class="product-description">{{ product.description }}</p>
-            <div class="product-meta">
-              <span>{{ t('encyclopedia.basePrice') }}: ${{ product.basePrice }}</span>
-              <span>{{ t('encyclopedia.craftTime') }}: {{ product.baseCraftTicks }}</span>
-              <span>{{ t('encyclopedia.energy') }}: {{ product.energyConsumptionMwh }} MW</span>
+          </div>
+
+          <div class="composition-panel">
+            <div class="composition-header">
+              <h4>{{ t('encyclopedia.compositionTitle') }}</h4>
+              <p>{{ t('encyclopedia.compositionHelp') }}</p>
+            </div>
+            <div class="composition-flow">
+              <div v-for="(recipe, index) in selectedProduct.recipes" :key="`${selectedProduct.id}-${index}`" class="composition-node ingredient">
+                <img v-if="getIngredientImage(recipe)" :src="getIngredientImage(recipe) ?? undefined" :alt="getLocalizedRecipeIngredientName(recipe, locale)" class="composition-image" />
+                <strong>{{ recipe.quantity }} {{ recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol }}</strong>
+                <span>{{ getLocalizedRecipeIngredientName(recipe, locale) }}</span>
+              </div>
+              <span class="composition-arrow" aria-hidden="true">→</span>
+              <div class="composition-node output">
+                <img :src="getProductCardImage(selectedProduct)" :alt="getProductCardName(selectedProduct)" class="composition-image" />
+                <strong>{{ selectedProduct.outputQuantity }} {{ selectedProduct.unitSymbol }}</strong>
+                <span>{{ getProductCardName(selectedProduct) }}</span>
+              </div>
             </div>
             <p class="recipe-line">
               <strong>{{ t('encyclopedia.recipe') }}:</strong>
-              {{ formatRecipe(product) }}
-              <span class="recipe-output">→ {{ product.outputQuantity }} {{ product.unitSymbol }} {{ product.name }}</span>
+              {{ getRecipeText(selectedProduct) }}
             </p>
-          </article>
+          </div>
+        </section>
+
+        <div class="product-grid">
+          <button
+            v-for="product in filteredProducts"
+            :key="product.id"
+            type="button"
+            class="product-card"
+            :class="{ active: selectedProductId === product.id }"
+            @click="selectedProductId = product.id"
+          >
+            <img :src="getProductCardImage(product)" :alt="getProductCardName(product)" class="product-image" />
+            <div class="product-heading">
+              <div>
+                <h3>{{ getProductCardName(product) }}</h3>
+                <p class="product-industry">{{ getIndustryLabel(product.industry) }}</p>
+              </div>
+              <span class="product-batch">{{ product.outputQuantity }} {{ product.unitSymbol }}</span>
+            </div>
+            <p class="product-description">{{ getProductCardDescription(product) }}</p>
+            <div class="product-meta">
+              <span>{{ t('encyclopedia.basePrice') }}: ${{ product.basePrice }}</span>
+              <span>{{ t('encyclopedia.energy') }}: {{ product.energyConsumptionMwh }} MW</span>
+            </div>
+          </button>
         </div>
       </section>
     </template>
@@ -193,7 +304,9 @@ function formatRecipe(product: ProductType) {
 .filters,
 .hero-stats,
 .resource-meta,
-.product-meta {
+.product-meta,
+.selected-product-main,
+.composition-header {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
@@ -212,14 +325,17 @@ function formatRecipe(product: ProductType) {
 .product-industry,
 .recipe-line,
 .resource-meta,
-.product-meta {
+.product-meta,
+.composition-header p {
   color: var(--color-text-secondary);
 }
 
 .hero h1,
 .section-header h2,
 .resource-heading h3,
-.product-heading h3 {
+.product-heading h3,
+.selected-product-copy h3,
+.composition-header h4 {
   margin: 0;
 }
 
@@ -229,7 +345,9 @@ function formatRecipe(product: ProductType) {
 
 .stat-card,
 .resource-card,
-.product-card {
+.product-card,
+.selected-product,
+.composition-node {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -249,20 +367,47 @@ function formatRecipe(product: ProductType) {
   gap: 1rem;
 }
 
-.resource-card {
+.resource-card,
+.product-card,
+.selected-product {
   overflow: hidden;
 }
 
-.resource-image {
+.resource-image,
+.product-image,
+.selected-product-image,
+.composition-image {
   width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
   background: var(--color-bg);
+  object-fit: cover;
+}
+
+.resource-image,
+.product-image {
+  aspect-ratio: 16 / 9;
+}
+
+.selected-product-image {
+  width: min(280px, 100%);
+  border-radius: 16px;
+  aspect-ratio: 1;
 }
 
 .resource-body,
 .product-card {
   padding: 1rem;
+}
+
+.product-card {
+  display: grid;
+  gap: 0.75rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.product-card.active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
 }
 
 .resource-heading,
@@ -301,10 +446,59 @@ function formatRecipe(product: ProductType) {
   min-width: 240px;
 }
 
-.recipe-output {
-  display: block;
-  margin-top: 0.35rem;
-  color: var(--color-text);
+.selected-product {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1rem;
+}
+
+.selected-product-copy {
+  display: grid;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 240px;
+}
+
+.composition-panel {
+  display: grid;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.composition-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.composition-node {
+  width: 150px;
+  padding: 0.75rem;
+  display: grid;
+  gap: 0.5rem;
+  justify-items: center;
+  text-align: center;
+}
+
+.composition-node.output {
+  border-color: var(--color-primary);
+}
+
+.composition-image {
+  border-radius: 12px;
+  aspect-ratio: 1;
+}
+
+.composition-arrow {
+  font-size: 1.5rem;
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.recipe-line {
+  margin: 0;
 }
 
 @media (max-width: 720px) {
@@ -318,6 +512,20 @@ function formatRecipe(product: ProductType) {
 
   .stat-card {
     flex: 1;
+  }
+
+  .composition-flow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .composition-node {
+    width: 100%;
+  }
+
+  .composition-arrow {
+    transform: rotate(90deg);
+    align-self: center;
   }
 }
 </style>

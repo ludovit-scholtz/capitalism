@@ -3,12 +3,87 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import {
+  getLocalizedProductDescription,
+  getLocalizedProductName,
+  getLocalizedRecipeIngredientName,
+  getLocalizedResourceName,
+  getProductImageUrl,
+} from '@/lib/catalogPresentation'
 import { useAuthStore } from '@/stores/auth'
 import type { City, ProductType, OnboardingResult } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+
+const CITIES_QUERY = `
+  {
+    cities {
+      id
+      name
+      countryCode
+      latitude
+      longitude
+      population
+      resources {
+        resourceType {
+          id
+          name
+          slug
+          category
+          basePrice
+          weightPerUnit
+          unitName
+          unitSymbol
+          imageUrl
+          description
+        }
+        abundance
+      }
+    }
+  }
+`
+
+const PRODUCTS_QUERY = `
+  query Products($industry: String) {
+    productTypes(industry: $industry) {
+      id
+      name
+      slug
+      industry
+      basePrice
+      baseCraftTicks
+      outputQuantity
+      energyConsumptionMwh
+      unitName
+      unitSymbol
+      description
+      recipes {
+        quantity
+        resourceType {
+          id
+          name
+          slug
+          category
+          basePrice
+          weightPerUnit
+          unitName
+          unitSymbol
+          imageUrl
+          description
+        }
+        inputProductType {
+          id
+          name
+          slug
+          unitName
+          unitSymbol
+        }
+      }
+    }
+  }
+`
 
 const step = ref(1)
 const loading = ref(false)
@@ -56,9 +131,7 @@ onMounted(async () => {
       gqlRequest<{ starterIndustries: { industries: string[] } }>(
         '{ starterIndustries { industries } }',
       ),
-      gqlRequest<{ cities: City[] }>(
-        '{ cities { id name countryCode latitude longitude population resources { resourceType { name } abundance } } }',
-      ),
+      gqlRequest<{ cities: City[] }>(CITIES_QUERY),
     ])
     industries.value = industriesData.starterIndustries.industries
     cities.value = citiesData.cities
@@ -73,12 +146,7 @@ async function loadProducts() {
   loading.value = true
   try {
     const data = await gqlRequest<{ productTypes: ProductType[] }>(
-      `query Products($industry: String) {
-        productTypes(industry: $industry) {
-          id name slug industry basePrice baseCraftTicks description
-          recipes { resourceType { name } quantity }
-        }
-      }`,
+      PRODUCTS_QUERY,
       { industry: selectedIndustry.value },
     )
     products.value = data.productTypes
@@ -135,6 +203,29 @@ async function completeOnboarding() {
 
 function formatIndustry(industry: string): string {
   return industry.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+function getProductName(product: ProductType): string {
+  return getLocalizedProductName(product, locale.value)
+}
+
+function getProductDescription(product: ProductType): string {
+  return getLocalizedProductDescription(product, locale.value)
+}
+
+function getProductImage(product: ProductType): string {
+  return getProductImageUrl(product)
+}
+
+function getRecipeIngredientLabel(product: ProductType, index: number): string {
+  const recipe = product.recipes[index]
+  if (!recipe) return ''
+  return `${recipe.quantity}× ${getLocalizedRecipeIngredientName(recipe, locale.value)}`
+}
+
+function getCityResourceName(city: City, index: number): string {
+  const resource = city.resources[index]?.resourceType
+  return resource ? getLocalizedResourceName(resource, locale.value) : ''
 }
 </script>
 
@@ -223,7 +314,7 @@ function formatIndustry(industry: string): string {
             <div class="city-resources">
               <span class="resource-label">{{ t('onboarding.resources') }}:</span>
               <span v-for="(r, i) in city.resources" :key="i" class="resource-badge">
-                {{ r.resourceType.name }}
+                {{ getCityResourceName(city, i) }}
               </span>
             </div>
           </button>
@@ -269,13 +360,15 @@ function formatIndustry(industry: string): string {
               :class="{ selected: selectedProductId === prod.id }"
               @click="selectedProductId = prod.id"
             >
-              <span class="card-title">{{ prod.name }}</span>
+              <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="product-image" />
+              <span class="card-title">{{ getProductName(prod) }}</span>
               <span class="product-price">${{ prod.basePrice }}{{ t('onboarding.perUnit') }}</span>
               <span class="product-craft">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
+              <span class="card-desc">{{ getProductDescription(prod) }}</span>
               <div class="product-recipe">
                 <span class="recipe-label">{{ t('onboarding.requires') }}:</span>
                 <span v-for="(r, i) in prod.recipes" :key="i" class="recipe-item">
-                  {{ r.quantity }}× {{ r.resourceType.name }}
+                  {{ getRecipeIngredientLabel(prod, i) }}
                 </span>
               </div>
             </button>
@@ -299,7 +392,7 @@ function formatIndustry(industry: string): string {
             </div>
             <div class="summary-item">
               <span class="summary-label">📦</span>
-              <span>{{ selectedProduct!.name }} — ${{ selectedProduct!.basePrice }}</span>
+              <span>{{ getProductName(selectedProduct!) }} — ${{ selectedProduct!.basePrice }}</span>
             </div>
           </div>
         </div>
@@ -503,6 +596,14 @@ function formatIndustry(industry: string): string {
 .card-icon {
   font-size: 2.5rem;
   line-height: 1;
+}
+
+.product-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
 }
 
 .card-title {

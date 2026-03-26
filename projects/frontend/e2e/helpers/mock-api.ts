@@ -146,6 +146,7 @@ export type MockProductType = {
   energyConsumptionMwh?: number
   unitName?: string
   unitSymbol?: string
+  imageUrl?: string | null
   isProOnly: boolean
   description: string | null
   recipes: {

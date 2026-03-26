@@ -110,8 +110,12 @@ export default {
     weight: 'Weight',
     craftTime: 'Craft ticks',
     energy: 'Batch energy',
+    output: 'Batch output',
     recipe: 'Recipe',
+    compositionTitle: 'Requirement composition',
+    compositionHelp: 'Visualize each upstream requirement flowing into the selected manufactured product.',
   },
+
   buildings: {
     title: 'Buy Building',
     selectType: 'Select Building Type',
