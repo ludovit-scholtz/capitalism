@@ -349,6 +349,36 @@ public sealed class Mutation
             .FirstAsync(candidate => candidate.Id == plan.Id);
     }
 
+    /// <summary>Sets or clears the for-sale status and asking price of a building.</summary>
+    [Authorize]
+    public async Task<Building> SetBuildingForSale(
+        SetBuildingForSaleInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.Units)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        building.IsForSale = input.IsForSale;
+        building.AskingPrice = input.IsForSale ? input.AskingPrice : null;
+
+        await db.SaveChangesAsync();
+        return building;
+    }
+
     private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));

@@ -60,6 +60,50 @@ public sealed class BuildingUnit
 
     /// <summary>Whether the diagonal link to the unit below-right is active.</summary>
     public bool LinkDownRight { get; set; }
+
+    // ── Unit-specific configuration ──
+
+    /// <summary>Resource type this unit works with (Mining, Purchase, Storage, B2B Sales).</summary>
+    public Guid? ResourceTypeId { get; set; }
+
+    /// <summary>Product type this unit works with (Manufacturing, Purchase, Public Sales, Branding).</summary>
+    public Guid? ProductTypeId { get; set; }
+
+    /// <summary>Minimum selling price for B2B Sales or Public Sales units.</summary>
+    public decimal? MinPrice { get; set; }
+
+    /// <summary>Maximum purchase price for Purchase units.</summary>
+    public decimal? MaxPrice { get; set; }
+
+    /// <summary>
+    /// Purchase source for Purchase units: EXCHANGE, LOCAL, OPTIMAL.
+    /// </summary>
+    [MaxLength(20)]
+    public string? PurchaseSource { get; set; }
+
+    /// <summary>
+    /// Sale/purchase visibility: PUBLIC, COMPANY, GROUP.
+    /// </summary>
+    [MaxLength(20)]
+    public string? SaleVisibility { get; set; }
+
+    /// <summary>Marketing budget per tick for Marketing units.</summary>
+    public decimal? Budget { get; set; }
+
+    /// <summary>Media house building ID that the Marketing unit uses.</summary>
+    public Guid? MediaHouseBuildingId { get; set; }
+
+    /// <summary>Minimum product quality for Purchase units (0.0-1.0).</summary>
+    public decimal? MinQuality { get; set; }
+
+    /// <summary>
+    /// Brand scope for Branding units: PRODUCT, CATEGORY, COMPANY.
+    /// </summary>
+    [MaxLength(20)]
+    public string? BrandScope { get; set; }
+
+    /// <summary>Lock purchases to a specific vendor company ID.</summary>
+    public Guid? VendorLockCompanyId { get; set; }
 }
 
 /// <summary>Defines valid unit types for each building type.</summary>
