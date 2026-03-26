@@ -346,7 +346,7 @@ function formatIndustry(industry: string): string {
 .city-card.selected,
 .product-card.selected {
   border-color: var(--color-primary);
-  background: rgba(19, 127, 236, 0.1);
+  background: rgba(0, 71, 255, 0.1);
 }
 
 .industry-icon {
