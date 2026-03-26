@@ -458,13 +458,14 @@ const unitNameTranslations: Record<SupportedLocale, Record<string, string>> = {
   },
 }
 
-const visualsByIndustry = {
+const visualsByIndustry: Record<string, { background: string; accent: string }> = {
   FURNITURE: { background: '#8B5A2B', accent: '#D4A373' },
   FOOD_PROCESSING: { background: '#B45309', accent: '#F59E0B' },
   HEALTHCARE: { background: '#7C3AED', accent: '#A78BFA' },
   ELECTRONICS: { background: '#0EA5E9', accent: '#67E8F9' },
   CONSTRUCTION: { background: '#374151', accent: '#9CA3AF' },
-} satisfies Record<string, { background: string; accent: string }>
+}
+const defaultProductVisual = { background: '#8B5A2B', accent: '#D4A373' }
 
 export function normalizeCatalogLocale(locale: string): SupportedLocale {
   const short = locale.toLowerCase().slice(0, 2)
@@ -581,8 +582,8 @@ function humanizeIdentifier(value: string): string {
     .replace(/\b\w/g, (char) => char.toUpperCase())
 }
 
-function getProductVisual(slug: string, industry: string) {
-  const base = visualsByIndustry[industry] ?? visualsByIndustry.FURNITURE
+function getProductVisual(slug: string, industry: string): { icon: string; background: string; accent: string } {
+  const base = visualsByIndustry[industry] ?? defaultProductVisual
 
   if (/(chair|bench|stool)/.test(slug)) return { icon: '🪑', ...base }
   if (/(bed|crib|bunk)/.test(slug)) return { icon: '🛏️', ...base }
@@ -649,9 +650,9 @@ function sanitizeHexColor(value: string): string {
 
 function escapeSvgText(value: string): string {
   return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
 function hashValue(value: string): string {

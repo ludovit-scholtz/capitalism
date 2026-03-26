@@ -76,6 +76,18 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
     }
 
+    private async Task ResetGameStateAsync()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var gameState = await db.GameStates.FindAsync(1);
+        Assert.NotNull(gameState);
+
+        gameState!.CurrentTick = 0;
+        gameState.LastTickAtUtc = DateTime.UtcNow;
+        await db.SaveChangesAsync();
+    }
+
     #endregion
 
     #region Health & Info
@@ -283,6 +295,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task GameState_ReturnsInitialState()
     {
+        await ResetGameStateAsync();
         var result = await ExecuteGraphQlAsync("{ gameState { currentTick tickIntervalSeconds taxRate } }");
 
         var state = result.GetProperty("data").GetProperty("gameState");
@@ -757,14 +770,19 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task CompleteOnboarding_CreatesCompanyFactoryAndShop()
     {
         var token = await RegisterAndGetTokenAsync("onboard@test.com", "Onboarder");
+        await ResetGameStateAsync();
 
         // Get city and product
         var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
         var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
 
         var productsResult = await ExecuteGraphQlAsync(
-            "query { productTypes(industry: \"FURNITURE\") { id name } }");
-        var productId = productsResult.GetProperty("data").GetProperty("productTypes")[0].GetProperty("id").GetString();
+            "query { productTypes(industry: \"FURNITURE\") { id slug name } }");
+        var productId = productsResult.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray()
+            .Single(product => product.GetProperty("slug").GetString() == "wooden-chair")
+            .GetProperty("id")
+            .GetString();
 
         var result = await ExecuteGraphQlAsync(
             """
@@ -785,6 +803,33 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("FACTORY", data.GetProperty("factory").GetProperty("type").GetString());
         Assert.Equal("SALES_SHOP", data.GetProperty("salesShop").GetProperty("type").GetString());
         Assert.Equal("FURNITURE", data.GetProperty("selectedProduct").GetProperty("industry").GetString());
+
+        var companiesResult = await ExecuteGraphQlAsync(
+            """
+            {
+              myCompanies {
+                buildings {
+                  type
+                  units { unitType resourceTypeId productTypeId }
+                }
+              }
+            }
+            """,
+            token: token);
+
+        var buildings = companiesResult.GetProperty("data").GetProperty("myCompanies")[0].GetProperty("buildings").EnumerateArray().ToList();
+        var factory = buildings.Single(building => building.GetProperty("type").GetString() == "FACTORY");
+        var shop = buildings.Single(building => building.GetProperty("type").GetString() == "SALES_SHOP");
+
+        Assert.Contains(factory.GetProperty("units").EnumerateArray(), unit =>
+            unit.GetProperty("unitType").GetString() == "PURCHASE"
+            && unit.GetProperty("resourceTypeId").ValueKind == JsonValueKind.String);
+        Assert.Contains(factory.GetProperty("units").EnumerateArray(), unit =>
+            unit.GetProperty("unitType").GetString() == "MANUFACTURING"
+            && unit.GetProperty("productTypeId").GetString() == productId);
+        Assert.Contains(shop.GetProperty("units").EnumerateArray(), unit =>
+            unit.GetProperty("unitType").GetString() == "PUBLIC_SALES"
+            && unit.GetProperty("productTypeId").GetString() == productId);
     }
 
     [Fact]

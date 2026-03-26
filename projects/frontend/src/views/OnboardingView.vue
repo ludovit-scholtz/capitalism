@@ -85,6 +85,12 @@ const PRODUCTS_QUERY = `
   }
 `
 
+const starterProductSlugByIndustry: Record<string, string[]> = {
+  FURNITURE: ['wooden-chair'],
+  FOOD_PROCESSING: ['bread'],
+  HEALTHCARE: ['basic-medicine'],
+}
+
 const step = ref(1)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -149,7 +155,8 @@ async function loadProducts() {
       PRODUCTS_QUERY,
       { industry: selectedIndustry.value },
     )
-    products.value = data.productTypes
+    const allowedSlugs = starterProductSlugByIndustry[selectedIndustry.value] ?? []
+    products.value = data.productTypes.filter((product) => allowedSlugs.includes(product.slug))
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load products'
   } finally {
