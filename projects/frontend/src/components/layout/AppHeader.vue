@@ -1,25 +1,30 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-//import { useAuthStore } from '@/stores/auth'
+import { useAuthStore } from '@/stores/auth'
 import LanguageSwitcher from '@/components/layout/LanguageSwitcher.vue'
 
 const { t } = useI18n()
-//const auth = useAuthStore()
+const auth = useAuthStore()
 </script>
 
 <template>
   <header class="app-header">
     <div class="container header-inner">
       <RouterLink to="/" class="logo">
-        <span class="logo-icon">📅</span>
+        <span class="logo-icon">🏭</span>
         <span class="logo-text">CAPITALISM V</span>
       </RouterLink>
       <nav class="nav-links">
-        <RouterLink to="/">{{ t('nav.browse') }}</RouterLink>
+        <RouterLink to="/">{{ t('nav.home') }}</RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/dashboard">{{ t('nav.dashboard') }}</RouterLink>
       </nav>
       <div class="header-actions">
         <LanguageSwitcher />
-          <RouterLink to="/login" class="btn btn-primary">{{ t('common.login') }}</RouterLink>
+        <template v-if="auth.isAuthenticated">
+          <span class="player-name">{{ auth.player?.displayName }}</span>
+          <button class="btn btn-secondary" @click="auth.logout()">{{ t('common.logout') }}</button>
+        </template>
+        <RouterLink v-else to="/login" class="btn btn-primary">{{ t('common.login') }}</RouterLink>
       </div>
     </div>
   </header>

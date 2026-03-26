@@ -1,0 +1,168 @@
+# Capitalism V — GraphQL API Reference
+
+## Endpoint
+`POST /graphql`
+
+## Authentication
+JWT Bearer tokens. Obtained via `register` or `login` mutations.  
+Include in request header: `Authorization: Bearer <token>`
+
+## Queries
+
+### `me` *(requires auth)*
+Returns the authenticated player's profile with companies.
+
+```graphql
+{
+  me {
+    id
+    displayName
+    email
+    role
+    createdAtUtc
+    companies { id name cash }
+  }
+}
+```
+
+### `cities`
+Lists all game map cities with their resources.
+
+```graphql
+{
+  cities {
+    id name countryCode latitude longitude population averageRentPerSqm
+    resources {
+      resourceType { id name slug category }
+      abundance
+    }
+  }
+}
+```
+
+### `city(id: UUID!)`
+Gets a single city with buildings.
+
+### `resourceTypes`
+Lists all raw material types (encyclopaedia).
+
+```graphql
+{
+  resourceTypes { id name slug category basePrice weightPerUnit description }
+}
+```
+
+### `productTypes(industry: String)`
+Lists product types, optionally filtered by industry.
+
+```graphql
+query {
+  productTypes(industry: "FURNITURE") {
+    id name slug industry basePrice baseCraftTicks
+    recipes { resourceType { name } quantity }
+  }
+}
+```
+
+### `rankings`
+Player leaderboard sorted by total wealth (cash across all companies).
+
+```graphql
+{
+  rankings { playerId displayName totalWealth companyCount }
+}
+```
+
+### `myCompanies` *(requires auth)*
+Lists the current player's companies with their buildings and units.
+
+### `gameState`
+Returns current tick, tax configuration, etc.
+
+```graphql
+{
+  gameState { currentTick tickIntervalSeconds taxCycleTicks taxRate }
+}
+```
+
+### `starterIndustries`
+Returns available industries for new player onboarding.
+
+```graphql
+{
+  starterIndustries { industries }
+}
+```
+
+## Mutations
+
+### `register(input: RegisterInput!)`
+Creates a new player account.
+
+**Input:**
+| Field | Type | Required |
+|-------|------|----------|
+| email | String | Yes |
+| displayName | String | Yes |
+| password | String | Yes (min 8 chars) |
+
+**Returns:** `AuthPayload { token, expiresAtUtc, player }`
+
+### `login(input: LoginInput!)`
+Authenticates an existing player.
+
+**Input:**
+| Field | Type | Required |
+|-------|------|----------|
+| email | String | Yes |
+| password | String | Yes |
+
+**Returns:** `AuthPayload { token, expiresAtUtc, player }`
+
+### `createCompany(input: CreateCompanyInput!)` *(requires auth)*
+Creates a new company for the player (starting capital: 1,000,000).
+
+**Input:**
+| Field | Type | Required |
+|-------|------|----------|
+| name | String | Yes |
+
+**Returns:** `Company`
+
+### `placeBuilding(input: PlaceBuildingInput!)` *(requires auth)*
+Places a building in a city.
+
+**Input:**
+| Field | Type | Required |
+|-------|------|----------|
+| companyId | UUID | Yes |
+| cityId | UUID | Yes |
+| type | String | Yes (valid BuildingType) |
+| name | String | Yes |
+| initialProductTypeId | UUID | No |
+
+**Returns:** `Building`
+
+### `completeOnboarding(input: OnboardingInput!)` *(requires auth)*
+Onboarding wizard completion: creates a company, factory (with default units), and sales shop.
+
+**Input:**
+| Field | Type | Required |
+|-------|------|----------|
+| industry | String | Yes (FURNITURE, FOOD_PROCESSING, HEALTHCARE) |
+| cityId | UUID | Yes |
+| productTypeId | UUID | Yes |
+| companyName | String | Yes |
+
+**Returns:** `OnboardingResult { company, factory, salesShop, selectedProduct }`
+
+## Error Codes
+| Code | Description |
+|------|-------------|
+| `DUPLICATE_EMAIL` | Email already registered |
+| `INVALID_CREDENTIALS` | Wrong email or password |
+| `COMPANY_NOT_FOUND` | Company doesn't exist or not owned by player |
+| `INVALID_BUILDING_TYPE` | Invalid building type string |
+| `CITY_NOT_FOUND` | City ID doesn't exist |
+| `INVALID_INDUSTRY` | Not a valid starter industry |
+| `INVALID_PRODUCT` | Product not found or wrong industry |

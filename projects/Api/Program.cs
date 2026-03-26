@@ -119,7 +119,9 @@ builder.Services
 
 builder.Services
     .AddGraphQLServer()
-    .AddAuthorization();
+    .AddAuthorization()
+    .AddQueryType<Api.Types.Query>()
+    .AddMutationType<Api.Types.Mutation>();
 
 var app = builder.Build();
 
@@ -129,7 +131,7 @@ app.UseAuthorization();
 
 app.MapGet("/", () => Results.Ok(new
 {
-    name = "Events API",
+    name = "Capitalism V API",
     graphql = "/graphql",
     health = "/healthz"
 }));
@@ -140,7 +142,7 @@ app.MapGraphQL();
 using (var scope = app.Services.CreateScope())
 {
     var initializer = scope.ServiceProvider.GetRequiredService<AppDbInitializer>();
-    
+    await initializer.InitializeAsync();
 }
 
 app.Run();

@@ -1,4 +1,4 @@
-const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || 'https://events-api.de-4.biatec.io/graphql'
+const GRAPHQL_URL = import.meta.env.VITE_GRAPHQL_URL || 'https://capitalism.de-4.biatec.io/graphql'
 
 export interface GraphQLResponse<T> {
   data?: T

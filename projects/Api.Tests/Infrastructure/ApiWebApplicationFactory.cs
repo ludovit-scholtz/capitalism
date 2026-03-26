@@ -10,13 +10,7 @@ namespace Api.Tests.Infrastructure;
 
 public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly string _databaseName = $"events-tests-{Guid.NewGuid()}";
-    private readonly Action<IServiceCollection>? _additionalServices;
-
-    public ApiWebApplicationFactory(Action<IServiceCollection>? additionalServices = null)
-    {
-        _additionalServices = additionalServices;
-    }
+    private readonly string _databaseName = $"capitalism-tests-{Guid.NewGuid()}";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -27,7 +21,7 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
             configurationBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:EventsCatalog"] = "Data Source=events-tests.db",
-                ["SeedData:AdminEmail"] = "admin@events.local",
+                ["SeedData:AdminEmail"] = "admin@capitalism.local",
                 ["SeedData:AdminDisplayName"] = "Platform Admin",
                 ["SeedData:AdminPassword"] = "ChangeMe123!"
             });
@@ -39,8 +33,6 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
             services.RemoveAll<AppDbContext>();
             services.AddDbContext<AppDbContext>(options =>
                 options.UseInMemoryDatabase(_databaseName));
-
-            _additionalServices?.Invoke(services);
         });
     }
 }

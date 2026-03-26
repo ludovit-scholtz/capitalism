@@ -1,0 +1,143 @@
+using Api.Data;
+using Api.Data.Entities;
+using Api.Security;
+using HotChocolate.Authorization;
+using Microsoft.EntityFrameworkCore;
+
+namespace Api.Types;
+
+/// <summary>
+/// GraphQL query type for the Capitalism V game.
+/// Provides read access to game data including players, cities, resources, products, and buildings.
+/// </summary>
+public sealed class Query
+{
+    /// <summary>Returns the currently authenticated player's profile.</summary>
+    [Authorize]
+    public async Task<Player?> GetMe(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        return await db.Players
+            .Include(p => p.Companies)
+            .FirstOrDefaultAsync(p => p.Id == userId);
+    }
+
+    /// <summary>Lists all cities available on the game map.</summary>
+    public async Task<List<City>> GetCities([Service] AppDbContext db)
+    {
+        return await db.Cities
+            .Include(c => c.Resources)
+            .ThenInclude(r => r.ResourceType)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    /// <summary>Gets a specific city by ID.</summary>
+    public async Task<City?> GetCity(Guid id, [Service] AppDbContext db)
+    {
+        return await db.Cities
+            .Include(c => c.Resources)
+            .ThenInclude(r => r.ResourceType)
+            .Include(c => c.Buildings)
+            .FirstOrDefaultAsync(c => c.Id == id);
+    }
+
+    /// <summary>Lists all raw material resource types in the game encyclopaedia.</summary>
+    public async Task<List<ResourceType>> GetResourceTypes([Service] AppDbContext db)
+    {
+        return await db.ResourceTypes.OrderBy(r => r.Name).ToListAsync();
+    }
+
+    /// <summary>Lists all product types, optionally filtered by industry.</summary>
+    public async Task<List<ProductType>> GetProductTypes(
+        string? industry,
+        [Service] AppDbContext db)
+    {
+        var query = db.ProductTypes
+            .Include(p => p.Recipes)
+            .ThenInclude(r => r.ResourceType)
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(industry))
+        {
+            query = query.Where(p => p.Industry == industry);
+        }
+
+        return await query.OrderBy(p => p.Name).ToListAsync();
+    }
+
+    /// <summary>Gets the player ranking (leaderboard) sorted by total wealth.</summary>
+    public async Task<List<PlayerRanking>> GetRankings([Service] AppDbContext db)
+    {
+        var players = await db.Players
+            .Include(p => p.Companies)
+            .Where(p => p.Role != PlayerRole.Admin)
+            .ToListAsync();
+
+        return players
+            .Select(p => new PlayerRanking
+            {
+                PlayerId = p.Id,
+                DisplayName = p.DisplayName,
+                TotalWealth = p.Companies.Sum(c => c.Cash),
+                CompanyCount = p.Companies.Count
+            })
+            .OrderByDescending(r => r.TotalWealth)
+            .ToList();
+    }
+
+    /// <summary>Gets the current player's companies with their buildings.</summary>
+    [Authorize]
+    public async Task<List<Company>> GetMyCompanies(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        return await db.Companies
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.Units)
+            .Where(c => c.PlayerId == userId)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+    }
+
+    /// <summary>Gets the current game state (tick, tax info).</summary>
+    public async Task<GameState?> GetGameState([Service] AppDbContext db)
+    {
+        return await db.GameStates.FirstOrDefaultAsync();
+    }
+
+    /// <summary>Gets available starter industries for onboarding.</summary>
+    public StarterIndustriesPayload GetStarterIndustries()
+    {
+        return new StarterIndustriesPayload
+        {
+            Industries = Industry.StarterIndustries.ToList()
+        };
+    }
+}
+
+/// <summary>Payload for player ranking.</summary>
+public sealed class PlayerRanking
+{
+    /// <summary>Player identifier.</summary>
+    public Guid PlayerId { get; set; }
+
+    /// <summary>Player display name.</summary>
+    public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>Sum of all company cash balances.</summary>
+    public decimal TotalWealth { get; set; }
+
+    /// <summary>Number of companies owned.</summary>
+    public int CompanyCount { get; set; }
+}
+
+/// <summary>Payload for starter industries.</summary>
+public sealed class StarterIndustriesPayload
+{
+    /// <summary>Available starter industry values.</summary>
+    public List<string> Industries { get; set; } = [];
+}

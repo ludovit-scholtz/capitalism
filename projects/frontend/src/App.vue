@@ -4,9 +4,12 @@ import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import { usePwa } from '@/composables/usePwa'
+import { useAuthStore } from '@/stores/auth'
 
 const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
+const auth = useAuthStore()
+auth.initFromStorage()
 
 </script>
 
