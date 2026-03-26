@@ -374,6 +374,38 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('PlaceBuilding')) {
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
+      }
+      const company = player.companies.find((c) => c.id === input.companyId)
+      if (!company) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found' }] }) })
+      }
+      const city = state.cities.find((c) => c.id === input.cityId)
+      const newBuilding: MockBuilding = {
+        id: `building-${Date.now()}`,
+        companyId: company.id,
+        cityId: input.cityId,
+        type: input.type,
+        name: input.name,
+        latitude: city?.latitude ?? 0,
+        longitude: city?.longitude ?? 0,
+        level: 1,
+        powerConsumption: 1,
+        isForSale: false,
+        units: [],
+      }
+      company.buildings.push(newBuilding)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { placeBuilding: newBuilding } }),
+      })
+    }
+
     // Queries - order specific handlers before generic ones
     if (query.includes('starterIndustries')) {
       return route.fulfill({
