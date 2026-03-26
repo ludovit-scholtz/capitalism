@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -37,10 +38,24 @@ public sealed class Query
     /// <summary>Gets a specific city by ID.</summary>
     public async Task<City?> GetCity(Guid id, [Service] AppDbContext db)
     {
+        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        if (gameState is not null)
+        {
+            await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
+            await db.SaveChangesAsync();
+        }
+
         return await db.Cities
             .Include(c => c.Resources)
             .ThenInclude(r => r.ResourceType)
             .Include(c => c.Buildings)
+            .ThenInclude(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Units)
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.Units)
             .FirstOrDefaultAsync(c => c.Id == id);
     }
 
@@ -95,9 +110,23 @@ public sealed class Query
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        if (gameState is not null)
+        {
+            await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
+            await db.SaveChangesAsync();
+        }
+
         return await db.Companies
             .Include(c => c.Buildings)
             .ThenInclude(b => b.Units)
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Units)
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
             .Where(c => c.PlayerId == userId)
             .OrderBy(c => c.Name)
             .ToListAsync();
@@ -106,7 +135,15 @@ public sealed class Query
     /// <summary>Gets the current game state (tick, tax info).</summary>
     public async Task<GameState?> GetGameState([Service] AppDbContext db)
     {
-        return await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        if (gameState is null)
+        {
+            return null;
+        }
+
+        await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
+        await db.SaveChangesAsync();
+        return gameState;
     }
 
     /// <summary>Gets available starter industries for onboarding.</summary>

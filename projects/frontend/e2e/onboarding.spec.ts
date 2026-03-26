@@ -101,7 +101,7 @@ test.describe('Onboarding wizard', () => {
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
 
     // Verify summary appears
-    await expect(page.getByText('My Empire Inc')).toBeVisible()
+    await expect(page.locator('.summary', { hasText: 'My Empire Inc' })).toBeVisible()
     await expect(page.getByText('Bratislava')).toBeVisible()
 
     // Complete onboarding
@@ -190,7 +190,7 @@ test.describe('Dashboard', () => {
       cash: 500000,
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [
-        { id: 'b1', companyId: 'comp-1', cityId: 'city-ba', type: 'FACTORY', name: 'Test Corp Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [] },
+        { id: 'b1', companyId: 'comp-1', cityId: 'city-ba', type: 'FACTORY', name: 'Test Corp Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [], pendingConfiguration: null },
       ],
     })
     const state = setupMockApi(page, { players: [player] })
@@ -207,7 +207,8 @@ test.describe('Dashboard', () => {
     const companyCard = page.locator('.company-card').first()
     await expect(companyCard.getByRole('heading', { name: 'Test Corp' })).toBeVisible()
     await expect(companyCard.getByText('$500,000')).toBeVisible()
-    await expect(companyCard.locator('.building-type', { hasText: 'FACTORY' })).toBeVisible()
+    await expect(companyCard.locator('.building-card', { hasText: 'Test Corp Factory' })).toBeVisible()
+    await expect(companyCard.locator('.building-type-label', { hasText: 'Factory' })).toBeVisible()
   })
 
   test('redirects to login if not authenticated', async ({ page }) => {

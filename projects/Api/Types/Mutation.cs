@@ -4,6 +4,7 @@ using System.Text;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -292,6 +293,60 @@ public sealed class Mutation
             SalesShop = shop,
             SelectedProduct = product
         };
+    }
+
+    /// <summary>Queues a building configuration update that becomes active after the required ticks have passed.</summary>
+    [Authorize]
+    public async Task<BuildingConfigurationPlan> StoreBuildingConfiguration(
+        StoreBuildingConfigurationInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var gameState = await db.GameStates.FirstOrDefaultAsync()
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Game state is not initialized.")
+                    .SetCode("GAME_STATE_NOT_FOUND")
+                    .Build());
+
+        await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
+
+        var building = await db.Buildings
+            .Include(candidate => candidate.Company)
+            .Include(candidate => candidate.Units)
+            .Include(candidate => candidate.PendingConfiguration)
+            .ThenInclude(plan => plan!.Units)
+            .Include(candidate => candidate.PendingConfiguration)
+            .ThenInclude(plan => plan!.Removals)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        if (!BuildingConfigurationService.GetAllowedUnitTypes(building.Type).Any())
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This building type does not support editable unit configurations.")
+                    .SetCode("BUILDING_CONFIGURATION_NOT_SUPPORTED")
+                    .Build());
+        }
+
+        var plan = await BuildingConfigurationService.StoreConfigurationAsync(db, building, input.Units, gameState.CurrentTick);
+        await db.SaveChangesAsync();
+
+        return await db.BuildingConfigurationPlans
+            .Include(candidate => candidate.Units)
+            .Include(candidate => candidate.Removals)
+            .FirstAsync(candidate => candidate.Id == plan.Id);
     }
 
     private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)

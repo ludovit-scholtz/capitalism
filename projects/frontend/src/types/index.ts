@@ -51,6 +51,51 @@ export interface Building {
   interestRate: number | null
   builtAtUtc: string
   units: BuildingUnit[]
+  pendingConfiguration: BuildingConfigurationPlan | null
+}
+
+/** Queued building configuration that becomes active on a future tick. */
+export interface BuildingConfigurationPlan {
+  id: string
+  buildingId: string
+  submittedAtUtc: string
+  submittedAtTick: number
+  appliesAtTick: number
+  totalTicksRequired: number
+  units: BuildingConfigurationPlanUnit[]
+  removals: BuildingConfigurationPlanRemoval[]
+}
+
+/** Pending unit snapshot inside a queued building configuration. */
+export interface BuildingConfigurationPlanUnit {
+  id: string
+  unitType: string
+  gridX: number
+  gridY: number
+  level: number
+  linkUp: boolean
+  linkDown: boolean
+  linkLeft: boolean
+  linkRight: boolean
+  linkUpLeft: boolean
+  linkUpRight: boolean
+  linkDownLeft: boolean
+  linkDownRight: boolean
+  startedAtTick: number
+  appliesAtTick: number
+  ticksRequired: number
+  isChanged: boolean
+  isReverting: boolean
+}
+
+export interface BuildingConfigurationPlanRemoval {
+  id: string
+  gridX: number
+  gridY: number
+  startedAtTick: number
+  appliesAtTick: number
+  ticksRequired: number
+  isReverting: boolean
 }
 
 /** Matches backend BuildingUnit entity */
@@ -61,13 +106,94 @@ export interface BuildingUnit {
   gridX: number
   gridY: number
   level: number
-  linkRight: boolean
+  linkUp: boolean
   linkDown: boolean
-  linkDiagonalDown: boolean
-  linkDiagonalUp: boolean
+  linkLeft: boolean
+  linkRight: boolean
+  linkUpLeft: boolean
+  linkUpRight: boolean
+  linkDownLeft: boolean
+  linkDownRight: boolean
 }
 
-/** Matches backend City entity */
+/** Matches backend ApplicationUser entity */
+export interface User {
+  id: string
+  email: string
+  displayName: string
+  role: 'ADMIN' | 'CONTRIBUTOR'
+  createdAtUtc: string
+  lastLoginAtUtc: string | null
+}
+
+/** Matches backend CatalogEvent entity */
+export interface CatalogEvent {
+  id: string
+  name: string
+  slug: string
+  description: string
+  startDate: string
+  endDate: string | null
+  startsAtUtc: string
+  endsAtUtc: string | null
+  venueName: string | null
+  addressLine1: string | null
+  city: string | null
+  countryCode: string | null
+  latitude: number | null
+  longitude: number | null
+  mapUrl: string | null
+  attendanceMode: 'IN_PERSON' | 'ONLINE' | 'HYBRID'
+  isFree: boolean
+  currencyCode: string
+  price: number | null
+  eventUrl: string | null
+  timezone: string | null
+  submittedBy: User
+  submittedAtUtc: string
+  status: 'PUBLISHED' | 'PENDING_APPROVAL' | 'REJECTED' | 'DRAFT'
+  interestedCount: number
+  domain: EventDomain | null
+}
+
+/** Matches backend EventDomain entity */
+export interface EventDomain {
+  id: string
+  name: string
+  slug: string
+  subdomain: string
+  isActive: boolean
+  description: string | null
+  logoUrl: string | null
+  bannerUrl: string | null
+  primaryColor: string | null
+  accentColor: string | null
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+/** Event filters for discovery */
+export interface EventFilters {
+  keyword?: string
+  search?: string
+  location?: string
+  mode?: 'IN_PERSON' | 'ONLINE' | 'HYBRID'
+  price?: 'free' | 'paid'
+  priceType?: 'FREE' | 'PAID'
+  priceMin?: number
+  priceMax?: number
+  date?: 'upcoming' | 'past'
+  dateFrom?: string
+  dateTo?: string
+  sort?: 'newest' | 'oldest' | 'name' | 'RELEVANCE'
+  sortBy?: 'NEWEST' | 'RELEVANCE'
+  domain?: string
+  attendanceMode?: 'IN_PERSON' | 'ONLINE' | 'HYBRID'
+  language?: string
+  timezone?: string
+}
+
+/** Onboarding types */
 export interface City {
   id: string
   name: string
@@ -75,30 +201,18 @@ export interface City {
   latitude: number
   longitude: number
   population: number
-  averageRentPerSqm: number
-  resources: CityResource[]
+  resources: Resource[]
 }
 
-/** Matches backend CityResource entity */
-export interface CityResource {
-  id: string
-  cityId: string
+export interface Resource {
   resourceType: ResourceType
   abundance: number
 }
 
-/** Matches backend ResourceType entity */
 export interface ResourceType {
-  id: string
   name: string
-  slug: string
-  category: string
-  basePrice: number
-  weightPerUnit: number
-  description: string | null
 }
 
-/** Matches backend ProductType entity */
 export interface ProductType {
   id: string
   name: string
@@ -106,16 +220,20 @@ export interface ProductType {
   industry: string
   basePrice: number
   baseCraftTicks: number
-  isProOnly: boolean
-  description: string | null
-  recipes: ProductRecipe[]
+  description: string
+  recipes: Recipe[]
 }
 
-/** Matches backend ProductRecipe entity */
-export interface ProductRecipe {
-  id: string
+export interface Recipe {
   resourceType: ResourceType
   quantity: number
+}
+
+export interface OnboardingResult {
+  company: Company
+  factory: Building
+  salesShop: Building
+  selectedProduct: ProductType
 }
 
 /** Matches backend PlayerRanking response */
@@ -132,12 +250,4 @@ export interface GameState {
   tickIntervalSeconds: number
   taxCycleTicks: number
   taxRate: number
-}
-
-/** Matches backend OnboardingResult response */
-export interface OnboardingResult {
-  company: Company
-  factory: Building
-  salesShop: Building
-  selectedProduct: ProductType
 }

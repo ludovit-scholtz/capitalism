@@ -97,7 +97,7 @@ onMounted(async () => {
 
 <style scoped>
 .hero {
-  background: linear-gradient(160deg, #0d0f14 0%, rgba(19, 127, 236, 0.12) 100%);
+  background: linear-gradient(160deg, #0D1117 0%, rgba(0, 71, 255, 0.12) 100%);
   border-bottom: 1px solid var(--color-border);
   padding: 4rem 0 3rem;
 }

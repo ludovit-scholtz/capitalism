@@ -18,7 +18,7 @@
 
 ## Local development
 1. Restore packages and run the app:
-   - `dotnet restore events.slnx`
+   - `dotnet restore Api.slnx`
    - `dotnet run --project Api.csproj`
 2. Open `http://localhost:5000/graphql` or the HTTPS equivalent.
 3. Default seeded admin credentials are defined in `appsettings.json` under `SeedData`.
@@ -137,7 +137,7 @@ query AdminOverview {
 - Coordinates and `mapUrl` are exposed directly from `CatalogEvent` for map rendering.
 
 ## Testing
-- `dotnet test events.slnx`
+- `dotnet test Api.slnx`
 
 ## Deployment
 - Container image build uses `Dockerfile`

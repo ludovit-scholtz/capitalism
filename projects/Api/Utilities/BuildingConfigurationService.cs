@@ -1,0 +1,523 @@
+using Api.Data;
+using Api.Data.Entities;
+using Api.Types;
+using HotChocolate;
+using Microsoft.EntityFrameworkCore;
+
+namespace Api.Utilities;
+
+/// <summary>
+/// Handles validation, queueing, modification, and activation of building configuration upgrades.
+/// </summary>
+public static class BuildingConfigurationService
+{
+    public const int LinkChangeTicks = 1;
+    public const int UnitPlanChangeTicks = 3;
+    private const decimal CancelTicksMultiplier = 0.1m;
+
+    public static async Task<BuildingConfigurationPlan> StoreConfigurationAsync(
+        AppDbContext db,
+        Building building,
+        IReadOnlyCollection<BuildingConfigurationUnitInput> submittedUnits,
+        long currentTick)
+    {
+        ValidateUnits(building.Type, submittedUnits);
+
+        var existingPlan = await db.BuildingConfigurationPlans
+            .Include(plan => plan.Units)
+            .Include(plan => plan.Removals)
+            .FirstOrDefaultAsync(plan => plan.BuildingId == building.Id);
+
+        var currentUnits = building.Units.ToDictionary(unit => (unit.GridX, unit.GridY));
+        var desiredUnits = submittedUnits
+            .OrderBy(unit => unit.GridY)
+            .ThenBy(unit => unit.GridX)
+            .ToDictionary(unit => (unit.GridX, unit.GridY));
+        var existingTargetUnits = existingPlan?.Units.ToDictionary(unit => (unit.GridX, unit.GridY))
+            ?? new Dictionary<(int GridX, int GridY), BuildingConfigurationPlanUnit>();
+        var existingRemovals = existingPlan?.Removals.ToDictionary(removal => (removal.GridX, removal.GridY))
+            ?? new Dictionary<(int GridX, int GridY), BuildingConfigurationPlanRemoval>();
+        var planId = Guid.NewGuid();
+
+        var allPositions = currentUnits.Keys
+            .Union(desiredUnits.Keys)
+            .Union(existingTargetUnits.Keys)
+            .Union(existingRemovals.Keys)
+            .OrderBy(position => position.GridY)
+            .ThenBy(position => position.GridX)
+            .ToList();
+
+        var nextUnits = new List<BuildingConfigurationPlanUnit>();
+        var nextRemovals = new List<BuildingConfigurationPlanRemoval>();
+
+        foreach (var position in allPositions)
+        {
+            var activeUnit = currentUnits.GetValueOrDefault(position);
+            var desiredUnit = desiredUnits.GetValueOrDefault(position);
+            var existingTargetUnit = existingTargetUnits.GetValueOrDefault(position);
+            var existingRemoval = existingRemovals.GetValueOrDefault(position);
+
+            if (desiredUnit is not null)
+            {
+                nextUnits.Add(CreateNextUnitPlan(
+                    desiredUnit,
+                    activeUnit,
+                    existingTargetUnit,
+                    existingRemoval,
+                    currentTick,
+                    planId));
+                continue;
+            }
+
+            var removal = CreateNextRemovalPlan(
+                activeUnit,
+                existingTargetUnit,
+                existingRemoval,
+                currentTick,
+                planId,
+                position.GridX,
+                position.GridY);
+
+            if (removal is not null)
+            {
+                nextRemovals.Add(removal);
+            }
+        }
+
+        var hasPendingChanges = nextUnits.Any(unit => unit.IsChanged) || nextRemovals.Any();
+        if (!hasPendingChanges)
+        {
+            if (existingPlan is not null)
+            {
+                db.BuildingConfigurationPlans.Remove(existingPlan);
+            }
+
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("No building configuration changes were detected.")
+                    .SetCode("NO_BUILDING_CONFIGURATION_CHANGES")
+                    .Build());
+        }
+
+        if (existingPlan is not null)
+        {
+            db.BuildingConfigurationPlans.Remove(existingPlan);
+            await db.SaveChangesAsync();
+        }
+
+        var plan = new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+
+        plan.SubmittedAtUtc = DateTime.UtcNow;
+        plan.SubmittedAtTick = currentTick;
+        plan.Units = nextUnits;
+        plan.Removals = nextRemovals;
+        RefreshPlanSummary(plan, currentTick);
+
+        return plan;
+    }
+
+    public static async Task ApplyDuePlansAsync(AppDbContext db, long currentTick)
+    {
+        var plans = await db.BuildingConfigurationPlans
+            .Include(plan => plan.Units)
+            .Include(plan => plan.Removals)
+            .Include(plan => plan.Building)
+            .ThenInclude(building => building.Units)
+            .ToListAsync();
+
+        foreach (var plan in plans)
+        {
+            var liveUnitsByPosition = plan.Building.Units.ToDictionary(unit => (unit.GridX, unit.GridY));
+
+            foreach (var removal in plan.Removals.Where(removal => removal.AppliesAtTick <= currentTick).ToList())
+            {
+                if (liveUnitsByPosition.TryGetValue((removal.GridX, removal.GridY), out var liveUnit))
+                {
+                    db.BuildingUnits.Remove(liveUnit);
+                    plan.Building.Units.Remove(liveUnit);
+                    liveUnitsByPosition.Remove((removal.GridX, removal.GridY));
+                }
+
+                plan.Removals.Remove(removal);
+                db.BuildingConfigurationPlanRemovals.Remove(removal);
+            }
+
+            foreach (var pendingUnit in plan.Units.Where(unit => unit.IsChanged && unit.AppliesAtTick <= currentTick).ToList())
+            {
+                if (!liveUnitsByPosition.TryGetValue((pendingUnit.GridX, pendingUnit.GridY), out var liveUnit))
+                {
+                    liveUnit = new BuildingUnit
+                    {
+                        Id = Guid.NewGuid(),
+                        BuildingId = plan.BuildingId
+                    };
+
+                    db.BuildingUnits.Add(liveUnit);
+                    liveUnitsByPosition[(pendingUnit.GridX, pendingUnit.GridY)] = liveUnit;
+                }
+
+                liveUnit.UnitType = pendingUnit.UnitType;
+                liveUnit.GridX = pendingUnit.GridX;
+                liveUnit.GridY = pendingUnit.GridY;
+                liveUnit.Level = pendingUnit.Level;
+                liveUnit.LinkUp = pendingUnit.LinkUp;
+                liveUnit.LinkDown = pendingUnit.LinkDown;
+                liveUnit.LinkLeft = pendingUnit.LinkLeft;
+                liveUnit.LinkRight = pendingUnit.LinkRight;
+                liveUnit.LinkUpLeft = pendingUnit.LinkUpLeft;
+                liveUnit.LinkUpRight = pendingUnit.LinkUpRight;
+                liveUnit.LinkDownLeft = pendingUnit.LinkDownLeft;
+                liveUnit.LinkDownRight = pendingUnit.LinkDownRight;
+
+                pendingUnit.StartedAtTick = currentTick;
+                pendingUnit.AppliesAtTick = currentTick;
+                pendingUnit.TicksRequired = 0;
+                pendingUnit.IsChanged = false;
+                pendingUnit.IsReverting = false;
+            }
+
+            if (!plan.Units.Any(unit => unit.IsChanged) && plan.Removals.Count == 0)
+            {
+                db.BuildingConfigurationPlanUnits.RemoveRange(plan.Units);
+                db.BuildingConfigurationPlans.Remove(plan);
+                continue;
+            }
+
+            RefreshPlanSummary(plan, currentTick);
+        }
+    }
+
+    public static IReadOnlyList<string> GetAllowedUnitTypes(string buildingType)
+    {
+        return buildingType switch
+        {
+            BuildingType.Mine => [UnitType.Mining, UnitType.Storage, UnitType.B2BSales],
+            BuildingType.Factory => [UnitType.Purchase, UnitType.Manufacturing, UnitType.Branding, UnitType.Storage, UnitType.B2BSales],
+            BuildingType.SalesShop => [UnitType.Purchase, UnitType.Marketing, UnitType.PublicSales],
+            BuildingType.ResearchDevelopment => [UnitType.ProductQuality, UnitType.BrandQuality],
+            _ => []
+        };
+    }
+
+    private static BuildingConfigurationPlanUnit CreateNextUnitPlan(
+        BuildingConfigurationUnitInput desiredUnit,
+        BuildingUnit? activeUnit,
+        BuildingConfigurationPlanUnit? existingTargetUnit,
+        BuildingConfigurationPlanRemoval? existingRemoval,
+        long currentTick,
+        Guid planId)
+    {
+        if (existingTargetUnit is not null && AreEquivalent(existingTargetUnit, desiredUnit))
+        {
+            if (IsPending(existingTargetUnit, currentTick))
+            {
+                return CloneUnit(existingTargetUnit);
+            }
+
+            return CreateUnitSnapshot(planId, desiredUnit, activeUnit?.Level ?? existingTargetUnit.Level, currentTick, 0, false, false);
+        }
+
+        if (existingRemoval is not null
+            && IsPending(existingRemoval, currentTick)
+            && activeUnit is not null
+            && AreEquivalent(activeUnit, desiredUnit))
+        {
+            return CreateUnitSnapshot(
+                planId,
+                desiredUnit,
+                activeUnit.Level,
+                currentTick,
+                CalculateCancelTicks(existingRemoval.TicksRequired),
+                true,
+                true);
+        }
+
+        if (existingTargetUnit is not null
+            && IsPending(existingTargetUnit, currentTick)
+            && activeUnit is not null
+            && AreEquivalent(activeUnit, desiredUnit))
+        {
+            return CreateUnitSnapshot(
+                planId,
+                desiredUnit,
+                activeUnit.Level,
+                currentTick,
+                CalculateCancelTicks(existingTargetUnit.TicksRequired),
+                true,
+                true);
+        }
+
+        return CreateUnitSnapshot(
+            planId,
+            desiredUnit,
+            activeUnit?.Level ?? 1,
+            currentTick,
+            CalculateTicksRequired(activeUnit, desiredUnit),
+            false,
+            !AreEquivalent(activeUnit, desiredUnit));
+    }
+
+    private static BuildingConfigurationPlanRemoval? CreateNextRemovalPlan(
+        BuildingUnit? activeUnit,
+        BuildingConfigurationPlanUnit? existingTargetUnit,
+        BuildingConfigurationPlanRemoval? existingRemoval,
+        long currentTick,
+        Guid planId,
+        int gridX,
+        int gridY)
+    {
+        if (existingRemoval is not null && IsPending(existingRemoval, currentTick) && activeUnit is not null)
+        {
+            return CloneRemoval(existingRemoval);
+        }
+
+        if (existingTargetUnit is not null && IsPending(existingTargetUnit, currentTick))
+        {
+            return CreateRemoval(planId, gridX, gridY, currentTick, CalculateCancelTicks(existingTargetUnit.TicksRequired), true);
+        }
+
+        if (activeUnit is not null)
+        {
+            return CreateRemoval(planId, gridX, gridY, currentTick, UnitPlanChangeTicks, false);
+        }
+
+        return null;
+    }
+
+    private static BuildingConfigurationPlanUnit CreateUnitSnapshot(
+        Guid planId,
+        BuildingConfigurationUnitInput input,
+        int level,
+        long currentTick,
+        int ticksRequired,
+        bool isReverting,
+        bool isChanged)
+    {
+        return new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = input.UnitType,
+            GridX = input.GridX,
+            GridY = input.GridY,
+            Level = level,
+            LinkUp = input.LinkUp,
+            LinkDown = input.LinkDown,
+            LinkLeft = input.LinkLeft,
+            LinkRight = input.LinkRight,
+            LinkUpLeft = input.LinkUpLeft,
+            LinkUpRight = input.LinkUpRight,
+            LinkDownLeft = input.LinkDownLeft,
+            LinkDownRight = input.LinkDownRight,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + ticksRequired,
+            TicksRequired = ticksRequired,
+            IsChanged = isChanged || ticksRequired > 0,
+            IsReverting = isReverting,
+        };
+    }
+
+    private static BuildingConfigurationPlanUnit CloneUnit(BuildingConfigurationPlanUnit unit)
+    {
+        return new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = unit.BuildingConfigurationPlanId,
+            UnitType = unit.UnitType,
+            GridX = unit.GridX,
+            GridY = unit.GridY,
+            Level = unit.Level,
+            LinkUp = unit.LinkUp,
+            LinkDown = unit.LinkDown,
+            LinkLeft = unit.LinkLeft,
+            LinkRight = unit.LinkRight,
+            LinkUpLeft = unit.LinkUpLeft,
+            LinkUpRight = unit.LinkUpRight,
+            LinkDownLeft = unit.LinkDownLeft,
+            LinkDownRight = unit.LinkDownRight,
+            StartedAtTick = unit.StartedAtTick,
+            AppliesAtTick = unit.AppliesAtTick,
+            TicksRequired = unit.TicksRequired,
+            IsChanged = unit.IsChanged,
+            IsReverting = unit.IsReverting,
+        };
+    }
+
+    private static BuildingConfigurationPlanRemoval CreateRemoval(
+        Guid planId,
+        int gridX,
+        int gridY,
+        long currentTick,
+        int ticksRequired,
+        bool isReverting)
+    {
+        return new BuildingConfigurationPlanRemoval
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            GridX = gridX,
+            GridY = gridY,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + ticksRequired,
+            TicksRequired = ticksRequired,
+            IsReverting = isReverting,
+        };
+    }
+
+    private static BuildingConfigurationPlanRemoval CloneRemoval(BuildingConfigurationPlanRemoval removal)
+    {
+        return new BuildingConfigurationPlanRemoval
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = removal.BuildingConfigurationPlanId,
+            GridX = removal.GridX,
+            GridY = removal.GridY,
+            StartedAtTick = removal.StartedAtTick,
+            AppliesAtTick = removal.AppliesAtTick,
+            TicksRequired = removal.TicksRequired,
+            IsReverting = removal.IsReverting,
+        };
+    }
+
+    private static int CalculateTicksRequired(BuildingUnit? currentUnit, BuildingConfigurationUnitInput input)
+    {
+        if (currentUnit is null)
+        {
+            return UnitPlanChangeTicks;
+        }
+
+        if (!string.Equals(currentUnit.UnitType, input.UnitType, StringComparison.Ordinal))
+        {
+            return UnitPlanChangeTicks;
+        }
+
+        if (currentUnit.LinkUp != input.LinkUp
+            || currentUnit.LinkDown != input.LinkDown
+            || currentUnit.LinkLeft != input.LinkLeft
+            || currentUnit.LinkRight != input.LinkRight
+            || currentUnit.LinkUpLeft != input.LinkUpLeft
+            || currentUnit.LinkUpRight != input.LinkUpRight
+            || currentUnit.LinkDownLeft != input.LinkDownLeft
+            || currentUnit.LinkDownRight != input.LinkDownRight)
+        {
+            return LinkChangeTicks;
+        }
+
+        return 0;
+    }
+
+    private static int CalculateCancelTicks(int originalTicks)
+    {
+        return Math.Max(1, (int)Math.Ceiling(originalTicks * CancelTicksMultiplier));
+    }
+
+    private static bool AreEquivalent(BuildingUnit? currentUnit, BuildingConfigurationUnitInput desiredUnit)
+    {
+        if (currentUnit is null)
+        {
+            return false;
+        }
+
+        return string.Equals(currentUnit.UnitType, desiredUnit.UnitType, StringComparison.Ordinal)
+            && currentUnit.GridX == desiredUnit.GridX
+            && currentUnit.GridY == desiredUnit.GridY
+            && currentUnit.LinkUp == desiredUnit.LinkUp
+            && currentUnit.LinkDown == desiredUnit.LinkDown
+            && currentUnit.LinkLeft == desiredUnit.LinkLeft
+            && currentUnit.LinkRight == desiredUnit.LinkRight
+            && currentUnit.LinkUpLeft == desiredUnit.LinkUpLeft
+            && currentUnit.LinkUpRight == desiredUnit.LinkUpRight
+            && currentUnit.LinkDownLeft == desiredUnit.LinkDownLeft
+            && currentUnit.LinkDownRight == desiredUnit.LinkDownRight;
+    }
+
+    private static bool AreEquivalent(BuildingConfigurationPlanUnit pendingUnit, BuildingConfigurationUnitInput desiredUnit)
+    {
+        return string.Equals(pendingUnit.UnitType, desiredUnit.UnitType, StringComparison.Ordinal)
+            && pendingUnit.GridX == desiredUnit.GridX
+            && pendingUnit.GridY == desiredUnit.GridY
+            && pendingUnit.LinkUp == desiredUnit.LinkUp
+            && pendingUnit.LinkDown == desiredUnit.LinkDown
+            && pendingUnit.LinkLeft == desiredUnit.LinkLeft
+            && pendingUnit.LinkRight == desiredUnit.LinkRight
+            && pendingUnit.LinkUpLeft == desiredUnit.LinkUpLeft
+            && pendingUnit.LinkUpRight == desiredUnit.LinkUpRight
+            && pendingUnit.LinkDownLeft == desiredUnit.LinkDownLeft
+            && pendingUnit.LinkDownRight == desiredUnit.LinkDownRight;
+    }
+
+    private static bool IsPending(BuildingConfigurationPlanUnit unit, long currentTick)
+    {
+        return unit.IsChanged && unit.AppliesAtTick > currentTick;
+    }
+
+    private static bool IsPending(BuildingConfigurationPlanRemoval removal, long currentTick)
+    {
+        return removal.AppliesAtTick > currentTick;
+    }
+
+    private static void RefreshPlanSummary(BuildingConfigurationPlan plan, long currentTick)
+    {
+        var remainingTicks = plan.Units
+            .Where(unit => unit.IsChanged)
+            .Select(unit => Math.Max(unit.AppliesAtTick - currentTick, 0L))
+            .Concat(plan.Removals.Select(removal => Math.Max(removal.AppliesAtTick - currentTick, 0L)))
+            .DefaultIfEmpty(0L)
+            .Max();
+
+        plan.AppliesAtTick = currentTick + remainingTicks;
+        plan.TotalTicksRequired = (int)remainingTicks;
+    }
+
+    private static void ValidateUnits(string buildingType, IReadOnlyCollection<BuildingConfigurationUnitInput> submittedUnits)
+    {
+        if (submittedUnits.Count > 16)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A building configuration can contain at most 16 units.")
+                    .SetCode("TOO_MANY_BUILDING_UNITS")
+                    .Build());
+        }
+
+        var allowedUnitTypes = GetAllowedUnitTypes(buildingType);
+        var duplicatePositions = submittedUnits
+            .GroupBy(unit => (unit.GridX, unit.GridY))
+            .FirstOrDefault(group => group.Count() > 1);
+
+        if (duplicatePositions is not null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Each building grid position can contain only one unit.")
+                    .SetCode("DUPLICATE_BUILDING_UNIT_POSITION")
+                    .Build());
+        }
+
+        foreach (var unit in submittedUnits)
+        {
+            if (unit.GridX < 0 || unit.GridX > 3 || unit.GridY < 0 || unit.GridY > 3)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Building unit positions must stay within the 4x4 grid.")
+                        .SetCode("INVALID_BUILDING_UNIT_POSITION")
+                        .Build());
+            }
+
+            if (!allowedUnitTypes.Contains(unit.UnitType))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"Unit type {unit.UnitType} is not allowed for building type {buildingType}.")
+                        .SetCode("INVALID_BUILDING_UNIT_TYPE")
+                        .Build());
+            }
+        }
+    }
+}
