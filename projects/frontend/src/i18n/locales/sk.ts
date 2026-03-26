@@ -101,6 +101,7 @@ export default {
     buyNow: 'K\u00fapi\u0165',
     cost: 'Cena',
     power: 'Energia',
+    powerUnit: 'MW',
     types: {
       MINE: 'Ba\u0148a',
       FACTORY: 'Tov\u00e1re\u0148',
@@ -202,5 +203,6 @@ export default {
     backToDashboard: 'Sp\u00e4\u0165 na preh\u013ead',
     selectUnitType: 'Vyberte typ jednotky',
     allowedUnits: 'Povolen\u00e9 jednotky pre t\u00fato budovu',
+    unitConfiguration: 'Konfigur\u00e1cia jednotky',
   },
 }

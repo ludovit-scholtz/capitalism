@@ -101,6 +101,7 @@ export default {
     buyNow: 'Buy Now',
     cost: 'Cost',
     power: 'Power',
+    powerUnit: 'MW',
     types: {
       MINE: 'Mine',
       FACTORY: 'Factory',
@@ -202,5 +203,6 @@ export default {
     backToDashboard: 'Back to Dashboard',
     selectUnitType: 'Select a unit type to place',
     allowedUnits: 'Allowed units for this building',
+    unitConfiguration: 'Unit Configuration',
   },
 }

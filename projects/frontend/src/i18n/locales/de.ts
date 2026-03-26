@@ -101,6 +101,7 @@ export default {
     buyNow: 'Jetzt kaufen',
     cost: 'Kosten',
     power: 'Strom',
+    powerUnit: 'MW',
     types: {
       MINE: 'Bergwerk',
       FACTORY: 'Fabrik',
@@ -202,5 +203,6 @@ export default {
     backToDashboard: 'Zur \u00dcbersicht',
     selectUnitType: 'Einheitentyp ausw\u00e4hlen',
     allowedUnits: 'Erlaubte Einheiten f\u00fcr dieses Geb\u00e4ude',
+    unitConfiguration: 'Einheitenkonfiguration',
   },
 }

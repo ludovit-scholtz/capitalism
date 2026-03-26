@@ -644,7 +644,7 @@ onMounted(async () => {
           </span>
           <span class="meta-pill">
             <span class="meta-label">{{ t('buildings.power') }}</span>
-            <span class="meta-value">{{ building.powerConsumption }} MW</span>
+            <span class="meta-value">{{ building.powerConsumption }} {{ t('buildings.powerUnit') }}</span>
           </span>
           <span class="meta-pill" :class="building.isForSale ? 'for-sale' : ''">
             {{ building.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
@@ -662,222 +662,232 @@ onMounted(async () => {
         </div>
       </div>
 
-      <div v-if="!isEditing" class="grid-section">
-        <div class="grid-header">
-          <div>
-            <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
-            <p class="section-subtitle">{{ t('buildingDetail.activeConfigurationHelp') }}</p>
-          </div>
-          <button v-if="!isEditing" class="btn btn-secondary" @click="startEditing">
-            {{ t('buildingDetail.editConfiguration') }}
-          </button>
-        </div>
-
-        <div class="unit-grid readonly-grid">
-          <template v-for="y in gridIndexes" :key="`active-row-${y}`">
-            <div class="grid-row unit-row">
-              <template v-for="x in gridIndexes" :key="`active-unit-${x}-${y}`">
-                <div
-                  class="grid-cell readonly"
-                  :class="{ occupied: !!getUnitAtFrom(activeUnits, x, y) }"
-                  :style="getUnitAtFrom(activeUnits, x, y)
-                    ? { borderColor: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType) + '18' }
-                    : {}"
-                >
-                  <template v-if="getUnitAtFrom(activeUnits, x, y)">
-                    <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
-                    <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
-                  </template>
-                  <template v-else>
-                    <span class="cell-empty">+</span>
-                  </template>
-                </div>
-
-                <div
-                  v-if="x < 3"
-                  :key="`active-horizontal-${x}-${y}`"
-                  class="link-toggle horizontal readonly"
-                  :class="{ active: isHorizontalLinkActiveFor(activeUnits, x, y), disabled: !canToggleHorizontalLink(activeUnits, x, y) }"
-                >
-                  <span class="link-line"></span>
-                </div>
-              </template>
-            </div>
-
-            <div v-if="y < 3" class="grid-row connector-row">
-              <template v-for="x in gridIndexes" :key="`active-connector-${x}-${y}`">
-                <div
-                  class="link-toggle vertical readonly"
-                  :class="{ active: isVerticalLinkActiveFor(activeUnits, x, y), disabled: !canToggleVerticalLink(activeUnits, x, y) }"
-                >
-                  <span class="link-line"></span>
-                </div>
-
-                <div
-                  v-if="x < 3"
-                  :key="`active-diagonal-${x}-${y}`"
-                  class="link-toggle diagonal readonly"
-                  :class="[`state-${getDiagonalStateFor(activeUnits, x, y)}`, { disabled: !canToggleDiagonalLink(activeUnits, x, y) }]"
-                >
-                  <span class="diag-line diag-line-primary"></span>
-                  <span class="diag-line diag-line-secondary"></span>
-                </div>
-              </template>
-            </div>
-          </template>
-        </div>
-      </div>
-
-      <div v-if="showPlanningSection" class="grid-section">
-        <div class="grid-header plan-header">
-          <div>
-            <h2>{{ isUpgradeInProgress ? t('buildingDetail.queuedConfiguration') : t('buildingDetail.plannedConfiguration') }}</h2>
-            <p class="section-subtitle">
-              {{ isUpgradeInProgress ? t('buildingDetail.queuedConfigurationHelp') : t('buildingDetail.plannedConfigurationHelp') }}
-            </p>
-          </div>
-          <div class="grid-actions">
-            <button class="btn btn-secondary" @click="cancelEditing">
-              {{ t('buildingDetail.cancelEditing') }}
-            </button>
-            <button
-              class="btn btn-primary"
-              :disabled="saving || !hasDraftChanges"
-              @click="storeConfiguration"
-            >
-              {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
-            </button>
-          </div>
-        </div>
-
-        <div class="upgrade-summary">
-          <span class="upgrade-summary-pill">{{ t('buildingDetail.currentTickLabel', { tick: currentTick }) }}</span>
-          <span class="upgrade-summary-pill">{{ t('buildingDetail.totalUpgradeTicks', { ticks: draftTotalTicks }) }}</span>
-        </div>
-
-        <div class="unit-grid">
-          <template v-for="y in gridIndexes" :key="`planned-row-${y}`">
-            <div class="grid-row unit-row">
-              <template v-for="x in gridIndexes" :key="`planned-unit-${x}-${y}`">
-                <button
-                  class="grid-cell"
-                  :class="{
-                    occupied: !!getUnitAtFrom(plannedUnits, x, y),
-                    selected: selectedCell?.x === x && selectedCell?.y === y,
-                    changed: !!getUnitAtFrom(plannedUnits, x, y) && getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0,
-                  }"
-                  :style="getUnitAtFrom(plannedUnits, x, y)
-                    ? { borderColor: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType) + '18' }
-                    : {}"
-                  @click="clickDraftCell(x, y)"
-                >
-                  <template v-if="getUnitAtFrom(plannedUnits, x, y)">
-                    <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, x, y)!.unitType}`) }}</span>
-                    <span class="cell-level">Lv.{{ getUnitAtFrom(plannedUnits, x, y)!.level }}</span>
-                    <span v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0" class="cell-pending">
-                      {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) }) }}
-                    </span>
-                  </template>
-                  <template v-else>
-                    <span class="cell-empty">+</span>
-                  </template>
-                </button>
-
-                <button
-                  v-if="x < 3"
-                  :key="`planned-horizontal-${x}-${y}`"
-                  class="link-toggle horizontal"
-                  :class="{ active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) }"
-                  :disabled="!canToggleHorizontalLink(plannedUnits, x, y)"
-                  :aria-label="t('buildingDetail.linkRight')"
-                  @click="toggleHorizontalLink(x, y)"
-                >
-                  <span class="link-line"></span>
-                </button>
-              </template>
-            </div>
-
-            <div v-if="y < 3" class="grid-row connector-row">
-              <template v-for="x in gridIndexes" :key="`planned-connector-${x}-${y}`">
-                <button
-                  class="link-toggle vertical"
-                  :class="{ active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) }"
-                  :disabled="!canToggleVerticalLink(plannedUnits, x, y)"
-                  :aria-label="t('buildingDetail.linkDown')"
-                  @click="toggleVerticalLink(x, y)"
-                >
-                  <span class="link-line"></span>
-                </button>
-
-                <button
-                  v-if="x < 3"
-                  :key="`planned-diagonal-${x}-${y}`"
-                  class="link-toggle diagonal"
-                  :class="[`state-${getDiagonalStateFor(plannedUnits, x, y)}`, { disabled: !canToggleDiagonalLink(plannedUnits, x, y) }]"
-                  :disabled="!canToggleDiagonalLink(plannedUnits, x, y)"
-                  :aria-label="t('buildingDetail.links')"
-                  @click="toggleDiagonalLink(x, y)"
-                >
-                  <span class="diag-line diag-line-primary"></span>
-                  <span class="diag-line diag-line-secondary"></span>
-                </button>
-              </template>
-            </div>
-          </template>
-        </div>
-
-        <div class="grid-legend">
-          <div v-for="unitType in allowedUnits" :key="unitType" class="legend-item">
-            <span class="legend-color" :style="{ background: getUnitColor(unitType) }"></span>
-            <span>{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div v-if="showUnitPicker && selectedCell && isEditing" class="unit-picker-overlay" @click.self="showUnitPicker = false">
-        <div class="unit-picker">
-          <div class="picker-header">
-            <h3>{{ t('buildingDetail.selectUnitType') }}</h3>
-            <button class="btn btn-ghost" @click="showUnitPicker = false">{{ t('common.close') }}</button>
-          </div>
-          <p class="picker-subtitle">{{ t('buildingDetail.allowedUnits') }}</p>
-          <div class="picker-grid">
-            <button v-for="unitType in allowedUnits" :key="unitType" class="picker-option" @click="placeUnit(unitType)">
-              <span class="picker-color" :style="{ background: getUnitColor(unitType) }"></span>
-              <div class="picker-info">
-                <span class="picker-name">{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
-                <span class="picker-desc">{{ t(`buildingDetail.unitDescriptions.${unitType}`) }}</span>
+      <div class="main-content">
+        <div class="grid-container">
+          <div v-if="!isEditing" class="grid-section">
+            <div class="grid-header">
+              <div>
+                <h2>{{ t('buildingDetail.activeConfiguration') }}</h2>
+                <p class="section-subtitle">{{ t('buildingDetail.activeConfigurationHelp') }}</p>
               </div>
-            </button>
+              <button v-if="!isEditing" class="btn btn-secondary" @click="startEditing">
+                {{ t('buildingDetail.editConfiguration') }}
+              </button>
+            </div>
+
+            <div class="unit-grid readonly-grid">
+              <template v-for="y in gridIndexes" :key="`active-row-${y}`">
+                <div class="grid-row unit-row">
+                  <template v-for="x in gridIndexes" :key="`active-unit-${x}-${y}`">
+                    <div
+                      class="grid-cell readonly"
+                      :class="{ occupied: !!getUnitAtFrom(activeUnits, x, y) }"
+                      :style="getUnitAtFrom(activeUnits, x, y)
+                        ? { borderColor: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType) + '18' }
+                        : {}"
+                    >
+                      <template v-if="getUnitAtFrom(activeUnits, x, y)">
+                        <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
+                        <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
+                      </template>
+                      <template v-else>
+                        <span class="cell-empty">+</span>
+                      </template>
+                    </div>
+
+                    <div
+                      v-if="x < 3"
+                      :key="`active-horizontal-${x}-${y}`"
+                      class="link-toggle horizontal readonly"
+                      :class="{ active: isHorizontalLinkActiveFor(activeUnits, x, y), disabled: !canToggleHorizontalLink(activeUnits, x, y) }"
+                    >
+                      <span class="link-line"></span>
+                    </div>
+                  </template>
+                </div>
+
+                <div v-if="y < 3" class="grid-row connector-row">
+                  <template v-for="x in gridIndexes" :key="`active-connector-${x}-${y}`">
+                    <div
+                      class="link-toggle vertical readonly"
+                      :class="{ active: isVerticalLinkActiveFor(activeUnits, x, y), disabled: !canToggleVerticalLink(activeUnits, x, y) }"
+                    >
+                      <span class="link-line"></span>
+                    </div>
+
+                    <div
+                      v-if="x < 3"
+                      :key="`active-diagonal-${x}-${y}`"
+                      class="link-toggle diagonal readonly"
+                      :class="[`state-${getDiagonalStateFor(activeUnits, x, y)}`, { disabled: !canToggleDiagonalLink(activeUnits, x, y) }]"
+                    >
+                      <span class="diag-line diag-line-primary"></span>
+                      <span class="diag-line diag-line-secondary"></span>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <div v-if="showPlanningSection" class="grid-section">
+            <div class="grid-header plan-header">
+              <div>
+                <h2>{{ isUpgradeInProgress ? t('buildingDetail.queuedConfiguration') : t('buildingDetail.plannedConfiguration') }}</h2>
+                <p class="section-subtitle">
+                  {{ isUpgradeInProgress ? t('buildingDetail.queuedConfigurationHelp') : t('buildingDetail.plannedConfigurationHelp') }}
+                </p>
+              </div>
+              <div class="grid-actions">
+                <button class="btn btn-secondary" @click="cancelEditing">
+                  {{ t('buildingDetail.cancelEditing') }}
+                </button>
+                <button
+                  class="btn btn-primary"
+                  :disabled="saving || !hasDraftChanges"
+                  @click="storeConfiguration"
+                >
+                  {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="upgrade-summary">
+              <span class="upgrade-summary-pill">{{ t('buildingDetail.currentTickLabel', { tick: currentTick }) }}</span>
+              <span class="upgrade-summary-pill">{{ t('buildingDetail.totalUpgradeTicks', { ticks: draftTotalTicks }) }}</span>
+            </div>
+
+            <div class="unit-grid">
+              <template v-for="y in gridIndexes" :key="`planned-row-${y}`">
+                <div class="grid-row unit-row">
+                  <template v-for="x in gridIndexes" :key="`planned-unit-${x}-${y}`">
+                    <button
+                      class="grid-cell"
+                      :class="{
+                        occupied: !!getUnitAtFrom(plannedUnits, x, y),
+                        selected: selectedCell?.x === x && selectedCell?.y === y,
+                        changed: !!getUnitAtFrom(plannedUnits, x, y) && getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0,
+                      }"
+                      :style="getUnitAtFrom(plannedUnits, x, y)
+                        ? { borderColor: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(plannedUnits, x, y)!.unitType) + '18' }
+                        : {}"
+                      @click="clickDraftCell(x, y)"
+                    >
+                      <template v-if="getUnitAtFrom(plannedUnits, x, y)">
+                        <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, x, y)!.unitType}`) }}</span>
+                        <span class="cell-level">Lv.{{ getUnitAtFrom(plannedUnits, x, y)!.level }}</span>
+                        <span v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0" class="cell-pending">
+                          {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) }) }}
+                        </span>
+                      </template>
+                      <template v-else>
+                        <span class="cell-empty">+</span>
+                      </template>
+                    </button>
+
+                    <button
+                      v-if="x < 3"
+                      :key="`planned-horizontal-${x}-${y}`"
+                      class="link-toggle horizontal"
+                      :class="{ active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) }"
+                      :disabled="!canToggleHorizontalLink(plannedUnits, x, y)"
+                      :aria-label="t('buildingDetail.linkRight')"
+                      @click="toggleHorizontalLink(x, y)"
+                    >
+                      <span class="link-line"></span>
+                    </button>
+                  </template>
+                </div>
+
+                <div v-if="y < 3" class="grid-row connector-row">
+                  <template v-for="x in gridIndexes" :key="`planned-connector-${x}-${y}`">
+                    <button
+                      class="link-toggle vertical"
+                      :class="{ active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) }"
+                      :disabled="!canToggleVerticalLink(plannedUnits, x, y)"
+                      :aria-label="t('buildingDetail.linkDown')"
+                      @click="toggleVerticalLink(x, y)"
+                    >
+                      <span class="link-line"></span>
+                    </button>
+
+                    <button
+                      v-if="x < 3"
+                      :key="`planned-diagonal-${x}-${y}`"
+                      class="link-toggle diagonal"
+                      :class="[`state-${getDiagonalStateFor(plannedUnits, x, y)}`, { disabled: !canToggleDiagonalLink(plannedUnits, x, y) }]"
+                      :disabled="!canToggleDiagonalLink(plannedUnits, x, y)"
+                      :aria-label="t('buildingDetail.links')"
+                      @click="toggleDiagonalLink(x, y)"
+                    >
+                      <span class="diag-line diag-line-primary"></span>
+                      <span class="diag-line diag-line-secondary"></span>
+                    </button>
+                  </template>
+                </div>
+              </template>
+            </div>
+
+            <div class="grid-legend">
+              <div v-for="unitType in allowedUnits" :key="unitType" class="legend-item">
+                <span class="legend-color" :style="{ background: getUnitColor(unitType) }"></span>
+                <span>{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div v-if="showPlanningSection && selectedCell && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) && !showUnitPicker" class="unit-detail">
-        <h3>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h3>
-        <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
-        <div class="unit-stats">
-          <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.level }}</span>
-          <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
-          <span class="stat" v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) > 0">
-            {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) }) }}
-          </span>
-        </div>
-        <div class="unit-links">
-          <span class="link-label">{{ t('buildingDetail.links') }}:</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
-          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
-        </div>
-        <div class="unit-actions" v-if="isEditing">
-          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
-            {{ t('buildingDetail.removeUnit') }}
-          </button>
+        <div class="sidebar" v-if="selectedCell && isEditing">
+          <div v-if="showUnitPicker" class="unit-picker">
+            <div class="picker-header">
+              <h3>{{ t('buildingDetail.selectUnitType') }}</h3>
+              <button class="btn btn-ghost" @click="showUnitPicker = false">{{ t('common.close') }}</button>
+            </div>
+            <p class="picker-subtitle">{{ t('buildingDetail.allowedUnits') }}</p>
+            <div class="picker-grid">
+              <button v-for="unitType in allowedUnits" :key="unitType" class="picker-option" @click="placeUnit(unitType)">
+                <span class="picker-color" :style="{ background: getUnitColor(unitType) }"></span>
+                <div class="picker-info">
+                  <span class="picker-name">{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
+                  <span class="picker-desc">{{ t(`buildingDetail.unitDescriptions.${unitType}`) }}</span>
+                </div>
+              </button>
+            </div>
+          </div>
+
+          <div v-if="!showUnitPicker && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)" class="unit-config">
+            <div class="unit-config-header">
+              <h3>{{ t('buildingDetail.unitConfiguration') }}</h3>
+              <button class="btn btn-ghost" @click="selectedCell = null">{{ t('common.close') }}</button>
+            </div>
+            <div class="unit-detail">
+              <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
+              <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
+              <div class="unit-stats">
+                <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.level }}</span>
+                <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+                <span class="stat" v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) > 0">
+                  {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) }) }}
+                </span>
+              </div>
+              <div class="unit-links">
+                <span class="link-label">{{ t('buildingDetail.links') }}:</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
+                <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
+              </div>
+              <div class="unit-actions" v-if="isEditing">
+                <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
+                  {{ t('buildingDetail.removeUnit') }}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </template>
@@ -887,7 +897,50 @@ onMounted(async () => {
 <style scoped>
 .building-detail-view {
   padding: 2rem 1rem;
-  max-width: 1100px;
+  max-width: 1400px;
+}
+
+.page-nav {
+  margin-bottom: 1.5rem;
+}
+
+.main-content {
+  display: grid;
+  grid-template-columns: 2fr 320px;
+  gap: 2rem;
+  align-items: start;
+}
+
+.grid-container {
+  min-width: 0; /* Allow shrinking */
+}
+
+.sidebar {
+  position: sticky;
+  top: 2rem;
+  min-width: 0; /* Allow shrinking */
+}
+
+@media (max-width: 1024px) {
+  .main-content {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .sidebar {
+    position: static;
+    order: -1; /* Show sidebar above grid on mobile */
+  }
+}
+
+@media (max-width: 768px) {
+  .building-detail-view {
+    padding: 1rem 0.5rem;
+  }
+
+  .main-content {
+    gap: 1rem;
+  }
 }
 
 .page-nav {
@@ -908,21 +961,65 @@ onMounted(async () => {
   text-decoration: none;
 }
 
-.building-header,
-.grid-section,
-.unit-detail,
-.upgrade-banner {
+.unit-detail {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
-}
-
-.building-header,
-.grid-section,
-.unit-detail {
   padding: 1.5rem;
   margin-bottom: 1.5rem;
+}
+
+.unit-config {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.unit-config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.unit-config-header h3 {
+  font-size: 1.125rem;
+  margin: 0;
+}
+
+.unit-detail {
+  padding: 1.5rem;
+}
+
+.unit-detail h4 {
+  font-size: 1rem;
+  margin: 0 0 0.35rem;
+}
+
+@media (min-width: 1025px) {
+  .unit-detail {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin-bottom: 0;
+    background: transparent;
+  }
+
+  .unit-config {
+    border: none;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .unit-config-header {
+    background: transparent;
+    border-bottom: none;
+    padding: 0 0 1rem 0;
+  }
 }
 
 .building-title {
@@ -1032,33 +1129,33 @@ onMounted(async () => {
 
 .unit-grid {
   display: grid;
-  gap: 0.9rem;
+  gap: 0.6rem;
   margin-bottom: 1rem;
 }
 
 .grid-row {
   display: grid;
-  grid-template-columns: minmax(92px, 1fr) 46px minmax(92px, 1fr) 46px minmax(92px, 1fr) 46px minmax(92px, 1fr);
+  grid-template-columns: minmax(80px, 1fr) 40px minmax(80px, 1fr) 40px minmax(80px, 1fr) 40px minmax(80px, 1fr);
   align-items: center;
   justify-items: center;
 }
 
 .connector-row {
-  min-height: 44px;
+  min-height: 32px;
 }
 
 .grid-cell {
   aspect-ratio: 1;
   width: 100%;
-  min-height: 86px;
+  min-height: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.25rem;
-  padding: 0.6rem;
+  padding: 0.4rem;
   border: 2px solid var(--color-border);
-  border-radius: 18px;
+  border-radius: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 247, 251, 0.92));
   color: var(--color-text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
@@ -1131,21 +1228,21 @@ onMounted(async () => {
 }
 
 .link-toggle.horizontal {
-  width: 38px;
-  height: 18px;
+  width: 32px;
+  height: 14px;
   border-radius: 999px;
 }
 
 .link-toggle.vertical {
-  width: 18px;
-  height: 38px;
+  width: 14px;
+  height: 32px;
   border-radius: 999px;
 }
 
 .link-toggle.diagonal {
-  width: 38px;
-  height: 38px;
-  border-radius: 14px;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
 }
 
 .link-line {
@@ -1155,13 +1252,13 @@ onMounted(async () => {
 }
 
 .horizontal .link-line {
-  width: 24px;
+  width: 20px;
   height: 4px;
 }
 
 .vertical .link-line {
   width: 4px;
-  height: 24px;
+  height: 20px;
 }
 
 .link-toggle.active .link-line {
@@ -1170,7 +1267,7 @@ onMounted(async () => {
 
 .diag-line {
   position: absolute;
-  width: 26px;
+  width: 22px;
   height: 3px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-border) 78%, transparent);
@@ -1213,7 +1310,23 @@ onMounted(async () => {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.5rem;
-  width: min(92vw, 520px);
+  width: 100%;
+  max-width: 320px;
+}
+
+@media (min-width: 1025px) {
+  .unit-picker-overlay {
+    display: none;
+  }
+
+  .unit-picker {
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    width: 100%;
+    max-width: none;
+    background: transparent;
+  }
 }
 
 .picker-header {
