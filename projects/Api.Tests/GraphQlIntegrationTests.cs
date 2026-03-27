@@ -2,7 +2,10 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Api.Data;
+using Api.Data.Entities;
 using Api.Tests.Infrastructure;
+using Api.Utilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Api.Tests;
@@ -86,6 +89,47 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         gameState!.CurrentTick = 0;
         gameState.LastTickAtUtc = DateTime.UtcNow;
         await db.SaveChangesAsync();
+    }
+
+    private async Task<(string CompanyId, string ProductId, JsonElement Result)> CompleteOnboardingAsync(
+        string token,
+        string companyName = "My First Co")
+    {
+        await ResetGameStateAsync();
+
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
+        var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+
+        var productsResult = await ExecuteGraphQlAsync(
+            "query { productTypes(industry: \"FURNITURE\") { id slug } }");
+        var productId = productsResult.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray()
+            .Single(product => product.GetProperty("slug").GetString() == "wooden-chair")
+            .GetProperty("id")
+            .GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CompleteOnboarding($input: OnboardingInput!) {
+              completeOnboarding(input: $input) {
+                company { id name cash }
+                factory { id name type }
+                salesShop { id name type }
+                selectedProduct { name industry }
+                startupPackOffer {
+                  status
+                  companyCashGrant
+                  proDurationDays
+                  expiresAtUtc
+                }
+              }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, productTypeId = productId, companyName } },
+            token);
+
+        var companyId = result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("company").GetProperty("id").GetString()!;
+        return (companyId, productId!, result);
     }
 
     #endregion
@@ -770,33 +814,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task CompleteOnboarding_CreatesCompanyFactoryAndShop()
     {
         var token = await RegisterAndGetTokenAsync("onboard@test.com", "Onboarder");
-        await ResetGameStateAsync();
-
-        // Get city and product
-        var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
-        var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
-
-        var productsResult = await ExecuteGraphQlAsync(
-            "query { productTypes(industry: \"FURNITURE\") { id slug name } }");
-        var productId = productsResult.GetProperty("data").GetProperty("productTypes")
-            .EnumerateArray()
-            .Single(product => product.GetProperty("slug").GetString() == "wooden-chair")
-            .GetProperty("id")
-            .GetString();
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation CompleteOnboarding($input: OnboardingInput!) {
-              completeOnboarding(input: $input) {
-                company { id name cash }
-                factory { id name type }
-                salesShop { id name type }
-                selectedProduct { name industry }
-              }
-            }
-            """,
-            new { input = new { industry = "FURNITURE", cityId, productTypeId = productId, companyName = "My First Co" } },
-            token);
+        var (_, productId, result) = await CompleteOnboardingAsync(token);
 
         var data = result.GetProperty("data").GetProperty("completeOnboarding");
         Assert.Equal("My First Co", data.GetProperty("company").GetProperty("name").GetString());
@@ -836,27 +854,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task CompleteOnboarding_SetsOnboardingCompletedAtUtc()
     {
         var token = await RegisterAndGetTokenAsync("onboard_complete@test.com", "CompletionTester");
-        await ResetGameStateAsync();
-
-        var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
-        var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
-
-        var productsResult = await ExecuteGraphQlAsync(
-            "query { productTypes(industry: \"FURNITURE\") { id slug } }");
-        var productId = productsResult.GetProperty("data").GetProperty("productTypes")
-            .EnumerateArray()
-            .Single(product => product.GetProperty("slug").GetString() == "wooden-chair")
-            .GetProperty("id")
-            .GetString();
-
-        await ExecuteGraphQlAsync(
-            """
-            mutation CompleteOnboarding($input: OnboardingInput!) {
-              completeOnboarding(input: $input) { company { id } }
-            }
-            """,
-            new { input = new { industry = "FURNITURE", cityId, productTypeId = productId, companyName = "Done Corp" } },
-            token);
+        await CompleteOnboardingAsync(token, "Done Corp");
 
         // Verify me query returns onboardingCompletedAtUtc
         var meResult = await ExecuteGraphQlAsync(
@@ -866,6 +864,246 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var completedAt = meResult.GetProperty("data").GetProperty("me").GetProperty("onboardingCompletedAtUtc");
         Assert.Equal(JsonValueKind.String, completedAt.ValueKind);
         Assert.True(DateTime.TryParse(completedAt.GetString(), out _));
+    }
+
+    [Fact]
+    public async Task CompleteOnboarding_ReturnsEligibleStartupPackOffer()
+    {
+        var token = await RegisterAndGetTokenAsync("startup-pack@test.com", "StartupPacker");
+
+        var (_, _, result) = await CompleteOnboardingAsync(token, "Offer Corp");
+
+        var offer = result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("startupPackOffer");
+        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
+        Assert.Equal(250000m, offer.GetProperty("companyCashGrant").GetDecimal());
+        Assert.Equal(90, offer.GetProperty("proDurationDays").GetInt32());
+        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
+    }
+
+    [Fact]
+    public async Task StartupPackOffer_PreviouslyOnboardedPlayer_IsBackfilledOnFirstQuery()
+    {
+        const string email = "backfill@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "BackfillPlayer");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == email);
+            player.OnboardingCompletedAtUtc = DateTime.UtcNow.AddDays(-2);
+            db.Companies.Add(new Api.Data.Entities.Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Legacy Corp",
+                Cash = 600000m,
+                FoundedAtUtc = DateTime.UtcNow.AddDays(-2)
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            "{ startupPackOffer { status companyCashGrant proDurationDays } }",
+            token: token);
+
+        var offer = result.GetProperty("data").GetProperty("startupPackOffer");
+        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
+        Assert.Equal(250000m, offer.GetProperty("companyCashGrant").GetDecimal());
+        Assert.Equal(90, offer.GetProperty("proDurationDays").GetInt32());
+    }
+
+    [Fact]
+    public async Task StartupPackOffer_BeforeOnboarding_ReturnsNull()
+    {
+        var token = await RegisterAndGetTokenAsync("startup-pack-none@test.com", "NoOfferYet");
+
+        var result = await ExecuteGraphQlAsync(
+            "{ startupPackOffer { status } }",
+            token: token);
+
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("startupPackOffer").ValueKind);
+    }
+
+    [Fact]
+    public async Task StartupPackOffer_ShownAndDismissed_StoresLifecycleState()
+    {
+        var token = await RegisterAndGetTokenAsync("startup-pack-lifecycle@test.com", "LifecyclePlayer");
+        await CompleteOnboardingAsync(token, "Lifecycle Corp");
+
+        var shownResult = await ExecuteGraphQlAsync(
+            """
+            mutation {
+              markStartupPackOfferShown {
+                status
+                shownAtUtc
+                dismissedAtUtc
+              }
+            }
+            """,
+            token: token);
+
+        var shownOffer = shownResult.GetProperty("data").GetProperty("markStartupPackOfferShown");
+        Assert.Equal("SHOWN", shownOffer.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.String, shownOffer.GetProperty("shownAtUtc").ValueKind);
+        Assert.Equal(JsonValueKind.Null, shownOffer.GetProperty("dismissedAtUtc").ValueKind);
+
+        var dismissedResult = await ExecuteGraphQlAsync(
+            """
+            mutation {
+              dismissStartupPackOffer {
+                status
+                shownAtUtc
+                dismissedAtUtc
+              }
+            }
+            """,
+            token: token);
+
+        var dismissedOffer = dismissedResult.GetProperty("data").GetProperty("dismissStartupPackOffer");
+        Assert.Equal("DISMISSED", dismissedOffer.GetProperty("status").GetString());
+        Assert.Equal(JsonValueKind.String, dismissedOffer.GetProperty("shownAtUtc").ValueKind);
+        Assert.Equal(JsonValueKind.String, dismissedOffer.GetProperty("dismissedAtUtc").ValueKind);
+    }
+
+    [Fact]
+    public async Task ClaimStartupPack_IsIdempotentAndGrantsEntitlementsOnce()
+    {
+        var token = await RegisterAndGetTokenAsync("startup-pack-claim@test.com", "ClaimPlayer");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Claim Corp");
+
+        var firstClaim = await ExecuteGraphQlAsync(
+            """
+            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
+              claimStartupPack(input: $input) {
+                offer { status claimedAtUtc grantedCompanyId }
+                company { id cash }
+                proSubscriptionEndsAtUtc
+              }
+            }
+            """,
+            new { input = new { companyId } },
+            token);
+
+        var firstClaimData = firstClaim.GetProperty("data").GetProperty("claimStartupPack");
+        Assert.Equal("CLAIMED", firstClaimData.GetProperty("offer").GetProperty("status").GetString());
+        Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, firstClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
+        var firstProEndsAt = firstClaimData.GetProperty("proSubscriptionEndsAtUtc").GetString();
+
+        var secondClaim = await ExecuteGraphQlAsync(
+            """
+            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
+              claimStartupPack(input: $input) {
+                offer { status claimedAtUtc grantedCompanyId }
+                company { id cash }
+                proSubscriptionEndsAtUtc
+              }
+            }
+            """,
+            new { input = new { companyId } },
+            token);
+
+        var secondClaimData = secondClaim.GetProperty("data").GetProperty("claimStartupPack");
+        Assert.Equal("CLAIMED", secondClaimData.GetProperty("offer").GetProperty("status").GetString());
+        Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, secondClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
+        Assert.Equal(firstProEndsAt, secondClaimData.GetProperty("proSubscriptionEndsAtUtc").GetString());
+
+        var meResult = await ExecuteGraphQlAsync(
+            "{ me { proSubscriptionEndsAtUtc } }",
+            token: token);
+        Assert.Equal(firstProEndsAt, meResult.GetProperty("data").GetProperty("me").GetProperty("proSubscriptionEndsAtUtc").GetString());
+    }
+
+    [Fact]
+    public async Task ClaimStartupPack_ConcurrentRequests_SettleEconomyAndPremiumOnce()
+    {
+        var token = await RegisterAndGetTokenAsync("startup-pack-concurrent@test.com", "ConcurrentPlayer");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Concurrent Corp");
+
+        const string claimMutation = """
+            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
+              claimStartupPack(input: $input) {
+                offer { status claimedAtUtc grantedCompanyId }
+                company { id cash }
+                proSubscriptionEndsAtUtc
+              }
+            }
+            """;
+
+        // Monetization integrity matters here: duplicate network submits or two tabs racing
+        // must converge on a single durable grant so premium time and company cash never double-credit.
+        var claimTasks = Enumerable.Range(0, 8)
+            .Select(_ => ExecuteGraphQlAsync(claimMutation, new { input = new { companyId } }, token))
+            .ToArray();
+
+        var claimResults = await Task.WhenAll(claimTasks);
+
+        var claimPayloads = claimResults
+            .Select(result => result.GetProperty("data").GetProperty("claimStartupPack"))
+            .ToList();
+
+        Assert.All(claimPayloads, payload =>
+        {
+            Assert.Equal("CLAIMED", payload.GetProperty("offer").GetProperty("status").GetString());
+            Assert.Equal(companyId, payload.GetProperty("offer").GetProperty("grantedCompanyId").GetString());
+            Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, payload.GetProperty("company").GetProperty("cash").GetDecimal());
+        });
+
+        var distinctProEndTimes = claimPayloads
+            .Select(payload => payload.GetProperty("proSubscriptionEndsAtUtc").GetString())
+            .Distinct()
+            .ToList();
+        Assert.Single(distinctProEndTimes);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.SingleAsync(candidate => candidate.Email == "startup-pack-concurrent@test.com");
+        var offer = await db.StartupPackOffers.SingleAsync(candidate => candidate.PlayerId == player.Id);
+        var company = await db.Companies.SingleAsync(candidate => candidate.Id == Guid.Parse(companyId));
+
+        Assert.Equal(StartupPackOfferStatus.Claimed, offer.Status);
+        Assert.NotNull(offer.ClaimedAtUtc);
+        Assert.Equal(Guid.Parse(companyId), offer.GrantedCompanyId);
+        Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, company.Cash);
+        Assert.NotNull(player.ProSubscriptionEndsAtUtc);
+        var returnedProEndsAtUtc = DateTime.Parse(distinctProEndTimes[0]!).ToUniversalTime();
+        Assert.True(
+            Math.Abs((player.ProSubscriptionEndsAtUtc!.Value.ToUniversalTime() - returnedProEndsAtUtc).TotalMilliseconds) < 5,
+            "Concurrent claims should converge to the same durable Pro end timestamp within sub-millisecond serialization precision.");
+    }
+
+    [Fact]
+    public async Task StartupPackOffer_ExpiresAndRejectsClaims()
+    {
+        var token = await RegisterAndGetTokenAsync("startup-pack-expired@test.com", "ExpiredPlayer");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Expired Corp");
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == "startup-pack-expired@test.com");
+            var offer = await db.StartupPackOffers.SingleAsync(candidate => candidate.PlayerId == player.Id);
+            offer.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5);
+            await db.SaveChangesAsync();
+        }
+
+        var offerResult = await ExecuteGraphQlAsync(
+            "{ startupPackOffer { status } }",
+            token: token);
+        Assert.Equal("EXPIRED", offerResult.GetProperty("data").GetProperty("startupPackOffer").GetProperty("status").GetString());
+
+        var claimResult = await ExecuteGraphQlAsync(
+            """
+            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
+              claimStartupPack(input: $input) {
+                offer { status }
+              }
+            }
+            """,
+            new { input = new { companyId } },
+            token);
+
+        Assert.True(claimResult.TryGetProperty("errors", out var errors));
+        Assert.Contains(errors.EnumerateArray(), error => error.GetProperty("extensions").GetProperty("code").GetString() == "STARTUP_PACK_EXPIRED");
     }
 
     [Fact]
