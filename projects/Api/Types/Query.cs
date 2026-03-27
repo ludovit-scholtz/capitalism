@@ -73,6 +73,8 @@ public sealed class Query
         var query = db.ProductTypes
             .Include(p => p.Recipes)
             .ThenInclude(r => r.ResourceType)
+            .Include(p => p.Recipes)
+            .ThenInclude(r => r.InputProductType)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(industry))

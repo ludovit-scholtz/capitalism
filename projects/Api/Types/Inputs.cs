@@ -88,6 +88,19 @@ public sealed class StoreBuildingConfigurationInput
     public List<BuildingConfigurationUnitInput> Units { get; set; } = [];
 }
 
+/// <summary>Input for setting a building's for-sale status.</summary>
+public sealed class SetBuildingForSaleInput
+{
+    /// <summary>Building to update.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>Whether the building is listed for sale.</summary>
+    public bool IsForSale { get; set; }
+
+    /// <summary>Asking price (required when IsForSale is true).</summary>
+    public decimal? AskingPrice { get; set; }
+}
+
 /// <summary>User-editable portion of a building unit configuration.</summary>
 public sealed class BuildingConfigurationUnitInput
 {
@@ -124,4 +137,42 @@ public sealed class BuildingConfigurationUnitInput
 
     /// <summary>Whether the diagonal link to the unit below-right is active.</summary>
     public bool LinkDownRight { get; set; }
+
+    // ── Unit-specific configuration ──
+
+    /// <summary>Resource type this unit works with (optional, for Mining/Purchase/Storage/B2B Sales).</summary>
+    public Guid? ResourceTypeId { get; set; }
+
+    /// <summary>Product type this unit works with (optional, for Manufacturing/Purchase/Public Sales/Branding).</summary>
+    public Guid? ProductTypeId { get; set; }
+
+    /// <summary>Minimum selling price (for B2B Sales or Public Sales units).</summary>
+    public decimal? MinPrice { get; set; }
+
+    /// <summary>Maximum purchase price (for Purchase units).</summary>
+    public decimal? MaxPrice { get; set; }
+
+    /// <summary>Purchase source: EXCHANGE, LOCAL, OPTIMAL.</summary>
+    [MaxLength(20)]
+    public string? PurchaseSource { get; set; }
+
+    /// <summary>Visibility: PUBLIC, COMPANY, GROUP.</summary>
+    [MaxLength(20)]
+    public string? SaleVisibility { get; set; }
+
+    /// <summary>Marketing budget per tick (for Marketing units).</summary>
+    public decimal? Budget { get; set; }
+
+    /// <summary>Media house building ID (for Marketing units).</summary>
+    public Guid? MediaHouseBuildingId { get; set; }
+
+    /// <summary>Minimum product quality for Purchase units (0.0-1.0).</summary>
+    public decimal? MinQuality { get; set; }
+
+    /// <summary>Brand scope: PRODUCT, CATEGORY, COMPANY (for Branding units).</summary>
+    [MaxLength(20)]
+    public string? BrandScope { get; set; }
+
+    /// <summary>Lock purchases to a specific vendor company ID (for Purchase units).</summary>
+    public Guid? VendorLockCompanyId { get; set; }
 }

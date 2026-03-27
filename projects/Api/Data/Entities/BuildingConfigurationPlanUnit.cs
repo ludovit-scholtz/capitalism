@@ -67,4 +67,42 @@ public sealed class BuildingConfigurationPlanUnit
 
     /// <summary>Whether this entry represents canceling a previously queued change back to the current live state.</summary>
     public bool IsReverting { get; set; }
+
+    // ── Unit-specific configuration ──
+
+    /// <summary>Resource type this unit works with.</summary>
+    public Guid? ResourceTypeId { get; set; }
+
+    /// <summary>Product type this unit works with.</summary>
+    public Guid? ProductTypeId { get; set; }
+
+    /// <summary>Minimum selling price for B2B Sales or Public Sales units.</summary>
+    public decimal? MinPrice { get; set; }
+
+    /// <summary>Maximum purchase price for Purchase units.</summary>
+    public decimal? MaxPrice { get; set; }
+
+    /// <summary>Purchase source: EXCHANGE, LOCAL, OPTIMAL.</summary>
+    [MaxLength(20)]
+    public string? PurchaseSource { get; set; }
+
+    /// <summary>Visibility: PUBLIC, COMPANY, GROUP.</summary>
+    [MaxLength(20)]
+    public string? SaleVisibility { get; set; }
+
+    /// <summary>Marketing budget per tick.</summary>
+    public decimal? Budget { get; set; }
+
+    /// <summary>Media house building ID for Marketing units.</summary>
+    public Guid? MediaHouseBuildingId { get; set; }
+
+    /// <summary>Minimum product quality for Purchase units (0.0-1.0).</summary>
+    public decimal? MinQuality { get; set; }
+
+    /// <summary>Brand scope: PRODUCT, CATEGORY, COMPANY.</summary>
+    [MaxLength(20)]
+    public string? BrandScope { get; set; }
+
+    /// <summary>Lock purchases to a specific vendor company ID.</summary>
+    public Guid? VendorLockCompanyId { get; set; }
 }

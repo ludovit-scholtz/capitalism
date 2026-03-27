@@ -19,6 +19,13 @@ namespace Api.Types;
 /// </summary>
 public sealed class Mutation
 {
+    private static readonly IReadOnlyDictionary<string, string> StarterOnboardingProductByIndustry = new Dictionary<string, string>
+    {
+        [Industry.Furniture] = "wooden-chair",
+        [Industry.FoodProcessing] = "bread",
+        [Industry.Healthcare] = "basic-medicine"
+    };
+
     /// <summary>Registers a new player account and returns an auth token.</summary>
     public async Task<AuthPayload> Register(
         RegisterInput input,
@@ -216,12 +223,30 @@ public sealed class Mutation
         }
 
         // Validate product
-        var product = await db.ProductTypes.FindAsync(input.ProductTypeId);
-        if (product is null || product.Industry != input.Industry)
+        var product = await db.ProductTypes
+            .Include(candidate => candidate.Recipes)
+            .ThenInclude(recipe => recipe.ResourceType)
+            .Include(candidate => candidate.Recipes)
+            .ThenInclude(recipe => recipe.InputProductType)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.ProductTypeId);
+        if (product is null || product.Industry != input.Industry || !IsStarterOnboardingProduct(product))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Product not found or doesn't belong to selected industry.")
+                    .SetMessage("Product not found, doesn't belong to selected industry, or is not available for onboarding.")
+                    .SetCode("INVALID_PRODUCT")
+                    .Build());
+        }
+
+        var starterResourceId = product.Recipes
+            .Where(recipe => recipe.InputProductTypeId is null && recipe.ResourceTypeId is not null)
+            .Select(recipe => recipe.ResourceTypeId)
+            .FirstOrDefault();
+        if (starterResourceId is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The selected onboarding product is missing a starter raw-material recipe.")
                     .SetCode("INVALID_PRODUCT")
                     .Build());
         }
@@ -255,10 +280,10 @@ public sealed class Mutation
 
         // Add default factory units: Purchase, Manufacturing, Storage, B2B Sales
         db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1, LinkRight = true, LinkDown = true },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ResourceTypeId = starterResourceId, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Storage, GridX = 2, GridY = 0, Level = 1, LinkRight = true },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1 }
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice }
         );
 
         // Create sales shop
@@ -277,11 +302,10 @@ public sealed class Mutation
         };
         db.Buildings.Add(shop);
 
-        // Add default shop units: Purchase, Marketing, Public Sales
+        // Add default shop units: Purchase, Public Sales
         db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.Marketing, GridX = 1, GridY = 0, Level = 1, LinkRight = true },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.PublicSales, GridX = 2, GridY = 0, Level = 1 }
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.PublicSales, GridX = 1, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice }
         );
 
         await db.SaveChangesAsync();
@@ -293,6 +317,12 @@ public sealed class Mutation
             SalesShop = shop,
             SelectedProduct = product
         };
+    }
+
+    private static bool IsStarterOnboardingProduct(ProductType product)
+    {
+        return StarterOnboardingProductByIndustry.TryGetValue(product.Industry, out var starterSlug)
+            && string.Equals(product.Slug, starterSlug, StringComparison.Ordinal);
     }
 
     /// <summary>Queues a building configuration update that becomes active after the required ticks have passed.</summary>
@@ -347,6 +377,36 @@ public sealed class Mutation
             .Include(candidate => candidate.Units)
             .Include(candidate => candidate.Removals)
             .FirstAsync(candidate => candidate.Id == plan.Id);
+    }
+
+    /// <summary>Sets or clears the for-sale status and asking price of a building.</summary>
+    [Authorize]
+    public async Task<Building> SetBuildingForSale(
+        SetBuildingForSaleInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.Units)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        building.IsForSale = input.IsForSale;
+        building.AskingPrice = input.IsForSale ? input.AskingPrice : null;
+
+        await db.SaveChangesAsync();
+        return building;
     }
 
     private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)

@@ -107,6 +107,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasKey(u => u.Id);
             e.Property(u => u.UnitType).HasMaxLength(30);
+            e.Property(u => u.PurchaseSource).HasMaxLength(20);
+            e.Property(u => u.SaleVisibility).HasMaxLength(20);
+            e.Property(u => u.BrandScope).HasMaxLength(20);
+            e.Property(u => u.MinPrice).HasPrecision(18, 2);
+            e.Property(u => u.MaxPrice).HasPrecision(18, 2);
+            e.Property(u => u.Budget).HasPrecision(18, 2);
+            e.Property(u => u.MinQuality).HasPrecision(5, 4);
             e.HasOne(u => u.Building).WithMany(b => b.Units).HasForeignKey(u => u.BuildingId);
         });
 
@@ -124,6 +131,13 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasKey(unit => unit.Id);
             e.Property(unit => unit.UnitType).HasMaxLength(30);
+            e.Property(unit => unit.PurchaseSource).HasMaxLength(20);
+            e.Property(unit => unit.SaleVisibility).HasMaxLength(20);
+            e.Property(unit => unit.BrandScope).HasMaxLength(20);
+            e.Property(unit => unit.MinPrice).HasPrecision(18, 2);
+            e.Property(unit => unit.MaxPrice).HasPrecision(18, 2);
+            e.Property(unit => unit.Budget).HasPrecision(18, 2);
+            e.Property(unit => unit.MinQuality).HasPrecision(5, 4);
             e.HasOne(unit => unit.BuildingConfigurationPlan)
                 .WithMany(plan => plan.Units)
                 .HasForeignKey(unit => unit.BuildingConfigurationPlanId)
@@ -168,6 +182,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(r => r.Category).HasMaxLength(30);
             e.Property(r => r.BasePrice).HasPrecision(18, 2);
             e.Property(r => r.WeightPerUnit).HasPrecision(18, 4);
+            e.Property(r => r.UnitName).HasMaxLength(50);
+            e.Property(r => r.UnitSymbol).HasMaxLength(20);
+            e.Property(r => r.ImageUrl).HasMaxLength(12000);
         });
 
         // ProductType
@@ -179,6 +196,10 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(p => p.Slug).HasMaxLength(200);
             e.Property(p => p.Industry).HasMaxLength(50);
             e.Property(p => p.BasePrice).HasPrecision(18, 2);
+            e.Property(p => p.OutputQuantity).HasPrecision(18, 4);
+            e.Property(p => p.EnergyConsumptionMwh).HasPrecision(18, 4);
+            e.Property(p => p.UnitName).HasMaxLength(50);
+            e.Property(p => p.UnitSymbol).HasMaxLength(20);
         });
 
         // ProductRecipe
@@ -187,7 +208,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasKey(r => r.Id);
             e.Property(r => r.Quantity).HasPrecision(18, 4);
             e.HasOne(r => r.ProductType).WithMany(p => p.Recipes).HasForeignKey(r => r.ProductTypeId);
-            e.HasOne(r => r.ResourceType).WithMany().HasForeignKey(r => r.ResourceTypeId);
+            e.HasOne(r => r.ResourceType).WithMany().HasForeignKey(r => r.ResourceTypeId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.InputProductType).WithMany().HasForeignKey(r => r.InputProductTypeId).OnDelete(DeleteBehavior.Restrict);
         });
 
         // Inventory

@@ -69,6 +69,17 @@ export type MockBuildingUnit = {
   linkUpRight: boolean
   linkDownLeft: boolean
   linkDownRight: boolean
+  resourceTypeId?: string | null
+  productTypeId?: string | null
+  minPrice?: number | null
+  maxPrice?: number | null
+  purchaseSource?: string | null
+  saleVisibility?: string | null
+  budget?: number | null
+  mediaHouseBuildingId?: string | null
+  minQuality?: number | null
+  brandScope?: string | null
+  vendorLockCompanyId?: string | null
 }
 
 export type MockBuildingConfigurationPlanUnit = MockBuildingUnit & {
@@ -118,6 +129,9 @@ export type MockResourceType = {
   category: string
   basePrice: number
   weightPerUnit: number
+  unitName: string
+  unitSymbol: string
+  imageUrl?: string | null
   description: string | null
 }
 
@@ -128,9 +142,18 @@ export type MockProductType = {
   industry: string
   basePrice: number
   baseCraftTicks: number
+  outputQuantity?: number
+  energyConsumptionMwh?: number
+  unitName?: string
+  unitSymbol?: string
+  imageUrl?: string | null
   isProOnly: boolean
   description: string | null
-  recipes: { resourceType: { id: string; name: string }; quantity: number }[]
+  recipes: {
+    resourceType?: { id: string; name: string; slug?: string; unitName?: string; unitSymbol?: string } | null
+    inputProductType?: { id: string; name: string; slug: string; unitName?: string; unitSymbol?: string } | null
+    quantity: number
+  }[]
 }
 
 export type MockState = {
@@ -163,6 +186,17 @@ function areUnitsEquivalent(currentUnit: MockBuildingUnit | undefined, nextUnit:
     && currentUnit.linkUpRight === nextUnit.linkUpRight
     && currentUnit.linkDownLeft === nextUnit.linkDownLeft
     && currentUnit.linkDownRight === nextUnit.linkDownRight
+    && (currentUnit.resourceTypeId ?? null) === (nextUnit.resourceTypeId ?? null)
+    && (currentUnit.productTypeId ?? null) === (nextUnit.productTypeId ?? null)
+    && (currentUnit.minPrice ?? null) === (nextUnit.minPrice ?? null)
+    && (currentUnit.maxPrice ?? null) === (nextUnit.maxPrice ?? null)
+    && (currentUnit.purchaseSource ?? null) === (nextUnit.purchaseSource ?? null)
+    && (currentUnit.saleVisibility ?? null) === (nextUnit.saleVisibility ?? null)
+    && (currentUnit.budget ?? null) === (nextUnit.budget ?? null)
+    && (currentUnit.mediaHouseBuildingId ?? null) === (nextUnit.mediaHouseBuildingId ?? null)
+    && (currentUnit.minQuality ?? null) === (nextUnit.minQuality ?? null)
+    && (currentUnit.brandScope ?? null) === (nextUnit.brandScope ?? null)
+    && (currentUnit.vendorLockCompanyId ?? null) === (nextUnit.vendorLockCompanyId ?? null)
 }
 
 function arePendingUnitsEquivalent(currentUnit: MockBuildingConfigurationPlanUnit | undefined, nextUnit: MockBuildingUnit): boolean {
@@ -211,6 +245,22 @@ function calculateUnitTicks(currentUnit: MockBuildingUnit | undefined, nextUnit:
     || currentUnit.linkUpRight !== nextUnit.linkUpRight
     || currentUnit.linkDownLeft !== nextUnit.linkDownLeft
     || currentUnit.linkDownRight !== nextUnit.linkDownRight
+  ) {
+    return 1
+  }
+
+  if (
+    (currentUnit.resourceTypeId ?? null) !== (nextUnit.resourceTypeId ?? null)
+    || (currentUnit.productTypeId ?? null) !== (nextUnit.productTypeId ?? null)
+    || (currentUnit.minPrice ?? null) !== (nextUnit.minPrice ?? null)
+    || (currentUnit.maxPrice ?? null) !== (nextUnit.maxPrice ?? null)
+    || (currentUnit.purchaseSource ?? null) !== (nextUnit.purchaseSource ?? null)
+    || (currentUnit.saleVisibility ?? null) !== (nextUnit.saleVisibility ?? null)
+    || (currentUnit.budget ?? null) !== (nextUnit.budget ?? null)
+    || (currentUnit.mediaHouseBuildingId ?? null) !== (nextUnit.mediaHouseBuildingId ?? null)
+    || (currentUnit.minQuality ?? null) !== (nextUnit.minQuality ?? null)
+    || (currentUnit.brandScope ?? null) !== (nextUnit.brandScope ?? null)
+    || (currentUnit.vendorLockCompanyId ?? null) !== (nextUnit.vendorLockCompanyId ?? null)
   ) {
     return 1
   }
@@ -290,6 +340,9 @@ const woodResource: MockResourceType = {
   category: 'ORGANIC',
   basePrice: 10,
   weightPerUnit: 5,
+  unitName: 'Ton',
+  unitSymbol: 't',
+  imageUrl: null,
   description: 'Harvested timber.',
 }
 
@@ -300,6 +353,9 @@ const grainResource: MockResourceType = {
   category: 'ORGANIC',
   basePrice: 5,
   weightPerUnit: 2,
+  unitName: 'Ton',
+  unitSymbol: 't',
+  imageUrl: null,
   description: 'Cereal crops.',
 }
 
@@ -310,6 +366,9 @@ const chemResource: MockResourceType = {
   category: 'MINERAL',
   basePrice: 30,
   weightPerUnit: 3,
+  unitName: 'Ton',
+  unitSymbol: 't',
+  imageUrl: null,
   description: 'Raw minerals for pharma.',
 }
 
@@ -360,9 +419,13 @@ export function makeChairProduct(): MockProductType {
     industry: 'FURNITURE',
     basePrice: 45,
     baseCraftTicks: 2,
+    outputQuantity: 20,
+    energyConsumptionMwh: 1,
+    unitName: 'Chair',
+    unitSymbol: 'chairs',
     isProOnly: false,
     description: 'A basic wooden chair.',
-    recipes: [{ resourceType: { id: 'res-wood', name: 'Wood' }, quantity: 3 }],
+    recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
   }
 }
 
@@ -376,9 +439,13 @@ export function makeDefaultProducts(): MockProductType[] {
       industry: 'FOOD_PROCESSING',
       basePrice: 3,
       baseCraftTicks: 1,
+      outputQuantity: 12,
+      energyConsumptionMwh: 0.5,
+      unitName: 'Loaf',
+      unitSymbol: 'loaves',
       isProOnly: false,
       description: 'Basic wheat bread.',
-      recipes: [{ resourceType: { id: 'res-grain', name: 'Grain' }, quantity: 1 }],
+      recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
     },
     {
       id: 'prod-medicine',
@@ -387,9 +454,13 @@ export function makeDefaultProducts(): MockProductType[] {
       industry: 'HEALTHCARE',
       basePrice: 50,
       baseCraftTicks: 3,
+      outputQuantity: 8,
+      energyConsumptionMwh: 1,
+      unitName: 'Bottle',
+      unitSymbol: 'bottles',
       isProOnly: false,
       description: 'Essential pharma product.',
-      recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals' }, quantity: 2 }],
+      recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
     },
   ]
 }
@@ -597,6 +668,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             linkUpRight: unit.linkUpRight,
             linkDownLeft: unit.linkDownLeft,
             linkDownRight: unit.linkDownRight,
+            resourceTypeId: unit.resourceTypeId ?? null,
+            productTypeId: unit.productTypeId ?? null,
+            minPrice: unit.minPrice ?? null,
+            maxPrice: unit.maxPrice ?? null,
+            purchaseSource: unit.purchaseSource ?? null,
+            saleVisibility: unit.saleVisibility ?? null,
+            budget: unit.budget ?? null,
+            mediaHouseBuildingId: unit.mediaHouseBuildingId ?? null,
+            minQuality: unit.minQuality ?? null,
+            brandScope: unit.brandScope ?? null,
+            vendorLockCompanyId: unit.vendorLockCompanyId ?? null,
           } satisfies MockBuildingUnit]
         }),
       )
@@ -726,6 +808,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { storeBuildingConfiguration: building.pendingConfiguration } }),
+      })
+    }
+
+    if (query.includes('SetBuildingForSale') || query.includes('setBuildingForSale')) {
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
+
+      if (!building) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building not found' }] }) })
+      }
+
+      building.isForSale = input.isForSale
+      building.askingPrice = input.isForSale ? input.askingPrice : null
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setBuildingForSale: { id: building.id, isForSale: building.isForSale, askingPrice: building.askingPrice } } }),
       })
     }
 

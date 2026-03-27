@@ -86,6 +86,17 @@ export interface BuildingConfigurationPlanUnit {
   ticksRequired: number
   isChanged: boolean
   isReverting: boolean
+  resourceTypeId: string | null
+  productTypeId: string | null
+  minPrice: number | null
+  maxPrice: number | null
+  purchaseSource: string | null
+  saleVisibility: string | null
+  budget: number | null
+  mediaHouseBuildingId: string | null
+  minQuality: number | null
+  brandScope: string | null
+  vendorLockCompanyId: string | null
 }
 
 export interface BuildingConfigurationPlanRemoval {
@@ -114,6 +125,17 @@ export interface BuildingUnit {
   linkUpRight: boolean
   linkDownLeft: boolean
   linkDownRight: boolean
+  resourceTypeId: string | null
+  productTypeId: string | null
+  minPrice: number | null
+  maxPrice: number | null
+  purchaseSource: string | null
+  saleVisibility: string | null
+  budget: number | null
+  mediaHouseBuildingId: string | null
+  minQuality: number | null
+  brandScope: string | null
+  vendorLockCompanyId: string | null
 }
 
 /** Matches backend ApplicationUser entity */
@@ -210,7 +232,16 @@ export interface Resource {
 }
 
 export interface ResourceType {
+  id: string
   name: string
+  slug: string
+  category: string
+  basePrice: number
+  weightPerUnit: number
+  unitName: string
+  unitSymbol: string
+  imageUrl: string | null
+  description: string | null
 }
 
 export interface ProductType {
@@ -220,12 +251,17 @@ export interface ProductType {
   industry: string
   basePrice: number
   baseCraftTicks: number
-  description: string
+  outputQuantity: number
+  energyConsumptionMwh: number
+  unitName: string
+  unitSymbol: string
+  description: string | null
   recipes: Recipe[]
 }
 
 export interface Recipe {
-  resourceType: ResourceType
+  resourceType: ResourceType | null
+  inputProductType: Pick<ProductType, 'id' | 'name' | 'slug' | 'unitName' | 'unitSymbol'> | null
   quantity: number
 }
 

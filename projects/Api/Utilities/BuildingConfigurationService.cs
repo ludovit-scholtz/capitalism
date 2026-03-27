@@ -15,6 +15,9 @@ public static class BuildingConfigurationService
     public const int UnitPlanChangeTicks = 3;
     private const decimal CancelTicksMultiplier = 0.1m;
 
+    /// <summary>Normalizes null and empty strings to null for consistent comparison.</summary>
+    private static string? NormalizeString(string? value) => string.IsNullOrEmpty(value) ? null : value;
+
     public static async Task<BuildingConfigurationPlan> StoreConfigurationAsync(
         AppDbContext db,
         Building building,
@@ -173,6 +176,17 @@ public static class BuildingConfigurationService
                 liveUnit.LinkUpRight = pendingUnit.LinkUpRight;
                 liveUnit.LinkDownLeft = pendingUnit.LinkDownLeft;
                 liveUnit.LinkDownRight = pendingUnit.LinkDownRight;
+                liveUnit.ResourceTypeId = pendingUnit.ResourceTypeId;
+                liveUnit.ProductTypeId = pendingUnit.ProductTypeId;
+                liveUnit.MinPrice = pendingUnit.MinPrice;
+                liveUnit.MaxPrice = pendingUnit.MaxPrice;
+                liveUnit.PurchaseSource = pendingUnit.PurchaseSource;
+                liveUnit.SaleVisibility = pendingUnit.SaleVisibility;
+                liveUnit.Budget = pendingUnit.Budget;
+                liveUnit.MediaHouseBuildingId = pendingUnit.MediaHouseBuildingId;
+                liveUnit.MinQuality = pendingUnit.MinQuality;
+                liveUnit.BrandScope = pendingUnit.BrandScope;
+                liveUnit.VendorLockCompanyId = pendingUnit.VendorLockCompanyId;
 
                 pendingUnit.StartedAtTick = currentTick;
                 pendingUnit.AppliesAtTick = currentTick;
@@ -319,6 +333,17 @@ public static class BuildingConfigurationService
             TicksRequired = ticksRequired,
             IsChanged = isChanged || ticksRequired > 0,
             IsReverting = isReverting,
+            ResourceTypeId = input.ResourceTypeId,
+            ProductTypeId = input.ProductTypeId,
+            MinPrice = input.MinPrice,
+            MaxPrice = input.MaxPrice,
+            PurchaseSource = input.PurchaseSource,
+            SaleVisibility = input.SaleVisibility,
+            Budget = input.Budget,
+            MediaHouseBuildingId = input.MediaHouseBuildingId,
+            MinQuality = input.MinQuality,
+            BrandScope = input.BrandScope,
+            VendorLockCompanyId = input.VendorLockCompanyId,
         };
     }
 
@@ -345,6 +370,17 @@ public static class BuildingConfigurationService
             TicksRequired = unit.TicksRequired,
             IsChanged = unit.IsChanged,
             IsReverting = unit.IsReverting,
+            ResourceTypeId = unit.ResourceTypeId,
+            ProductTypeId = unit.ProductTypeId,
+            MinPrice = unit.MinPrice,
+            MaxPrice = unit.MaxPrice,
+            PurchaseSource = unit.PurchaseSource,
+            SaleVisibility = unit.SaleVisibility,
+            Budget = unit.Budget,
+            MediaHouseBuildingId = unit.MediaHouseBuildingId,
+            MinQuality = unit.MinQuality,
+            BrandScope = unit.BrandScope,
+            VendorLockCompanyId = unit.VendorLockCompanyId,
         };
     }
 
@@ -408,6 +444,21 @@ public static class BuildingConfigurationService
             return LinkChangeTicks;
         }
 
+        if (currentUnit.ResourceTypeId != input.ResourceTypeId
+            || currentUnit.ProductTypeId != input.ProductTypeId
+            || currentUnit.MinPrice != input.MinPrice
+            || currentUnit.MaxPrice != input.MaxPrice
+            || !string.Equals(NormalizeString(currentUnit.PurchaseSource), NormalizeString(input.PurchaseSource), StringComparison.Ordinal)
+            || !string.Equals(NormalizeString(currentUnit.SaleVisibility), NormalizeString(input.SaleVisibility), StringComparison.Ordinal)
+            || currentUnit.Budget != input.Budget
+            || currentUnit.MediaHouseBuildingId != input.MediaHouseBuildingId
+            || currentUnit.MinQuality != input.MinQuality
+            || !string.Equals(NormalizeString(currentUnit.BrandScope), NormalizeString(input.BrandScope), StringComparison.Ordinal)
+            || currentUnit.VendorLockCompanyId != input.VendorLockCompanyId)
+        {
+            return LinkChangeTicks;
+        }
+
         return 0;
     }
 
@@ -433,7 +484,18 @@ public static class BuildingConfigurationService
             && currentUnit.LinkUpLeft == desiredUnit.LinkUpLeft
             && currentUnit.LinkUpRight == desiredUnit.LinkUpRight
             && currentUnit.LinkDownLeft == desiredUnit.LinkDownLeft
-            && currentUnit.LinkDownRight == desiredUnit.LinkDownRight;
+            && currentUnit.LinkDownRight == desiredUnit.LinkDownRight
+            && currentUnit.ResourceTypeId == desiredUnit.ResourceTypeId
+            && currentUnit.ProductTypeId == desiredUnit.ProductTypeId
+            && currentUnit.MinPrice == desiredUnit.MinPrice
+            && currentUnit.MaxPrice == desiredUnit.MaxPrice
+            && string.Equals(NormalizeString(currentUnit.PurchaseSource), NormalizeString(desiredUnit.PurchaseSource), StringComparison.Ordinal)
+            && string.Equals(NormalizeString(currentUnit.SaleVisibility), NormalizeString(desiredUnit.SaleVisibility), StringComparison.Ordinal)
+            && currentUnit.Budget == desiredUnit.Budget
+            && currentUnit.MediaHouseBuildingId == desiredUnit.MediaHouseBuildingId
+            && currentUnit.MinQuality == desiredUnit.MinQuality
+            && string.Equals(NormalizeString(currentUnit.BrandScope), NormalizeString(desiredUnit.BrandScope), StringComparison.Ordinal)
+            && currentUnit.VendorLockCompanyId == desiredUnit.VendorLockCompanyId;
     }
 
     private static bool AreEquivalent(BuildingConfigurationPlanUnit pendingUnit, BuildingConfigurationUnitInput desiredUnit)
@@ -448,7 +510,18 @@ public static class BuildingConfigurationService
             && pendingUnit.LinkUpLeft == desiredUnit.LinkUpLeft
             && pendingUnit.LinkUpRight == desiredUnit.LinkUpRight
             && pendingUnit.LinkDownLeft == desiredUnit.LinkDownLeft
-            && pendingUnit.LinkDownRight == desiredUnit.LinkDownRight;
+            && pendingUnit.LinkDownRight == desiredUnit.LinkDownRight
+            && pendingUnit.ResourceTypeId == desiredUnit.ResourceTypeId
+            && pendingUnit.ProductTypeId == desiredUnit.ProductTypeId
+            && pendingUnit.MinPrice == desiredUnit.MinPrice
+            && pendingUnit.MaxPrice == desiredUnit.MaxPrice
+            && string.Equals(NormalizeString(pendingUnit.PurchaseSource), NormalizeString(desiredUnit.PurchaseSource), StringComparison.Ordinal)
+            && string.Equals(NormalizeString(pendingUnit.SaleVisibility), NormalizeString(desiredUnit.SaleVisibility), StringComparison.Ordinal)
+            && pendingUnit.Budget == desiredUnit.Budget
+            && pendingUnit.MediaHouseBuildingId == desiredUnit.MediaHouseBuildingId
+            && pendingUnit.MinQuality == desiredUnit.MinQuality
+            && string.Equals(NormalizeString(pendingUnit.BrandScope), NormalizeString(desiredUnit.BrandScope), StringComparison.Ordinal)
+            && pendingUnit.VendorLockCompanyId == desiredUnit.VendorLockCompanyId;
     }
 
     private static bool IsPending(BuildingConfigurationPlanUnit unit, long currentTick)

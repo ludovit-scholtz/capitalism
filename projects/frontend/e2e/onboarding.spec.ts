@@ -110,6 +110,96 @@ test.describe('Onboarding wizard', () => {
     await expect(page).toHaveURL('/dashboard')
   })
 
+  test('renders mixed resource and intermediate-product recipes without runtime errors', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      productTypes: [
+        {
+          id: 'prod-chair',
+          name: 'Wooden Chair',
+          slug: 'wooden-chair',
+          industry: 'FURNITURE',
+          basePrice: 45,
+          baseCraftTicks: 2,
+          outputQuantity: 20,
+          energyConsumptionMwh: 1,
+          unitName: 'Chair',
+          unitSymbol: 'chairs',
+          isProOnly: false,
+          description: 'Starter furniture product.',
+          recipes: [
+            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', imageUrl: null, description: 'Wood' }, inputProductType: null, quantity: 1 },
+          ],
+        },
+        {
+          id: 'prod-components',
+          name: 'Electronic Components',
+          slug: 'electronic-components',
+          industry: 'ELECTRONICS',
+          basePrice: 50,
+          baseCraftTicks: 3,
+          outputQuantity: 16,
+          energyConsumptionMwh: 1.2,
+          unitName: 'Pack',
+          unitSymbol: 'packs',
+          isProOnly: false,
+          description: 'Intermediate electronics input.',
+          recipes: [],
+        },
+        {
+          id: 'prod-electronic-table',
+          name: 'Electronic Table',
+          slug: 'electronic-table',
+          industry: 'FURNITURE',
+          basePrice: 520,
+          baseCraftTicks: 6,
+          outputQuantity: 1,
+          energyConsumptionMwh: 2,
+          unitName: 'Piece',
+          unitSymbol: 'pcs',
+          isProOnly: false,
+          description: 'Smart table with electronics.',
+          recipes: [
+            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', imageUrl: null, description: 'Wood' }, inputProductType: null, quantity: 1 },
+            { resourceType: null, inputProductType: { id: 'prod-components', name: 'Electronic Components', slug: 'electronic-components', unitName: 'Pack', unitSymbol: 'packs' }, quantity: 10 },
+          ],
+        },
+      ],
+    })
+
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    const pageErrors: string[] = []
+    page.on('pageerror', (error) => {
+      pageErrors.push(error.message)
+    })
+
+    await page.goto('/onboarding')
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Name Your Company & Pick a Product' })).toBeVisible()
+    await expect(page.locator('.product-card')).toHaveCount(1)
+    await expect(page.locator('.product-card', { hasText: 'Wooden Chair' })).toBeVisible()
+    expect(pageErrors).toEqual([])
+
+    await page.getByLabel('Company Name').fill('Mixed Recipe Corp')
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await page.getByRole('button', { name: 'Start Playing' }).click()
+    await page.waitForURL('/dashboard')
+    await expect(page).toHaveURL('/dashboard')
+    expect(pageErrors).toEqual([])
+  })
+
   test('step 1 Next button disabled until industry selected', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -130,6 +220,27 @@ test.describe('Onboarding wizard', () => {
     // Select industry
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
     await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled()
+  })
+
+  test('shows only the simple starter product for the selected industry', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/onboarding')
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.locator('.product-card')).toHaveCount(1)
+    await expect(page.locator('.product-card')).toContainText('Wooden Chair')
   })
 
   test('back button navigates to previous step', async ({ page }) => {
@@ -235,9 +346,11 @@ test.describe('Full onboarding journey', () => {
     await page.getByLabel('Password').fill('TestPass1!')
     await page.getByRole('button', { name: 'Create Account' }).first().click()
     await page.waitForURL('/')
+    await page.waitForFunction(() => !!localStorage.getItem('auth_token'))
 
     // Go to onboarding
     await page.goto('/onboarding')
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
     // Step 1: Choose industry
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()

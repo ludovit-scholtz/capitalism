@@ -192,4 +192,561 @@ test.describe('Building detail upgrades', () => {
     await getGridCell(refreshedPlannedSection, 1, 0).click()
     await expect(page.getByText('Down-Left')).toBeVisible()
   })
+
+  test('shows unit configuration panel with type-specific settings', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-1',
+      playerId: player.id,
+      name: 'Config Test Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-cfg',
+          companyId: 'company-1',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Config Test Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'cu-1',
+              buildingId: 'building-cfg',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'cu-2',
+              buildingId: 'building-cfg',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'cu-3',
+              buildingId: 'building-cfg',
+              unitType: 'STORAGE',
+              gridX: 2,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-cfg')
+    await expect(page.getByRole('heading', { name: 'Config Test Factory' })).toBeVisible()
+
+    // Click "Edit Building"
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+
+    // Click on the Purchase unit to see its config
+    await getGridCell(plannedSection, 0, 0).click()
+    await expect(page.getByText('Unit Configuration')).toBeVisible()
+    await expect(page.getByText('Unit Settings')).toBeVisible()
+    await expect(page.getByText('Input Item')).toBeVisible()
+    await expect(page.getByText('Max Price')).toBeVisible()
+    await expect(page.getByText('Purchase Source')).toBeVisible()
+
+    // Click on Manufacturing unit
+    await getGridCell(plannedSection, 1, 0).click()
+    await expect(page.getByText('Product Type').first()).toBeVisible()
+
+    // Click on Storage unit
+    await getGridCell(plannedSection, 2, 0).click()
+    await expect(page.getByText('Unit Settings')).toBeVisible()
+  })
+
+  test('shows configuration warnings for unconfigured units', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-w',
+      playerId: player.id,
+      name: 'Warning Test Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-warn',
+          companyId: 'company-w',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Warning Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'wu-1',
+              buildingId: 'building-warn',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'wu-2',
+              buildingId: 'building-warn',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-warn')
+    await expect(page.getByRole('heading', { name: 'Warning Factory' })).toBeVisible()
+
+    // Warnings should be visible for unconfigured units
+    await expect(page.getByText('Configuration Warnings')).toBeVisible()
+    await expect(page.getByText('Purchase unit at (0, 0) has no resource or product selected.')).toBeVisible()
+    await expect(page.getByText('Manufacturing unit at (1, 0) has no product type set.')).toBeVisible()
+    await expect(page.getByText('Purchase unit at (0, 0) is not linked to a consumer unit.')).toBeVisible()
+    await expect(page.getByText('Manufacturing unit at (1, 0) is not linked to a storage or sales output.')).toBeVisible()
+  })
+
+  test('shows sell building dialog and updates sale status', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-s',
+      playerId: player.id,
+      name: 'Sell Test Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-sell',
+          companyId: 'company-s',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Selling Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sell')
+    await expect(page.getByRole('heading', { name: 'Selling Factory' })).toBeVisible()
+    await expect(page.getByText('Not For Sale')).toBeVisible()
+
+    // Click sell button
+    await page.getByRole('button', { name: 'Sell Building' }).click()
+    await expect(page.getByText('Asking Price ($)')).toBeVisible()
+
+    // Fill in price and list for sale
+    await page.locator('.sale-dialog .form-input').fill('100000')
+    await page.getByRole('button', { name: 'List for Sale' }).click()
+
+    // Should update to show "For Sale" in the meta pill
+    await expect(page.locator('.meta-pill.for-sale')).toBeVisible()
+  })
+
+  test('shows read-only unit details when clicking active grid cells', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-ro',
+      playerId: player.id,
+      name: 'Readonly Test Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-ro',
+          companyId: 'company-ro',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Readonly Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'ro-1',
+              buildingId: 'building-ro',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 2,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              maxPrice: 500,
+              purchaseSource: 'EXCHANGE',
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ro')
+    await expect(page.getByRole('heading', { name: 'Readonly Factory' })).toBeVisible()
+
+    // Click on the Purchase unit in the active grid to see read-only details
+    const activeSection = getGridSection(page, 'Current Configuration')
+    await getGridCell(activeSection, 0, 0).click()
+    await expect(page.getByText('Unit Details')).toBeVisible()
+    await expect(page.getByText('Lv.2')).toBeVisible()
+    await expect(page.getByText('Max Price: $500')).toBeVisible()
+    await expect(page.getByText('Purchase Source: EXCHANGE')).toBeVisible()
+  })
+
+  test('factory purchase selector shows raw materials and only intermediate products', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-advanced',
+      playerId: player.id,
+      name: 'Advanced Selector Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-advanced',
+          companyId: 'company-advanced',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Advanced Selector Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'adv-1',
+              buildingId: 'building-advanced',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'adv-2',
+              buildingId: 'building-advanced',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player],
+      resourceTypes: [
+        { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', description: 'Wood', imageUrl: null },
+      ],
+      productTypes: [
+        {
+          id: 'prod-components',
+          name: 'Electronic Components',
+          slug: 'electronic-components',
+          industry: 'ELECTRONICS',
+          basePrice: 50,
+          baseCraftTicks: 3,
+          outputQuantity: 16,
+          energyConsumptionMwh: 1.2,
+          unitName: 'Pack',
+          unitSymbol: 'packs',
+          isProOnly: false,
+          description: 'Intermediate electronics input.',
+          recipes: [],
+        },
+        {
+          id: 'prod-electronic-table',
+          name: 'Electronic Table',
+          slug: 'electronic-table',
+          industry: 'FURNITURE',
+          basePrice: 520,
+          baseCraftTicks: 6,
+          outputQuantity: 1,
+          energyConsumptionMwh: 2,
+          unitName: 'Piece',
+          unitSymbol: 'pcs',
+          isProOnly: false,
+          description: 'Smart table.',
+          recipes: [
+            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 },
+            { resourceType: null, inputProductType: { id: 'prod-components', name: 'Electronic Components', slug: 'electronic-components', unitName: 'Pack', unitSymbol: 'packs' }, quantity: 10 },
+          ],
+        },
+        {
+          id: 'prod-chair-final',
+          name: 'Wooden Chair',
+          slug: 'wooden-chair',
+          industry: 'FURNITURE',
+          basePrice: 45,
+          baseCraftTicks: 2,
+          outputQuantity: 20,
+          energyConsumptionMwh: 1,
+          unitName: 'Chair',
+          unitSymbol: 'chairs',
+          isProOnly: false,
+          description: 'Final product not used as ingredient.',
+          recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+        },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-advanced')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    await expect(page.getByText('Input Item')).toBeVisible()
+    await expect(page.getByText('Electronic Components')).toBeVisible()
+    await expect(page.getByText('Wooden Chair')).toHaveCount(0)
+  })
+
+  test('manufacturing selector only shows outputs supported by linked inputs', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-linked',
+      playerId: player.id,
+      name: 'Linked Inputs Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-linked',
+          companyId: 'company-linked',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Linked Inputs Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'linked-purchase',
+              buildingId: 'building-linked',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-grain',
+            },
+            {
+              id: 'linked-manufacturing',
+              buildingId: 'building-linked',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player],
+      resourceTypes: [
+        { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC', basePrice: 5, weightPerUnit: 2, unitName: 'Ton', unitSymbol: 't', description: 'Grain', imageUrl: null },
+        { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', description: 'Wood', imageUrl: null },
+      ],
+      productTypes: [
+        {
+          id: 'prod-bread-linked',
+          name: 'Bread',
+          slug: 'bread',
+          industry: 'FOOD_PROCESSING',
+          basePrice: 3,
+          baseCraftTicks: 1,
+          outputQuantity: 12,
+          energyConsumptionMwh: 0.5,
+          unitName: 'Loaf',
+          unitSymbol: 'loaves',
+          isProOnly: false,
+          description: 'Bread from grain.',
+          recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+        },
+        {
+          id: 'prod-chair-linked',
+          name: 'Wooden Chair',
+          slug: 'wooden-chair',
+          industry: 'FURNITURE',
+          basePrice: 45,
+          baseCraftTicks: 2,
+          outputQuantity: 20,
+          energyConsumptionMwh: 1,
+          unitName: 'Chair',
+          unitSymbol: 'chairs',
+          isProOnly: false,
+          description: 'Chair from wood.',
+          recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+        },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-linked')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 1, 0).click()
+
+    await expect(page.getByText('Output Product')).toBeVisible()
+    const breadOption = page.getByRole('button', { name: /Bread/ })
+    await expect(breadOption).toBeVisible()
+    await expect(page.getByRole('button', { name: /Wooden Chair/ })).toHaveCount(0)
+    await breadOption.click()
+    await expect(page.locator('.selected-chip')).toContainText('Bread')
+  })
 })
