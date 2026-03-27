@@ -75,6 +75,22 @@ Public sales unit - allows to sell products directly to general public. The sale
 
 Each change - new building, change of the building unit plan, or upgrade of the unit takes specific number of ticks to be executed.
 
+Backend handles tick based resolution of actions. Tick system runs in loop every N seconds configured in the app and defaults to 10 seconds. Tick system must be very efficient and be able to handle 1000 concurrent users and 20000 buildings and 500000 units to be handled in less then one second.
+
+Tick base system handles mainly
+- Sale of the resources to the public
+- Paying rent
+- Moving resources between storage capacity of the units if the move is possible
+- Mining operations
+- Purchasing resources at the purchase units
+- Marketing - payment to media houses and brand improvements
+- Research and developemnt updates
+- Handling upgrade of the units and changes in the unit links
+- New building availability 
+- Ranking recalculation
+
+Frontend integration to tick resolution must be seamless. User should see next tick calculation visible on the website and should see estimate in real time when he is waiting for some action for example the wait for the building.
+
 ## Building modification
 
 Building unit configuration can be modified. User can edit the building and prepare all building modifications on frontend. When building is done being modified by user, user confirms his selection. Each unit can have different suspend time. For example upgrade unit from level 1 to 2 may take 10 ticks. Upgrade from level 2 to 3 may take 100 ticks. Upgrade from level 3 to 4 may take 1000 ticks. Change in the links between the units takes one tick to apply. Each item the unit or link acts separately. User cannot change the building attributes directly. Everything must be scheduled by the tick resolve engine.
