@@ -3,10 +3,12 @@ using System.Text;
 using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
+using Api.Engine;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Api.Tests;
 
@@ -2654,6 +2656,287 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.Equal("BRAND_QUALITY_PRODUCT_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    #endregion
+
+    #region Company Ledger & Public Sales Analytics
+
+    [Fact]
+    public async Task CompanyLedger_EmptyCompany_ReturnsZeroTotals()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-empty@test.com", "LedgerEmpty");
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+              createCompany(input: $input) { id name cash }
+            }
+            """,
+            new { input = new { name = "Empty Ledger Co" } },
+            token);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var ledgerResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ companyId companyName currentCash totalRevenue totalPurchasingCosts totalPropertyPurchases netIncome totalAssets buildingSummaries {{ buildingId buildingName revenue costs }} }} }}",
+            token: token);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.Equal(companyId, ledger.GetProperty("companyId").GetString());
+        Assert.Equal("Empty Ledger Co", ledger.GetProperty("companyName").GetString());
+        Assert.True(ledger.GetProperty("currentCash").GetDecimal() > 0);
+        Assert.Equal(0m, ledger.GetProperty("totalRevenue").GetDecimal());
+        Assert.Equal(0m, ledger.GetProperty("totalPurchasingCosts").GetDecimal());
+        Assert.Equal(0m, ledger.GetProperty("totalPropertyPurchases").GetDecimal());
+        Assert.Equal(0m, ledger.GetProperty("netIncome").GetDecimal());
+        Assert.True(ledger.GetProperty("totalAssets").GetDecimal() > 0);
+    }
+
+    [Fact]
+    public async Task CompanyLedger_AfterPropertyPurchase_ShowsPropertyCosts()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-prop@test.com", "LedgerProp");
+        var (companyId, _, cityId0, _) = await StartOnboardingCompanyAsync(token, "Ledger Prop Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId0, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var ledgerResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ totalPropertyPurchases totalAssets currentCash }} }}",
+            token: token);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.True(ledger.GetProperty("totalPropertyPurchases").GetDecimal() > 0,
+            "TotalPropertyPurchases should be > 0 after onboarding lot purchases");
+        Assert.True(ledger.GetProperty("totalAssets").GetDecimal() > 0);
+    }
+
+    [Fact]
+    public async Task LedgerDrillDown_PropertyPurchase_ReturnsEntries()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-drilldown@test.com", "LedgerDrillDown");
+        var (companyId, _, cityId1, _) = await StartOnboardingCompanyAsync(token, "DrillDown Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId1, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var drillResult = await ExecuteGraphQlAsync(
+            $"{{ ledgerDrillDown(companyId: \"{companyId}\", category: \"PROPERTY_PURCHASE\") {{ id category description amount recordedAtTick buildingId buildingName }} }}",
+            token: token);
+
+        var entries = drillResult.GetProperty("data").GetProperty("ledgerDrillDown").EnumerateArray().ToList();
+        Assert.True(entries.Count >= 2, "Should have at least 2 PROPERTY_PURCHASE entries (factory + shop)");
+        Assert.All(entries, e =>
+        {
+            Assert.Equal("PROPERTY_PURCHASE", e.GetProperty("category").GetString());
+            Assert.True(e.GetProperty("amount").GetDecimal() < 0, "Property purchase amounts should be negative");
+        });
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_EmptyUnit_ReturnsEmptyHistory()
+    {
+        var token = await RegisterAndGetTokenAsync("analytics-empty@test.com", "AnalyticsEmpty");
+        var (companyId2, _, cityId2, _) = await StartOnboardingCompanyAsync(token, "Analytics Empty Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId2, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ buildingUnitId totalRevenue totalQuantitySold revenueHistory {{ tick revenue }} priceHistory {{ tick pricePerUnit }} marketShare {{ label share }} }} }}",
+            token: token);
+
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.Equal(unit.Id.ToString(), analytics.GetProperty("buildingUnitId").GetString());
+        Assert.Equal(0m, analytics.GetProperty("totalRevenue").GetDecimal());
+        Assert.Equal(0m, analytics.GetProperty("totalQuantitySold").GetDecimal());
+        Assert.Equal(0, analytics.GetProperty("revenueHistory").GetArrayLength());
+        Assert.Equal(0, analytics.GetProperty("priceHistory").GetArrayLength());
+        Assert.Equal(0, analytics.GetProperty("marketShare").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task CompanyLedger_RequiresOwnership_ForbidsOtherPlayer()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync("ledger-owner@test.com", "LedgerOwner");
+        var result = await ExecuteGraphQlAsync(
+            """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+            new { input = new { name = "Owner Co" } },
+            ownerToken);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var otherToken = await RegisterAndGetTokenAsync("ledger-other@test.com", "LedgerOther");
+        var ledgerResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ companyId }} }}",
+            token: otherToken);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.Equal(JsonValueKind.Null, ledger.ValueKind);
+    }
+
+    [Fact]
+    public async Task MarketingPhase_RecordsMarketingLedgerEntry()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Seed: company with a sales shop, marketing unit, and linked public-sales unit.
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"mktg-ledger-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Marketing Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Marketing Corp",
+            Cash = 500_000m
+        };
+        db.Companies.Add(company);
+
+        var shop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Marketing Shop",
+            Level = 1
+        };
+        db.Buildings.Add(shop);
+
+        var salesUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0, GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice
+        };
+        var marketingUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.Marketing,
+            GridX = 1, GridY = 0,
+            Level = 1,
+            Budget = 1_000m,
+            LinkRight = false
+        };
+        db.BuildingUnits.AddRange(salesUnit, marketingUnit);
+        await db.SaveChangesAsync();
+
+        var cashBefore = company.Cash;
+        var ledgerCountBefore = await db.LedgerEntries
+            .CountAsync(e => e.CompanyId == company.Id && e.Category == LedgerCategory.Marketing);
+
+        // Run one tick to trigger the marketing phase.
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var logger = new NullLogger<TickProcessor>();
+        var processor = new TickProcessor(db, phases, logger);
+        await processor.ProcessTickAsync();
+
+        var marketingEntries = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.Marketing)
+            .ToListAsync();
+
+        Assert.True(marketingEntries.Count > ledgerCountBefore,
+            "Marketing phase should have added a MARKETING ledger entry.");
+        Assert.All(marketingEntries, e =>
+        {
+            Assert.Equal(LedgerCategory.Marketing, e.Category);
+            Assert.True(e.Amount < 0, "Marketing ledger amount should be negative (debit).");
+            Assert.Equal(shop.Id, e.BuildingId);
+            Assert.Equal(marketingUnit.Id, e.BuildingUnitId);
+        });
+        Assert.True(company.Cash < cashBefore,
+            "Company cash should decrease after marketing spend.");
+    }
+
+    [Fact]
+    public async Task CompanyLedger_AfterMarketingTick_ReflectsMarketingCosts()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-mktg@test.com", "LedgerMktg");
+        var result = await ExecuteGraphQlAsync(
+            """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+            new { input = new { name = "Mktg Ledger Co" } },
+            token);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var companyGuid = Guid.Parse(companyId);
+
+        // Build a shop with a marketing unit directly in DB.
+        var shop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyGuid,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Mktg Shop",
+            Level = 1
+        };
+        db.Buildings.Add(shop);
+
+        var salesUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0, GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice
+        };
+        var marketingUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.Marketing,
+            GridX = 1, GridY = 0,
+            Level = 1,
+            Budget = 2_000m
+        };
+        db.BuildingUnits.AddRange(salesUnit, marketingUnit);
+        await db.SaveChangesAsync();
+
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var logger = new NullLogger<TickProcessor>();
+        var processor = new TickProcessor(db, phases, logger);
+        await processor.ProcessTickAsync();
+
+        var ledgerResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ totalMarketingCosts netIncome cashFromOperations }} }}",
+            token: token);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.True(ledger.GetProperty("totalMarketingCosts").GetDecimal() > 0,
+            "totalMarketingCosts should be > 0 after a tick with a configured marketing unit.");
+        // Net income accounts for marketing cost (negative contribution).
+        // cashFromOperations should also reflect the marketing debit.
+        Assert.True(ledger.GetProperty("cashFromOperations").GetDecimal() < 0,
+            "cashFromOperations should be negative when marketing spend exceeds zero revenue.");
     }
 
     #endregion
