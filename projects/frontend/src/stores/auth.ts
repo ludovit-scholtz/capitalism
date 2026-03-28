@@ -61,6 +61,8 @@ export const useAuthStore = defineStore('auth', () => {
               onboardingCityId
               onboardingCompanyId
               onboardingFactoryLotId
+              onboardingShopBuildingId
+              onboardingFirstSaleCompletedAtUtc
               proSubscriptionEndsAtUtc
               companies { id name cash }
             }
@@ -98,6 +100,8 @@ export const useAuthStore = defineStore('auth', () => {
               onboardingCityId
               onboardingCompanyId
               onboardingFactoryLotId
+              onboardingShopBuildingId
+              onboardingFirstSaleCompletedAtUtc
               proSubscriptionEndsAtUtc
               companies { id name cash }
             }
@@ -132,6 +136,8 @@ export const useAuthStore = defineStore('auth', () => {
             onboardingCityId
             onboardingCompanyId
             onboardingFactoryLotId
+            onboardingShopBuildingId
+            onboardingFirstSaleCompletedAtUtc
             proSubscriptionEndsAtUtc
             companies { id name cash }
           }

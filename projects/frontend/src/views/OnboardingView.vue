@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
@@ -16,6 +16,7 @@ import { useAuthStore } from '@/stores/auth'
 import type {
   BuildingLot,
   City,
+  GameState,
   OnboardingResult,
   OnboardingStartResult,
   ProductType,
@@ -134,6 +135,8 @@ const offerLoading = ref(false)
 const offerError = ref<string | null>(null)
 const offerMessage = ref<string | null>(null)
 const onboardingCompanyCash = ref<number | null>(null)
+const milestoneLoading = ref(false)
+const milestoneError = ref<string | null>(null)
 
 const industries = ref<string[]>([])
 const cities = ref<City[]>([])
@@ -149,6 +152,9 @@ const companyName = ref('')
 
 const completionResult = ref<OnboardingResult | null>(null)
 const startupPackOffer = ref<StartupPackOffer | null>(null)
+const gameState = ref<GameState | null>(null)
+const tickCountdown = ref<string | null>(null)
+let tickCountdownInterval: number | null = null
 
 const selectedCity = computed(() => cities.value.find((city) => city.id === selectedCityId.value) ?? null)
 const selectedProduct = computed(() => products.value.find((product) => product.id === selectedProductId.value) ?? null)
@@ -229,6 +235,28 @@ const expiredStartupPackOffer = computed(() =>
   startupPackOffer.value?.status === 'EXPIRED' ? startupPackOffer.value : null,
 )
 
+/**
+ * True when the player has completed the lot flow but has not yet completed
+ * the first-sale milestone. In this state the configure-guide step (step 5)
+ * should be shown even after a page refresh.
+ */
+const isResumingConfigureStep = computed(() =>
+  !!auth.player?.onboardingCompletedAtUtc
+  && !auth.player.onboardingFirstSaleCompletedAtUtc
+  && !!auth.player.onboardingShopBuildingId,
+)
+
+/** Building ID for the "Configure My Sales Shop" CTA. Works both in-session and after resume. */
+const shopBuildingId = computed(() =>
+  completionResult.value?.salesShop.id ?? auth.player?.onboardingShopBuildingId ?? null,
+)
+
+/** Cash balance to show in the configure-guide panel. Works in-session and after resume. */
+const configureGuideCash = computed(() => {
+  if (completionResult.value) return completionResult.value.company.cash
+  return auth.player?.companies[0]?.cash ?? 0
+})
+
 const industryIcons: Record<string, string> = {
   FURNITURE: '🪑',
   FOOD_PROCESSING: '🍞',
@@ -259,6 +287,7 @@ function keyToStep(value: unknown): number {
 
 function getMaxReachableStep(): number {
   if (completionResult.value) return 5
+  if (isResumingConfigureStep.value) return 5
   if (auth.player?.onboardingCurrentStep === 'SHOP_SELECTION') return 4
   if (selectedCityId.value) return 3
   if (selectedIndustry.value) return 2
@@ -396,8 +425,24 @@ onMounted(async () => {
     await auth.fetchMe()
   }
 
-  if (auth.player?.onboardingCompletedAtUtc && auth.player.companies.length > 0) {
+  if (auth.player?.onboardingFirstSaleCompletedAtUtc) {
+    // Fully done with onboarding — go straight to dashboard
     router.push('/dashboard')
+    return
+  }
+
+  if (auth.player?.onboardingCompletedAtUtc && !auth.player.onboardingShopBuildingId) {
+    // Legacy players who completed before shop-building tracking was added,
+    // or players whose milestone shop is gone
+    router.push('/dashboard')
+    return
+  }
+
+  if (isResumingConfigureStep.value) {
+    // Player completed the lot flow but hasn't finished the configure-guide step.
+    // Resume at step 5 with the guidance panel visible.
+    await loadGameState()
+    step.value = 5
     return
   }
 
@@ -548,6 +593,7 @@ async function completeOnboarding() {
       trackStartupPackEvent('view', { context: 'onboarding', status: startupPackOffer.value.status })
     }
     step.value = 5
+    await loadGameState()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('onboarding.lotUnavailableBody')
     await auth.fetchMe()
@@ -728,6 +774,27 @@ function formatDateTime(value: string): string {
   }).format(new Date(value))
 }
 
+async function markMilestoneComplete() {
+  milestoneError.value = null
+  milestoneLoading.value = true
+  try {
+    await gqlRequest<{ completeFirstSaleMilestone: { onboardingFirstSaleCompletedAtUtc: string } }>(
+      `mutation {
+        completeFirstSaleMilestone {
+          onboardingFirstSaleCompletedAtUtc
+        }
+      }`,
+    )
+    await auth.fetchMe()
+    stopTickCountdown()
+    router.push('/dashboard')
+  } catch (e: unknown) {
+    milestoneError.value = e instanceof Error ? e.message : t('onboarding.milestoneError')
+  } finally {
+    milestoneLoading.value = false
+  }
+}
+
 function formatTimeRemaining(expiresAtUtc: string): string {
   const diffMs = new Date(expiresAtUtc).getTime() - Date.now()
   if (diffMs <= 0) {
@@ -749,6 +816,58 @@ function formatTimeRemaining(expiresAtUtc: string): string {
 
   return t('startupPack.timeRemainingMinutes', { minutes })
 }
+
+async function loadGameState() {
+  try {
+    const data = await gqlRequest<{ gameState: GameState }>(
+      '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxRate } }',
+    )
+    gameState.value = data.gameState
+    startTickCountdown()
+  } catch {
+    // ignore — tick countdown is best-effort
+  }
+}
+
+function startTickCountdown() {
+  stopTickCountdown()
+  updateTickCountdown()
+  tickCountdownInterval = setInterval(updateTickCountdown, 1000)
+}
+
+function stopTickCountdown() {
+  if (tickCountdownInterval !== null) {
+    clearInterval(tickCountdownInterval)
+    tickCountdownInterval = null
+  }
+}
+
+function updateTickCountdown() {
+  if (!gameState.value) {
+    tickCountdown.value = null
+    return
+  }
+
+  const lastTickMs = new Date(gameState.value.lastTickAtUtc).getTime()
+  const nextTickMs = lastTickMs + gameState.value.tickIntervalSeconds * 1000
+  const remainingMs = nextTickMs - Date.now()
+
+  if (remainingMs <= 0) {
+    tickCountdown.value = t('onboarding.configureStepTickSoon')
+    return
+  }
+
+  const totalSeconds = Math.ceil(remainingMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  const paddedSeconds = String(seconds).padStart(2, '0')
+  const timeStr = minutes > 0 ? minutes + 'm ' + paddedSeconds + 's' : seconds + 's'
+  tickCountdown.value = t('onboarding.configureStepTickNext', { time: timeStr })
+}
+
+onUnmounted(() => {
+  stopTickCountdown()
+})
 </script>
 
 <template>
@@ -1025,13 +1144,13 @@ function formatTimeRemaining(expiresAtUtc: string): string {
         </div>
       </div>
 
-      <div v-if="step === 5 && completionResult" class="step-content completion-step">
+      <div v-if="step === 5 && (completionResult || isResumingConfigureStep)" class="step-content completion-step">
         <div class="completion-hero">
           <h2 class="completion-title">{{ t('onboarding.completionTitle') }}</h2>
           <p class="completion-desc">{{ t('onboarding.completionDesc') }}</p>
         </div>
 
-        <div class="completion-achievements">
+        <div v-if="completionResult" class="completion-achievements">
           <div class="achievement-item">
             <span class="achievement-icon">🏭</span>
             <div class="achievement-text">
@@ -1094,7 +1213,7 @@ function formatTimeRemaining(expiresAtUtc: string): string {
                     {{
                       t('startupPack.cashBenefitBody', {
                         amount: formatCurrency(activeStartupPackOffer.companyCashGrant),
-                        company: completionResult.company.name,
+                        company: completionResult?.company.name ?? '',
                       })
                     }}
                   </p>
@@ -1132,7 +1251,7 @@ function formatTimeRemaining(expiresAtUtc: string): string {
               {{
                 t('startupPack.cashBenefitBody', {
                   amount: formatCurrency(claimedStartupPackOffer.companyCashGrant),
-                  company: completionResult.company.name,
+                  company: completionResult?.company.name ?? '',
                 })
               }}
             </p>
@@ -1144,10 +1263,70 @@ function formatTimeRemaining(expiresAtUtc: string): string {
           </div>
         </section>
 
+        <section class="configure-guide" aria-labelledby="configure-guide-title">
+          <h3 id="configure-guide-title">{{ t('onboarding.configureShopTitle') }}</h3>
+          <p class="configure-guide-desc">{{ t('onboarding.configureShopDesc') }}</p>
+
+          <div class="configure-steps">
+            <article class="configure-step">
+              <span class="configure-step-icon">💰</span>
+              <div class="configure-step-body">
+                <strong>{{ t('onboarding.configureStepCash') }}</strong>
+                <p>{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash) }) }}</p>
+              </div>
+            </article>
+
+            <article class="configure-step">
+              <span class="configure-step-icon">💲</span>
+              <div class="configure-step-body">
+                <strong>{{ t('onboarding.configureStepPrice') }}</strong>
+                <p>{{ t('onboarding.configureStepPriceDesc') }}</p>
+              </div>
+            </article>
+
+            <article class="configure-step">
+              <span class="configure-step-icon">🌐</span>
+              <div class="configure-step-body">
+                <strong>{{ t('onboarding.configureStepPublicSales') }}</strong>
+                <p>{{ t('onboarding.configureStepPublicSalesDesc') }}</p>
+              </div>
+            </article>
+
+            <article class="configure-step">
+              <span class="configure-step-icon">⏱</span>
+              <div class="configure-step-body">
+                <strong>{{ t('onboarding.configureStepTick') }}</strong>
+                <p>{{ t('onboarding.configureStepTickDesc') }}</p>
+                <p v-if="tickCountdown" class="tick-countdown" role="timer">{{ tickCountdown }}</p>
+              </div>
+            </article>
+          </div>
+
+          <div class="configure-cta">
+            <RouterLink v-if="shopBuildingId" :to="'/building/' + shopBuildingId" class="btn btn-primary btn-lg">
+              {{ t('onboarding.configureShopCta') }}
+              <span class="btn-arrow">🏪</span>
+            </RouterLink>
+          </div>
+
+          <div class="milestone-complete">
+            <p class="milestone-complete-hint">{{ t('onboarding.milestoneCompleteHint') }}</p>
+            <button
+              class="btn btn-secondary"
+              :disabled="milestoneLoading"
+              @click="markMilestoneComplete"
+            >
+              {{ milestoneLoading ? t('common.loading') : t('onboarding.milestoneCompleteCta') }}
+              <span v-if="!milestoneLoading" class="btn-arrow">✓</span>
+            </button>
+            <p v-if="milestoneError" class="milestone-error" role="alert">{{ milestoneError }}</p>
+          </div>
+        </section>
+
         <div class="completion-next">
           <h3>{{ t('onboarding.completionNextSteps') }}</h3>
           <div class="completion-actions">
-            <RouterLink to="/dashboard" class="btn btn-primary btn-lg">
+            <RouterLink to="/dashboard" class="btn btn-secondary">
               {{ t('onboarding.completionGoDashboard') }}
               <span class="btn-arrow">→</span>
             </RouterLink>
@@ -1808,11 +1987,104 @@ function formatTimeRemaining(expiresAtUtc: string): string {
   flex-wrap: wrap;
 }
 
+.configure-guide {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.configure-guide h3 {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
+  color: var(--color-primary);
+}
+
+.configure-guide-desc {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 1.25rem;
+}
+
+.configure-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.configure-step {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.configure-step-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.configure-step-body strong {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.configure-step-body p {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.configure-step-body p + p {
+  margin-top: 0.5rem;
+}
+
+.tick-countdown {
+  color: var(--color-secondary) !important;
+  font-weight: 600;
+  font-size: 0.9rem !important;
+}
+
+.configure-cta {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1.5rem;
+}
+
+.milestone-complete {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+
+.milestone-complete-hint {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.milestone-error {
+  font-size: 0.9rem;
+  color: var(--color-error, #ff4757);
+  margin: 0;
+}
+
 @media (max-width: 640px) {
   .industry-grid,
   .city-grid,
   .product-grid,
-  .budget-grid {
+  .budget-grid,
+  .configure-steps {
     grid-template-columns: 1fr;
   }
 
