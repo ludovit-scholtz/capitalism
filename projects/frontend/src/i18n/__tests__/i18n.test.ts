@@ -74,7 +74,8 @@ describe('i18n', () => {
 
     it('returns en when no localStorage value exists', async () => {
       const { detectLocale } = await import('../index')
-      // navigator.languages is not available in vitest, so it falls back to 'en'
+      // Mock navigator.languages to be undefined so it falls back to 'en'
+      vi.stubGlobal('navigator', { languages: undefined })
       const result = detectLocale()
       expect(result).toBe('en')
     })

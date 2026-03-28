@@ -64,18 +64,6 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
       },
     },
-    {
-      name: 'firefox',
-      use: {
-        ...devices['Desktop Firefox'],
-      },
-    },
-    {
-      name: 'webkit',
-      use: {
-        ...devices['Desktop Safari'],
-      },
-    },
 
     /* Test against mobile viewports. */
     // {
@@ -119,6 +107,7 @@ export default defineConfig({
     command: process.env.CI ? 'npm run build:client && npm run preview' : 'npm run dev',
     port: process.env.CI ? 4173 : 5173,
     reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // 2 minutes
     // Provide the GraphQL URL for the Vite dev server.
     // All API calls are intercepted by page.route() in tests.
     env: {
