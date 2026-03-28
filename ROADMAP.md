@@ -89,7 +89,9 @@ When configuring the building and buying the new unit make sure to show user the
 
 Accounting ledger allows to see the income statement, cash flow statment and balance sheet. Items in the statement can be opened and exact details on each item is visible. For example when the long-term tangible assets from balance sheet is opened, the list of all buildings is visible. When income is clicked the each sales item from each unit is visible and person can access the building. When costs are clicked every costs such as the property purchase, units upgrades, purchasing unit purchases, marketing costs or others are clickable to get to the source. 
 
-## Timing
+## Timing & Game engine
+
+Game is played in ticks. One game year is 8640 ticks. Game time is visible in the game. The start time is year 2000.
 
 Each change - new building, change of the building unit plan, or upgrade of the unit takes specific number of ticks to be executed.
 
@@ -126,9 +128,13 @@ Next the player buys his first sales shop and configures it to set the sales pri
 
 The player is shown that the time goes on and he makes the profit from his business.
 
-## Game engine
+## Exchanges
 
-Game is played in ticks. In each tick the game state for all buildings is recalculated, the products are sold, the free storage capacity is used to to fill in from the linked units, r&d is recalculated, brading is recalculated, occupancy and rents are calculated. The game engine runs in backend.
+In each city is one in game global exchange which serves as the hub between connecting the cities. Global Exchange acts never ending resource sale for every resource. Each city has different resource pricing and quality at the global exchange.
+
+## Transit costs
+
+When resource is sent between one unit to another (sale to purchase or exchange to purchase or b2b sale to exchange) the transit costs are calculated. The transit costs must be visible in the purchase unit when selecting the resource.
 
 ## Taxes
 
