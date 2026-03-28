@@ -7,4 +7,5 @@ public sealed class SeedDataOptions
     public string AdminEmail { get; init; } = "admin@capitalism.local";
     public string AdminDisplayName { get; init; } = "Platform Admin";
     public string AdminPassword { get; init; } = "ChangeMe123!";
+    public int TickIntervalSeconds { get; set; } = 10;
 }

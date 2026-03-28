@@ -23,7 +23,8 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["ConnectionStrings:EventsCatalog"] = $"Data Source={_databasePath}",
                 ["SeedData:AdminEmail"] = "admin@capitalism.local",
                 ["SeedData:AdminDisplayName"] = "Platform Admin",
-                ["SeedData:AdminPassword"] = "ChangeMe123!"
+                ["SeedData:AdminPassword"] = "ChangeMe123!",
+                ["GameEngine:Enabled"] = "false"
             });
         });
     }

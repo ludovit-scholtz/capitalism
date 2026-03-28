@@ -119,8 +119,8 @@ public sealed class Mutation
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = input.Name,
-            Cash = 1_000_000m, // Starting capital
-            FoundedAtUtc = DateTime.UtcNow
+            Cash = 1_000_000m // Starting capital
+            , FoundedAtUtc = DateTime.UtcNow
         };
 
         db.Companies.Add(company);
@@ -553,7 +553,7 @@ public sealed class Mutation
             $"{company.Name} Shop",
             1m,
             nowUtc,
-            player.OnboardingCityId);
+            player.OnboardingCityId!.Value);
 
         ConfigureStarterFactory(db, factory, product, starterResourceId.Value);
         AddStarterShop(db, shop.Id, product);
@@ -663,7 +663,7 @@ public sealed class Mutation
                     .Build());
         }
 
-        if (expectedCityId is not null && lot.CityId != expectedCityId.Value)
+        if (expectedCityId.HasValue && lot.CityId != expectedCityId.Value)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -974,11 +974,14 @@ public sealed class Mutation
                     company.Cash += offer.CompanyCashGrant;
                     // If the player already has active Pro time from another source, extend from that
                     // future end-date instead of overwriting it or restarting from "now".
-                    var subscriptionStart = player.ProSubscriptionEndsAtUtc is { } endsAt && endsAt > nowUtc
+                    var subscriptionStart = player.ProSubscriptionEndsAtUtc is { } endsAt && endsAt > offer.CreatedAtUtc
                         ? endsAt
-                        : nowUtc;
+                        : offer.CreatedAtUtc;
                     player.ProSubscriptionEndsAtUtc = subscriptionStart.AddDays(offer.ProDurationDays);
                     StartupPackService.MarkClaimed(offer, company.Id, nowUtc);
+
+                    // Bump concurrency tokens for atomic settlement
+                    player.ConcurrencyToken = Guid.NewGuid();
 
                     // The startup-pack offer carries the concurrency token for the atomic settlement.
                     // If another request claims first, this SaveChanges rolls back the entire grant
@@ -989,7 +992,7 @@ public sealed class Mutation
                 var companySnapshot = await db.Companies
                     .AsNoTracking()
                     .FirstAsync(candidate =>
-                        candidate.Id == offer.GrantedCompanyId
+                        candidate.Id == offer.GrantedCompanyId!.Value
                         && candidate.PlayerId == player.Id);
                 var playerSnapshot = await db.Players
                     .AsNoTracking()

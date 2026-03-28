@@ -40,7 +40,7 @@ public sealed class AppDbInitializer(
 
         if (!await dbContext.GameStates.AnyAsync())
         {
-            dbContext.GameStates.Add(new GameState { Id = 1, CurrentTick = 0 });
+            dbContext.GameStates.Add(new GameState { Id = 1, CurrentTick = 0, TickIntervalSeconds = seedOptions.Value.TickIntervalSeconds });
         }
 
         if (!await dbContext.ResourceTypes.AnyAsync())

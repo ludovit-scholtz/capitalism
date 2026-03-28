@@ -78,6 +78,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(p => p.Role).HasMaxLength(20);
             e.Property(p => p.OnboardingCurrentStep).HasMaxLength(40);
             e.Property(p => p.OnboardingIndustry).HasMaxLength(50);
+            e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
         });
 
         // StartupPackOffer
@@ -261,6 +262,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(i => i.Quantity).HasPrecision(18, 4);
             e.Property(i => i.Quality).HasPrecision(5, 4);
             e.HasOne(i => i.Building).WithMany().HasForeignKey(i => i.BuildingId);
+            e.HasOne(i => i.BuildingUnit).WithMany().HasForeignKey(i => i.BuildingUnitId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(i => i.ResourceType).WithMany().HasForeignKey(i => i.ResourceTypeId);
             e.HasOne(i => i.ProductType).WithMany().HasForeignKey(i => i.ProductTypeId);
         });

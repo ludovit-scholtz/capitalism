@@ -1,0 +1,135 @@
+using System.Diagnostics;
+using Api.Data;
+using Api.Data.Entities;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace Api.Engine;
+
+/// <summary>
+/// Orchestrates a single game tick: loads all data, runs each <see cref="ITickPhase"/>
+/// in order, then persists changes in a single SaveChanges call.
+/// Designed to handle 20 000 buildings / 500 000 units in under one second.
+/// </summary>
+public sealed class TickProcessor(
+    AppDbContext db,
+    IEnumerable<ITickPhase> phases,
+    ILogger<TickProcessor> logger)
+{
+    /// <summary>
+    /// Advances the game by one tick and returns the configured interval in seconds
+    /// so the hosted service knows how long to wait before the next tick.
+    /// </summary>
+    public async Task<int> ProcessTickAsync(CancellationToken ct = default)
+    {
+        var gameState = await db.GameStates.FirstOrDefaultAsync(ct);
+        if (gameState is null)
+        {
+            logger.LogWarning("No game state found; skipping tick.");
+            return 10;
+        }
+
+        gameState.CurrentTick++;
+        gameState.LastTickAtUtc = DateTime.UtcNow;
+
+        var context = await BuildContextAsync(gameState, ct);
+        var sw = Stopwatch.StartNew();
+
+        foreach (var phase in phases.OrderBy(p => p.Order))
+        {
+            try
+            {
+                await phase.ProcessAsync(context);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Tick {Tick} – phase {Phase} failed.", gameState.CurrentTick, phase.Name);
+            }
+        }
+
+        // Persist new inventory rows created during this tick (skip zero-quantity leftovers).
+        var newToAdd = context.NewInventory.Where(i => i.Quantity > 0m).ToList();
+        if (newToAdd.Count > 0)
+        {
+            db.Inventories.AddRange(newToAdd);
+        }
+
+        // Remove depleted tracked inventory (quantity ≤ 0) to keep the table lean.
+        // NewInventory items are untracked so they can't be passed to RemoveRange.
+        var depleted = context.InventoryByBuilding.Values
+            .SelectMany(list => list)
+            .Where(i => i.Quantity <= 0m && !context.NewInventory.Contains(i))
+            .ToList();
+        if (depleted.Count > 0)
+        {
+            db.Inventories.RemoveRange(depleted);
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        sw.Stop();
+        logger.LogInformation(
+            "Tick {Tick} completed in {ElapsedMs}ms  (buildings={Buildings}, phases={Phases})",
+            gameState.CurrentTick,
+            sw.ElapsedMilliseconds,
+            context.BuildingsById.Count,
+            phases.Count());
+
+        return gameState.TickIntervalSeconds;
+    }
+
+    private async Task<TickContext> BuildContextAsync(GameState gameState, CancellationToken ct)
+    {
+        // Bulk-load all data needed by every phase.
+        // EF Core change-tracking is required for entities we modify (Company.Cash,
+        // Inventory.Quantity, Brand, Building, ExchangeOrder, GameState).
+
+        var buildings = await db.Buildings
+            .Include(b => b.Units)
+            .Include(b => b.PendingConfiguration)!.ThenInclude(p => p!.Units)
+            .Include(b => b.PendingConfiguration)!.ThenInclude(p => p!.Removals)
+            .ToListAsync(ct);
+
+        var companies = await db.Companies.ToListAsync(ct);
+        var cities = await db.Cities.ToListAsync(ct);
+        var cityResources = await db.CityResources.ToListAsync(ct);
+        var resourceTypes = await db.ResourceTypes.ToListAsync(ct);
+        var productTypes = await db.ProductTypes.Include(p => p.Recipes).ToListAsync(ct);
+        var brands = await db.Brands.ToListAsync(ct);
+        var inventories = await db.Inventories.ToListAsync(ct);
+        var exchangeOrders = await db.ExchangeOrders.Where(o => o.IsActive).ToListAsync(ct);
+
+        return new TickContext
+        {
+            Db = db,
+            GameState = gameState,
+            BuildingsById = buildings.ToDictionary(b => b.Id),
+            BuildingsByType = buildings
+                .GroupBy(b => b.Type)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase),
+            UnitsByBuilding = buildings.ToDictionary(b => b.Id, b => b.Units.ToList()),
+            UnitsByBuildingPosition = buildings.ToDictionary(
+                b => b.Id,
+                b => b.Units.ToDictionary(u => (u.GridX, u.GridY))),
+            InventoryByUnit = inventories
+                .Where(i => i.BuildingUnitId.HasValue)
+                .GroupBy(i => i.BuildingUnitId!.Value)
+                .ToDictionary(g => g.Key, g => g.ToList()),
+            InventoryByBuilding = inventories
+                .GroupBy(i => i.BuildingId)
+                .ToDictionary(g => g.Key, g => g.ToList()),
+            CompaniesById = companies.ToDictionary(c => c.Id),
+            CitiesById = cities.ToDictionary(c => c.Id),
+            ResourcesByCity = cityResources
+                .GroupBy(cr => cr.CityId)
+                .ToDictionary(g => g.Key, g => g.ToList()),
+            ResourceTypesById = resourceTypes.ToDictionary(r => r.Id),
+            ProductTypesById = productTypes.ToDictionary(p => p.Id),
+            RecipesByProduct = productTypes.ToDictionary(p => p.Id, p => p.Recipes.ToList()),
+            BrandsByCompany = brands
+                .GroupBy(b => b.CompanyId)
+                .ToDictionary(g => g.Key, g => g.ToList()),
+            ActiveExchangeOrders = exchangeOrders,
+        };
+    }
+}

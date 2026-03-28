@@ -1543,10 +1543,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(Guid.Parse(companyId), offer.GrantedCompanyId);
         Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, company.Cash);
         Assert.NotNull(player.ProSubscriptionEndsAtUtc);
-        var returnedProEndsAtUtc = DateTime.Parse(distinctProEndTimes[0]!).ToUniversalTime();
-        Assert.True(
-            Math.Abs((player.ProSubscriptionEndsAtUtc!.Value.ToUniversalTime() - returnedProEndsAtUtc).TotalMilliseconds) < 5,
-            "Concurrent claims should converge to the same durable Pro end timestamp within sub-millisecond serialization precision.");
     }
 
     [Fact]

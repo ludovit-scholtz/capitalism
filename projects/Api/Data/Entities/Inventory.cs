@@ -17,6 +17,12 @@ public sealed class Inventory
     /// <summary>Navigation property to the building.</summary>
     public Building Building { get; set; } = null!;
 
+    /// <summary>The specific building unit that holds this inventory (null for building-level stock).</summary>
+    public Guid? BuildingUnitId { get; set; }
+
+    /// <summary>Navigation property to the building unit.</summary>
+    public BuildingUnit? BuildingUnit { get; set; }
+
     /// <summary>Resource type (null if this is a finished product).</summary>
     public Guid? ResourceTypeId { get; set; }
 

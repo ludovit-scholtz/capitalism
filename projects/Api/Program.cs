@@ -1,6 +1,8 @@
 using System.Text;
 using Api.Configuration;
 using Api.Data;
+using Api.Engine;
+using Api.Engine.Phases;
 using Api.Security;
 using Api.Utilities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -13,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.Configure<SeedDataOptions>(builder.Configuration.GetSection(SeedDataOptions.SectionName));
 builder.Services.Configure<VapidOptions>(builder.Configuration.GetSection("Vapid"));
+builder.Services.Configure<GameEngineOptions>(builder.Configuration.GetSection(GameEngineOptions.SectionName));
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -122,6 +125,20 @@ builder.Services
     .AddAuthorization()
     .AddQueryType<Api.Types.Query>()
     .AddMutationType<Api.Types.Mutation>();
+
+// ── Game tick engine ──
+builder.Services.AddScoped<TickProcessor>();
+builder.Services.AddScoped<ITickPhase, BuildingUpgradePhase>();
+builder.Services.AddScoped<ITickPhase, PublicSalesPhase>();
+builder.Services.AddScoped<ITickPhase, ResourceMovementPhase>();
+builder.Services.AddScoped<ITickPhase, ManufacturingPhase>();
+builder.Services.AddScoped<ITickPhase, MiningPhase>();
+builder.Services.AddScoped<ITickPhase, PurchasingPhase>();
+builder.Services.AddScoped<ITickPhase, MarketingPhase>();
+builder.Services.AddScoped<ITickPhase, ResearchPhase>();
+builder.Services.AddScoped<ITickPhase, RentPhase>();
+builder.Services.AddScoped<ITickPhase, TaxPhase>();
+builder.Services.AddHostedService<GameTickHostedService>();
 
 var app = builder.Build();
 

@@ -39,6 +39,9 @@ public sealed class Player
     /// <summary>UTC timestamp until which the player's Pro subscription remains active. Null when inactive.</summary>
     public DateTime? ProSubscriptionEndsAtUtc { get; set; }
 
+    /// <summary>Application-managed concurrency token for optimistic concurrency control.</summary>
+    public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
+
     /// <summary>Current resumable onboarding step. Null when onboarding has not started or is completed.</summary>
     public string? OnboardingCurrentStep { get; set; }
 
