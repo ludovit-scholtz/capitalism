@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
 import { isProductLocked } from '@/lib/productAccess'
 import {
@@ -10,56 +10,134 @@ import {
   getLocalizedProductDescription,
   getLocalizedProductName,
   getLocalizedRecipeIngredientName,
-  getLocalizedRecipeSummary,
   getLocalizedResourceDescription,
   getLocalizedResourceName,
-  getLocalizedUnitName,
   getProductImageUrl,
   getResourceImageUrl,
 } from '@/lib/catalogPresentation'
-import { useAuthStore } from '@/stores/auth'
 import type { ProductType, ResourceType } from '@/types'
 
+type CatalogEntry = {
+  id: string
+  slug: string
+  kind: 'resource' | 'product'
+  title: string
+  description: string
+  imageUrl: string | null
+  pill: string
+  badge: string
+  meta: string[]
+  industry: string | null
+  accessText: string | null
+  accessClass: 'locked' | 'unlocked' | null
+  searchText: string
+}
+
 const { t, locale } = useI18n()
-const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
 const search = ref('')
 const industry = ref('ALL')
-const selectedProductId = ref<string | null>(null)
 const resources = ref<ResourceType[]>([])
 const products = ref<ProductType[]>([])
 
-const industries = computed(() => ['ALL', ...new Set(products.value.map((product) => product.industry))])
+const showProProducts = computed({
+  get: () => route.query.showPro === '1',
+  set: (value: boolean) => {
+    const nextQuery = { ...route.query }
 
-const filteredProducts = computed(() => {
+    if (value) {
+      nextQuery.showPro = '1'
+    } else {
+      delete nextQuery.showPro
+    }
+
+    router.replace({ path: route.path, query: nextQuery })
+  },
+})
+
+const visibleProducts = computed(() =>
+  showProProducts.value ? products.value : products.value.filter((product) => !product.isProOnly),
+)
+
+const industries = computed(() => ['ALL', ...new Set(visibleProducts.value.map((product) => product.industry))])
+
+const hiddenProProductCount = computed(() =>
+  showProProducts.value ? 0 : products.value.filter((product) => product.isProOnly).length,
+)
+
+const catalogEntries = computed<CatalogEntry[]>(() => {
   const query = search.value.trim().toLowerCase()
-  return products.value.filter((product) => {
-    const localizedName = getLocalizedProductName(product, locale.value).toLowerCase()
-    const localizedDescription = getLocalizedProductDescription(product, locale.value).toLowerCase()
-    const matchesIndustry = industry.value === 'ALL' || product.industry === industry.value
-    const matchesSearch = query.length === 0
-      || localizedName.includes(query)
-      || localizedDescription.includes(query)
-      || product.recipes.some((recipe) => getLocalizedRecipeIngredientName(recipe, locale.value).toLowerCase().includes(query))
+  const entries: CatalogEntry[] = [
+    ...resources.value.map((resource) => {
+      const title = getLocalizedResourceName(resource, locale.value)
+      const description = getLocalizedResourceDescription(resource, locale.value)
+
+      return {
+        id: resource.id,
+        slug: resource.slug,
+        kind: 'resource' as const,
+        title,
+        description,
+        imageUrl: getResourceImageUrl(resource),
+        pill: resource.unitSymbol,
+        badge: t('encyclopedia.resourceTypeRaw'),
+        meta: [
+          `${t('encyclopedia.basePrice')}: $${resource.basePrice}`,
+          `${t('encyclopedia.weight')}: ${resource.weightPerUnit} kg/${resource.unitSymbol}`,
+          getLocalizedCategory(resource.category, locale.value),
+        ],
+        industry: null,
+        accessText: null,
+        accessClass: null,
+        searchText: [title, description, resource.category].join(' ').toLowerCase(),
+      }
+    }),
+    ...visibleProducts.value.map((product) => {
+      const title = getLocalizedProductName(product, locale.value)
+      const description = getLocalizedProductDescription(product, locale.value)
+
+      return {
+        id: product.id,
+        slug: product.slug,
+        kind: 'product' as const,
+        title,
+        description,
+        imageUrl: getProductImageUrl(product),
+        pill: product.unitSymbol,
+        badge: getLocalizedIndustry(product.industry, locale.value),
+        meta: [
+          `${t('encyclopedia.basePrice')}: $${product.basePrice}`,
+          `${t('encyclopedia.energy')}: ${product.energyConsumptionMwh} MW`,
+          `${t('encyclopedia.output')}: ${product.outputQuantity} ${product.unitSymbol}`,
+        ],
+        industry: product.industry,
+        accessText: product.isProOnly ? getProductAccessText(product) : null,
+        accessClass: product.isProOnly ? (isProductLocked(product) ? 'locked' as const : 'unlocked' as const) : null,
+        searchText: [
+          title,
+          description,
+          product.industry,
+          ...product.recipes.map((recipe) => getLocalizedRecipeIngredientName(recipe, locale.value)),
+        ].join(' ').toLowerCase(),
+      }
+    }),
+  ]
+
+  return entries.filter((entry) => {
+    const matchesIndustry = industry.value === 'ALL' || entry.industry === industry.value
+    const matchesSearch = query.length === 0 || entry.searchText.includes(query)
 
     return matchesIndustry && matchesSearch
   })
 })
 
-const selectedProduct = computed(() => filteredProducts.value.find((product) => product.id === selectedProductId.value) ?? filteredProducts.value[0] ?? null)
-const lockedProductCount = computed(() => products.value.filter((product) => isProductLocked(product)).length)
-
-watch(filteredProducts, (nextProducts) => {
-  if (nextProducts.length === 0) {
-    selectedProductId.value = null
-    return
-  }
-
-  if (!nextProducts.some((product) => product.id === selectedProductId.value)) {
-    selectedProductId.value = nextProducts[0]?.id ?? null
+watch(industries, (nextIndustries) => {
+  if (!nextIndustries.includes(industry.value)) {
+    industry.value = 'ALL'
   }
 }, { immediate: true })
 
@@ -114,40 +192,8 @@ onMounted(async () => {
   }
 })
 
-function getResourceCardName(resource: ResourceType) {
-  return getLocalizedResourceName(resource, locale.value)
-}
-
-function getResourceCardDescription(resource: ResourceType) {
-  return getLocalizedResourceDescription(resource, locale.value)
-}
-
-function getProductCardName(product: ProductType) {
-  return getLocalizedProductName(product, locale.value)
-}
-
-function getProductCardDescription(product: ProductType) {
-  return getLocalizedProductDescription(product, locale.value)
-}
-
 function getIndustryLabel(value: string) {
   return getLocalizedIndustry(value, locale.value)
-}
-
-function getCategoryLabel(value: string) {
-  return getLocalizedCategory(value, locale.value)
-}
-
-function getResourceCardImage(resource: ResourceType) {
-  return getResourceImageUrl(resource)
-}
-
-function getProductCardImage(product: ProductType) {
-  return getProductImageUrl(product)
-}
-
-function getRecipeText(product: ProductType) {
-  return getLocalizedRecipeSummary(product, locale.value)
 }
 
 function getProductAccessText(product: ProductType) {
@@ -158,29 +204,12 @@ function getProductAccessText(product: ProductType) {
   return isProductLocked(product) ? t('catalog.proRequired') : t('catalog.proUnlocked')
 }
 
-function getProductAccessDetail(product: ProductType) {
-  return isProductLocked(product) ? t('catalog.proDetail') : t('catalog.proUnlockedDetail')
-}
-
-function getIngredientImage(recipe: ProductType['recipes'][number]) {
-  if (recipe.resourceType) {
-    return getResourceImageUrl(recipe.resourceType)
-  }
-
-  if (recipe.inputProductType) {
-    const product = products.value.find((candidate) => candidate.id === recipe.inputProductType?.id)
-    return getProductImageUrl({
-      slug: recipe.inputProductType.slug,
-      name: recipe.inputProductType.name,
-      industry: product?.industry ?? 'ELECTRONICS',
-    })
-  }
-
-  return null
-}
-
-function navigateToResource(resource: ResourceType) {
-  router.push({ name: 'resource-detail', params: { slug: resource.slug } })
+function navigateToEntry(slug: string) {
+  router.push({
+    name: 'encyclopedia-detail',
+    params: { slug },
+    query: showProProducts.value ? { showPro: '1' } : {},
+  })
 }
 </script>
 
@@ -194,11 +223,11 @@ function navigateToResource(resource: ResourceType) {
       </div>
       <div class="hero-stats">
         <div class="stat-card">
-          <strong>{{ resources.length }}</strong>
+          <strong>{{ catalogEntries.length }}</strong>
           <span>{{ t('encyclopedia.resourcesCount') }}</span>
         </div>
         <div class="stat-card">
-          <strong>{{ products.length }}</strong>
+          <strong>{{ visibleProducts.length }}</strong>
           <span>{{ t('encyclopedia.productsCount') }}</span>
         </div>
       </div>
@@ -206,150 +235,66 @@ function navigateToResource(resource: ResourceType) {
 
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
     <div v-else-if="error" class="error-message" role="alert">{{ error }}</div>
-    <template v-else>
-      <section class="resources-section">
-        <div class="section-header">
-          <h2>{{ t('encyclopedia.rawMaterials') }}</h2>
-          <p>{{ t('encyclopedia.rawMaterialsHelp') }}</p>
-        </div>
-        <div class="resource-grid">
-          <article
-            v-for="resource in resources"
-            :key="resource.id"
-            class="resource-card resource-card--link"
-            role="button"
-            tabindex="0"
-            :aria-label="t('encyclopedia.viewDetail') + ': ' + getResourceCardName(resource)"
-            @click="navigateToResource(resource)"
-            @keydown.enter="navigateToResource(resource)"
-            @keydown.space.prevent="navigateToResource(resource)"
-          >
-            <img v-if="getResourceCardImage(resource)" :src="getResourceCardImage(resource) ?? undefined" :alt="getResourceCardName(resource)" class="resource-image" />
-            <div class="resource-body">
-              <div class="resource-heading">
-                <h3>{{ getResourceCardName(resource) }}</h3>
-                <span class="resource-unit">{{ resource.unitSymbol }}</span>
-              </div>
-              <p class="resource-description">{{ getResourceCardDescription(resource) }}</p>
-              <div class="resource-meta">
-                <span>{{ t('encyclopedia.basePrice') }}: ${{ resource.basePrice }}</span>
-                <span>{{ t('encyclopedia.weight') }}: {{ resource.weightPerUnit }} kg/{{ resource.unitSymbol }}</span>
-                <span>{{ getCategoryLabel(resource.category) }}</span>
-              </div>
-              <span class="resource-view-detail">{{ t('encyclopedia.viewDetail') }} →</span>
-            </div>
-          </article>
-        </div>
-      </section>
+    <section v-else class="resources-section">
+      <div class="section-header">
+        <h2>{{ t('encyclopedia.resourcesTitle') }}</h2>
+        <p>{{ t('encyclopedia.resourcesHelp') }}</p>
+        <p v-if="hiddenProProductCount > 0 && !showProProducts" class="catalog-note">
+          {{ t('encyclopedia.proHiddenNotice', { count: hiddenProProductCount }) }}
+        </p>
+      </div>
 
-      <section class="products-section">
-        <div class="section-header">
-          <h2>{{ t('encyclopedia.manufacturedProducts') }}</h2>
-          <p>{{ t('encyclopedia.manufacturedProductsHelp') }}</p>
-          <p class="catalog-note">
-            {{
-              auth.isProSubscriber
-                ? t('catalog.discoveryUnlocked')
-                : t('catalog.discoveryLocked', { count: lockedProductCount })
-            }}
-          </p>
-        </div>
+      <div class="filters">
+        <input v-model="search" type="search" class="filter-input" :placeholder="t('encyclopedia.searchPlaceholder')" />
+        <select v-model="industry" class="filter-select" :aria-label="t('encyclopedia.filterByIndustry')">
+          <option v-for="option in industries" :key="option" :value="option">
+            {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
+          </option>
+        </select>
+        <label class="filter-toggle">
+          <input v-model="showProProducts" type="checkbox" />
+          <span>{{ t('encyclopedia.showProProducts') }}</span>
+        </label>
+      </div>
 
-        <div class="filters">
-          <input v-model="search" type="search" class="filter-input" :placeholder="t('encyclopedia.searchPlaceholder')" />
-          <select v-model="industry" class="filter-select" :aria-label="t('encyclopedia.filterByIndustry')">
-            <option v-for="option in industries" :key="option" :value="option">
-              {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
-            </option>
-          </select>
-        </div>
-
-        <section v-if="selectedProduct" class="selected-product">
-          <div class="selected-product-main">
-            <img :src="getProductCardImage(selectedProduct)" :alt="getProductCardName(selectedProduct)" class="selected-product-image" />
-            <div class="selected-product-copy">
-              <p class="product-industry">{{ getIndustryLabel(selectedProduct.industry) }}</p>
-              <div class="product-access-row">
-                <span
-                  v-if="selectedProduct.isProOnly"
-                  class="product-access-badge"
-                  :class="{ locked: isProductLocked(selectedProduct), unlocked: !isProductLocked(selectedProduct) }"
-                >
-                  {{ getProductAccessText(selectedProduct) }}
-                </span>
-              </div>
-              <h3>{{ getProductCardName(selectedProduct) }}</h3>
-              <p class="product-description">{{ getProductCardDescription(selectedProduct) }}</p>
-              <p v-if="selectedProduct.isProOnly" class="product-access-detail">
-                {{ getProductAccessDetail(selectedProduct) }}
-              </p>
-              <div class="product-meta">
-                <span>{{ t('encyclopedia.basePrice') }}: ${{ selectedProduct.basePrice }}</span>
-                <span>{{ t('encyclopedia.craftTime') }}: {{ selectedProduct.baseCraftTicks }}</span>
-                <span>{{ t('encyclopedia.energy') }}: {{ selectedProduct.energyConsumptionMwh }} MW</span>
-                <span>{{ t('encyclopedia.output') }}: {{ selectedProduct.outputQuantity }} {{ getLocalizedUnitName(selectedProduct.unitName, locale) }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="composition-panel">
-            <div class="composition-header">
-              <h4>{{ t('encyclopedia.compositionTitle') }}</h4>
-              <p>{{ t('encyclopedia.compositionHelp') }}</p>
-            </div>
-            <div class="composition-flow">
-              <div v-for="(recipe, index) in selectedProduct.recipes" :key="`${selectedProduct.id}-${index}`" class="composition-node ingredient">
-                <img v-if="getIngredientImage(recipe)" :src="getIngredientImage(recipe) ?? undefined" :alt="getLocalizedRecipeIngredientName(recipe, locale)" class="composition-image" />
-                <strong>{{ recipe.quantity }} {{ recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol }}</strong>
-                <span>{{ getLocalizedRecipeIngredientName(recipe, locale) }}</span>
-              </div>
-              <span class="composition-arrow" aria-hidden="true">→</span>
-              <div class="composition-node output">
-                <img :src="getProductCardImage(selectedProduct)" :alt="getProductCardName(selectedProduct)" class="composition-image" />
-                <strong>{{ selectedProduct.outputQuantity }} {{ selectedProduct.unitSymbol }}</strong>
-                <span>{{ getProductCardName(selectedProduct) }}</span>
-              </div>
-            </div>
-            <p class="recipe-line">
-              <strong>{{ t('encyclopedia.recipe') }}:</strong>
-              {{ getRecipeText(selectedProduct) }}
-            </p>
-          </div>
-        </section>
-
-        <div class="product-grid">
-          <button
-            v-for="product in filteredProducts"
-            :key="product.id"
-            type="button"
-            class="product-card"
-            :class="{ active: selectedProductId === product.id }"
-            @click="selectedProductId = product.id"
-          >
-            <img :src="getProductCardImage(product)" :alt="getProductCardName(product)" class="product-image" />
-            <div class="product-heading">
+      <div class="resource-grid">
+        <article
+          v-for="entry in catalogEntries"
+          :key="entry.id"
+          class="resource-card resource-card--link"
+          :class="`resource-card--${entry.kind}`"
+          role="button"
+          tabindex="0"
+          :aria-label="t('encyclopedia.viewDetail') + ': ' + entry.title"
+          @click="navigateToEntry(entry.slug)"
+          @keydown.enter="navigateToEntry(entry.slug)"
+          @keydown.space.prevent="navigateToEntry(entry.slug)"
+        >
+          <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="resource-image" />
+          <div class="resource-body">
+            <div class="resource-heading">
               <div>
-                <h3>{{ getProductCardName(product) }}</h3>
-                <p class="product-industry">{{ getIndustryLabel(product.industry) }}</p>
+                <p class="resource-kind">{{ entry.badge }}</p>
+                <h3>{{ entry.title }}</h3>
               </div>
-              <span
-                v-if="product.isProOnly"
-                class="product-access-badge"
-                :class="{ locked: isProductLocked(product), unlocked: !isProductLocked(product) }"
-              >
-                {{ getProductAccessText(product) }}
-              </span>
-              <span class="product-batch">{{ product.outputQuantity }} {{ product.unitSymbol }}</span>
+              <span class="resource-unit">{{ entry.pill }}</span>
             </div>
-            <p class="product-description">{{ getProductCardDescription(product) }}</p>
-            <div class="product-meta">
-              <span>{{ t('encyclopedia.basePrice') }}: ${{ product.basePrice }}</span>
-              <span>{{ t('encyclopedia.energy') }}: {{ product.energyConsumptionMwh }} MW</span>
+            <span
+              v-if="entry.accessText"
+              class="product-access-badge"
+              :class="entry.accessClass ?? undefined"
+            >
+              {{ entry.accessText }}
+            </span>
+            <p class="resource-description">{{ entry.description }}</p>
+            <div class="resource-meta">
+              <span v-for="metaEntry in entry.meta" :key="metaEntry">{{ metaEntry }}</span>
             </div>
-          </button>
-        </div>
-      </section>
-    </template>
+            <span class="resource-view-detail">{{ t('encyclopedia.viewDetail') }} →</span>
+          </div>
+        </article>
+      </div>
+    </section>
   </div>
 </template>
 
@@ -364,10 +309,7 @@ function navigateToResource(resource: ResourceType) {
 .section-header,
 .filters,
 .hero-stats,
-.resource-meta,
-.product-meta,
-.selected-product-main,
-.composition-header {
+.resource-meta {
   display: flex;
   gap: 1rem;
   flex-wrap: wrap;
@@ -383,22 +325,13 @@ function navigateToResource(resource: ResourceType) {
 .section-header p,
 .catalog-note,
 .resource-description,
-.product-description,
-.product-industry,
-.recipe-line,
-.resource-meta,
-.product-meta,
-.composition-header p,
-.product-access-detail {
+.resource-meta {
   color: var(--color-text-secondary);
 }
 
 .hero h1,
 .section-header h2,
-.resource-heading h3,
-.product-heading h3,
-.selected-product-copy h3,
-.composition-header h4 {
+.resource-heading h3 {
   margin: 0;
 }
 
@@ -407,10 +340,7 @@ function navigateToResource(resource: ResourceType) {
 }
 
 .stat-card,
-.resource-card,
-.product-card,
-.selected-product,
-.composition-node {
+.resource-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 16px;
@@ -423,54 +353,27 @@ function navigateToResource(resource: ResourceType) {
   gap: 0.25rem;
 }
 
-.resource-grid,
-.product-grid {
+.resource-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
 }
 
-.resource-card,
-.product-card,
-.selected-product {
+.resource-card {
   overflow: hidden;
 }
 
-.resource-image,
-.product-image,
-.selected-product-image,
-.composition-image {
+.resource-image {
   width: 100%;
+  aspect-ratio: 16 / 9;
   background: var(--color-bg);
   object-fit: cover;
 }
 
-.resource-image,
-.product-image {
-  aspect-ratio: 16 / 9;
-}
-
-.selected-product-image {
-  width: min(280px, 100%);
-  border-radius: 16px;
-  aspect-ratio: 1;
-}
-
-.resource-body,
-.product-card {
+.resource-body {
   padding: 1rem;
-}
-
-.product-card {
   display: grid;
   gap: 0.75rem;
-  text-align: left;
-  cursor: pointer;
-}
-
-.product-access-row {
-  display: flex;
-  gap: 0.5rem;
 }
 
 .product-access-badge {
@@ -497,21 +400,23 @@ function navigateToResource(resource: ResourceType) {
   background: rgba(0, 200, 83, 0.12);
 }
 
-.product-card.active {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
-}
-
-.resource-heading,
-.product-heading {
+.resource-heading {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
   align-items: flex-start;
 }
 
-.resource-unit,
-.product-batch {
+.resource-kind {
+  margin: 0 0 0.3rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.resource-unit {
   padding: 0.25rem 0.6rem;
   border-radius: 999px;
   background: rgba(0, 71, 255, 0.08);
@@ -538,59 +443,16 @@ function navigateToResource(resource: ResourceType) {
   min-width: 240px;
 }
 
-.selected-product {
-  display: grid;
-  gap: 1.25rem;
-  padding: 1rem;
-}
-
-.selected-product-copy {
-  display: grid;
-  gap: 0.75rem;
-  flex: 1;
-  min-width: 240px;
-}
-
-.composition-panel {
-  display: grid;
-  gap: 1rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid var(--color-border);
-}
-
-.composition-flow {
-  display: flex;
+.filter-toggle {
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.composition-node {
-  width: 150px;
-  padding: 0.75rem;
-  display: grid;
   gap: 0.5rem;
-  justify-items: center;
-  text-align: center;
+  color: var(--color-text-secondary);
+  font-weight: 600;
 }
 
-.composition-node.output {
-  border-color: var(--color-primary);
-}
-
-.composition-image {
-  border-radius: 12px;
-  aspect-ratio: 1;
-}
-
-.composition-arrow {
-  font-size: 1.5rem;
-  color: var(--color-primary);
-  font-weight: 700;
-}
-
-.recipe-line {
-  margin: 0;
+.filter-toggle input {
+  accent-color: var(--color-primary);
 }
 
 .resource-card--link {
@@ -611,7 +473,6 @@ function navigateToResource(resource: ResourceType) {
   color: var(--color-primary);
 }
 
-
 @media (max-width: 720px) {
   .hero {
     align-items: stretch;
@@ -623,20 +484,6 @@ function navigateToResource(resource: ResourceType) {
 
   .stat-card {
     flex: 1;
-  }
-
-  .composition-flow {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .composition-node {
-    width: 100%;
-  }
-
-  .composition-arrow {
-    transform: rotate(90deg);
-    align-self: center;
   }
 }
 </style>
