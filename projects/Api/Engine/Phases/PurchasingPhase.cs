@@ -157,14 +157,9 @@ public sealed class PurchasingPhase : ITickPhase
                 if (fill <= 0m) continue;
 
                 var sellerIsSameCompany = supply.Building.CompanyId == company.Id;
-                decimal transferCost;
-                if (sellerIsSameCompany)
+                decimal transferCost = fill * supply.PricePerUnit;
+                if (!sellerIsSameCompany)
                 {
-                    transferCost = 0m;
-                }
-                else
-                {
-                    transferCost = fill * supply.PricePerUnit;
                     if (company.Cash < transferCost)
                     {
                         fill = company.Cash / supply.PricePerUnit;
@@ -190,7 +185,38 @@ public sealed class PurchasingPhase : ITickPhase
 
                 if (sellerIsSameCompany)
                 {
-                    totalSourcingCost += withdrawn.SourcingCostTotal;
+                    // Internal transfer: record as sale for seller and purchase for buyer
+                    context.Db.LedgerEntries.Add(new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = supply.Building.CompanyId, // Seller
+                        BuildingId = supply.Building.Id,
+                        BuildingUnitId = supply.Unit.Id,
+                        Category = LedgerCategory.Revenue,
+                        Description = resourceId.HasValue ? "Internal sale: raw material" : "Internal sale: product",
+                        Amount = transferCost,
+                        RecordedAtTick = context.CurrentTick,
+                        RecordedAtUtc = DateTime.UtcNow,
+                        ResourceTypeId = resourceId,
+                        ProductTypeId = productId,
+                    });
+
+                    context.Db.LedgerEntries.Add(new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = company.Id, // Buyer
+                        BuildingId = building.Id,
+                        BuildingUnitId = unit.Id,
+                        Category = LedgerCategory.PurchasingCost,
+                        Description = resourceId.HasValue ? "Internal purchase: raw material" : "Internal purchase: product",
+                        Amount = -transferCost,
+                        RecordedAtTick = context.CurrentTick,
+                        RecordedAtUtc = DateTime.UtcNow,
+                        ResourceTypeId = resourceId,
+                        ProductTypeId = productId,
+                    });
+
+                    totalSourcingCost += transferCost;
                 }
                 else
                 {
