@@ -35,6 +35,14 @@ onMounted(async () => {
 <template>
   <div class="home-view">
     <section class="hero">
+      <div class="hero-video-wrapper">
+        <div class="hero-video-overlay">
+          <div class="hero-video-uplayer"></div>
+          <video autoplay muted playsinline class="hero-video">
+            <source src="../assets/hero-video.webm" type="video/webm" />
+          </video>
+        </div>
+      </div>
       <div class="container hero-content">
         <h1 class="hero-title">{{ t('home.heroTitle') }}</h1>
         <p class="hero-description">{{ t('home.heroDescription') }}</p>
@@ -105,6 +113,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+section{
+  position: relative;
+}
 .hero {
   background: linear-gradient(160deg, #0D1117 0%, rgba(0, 71, 255, 0.12) 100%);
   border-bottom: 1px solid var(--color-border);
@@ -115,18 +126,40 @@ onMounted(async () => {
   text-align: center;
 }
 
+.hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+}
+
+.hero-video-uplayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 246, 67, 0.2);
+  z-index: -1;
+}
 .hero-title {
-  font-size: 2.5rem;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  font-size: 3rem;
+  background: linear-gradient(135deg, rgba(246, 235, 17),rgb(246, 189, 17));
+  border-top: 1px solid rgba(246, 235, 17);
+  border-bottom: 1px solid rgba(246, 235, 17);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   margin-bottom: 1rem;
+  font-style: normal;
+  text-transform: uppercase;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
 }
 
 .hero-description {
   font-size: 1.125rem;
-  color: var(--color-text-secondary);
+  color: rgb(254, 226, 141);
   max-width: 600px;
   margin: 0 auto 2rem;
 }
