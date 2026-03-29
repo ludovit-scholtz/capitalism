@@ -81,6 +81,25 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
     }
 
+    private Task<TickProcessor> CreateProcessorAsync(IServiceScope scope)
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var logger = new NullLogger<TickProcessor>();
+        return Task.FromResult(new TickProcessor(db, phases, logger));
+    }
+
+    private async Task ProcessTicksAsync(int count)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var processor = await CreateProcessorAsync(scope);
+
+        for (var index = 0; index < count; index++)
+        {
+            await processor.ProcessTickAsync();
+        }
+    }
+
     private async Task ResetGameStateAsync()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -279,6 +298,51 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("Staged Flow Co", payload.GetProperty("company").GetProperty("name").GetString());
         Assert.Equal("SALES_SHOP", payload.GetProperty("salesShop").GetProperty("type").GetString());
         Assert.Equal(productId, payload.GetProperty("selectedProduct").GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_StarterSupplyChainFeedsShopAndMakesFirstSale()
+    {
+        var token = await RegisterAndGetTokenAsync(email: $"finish-onboarding-sales-{Guid.NewGuid():N}@test.com");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, companyName: "Starter Sales Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await GetAvailableLotIdAsync(cityId, "SALES_SHOP");
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(productId);
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "Starter sales shop purchase unit should fill from the starter factory output after onboarding.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
     }
 
     #endregion
@@ -1976,7 +2040,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task FinishOnboarding_ConfiguresStarterPricingAndLinks()
     {
         var token = await RegisterAndGetTokenAsync($"onboard-map-config-{Guid.NewGuid()}@test.com", "Config Founder");
-        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Config Founder Co");
+        var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Config Founder Co");
 
         var productsResult = await ExecuteGraphQlAsync(
             """
@@ -2021,6 +2085,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                     minPrice
                     maxPrice
                     purchaseSource
+                                        saleVisibility
+                                        vendorLockCompanyId
                     linkRight
                   }
                 }
@@ -2057,6 +2123,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(3, factorySales.GetProperty("gridX").GetInt32());
         Assert.Equal(productId, factorySales.GetProperty("productTypeId").GetString());
         Assert.Equal(basePrice, factorySales.GetProperty("minPrice").GetDecimal());
+        Assert.Equal("COMPANY", factorySales.GetProperty("saleVisibility").GetString());
 
         var shopUnits = shop.GetProperty("units").EnumerateArray().ToList();
         var shopPurchase = shopUnits.Single(unit => unit.GetProperty("unitType").GetString() == "PURCHASE");
@@ -2064,13 +2131,14 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.Equal(0, shopPurchase.GetProperty("gridX").GetInt32());
         Assert.Equal(productId, shopPurchase.GetProperty("productTypeId").GetString());
-        Assert.Equal(basePrice, shopPurchase.GetProperty("maxPrice").GetDecimal());
+        Assert.Equal(basePrice * 1.1m, shopPurchase.GetProperty("maxPrice").GetDecimal());
         Assert.Equal("LOCAL", shopPurchase.GetProperty("purchaseSource").GetString());
+        Assert.Equal(companyId, shopPurchase.GetProperty("vendorLockCompanyId").GetString());
         Assert.True(shopPurchase.GetProperty("linkRight").GetBoolean());
 
         Assert.Equal(1, publicSales.GetProperty("gridX").GetInt32());
         Assert.Equal(productId, publicSales.GetProperty("productTypeId").GetString());
-        Assert.Equal(basePrice, publicSales.GetProperty("minPrice").GetDecimal());
+        Assert.Equal(basePrice * 1.5m, publicSales.GetProperty("minPrice").GetDecimal());
     }
 
     [Fact]

@@ -4,8 +4,9 @@ using Api.Utilities;
 namespace Api.Engine.Phases;
 
 /// <summary>
-/// Fills PURCHASE units by matching against active exchange sell orders and/or
-/// the city-level global exchange (infinite counterparty).
+/// Fills PURCHASE units by matching against active exchange sell orders,
+/// same-city B2B supply, and/or the city-level global exchange
+/// (infinite counterparty).
 /// Purchase source is controlled by <see cref="BuildingUnit.PurchaseSource"/>:
 /// <list type="bullet">
 ///   <item><description>LOCAL  – player-placed exchange orders only.</description></item>
@@ -62,7 +63,7 @@ public sealed class PurchasingPhase : ITickPhase
 
         var totalBought = 0m;
         var totalSourcingCost = 0m;
-        var inventoryQuality = 0m;
+        var weightedQualityTotal = 0m;
 
         // Phase 1: Player-placed exchange orders (LOCAL or OPTIMAL source).
         if (purchaseSource is "LOCAL" or "OPTIMAL")
@@ -128,8 +129,83 @@ public sealed class PurchasingPhase : ITickPhase
 
                 totalBought += fill;
                 totalSourcingCost += cost;
-                // Quality is tracked per-source; for player orders use a default of 0.7 if not available.
-                inventoryQuality = 0.7m;
+                weightedQualityTotal += fill * 0.7m;
+            }
+        }
+
+        if (purchaseSource is "LOCAL" or "OPTIMAL" && totalBought < maxBuy)
+        {
+            var localSupplies = GetLocalB2BSupplies(
+                context,
+                building,
+                unit,
+                resourceId,
+                productId,
+                maxPrice,
+                minQuality);
+
+            foreach (var supply in localSupplies)
+            {
+                if (totalBought >= maxBuy) break;
+
+                var wanted = maxBuy - totalBought;
+                var fill = Math.Min(wanted, supply.Inventory.Quantity);
+                if (fill <= 0m) continue;
+
+                var sellerIsSameCompany = supply.Building.CompanyId == company.Id;
+                decimal transferCost;
+                if (sellerIsSameCompany)
+                {
+                    transferCost = 0m;
+                }
+                else
+                {
+                    transferCost = fill * supply.PricePerUnit;
+                    if (company.Cash < transferCost)
+                    {
+                        fill = company.Cash / supply.PricePerUnit;
+                        fill = Math.Floor(fill * 10000m) / 10000m;
+                        transferCost = fill * supply.PricePerUnit;
+                    }
+                }
+
+                if (fill <= 0m) break;
+
+                var withdrawn = context.WithdrawInventory(supply.Inventory, fill);
+                if (withdrawn.Quantity <= 0m) continue;
+
+                if (sellerIsSameCompany)
+                {
+                    totalSourcingCost += withdrawn.SourcingCostTotal;
+                }
+                else
+                {
+                    transferCost = withdrawn.Quantity * supply.PricePerUnit;
+                    company.Cash -= transferCost;
+
+                    if (context.CompaniesById.TryGetValue(supply.Building.CompanyId, out var seller))
+                        seller.Cash += transferCost;
+
+                    context.Db.LedgerEntries.Add(new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = company.Id,
+                        BuildingId = building.Id,
+                        BuildingUnitId = unit.Id,
+                        Category = LedgerCategory.PurchasingCost,
+                        Description = resourceId.HasValue ? "Purchase: local raw material" : "Purchase: local product",
+                        Amount = -transferCost,
+                        RecordedAtTick = context.CurrentTick,
+                        RecordedAtUtc = DateTime.UtcNow,
+                        ResourceTypeId = resourceId,
+                        ProductTypeId = productId,
+                    });
+
+                    totalSourcingCost += transferCost;
+                }
+
+                totalBought += withdrawn.Quantity;
+                weightedQualityTotal += withdrawn.Quantity * supply.Inventory.Quality;
             }
         }
 
@@ -146,9 +222,7 @@ public sealed class PurchasingPhase : ITickPhase
             {
                 totalBought += globalBought;
                 totalSourcingCost += globalCost;
-                inventoryQuality = inventoryQuality > 0m
-                    ? (inventoryQuality + globalQuality) / 2m  // blend with existing inventory quality
-                    : globalQuality;
+                weightedQualityTotal += globalBought * globalQuality;
             }
         }
 
@@ -156,8 +230,77 @@ public sealed class PurchasingPhase : ITickPhase
         {
             var inv = context.GetOrCreateUnitInventory(
                 building.Id, unit.Id, resourceId, productId);
+            var inventoryQuality = weightedQualityTotal > 0m ? weightedQualityTotal / totalBought : (decimal?)null;
             context.AddInventory(inv, totalBought, totalSourcingCost, inventoryQuality);
         }
+    }
+
+    private static List<(Building Building, BuildingUnit Unit, Inventory Inventory, decimal PricePerUnit)> GetLocalB2BSupplies(
+        TickContext context,
+        Building destinationBuilding,
+        BuildingUnit purchaseUnit,
+        Guid? resourceId,
+        Guid? productId,
+        decimal maxPrice,
+        decimal minQuality)
+    {
+        var matchingSupplies = new List<(Building Building, BuildingUnit Unit, Inventory Inventory, decimal PricePerUnit)>();
+
+        foreach (var (buildingId, units) in context.UnitsByBuilding)
+        {
+            if (!context.BuildingsById.TryGetValue(buildingId, out var building))
+                continue;
+            if (building.Id == destinationBuilding.Id || building.CityId != destinationBuilding.CityId)
+                continue;
+
+            foreach (var unit in units)
+            {
+                if (unit.UnitType != UnitType.B2BSales)
+                    continue;
+                if (purchaseUnit.VendorLockCompanyId.HasValue && building.CompanyId != purchaseUnit.VendorLockCompanyId.Value)
+                    continue;
+                if (!purchaseUnit.VendorLockCompanyId.HasValue && building.CompanyId != destinationBuilding.CompanyId)
+                    continue;
+                if (!context.InventoryByUnit.TryGetValue(unit.Id, out var inventories))
+                    continue;
+
+                foreach (var inventory in inventories)
+                {
+                    if (inventory.Quantity <= 0m)
+                        continue;
+                    if (resourceId.HasValue && inventory.ResourceTypeId != resourceId)
+                        continue;
+                    if (productId.HasValue && inventory.ProductTypeId != productId)
+                        continue;
+                    if (resourceId is null && productId is null)
+                        continue;
+                    if (inventory.Quality < minQuality)
+                        continue;
+
+                    var price = unit.MinPrice ?? GetBasePrice(context, inventory.ResourceTypeId, inventory.ProductTypeId);
+                    if (price <= 0m || price > maxPrice)
+                        continue;
+
+                    matchingSupplies.Add((building, unit, inventory, price));
+                }
+            }
+        }
+
+        return matchingSupplies
+            .OrderBy(supply => supply.PricePerUnit)
+            .ThenByDescending(supply => supply.Inventory.Quality)
+            .ToList();
+    }
+
+    private static decimal GetBasePrice(TickContext context, Guid? resourceId, Guid? productId)
+    {
+        if (productId.HasValue && context.ProductTypesById.TryGetValue(productId.Value, out var productType))
+            return productType.BasePrice;
+
+        if (resourceId.HasValue && context.ResourceTypesById.TryGetValue(resourceId.Value, out var resourceType))
+            return resourceType.BasePrice;
+
+        return 0m;
     }
 
     /// <summary>

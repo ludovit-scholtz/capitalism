@@ -227,6 +227,148 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         return (company.Id, factory.Id, shop.Id);
     }
 
+    private async Task<(Guid CompanyId, Guid FactoryId, Guid ShopId, Guid ShopPurchaseUnitId, Guid ShopPublicSalesUnitId)> SeedFactoryToShopSupplyChainAsync(AppDbContext db)
+    {
+        var city = await db.Cities.Include(c => c.Resources).FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"factory-chain-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Factory Chain Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Starter Chain Corp",
+            Cash = 5_000_000m
+        };
+        db.Companies.Add(company);
+
+        var product = await db.ProductTypes
+            .Include(candidate => candidate.Recipes)
+            .FirstAsync(candidate => candidate.Slug == "wooden-chair");
+        var woodResource = await db.ResourceTypes.FirstAsync(candidate => candidate.Slug == "wood");
+
+        var factory = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Starter Factory",
+            Level = 1
+        };
+        db.Buildings.Add(factory);
+
+        var factoryPurchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.Purchase,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,
+            ResourceTypeId = woodResource.Id,
+            MaxPrice = 999_999m,
+            PurchaseSource = "EXCHANGE"
+        };
+
+        db.BuildingUnits.AddRange(
+            factoryPurchaseUnit,
+            new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factory.Id,
+                UnitType = UnitType.Manufacturing,
+                GridX = 1,
+                GridY = 0,
+                Level = 1,
+                LinkRight = true,
+                ProductTypeId = product.Id
+            },
+            new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factory.Id,
+                UnitType = UnitType.Storage,
+                GridX = 2,
+                GridY = 0,
+                Level = 1,
+                LinkRight = true
+            },
+            new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factory.Id,
+                UnitType = UnitType.B2BSales,
+                GridX = 3,
+                GridY = 0,
+                Level = 1,
+                ProductTypeId = product.Id,
+                MinPrice = product.BasePrice,
+                SaleVisibility = "COMPANY"
+            });
+
+        var shop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Starter Shop",
+            Level = 1
+        };
+        db.Buildings.Add(shop);
+
+        var shopPurchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.Purchase,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,
+            ProductTypeId = product.Id,
+            PurchaseSource = "LOCAL",
+            MaxPrice = product.BasePrice * 1.1m,
+            VendorLockCompanyId = company.Id
+        };
+        var shopPublicSalesUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 1,
+            GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice * 1.5m
+        };
+        db.BuildingUnits.AddRange(shopPurchaseUnit, shopPublicSalesUnit);
+
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            BuildingUnitId = factoryPurchaseUnit.Id,
+            ResourceTypeId = woodResource.Id,
+            Quantity = 10m,
+            Quality = 0.7m,
+            SourcingCostTotal = 40m
+        });
+
+        await db.SaveChangesAsync();
+        return (company.Id, factory.Id, shop.Id, shopPurchaseUnit.Id, shopPublicSalesUnit.Id);
+    }
+
     private async Task<(Guid CompanyId, Guid BuildingId)> SeedApartmentAsync(AppDbContext db)
     {
         var city = await db.Cities.FirstAsync();
@@ -398,6 +540,32 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Sales should have generated revenue.
         Assert.True(company.Cash > cashBefore,
             "Company cash should increase after public sales.");
+    }
+
+    [Fact]
+    public async Task PurchasingPhase_PurchaseUnit_BuysProductsFromSameCompanyB2BSalesUnit()
+    {
+        Guid shopPurchaseUnitId;
+
+        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (_, _, _, shopPurchaseUnitId, _) = await SeedFactoryToShopSupplyChainAsync(seedDb);
+        }
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        var purchasedInventory = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == shopPurchaseUnitId && entry.ProductTypeId != null)
+            .ToListAsync();
+
+        Assert.True(
+            purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+            "Shop purchase unit should buy finished products from the same company's B2B sales unit.");
     }
 
     [Fact]
