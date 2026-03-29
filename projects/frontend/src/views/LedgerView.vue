@@ -22,7 +22,7 @@ const LEDGER_QUERY = `
     companyLedger(companyId: $companyId) {
       companyId companyName currentCash
       totalRevenue totalPurchasingCosts totalMarketingCosts totalTaxPaid totalOtherCosts netIncome
-      buildingValue inventoryValue totalAssets totalPropertyPurchases
+      propertyValue propertyAppreciation buildingValue inventoryValue totalAssets totalPropertyPurchases
       cashFromOperations cashFromInvestments firstRecordedTick lastRecordedTick
       buildingSummaries { buildingId buildingName buildingType revenue costs }
     }
@@ -211,16 +211,26 @@ onMounted(fetchLedger)
               <span>{{ formatAmount(ledger.currentCash) }}</span>
             </div>
             <div class="statement-row">
-              <span class="row-label">{{ t('ledger.buildingValue') }}</span>
-              <span>{{ formatAmount(ledger.buildingValue) }}</span>
+              <span class="row-label">{{ t('ledger.propertyValue') }}</span>
+              <span>{{ formatAmount(ledger.propertyValue) }}</span>
               <button
                 class="drill-btn"
                 :class="{ active: drillCategory === 'PROPERTY_PURCHASE' }"
-                :aria-label="t('ledger.drillDown') + ': ' + t('ledger.buildingValue')"
+                :aria-label="t('ledger.drillDown') + ': ' + t('ledger.propertyValue')"
                 @click="toggleDrill('PROPERTY_PURCHASE')"
               >
                 {{ drillCategory === 'PROPERTY_PURCHASE' ? '▲' : '▼' }}
               </button>
+            </div>
+            <div class="statement-row">
+              <span class="row-label">{{ t('ledger.propertyAppreciation') }}</span>
+              <span :class="amountClass(ledger.propertyAppreciation)">{{
+                formatAmount(ledger.propertyAppreciation)
+              }}</span>
+            </div>
+            <div class="statement-row">
+              <span class="row-label">{{ t('ledger.buildingValue') }}</span>
+              <span>{{ formatAmount(ledger.buildingValue) }}</span>
             </div>
             <div class="statement-row">
               <span class="row-label">{{ t('ledger.inventoryValue') }}</span>

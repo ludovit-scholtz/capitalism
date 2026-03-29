@@ -401,6 +401,149 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
+    public async Task PublicSalesPhase_HigherPopulationIndexImprovesSales()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync(candidate => candidate.Slug == "wooden-chair");
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"population-sales-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Population Sales Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Retail Density Corp",
+            Cash = 2_000_000m
+        };
+        db.Companies.Add(company);
+
+        var premiumShop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Center Shop",
+            Latitude = city.Latitude + 0.001,
+            Longitude = city.Longitude + 0.001,
+            Level = 1
+        };
+        var outskirtsShop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Outskirts Shop",
+            Latitude = city.Latitude + 0.085,
+            Longitude = city.Longitude + 0.085,
+            Level = 1
+        };
+        db.Buildings.AddRange(premiumShop, outskirtsShop);
+
+        var premiumUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = premiumShop.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice * 1.8m,
+        };
+        var outskirtsUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = outskirtsShop.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice * 1.8m,
+        };
+        db.BuildingUnits.AddRange(premiumUnit, outskirtsUnit);
+
+        db.Inventories.AddRange(
+            new Inventory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = premiumShop.Id,
+                BuildingUnitId = premiumUnit.Id,
+                ProductTypeId = product.Id,
+                Quantity = 50m,
+                Quality = 0.8m,
+            },
+            new Inventory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = outskirtsShop.Id,
+                BuildingUnitId = outskirtsUnit.Id,
+                ProductTypeId = product.Id,
+                Quantity = 50m,
+                Quality = 0.8m,
+            });
+
+        db.BuildingLots.AddRange(
+            new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = city.Id,
+                Name = "Center Retail Lot",
+                Description = "High-footfall central parcel.",
+                District = "Retail District",
+                Latitude = premiumShop.Latitude,
+                Longitude = premiumShop.Longitude,
+                BasePrice = 120_000m,
+                Price = 120_000m,
+                PopulationIndex = 1.6m,
+                SuitableTypes = BuildingType.SalesShop,
+                OwnerCompanyId = company.Id,
+                BuildingId = premiumShop.Id,
+            },
+            new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = city.Id,
+                Name = "Peripheral Retail Lot",
+                Description = "Low-density edge parcel.",
+                District = "Retail District",
+                Latitude = outskirtsShop.Latitude,
+                Longitude = outskirtsShop.Longitude,
+                BasePrice = 80_000m,
+                Price = 80_000m,
+                PopulationIndex = 0.45m,
+                SuitableTypes = BuildingType.SalesShop,
+                OwnerCompanyId = company.Id,
+                BuildingId = outskirtsShop.Id,
+            });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var revenuesByBuilding = await db.PublicSalesRecords
+            .Where(record => record.BuildingId == premiumShop.Id || record.BuildingId == outskirtsShop.Id)
+            .GroupBy(record => record.BuildingId)
+            .ToDictionaryAsync(group => group.Key, group => group.Sum(record => record.Revenue));
+
+        Assert.True(revenuesByBuilding[premiumShop.Id] > revenuesByBuilding[outskirtsShop.Id],
+            "The sales shop on higher-population land should sell more than the comparable outskirt shop.");
+    }
+
+    [Fact]
     public async Task RentPhase_CollectsRentForApartments()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

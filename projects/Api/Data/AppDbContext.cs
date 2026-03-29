@@ -204,6 +204,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(lot => lot.Name).HasMaxLength(200);
             e.Property(lot => lot.Description).HasMaxLength(500);
             e.Property(lot => lot.District).HasMaxLength(100);
+            e.Property(lot => lot.PopulationIndex).HasPrecision(9, 4);
+            e.Property(lot => lot.BasePrice).HasPrecision(18, 2);
             e.Property(lot => lot.Price).HasPrecision(18, 2);
             e.Property(lot => lot.SuitableTypes).HasMaxLength(200);
             e.Property(lot => lot.ConcurrencyToken).IsConcurrencyToken();

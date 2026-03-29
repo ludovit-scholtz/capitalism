@@ -555,6 +555,11 @@ public sealed class Query
         var totalOtherCosts = Math.Abs(entries.Where(e => e.Category == LedgerCategory.Other && e.Amount < 0).Sum(e => e.Amount));
         var totalPropertyPurchases = Math.Abs(entries.Where(e => e.Category == LedgerCategory.PropertyPurchase).Sum(e => e.Amount));
 
+        var ownedLots = await db.BuildingLots
+            .Where(lot => lot.OwnerCompanyId == companyId)
+            .ToListAsync();
+
+        var propertyValue = ownedLots.Sum(WealthCalculator.GetLandValue);
         var buildingValue = company.Buildings.Sum(b => WealthCalculator.GetBuildingValue(b));
 
         var buildingIds = company.Buildings.Select(b => b.Id).ToList();
@@ -594,9 +599,11 @@ public sealed class Query
             TotalOtherCosts = totalOtherCosts,
             TotalPropertyPurchases = totalPropertyPurchases,
             NetIncome = totalRevenue - totalPurchasingCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
+            PropertyValue = propertyValue,
+            PropertyAppreciation = propertyValue - totalPropertyPurchases,
             BuildingValue = buildingValue,
             InventoryValue = inventoryValue,
-            TotalAssets = company.Cash + buildingValue + inventoryValue,
+            TotalAssets = company.Cash + propertyValue + buildingValue + inventoryValue,
             CashFromOperations = totalRevenue - totalPurchasingCosts - totalMarketingCosts,
             CashFromInvestments = -totalPropertyPurchases,
             FirstRecordedTick = entries.Count > 0 ? entries.Min(e => e.RecordedAtTick) : 0,

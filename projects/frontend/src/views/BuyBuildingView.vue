@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
-import type { City, Building } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult } from '@/types'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -14,8 +14,11 @@ const auth = useAuthStore()
 const companyId = computed(() => route.params.companyId as string)
 
 const loading = ref(false)
+const lotsLoading = ref(false)
 const error = ref<string | null>(null)
 const cities = ref<City[]>([])
+const availableLots = ref<BuildingLot[]>([])
+const selectedLotId = ref('')
 const selectedType = ref('')
 const selectedCityId = ref('')
 const buildingName = ref('')
@@ -34,8 +37,16 @@ const buildingTypes = [
   'POWER_PLANT',
 ]
 
+const selectedCompany = computed<Company | null>(() => {
+  return auth.player?.companies.find((company) => company.id === companyId.value) ?? null
+})
+
+const selectedLot = computed<BuildingLot | null>(() => {
+  return availableLots.value.find((lot) => lot.id === selectedLotId.value) ?? null
+})
+
 const canSubmit = computed(
-  () => !!selectedType.value && !!selectedCityId.value && !!buildingName.value.trim(),
+  () => !!selectedType.value && !!selectedCityId.value && !!buildingName.value.trim() && !!selectedLot.value,
 )
 
 onMounted(async () => {
@@ -43,12 +54,21 @@ onMounted(async () => {
     router.push('/login')
     return
   }
+
+  if (!auth.player) {
+    await auth.fetchMe()
+  }
+
   loading.value = true
   try {
     const data = await gqlRequest<{ cities: City[] }>(
       '{ cities { id name countryCode population } }',
     )
     cities.value = data.cities
+
+    if (!selectedCompany.value) {
+      error.value = t('cityMap.noCompany')
+    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load cities'
   } finally {
@@ -56,29 +76,79 @@ onMounted(async () => {
   }
 })
 
+watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
+  selectedLotId.value = ''
+  availableLots.value = []
+
+  if (!cityId || !buildingType) {
+    return
+  }
+
+  lotsLoading.value = true
+  error.value = null
+
+  try {
+    const data = await gqlRequest<{ cityLots: BuildingLot[] }>(
+      `query BuyBuildingLots($cityId: UUID!) {
+        cityLots(cityId: $cityId) {
+          id cityId name description district latitude longitude populationIndex basePrice price suitableTypes
+          ownerCompanyId buildingId
+        }
+      }`,
+      { cityId },
+    )
+
+    availableLots.value = data.cityLots.filter((lot) => {
+      const supportedTypes = lot.suitableTypes.split(',').map((item) => item.trim())
+      return !lot.ownerCompanyId && supportedTypes.includes(buildingType)
+    })
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
+  } finally {
+    lotsLoading.value = false
+  }
+})
+
+function formatCurrency(value: number) {
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+}
+
+function formatPopulationIndex(value: number) {
+  return value.toFixed(2)
+}
+
+function districtLabel(district: string) {
+  const key = `cityMap.districts.${district}`
+  const translated = t(key)
+  return translated === key ? district : translated
+}
+
 async function buyBuilding() {
-  if (!canSubmit.value) return
+  if (!canSubmit.value || !selectedCompany.value || !selectedLot.value) return
+
   submitting.value = true
   error.value = null
+
   try {
-    await gqlRequest<{ placeBuilding: Building }>(
-      `mutation PlaceBuilding($input: PlaceBuildingInput!) {
-        placeBuilding(input: $input) {
-          id name type level
+    const data = await gqlRequest<{ purchaseLot: PurchaseLotResult }>(
+      `mutation PurchaseLot($input: PurchaseLotInput!) {
+        purchaseLot(input: $input) {
+          building { id name type level }
         }
       }`,
       {
         input: {
-          companyId: companyId.value,
-          cityId: selectedCityId.value,
-          type: selectedType.value,
-          name: buildingName.value,
+          companyId: selectedCompany.value.id,
+          lotId: selectedLot.value.id,
+          buildingType: selectedType.value,
+          buildingName: buildingName.value,
         },
       },
     )
-    router.push('/dashboard')
+
+    router.push(`/building/${data.purchaseLot.building.id}`)
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : 'Failed to buy building'
+    error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
   } finally {
     submitting.value = false
   }
@@ -101,7 +171,6 @@ async function buyBuilding() {
       <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
 
       <template v-else>
-        <!-- Step 1: Select building type -->
         <div class="form-section">
           <h2>{{ t('buildings.selectType') }}</h2>
           <div class="type-grid">
@@ -119,7 +188,6 @@ async function buyBuilding() {
           </div>
         </div>
 
-        <!-- Step 2: City and name -->
         <div v-if="selectedType" class="form-section">
           <div class="form-row">
             <div class="form-group">
@@ -148,6 +216,58 @@ async function buyBuilding() {
                   <span class="city-country">{{ city.countryCode }}</span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div v-if="selectedCompany" class="company-banner">
+            <span>{{ selectedCompany.name }}</span>
+            <strong>{{ formatCurrency(selectedCompany.cash) }}</strong>
+          </div>
+        </div>
+
+        <div v-if="selectedType && selectedCityId" class="form-section">
+          <div class="section-header">
+            <h2>{{ t('buildings.selectLand') }}</h2>
+            <span v-if="lotsLoading" class="loading-inline">{{ t('common.loading') }}</span>
+          </div>
+
+          <div v-if="!lotsLoading && availableLots.length === 0" class="empty-state">
+            {{ t('buildings.noAvailableLand') }}
+          </div>
+
+          <div v-else class="lot-grid">
+            <button
+              v-for="lot in availableLots"
+              :key="lot.id"
+              class="lot-card"
+              :class="{ selected: selectedLotId === lot.id }"
+              @click="selectedLotId = lot.id"
+            >
+              <div class="lot-card-header">
+                <span class="lot-name">{{ lot.name }}</span>
+                <span class="lot-price">{{ formatCurrency(lot.price) }}</span>
+              </div>
+              <span class="lot-district">{{ districtLabel(lot.district) }}</span>
+              <span class="lot-meta">
+                {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }}
+              </span>
+              <span class="lot-meta">
+                {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }}
+              </span>
+            </button>
+          </div>
+
+          <div v-if="selectedLot" class="selected-lot-panel">
+            <div>
+              <span class="selected-lot-label">{{ t('buildings.selectedLand') }}</span>
+              <strong>{{ selectedLot.name }}</strong>
+            </div>
+            <div class="selected-lot-stats">
+              <span>{{ districtLabel(selectedLot.district) }}</span>
+              <span>{{ t('buildings.askingPrice') }}: {{ formatCurrency(selectedLot.price) }}</span>
+              <span>
+                {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}
+              </span>
             </div>
           </div>
 
@@ -201,6 +321,14 @@ async function buyBuilding() {
 .buy-card h1 {
   font-size: 1.5rem;
   margin-bottom: 1.5rem;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .form-section {
@@ -301,6 +429,17 @@ async function buyBuilding() {
   flex-wrap: wrap;
 }
 
+.company-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
 .city-option {
   display: flex;
   align-items: center;
@@ -331,6 +470,83 @@ async function buyBuilding() {
 .city-country {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+}
+
+.lot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.lot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.lot-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+}
+
+.lot-card.selected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+  background: rgba(0, 71, 255, 0.08);
+}
+
+.lot-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.lot-name {
+  font-weight: 700;
+}
+
+.lot-price {
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.lot-district,
+.lot-meta,
+.loading-inline,
+.selected-lot-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.selected-lot-panel,
+.empty-state {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.selected-lot-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.selected-lot-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  font-size: 0.875rem;
 }
 
 .action-bar {

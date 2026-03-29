@@ -169,21 +169,24 @@ public sealed class Mutation
                     .Build());
         }
 
-        var building = new Building
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = company.Id,
-            CityId = city.Id,
-            Type = input.Type,
-            Name = input.Name,
-            Latitude = city.Latitude,
-            Longitude = city.Longitude,
-            Level = 1,
-            PowerConsumption = 1m,
-            BuiltAtUtc = DateTime.UtcNow
-        };
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
+        await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
+        var lotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, input.Type);
 
-        db.Buildings.Add(building);
+        var (_, building) = await PrepareLotPurchaseAsync(
+            db,
+            company,
+            lotId,
+            input.Type,
+            input.Name,
+            1m,
+            DateTime.UtcNow,
+            city.Id);
+
+        await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
         await db.SaveChangesAsync();
 
         return building;
@@ -230,6 +233,12 @@ public sealed class Mutation
                     .Build());
         }
 
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
+        await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
+
         // Validate product
         var product = await db.ProductTypes
             .Include(candidate => candidate.Recipes)
@@ -275,57 +284,36 @@ public sealed class Mutation
         };
         db.Companies.Add(company);
 
-        // Create factory with default layout
-        var factory = new Building
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = company.Id,
-            CityId = city.Id,
-            Type = BuildingType.Factory,
-            Name = $"{input.CompanyName} Factory",
-            Latitude = city.Latitude + 0.001,
-            Longitude = city.Longitude + 0.001,
-            Level = 1,
-            PowerConsumption = 2m,
-            BuiltAtUtc = nowUtc
-        };
-        db.Buildings.Add(factory);
+        var factoryLotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, BuildingType.Factory);
+        var (_, factory) = await PrepareLotPurchaseAsync(
+            db,
+            company,
+            factoryLotId,
+            BuildingType.Factory,
+            $"{input.CompanyName} Factory",
+            2m,
+            nowUtc,
+            city.Id);
+        ConfigureStarterFactory(db, factory, product, starterResourceId.Value);
 
-        // Add default factory units: Purchase, Manufacturing, Storage, B2B Sales
-        db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ResourceTypeId = starterResourceId, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Storage, GridX = 2, GridY = 0, Level = 1, LinkRight = true },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice }
-        );
-
-        // Create sales shop
-        var shop = new Building
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = company.Id,
-            CityId = city.Id,
-            Type = BuildingType.SalesShop,
-            Name = $"{input.CompanyName} Shop",
-            Latitude = city.Latitude + 0.002,
-            Longitude = city.Longitude + 0.002,
-            Level = 1,
-            PowerConsumption = 1m,
-            BuiltAtUtc = nowUtc
-        };
-        db.Buildings.Add(shop);
-
-        // Add default shop units: Purchase, Public Sales
-        db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.PublicSales, GridX = 1, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice }
-        );
+        var shopLotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, BuildingType.SalesShop);
+        var (_, shop) = await PrepareLotPurchaseAsync(
+            db,
+            company,
+            shopLotId,
+            BuildingType.SalesShop,
+            $"{input.CompanyName} Shop",
+            1m,
+            nowUtc,
+            city.Id);
+        AddStarterShop(db, shop.Id, product);
 
         // Mark onboarding as completed for this player
         player.OnboardingCompletedAtUtc = nowUtc;
         player.OnboardingShopBuildingId = shop.Id;
         ClearOnboardingProgress(player);
 
+        await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
         await db.SaveChangesAsync();
         var startupPackOffer = await StartupPackService.EnsureOfferForPlayerAsync(db, player, nowUtc);
 
@@ -431,9 +419,14 @@ public sealed class Mutation
         player.OnboardingCityId = input.CityId;
         player.OnboardingCompanyId = company.Id;
         player.OnboardingFactoryLotId = factoryLot.Id;
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
 
         try
         {
+            await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [input.CityId]);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
@@ -561,9 +554,14 @@ public sealed class Mutation
         player.OnboardingCompletedAtUtc = nowUtc;
         player.OnboardingShopBuildingId = shop.Id;
         ClearOnboardingProgress(player);
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
 
         try
         {
+            await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [player.OnboardingCityId!.Value]);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
@@ -735,6 +733,34 @@ public sealed class Mutation
         });
 
         return (lot, building);
+    }
+
+    private static async Task<Guid> FindCompatibleAvailableLotIdAsync(
+        AppDbContext db,
+        Guid cityId,
+        string buildingType)
+    {
+        var lots = await db.BuildingLots
+            .Where(lot => lot.CityId == cityId && lot.OwnerCompanyId == null)
+            .OrderBy(lot => lot.Price)
+            .ToListAsync();
+
+        var lotId = lots
+            .FirstOrDefault(lot => lot.SuitableTypes
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Contains(buildingType, StringComparer.OrdinalIgnoreCase))?
+            .Id;
+
+        if (lotId is not Guid matchingLotId || matchingLotId == Guid.Empty)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("No suitable land is currently available for this building type in the selected city.")
+                    .SetCode("NO_SUITABLE_LOT_AVAILABLE")
+                    .Build());
+        }
+
+        return matchingLotId;
     }
 
     private static async Task EnsureSubmittedProductsAreAccessibleAsync(
@@ -1178,6 +1204,11 @@ public sealed class Mutation
 
         try
         {
+            var currentTick = await db.GameStates
+                .AsNoTracking()
+                .Select(state => state.CurrentTick)
+                .FirstOrDefaultAsync();
+            await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [lot.CityId]);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)

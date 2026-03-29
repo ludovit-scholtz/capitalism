@@ -37,6 +37,18 @@ public sealed class BuildingLot
     /// <summary>Longitude position on the map.</summary>
     public double Longitude { get; set; }
 
+    /// <summary>
+    /// Dynamic density score for the lot. Higher values represent land with stronger
+    /// consumer foot traffic and better access to populated neighborhoods.
+    /// </summary>
+    public decimal PopulationIndex { get; set; } = 1m;
+
+    /// <summary>
+    /// Long-term anchor value for this land parcel. The current appraised price moves
+    /// around this base as the local population index changes over time.
+    /// </summary>
+    public decimal BasePrice { get; set; }
+
     /// <summary>Purchase price in game currency.</summary>
     public decimal Price { get; set; }
 

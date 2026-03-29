@@ -1,4 +1,5 @@
 using Api.Data.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Engine.Phases;
 
@@ -13,10 +14,15 @@ public sealed class PublicSalesPhase : ITickPhase
     public string Name => "PublicSales";
     public int Order => 200;
 
-    public Task ProcessAsync(TickContext context)
+    public async Task ProcessAsync(TickContext context)
     {
         if (!context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var shops))
-            return Task.CompletedTask;
+            return;
+
+        var shopIds = shops.Select(shop => shop.Id).ToList();
+        var lotsByBuildingId = await context.Db.BuildingLots
+            .Where(lot => lot.BuildingId.HasValue && shopIds.Contains(lot.BuildingId.Value))
+            .ToDictionaryAsync(lot => lot.BuildingId!.Value);
 
         foreach (var building in shops)
         {
@@ -30,11 +36,10 @@ public sealed class PublicSalesPhase : ITickPhase
             foreach (var unit in units)
             {
                 if (unit.UnitType != UnitType.PublicSales) continue;
-                ProcessSalesUnit(context, building, unit, city, company);
+                lotsByBuildingId.TryGetValue(building.Id, out var lot);
+                ProcessSalesUnit(context, building, unit, city, company, lot);
             }
         }
-
-        return Task.CompletedTask;
     }
 
     private static void ProcessSalesUnit(
@@ -42,7 +47,8 @@ public sealed class PublicSalesPhase : ITickPhase
         Building building,
         BuildingUnit unit,
         City city,
-        Company company)
+        Company company,
+        BuildingLot? lot)
     {
         if (!context.InventoryByUnit.TryGetValue(unit.Id, out var inventories))
             return;
@@ -81,7 +87,8 @@ public sealed class PublicSalesPhase : ITickPhase
             if (price <= 0m) price = basePrice;
 
             // Demand formula.
-            var baseDemand = city.Population * GameConstants.BaseDemandPerCapita;
+            var populationIndex = lot?.PopulationIndex > 0m ? lot.PopulationIndex : 1m;
+            var baseDemand = city.Population * GameConstants.BaseDemandPerCapita * populationIndex;
             var priceRatio = basePrice > 0m ? price / basePrice : 1m;
             var priceMultiplier = Math.Max(0m, 2m - priceRatio); // demand drops as price exceeds base
             var qualityMultiplier = Math.Max(0.1m, inv.Quality);

@@ -51,6 +51,12 @@ public static class WealthCalculator
         return 0m;
     }
 
+    /// <summary>Returns the current appraised value of a land parcel.</summary>
+    public static decimal GetLandValue(BuildingLot lot)
+    {
+        return Math.Max(lot.Price, 0m);
+    }
+
     /// <summary>
     /// Returns the base price of an inventory item.
     /// Uses the resource type's base price for raw materials, or the product type's

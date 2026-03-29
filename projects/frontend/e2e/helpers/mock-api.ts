@@ -55,6 +55,8 @@ export type MockLedgerSummary = {
   totalTaxPaid: number
   totalOtherCosts: number
   netIncome: number
+  propertyValue: number
+  propertyAppreciation: number
   buildingValue: number
   inventoryValue: number
   totalAssets: number
@@ -209,6 +211,8 @@ export type MockBuildingLot = {
   district: string
   latitude: number
   longitude: number
+  populationIndex: number
+  basePrice: number
   price: number
   suitableTypes: string
   ownerCompanyId: string | null
@@ -648,6 +652,8 @@ export function makeDefaultBuildingLots(): MockBuildingLot[] {
       district: 'Industrial Zone',
       latitude: 48.152,
       longitude: 17.125,
+      populationIndex: 0.78,
+      basePrice: 76000,
       price: 80000,
       suitableTypes: 'FACTORY,MINE',
       ownerCompanyId: null,
@@ -663,6 +669,8 @@ export function makeDefaultBuildingLots(): MockBuildingLot[] {
       district: 'Commercial District',
       latitude: 48.145,
       longitude: 17.107,
+      populationIndex: 1.42,
+      basePrice: 108000,
       price: 120000,
       suitableTypes: 'SALES_SHOP,COMMERCIAL',
       ownerCompanyId: null,
@@ -678,6 +686,8 @@ export function makeDefaultBuildingLots(): MockBuildingLot[] {
       district: 'Residential Quarter',
       latitude: 48.14,
       longitude: 17.1,
+      populationIndex: 1.18,
+      basePrice: 102000,
       price: 110000,
       suitableTypes: 'APARTMENT',
       ownerCompanyId: null,
@@ -693,6 +703,8 @@ export function makeDefaultBuildingLots(): MockBuildingLot[] {
       district: 'Business Park',
       latitude: 48.156,
       longitude: 17.11,
+      populationIndex: 1.08,
+      basePrice: 124000,
       price: 130000,
       suitableTypes: 'RESEARCH_DEVELOPMENT,BANK',
       ownerCompanyId: null,
@@ -1952,6 +1964,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           totalTaxPaid: 0,
           totalOtherCosts: 0,
           netIncome: 0,
+          propertyValue: 0,
+          propertyAppreciation: 0,
           buildingValue,
           inventoryValue: 0,
           totalAssets: company.cash + buildingValue,

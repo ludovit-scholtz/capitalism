@@ -14,6 +14,8 @@ public sealed class CompanyLedgerSummary
     public decimal TotalOtherCosts { get; set; }
     public decimal NetIncome { get; set; }
     // Balance Sheet
+    public decimal PropertyValue { get; set; }
+    public decimal PropertyAppreciation { get; set; }
     public decimal BuildingValue { get; set; }
     public decimal InventoryValue { get; set; }
     public decimal TotalAssets { get; set; }

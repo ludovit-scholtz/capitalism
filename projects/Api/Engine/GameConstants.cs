@@ -59,6 +59,9 @@ public static class GameConstants
     /// <summary>Base demand per capita per product per tick.</summary>
     public const decimal BaseDemandPerCapita = 0.001m;
 
+    /// <summary>Minimum number of purchasable lands maintained per building type and city.</summary>
+    public const int MinimumAvailableLotsPerBuildingType = 10;
+
     /// <summary>Brand awareness increment per unit of marketing budget spent.</summary>
     public const decimal BrandAwarenessPerBudget = 0.0001m;
 

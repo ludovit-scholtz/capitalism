@@ -1,5 +1,6 @@
 using Api.Configuration;
 using Api.Data.Entities;
+using Api.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -77,6 +78,13 @@ public sealed class AppDbInitializer(
             await SeedBuildingLotsAsync();
             await dbContext.SaveChangesAsync();
         }
+
+        var currentTick = await dbContext.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
+        await LandService.EnsureMinimumAvailableLotsAsync(dbContext, currentTick);
+        await dbContext.SaveChangesAsync();
     }
 
     private void SeedResources()
