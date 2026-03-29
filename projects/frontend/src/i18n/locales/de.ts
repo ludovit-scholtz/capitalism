@@ -457,6 +457,9 @@ export default {
       averageQuality: 'Ø Qualität',
       estimatedValue: 'Geschätzter Wert',
       estimatedValueShort: 'Wert {value}',
+      item: 'Artikel',
+      name: 'Name',
+      quality: 'Qualität',
     },
     exchange: {
       title: 'Angebote der globalen Börse',

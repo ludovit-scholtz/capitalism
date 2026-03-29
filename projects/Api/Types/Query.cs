@@ -430,6 +430,47 @@ public sealed class Query
     }
 
     /// <summary>
+    /// Returns detailed inventory entries for units in a building that belongs
+    /// to the authenticated player.
+    /// </summary>
+    [Authorize]
+    public async Task<List<BuildingUnitInventory>> BuildingUnitInventories(
+        Guid buildingId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(candidate => candidate.Company)
+            .FirstOrDefaultAsync(candidate => candidate.Id == buildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        var inventories = await db.Inventories
+            .Where(entry => entry.BuildingId == buildingId && entry.BuildingUnitId.HasValue)
+            .Select(entry => new BuildingUnitInventory
+            {
+                Id = entry.Id,
+                BuildingUnitId = entry.BuildingUnitId!.Value,
+                ResourceTypeId = entry.ResourceTypeId,
+                ProductTypeId = entry.ProductTypeId,
+                Quantity = entry.Quantity,
+                Quality = entry.Quality
+            })
+            .ToListAsync();
+
+        return inventories;
+    }
+
+    /// <summary>
     /// Returns all pending scheduled actions for the authenticated player.
     /// Currently covers building configuration upgrades (layout changes) that have not yet applied.
     /// </summary>

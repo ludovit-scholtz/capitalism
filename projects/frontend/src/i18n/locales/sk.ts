@@ -457,6 +457,9 @@ export default {
       averageQuality: 'Priem. kvalita',
       estimatedValue: 'Odhadovaná hodnota',
       estimatedValueShort: 'Hodnota {value}',
+      item: 'Položka',
+      name: 'Názov',
+      quality: 'Kvalita',
     },
     exchange: {
       title: 'Ponuky globálnej burzy',

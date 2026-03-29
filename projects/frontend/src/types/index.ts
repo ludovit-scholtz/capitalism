@@ -155,6 +155,15 @@ export interface BuildingUnitInventorySummary {
   averageQuality: number | null
 }
 
+export interface BuildingUnitInventory {
+  id: string
+  buildingUnitId: string
+  resourceTypeId: string | null
+  productTypeId: string | null
+  quantity: number
+  quality: number
+}
+
 export interface GlobalExchangeOffer {
   cityId: string
   cityName: string

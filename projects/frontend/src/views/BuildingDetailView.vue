@@ -41,6 +41,7 @@ import type {
   BuildingConfigurationPlanRemoval,
   BuildingConfigurationPlanUnit,
   BuildingUnit,
+  BuildingUnitInventory,
   BuildingUnitInventorySummary,
   Company,
   GlobalExchangeOffer,
@@ -115,6 +116,7 @@ const editBaselineUnits = ref<EditableGridUnit[]>([])
 const resourceTypes = ref<ResourceType[]>([])
 const productTypes = ref<ProductType[]>([])
 const unitInventorySummaries = ref<BuildingUnitInventorySummary[]>([])
+const unitInventories = ref<BuildingUnitInventory[]>([])
 const exchangeOffers = ref<GlobalExchangeOffer[]>([])
 const exchangeOffersLoading = ref(false)
 const showSaleDialog = ref(false)
@@ -1213,6 +1215,15 @@ function getUnitInventorySummary(unit: GridUnit | undefined): BuildingUnitInvent
   return unitInventorySummaries.value.find((summary) => summary.buildingUnitId === activeUnit.id)
 }
 
+function getUnitInventories(unit: GridUnit | undefined): BuildingUnitInventory[] {
+  if (!unit) return []
+  return unitInventories.value.filter((inventory) => inventory.buildingUnitId === unit.id)
+}
+
+function hasUnitInventory(unit: GridUnit | undefined): boolean {
+  return getUnitInventories(unit).length > 0
+}
+
 function formatCurrency(value: number | null | undefined): string {
   const amount = value ?? 0
   const formatter = new Intl.NumberFormat(locale.value, {
@@ -1233,6 +1244,36 @@ function getConfiguredItemMonogram(unit: GridUnit | undefined): string {
   if (!label) return '?'
 
   return label
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+function getInventoryItemImageUrl(inventory: BuildingUnitInventory): string | null {
+  if (inventory.resourceTypeId) {
+    return resourceTypes.value.find((resource) => resource.id === inventory.resourceTypeId)?.imageUrl ?? null
+  }
+  if (inventory.productTypeId) {
+    return productTypes.value.find((product) => product.id === inventory.productTypeId)?.imageUrl ?? null
+  }
+  return null
+}
+
+function getInventoryItemName(inventory: BuildingUnitInventory): string {
+  if (inventory.resourceTypeId) {
+    return getResourceName(inventory.resourceTypeId)
+  }
+  if (inventory.productTypeId) {
+    return getProductName(inventory.productTypeId)
+  }
+  return 'Unknown'
+}
+
+function getInventoryItemMonogram(inventory: BuildingUnitInventory): string {
+  const name = getInventoryItemName(inventory)
+  return name
     .split(/\s+/)
     .filter(Boolean)
     .slice(0, 2)
@@ -1330,6 +1371,32 @@ async function loadUnitInventorySummaries() {
     unitInventorySummaries.value = data.buildingUnitInventorySummaries
   } catch {
     unitInventorySummaries.value = []
+  }
+}
+
+async function loadUnitInventories() {
+  if (!auth.token) {
+    unitInventories.value = []
+    return
+  }
+
+  try {
+    const data = await gqlRequest<{ buildingUnitInventories: BuildingUnitInventory[] }>(
+      `query BuildingUnitInventories($buildingId: UUID!) {
+        buildingUnitInventories(buildingId: $buildingId) {
+          id
+          buildingUnitId
+          resourceTypeId
+          productTypeId
+          quantity
+          quality
+        }
+      }`,
+      { buildingId: buildingId.value },
+    )
+    unitInventories.value = data.buildingUnitInventories
+  } catch {
+    unitInventories.value = []
   }
 }
 
@@ -1545,6 +1612,7 @@ async function loadBuilding() {
     selectedCell.value = null
     showUnitPicker.value = false
     await loadUnitInventorySummaries()
+    await loadUnitInventories()
     await loadGlobalExchangeOffers()
   } catch (reason: unknown) {
     error.value = reason instanceof Error ? reason.message : t('buildingDetail.loadFailed')
@@ -1744,6 +1812,12 @@ watch(
                             </span>
                           </div>
                         </div>
+                        <div v-else-if="getUnitAtFrom(activeUnits, x, y)!.unitType === 'STORAGE' && hasUnitInventory(getUnitAtFrom(activeUnits, x, y))" class="cell-inventory-indicator" aria-hidden="true">
+                          <span class="inventory-icon">📦</span>
+                          <span class="cell-stock">
+                            {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.capacity) }}
+                          </span>
+                        </div>
                         <span v-if="getUnitPrimaryMetric(getUnitAtFrom(activeUnits, x, y))" class="cell-metric" aria-hidden="true">
                           {{ getUnitPrimaryMetric(getUnitAtFrom(activeUnits, x, y)) }}
                         </span>
@@ -1887,6 +1961,12 @@ watch(
                               {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.capacity) }}
                             </span>
                           </div>
+                        </div>
+                        <div v-else-if="getUnitAtFrom(plannedUnits, x, y)!.unitType === 'STORAGE' && hasUnitInventory(getUnitAtFrom(plannedUnits, x, y))" class="cell-inventory-indicator" aria-hidden="true">
+                          <span class="inventory-icon">📦</span>
+                          <span class="cell-stock">
+                            {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.capacity) }}
+                          </span>
                         </div>
                         <span v-if="getUnitPrimaryMetric(getUnitAtFrom(plannedUnits, x, y))" class="cell-metric" aria-hidden="true">
                           {{ getUnitPrimaryMetric(getUnitAtFrom(plannedUnits, x, y)) }}
@@ -2265,6 +2345,34 @@ watch(
                   <span class="stat" v-if="getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))">
                     {{ t('buildingDetail.inventory.estimatedValue') }}: {{ getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}
                   </span>
+                </div>
+                <div v-if="getUnitInventories(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).length > 0" class="inventory-table">
+                  <div class="inventory-table-header">
+                    <span class="inventory-col-icon">{{ t('buildingDetail.inventory.item') }}</span>
+                    <span class="inventory-col-name">{{ t('buildingDetail.inventory.name') }}</span>
+                    <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.quantity') }}</span>
+                    <span class="inventory-col-quality">{{ t('buildingDetail.inventory.quality') }}</span>
+                  </div>
+                  <div v-for="inventory in getUnitInventories(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" :key="inventory.id" class="inventory-table-row">
+                    <div class="inventory-col-icon">
+                      <img
+                        v-if="getInventoryItemImageUrl(inventory)"
+                        class="inventory-item-image"
+                        :src="getInventoryItemImageUrl(inventory)!"
+                        :alt="getInventoryItemName(inventory)"
+                      />
+                      <span v-else class="inventory-item-avatar">{{ getInventoryItemMonogram(inventory) }}</span>
+                    </div>
+                    <div class="inventory-col-name">
+                      <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
+                    </div>
+                    <div class="inventory-col-quantity">
+                      <span class="inventory-item-quantity">{{ formatUnitQuantity(inventory.quantity) }}</span>
+                    </div>
+                    <div class="inventory-col-quality">
+                      <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
+                    </div>
+                  </div>
                 </div>
                 <div class="detail-capacity">
                   <span
@@ -2939,6 +3047,17 @@ watch(
   opacity: 0.85;
 }
 
+.cell-inventory-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.inventory-icon {
+  font-size: 1rem;
+}
+
 .cell-empty {
   font-size: 1.35rem;
   opacity: 0.45;
@@ -3470,6 +3589,85 @@ watch(
   display: grid;
   gap: 0.25rem;
   font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+/* Inventory table */
+.inventory-table {
+  margin-top: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+}
+
+.inventory-table-header,
+.inventory-table-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 80px 80px;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.inventory-table-header {
+  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 95%, white 5%);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.inventory-table-row {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 95%, transparent);
+}
+
+.inventory-table-row:last-child {
+  border-bottom: none;
+}
+
+.inventory-col-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inventory-col-name,
+.inventory-col-quantity,
+.inventory-col-quality {
+  font-size: 0.8125rem;
+}
+
+.inventory-item-image {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.inventory-item-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.inventory-item-name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.inventory-item-quantity,
+.inventory-item-quality {
   color: var(--color-text-secondary);
 }
 

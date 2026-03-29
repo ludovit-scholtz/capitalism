@@ -458,6 +458,9 @@ export default {
       averageQuality: 'Avg. quality',
       estimatedValue: 'Estimated value',
       estimatedValueShort: 'Value {value}',
+      item: 'Item',
+      name: 'Name',
+      quality: 'Quality',
     },
     exchange: {
       title: 'Global exchange offers',
