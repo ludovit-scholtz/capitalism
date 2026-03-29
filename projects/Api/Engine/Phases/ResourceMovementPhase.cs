@@ -81,7 +81,7 @@ public sealed class ResourceMovementPhase : ITickPhase
 
             // Distribute evenly among neighbors with free space.
             var eligibleNeighbors = neighbors
-                .Where(n => context.GetUnitFreeSpace(n) > 0m)
+                .Where(n => context.GetUnitReceivingSpace(n, inv.ResourceTypeId, inv.ProductTypeId) > 0m)
                 .ToList();
             if (eligibleNeighbors.Count == 0) continue;
 
@@ -93,7 +93,7 @@ public sealed class ResourceMovementPhase : ITickPhase
                 if (remainingMovable <= 0m)
                     break;
 
-                var space = context.GetUnitFreeSpace(neighbor);
+                var space = context.GetUnitReceivingSpace(neighbor, inv.ResourceTypeId, inv.ProductTypeId);
                 var transfer = Math.Min(Math.Min(sharePerNeighbor, remainingMovable), space);
                 transfer = Math.Max(0m, Math.Floor(transfer * 10000m) / 10000m);
                 if (transfer <= 0m) continue;

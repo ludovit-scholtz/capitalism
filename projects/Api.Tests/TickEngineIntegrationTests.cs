@@ -798,6 +798,113 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
+    public async Task ResourceMovementPhase_ManufacturingInputDoesNotExceedHalfCapacityForSingleInputRecipe()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var wood = await db.ResourceTypes.FirstAsync(candidate => candidate.Slug == "wood");
+
+        var product = new ProductType
+        {
+            Id = Guid.NewGuid(),
+            Name = "Capacity Test Product",
+            Slug = $"capacity-test-{Guid.NewGuid():N}",
+            Industry = Industry.Furniture,
+            BasePrice = 100m,
+            OutputQuantity = 1m
+        };
+        db.ProductTypes.Add(product);
+        db.ProductRecipes.Add(new ProductRecipe
+        {
+            Id = Guid.NewGuid(),
+            ProductTypeId = product.Id,
+            ResourceTypeId = wood.Id,
+            Quantity = 200m
+        });
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"mfg-cap-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Manufacturing Capacity Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Manufacturing Capacity Corp",
+            Cash = 1_000_000m
+        };
+        db.Companies.Add(company);
+
+        var factory = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Capacity Factory",
+            Level = 1
+        };
+        db.Buildings.Add(factory);
+
+        var purchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.Purchase,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,
+            ResourceTypeId = wood.Id,
+            MaxPrice = 999_999m,
+            PurchaseSource = "LOCAL"
+        };
+        var manufacturingUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.Manufacturing,
+            GridX = 1,
+            GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id
+        };
+        db.BuildingUnits.AddRange(purchaseUnit, manufacturingUnit);
+
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            BuildingUnitId = purchaseUnit.Id,
+            ResourceTypeId = wood.Id,
+            Quantity = 100m,
+            Quality = 0.75m
+        });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var purchaseQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == purchaseUnit.Id && entry.ResourceTypeId == wood.Id)
+            .SumAsync(entry => entry.Quantity);
+        var manufacturingInputQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == manufacturingUnit.Id && entry.ResourceTypeId == wood.Id)
+            .SumAsync(entry => entry.Quantity);
+
+        Assert.Equal(50m, manufacturingInputQuantity);
+        Assert.Equal(50m, purchaseQuantity);
+    }
+
+    [Fact]
     public async Task PublicSalesPhase_HigherPopulationIndexImprovesSales()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

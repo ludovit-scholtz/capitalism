@@ -102,6 +102,63 @@ public sealed class TickContext
     }
 
     /// <summary>
+    /// Returns the remaining space a specific inventory item can occupy in a target unit.
+    /// Manufacturing inputs are capped per ingredient so one input cannot block the whole unit.
+    /// </summary>
+    public decimal GetUnitReceivingSpace(BuildingUnit unit, Guid? resourceTypeId, Guid? productTypeId)
+    {
+        var totalFreeSpace = GetUnitFreeSpace(unit);
+        if (totalFreeSpace <= 0m || unit.UnitType != UnitType.Manufacturing)
+        {
+            return totalFreeSpace;
+        }
+
+        if (!unit.ProductTypeId.HasValue)
+        {
+            return totalFreeSpace;
+        }
+
+        if (productTypeId == unit.ProductTypeId && !resourceTypeId.HasValue)
+        {
+            return totalFreeSpace;
+        }
+
+        if (!RecipesByProduct.TryGetValue(unit.ProductTypeId.Value, out var recipes) || recipes.Count == 0)
+        {
+            return totalFreeSpace;
+        }
+
+        var isRecipeInput = recipes.Any(recipe =>
+            recipe.ResourceTypeId == resourceTypeId
+            || recipe.InputProductTypeId == productTypeId);
+        if (!isRecipeInput)
+        {
+            return totalFreeSpace;
+        }
+
+        var distinctInputCount = recipes
+            .Select(recipe => recipe.ResourceTypeId ?? recipe.InputProductTypeId)
+            .Where(ingredientId => ingredientId.HasValue)
+            .Select(ingredientId => ingredientId!.Value)
+            .Distinct()
+            .Count();
+        if (distinctInputCount <= 0)
+        {
+            return totalFreeSpace;
+        }
+
+        var perIngredientCapacity = GameConstants.StorageCapacity(unit.Level) / (distinctInputCount + 1m);
+        var currentMatchingLoad = InventoryByUnit.TryGetValue(unit.Id, out var inventories)
+            ? inventories
+                .Where(inventory => inventory.ResourceTypeId == resourceTypeId && inventory.ProductTypeId == productTypeId)
+                .Sum(inventory => inventory.Quantity)
+            : 0m;
+
+        var ingredientFreeSpace = Math.Max(0m, perIngredientCapacity - currentMatchingLoad);
+        return Math.Min(totalFreeSpace, ingredientFreeSpace);
+    }
+
+    /// <summary>
     /// Returns how much of an inventory row was already present at tick start and
     /// remains unconsumed by earlier phases in the current tick.
     /// </summary>
