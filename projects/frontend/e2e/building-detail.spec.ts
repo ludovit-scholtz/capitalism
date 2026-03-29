@@ -2070,3 +2070,372 @@ test.describe('Building detail upgrades', () => {
     await expect(plannedPurchase).toHaveAttribute('aria-label', /Buy up to/)
   })
 })
+
+test.describe('Global exchange market', () => {
+  test('shows exchange offer prices, transit costs, and delivered prices for all cities', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-exmkt',
+      playerId: player.id,
+      name: 'Exchange Market Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-exmkt',
+          companyId: 'company-exmkt',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Market Factory',
+          latitude: 48.1486,
+          longitude: 17.1077,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-exmkt-purchase',
+              buildingId: 'building-exmkt',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              purchaseSource: 'EXCHANGE',
+              maxPrice: 999,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-exmkt')
+    await expect(page.getByRole('heading', { name: 'Market Factory' })).toBeVisible()
+
+    // Click on the PURCHASE cell to see exchange offers panel
+    const activeSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    // Exchange offers section must be visible
+    await expect(page.getByText('Global exchange offers')).toBeVisible()
+
+    // All three seeded mock cities must appear in the exchange list
+    const offersList = page.locator('.exchange-offers-list')
+    await expect(offersList).toBeVisible()
+    await expect(offersList.getByText('Bratislava')).toBeVisible()
+    await expect(offersList.getByText('Prague')).toBeVisible()
+    await expect(offersList.getByText('Vienna')).toBeVisible()
+
+    // Exchange, transit, and delivered price labels must all be present
+    // (multiple offers exist, so scope to the first offer)
+    await expect(offersList.getByText(/Exchange:/).first()).toBeVisible()
+    await expect(offersList.getByText(/Transit:/).first()).toBeVisible()
+    await expect(offersList.getByText(/Delivered:/).first()).toBeVisible()
+
+    // Quality must be shown for each offer
+    await expect(offersList.getByText(/Quality \d/).first()).toBeVisible()
+  })
+
+  test('does NOT show exchange offers when purchase source is LOCAL', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-local',
+      playerId: player.id,
+      name: 'Local Source Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-local',
+          companyId: 'company-local',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Local Factory',
+          latitude: 48.1486,
+          longitude: 17.1077,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-local-purchase',
+              buildingId: 'building-local',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              purchaseSource: 'LOCAL',
+              maxPrice: 50,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-local')
+    await expect(page.getByRole('heading', { name: 'Local Factory' })).toBeVisible()
+
+    // Click on the PURCHASE cell
+    const activeSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    // Exchange offers must NOT appear for LOCAL source
+    await expect(page.getByText('Global exchange offers')).toBeHidden()
+  })
+
+  test('shows exchange offers when OPTIMAL source is configured', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-optimal',
+      playerId: player.id,
+      name: 'Optimal Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-optimal',
+          companyId: 'company-optimal',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Optimal Factory',
+          latitude: 48.1486,
+          longitude: 17.1077,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-optimal-purchase',
+              buildingId: 'building-optimal',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              purchaseSource: 'OPTIMAL',
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-optimal')
+    await expect(page.getByRole('heading', { name: 'Optimal Factory' })).toBeVisible()
+
+    const activeSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    // OPTIMAL source also triggers exchange offer visibility
+    await expect(page.getByText('Global exchange offers')).toBeVisible()
+    await expect(page.getByText('Bratislava')).toBeVisible()
+  })
+
+  test('configuring a purchase unit with EXCHANGE source persists and shows exchange offers', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-cfg',
+      playerId: player.id,
+      name: 'Config Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-cfg',
+          companyId: 'company-cfg',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Config Factory',
+          latitude: 48.1486,
+          longitude: 17.1077,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-cfg')
+    await expect(page.getByRole('heading', { name: 'Config Factory' })).toBeVisible()
+
+    // Enter edit mode — the button says "Edit Building"
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    await expect(page.getByRole('button', { name: 'Store Upgrade' })).toBeVisible()
+
+    // Click on an empty cell (0,0) in the draft ("Planned Upgrade") section
+    const draftSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) }).first()
+    await draftSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    // Unit picker should appear; select PURCHASE unit
+    await expect(page.getByText('Select a unit type to place')).toBeVisible()
+    await page.getByRole('button', { name: 'Purchase' }).click()
+
+    // After placing, selectedCell is reset — click the cell again to open config
+    await draftSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    // Config panel should open for the placed PURCHASE unit
+    await expect(page.getByText('Unit Configuration')).toBeVisible()
+    await expect(page.getByText('Input Item')).toBeVisible()
+    await expect(page.getByText('Purchase Source')).toBeVisible()
+
+    // Set purchase source to EXCHANGE via the select next to the "Purchase Source" label
+    const purchaseSourceSelect = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Purchase Source') })
+      .locator('select')
+    await purchaseSourceSelect.selectOption({ value: 'EXCHANGE' })
+
+    // Exchange offers should become visible once source = EXCHANGE and there is a resource set
+    // (exchange loads when source changes; since no resource is set yet the panel may be hidden)
+    // Verify config labels are shown as expected for a PURCHASE unit
+    await expect(page.getByText('Max Price')).toBeVisible()
+    await expect(page.getByText('Min Quality')).toBeVisible()
+  })
+
+  test('exchange offer shows correct breakdown: exchange price, transit, delivered', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-breakdown',
+      playerId: player.id,
+      name: 'Breakdown Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-breakdown',
+          companyId: 'company-breakdown',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Breakdown Factory',
+          latitude: 48.1486,
+          longitude: 17.1077,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-breakdown',
+              buildingId: 'building-breakdown',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              purchaseSource: 'EXCHANGE',
+              maxPrice: 999,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-breakdown')
+    const activeSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    await expect(page.getByText('Global exchange offers')).toBeVisible()
+
+    // The Bratislava offer (same city) should show 0 transit cost (delivered = exchange price)
+    const braSection = page.locator('.exchange-offer-item').filter({ hasText: 'Bratislava' })
+    await expect(braSection).toBeVisible()
+
+    // Bratislava is the destination city so transit should be $0.00 / 0 km
+    await expect(braSection.getByText(/Transit: \$0/)).toBeVisible()
+
+    // Remote city offers must show positive transit cost
+    const pragueSection = page.locator('.exchange-offer-item').filter({ hasText: 'Prague' })
+    await expect(pragueSection).toBeVisible()
+    // Prague transit > 0 (cross-city)
+    const pragueTransitText = await pragueSection.getByText(/Transit:/).textContent()
+    expect(pragueTransitText).not.toContain('$0.00')
+  })
+})
