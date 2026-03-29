@@ -73,6 +73,8 @@ allows to sell raw materials at the place, or ship it to the exchange warehouse.
 
 Allows to purchase products from the exchange warehouse or from other players. The purchase capacity can be increased by upgrading the unit. The maximum purchase price can be set by the player. The purchase can be locked for specific vendor, specific exchange or can be set to buy at the optimal price. The minimum product quality can be set by the player. The purchase unit can be set to buy raw materials or finished products. Unit holds max storage capacity resources.
 
+By default make sure the purchase is the optimal price.
+
 ### Manufacturing unit
 
 allows to manufacture products from raw materials linked to the manufacturing unit. The manufacturing speed and storage size can be increased by upgrading the unit. The player can set the product type to be manufactured. The quality of manufactured product depends on the quality of raw materials and the quality of the researched product. The quality can be increased by upgrading the unit. Unit holds max storage capacity resources for each resource.
@@ -103,7 +105,7 @@ Select what type of marketing to research - The global company branding, industr
 
 On big display the grid is shown on half of the page and unit details is showned in the other side.
 
-When unit has configured resource, make sure to display this resource in the grid at the unit. Also show visually the capacity how much much resource is stored in the unit.
+When unit has configured resource, make sure to display this resource in the grid at the unit including picture. Also show visually the capacity how much much resource is stored in the unit.
 
 Show the most important details in the grid - for example the price to sell the product.
 
@@ -111,13 +113,23 @@ Links between units are directional. Make sure to show the arrow between the uni
 
 When configuring the building and buying the new unit make sure to show user the price how much the unit costs and substract the costs when the building configuration is applied at the backend.
 
+For every resource held in the unit make sure to show the value of the resource.
+
+Show costs associated with the unit and next tick payment for the labor costs.
+
+## Unit price
+
+Each unit costs money to build it. 
+
+Also each unit employs labor depending on the unit level. Labor costs are paid 
+
 ## Ledger
 
 Accounting ledger allows to see the income statement, cash flow statment and balance sheet. Items in the statement can be opened and exact details on each item is visible. For example when the long-term tangible assets from balance sheet is opened, the list of all buildings is visible. When income is clicked the each sales item from each unit is visible and person can access the building. When costs are clicked every costs such as the property purchase, units upgrades, purchasing unit purchases, marketing costs or others are clickable to get to the source. 
 
 ## Timing & Game engine
 
-Game is played in ticks. One game year is 8640 ticks. Game time is visible in the game. The start time is year 2000.
+Game is played in ticks. One game day is 24 ticks. One game year is 8760 ticks. Game time is visible in the game. The start time is year 2000. Show game time in the header.
 
 Each change - new building, change of the building unit plan, or upgrade of the unit takes specific number of ticks to be executed.
 
@@ -153,6 +165,8 @@ Then they pick the location of their first factory and select the first product 
 Next the player buys his first sales shop and configures it to set the sales price to public.
 
 The player is shown that the time goes on and he makes the profit from his business.
+
+Do not require authentication for new not authenticated users. Do not store the progress for these users to the backend, but make sure to show them they bought the buildings they setup the resources chain and they made some profit. After that ask them to log in to save their progress. If there is error such as the building was meanwhile purchased by someone else or profit is too big make sure to create their profile with the name they chosed and start the wizzard again with the authenticated user and this time save everything.
 
 ## City Global Exchanges
 
