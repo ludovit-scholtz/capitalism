@@ -117,7 +117,7 @@ allows to manufacture products from raw materials linked to the manufacturing un
 
 The game engine does not move the input resources from the manufacturing unit to output unit.
 
-The capacity in manufacturing unit for specific input resource must be lower then 1/(input resource count for product) % so that the manufacturing storage capacity is not halted by one input product.
+The capacity in manufacturing unit for specific input resource must be lower then 1/(input resource count for product plus output resource count) % so that the manufacturing storage capacity is not halted by one input product.
 
 The manufacturing takes one tick to process. It converts the input resources to output resources. The costs for the unit such as labor or energy costs are compounded to the sourcing costs of the output product.
 
