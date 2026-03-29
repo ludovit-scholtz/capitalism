@@ -192,6 +192,8 @@ Tick base system handles mainly
 
 Frontend integration to tick resolution must be seamless. User should see next tick calculation visible on the website and should see estimate in real time when he is waiting for some action for example the wait for the building.
 
+Tick base system handles units from the end directions and moves single resources only once. Sales buildings are processed before the factories. If there is purchase unit, manufacturing unit, storage unit and b2b sales unit, first it process movement of available resources to fill in the b2b sales unit from storage, next move resources from manufacturing unit to storage and then move resources from purchase to manufacturing. This means that storage and sales will always have not empty resources if the manufacturing and purchasing is working properly.
+
 ## Building modification
 
 Building unit configuration can be modified. User can edit the building and prepare all building modifications on frontend. When building is done being modified by user, user confirms his selection. Each unit can have different suspend time. For example upgrade unit from level 1 to 2 may take 10 ticks. Upgrade from level 2 to 3 may take 100 ticks. Upgrade from level 3 to 4 may take 1000 ticks. Change in the links between the units takes one tick to apply. Each item the unit or link acts separately. User cannot change the building attributes directly. Everything must be scheduled by the tick resolve engine.
