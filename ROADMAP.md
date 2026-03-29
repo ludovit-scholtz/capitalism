@@ -6,6 +6,8 @@ It will use real world map. The game will start in single city and later other c
 
 ## Buildings
 
+Every building must be placed on existing land. Land can be purchased on map and it has value which can be increased in time, has gps coordinates, and has attributes like population index which serves for the sale unit sales calculation.
+
 Player can buy the buildings:
 - mines, 
 - factories, 
@@ -48,6 +50,26 @@ Appartment buildings and commercial buildings allows to set the price per m^2. A
 Media houses improve brand quality.
 
 Banks allows to borrow to player money. Player can configure the interest rate in the bank.
+
+## Land
+
+Game engine ensures there is always at least 10 available lands available for each building type in each city. Buildings can be purchased only on existing lands.
+
+Each land has properties:
+
+### gps coordinates
+
+The logicics costs between buildings is calculated when resources moves. The real distance between buildings is calculated.
+
+GPS coordinates cannot change. Only game engine is allowed to modify this property.
+
+### Population index
+
+Population index is information on how close to the city center the building is located, with respect the randomness and respect of closeby residential and commercial occupancy and city overall population.
+
+Poplulation index changes over time. Only game engine is allowed to modify this property.
+
+The population index is the input to the public sales unit function. Products are sold better in more populated areas.
 
 ## Ranking
 
