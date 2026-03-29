@@ -299,6 +299,7 @@ export interface ProductType {
   id: string
   name: string
   slug: string
+  imageUrl?: string | null
   industry: string
   basePrice: number
   baseCraftTicks: number

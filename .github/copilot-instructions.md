@@ -313,6 +313,17 @@ Root-cause of a quality failure (March 2026, PR #51 onboarding follow-up):
 4. Add backend assertions for authoritative starter configuration values when the guided flow depends on them (for example min/max prices, product/resource bindings, and unit links).
 5. Do not respond to product-review feedback with "tests already pass" alone — prove the player-visible outcome and then update the PR description accordingly.
 
+## Frontend CI parity — avoid local/CI type-check drift
+
+Root-cause of a quality failure (March 2026, PR #52 onboarding follow-up):
+- `frontend-ci-cd` failed in CI with a `vue-tsc` error even though the agent had previously seen a local `npm run build` succeed.
+- The missing type surface (`ProductType.imageUrl`) was still referenced by the app, but the local check did not expose it before the branch was pushed.
+
+**When frontend CI reports a type-check failure but local build looked green:**
+1. Pull the failing GitHub Actions job logs and identify the exact file/line before assuming the failure is transient.
+2. Re-run the frontend pipeline from a clean dependency state (`npm ci`, then `npm run lint`, `npm run test:unit`, `npm run build`) so CI and local validation match.
+3. If the failure is a missing property on a shared frontend GraphQL type, update the canonical type definition in `src/types/index.ts` and then rerun the affected build/tests.
+
 ## E2E test quality — preventing selector failures
 
 Root-cause of a quality failure (March 2026, PR #48 / global exchange):
