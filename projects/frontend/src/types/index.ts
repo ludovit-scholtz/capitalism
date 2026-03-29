@@ -312,6 +312,7 @@ export interface ProductType {
   id: string
   name: string
   slug: string
+  imageUrl?: string | null
   industry: string
   basePrice: number
   baseCraftTicks: number
@@ -319,7 +320,6 @@ export interface ProductType {
   energyConsumptionMwh: number
   unitName: string
   unitSymbol: string
-  imageUrl?: string | null
   isProOnly: boolean
   isUnlockedForCurrentPlayer: boolean
   description: string | null

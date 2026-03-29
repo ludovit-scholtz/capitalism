@@ -1955,6 +1955,107 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task FinishOnboarding_ConfiguresStarterPricingAndLinks()
+    {
+        var token = await RegisterAndGetTokenAsync($"onboard-map-config-{Guid.NewGuid()}@test.com", "Config Founder");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Config Founder Co");
+
+        var productsResult = await ExecuteGraphQlAsync(
+            """
+            query {
+              productTypes(industry: "FURNITURE") {
+                id
+                slug
+                basePrice
+                recipes {
+                  resourceType { id }
+                }
+              }
+            }
+            """);
+
+        var selectedProduct = productsResult.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray()
+            .Single(product => product.GetProperty("slug").GetString() == "wooden-chair");
+        var productId = selectedProduct.GetProperty("id").GetString()!;
+        var basePrice = selectedProduct.GetProperty("basePrice").GetDecimal();
+        var starterResourceId = selectedProduct.GetProperty("recipes").EnumerateArray()
+            .Select(recipe => recipe.GetProperty("resourceType"))
+            .Single(resourceType => resourceType.ValueKind == JsonValueKind.Object)
+            .GetProperty("id")
+            .GetString();
+
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 95_000m, "Configured Shop Lot");
+        await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var companiesResult = await ExecuteGraphQlAsync(
+            """
+            {
+              myCompanies {
+                buildings {
+                  type
+                  units {
+                    unitType
+                    gridX
+                    gridY
+                    resourceTypeId
+                    productTypeId
+                    minPrice
+                    maxPrice
+                    purchaseSource
+                    linkRight
+                  }
+                }
+              }
+            }
+            """,
+            token: token);
+
+        var buildings = companiesResult.GetProperty("data").GetProperty("myCompanies")[0].GetProperty("buildings")
+            .EnumerateArray()
+            .ToList();
+        var factory = buildings.Single(building => building.GetProperty("type").GetString() == "FACTORY");
+        var shop = buildings.Single(building => building.GetProperty("type").GetString() == "SALES_SHOP");
+
+        var factoryUnits = factory.GetProperty("units").EnumerateArray().ToList();
+        var factoryPurchase = factoryUnits.Single(unit => unit.GetProperty("unitType").GetString() == "PURCHASE");
+        var factoryManufacturing = factoryUnits.Single(unit => unit.GetProperty("unitType").GetString() == "MANUFACTURING");
+        var factoryStorage = factoryUnits.Single(unit => unit.GetProperty("unitType").GetString() == "STORAGE");
+        var factorySales = factoryUnits.Single(unit => unit.GetProperty("unitType").GetString() == "B2B_SALES");
+
+        Assert.Equal(0, factoryPurchase.GetProperty("gridX").GetInt32());
+        Assert.Equal(starterResourceId, factoryPurchase.GetProperty("resourceTypeId").GetString());
+        Assert.Equal(basePrice, factoryPurchase.GetProperty("maxPrice").GetDecimal());
+        Assert.Equal("LOCAL", factoryPurchase.GetProperty("purchaseSource").GetString());
+        Assert.True(factoryPurchase.GetProperty("linkRight").GetBoolean());
+
+        Assert.Equal(1, factoryManufacturing.GetProperty("gridX").GetInt32());
+        Assert.Equal(productId, factoryManufacturing.GetProperty("productTypeId").GetString());
+        Assert.True(factoryManufacturing.GetProperty("linkRight").GetBoolean());
+
+        Assert.Equal(2, factoryStorage.GetProperty("gridX").GetInt32());
+        Assert.True(factoryStorage.GetProperty("linkRight").GetBoolean());
+
+        Assert.Equal(3, factorySales.GetProperty("gridX").GetInt32());
+        Assert.Equal(productId, factorySales.GetProperty("productTypeId").GetString());
+        Assert.Equal(basePrice, factorySales.GetProperty("minPrice").GetDecimal());
+
+        var shopUnits = shop.GetProperty("units").EnumerateArray().ToList();
+        var shopPurchase = shopUnits.Single(unit => unit.GetProperty("unitType").GetString() == "PURCHASE");
+        var publicSales = shopUnits.Single(unit => unit.GetProperty("unitType").GetString() == "PUBLIC_SALES");
+
+        Assert.Equal(0, shopPurchase.GetProperty("gridX").GetInt32());
+        Assert.Equal(productId, shopPurchase.GetProperty("productTypeId").GetString());
+        Assert.Equal(basePrice, shopPurchase.GetProperty("maxPrice").GetDecimal());
+        Assert.Equal("LOCAL", shopPurchase.GetProperty("purchaseSource").GetString());
+        Assert.True(shopPurchase.GetProperty("linkRight").GetBoolean());
+
+        Assert.Equal(1, publicSales.GetProperty("gridX").GetInt32());
+        Assert.Equal(productId, publicSales.GetProperty("productTypeId").GetString());
+        Assert.Equal(basePrice, publicSales.GetProperty("minPrice").GetDecimal());
+    }
+
+    [Fact]
     public async Task StartOnboardingCompany_UnsuitableFactoryLot_Fails()
     {
         var token = await RegisterAndGetTokenAsync($"onboard-map-invalid-{Guid.NewGuid()}@test.com", "Wrong Plot");
@@ -2526,6 +2627,76 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.True(result.TryGetProperty("errors", out var errors));
         Assert.Equal("INVALID_PRODUCT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WhenShopLotIsUnsuitableType_Fails()
+    {
+        var token = await RegisterAndGetTokenAsync($"finish-unsuitable-shop-{Guid.NewGuid()}@test.com", "UnsuitableShop");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Unsuitable Shop Co");
+        var productId = await GetStarterProductIdAsync();
+        // Use a FACTORY-only lot as the shop lot — should be rejected
+        var factoryOnlyLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m, "Factory-Only Lot");
+
+        var result = await FinishOnboardingAsync(token, productId, factoryOnlyLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("UNSUITABLE_BUILDING_TYPE", code);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WhenShopLotIsInDifferentCity_Fails()
+    {
+        var token = await RegisterAndGetTokenAsync($"finish-city-mismatch-{Guid.NewGuid()}@test.com", "CityMismatch");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "City Mismatch Co");
+        var productId = await GetStarterProductIdAsync();
+
+        // Create a shop lot in a different city
+        var cities = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var allCities = cities.GetProperty("data").GetProperty("cities");
+        var otherCityId = Enumerable.Range(0, allCities.GetArrayLength())
+            .Select(i => allCities[i].GetProperty("id").GetString()!)
+            .FirstOrDefault(id => id != cityId.ToString());
+
+        if (otherCityId is null)
+        {
+            // Only one city seeded — skip the cross-city check gracefully
+            return;
+        }
+
+        var otherCityShopLotId = await CreateTestLotAsync(otherCityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Other City Shop");
+
+        var result = await FinishOnboardingAsync(token, productId, otherCityShopLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("LOT_CITY_MISMATCH", code);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WhenInsufficientFundsForShopLot_Fails()
+    {
+        var token = await RegisterAndGetTokenAsync($"finish-broke-{Guid.NewGuid()}@test.com", "BrokePlayer");
+        var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Broke Shop Co");
+        var productId = await GetStarterProductIdAsync();
+
+        // Drain the company's cash so it cannot afford the shop lot
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var company = await db.Companies.FirstAsync(c => c.Id == Guid.Parse(companyId));
+            company.Cash = 0;
+            await db.SaveChangesAsync();
+        }
+
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Affordable-Looking Shop");
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
     }
 
     [Fact]
