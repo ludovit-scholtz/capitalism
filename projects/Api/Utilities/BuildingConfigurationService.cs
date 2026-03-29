@@ -130,6 +130,8 @@ public static class BuildingConfigurationService
             .Include(plan => plan.Units)
             .Include(plan => plan.Removals)
             .Include(plan => plan.Building)
+            .ThenInclude(building => building.Company)
+            .Include(plan => plan.Building)
             .ThenInclude(building => building.Units)
             .ToListAsync();
 
@@ -150,7 +152,39 @@ public static class BuildingConfigurationService
                 db.BuildingConfigurationPlanRemovals.Remove(removal);
             }
 
-            foreach (var pendingUnit in plan.Units.Where(unit => unit.IsChanged && unit.AppliesAtTick <= currentTick).ToList())
+            var dueUnits = plan.Units
+                .Where(unit => unit.IsChanged && unit.AppliesAtTick <= currentTick)
+                .ToList();
+
+            var costfulDueUnits = dueUnits
+                .Select(unit => new
+                {
+                    Unit = unit,
+                    Cost = BuildingConfigurationEconomics.CalculateActivationCost(
+                        liveUnitsByPosition.GetValueOrDefault((unit.GridX, unit.GridY)),
+                        unit)
+                })
+                .Where(entry => entry.Cost > 0m)
+                .ToList();
+
+            var totalActivationCost = costfulDueUnits.Sum(entry => entry.Cost);
+
+            if (totalActivationCost > 0m && plan.Building.Company.Cash < totalActivationCost)
+            {
+                foreach (var entry in costfulDueUnits)
+                {
+                    entry.Unit.AppliesAtTick = currentTick + 1;
+                    entry.Unit.TicksRequired = Math.Max(entry.Unit.TicksRequired, 1);
+                }
+
+                dueUnits = dueUnits.Except(costfulDueUnits.Select(entry => entry.Unit)).ToList();
+            }
+            else if (totalActivationCost > 0m)
+            {
+                plan.Building.Company.Cash -= totalActivationCost;
+            }
+
+            foreach (var pendingUnit in dueUnits)
             {
                 if (!liveUnitsByPosition.TryGetValue((pendingUnit.GridX, pendingUnit.GridY), out var liveUnit))
                 {

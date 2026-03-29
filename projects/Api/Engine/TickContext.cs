@@ -9,6 +9,9 @@ namespace Api.Engine;
 /// </summary>
 public sealed class TickContext
 {
+    private static decimal RoundInventoryDecimal(decimal value) =>
+        decimal.Round(value, 4, MidpointRounding.AwayFromZero);
+
     public required AppDbContext Db { get; init; }
     public required GameState GameState { get; init; }
     public long CurrentTick => GameState.CurrentTick;
@@ -62,6 +65,7 @@ public sealed class TickContext
             ResourceTypeId = resourceTypeId,
             ProductTypeId = productTypeId,
             Quantity = 0m,
+            SourcingCostTotal = 0m,
             Quality = 0.5m
         };
 
@@ -90,6 +94,62 @@ public sealed class TickContext
     {
         var capacity = GameConstants.StorageCapacity(unit.Level);
         return Math.Max(0m, capacity - GetUnitCurrentLoad(unit.Id));
+    }
+
+    /// <summary>
+    /// Removes quantity from an inventory row and returns the proportional
+    /// sourcing cost carried by the withdrawn quantity.
+    /// </summary>
+    public (decimal Quantity, decimal SourcingCostTotal) WithdrawInventory(
+        Inventory inventory,
+        decimal requestedQuantity)
+    {
+        if (requestedQuantity <= 0m || inventory.Quantity <= 0m)
+        {
+            return (0m, 0m);
+        }
+
+        var actualQuantity = Math.Min(inventory.Quantity, requestedQuantity);
+        var previousQuantity = inventory.Quantity;
+        var costRemoved = previousQuantity > 0m && inventory.SourcingCostTotal > 0m
+            ? RoundInventoryDecimal(inventory.SourcingCostTotal * (actualQuantity / previousQuantity))
+            : 0m;
+
+        inventory.Quantity = RoundInventoryDecimal(previousQuantity - actualQuantity);
+        inventory.SourcingCostTotal = inventory.Quantity <= 0m
+            ? 0m
+            : Math.Max(0m, RoundInventoryDecimal(inventory.SourcingCostTotal - costRemoved));
+
+        return (RoundInventoryDecimal(actualQuantity), costRemoved);
+    }
+
+    /// <summary>
+    /// Adds quantity and sourcing cost to an inventory row while blending
+    /// quality by quantity when a value is supplied.
+    /// </summary>
+    public void AddInventory(
+        Inventory inventory,
+        decimal quantity,
+        decimal sourcingCostTotal,
+        decimal? quality)
+    {
+        if (quantity <= 0m)
+        {
+            return;
+        }
+
+        var previousQuantity = inventory.Quantity;
+        var newQuantity = RoundInventoryDecimal(previousQuantity + quantity);
+
+        if (quality.HasValue && newQuantity > 0m)
+        {
+            inventory.Quality = previousQuantity > 0m
+                ? RoundInventoryDecimal(((inventory.Quality * previousQuantity) + (quality.Value * quantity)) / newQuantity)
+                : RoundInventoryDecimal(quality.Value);
+        }
+
+        inventory.Quantity = newQuantity;
+        inventory.SourcingCostTotal = RoundInventoryDecimal(inventory.SourcingCostTotal + sourcingCostTotal);
     }
 
     /// <summary>Returns units that this unit pushes resources TO (outgoing links).</summary>

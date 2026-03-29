@@ -38,6 +38,12 @@ public sealed class Inventory
     /// <summary>Quantity in stock.</summary>
     public decimal Quantity { get; set; }
 
+    /// <summary>
+    /// Remaining cumulative sourcing cost carried by the quantity still held in
+    /// this inventory row.
+    /// </summary>
+    public decimal SourcingCostTotal { get; set; }
+
     /// <summary>Quality rating (0.0-1.0) for manufactured products.</summary>
     public decimal Quality { get; set; } = 0.5m;
 

@@ -122,6 +122,7 @@ public sealed class ManufacturingPhase : ITickPhase
 
         // Consume inputs.
         decimal avgInputQuality = 0m;
+        decimal totalInputSourcingCost = 0m;
         int qualitySamples = 0;
         foreach (var recipe in recipes)
         {
@@ -135,10 +136,13 @@ public sealed class ManufacturingPhase : ITickPhase
             {
                 if (needed <= 0m) break;
                 var consume = Math.Min(item.Quantity, needed);
+                var withdrawn = context.WithdrawInventory(item, consume);
+                if (withdrawn.Quantity <= 0m) continue;
+
                 avgInputQuality += item.Quality * consume;
+                totalInputSourcingCost += withdrawn.SourcingCostTotal;
                 qualitySamples++;
-                item.Quantity -= consume;
-                needed -= consume;
+                needed -= withdrawn.Quantity;
             }
         }
 
@@ -154,7 +158,6 @@ public sealed class ManufacturingPhase : ITickPhase
         // Produce output.
         var output = context.GetOrCreateUnitInventory(
             building.Id, unit.Id, null, productType.Id);
-        output.Quantity += outputQuantity;
-        output.Quality = quality;
+        context.AddInventory(output, outputQuantity, totalInputSourcingCost, quality);
     }
 }

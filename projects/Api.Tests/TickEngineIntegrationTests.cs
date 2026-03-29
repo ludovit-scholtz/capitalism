@@ -719,5 +719,68 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.Equal(cashBefore + ledgerEntry.Amount, company.Cash);
     }
 
+    [Fact]
+    public async Task PurchasingPhase_GlobalExchange_StoresSourcingCostTotalOnInventory()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (companyId, _, _, purchaseUnitId, _) =
+            await SeedExchangePurchaseUnitAsync(db, maxPrice: 9999m, purchaseSource: "EXCHANGE");
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var ledgerEntry = await db.LedgerEntries
+            .Where(entry => entry.CompanyId == companyId && entry.BuildingUnitId == purchaseUnitId)
+            .SingleAsync();
+
+        var inventory = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == purchaseUnitId && entry.Quantity > 0m)
+            .SingleAsync();
+
+        Assert.True(inventory.SourcingCostTotal > 0m);
+        Assert.Equal(-ledgerEntry.Amount, inventory.SourcingCostTotal);
+        Assert.True(inventory.SourcingCostTotal / inventory.Quantity > 0m);
+    }
+
+    [Fact]
+    public async Task ManufacturingPhase_CarriesConsumedSourcingCostsIntoOutputInventory()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (_, factoryId, _) = await SeedFactoryAndShopAsync(db);
+
+        var purchaseUnit = await db.BuildingUnits
+            .Where(unit => unit.BuildingId == factoryId && unit.UnitType == UnitType.Purchase)
+            .SingleAsync();
+        purchaseUnit.PurchaseSource = "LOCAL";
+        purchaseUnit.MaxPrice = 0m;
+
+        var purchaseInventory = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == purchaseUnit.Id && entry.ResourceTypeId != null)
+            .SingleAsync();
+        purchaseInventory.SourcingCostTotal = 125m;
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var productInventories = await db.Inventories
+            .Where(entry => entry.BuildingId == factoryId && entry.ProductTypeId != null && entry.Quantity > 0m)
+            .ToListAsync();
+
+        Assert.NotEmpty(productInventories);
+        Assert.Equal(12.5m, productInventories.Sum(entry => entry.SourcingCostTotal));
+
+        var remainingRawInventories = await db.Inventories
+            .Where(entry => entry.BuildingId == factoryId && entry.ResourceTypeId != null && entry.Quantity > 0m)
+            .ToListAsync();
+
+        Assert.Equal(9m, remainingRawInventories.Sum(entry => entry.Quantity));
+        Assert.Equal(112.5m, remainingRawInventories.Sum(entry => entry.SourcingCostTotal));
+    }
+
     #endregion
 }

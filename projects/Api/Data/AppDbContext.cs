@@ -266,6 +266,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         {
             e.HasKey(i => i.Id);
             e.Property(i => i.Quantity).HasPrecision(18, 4);
+            e.Property(i => i.SourcingCostTotal).HasPrecision(18, 4);
             e.Property(i => i.Quality).HasPrecision(5, 4);
             e.HasOne(i => i.Building).WithMany().HasForeignKey(i => i.BuildingId);
             e.HasOne(i => i.BuildingUnit).WithMany().HasForeignKey(i => i.BuildingUnitId).OnDelete(DeleteBehavior.SetNull);

@@ -1197,6 +1197,204 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 Assert.Contains(building.GetProperty("units").EnumerateArray(), unit => unit.GetProperty("linkDownLeft").GetBoolean());
         }
 
+                [Fact]
+                public async Task QueuedBuildingConfiguration_DeductsCompanyCashWhenNewUnitsActivate()
+                {
+                    var token = await RegisterAndGetTokenAsync("apply-cost@test.com", "ApplyCost");
+
+                    var companyResult = await ExecuteGraphQlAsync(
+                        "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+                        new { input = new { name = "Apply Cost Corp" } },
+                        token);
+                    var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+                    var companyGuid = Guid.Parse(companyId);
+
+                    var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
+                    var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString()!;
+
+                    var buildingResult = await ExecuteGraphQlAsync(
+                        "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
+                        new { input = new { companyId, cityId, type = "FACTORY", name = "Apply Cost Factory" } },
+                        token);
+                    var buildingId = buildingResult.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString()!;
+
+                    await using (var scope = _factory.Services.CreateAsyncScope())
+                    {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var company = await db.Companies.FirstAsync(candidate => candidate.Id == companyGuid);
+                        company.Cash = 20_000m;
+                        await db.SaveChangesAsync();
+                    }
+
+                    await ExecuteGraphQlAsync(
+                        """
+                        mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+                            storeBuildingConfiguration(input: $input) { id }
+                        }
+                        """,
+                        new
+                        {
+                            input = new
+                            {
+                                buildingId,
+                                units = new[]
+                                {
+                                    new { unitType = "PURCHASE", gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false },
+                                    new { unitType = "STORAGE", gridX = 1, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false }
+                                }
+                            }
+                        },
+                        token);
+
+                    await AdvanceGameTicksAsync(3);
+
+                    var companiesResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            myCompanies {
+                            id
+                            cash
+                            buildings {
+                                id
+                                units { gridX gridY unitType }
+                                pendingConfiguration { id }
+                            }
+                            }
+                        }
+                        """,
+                        token: token);
+
+                    var companyJson = companiesResult.GetProperty("data").GetProperty("myCompanies")
+                        .EnumerateArray().Single(candidate => candidate.GetProperty("id").GetString() == companyId);
+                    var building = companyJson.GetProperty("buildings")
+                        .EnumerateArray().Single(candidate => candidate.GetProperty("id").GetString() == buildingId);
+
+                    Assert.Equal(12_000m, companyJson.GetProperty("cash").GetDecimal());
+                    Assert.Equal(2, building.GetProperty("units").GetArrayLength());
+                    Assert.Equal(JsonValueKind.Null, building.GetProperty("pendingConfiguration").ValueKind);
+                }
+
+                [Fact]
+                public async Task QueuedBuildingConfiguration_InsufficientCashDelaysCostfulActivation()
+                {
+                    var token = await RegisterAndGetTokenAsync("delay-cost@test.com", "DelayCost");
+
+                    var companyResult = await ExecuteGraphQlAsync(
+                        "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+                        new { input = new { name = "Delay Cost Corp" } },
+                        token);
+                    var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+                    var companyGuid = Guid.Parse(companyId);
+
+                    var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
+                    var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString()!;
+
+                    var buildingResult = await ExecuteGraphQlAsync(
+                        "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
+                        new { input = new { companyId, cityId, type = "FACTORY", name = "Delay Cost Factory" } },
+                        token);
+                    var buildingId = buildingResult.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString()!;
+
+                    await using (var scope = _factory.Services.CreateAsyncScope())
+                    {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var company = await db.Companies.FirstAsync(candidate => candidate.Id == companyGuid);
+                        company.Cash = 4_000m;
+                        await db.SaveChangesAsync();
+                    }
+
+                    await ExecuteGraphQlAsync(
+                        """
+                        mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+                            storeBuildingConfiguration(input: $input) { id }
+                        }
+                        """,
+                        new
+                        {
+                            input = new
+                            {
+                                buildingId,
+                                units = new[]
+                                {
+                                    new { unitType = "PURCHASE", gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false }
+                                }
+                            }
+                        },
+                        token);
+
+                    await AdvanceGameTicksAsync(3);
+
+                    long currentTick;
+                    await using (var scope = _factory.Services.CreateAsyncScope())
+                    {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        currentTick = (await db.GameStates.FindAsync(1))!.CurrentTick;
+                    }
+
+                    var delayedResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            myCompanies {
+                            id
+                            cash
+                            buildings {
+                                id
+                                units { id }
+                                pendingConfiguration {
+                                id
+                                appliesAtTick
+                                }
+                            }
+                            }
+                        }
+                        """,
+                        token: token);
+
+                    var delayedCompany = delayedResult.GetProperty("data").GetProperty("myCompanies")
+                        .EnumerateArray().Single(candidate => candidate.GetProperty("id").GetString() == companyId);
+                    var delayedBuilding = delayedCompany.GetProperty("buildings")
+                        .EnumerateArray().Single(candidate => candidate.GetProperty("id").GetString() == buildingId);
+
+                    Assert.Equal(4_000m, delayedCompany.GetProperty("cash").GetDecimal());
+                    Assert.Equal(0, delayedBuilding.GetProperty("units").GetArrayLength());
+                    Assert.Equal(currentTick + 1, delayedBuilding.GetProperty("pendingConfiguration").GetProperty("appliesAtTick").GetInt64());
+
+                    await using (var scope = _factory.Services.CreateAsyncScope())
+                    {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var company = await db.Companies.FirstAsync(candidate => candidate.Id == companyGuid);
+                        company.Cash = 10_000m;
+                        await db.SaveChangesAsync();
+                    }
+
+                    await AdvanceGameTicksAsync(1);
+
+                    var appliedResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            myCompanies {
+                            id
+                            cash
+                            buildings {
+                                id
+                                units { id }
+                                pendingConfiguration { id }
+                            }
+                            }
+                        }
+                        """,
+                        token: token);
+
+                    var appliedCompany = appliedResult.GetProperty("data").GetProperty("myCompanies")
+                        .EnumerateArray().Single(candidate => candidate.GetProperty("id").GetString() == companyId);
+                    var appliedBuilding = appliedCompany.GetProperty("buildings")
+                        .EnumerateArray().Single(candidate => candidate.GetProperty("id").GetString() == buildingId);
+
+                    Assert.Equal(5_500m, appliedCompany.GetProperty("cash").GetDecimal());
+                    Assert.Equal(1, appliedBuilding.GetProperty("units").GetArrayLength());
+                    Assert.Equal(JsonValueKind.Null, appliedBuilding.GetProperty("pendingConfiguration").ValueKind);
+                }
+
             [Fact]
             public async Task StoreBuildingConfiguration_AllowsEditingWhileUnitWorkIsStillPending()
             {
@@ -4395,6 +4593,103 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // cashFromOperations should also reflect the marketing debit.
         Assert.True(ledger.GetProperty("cashFromOperations").GetDecimal() < 0,
             "cashFromOperations should be negative when marketing spend exceeds zero revenue.");
+    }
+
+    [Fact]
+    public async Task BuildingUnitInventories_ReturnSourcingCostsForMixedUnitInventory()
+    {
+        var token = await RegisterAndGetTokenAsync($"inventory-{Guid.NewGuid():N}@test.com", "Inventory Tester");
+        var onboarding = await CompleteOnboardingAsync(token, "Inventory Works");
+        var factoryId = onboarding.Result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("factory").GetProperty("id").GetString()!;
+
+        Guid unitId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var factoryGuid = Guid.Parse(factoryId);
+
+            var unit = await db.BuildingUnits
+                .Where(candidate => candidate.BuildingId == factoryGuid && candidate.UnitType == UnitType.Purchase)
+                .FirstAsync();
+
+            var woodId = await db.ResourceTypes
+                .Where(resource => resource.Slug == "wood")
+                .Select(resource => resource.Id)
+                .FirstAsync();
+
+            var grainId = await db.ResourceTypes
+                .Where(resource => resource.Slug == "grain")
+                .Select(resource => resource.Id)
+                .FirstAsync();
+
+            unitId = unit.Id;
+            db.Inventories.AddRange(
+                new Inventory
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = factoryGuid,
+                    BuildingUnitId = unit.Id,
+                    ResourceTypeId = woodId,
+                    Quantity = 10m,
+                    SourcingCostTotal = 140m,
+                    Quality = 0.8m,
+                },
+                new Inventory
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = factoryGuid,
+                    BuildingUnitId = unit.Id,
+                    ResourceTypeId = grainId,
+                    Quantity = 5m,
+                    SourcingCostTotal = 40m,
+                    Quality = 0.6m,
+                });
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingInventory($buildingId: UUID!) {
+              buildingUnitInventorySummaries(buildingId: $buildingId) {
+                buildingUnitId
+                quantity
+                capacity
+                fillPercent
+                averageQuality
+                totalSourcingCost
+                sourcingCostPerUnit
+              }
+              buildingUnitInventories(buildingId: $buildingId) {
+                buildingUnitId
+                quantity
+                sourcingCostTotal
+                sourcingCostPerUnit
+                quality
+                resourceTypeId
+              }
+            }
+            """,
+            new { buildingId = factoryId },
+            token);
+
+        var data = result.GetProperty("data");
+        var summary = data.GetProperty("buildingUnitInventorySummaries").EnumerateArray()
+            .Single(item => item.GetProperty("buildingUnitId").GetString() == unitId.ToString());
+
+        Assert.Equal(15m, summary.GetProperty("quantity").GetDecimal());
+        Assert.Equal(180m, summary.GetProperty("totalSourcingCost").GetDecimal());
+        Assert.Equal(12m, summary.GetProperty("sourcingCostPerUnit").GetDecimal());
+        Assert.Equal(0.7333m, summary.GetProperty("averageQuality").GetDecimal());
+
+        var inventories = data.GetProperty("buildingUnitInventories").EnumerateArray()
+            .Where(item => item.GetProperty("buildingUnitId").GetString() == unitId.ToString())
+            .ToList();
+
+        Assert.Equal(2, inventories.Count);
+        Assert.Equal(180m, inventories.Sum(item => item.GetProperty("sourcingCostTotal").GetDecimal()));
+        Assert.Contains(inventories, item => item.GetProperty("sourcingCostPerUnit").GetDecimal() == 14m);
+        Assert.Contains(inventories, item => item.GetProperty("sourcingCostPerUnit").GetDecimal() == 8m);
     }
 
     #endregion
