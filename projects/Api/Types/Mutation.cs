@@ -120,7 +120,8 @@ public sealed class Mutation
             PlayerId = userId,
             Name = input.Name,
             Cash = 1_000_000m // Starting capital
-            , FoundedAtUtc = DateTime.UtcNow
+            ,
+            FoundedAtUtc = DateTime.UtcNow
         };
 
         db.Companies.Add(company);
@@ -626,8 +627,8 @@ public sealed class Mutation
     private static void AddStarterShop(AppDbContext db, Guid buildingId, ProductType product)
     {
         db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.PublicSales, GridX = 1, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice }
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id, PurchaseSource = "OPTIMAL", MaxPrice = product.BasePrice * 1.1m },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.PublicSales, GridX = 1, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice * 1.5m }
         );
     }
 
