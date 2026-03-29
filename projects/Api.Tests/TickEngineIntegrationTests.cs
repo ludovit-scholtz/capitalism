@@ -543,14 +543,16 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
-    public async Task PurchasingPhase_PurchaseUnit_BuysProductsFromSameCompanyB2BSalesUnit()
+    public async Task PurchasingPhase_PurchaseUnit_OnlyBuysB2BInventoryThatExistedAtTickStart()
     {
+        Guid factoryId;
         Guid shopPurchaseUnitId;
+        Guid shopPublicSalesUnitId;
 
         await using (var seedScope = _factory.Services.CreateAsyncScope())
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            (_, _, _, shopPurchaseUnitId, _) = await SeedFactoryToShopSupplyChainAsync(seedDb);
+            (_, factoryId, _, shopPurchaseUnitId, shopPublicSalesUnitId) = await SeedFactoryToShopSupplyChainAsync(seedDb);
         }
 
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -560,13 +562,43 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await processor.ProcessTickAsync();
         await processor.ProcessTickAsync();
 
-        var purchasedInventory = await db.Inventories
+        var factoryB2BSalesUnitId = await db.BuildingUnits
+            .Where(unit => unit.BuildingId == factoryId && unit.UnitType == UnitType.B2BSales)
+            .Select(unit => unit.Id)
+            .SingleAsync();
+
+        var purchasedInventoryBeforeThirdTick = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == shopPurchaseUnitId && entry.ProductTypeId != null)
+            .ToListAsync();
+        var b2bInventoryAfterSecondTick = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == factoryB2BSalesUnitId && entry.ProductTypeId != null)
+            .ToListAsync();
+
+        Assert.Equal(
+            0m,
+            purchasedInventoryBeforeThirdTick.Sum(entry => entry.Quantity));
+        Assert.True(
+            b2bInventoryAfterSecondTick.Sum(entry => entry.Quantity) > 0m,
+            "Freshly moved inventory should stop in the B2B sales unit until the next tick.");
+
+        await processor.ProcessTickAsync();
+
+        var purchasedInventoryAfterThirdTick = await db.Inventories
             .Where(entry => entry.BuildingUnitId == shopPurchaseUnitId && entry.ProductTypeId != null)
             .ToListAsync();
 
+        await processor.ProcessTickAsync();
+
+        var publicSalesInventoryAfterFourthTick = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == shopPublicSalesUnitId && entry.ProductTypeId != null)
+            .ToListAsync();
+
         Assert.True(
-            purchasedInventory.Sum(entry => entry.Quantity) > 0m,
-            "Shop purchase unit should buy finished products from the same company's B2B sales unit.");
+            purchasedInventoryAfterThirdTick.Sum(entry => entry.Quantity) > 0m,
+            "Shop purchase unit should buy finished products from the same company's B2B sales unit once that stock existed at tick start.");
+        Assert.True(
+            publicSalesInventoryAfterFourthTick.Sum(entry => entry.Quantity) > 0m,
+            "Products should advance to the public sales unit one hop per tick after the shop purchase unit is filled.");
     }
 
     [Fact]

@@ -159,6 +159,8 @@ For every resource held in the unit make sure to show the value of the resource.
 
 Show costs associated with the unit and next tick payment for the labor costs.
 
+Every unit with resources shows chart of historic movement of the resource. The manufacturing unit shows clearly how many of each resources were consumed and how much was produced when the resource is selected.
+
 ## Unit price
 
 Each unit costs money to build it. 

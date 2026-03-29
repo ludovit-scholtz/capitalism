@@ -32,6 +32,7 @@ public sealed class TickContext
     public Dictionary<Guid, List<ProductRecipe>> RecipesByProduct { get; init; } = [];
     public Dictionary<Guid, List<Brand>> BrandsByCompany { get; init; } = [];
     public List<ExchangeOrder> ActiveExchangeOrders { get; init; } = [];
+    public Dictionary<Guid, decimal> TickStartRemainingQuantityByInventoryId { get; init; } = [];
 
     // ── Pending mutations ──
 
@@ -71,6 +72,7 @@ public sealed class TickContext
 
         unitInventories.Add(inventory);
         NewInventory.Add(inventory);
+        TickStartRemainingQuantityByInventoryId[inventory.Id] = 0m;
 
         if (!InventoryByBuilding.TryGetValue(buildingId, out var buildingInventories))
         {
@@ -97,6 +99,15 @@ public sealed class TickContext
     }
 
     /// <summary>
+    /// Returns how much of an inventory row was already present at tick start and
+    /// remains unconsumed by earlier phases in the current tick.
+    /// </summary>
+    public decimal GetTickStartRemainingQuantity(Inventory inventory)
+    {
+        return TickStartRemainingQuantityByInventoryId.GetValueOrDefault(inventory.Id);
+    }
+
+    /// <summary>
     /// Removes quantity from an inventory row and returns the proportional
     /// sourcing cost carried by the withdrawn quantity.
     /// </summary>
@@ -119,6 +130,13 @@ public sealed class TickContext
         inventory.SourcingCostTotal = inventory.Quantity <= 0m
             ? 0m
             : Math.Max(0m, RoundInventoryDecimal(inventory.SourcingCostTotal - costRemoved));
+
+        if (TickStartRemainingQuantityByInventoryId.TryGetValue(inventory.Id, out var remainingTickStartQuantity))
+        {
+            TickStartRemainingQuantityByInventoryId[inventory.Id] = Math.Max(
+                0m,
+                RoundInventoryDecimal(remainingTickStartQuantity - actualQuantity));
+        }
 
         return (RoundInventoryDecimal(actualQuantity), costRemoved);
     }

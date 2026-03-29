@@ -327,6 +327,22 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
                 .ToListAsync();
 
+            Assert.Equal(
+                0m,
+                purchasedInventory.Sum(entry => entry.Quantity));
+        }
+
+        await ProcessTicksAsync(1);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
             Assert.True(
                 purchasedInventory.Sum(entry => entry.Quantity) > 0m,
                 "Starter sales shop purchase unit should fill from the starter factory output after onboarding.");

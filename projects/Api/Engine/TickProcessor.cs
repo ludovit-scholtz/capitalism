@@ -130,6 +130,7 @@ public sealed class TickProcessor(
                 .GroupBy(b => b.CompanyId)
                 .ToDictionary(g => g.Key, g => g.ToList()),
             ActiveExchangeOrders = exchangeOrders,
+            TickStartRemainingQuantityByInventoryId = inventories.ToDictionary(i => i.Id, i => i.Quantity),
         };
     }
 }

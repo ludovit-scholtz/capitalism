@@ -149,7 +149,11 @@ public sealed class PurchasingPhase : ITickPhase
                 if (totalBought >= maxBuy) break;
 
                 var wanted = maxBuy - totalBought;
-                var fill = Math.Min(wanted, supply.Inventory.Quantity);
+                var eligibleTickStartQuantity = context.GetTickStartRemainingQuantity(supply.Inventory);
+                if (eligibleTickStartQuantity <= 0m)
+                    continue;
+
+                var fill = Math.Min(wanted, eligibleTickStartQuantity);
                 if (fill <= 0m) continue;
 
                 var sellerIsSameCompany = supply.Building.CompanyId == company.Id;
