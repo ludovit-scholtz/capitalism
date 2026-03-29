@@ -791,7 +791,6 @@ const configWarnings = computed<ValidationWarning[]>(() => {
   const purchaseUnits = units.filter((u) => u.unitType === 'PURCHASE')
   const manufacturingUnits = units.filter((u) => u.unitType === 'MANUFACTURING')
   const publicSalesUnits = units.filter((u) => u.unitType === 'PUBLIC_SALES')
-  const b2bSalesUnits = units.filter((u) => u.unitType === 'B2B_SALES')
   const marketingUnits = units.filter((u) => u.unitType === 'MARKETING')
   const brandingUnits = units.filter((u) => u.unitType === 'BRANDING')
   const miningUnits = units.filter((u) => u.unitType === 'MINING')
@@ -882,17 +881,11 @@ const configWarnings = computed<ValidationWarning[]>(() => {
     }
   }
 
-  // Check unlinked storage/sales units
+  // Check unlinked storage units
   for (const su of storageUnits) {
     const linked = getLinkedUnits(su, units)
     if (linked.length === 0) {
       warnings.push({ key: 'buildingDetail.warnings.storageNotLinked', params: { x: su.gridX, y: su.gridY } })
-    }
-  }
-  for (const su of b2bSalesUnits) {
-    const linked = getLinkedUnits(su, units)
-    if (linked.length === 0) {
-      warnings.push({ key: 'buildingDetail.warnings.b2bSalesNotLinked', params: { x: su.gridX, y: su.gridY } })
     }
   }
 

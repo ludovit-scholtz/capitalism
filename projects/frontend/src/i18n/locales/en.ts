@@ -510,7 +510,6 @@ export default {
       manufacturingNotLinked: 'Manufacturing unit at ({x}, {y}) is not linked to a storage or sales output.',
       miningNotLinked: 'Mining unit at ({x}, {y}) is not linked to a storage or sales output.',
       storageNotLinked: 'Storage unit at ({x}, {y}) is not linked to any other unit.',
-      b2bSalesNotLinked: 'B2B Sales unit at ({x}, {y}) is not linked to any other unit.',
     },
     layouts: {
       title: 'Saved Layouts',

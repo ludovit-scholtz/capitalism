@@ -316,7 +316,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
         var productGuid = Guid.Parse(productId);
 
-        await ProcessTicksAsync(2);
+        await ProcessTicksAsync(3);
 
         await using (var verificationScope = _factory.Services.CreateAsyncScope())
         {

@@ -558,6 +558,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var processor = await CreateProcessorAsync(scope);
 
         await processor.ProcessTickAsync();
+        await processor.ProcessTickAsync();
 
         var purchasedInventory = await db.Inventories
             .Where(entry => entry.BuildingUnitId == shopPurchaseUnitId && entry.ProductTypeId != null)
@@ -566,6 +567,151 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.True(
             purchasedInventory.Sum(entry => entry.Quantity) > 0m,
             "Shop purchase unit should buy finished products from the same company's B2B sales unit.");
+    }
+
+    [Fact]
+    public async Task ResourceMovement_MovesEachInventoryOnlyOneHopPerTick()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"one-hop-{Guid.NewGuid():N}@test.com",
+            DisplayName = "One Hop Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "One Hop Corp",
+            Cash = 1_000_000m
+        };
+        db.Companies.Add(company);
+
+        var product = await db.ProductTypes.FirstAsync(candidate => candidate.Slug == "wooden-chair");
+        var ironOre = await db.ResourceTypes.FirstAsync(candidate => candidate.Slug == "iron-ore");
+
+        var factory = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "One Hop Factory",
+            Level = 1
+        };
+        db.Buildings.Add(factory);
+
+        var purchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.Purchase,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,
+            ResourceTypeId = ironOre.Id,
+            MaxPrice = 999_999m,
+            PurchaseSource = "LOCAL"
+        };
+        var manufacturingUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.Manufacturing,
+            GridX = 1,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,
+            ProductTypeId = product.Id
+        };
+        var storageUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.Storage,
+            GridX = 2,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true
+        };
+        var salesUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = factory.Id,
+            UnitType = UnitType.B2BSales,
+            GridX = 3,
+            GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice,
+            SaleVisibility = "COMPANY"
+        };
+        db.BuildingUnits.AddRange(purchaseUnit, manufacturingUnit, storageUnit, salesUnit);
+
+        db.Inventories.AddRange(
+            new Inventory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factory.Id,
+                BuildingUnitId = purchaseUnit.Id,
+                ResourceTypeId = ironOre.Id,
+                Quantity = 4m,
+                Quality = 0.65m
+            },
+            new Inventory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factory.Id,
+                BuildingUnitId = manufacturingUnit.Id,
+                ProductTypeId = product.Id,
+                Quantity = 5m,
+                Quality = 0.8m
+            },
+            new Inventory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factory.Id,
+                BuildingUnitId = storageUnit.Id,
+                ProductTypeId = product.Id,
+                Quantity = 7m,
+                Quality = 0.82m
+            });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var purchaseQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == purchaseUnit.Id && entry.ResourceTypeId == ironOre.Id)
+            .SumAsync(entry => entry.Quantity);
+        var manufacturingProductQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == manufacturingUnit.Id && entry.ProductTypeId == product.Id)
+            .SumAsync(entry => entry.Quantity);
+        var manufacturingInputQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == manufacturingUnit.Id && entry.ResourceTypeId == ironOre.Id)
+            .SumAsync(entry => entry.Quantity);
+        var storageQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == storageUnit.Id && entry.ProductTypeId == product.Id)
+            .SumAsync(entry => entry.Quantity);
+        var salesQuantity = await db.Inventories
+            .Where(entry => entry.BuildingUnitId == salesUnit.Id && entry.ProductTypeId == product.Id)
+            .SumAsync(entry => entry.Quantity);
+
+        Assert.Equal(0m, purchaseQuantity);
+        Assert.Equal(0m, manufacturingProductQuantity);
+        Assert.Equal(4m, manufacturingInputQuantity);
+        Assert.Equal(5m, storageQuantity);
+        Assert.Equal(7m, salesQuantity);
     }
 
     [Fact]

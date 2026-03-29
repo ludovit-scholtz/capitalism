@@ -509,7 +509,6 @@ export default {
       manufacturingNotLinked: 'Výrobná jednotka na ({x}, {y}) nie je prepojená.',
       miningNotLinked: 'Ťažobná jednotka na ({x}, {y}) nie je prepojená.',
       storageNotLinked: 'Skladová jednotka na ({x}, {y}) nie je prepojená.',
-      b2bSalesNotLinked: 'B2B predajná jednotka na ({x}, {y}) nie je prepojená.',
     },
     layouts: {
       title: 'Uložené rozloženia',

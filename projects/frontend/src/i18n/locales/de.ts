@@ -509,7 +509,6 @@ export default {
       manufacturingNotLinked: 'Fertigungseinheit bei ({x}, {y}) ist nicht verbunden.',
       miningNotLinked: 'Bergbaueinheit bei ({x}, {y}) ist nicht verbunden.',
       storageNotLinked: 'Lagereinheit bei ({x}, {y}) ist nicht verbunden.',
-      b2bSalesNotLinked: 'B2B-Verkaufseinheit bei ({x}, {y}) ist nicht verbunden.',
     },
     layouts: {
       title: 'Gespeicherte Layouts',
