@@ -11,6 +11,17 @@ import {
   getLocalizedResourceName,
   getProductImageUrl,
 } from '@/lib/catalogPresentation'
+import {
+  canProceedStep3 as checkCanProceedStep3,
+  canProceedStep4 as checkCanProceedStep4,
+  clampStep,
+  getAvailableLots,
+  getMaxReachableStep,
+  getRecommendedFactoryLotIds,
+  getRecommendedShopLotIds,
+  keyToStep,
+  stepToKey,
+} from '@/lib/onboardingHelpers'
 import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTickCountdown } from '@/composables/useTickCountdown'
@@ -171,56 +182,18 @@ const starterCompany = computed(() => {
 })
 const starterCash = computed(() => onboardingCompanyCash.value ?? starterCompany.value?.cash ?? STARTING_CASH)
 
-const availableFactoryLots = computed(() =>
-  cityLots.value.filter((lot) => lot.suitableTypes.split(',').map((type) => type.trim()).includes('FACTORY')),
-)
-const availableShopLots = computed(() =>
-  cityLots.value.filter((lot) => lot.suitableTypes.split(',').map((type) => type.trim()).includes('SALES_SHOP')),
-)
-const recommendedFactoryLotIds = computed(() => {
-  const industrialLots = availableFactoryLots.value
-    .filter((lot) => !lot.ownerCompanyId && /industrial/i.test(lot.district))
-    .sort((left, right) => left.price - right.price)
-
-  if (industrialLots.length > 0) {
-    return industrialLots.slice(0, 2).map((lot) => lot.id)
-  }
-
-  return availableFactoryLots.value
-    .filter((lot) => !lot.ownerCompanyId)
-    .sort((left, right) => left.price - right.price)
-    .slice(0, 2)
-    .map((lot) => lot.id)
-})
-const recommendedShopLotIds = computed(() => {
-  const commercialLots = availableShopLots.value
-    .filter((lot) => !lot.ownerCompanyId && /(commercial|business)/i.test(lot.district))
-    .sort((left, right) => left.price - right.price)
-
-  if (commercialLots.length > 0) {
-    return commercialLots.slice(0, 2).map((lot) => lot.id)
-  }
-
-  return availableShopLots.value
-    .filter((lot) => !lot.ownerCompanyId)
-    .sort((left, right) => left.price - right.price)
-    .slice(0, 2)
-    .map((lot) => lot.id)
-})
+const availableFactoryLots = computed(() => getAvailableLots(cityLots.value, 'FACTORY'))
+const availableShopLots = computed(() => getAvailableLots(cityLots.value, 'SALES_SHOP'))
+const recommendedFactoryLotIds = computed(() => getRecommendedFactoryLotIds(availableFactoryLots.value))
+const recommendedShopLotIds = computed(() => getRecommendedShopLotIds(availableShopLots.value))
 
 const canProceedStep1 = computed(() => !!selectedIndustry.value)
 const canProceedStep2 = computed(() => !!selectedCityId.value)
 const canProceedStep3 = computed(() =>
-  !!companyName.value.trim()
-  && !!selectedFactoryLot.value
-  && !selectedFactoryLot.value.ownerCompanyId
-  && STARTING_CASH >= selectedFactoryLot.value.price,
+  checkCanProceedStep3(companyName.value, selectedFactoryLot.value, STARTING_CASH),
 )
 const canProceedStep4 = computed(() =>
-  !!selectedProduct.value
-  && !!selectedShopLot.value
-  && !selectedShopLot.value.ownerCompanyId
-  && starterCash.value >= selectedShopLot.value.price,
+  checkCanProceedStep4(selectedProductId.value, selectedShopLot.value, starterCash.value),
 )
 const canShowStep4Summary = computed(() => !!selectedProduct.value && !!selectedFactoryLot.value && !!selectedShopLot.value)
 const activeStartupPackOffer = computed(() =>
@@ -258,6 +231,26 @@ const configureGuideCash = computed(() => {
   return auth.player?.companies[0]?.cash ?? 0
 })
 
+function findResumedShopBasePrice(): number | null {
+  const resumedShop = auth.player?.companies
+    .flatMap((company) => company.buildings)
+    .find((building) => building.id === shopBuildingId.value)
+  const publicSalesUnit = resumedShop?.units.find((unit) => unit.unitType === 'PUBLIC_SALES')
+  return publicSalesUnit?.minPrice ?? null
+}
+
+const configureGuideBasePrice = computed(() => {
+  if (completionResult.value?.selectedProduct.basePrice) {
+    return completionResult.value.selectedProduct.basePrice
+  }
+
+  if (selectedProduct.value?.basePrice) {
+    return selectedProduct.value.basePrice
+  }
+
+  return findResumedShopBasePrice()
+})
+
 const industryIcons: Record<string, string> = {
   FURNITURE: '🪑',
   FOOD_PROCESSING: '🍞',
@@ -270,33 +263,18 @@ const industryDescriptions: Record<string, string> = {
   HEALTHCARE: 'Manufacture medicines from chemical minerals.',
 }
 
-function stepToKey(value: number): string {
-  if (value === 2) return 'city'
-  if (value === 3) return 'factory'
-  if (value === 4) return 'shop'
-  if (value === 5) return 'complete'
-  return 'industry'
+function resolveMaxReachableStep(): number {
+  return getMaxReachableStep({
+    hasCompletionResult: !!completionResult.value,
+    isResumingConfigureStep: isResumingConfigureStep.value,
+    onboardingCurrentStep: auth.player?.onboardingCurrentStep,
+    selectedCityId: selectedCityId.value,
+    selectedIndustry: selectedIndustry.value,
+  })
 }
 
-function keyToStep(value: unknown): number {
-  if (value === 'city') return 2
-  if (value === 'factory') return 3
-  if (value === 'shop') return 4
-  if (value === 'complete') return 5
-  return 1
-}
-
-function getMaxReachableStep(): number {
-  if (completionResult.value) return 5
-  if (isResumingConfigureStep.value) return 5
-  if (auth.player?.onboardingCurrentStep === 'SHOP_SELECTION') return 4
-  if (selectedCityId.value) return 3
-  if (selectedIndustry.value) return 2
-  return 1
-}
-
-function clampStep(requestedStep: number): number {
-  return Math.min(Math.max(requestedStep, 1), getMaxReachableStep())
+function resolveClampStep(requestedStep: number): number {
+  return clampStep(requestedStep, resolveMaxReachableStep())
 }
 
 function saveProgress() {
@@ -343,7 +321,7 @@ function restoreProgress() {
     if (typeof saved.companyName === 'string') companyName.value = saved.companyName
     if (typeof saved.factoryLotId === 'string') selectedFactoryLotId.value = saved.factoryLotId
     if (typeof saved.shopLotId === 'string') selectedShopLotId.value = saved.shopLotId
-    if (typeof saved.step === 'number') step.value = clampStep(saved.step)
+    if (typeof saved.step === 'number') step.value = resolveClampStep(saved.step)
   } catch {
     // corrupted data — ignore
   }
@@ -470,7 +448,7 @@ onMounted(async () => {
       await loadLots()
     }
 
-    step.value = clampStep(keyToStep(route.query.step))
+    step.value = resolveClampStep(keyToStep(route.query.step))
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load data'
   } finally {
@@ -557,7 +535,7 @@ async function completeOnboarding() {
           company { id name cash }
           factory { id name type }
           salesShop { id name type }
-          selectedProduct { name industry }
+          selectedProduct { name industry basePrice }
           startupPackOffer {
             id
             offerKey
@@ -765,6 +743,10 @@ function getCityResourceName(city: City, index: number): string {
 }
 
 function formatCurrency(value: number): string {
+  return value.toLocaleString(locale.value)
+}
+
+function formatNumber(value: number): string {
   return value.toLocaleString(locale.value)
 }
 
@@ -1245,7 +1227,15 @@ onUnmounted(() => {
               <span class="configure-step-icon">💲</span>
               <div class="configure-step-body">
                 <strong>{{ t('onboarding.configureStepPrice') }}</strong>
-                <p>{{ t('onboarding.configureStepPriceDesc') }}</p>
+                <p>
+                  {{
+                    configureGuideBasePrice === null
+                      ? t('onboarding.configureStepPriceDesc')
+                      : t('onboarding.configureStepPriceDescWithPrice', {
+                          price: formatCurrency(configureGuideBasePrice),
+                        })
+                  }}
+                </p>
               </div>
             </article>
 
@@ -1262,6 +1252,9 @@ onUnmounted(() => {
               <div class="configure-step-body">
                 <strong>{{ t('onboarding.configureStepTick') }}</strong>
                 <p>{{ t('onboarding.configureStepTickDesc') }}</p>
+                <p v-if="gameState" class="tick-status">
+                  {{ t('onboarding.configureStepTickStatus', { tick: formatNumber(gameState.currentTick) }) }}
+                </p>
                 <p v-if="tickCountdown" class="tick-countdown" role="timer">{{ tickCountdown }}</p>
               </div>
             </article>
@@ -2008,6 +2001,10 @@ onUnmounted(() => {
 
 .configure-step-body p + p {
   margin-top: 0.5rem;
+}
+
+.tick-status {
+  font-size: 0.85rem !important;
 }
 
 .tick-countdown {

@@ -309,6 +309,86 @@ test.describe('Onboarding wizard', () => {
     await page.waitForURL('/login')
     await expect(page).toHaveURL('/login')
   })
+
+  test('can complete onboarding with Food Processing industry', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    // Select Food Processing industry
+    await page.locator('.industry-card', { hasText: 'Food Processing' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    // Step 2: choose city
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    // Step 3: choose factory lot
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await page.getByLabel('Company Name').fill('Bread Empire Inc')
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    // Step 4: choose product (Bread) and shop lot
+    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
+    await page.locator('.product-card', { hasText: 'Bread' }).click()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+
+    // Completion
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
+  })
+
+  test('can complete onboarding with Healthcare industry', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/onboarding')
+
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
+
+    // Select Healthcare industry
+    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    // Step 2: choose city
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    // Step 3: choose factory lot
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await page.getByLabel('Company Name').fill('Pharma Corp')
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    // Step 4: choose product (Basic Medicine) and shop lot
+    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
+    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+
+    // Completion
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
+  })
 })
 
 test.describe('Dashboard', () => {
@@ -690,8 +770,10 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // All four guidance steps should be visible
     await expect(page.getByText('Review your cash')).toBeVisible()
     await expect(page.getByText('Set a selling price', { exact: true })).toBeVisible()
+    await expect(page.getByText('Start near the base market price of $45.')).toBeVisible()
     await expect(page.getByText('Enable public sales')).toBeVisible()
     await expect(page.getByText('Wait for the next tick')).toBeVisible()
+    await expect(page.getByText('Current simulation tick: 42.')).toBeVisible()
   })
 
   test('completion screen shows Configure My Sales Shop CTA linking to shop building', async ({
