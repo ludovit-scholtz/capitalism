@@ -5,6 +5,14 @@ import { useI18n } from 'vue-i18n'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
 import { isProductLocked } from '@/lib/productAccess'
 import {
+  applyHorizontalLinkCycle,
+  applyVerticalLinkCycle,
+  getHorizontalLinkArrow,
+  getHorizontalLinkState,
+  getVerticalLinkArrow,
+  getVerticalLinkState,
+} from '@/lib/linkHelpers'
+import {
   getLocalizedProductDescription,
   getLocalizedProductName,
   getLocalizedResourceDescription,
@@ -22,6 +30,7 @@ import type {
   ProductType,
   ResourceType,
 } from '@/types'
+import type { HorizontalLinkState, VerticalLinkState } from '@/lib/linkHelpers'
 
 type GridUnit = BuildingUnit | BuildingConfigurationPlanUnit | EditableGridUnit
 type ItemSelection = { kind: 'resource' | 'product'; id: string } | null
@@ -193,6 +202,61 @@ const draftTotalTicks = computed(() => {
   }, 0)
 })
 const hasDraftChanges = computed(() => !areUnitCollectionsEqual(draftUnits.value, editBaselineUnits.value))
+
+type LinkChangeSummaryEntry = {
+  description: string
+  changeType: 'added' | 'removed'
+}
+
+/**
+ * Computes a list of individual directional link changes between the edit baseline
+ * and the current draft layout, for display in the submission summary panel.
+ */
+const draftLinkChanges = computed<LinkChangeSummaryEntry[]>(() => {
+  if (!isEditing.value) return []
+  const changes: LinkChangeSummaryEntry[] = []
+
+  const baselineByPos = new Map(editBaselineUnits.value.map((u) => [`${u.gridX},${u.gridY}`, u]))
+  const draftByPos = new Map(draftUnits.value.map((u) => [`${u.gridX},${u.gridY}`, u]))
+
+  // Check each grid position that appears in baseline or draft
+  const allPositions = new Set([...baselineByPos.keys(), ...draftByPos.keys()])
+  for (const pos of allPositions) {
+    const baseline = baselineByPos.get(pos)
+    const draft = draftByPos.get(pos)
+    const linkDirs = [
+      { flag: 'linkRight', dx: 1, dy: 0, labelKey: 'buildingDetail.linkRight' },
+      { flag: 'linkLeft', dx: -1, dy: 0, labelKey: 'buildingDetail.linkLeft' },
+      { flag: 'linkDown', dx: 0, dy: 1, labelKey: 'buildingDetail.linkDown' },
+      { flag: 'linkUp', dx: 0, dy: -1, labelKey: 'buildingDetail.linkUp' },
+      { flag: 'linkDownRight', dx: 1, dy: 1, labelKey: 'buildingDetail.linkDownRight' },
+      { flag: 'linkDownLeft', dx: -1, dy: 1, labelKey: 'buildingDetail.linkDownLeft' },
+      { flag: 'linkUpRight', dx: 1, dy: -1, labelKey: 'buildingDetail.linkUpRight' },
+      { flag: 'linkUpLeft', dx: -1, dy: -1, labelKey: 'buildingDetail.linkUpLeft' },
+    ] as const
+
+    const [bx = 0, by = 0] = pos.split(',').map(Number)
+    for (const { flag, dx, dy, labelKey } of linkDirs) {
+      const wasActive = !!(baseline?.[flag as keyof typeof baseline])
+      const isActive = !!(draft?.[flag as keyof typeof draft])
+      if (wasActive === isActive) continue
+
+      const srcType = draft?.unitType ?? baseline?.unitType ?? '?'
+      const targetPos = `${bx + dx},${by + dy}`
+      const targetUnit = draftByPos.get(targetPos) ?? baselineByPos.get(targetPos)
+      const tgtType = targetUnit?.unitType ?? '?'
+      const dirLabel = t(labelKey)
+      const src = `${t(`buildingDetail.unitTypes.${srcType}`)} (${bx},${by})`
+      const tgt = `${t(`buildingDetail.unitTypes.${tgtType}`)} (${bx + dx},${by + dy})`
+      changes.push({
+        description: `${src} ${dirLabel.toLowerCase()} → ${tgt}`,
+        changeType: isActive ? 'added' : 'removed',
+      })
+    }
+  }
+
+  return changes
+})
 const selectedDisplayUnit = computed<GridUnit | undefined>(() => {
   if (!selectedCell.value) return undefined
 
@@ -362,6 +426,20 @@ function removeDraftUnit(x: number, y: number) {
   showUnitPicker.value = false
 }
 
+/** Wraps the imported getHorizontalLinkState to use the local GridUnit array type. */
+function getHorizontalLinkStateFor(units: GridUnit[], x: number, y: number): HorizontalLinkState {
+  return getHorizontalLinkState(units, x, y)
+}
+
+/** Wraps the imported getVerticalLinkState to use the local GridUnit array type. */
+function getVerticalLinkStateFor(units: GridUnit[], x: number, y: number): VerticalLinkState {
+  return getVerticalLinkState(units, x, y)
+}
+
+/**
+ * Cycles horizontal link through: none → forward (A→B) → backward (B→A) → both → none.
+ * Links are directional: each unit's flag is set independently.
+ */
 function toggleHorizontalLink(x: number, y: number) {
   if (!isEditing.value) return
 
@@ -369,11 +447,12 @@ function toggleHorizontalLink(x: number, y: number) {
   const right = getDraftUnitAt(x + 1, y)
   if (!left || !right) return
 
-  const next = !left.linkRight
-  left.linkRight = next
-  right.linkLeft = next
+  applyHorizontalLinkCycle(left, right, getHorizontalLinkStateFor(draftUnits.value, x, y))
 }
 
+/**
+ * Cycles vertical link through: none → forward (A→B) → backward (B→A) → both → none.
+ */
 function toggleVerticalLink(x: number, y: number) {
   if (!isEditing.value) return
 
@@ -381,9 +460,7 @@ function toggleVerticalLink(x: number, y: number) {
   const bottom = getDraftUnitAt(x, y + 1)
   if (!top || !bottom) return
 
-  const next = !top.linkDown
-  top.linkDown = next
-  bottom.linkUp = next
+  applyVerticalLinkCycle(top, bottom, getVerticalLinkStateFor(draftUnits.value, x, y))
 }
 
 function clearDiagonalState(units: EditableGridUnit[], x: number, y: number) {
@@ -443,11 +520,11 @@ function toggleDiagonalLink(x: number, y: number) {
 }
 
 function isHorizontalLinkActiveFor(units: GridUnit[], x: number, y: number): boolean {
-  return getUnitAtFrom(units, x, y)?.linkRight || false
+  return getHorizontalLinkStateFor(units, x, y) !== 'none'
 }
 
 function isVerticalLinkActiveFor(units: GridUnit[], x: number, y: number): boolean {
-  return getUnitAtFrom(units, x, y)?.linkDown || false
+  return getVerticalLinkStateFor(units, x, y) !== 'none'
 }
 
 function canToggleHorizontalLink(units: GridUnit[], x: number, y: number): boolean {
@@ -1629,9 +1706,10 @@ watch(
                       v-if="x < 3"
                       :key="`active-horizontal-${x}-${y}`"
                       class="link-toggle horizontal readonly"
-                      :class="{ active: isHorizontalLinkActiveFor(activeUnits, x, y), disabled: !canToggleHorizontalLink(activeUnits, x, y) }"
+                      :class="[`link-state-${getHorizontalLinkStateFor(activeUnits, x, y)}`, { active: isHorizontalLinkActiveFor(activeUnits, x, y), disabled: !canToggleHorizontalLink(activeUnits, x, y) }]"
                     >
                       <span class="link-line"></span>
+                      <span v-if="getHorizontalLinkStateFor(activeUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getHorizontalLinkArrow(getHorizontalLinkStateFor(activeUnits, x, y)) }}</span>
                     </div>
                   </template>
                 </div>
@@ -1640,9 +1718,10 @@ watch(
                   <template v-for="x in gridIndexes" :key="`active-connector-${x}-${y}`">
                     <div
                       class="link-toggle vertical readonly"
-                      :class="{ active: isVerticalLinkActiveFor(activeUnits, x, y), disabled: !canToggleVerticalLink(activeUnits, x, y) }"
+                      :class="[`link-state-${getVerticalLinkStateFor(activeUnits, x, y)}`, { active: isVerticalLinkActiveFor(activeUnits, x, y), disabled: !canToggleVerticalLink(activeUnits, x, y) }]"
                     >
                       <span class="link-line"></span>
+                      <span v-if="getVerticalLinkStateFor(activeUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getVerticalLinkArrow(getVerticalLinkStateFor(activeUnits, x, y)) }}</span>
                     </div>
 
                     <div
@@ -1685,6 +1764,21 @@ watch(
             <div class="upgrade-summary">
               <span class="upgrade-summary-pill">{{ t('buildingDetail.currentTickLabel', { tick: currentTick }) }}</span>
               <span class="upgrade-summary-pill">{{ t('buildingDetail.totalUpgradeTicks', { ticks: draftTotalTicks }) }}</span>
+            </div>
+
+            <div v-if="draftLinkChanges.length > 0" class="link-changes-summary" role="region" :aria-label="t('buildingDetail.linkChangesSummaryTitle')">
+              <h4 class="link-changes-title">{{ t('buildingDetail.linkChangesSummaryTitle') }}</h4>
+              <ul class="link-changes-list">
+                <li
+                  v-for="(change, i) in draftLinkChanges"
+                  :key="i"
+                  class="link-change-item"
+                  :class="change.changeType === 'added' ? 'link-change-added' : 'link-change-removed'"
+                >
+                  <span class="link-change-badge" aria-hidden="true">{{ change.changeType === 'added' ? '+' : '−' }}</span>
+                  <span>{{ change.description }}</span>
+                </li>
+              </ul>
             </div>
 
             <div class="unit-grid">
@@ -1744,12 +1838,13 @@ watch(
                       v-if="x < 3"
                       :key="`planned-horizontal-${x}-${y}`"
                       class="link-toggle horizontal"
-                      :class="{ active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) }"
+                      :class="[`link-state-${getHorizontalLinkStateFor(plannedUnits, x, y)}`, { active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) }]"
                       :disabled="!canToggleHorizontalLink(plannedUnits, x, y)"
-                      :aria-label="t('buildingDetail.linkRight')"
+                      :aria-label="t('buildingDetail.linkHorizontalAriaLabel', { state: getHorizontalLinkStateFor(plannedUnits, x, y) })"
                       @click="toggleHorizontalLink(x, y)"
                     >
                       <span class="link-line"></span>
+                      <span v-if="getHorizontalLinkStateFor(plannedUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getHorizontalLinkArrow(getHorizontalLinkStateFor(plannedUnits, x, y)) }}</span>
                     </button>
                   </template>
                 </div>
@@ -1758,12 +1853,13 @@ watch(
                   <template v-for="x in gridIndexes" :key="`planned-connector-${x}-${y}`">
                     <button
                       class="link-toggle vertical"
-                      :class="{ active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) }"
+                      :class="[`link-state-${getVerticalLinkStateFor(plannedUnits, x, y)}`, { active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) }]"
                       :disabled="!canToggleVerticalLink(plannedUnits, x, y)"
-                      :aria-label="t('buildingDetail.linkDown')"
+                      :aria-label="t('buildingDetail.linkVerticalAriaLabel', { state: getVerticalLinkStateFor(plannedUnits, x, y) })"
                       @click="toggleVerticalLink(x, y)"
                     >
                       <span class="link-line"></span>
+                      <span v-if="getVerticalLinkStateFor(plannedUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getVerticalLinkArrow(getVerticalLinkStateFor(plannedUnits, x, y)) }}</span>
                     </button>
 
                     <button
@@ -2395,6 +2491,63 @@ watch(
   gap: 0.5rem;
 }
 
+/* Link changes summary panel shown before submission */
+.link-changes-summary {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+}
+
+.link-changes-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.link-changes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.link-change-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.link-change-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.link-change-added .link-change-badge {
+  background: rgba(0, 200, 83, 0.12);
+  color: var(--color-secondary, #00c853);
+}
+
+.link-change-removed .link-change-badge {
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--color-danger, #dc2626);
+}
+
 .meta-pill,
 .upgrade-summary-pill,
 .upgrade-pill {
@@ -2680,6 +2833,50 @@ watch(
 
 .link-toggle.active .link-line {
   background: var(--color-primary);
+}
+
+/* Directional arrow indicator inside link toggle buttons */
+.link-arrow {
+  position: absolute;
+  font-size: 7px;
+  line-height: 1;
+  color: var(--color-primary);
+  pointer-events: none;
+  font-weight: 700;
+}
+
+.link-toggle.horizontal .link-arrow {
+  right: 1px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.link-toggle.horizontal.link-state-backward .link-arrow {
+  right: auto;
+  left: 1px;
+}
+
+.link-toggle.horizontal.link-state-both .link-arrow {
+  right: auto;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.link-toggle.vertical .link-arrow {
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.link-toggle.vertical.link-state-backward .link-arrow {
+  bottom: auto;
+  top: 1px;
+}
+
+.link-toggle.vertical.link-state-both .link-arrow {
+  top: 50%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
 }
 
 .diag-line {
