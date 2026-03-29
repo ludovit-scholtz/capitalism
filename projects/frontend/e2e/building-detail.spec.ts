@@ -569,6 +569,91 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Vienna')).toBeVisible()
   })
 
+  test('shows configured resource image, inventory value, and new-unit cost while planning', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-display',
+      playerId: player.id,
+      name: 'Display Test Co',
+      cash: 25000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-display',
+          companyId: 'company-display',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Display Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'display-storage',
+              buildingId: 'building-display',
+              unitType: 'STORAGE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 60,
+              inventoryQuality: 0.8,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    const wood = state.resourceTypes.find((resource) => resource.id === 'res-wood')!
+    wood.imageUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-display')
+    await expect(page.getByRole('heading', { name: 'Display Factory' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const activeCell = getGridCell(activeSection, 0, 0)
+
+    await expect(activeCell).toContainText('Wood')
+    await expect(activeCell).toContainText('60/100')
+    await expect(activeCell).toContainText('Value $600')
+    await expect(activeCell.locator('img.cell-item-image')).toHaveCount(1)
+
+    await activeCell.click()
+    await expect(page.getByText('Estimated value: $600')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    await expect(page.locator('.upgrade-summary').getByText('Build cost: $0')).toBeVisible()
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 1, 0).click()
+
+    await expect(page.getByText('Unit cost: $4,500')).toBeVisible()
+    await page.getByRole('button', { name: 'Purchase' }).click()
+
+    await expect(page.locator('.upgrade-summary').getByText('Build cost: $4,500')).toBeVisible()
+    await expect(page.locator('.upgrade-summary').getByText('Cash after apply: $20,500')).toBeVisible()
+  })
+
   test('lets players configure research product and brand-quality scope', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

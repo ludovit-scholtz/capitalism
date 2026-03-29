@@ -3,6 +3,12 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
+import {
+  getInventoryEstimatedValue,
+  getPlannedUnitConstructionCost,
+  getUnitConstructionCost,
+  sumPlannedConfigurationCost,
+} from '@/lib/buildingUnitEconomics'
 import { isProductLocked } from '@/lib/productAccess'
 import {
   formatPercent,
@@ -36,6 +42,7 @@ import type {
   BuildingConfigurationPlanUnit,
   BuildingUnit,
   BuildingUnitInventorySummary,
+  Company,
   GlobalExchangeOffer,
   ProductType,
   ResourceType,
@@ -99,6 +106,7 @@ const currentTick = ref(0)
 const loading = ref(true)
 const saving = ref(false)
 const error = ref<string | null>(null)
+const companyCash = ref<number | null>(null)
 const isEditing = ref(false)
 const selectedCell = ref<{ x: number; y: number } | null>(null)
 const showUnitPicker = ref(false)
@@ -212,6 +220,11 @@ const draftTotalTicks = computed(() => {
   }, 0)
 })
 const hasDraftChanges = computed(() => !areUnitCollectionsEqual(draftUnits.value, editBaselineUnits.value))
+const draftConstructionCost = computed(() => sumPlannedConfigurationCost(activeUnits.value, draftUnits.value))
+const projectedCompanyCashAfterApply = computed(() => {
+  if (companyCash.value == null) return null
+  return companyCash.value - draftConstructionCost.value
+})
 
 type LinkChangeSummaryEntry = {
   description: string
@@ -1189,7 +1202,75 @@ function getUnitPrimaryMetric(unit: GridUnit | undefined): string | null {
 
 function getUnitInventorySummary(unit: GridUnit | undefined): BuildingUnitInventorySummary | undefined {
   if (!unit) return undefined
-  return unitInventorySummaries.value.find((summary) => summary.buildingUnitId === unit.id)
+  const directSummary = unitInventorySummaries.value.find((summary) => summary.buildingUnitId === unit.id)
+  if (directSummary) return directSummary
+
+  const activeUnit = activeUnits.value.find(
+    (candidate) => candidate.gridX === unit.gridX && candidate.gridY === unit.gridY,
+  )
+
+  if (!activeUnit) return undefined
+  return unitInventorySummaries.value.find((summary) => summary.buildingUnitId === activeUnit.id)
+}
+
+function formatCurrency(value: number | null | undefined): string {
+  const amount = value ?? 0
+  const formatter = new Intl.NumberFormat(locale.value, {
+    minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+    maximumFractionDigits: 2,
+  })
+  return `$${formatter.format(amount)}`
+}
+
+function getConfiguredItemImageUrl(unit: GridUnit | undefined): string | null {
+  const resourceTypeId = unit && 'resourceTypeId' in unit ? unit.resourceTypeId : null
+  if (!resourceTypeId) return null
+  return resourceTypes.value.find((resource) => resource.id === resourceTypeId)?.imageUrl ?? null
+}
+
+function getConfiguredItemMonogram(unit: GridUnit | undefined): string {
+  const label = getUnitConfiguredItemLabel(unit)
+  if (!label) return '?'
+
+  return label
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+}
+
+function getUnitInventoryValue(unit: GridUnit | undefined): number | null {
+  if (!unit) return null
+  const summary = getUnitInventorySummary(unit)
+  if (!summary) return null
+
+  const resourceTypeId = 'resourceTypeId' in unit ? unit.resourceTypeId : null
+  const productTypeId = 'productTypeId' in unit ? unit.productTypeId : null
+
+  return getInventoryEstimatedValue(
+    summary.quantity,
+    resourceTypeId,
+    productTypeId,
+    resourceTypes.value,
+    productTypes.value,
+  )
+}
+
+function getUnitInventoryValueLabel(unit: GridUnit | undefined): string | null {
+  const value = getUnitInventoryValue(unit)
+  return value == null ? null : formatCurrency(value)
+}
+
+function getDraftUnitConstructionCost(unit: GridUnit | undefined): number {
+  if (!unit) return 0
+  const activeUnit = getUnitAtFrom(activeUnits.value, unit.gridX, unit.gridY)
+  return getPlannedUnitConstructionCost(activeUnit, unit)
+}
+
+function getDraftUnitConstructionCostLabel(unit: GridUnit | undefined): string | null {
+  const cost = getDraftUnitConstructionCost(unit)
+  return cost > 0 ? formatCurrency(cost) : null
 }
 
 function getPurchaseUnitResourceTypeId(unit: GridUnit | undefined): string | null {
@@ -1301,8 +1382,10 @@ async function loadBuilding() {
     error.value = null
 
     const [companiesData, gameStateData, resourceData, productData] = await Promise.all([
-      gqlRequest<{ myCompanies: { buildings: Building[] }[] }>(
+      gqlRequest<{ myCompanies: Company[] }>(
         `{ myCompanies {
+          id
+          cash
           buildings {
             id
             companyId
@@ -1448,9 +1531,12 @@ async function loadBuilding() {
     building.value = allBuildings.find((candidate) => candidate.id === buildingId.value) || null
 
     if (!building.value) {
+      companyCash.value = null
       error.value = t('buildingDetail.notFound')
       return
     }
+
+    companyCash.value = companiesData.myCompanies.find((company) => company.id === building.value?.companyId)?.cash ?? null
 
     const sourceUnits = pendingConfiguration.value?.units ?? building.value.units
     setDraftUnitsFrom(sourceUnits)
@@ -1639,14 +1725,31 @@ watch(
                       @keydown.enter.space.prevent="selectedCell = getUnitAtFrom(activeUnits, x, y) ? { x, y } : null"
                     >
                       <template v-if="getUnitAtFrom(activeUnits, x, y)">
-                        <span class="cell-type" aria-hidden="true">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
-                        <span v-if="getUnitConfiguredItemLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-item" aria-hidden="true">
-                          {{ getUnitConfiguredItemLabel(getUnitAtFrom(activeUnits, x, y)) }}
-                        </span>
+                        <div class="cell-heading" aria-hidden="true">
+                          <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
+                          <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
+                        </div>
+                        <div v-if="getUnitConfiguredItemLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-item-block" aria-hidden="true">
+                          <img
+                            v-if="getConfiguredItemImageUrl(getUnitAtFrom(activeUnits, x, y))"
+                            class="cell-item-image"
+                            :src="getConfiguredItemImageUrl(getUnitAtFrom(activeUnits, x, y))!"
+                            alt=""
+                          />
+                          <span v-else class="cell-item-avatar">{{ getConfiguredItemMonogram(getUnitAtFrom(activeUnits, x, y)) }}</span>
+                          <div class="cell-item-copy">
+                            <span class="cell-item">{{ getUnitConfiguredItemLabel(getUnitAtFrom(activeUnits, x, y)) }}</span>
+                            <span v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))" class="cell-stock">
+                              {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.capacity) }}
+                            </span>
+                          </div>
+                        </div>
                         <span v-if="getUnitPrimaryMetric(getUnitAtFrom(activeUnits, x, y))" class="cell-metric" aria-hidden="true">
                           {{ getUnitPrimaryMetric(getUnitAtFrom(activeUnits, x, y)) }}
                         </span>
-                        <span class="cell-level" aria-hidden="true">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
+                        <span v-if="getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-value" aria-hidden="true">
+                          {{ t('buildingDetail.inventory.estimatedValueShort', { value: getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, x, y)) }) }}
+                        </span>
                         <div
                           v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.capacity"
                           class="cell-capacity"
@@ -1726,6 +1829,10 @@ watch(
             <div class="upgrade-summary">
               <span class="upgrade-summary-pill">{{ t('buildingDetail.currentTickLabel', { tick: currentTick }) }}</span>
               <span class="upgrade-summary-pill">{{ t('buildingDetail.totalUpgradeTicks', { ticks: draftTotalTicks }) }}</span>
+              <span class="upgrade-summary-pill">{{ t('buildingDetail.totalBuildCost', { cost: formatCurrency(draftConstructionCost) }) }}</span>
+              <span v-if="projectedCompanyCashAfterApply != null" class="upgrade-summary-pill">
+                {{ t('buildingDetail.cashAfterApply', { cash: formatCurrency(projectedCompanyCashAfterApply) }) }}
+              </span>
             </div>
 
             <div v-if="draftLinkChanges.length > 0" class="link-changes-summary" role="region" :aria-label="t('buildingDetail.linkChangesSummaryTitle')">
@@ -1762,14 +1869,31 @@ watch(
                       @click="clickDraftCell(x, y)"
                     >
                       <template v-if="getUnitAtFrom(plannedUnits, x, y)">
-                        <span class="cell-type" aria-hidden="true">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, x, y)!.unitType}`) }}</span>
-                        <span v-if="getUnitConfiguredItemLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-item" aria-hidden="true">
-                          {{ getUnitConfiguredItemLabel(getUnitAtFrom(plannedUnits, x, y)) }}
-                        </span>
+                        <div class="cell-heading" aria-hidden="true">
+                          <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, x, y)!.unitType}`) }}</span>
+                          <span class="cell-level">Lv.{{ getUnitAtFrom(plannedUnits, x, y)!.level }}</span>
+                        </div>
+                        <div v-if="getUnitConfiguredItemLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-item-block" aria-hidden="true">
+                          <img
+                            v-if="getConfiguredItemImageUrl(getUnitAtFrom(plannedUnits, x, y))"
+                            class="cell-item-image"
+                            :src="getConfiguredItemImageUrl(getUnitAtFrom(plannedUnits, x, y))!"
+                            alt=""
+                          />
+                          <span v-else class="cell-item-avatar">{{ getConfiguredItemMonogram(getUnitAtFrom(plannedUnits, x, y)) }}</span>
+                          <div class="cell-item-copy">
+                            <span class="cell-item">{{ getUnitConfiguredItemLabel(getUnitAtFrom(plannedUnits, x, y)) }}</span>
+                            <span v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))" class="cell-stock">
+                              {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.capacity) }}
+                            </span>
+                          </div>
+                        </div>
                         <span v-if="getUnitPrimaryMetric(getUnitAtFrom(plannedUnits, x, y))" class="cell-metric" aria-hidden="true">
                           {{ getUnitPrimaryMetric(getUnitAtFrom(plannedUnits, x, y)) }}
                         </span>
-                        <span class="cell-level" aria-hidden="true">Lv.{{ getUnitAtFrom(plannedUnits, x, y)!.level }}</span>
+                        <span v-if="getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-value" aria-hidden="true">
+                          {{ t('buildingDetail.inventory.estimatedValueShort', { value: getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, x, y)) }) }}
+                        </span>
                         <div
                           v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.capacity"
                           class="cell-capacity"
@@ -1862,6 +1986,7 @@ watch(
                 <div class="picker-info">
                   <span class="picker-name">{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
                   <span class="picker-desc">{{ t(`buildingDetail.unitDescriptions.${unitType}`) }}</span>
+                  <span class="picker-cost">{{ t('buildingDetail.unitCost', { cost: formatCurrency(getUnitConstructionCost(unitType)) }) }}</span>
                 </div>
               </button>
             </div>
@@ -1878,6 +2003,9 @@ watch(
               <div class="unit-stats">
                 <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.level }}</span>
                 <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+                <span v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="stat">
+                  {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }) }}
+                </span>
                 <span class="stat" v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) > 0">
                   {{ t('buildingDetail.unitUnavailableFor', { ticks: getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) }) }}
                 </span>
@@ -2134,12 +2262,27 @@ watch(
                   <span class="stat" v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
                     {{ t('buildingDetail.inventory.averageQuality') }}: {{ formatPercent(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}
                   </span>
+                  <span class="stat" v-if="getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))">
+                    {{ t('buildingDetail.inventory.estimatedValue') }}: {{ getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}
+                  </span>
                 </div>
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
                     :style="{ width: `${Math.round(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.fillPercent * 100)}%` }"
                   ></span>
+                </div>
+              </div>
+
+              <div
+                v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))"
+                class="unit-insight-card"
+              >
+                <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
+                <div class="unit-stats">
+                  <span class="stat">
+                    {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }) }}
+                  </span>
                 </div>
               </div>
 
@@ -2256,6 +2399,9 @@ watch(
                   <span class="stat" v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
                     {{ t('buildingDetail.inventory.averageQuality') }}: {{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}
                   </span>
+                  <span class="stat" v-if="getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))">
+                    {{ t('buildingDetail.inventory.estimatedValue') }}: {{ getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)) }}
+                  </span>
                 </div>
                 <div class="detail-capacity">
                   <span
@@ -2288,6 +2434,29 @@ watch(
             </div>
           </div>
         </div>
+
+        <div v-else class="sidebar sidebar-placeholder">
+          <div class="unit-config">
+            <div class="unit-config-header">
+              <h3>{{ t('buildingDetail.unitDetails') }}</h3>
+            </div>
+            <div class="unit-detail placeholder-detail">
+              <h4>{{ t('buildingDetail.sidebarPlaceholderTitle') }}</h4>
+              <p class="unit-desc">
+                {{ isEditing ? t('buildingDetail.sidebarPlaceholderBodyEditing') : t('buildingDetail.sidebarPlaceholderBody') }}
+              </p>
+              <div v-if="isEditing" class="unit-insight-card placeholder-summary-card">
+                <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
+                <div class="unit-stats">
+                  <span class="stat">{{ t('buildingDetail.totalBuildCost', { cost: formatCurrency(draftConstructionCost) }) }}</span>
+                  <span v-if="projectedCompanyCashAfterApply != null" class="stat">
+                    {{ t('buildingDetail.cashAfterApply', { cash: formatCurrency(projectedCompanyCashAfterApply) }) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </template>
   </div>
@@ -2305,9 +2474,15 @@ watch(
 
 .main-content {
   display: grid;
-  grid-template-columns: 2fr 320px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
   gap: 2rem;
   align-items: start;
+}
+
+@media (min-width: 1320px) {
+  .main-content {
+    grid-template-columns: minmax(0, 1fr) minmax(420px, 1fr);
+  }
 }
 
 .grid-container {
@@ -2634,18 +2809,25 @@ watch(
 .grid-cell {
   aspect-ratio: 1;
   width: 100%;
-  min-height: 60px;
+  min-height: 96px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.4rem;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  padding: 0.5rem;
   border: 2px solid var(--color-border);
   border-radius: 12px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.76), rgba(244, 247, 251, 0.92));
   color: var(--color-text);
   transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cell-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 
 .grid-cell:not(:disabled):hover {
@@ -2670,14 +2852,52 @@ watch(
 .cell-type {
   font-size: 0.6875rem;
   font-weight: 700;
-  text-align: center;
+  text-align: left;
   line-height: 1.2;
 }
 
+.cell-item-block {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.cell-item-image,
+.cell-item-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.cell-item-image {
+  object-fit: cover;
+  border: 1px solid color-mix(in srgb, var(--color-border) 80%, transparent);
+}
+
+.cell-item-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--color-primary) 10%, white 90%);
+  color: var(--color-primary);
+}
+
+.cell-item-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
 .cell-item,
-.cell-metric {
+.cell-metric,
+.cell-value,
+.cell-stock {
   font-size: 0.5625rem;
-  text-align: center;
+  text-align: left;
   line-height: 1.2;
   color: var(--color-text-secondary);
   overflow: hidden;
@@ -2691,10 +2911,16 @@ watch(
   color: var(--color-text);
 }
 
+.cell-stock,
+.cell-value {
+  font-weight: 600;
+}
+
 .cell-level,
 .cell-pending,
 .cell-reverting {
   font-size: 0.625rem;
+  flex-shrink: 0;
 }
 
 .cell-pending {
@@ -2716,6 +2942,7 @@ watch(
 .cell-empty {
   font-size: 1.35rem;
   opacity: 0.45;
+  margin: auto;
 }
 
 .cell-capacity {
@@ -2980,6 +3207,12 @@ watch(
 .picker-desc {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+}
+
+.picker-cost {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text);
 }
 
 .unit-desc {
@@ -3295,6 +3528,14 @@ watch(
 .layout-empty {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
+}
+
+.placeholder-detail {
+  min-height: 240px;
+}
+
+.placeholder-summary-card {
+  border-top-style: dashed;
 }
 
 .grid-cell.clickable {

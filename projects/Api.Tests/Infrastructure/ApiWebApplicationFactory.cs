@@ -43,9 +43,51 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
 
     private void TryDeleteDatabase()
     {
-        if (File.Exists(_databasePath))
+        foreach (var path in GetDatabaseFiles())
         {
-            File.Delete(_databasePath);
+            TryDeleteFileWithRetry(path);
+        }
+    }
+
+    private IEnumerable<string> GetDatabaseFiles()
+    {
+        yield return _databasePath;
+        yield return $"{_databasePath}-wal";
+        yield return $"{_databasePath}-shm";
+    }
+
+    private static void TryDeleteFileWithRetry(string path)
+    {
+        const int maxAttempts = 10;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                File.Delete(path);
+                return;
+            }
+            catch (IOException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(100);
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(100);
+            }
+            catch (IOException)
+            {
+                return;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return;
+            }
         }
     }
 }
