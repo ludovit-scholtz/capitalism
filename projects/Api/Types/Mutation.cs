@@ -605,7 +605,7 @@ public sealed class Mutation
     private static void AddStarterFactoryShell(AppDbContext db, Guid buildingId)
     {
         db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, PurchaseSource = "LOCAL" },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, PurchaseSource = "OPTIMAL" },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1, LinkRight = true },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Storage, GridX = 2, GridY = 0, Level = 1, LinkRight = true },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1 }
@@ -616,7 +616,7 @@ public sealed class Mutation
     {
         db.BuildingUnits.RemoveRange(factory.Units);
         db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ResourceTypeId = starterResourceId, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ResourceTypeId = starterResourceId, PurchaseSource = "OPTIMAL", MaxPrice = product.BasePrice },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Storage, GridX = 2, GridY = 0, Level = 1, LinkRight = true },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice }

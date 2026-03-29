@@ -2044,7 +2044,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(0, factoryPurchase.GetProperty("gridX").GetInt32());
         Assert.Equal(starterResourceId, factoryPurchase.GetProperty("resourceTypeId").GetString());
         Assert.Equal(basePrice, factoryPurchase.GetProperty("maxPrice").GetDecimal());
-        Assert.Equal("LOCAL", factoryPurchase.GetProperty("purchaseSource").GetString());
+        Assert.Equal("OPTIMAL", factoryPurchase.GetProperty("purchaseSource").GetString());
         Assert.True(factoryPurchase.GetProperty("linkRight").GetBoolean());
 
         Assert.Equal(1, factoryManufacturing.GetProperty("gridX").GetInt32());
