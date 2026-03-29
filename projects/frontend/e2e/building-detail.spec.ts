@@ -674,6 +674,154 @@ test.describe('Building detail upgrades', () => {
     await expect(page.locator('.upgrade-summary').getByText('Cash after apply: $20,500')).toBeVisible()
   })
 
+  test('shows per-item movement history for manufacturing and storage units', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-history',
+      playerId: player.id,
+      name: 'History Test Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-history',
+          companyId: 'company-history',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'History Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'history-manufacturing',
+              buildingId: 'building-history',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              productTypeId: 'prod-chair',
+              inventoryItems: [
+                {
+                  productTypeId: 'prod-chair',
+                  quantity: 24,
+                  quality: 0.82,
+                  sourcingCostTotal: 144,
+                },
+              ],
+              resourceHistory: [
+                {
+                  resourceTypeId: 'res-wood',
+                  tick: 11,
+                  inflowQuantity: 4,
+                  consumedQuantity: 4,
+                },
+                {
+                  resourceTypeId: 'res-wood',
+                  tick: 12,
+                  inflowQuantity: 2,
+                  consumedQuantity: 2,
+                },
+                {
+                  productTypeId: 'prod-chair',
+                  tick: 11,
+                  producedQuantity: 20,
+                },
+                {
+                  productTypeId: 'prod-chair',
+                  tick: 12,
+                  producedQuantity: 10,
+                  outflowQuantity: 6,
+                },
+              ],
+            },
+            {
+              id: 'history-storage',
+              buildingId: 'building-history',
+              unitType: 'STORAGE',
+              gridX: 2,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              inventoryItems: [
+                {
+                  productTypeId: 'prod-chair',
+                  quantity: 14,
+                  quality: 0.82,
+                  sourcingCostTotal: 84,
+                },
+              ],
+              resourceHistory: [
+                {
+                  productTypeId: 'prod-chair',
+                  tick: 12,
+                  inflowQuantity: 20,
+                },
+                {
+                  productTypeId: 'prod-chair',
+                  tick: 13,
+                  outflowQuantity: 14,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-history')
+    await expect(page.getByRole('heading', { name: 'History Factory' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    await getGridCell(activeSection, 1, 0).click()
+
+    const manufacturingHistoryCard = page.locator('.history-card').first()
+    await expect(manufacturingHistoryCard.getByText('Movement history')).toBeVisible()
+    await expect(manufacturingHistoryCard.getByRole('button', { name: 'Wood', exact: true })).toBeVisible()
+    await expect(manufacturingHistoryCard.getByRole('button', { name: 'Wooden Chair', exact: true })).toBeVisible()
+
+    await manufacturingHistoryCard.getByRole('button', { name: 'Wood', exact: true }).click()
+    await expect(manufacturingHistoryCard.locator('.history-summary-stat').filter({ hasText: 'Inflow' }).getByText('6')).toBeVisible()
+    await expect(manufacturingHistoryCard.locator('.history-summary-stat').filter({ hasText: 'Consumed' }).getByText('6')).toBeVisible()
+
+    await manufacturingHistoryCard.getByRole('button', { name: 'Wooden Chair', exact: true }).click()
+    await expect(manufacturingHistoryCard.locator('.history-summary-stat').filter({ hasText: 'Produced' }).getByText('30')).toBeVisible()
+
+    await getGridCell(activeSection, 2, 0).click()
+
+    const storageHistoryCard = page.locator('.history-card').first()
+    await expect(storageHistoryCard.getByRole('button', { name: 'Wooden Chair', exact: true })).toBeVisible()
+    await expect(storageHistoryCard.locator('.history-summary-stat').filter({ hasText: 'Inflow' }).getByText('20')).toBeVisible()
+    await expect(storageHistoryCard.locator('.history-summary-stat').filter({ hasText: 'Outflow' }).getByText('14')).toBeVisible()
+  })
+
   test('lets players configure research product and brand-quality scope', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

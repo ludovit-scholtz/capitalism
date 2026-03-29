@@ -11,3 +11,15 @@ public sealed class BuildingUnitInventory
     public decimal SourcingCostPerUnit { get; set; }
     public decimal Quality { get; set; }
 }
+
+public sealed class BuildingUnitResourceHistoryPoint
+{
+    public Guid BuildingUnitId { get; set; }
+    public Guid? ResourceTypeId { get; set; }
+    public Guid? ProductTypeId { get; set; }
+    public long Tick { get; set; }
+    public decimal InflowQuantity { get; set; }
+    public decimal OutflowQuantity { get; set; }
+    public decimal ConsumedQuantity { get; set; }
+    public decimal ProducedQuantity { get; set; }
+}

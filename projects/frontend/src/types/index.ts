@@ -168,6 +168,17 @@ export interface BuildingUnitInventory {
   quality: number
 }
 
+export interface BuildingUnitResourceHistoryPoint {
+  buildingUnitId: string
+  resourceTypeId: string | null
+  productTypeId: string | null
+  tick: number
+  inflowQuantity: number
+  outflowQuantity: number
+  consumedQuantity: number
+  producedQuantity: number
+}
+
 export interface GlobalExchangeOffer {
   cityId: string
   cityName: string

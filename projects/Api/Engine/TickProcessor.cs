@@ -54,6 +54,17 @@ public sealed class TickProcessor(
             db.Inventories.AddRange(newToAdd);
         }
 
+        var newHistory = context.NewUnitResourceHistories
+            .Where(entry => entry.InflowQuantity > 0m
+                || entry.OutflowQuantity > 0m
+                || entry.ConsumedQuantity > 0m
+                || entry.ProducedQuantity > 0m)
+            .ToList();
+        if (newHistory.Count > 0)
+        {
+            db.BuildingUnitResourceHistories.AddRange(newHistory);
+        }
+
         // Remove depleted tracked inventory (quantity ≤ 0) to keep the table lean.
         // NewInventory items are untracked so they can't be passed to RemoveRange.
         var depleted = context.InventoryByBuilding.Values

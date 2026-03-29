@@ -139,6 +139,29 @@ public sealed class ManufacturingPhase : ITickPhase
                 var withdrawn = context.WithdrawInventory(item, consume);
                 if (withdrawn.Quantity <= 0m) continue;
 
+                 if (item.BuildingUnitId.HasValue && item.BuildingUnitId.Value != unit.Id)
+                 {
+                    context.RecordUnitResourceHistory(
+                        building.Id,
+                        item.BuildingUnitId.Value,
+                        item.ResourceTypeId,
+                        item.ProductTypeId,
+                        outflowQuantity: withdrawn.Quantity);
+                    context.RecordUnitResourceHistory(
+                        building.Id,
+                        unit.Id,
+                        item.ResourceTypeId,
+                        item.ProductTypeId,
+                        inflowQuantity: withdrawn.Quantity);
+                 }
+
+                context.RecordUnitResourceHistory(
+                    building.Id,
+                    unit.Id,
+                    item.ResourceTypeId,
+                    item.ProductTypeId,
+                    consumedQuantity: withdrawn.Quantity);
+
                 avgInputQuality += item.Quality * consume;
                 totalInputSourcingCost += withdrawn.SourcingCostTotal;
                 qualitySamples++;
@@ -159,5 +182,11 @@ public sealed class ManufacturingPhase : ITickPhase
         var output = context.GetOrCreateUnitInventory(
             building.Id, unit.Id, null, productType.Id);
         context.AddInventory(output, outputQuantity, totalInputSourcingCost, quality);
+        context.RecordUnitResourceHistory(
+            building.Id,
+            unit.Id,
+            null,
+            productType.Id,
+            producedQuantity: outputQuantity);
     }
 }

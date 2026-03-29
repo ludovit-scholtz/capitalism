@@ -43,7 +43,13 @@ public sealed class MiningPhase : ITickPhase
 
                 var inv = context.GetOrCreateUnitInventory(
                     building.Id, unit.Id, unit.ResourceTypeId, null);
-                inv.Quantity += actual;
+                context.AddInventory(inv, actual, 0m, null);
+                context.RecordUnitResourceHistory(
+                    building.Id,
+                    unit.Id,
+                    unit.ResourceTypeId,
+                    null,
+                    producedQuantity: actual);
             }
         }
 

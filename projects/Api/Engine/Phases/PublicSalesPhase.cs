@@ -139,6 +139,12 @@ public sealed class PublicSalesPhase : ITickPhase
                 SalesCapacity = salesCapacity,
             });
 
+            context.RecordUnitResourceHistory(
+                building.Id,
+                unit.Id,
+                inv.ResourceTypeId,
+                inv.ProductTypeId,
+                outflowQuantity: sold);
             context.WithdrawInventory(inv, sold);
             company.Cash += sold * price;
             totalSold += sold;

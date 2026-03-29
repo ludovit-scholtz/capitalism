@@ -104,9 +104,22 @@ public sealed class ResourceMovementPhase : ITickPhase
                 remainingMovable -= moved.Quantity;
                 movableQuantities[inv.Id] = remainingMovable;
 
+                context.RecordUnitResourceHistory(
+                    buildingId,
+                    source.Id,
+                    inv.ResourceTypeId,
+                    inv.ProductTypeId,
+                    outflowQuantity: moved.Quantity);
+
                 var targetInv = context.GetOrCreateUnitInventory(
                     buildingId, neighbor.Id, inv.ResourceTypeId, inv.ProductTypeId);
                 context.AddInventory(targetInv, moved.Quantity, moved.SourcingCostTotal, inv.Quality);
+                context.RecordUnitResourceHistory(
+                    buildingId,
+                    neighbor.Id,
+                    inv.ResourceTypeId,
+                    inv.ProductTypeId,
+                    inflowQuantity: moved.Quantity);
 
                 if (inv.Quantity <= 0m) break;
             }

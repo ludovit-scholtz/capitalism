@@ -479,6 +479,62 @@ public sealed class Query
     }
 
     /// <summary>
+    /// Returns recent per-tick movement history for every tracked resource or
+    /// product inside the building's units.
+    /// </summary>
+    [Authorize]
+    public async Task<List<BuildingUnitResourceHistoryPoint>> GetBuildingUnitResourceHistories(
+        Guid buildingId,
+        int? limit,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(candidate => candidate.Company)
+            .FirstOrDefaultAsync(candidate => candidate.Id == buildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        var historyQuery = db.BuildingUnitResourceHistories
+            .Where(entry => entry.BuildingId == buildingId);
+
+        var safeLimit = Math.Clamp(limit ?? 40, 1, 200);
+        var maxTick = await historyQuery.MaxAsync(entry => (long?)entry.Tick);
+        if (maxTick.HasValue)
+        {
+            var minTick = maxTick.Value - safeLimit + 1;
+            historyQuery = historyQuery.Where(entry => entry.Tick >= minTick);
+        }
+
+        return await historyQuery
+            .OrderBy(entry => entry.Tick)
+            .ThenBy(entry => entry.BuildingUnitId)
+            .ThenBy(entry => entry.ResourceTypeId)
+            .ThenBy(entry => entry.ProductTypeId)
+            .Select(entry => new BuildingUnitResourceHistoryPoint
+            {
+                BuildingUnitId = entry.BuildingUnitId,
+                ResourceTypeId = entry.ResourceTypeId,
+                ProductTypeId = entry.ProductTypeId,
+                Tick = entry.Tick,
+                InflowQuantity = entry.InflowQuantity,
+                OutflowQuantity = entry.OutflowQuantity,
+                ConsumedQuantity = entry.ConsumedQuantity,
+                ProducedQuantity = entry.ProducedQuantity,
+            })
+            .ToListAsync();
+    }
+
+    /// <summary>
     /// Returns all pending scheduled actions for the authenticated player.
     /// Currently covers building configuration upgrades (layout changes) that have not yet applied.
     /// </summary>

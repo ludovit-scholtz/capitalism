@@ -178,6 +178,16 @@ public sealed class PurchasingPhase : ITickPhase
                 var withdrawn = context.WithdrawInventory(supply.Inventory, fill);
                 if (withdrawn.Quantity <= 0m) continue;
 
+                if (supply.Inventory.BuildingUnitId.HasValue)
+                {
+                    context.RecordUnitResourceHistory(
+                        supply.Building.Id,
+                        supply.Inventory.BuildingUnitId.Value,
+                        supply.Inventory.ResourceTypeId,
+                        supply.Inventory.ProductTypeId,
+                        outflowQuantity: withdrawn.Quantity);
+                }
+
                 if (sellerIsSameCompany)
                 {
                     totalSourcingCost += withdrawn.SourcingCostTotal;
@@ -236,6 +246,12 @@ public sealed class PurchasingPhase : ITickPhase
                 building.Id, unit.Id, resourceId, productId);
             var inventoryQuality = weightedQualityTotal > 0m ? weightedQualityTotal / totalBought : (decimal?)null;
             context.AddInventory(inv, totalBought, totalSourcingCost, inventoryQuality);
+            context.RecordUnitResourceHistory(
+                building.Id,
+                unit.Id,
+                resourceId,
+                productId,
+                inflowQuantity: totalBought);
         }
     }
 

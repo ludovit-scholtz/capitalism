@@ -525,6 +525,57 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
+    public async Task UnitResourceHistory_TracksManufacturingAndStorageMovement()
+    {
+        Guid factoryId;
+
+        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (_, factoryId, _, _, _) = await SeedFactoryToShopSupplyChainAsync(seedDb);
+        }
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+        await processor.ProcessTickAsync();
+
+        var manufacturingUnitId = await db.BuildingUnits
+            .Where(unit => unit.BuildingId == factoryId && unit.UnitType == UnitType.Manufacturing)
+            .Select(unit => unit.Id)
+            .SingleAsync();
+        var storageUnitId = await db.BuildingUnits
+            .Where(unit => unit.BuildingId == factoryId && unit.UnitType == UnitType.Storage)
+            .Select(unit => unit.Id)
+            .SingleAsync();
+        var woodResourceId = await db.ResourceTypes
+            .Where(resource => resource.Slug == "wood")
+            .Select(resource => resource.Id)
+            .SingleAsync();
+        var chairProductId = await db.ProductTypes
+            .Where(product => product.Slug == "wooden-chair")
+            .Select(product => product.Id)
+            .SingleAsync();
+
+        var manufacturingWoodHistory = await db.BuildingUnitResourceHistories
+            .Where(entry => entry.BuildingUnitId == manufacturingUnitId && entry.ResourceTypeId == woodResourceId)
+            .ToListAsync();
+        var manufacturingChairHistory = await db.BuildingUnitResourceHistories
+            .Where(entry => entry.BuildingUnitId == manufacturingUnitId && entry.ProductTypeId == chairProductId)
+            .ToListAsync();
+        var storageChairHistory = await db.BuildingUnitResourceHistories
+            .Where(entry => entry.BuildingUnitId == storageUnitId && entry.ProductTypeId == chairProductId)
+            .ToListAsync();
+
+        Assert.Contains(manufacturingWoodHistory, entry => entry.InflowQuantity > 0m && entry.ConsumedQuantity > 0m);
+        Assert.Contains(manufacturingChairHistory, entry => entry.ProducedQuantity > 0m);
+        Assert.Contains(storageChairHistory, entry => entry.InflowQuantity > 0m);
+        Assert.Contains(storageChairHistory, entry => entry.OutflowQuantity > 0m);
+    }
+
+    [Fact]
     public async Task PublicSalesPhase_SellsProductsAndCreditsCompany()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

@@ -48,6 +48,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Inventory stored in buildings.</summary>
     public DbSet<Inventory> Inventories => Set<Inventory>();
 
+    /// <summary>Per-tick unit resource/product movement history.</summary>
+    public DbSet<BuildingUnitResourceHistory> BuildingUnitResourceHistories => Set<BuildingUnitResourceHistory>();
+
     /// <summary>Product brands owned by companies.</summary>
     public DbSet<Brand> Brands => Set<Brand>();
 
@@ -274,6 +277,35 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasOne(i => i.BuildingUnit).WithMany().HasForeignKey(i => i.BuildingUnitId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(i => i.ResourceType).WithMany().HasForeignKey(i => i.ResourceTypeId);
             e.HasOne(i => i.ProductType).WithMany().HasForeignKey(i => i.ProductTypeId);
+        });
+
+        // BuildingUnitResourceHistory
+        modelBuilder.Entity<BuildingUnitResourceHistory>(e =>
+        {
+            e.HasKey(history => history.Id);
+            e.Property(history => history.InflowQuantity).HasPrecision(18, 4);
+            e.Property(history => history.OutflowQuantity).HasPrecision(18, 4);
+            e.Property(history => history.ConsumedQuantity).HasPrecision(18, 4);
+            e.Property(history => history.ProducedQuantity).HasPrecision(18, 4);
+            e.HasOne(history => history.Building)
+                .WithMany()
+                .HasForeignKey(history => history.BuildingId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(history => history.BuildingUnit)
+                .WithMany()
+                .HasForeignKey(history => history.BuildingUnitId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(history => history.ResourceType)
+                .WithMany()
+                .HasForeignKey(history => history.ResourceTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(history => history.ProductType)
+                .WithMany()
+                .HasForeignKey(history => history.ProductTypeId)
+                .OnDelete(DeleteBehavior.SetNull);
+            e.HasIndex(history => new { history.BuildingId, history.Tick });
+            e.HasIndex(history => new { history.BuildingUnitId, history.Tick, history.ResourceTypeId, history.ProductTypeId })
+                .IsUnique();
         });
 
         // Brand

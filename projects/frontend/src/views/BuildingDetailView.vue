@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
+import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
 import {
   getInventorySourcingCostPerUnit,
   getPlannedUnitConstructionCost,
@@ -37,6 +38,7 @@ import {
 } from '@/lib/catalogPresentation'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
+import { getUnitResourceHistoryItemKey, type UnitResourceHistoryItemOption } from '@/lib/unitResourceHistory'
 import type {
   Building,
   BuildingConfigurationPlanRemoval,
@@ -44,6 +46,7 @@ import type {
   BuildingUnit,
   BuildingUnitInventory,
   BuildingUnitInventorySummary,
+  BuildingUnitResourceHistoryPoint,
   Company,
   GlobalExchangeOffer,
   ProductType,
@@ -118,6 +121,7 @@ const resourceTypes = ref<ResourceType[]>([])
 const productTypes = ref<ProductType[]>([])
 const unitInventorySummaries = ref<BuildingUnitInventorySummary[]>([])
 const unitInventories = ref<BuildingUnitInventory[]>([])
+const unitResourceHistories = ref<BuildingUnitResourceHistoryPoint[]>([])
 const exchangeOffers = ref<GlobalExchangeOffer[]>([])
 const exchangeOffersLoading = ref(false)
 const showSaleDialog = ref(false)
@@ -127,6 +131,7 @@ const cancellingPlan = ref(false)
 const cancelPlanError = ref<string | null>(null)
 const layoutName = ref('')
 const showLayoutDialog = ref(false)
+const selectedHistoryItemKey = ref<string | null>(null)
 
 const LAYOUT_STORAGE_KEY = 'capitalism_building_layouts'
 
@@ -293,6 +298,8 @@ const selectedDisplayUnit = computed<GridUnit | undefined>(() => {
   return getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y)
 })
 const selectedPurchaseUnit = computed(() => selectedDisplayUnit.value?.unitType === 'PURCHASE' ? selectedDisplayUnit.value : undefined)
+const selectedHistoryItemOptions = computed<UnitResourceHistoryItemOption[]>(() => getUnitResourceHistoryItemOptions(selectedDisplayUnit.value))
+const selectedUnitResourceHistory = computed(() => getSelectedUnitResourceHistory(selectedDisplayUnit.value))
 
 function formatBuildingType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
@@ -1226,6 +1233,93 @@ function getUnitInventories(unit: GridUnit | undefined): BuildingUnitInventory[]
     .sort((left, right) => right.quantity - left.quantity)
 }
 
+function getResolvedLiveUnitId(unit: GridUnit | undefined): string | null {
+  if (!unit) return null
+
+  const hasDirectLiveData = unitInventories.value.some((inventory) => inventory.buildingUnitId === unit.id)
+    || unitResourceHistories.value.some((entry) => entry.buildingUnitId === unit.id)
+  if (hasDirectLiveData) {
+    return unit.id
+  }
+
+  const activeUnit = activeUnits.value.find(
+    (candidate) => candidate.gridX === unit.gridX && candidate.gridY === unit.gridY,
+  )
+
+  return activeUnit?.id ?? unit.id
+}
+
+function getUnitResourceHistory(unit: GridUnit | undefined): BuildingUnitResourceHistoryPoint[] {
+  const resolvedUnitId = getResolvedLiveUnitId(unit)
+  if (!resolvedUnitId) return []
+
+  return unitResourceHistories.value
+    .filter((entry) => entry.buildingUnitId === resolvedUnitId)
+    .sort((left, right) => left.tick - right.tick)
+}
+
+function getHistoryItemLabel(
+  resourceTypeId: string | null | undefined,
+  productTypeId: string | null | undefined,
+): string {
+  if (resourceTypeId) {
+    return getResourceName(resourceTypeId)
+  }
+
+  if (productTypeId) {
+    return getProductName(productTypeId)
+  }
+
+  return t('buildingDetail.inventory.item')
+}
+
+function getUnitResourceHistoryItemOptions(unit: GridUnit | undefined): UnitResourceHistoryItemOption[] {
+  if (!unit) return []
+
+  const options = new Map<string, UnitResourceHistoryItemOption>()
+  const order = new Map<string, number>()
+  let nextOrder = 0
+
+  for (const inventory of getUnitInventories(unit)) {
+    const key = getUnitResourceHistoryItemKey(inventory.resourceTypeId, inventory.productTypeId)
+    if (!key || options.has(key)) {
+      continue
+    }
+
+    options.set(key, {
+      key,
+      label: getHistoryItemLabel(inventory.resourceTypeId, inventory.productTypeId),
+    })
+    order.set(key, nextOrder++)
+  }
+
+  for (const entry of getUnitResourceHistory(unit)) {
+    const key = getUnitResourceHistoryItemKey(entry.resourceTypeId, entry.productTypeId)
+    if (!key || options.has(key)) {
+      continue
+    }
+
+    options.set(key, {
+      key,
+      label: getHistoryItemLabel(entry.resourceTypeId, entry.productTypeId),
+    })
+    order.set(key, nextOrder++)
+  }
+
+  return Array.from(options.values()).sort(
+    (left, right) => (order.get(left.key) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.key) ?? Number.MAX_SAFE_INTEGER),
+  )
+}
+
+function getSelectedUnitResourceHistory(unit: GridUnit | undefined): BuildingUnitResourceHistoryPoint[] {
+  const selectedKey = selectedHistoryItemKey.value
+  if (!selectedKey) return []
+
+  return getUnitResourceHistory(unit).filter(
+    (entry) => getUnitResourceHistoryItemKey(entry.resourceTypeId, entry.productTypeId) === selectedKey,
+  )
+}
+
 function getUnitInventoryItemCount(unit: GridUnit | undefined): number {
   return getUnitInventories(unit).length
 }
@@ -1460,6 +1554,34 @@ async function loadUnitInventories() {
   }
 }
 
+async function loadUnitResourceHistories() {
+  if (!auth.token) {
+    unitResourceHistories.value = []
+    return
+  }
+
+  try {
+    const data = await gqlRequest<{ buildingUnitResourceHistories: BuildingUnitResourceHistoryPoint[] }>(
+      `query BuildingUnitResourceHistories($buildingId: UUID!, $limit: Int) {
+        buildingUnitResourceHistories(buildingId: $buildingId, limit: $limit) {
+          buildingUnitId
+          resourceTypeId
+          productTypeId
+          tick
+          inflowQuantity
+          outflowQuantity
+          consumedQuantity
+          producedQuantity
+        }
+      }`,
+      { buildingId: buildingId.value, limit: 60 },
+    )
+    unitResourceHistories.value = data.buildingUnitResourceHistories
+  } catch {
+    unitResourceHistories.value = []
+  }
+}
+
 async function loadGlobalExchangeOffers() {
   const unit = selectedPurchaseUnit.value
   const resourceTypeId = getPurchaseUnitResourceTypeId(unit)
@@ -1671,8 +1793,11 @@ async function loadBuilding() {
     isEditing.value = false
     selectedCell.value = null
     showUnitPicker.value = false
-    await loadUnitInventorySummaries()
-    await loadUnitInventories()
+    await Promise.all([
+      loadUnitInventorySummaries(),
+      loadUnitInventories(),
+      loadUnitResourceHistories(),
+    ])
     await loadGlobalExchangeOffers()
   } catch (reason: unknown) {
     error.value = reason instanceof Error ? reason.message : t('buildingDetail.loadFailed')
@@ -1702,6 +1827,25 @@ watch(
   () => {
     void loadGlobalExchangeOffers()
   },
+)
+
+watch(
+  () => ({
+    unitId: getResolvedLiveUnitId(selectedDisplayUnit.value),
+    itemKeys: selectedHistoryItemOptions.value.map((item) => item.key).join('|'),
+  }),
+  () => {
+    if (selectedHistoryItemOptions.value.length === 0) {
+      selectedHistoryItemKey.value = null
+      return
+    }
+
+    const hasSelectedItem = selectedHistoryItemOptions.value.some((item) => item.key === selectedHistoryItemKey.value)
+    if (!hasSelectedItem) {
+      selectedHistoryItemKey.value = selectedHistoryItemOptions.value[0]?.key ?? null
+    }
+  },
+  { immediate: true },
 )
 </script>
 
@@ -2446,6 +2590,14 @@ watch(
                 </div>
               </div>
 
+              <UnitResourceHistoryPanel
+                v-if="selectedHistoryItemOptions.length > 0"
+                :items="selectedHistoryItemOptions"
+                :selected-item-key="selectedHistoryItemKey"
+                :history="selectedUnitResourceHistory"
+                @update:selected-item-key="selectedHistoryItemKey = $event"
+              />
+
               <div
                 v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))"
                 class="unit-insight-card"
@@ -2626,6 +2778,14 @@ watch(
                   ></span>
                 </div>
               </div>
+
+              <UnitResourceHistoryPanel
+                v-if="selectedHistoryItemOptions.length > 0"
+                :items="selectedHistoryItemOptions"
+                :selected-item-key="selectedHistoryItemKey"
+                :history="selectedUnitResourceHistory"
+                @update:selected-item-key="selectedHistoryItemKey = $event"
+              />
               <div
                 v-if="selectedPurchaseUnit && 'resourceTypeId' in selectedPurchaseUnit && selectedPurchaseUnit.resourceTypeId && ['EXCHANGE', 'OPTIMAL'].includes(selectedPurchaseUnit.purchaseSource ?? '')"
                 class="unit-insight-card"

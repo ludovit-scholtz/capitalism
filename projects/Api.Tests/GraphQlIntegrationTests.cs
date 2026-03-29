@@ -906,6 +906,121 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.True(companies.GetArrayLength() >= 1);
     }
 
+    [Fact]
+    public async Task BuildingUnitResourceHistories_ReturnsRecentUnitMovementHistory()
+    {
+        var token = await RegisterAndGetTokenAsync("history-query@test.com", "History Query Tester");
+
+        Guid buildingId;
+        Guid woodResourceId;
+        Guid chairProductId;
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(candidate => candidate.Email == "history-query@test.com");
+            var city = await db.Cities.FirstAsync();
+            var product = await db.ProductTypes
+                .Include(candidate => candidate.Recipes)
+                .FirstAsync(candidate => candidate.Slug == "wooden-chair");
+            var woodResource = await db.ResourceTypes.FirstAsync(candidate => candidate.Slug == "wood");
+
+            woodResourceId = woodResource.Id;
+            chairProductId = product.Id;
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "History Query Corp",
+                Cash = 500_000m,
+            };
+            db.Companies.Add(company);
+
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.Factory,
+                Name = "History Query Factory",
+                Level = 1,
+            };
+            db.Buildings.Add(building);
+
+            var purchaseUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                UnitType = UnitType.Purchase,
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+                LinkRight = true,
+                ResourceTypeId = woodResource.Id,
+                PurchaseSource = "EXCHANGE",
+                MaxPrice = 999_999m,
+            };
+            var manufacturingUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                UnitType = UnitType.Manufacturing,
+                GridX = 1,
+                GridY = 0,
+                Level = 1,
+                LinkLeft = true,
+                ProductTypeId = product.Id,
+            };
+
+            db.BuildingUnits.AddRange(purchaseUnit, manufacturingUnit);
+            db.Inventories.Add(new Inventory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                BuildingUnitId = purchaseUnit.Id,
+                ResourceTypeId = woodResource.Id,
+                Quantity = 8m,
+                Quality = 0.7m,
+                SourcingCostTotal = 32m,
+            });
+
+            await db.SaveChangesAsync();
+            buildingId = building.Id;
+        }
+
+        await ProcessTicksAsync(1);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingUnitResourceHistories($buildingId: UUID!, $limit: Int) {
+              buildingUnitResourceHistories(buildingId: $buildingId, limit: $limit) {
+                buildingUnitId
+                resourceTypeId
+                productTypeId
+                tick
+                inflowQuantity
+                outflowQuantity
+                consumedQuantity
+                producedQuantity
+              }
+            }
+            """,
+            new { buildingId, limit = 20 },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+
+        var entries = result.GetProperty("data").GetProperty("buildingUnitResourceHistories").EnumerateArray().ToList();
+
+        Assert.Contains(entries, entry =>
+            entry.GetProperty("resourceTypeId").GetString() == woodResourceId.ToString()
+            && entry.GetProperty("consumedQuantity").GetDecimal() > 0m);
+        Assert.Contains(entries, entry =>
+            entry.GetProperty("productTypeId").GetString() == chairProductId.ToString()
+            && entry.GetProperty("producedQuantity").GetDecimal() > 0m);
+    }
+
     #endregion
 
     #region Building Placement

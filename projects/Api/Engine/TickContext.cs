@@ -9,6 +9,8 @@ namespace Api.Engine;
 /// </summary>
 public sealed class TickContext
 {
+    private readonly Dictionary<(Guid BuildingUnitId, Guid? ResourceTypeId, Guid? ProductTypeId, long Tick), BuildingUnitResourceHistory> _unitResourceHistoryByKey = [];
+
     private static decimal RoundInventoryDecimal(decimal value) =>
         decimal.Round(value, 4, MidpointRounding.AwayFromZero);
 
@@ -37,6 +39,7 @@ public sealed class TickContext
     // ── Pending mutations ──
 
     public List<Inventory> NewInventory { get; } = [];
+    public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 
     // ── Helpers ──
 
@@ -168,6 +171,57 @@ public sealed class TickContext
 
         inventory.Quantity = newQuantity;
         inventory.SourcingCostTotal = RoundInventoryDecimal(inventory.SourcingCostTotal + sourcingCostTotal);
+    }
+
+    /// <summary>
+    /// Aggregates per-tick movement history for a unit and tracked item.
+    /// </summary>
+    public void RecordUnitResourceHistory(
+        Guid buildingId,
+        Guid unitId,
+        Guid? resourceTypeId,
+        Guid? productTypeId,
+        decimal inflowQuantity = 0m,
+        decimal outflowQuantity = 0m,
+        decimal consumedQuantity = 0m,
+        decimal producedQuantity = 0m)
+    {
+        if (!resourceTypeId.HasValue && !productTypeId.HasValue)
+        {
+            return;
+        }
+
+        inflowQuantity = RoundInventoryDecimal(inflowQuantity);
+        outflowQuantity = RoundInventoryDecimal(outflowQuantity);
+        consumedQuantity = RoundInventoryDecimal(consumedQuantity);
+        producedQuantity = RoundInventoryDecimal(producedQuantity);
+
+        if (inflowQuantity <= 0m && outflowQuantity <= 0m && consumedQuantity <= 0m && producedQuantity <= 0m)
+        {
+            return;
+        }
+
+        var key = (unitId, resourceTypeId, productTypeId, CurrentTick);
+        if (!_unitResourceHistoryByKey.TryGetValue(key, out var history))
+        {
+            history = new BuildingUnitResourceHistory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = buildingId,
+                BuildingUnitId = unitId,
+                ResourceTypeId = resourceTypeId,
+                ProductTypeId = productTypeId,
+                Tick = CurrentTick,
+            };
+
+            _unitResourceHistoryByKey[key] = history;
+            NewUnitResourceHistories.Add(history);
+        }
+
+        history.InflowQuantity = RoundInventoryDecimal(history.InflowQuantity + inflowQuantity);
+        history.OutflowQuantity = RoundInventoryDecimal(history.OutflowQuantity + outflowQuantity);
+        history.ConsumedQuantity = RoundInventoryDecimal(history.ConsumedQuantity + consumedQuantity);
+        history.ProducedQuantity = RoundInventoryDecimal(history.ProducedQuantity + producedQuantity);
     }
 
     /// <summary>Returns units that this unit pushes resources TO (outgoing links).</summary>

@@ -131,6 +131,17 @@ export type MockUnitInventoryItem = {
   sourcingCostTotal?: number | null
 }
 
+export type MockUnitResourceHistoryPoint = {
+  buildingUnitId?: string
+  resourceTypeId?: string | null
+  productTypeId?: string | null
+  tick: number
+  inflowQuantity?: number
+  outflowQuantity?: number
+  consumedQuantity?: number
+  producedQuantity?: number
+}
+
 export type MockBuildingUnit = {
   id: string
   buildingId: string
@@ -161,6 +172,7 @@ export type MockBuildingUnit = {
   inventoryQuality?: number | null
   inventorySourcingCostTotal?: number | null
   inventoryItems?: MockUnitInventoryItem[]
+  resourceHistory?: MockUnitResourceHistoryPoint[]
 }
 
 export type MockBuildingConfigurationPlanUnit = MockBuildingUnit & {
@@ -275,7 +287,21 @@ function cloneUnit(unit: MockBuildingUnit): MockBuildingUnit {
   return {
     ...unit,
     inventoryItems: unit.inventoryItems?.map((item) => ({ ...item })) ?? undefined,
+    resourceHistory: unit.resourceHistory?.map((entry) => ({ ...entry })) ?? undefined,
   }
+}
+
+function getMockUnitResourceHistory(unit: MockBuildingUnit) {
+  return (unit.resourceHistory ?? []).map((entry) => ({
+    buildingUnitId: entry.buildingUnitId ?? unit.id,
+    resourceTypeId: entry.resourceTypeId ?? null,
+    productTypeId: entry.productTypeId ?? null,
+    tick: entry.tick,
+    inflowQuantity: entry.inflowQuantity ?? 0,
+    outflowQuantity: entry.outflowQuantity ?? 0,
+    consumedQuantity: entry.consumedQuantity ?? 0,
+    producedQuantity: entry.producedQuantity ?? 0,
+  }))
 }
 
 function computeDistanceKm(
@@ -1672,6 +1698,24 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { buildingUnitInventories } }),
+      })
+    }
+
+    if (query.includes('buildingUnitResourceHistories')) {
+      const buildingId = body.variables?.buildingId
+      const building = state.players
+        .flatMap((player) => player.companies)
+        .flatMap((company) => company.buildings)
+        .find((candidate) => candidate.id === buildingId)
+
+      const buildingUnitResourceHistories = (building?.units ?? [])
+        .flatMap((unit) => getMockUnitResourceHistory(unit))
+        .sort((left, right) => left.tick - right.tick)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { buildingUnitResourceHistories } }),
       })
     }
 
