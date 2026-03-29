@@ -71,6 +71,20 @@ Poplulation index changes over time. Only game engine is allowed to modify this 
 
 The population index is the input to the public sales unit function. Products are sold better in more populated areas.
 
+### Raw material
+
+One land can contain only one raw material type. For each raw material type there is always at least 2 available lands available. Mines can be built only on matching available raw material resource.
+
+The price to purchase the land includes also the base price for the raw meterial. The base price is evaluated by the qality and quantity and the base price of the resource in the global market in that city.
+
+### Raw material quality
+
+If land contains raw material the raw material quality must be defined.
+
+### Raw material quantity
+
+Quantity of the raw material at the land is consumable by the mining process.
+
 ## Ranking
 
 Each player is ranked by his total wealth. Players can start multiple companies. Company pays out the dividends.
