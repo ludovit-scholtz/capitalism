@@ -263,6 +263,24 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("Capitalism V API", body.GetProperty("name").GetString());
     }
 
+    [Fact]
+    public async Task FinishOnboarding_CompletesStagedFlowWithoutUnexpectedExecutionError()
+    {
+        var token = await RegisterAndGetTokenAsync(email: $"finish-onboarding-{Guid.NewGuid():N}@test.com");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, companyName: "Staged Flow Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await GetAvailableLotIdAsync(cityId, "SALES_SHOP");
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.Equal("Staged Flow Co", payload.GetProperty("company").GetProperty("name").GetString());
+        Assert.Equal("SALES_SHOP", payload.GetProperty("salesShop").GetProperty("type").GetString());
+        Assert.Equal(productId, payload.GetProperty("selectedProduct").GetProperty("id").GetString());
+    }
+
     #endregion
 
     #region Authentication
@@ -2217,7 +2235,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task ClaimStartupPack_IsIdempotentAndGrantsEntitlementsOnce()
     {
         var token = await RegisterAndGetTokenAsync("startup-pack-claim@test.com", "ClaimPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Claim Corp");
+        var (companyId, _, onboardingResult) = await CompleteOnboardingAsync(token, "Claim Corp");
+        var companyCashBeforeClaim = onboardingResult.GetProperty("data").GetProperty("completeOnboarding")
+            .GetProperty("company").GetProperty("cash").GetDecimal();
 
         var firstClaim = await ExecuteGraphQlAsync(
             """
@@ -2234,7 +2254,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var firstClaimData = firstClaim.GetProperty("data").GetProperty("claimStartupPack");
         Assert.Equal("CLAIMED", firstClaimData.GetProperty("offer").GetProperty("status").GetString());
-        Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, firstClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
+        Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, firstClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
         var firstProEndsAt = firstClaimData.GetProperty("proSubscriptionEndsAtUtc").GetString();
 
         var secondClaim = await ExecuteGraphQlAsync(
@@ -2252,7 +2272,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var secondClaimData = secondClaim.GetProperty("data").GetProperty("claimStartupPack");
         Assert.Equal("CLAIMED", secondClaimData.GetProperty("offer").GetProperty("status").GetString());
-        Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, secondClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
+        Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, secondClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
         Assert.Equal(firstProEndsAt, secondClaimData.GetProperty("proSubscriptionEndsAtUtc").GetString());
 
         var meResult = await ExecuteGraphQlAsync(
@@ -2265,7 +2285,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task ClaimStartupPack_ConcurrentRequests_SettleEconomyAndPremiumOnce()
     {
         var token = await RegisterAndGetTokenAsync("startup-pack-concurrent@test.com", "ConcurrentPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Concurrent Corp");
+        var (companyId, _, onboardingResult) = await CompleteOnboardingAsync(token, "Concurrent Corp");
+        var companyCashBeforeClaim = onboardingResult.GetProperty("data").GetProperty("completeOnboarding")
+            .GetProperty("company").GetProperty("cash").GetDecimal();
 
         const string claimMutation = """
             mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
@@ -2293,7 +2315,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         {
             Assert.Equal("CLAIMED", payload.GetProperty("offer").GetProperty("status").GetString());
             Assert.Equal(companyId, payload.GetProperty("offer").GetProperty("grantedCompanyId").GetString());
-            Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, payload.GetProperty("company").GetProperty("cash").GetDecimal());
+            Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, payload.GetProperty("company").GetProperty("cash").GetDecimal());
         });
 
         var distinctProEndTimes = claimPayloads
@@ -2311,7 +2333,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(StartupPackOfferStatus.Claimed, offer.Status);
         Assert.NotNull(offer.ClaimedAtUtc);
         Assert.Equal(Guid.Parse(companyId), offer.GrantedCompanyId);
-        Assert.Equal(500_000m + StartupPackService.CompanyCashGrant, company.Cash);
+        Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, company.Cash);
         Assert.NotNull(player.ProSubscriptionEndsAtUtc);
     }
 
@@ -3264,10 +3286,14 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         // Register two independent buyers, each with their own company
         var token1 = await RegisterAndGetTokenAsync($"lot-race-a-{Guid.NewGuid()}@test.com");
-        var (companyId1, _, _) = await CompleteOnboardingAsync(token1, "Race A Co");
+        var (companyId1, _, onboardingResult1) = await CompleteOnboardingAsync(token1, "Race A Co");
+        var company1CashBeforeRace = onboardingResult1.GetProperty("data").GetProperty("completeOnboarding")
+            .GetProperty("company").GetProperty("cash").GetDecimal();
 
         var token2 = await RegisterAndGetTokenAsync($"lot-race-b-{Guid.NewGuid()}@test.com");
-        var (companyId2, _, _) = await CompleteOnboardingAsync(token2, "Race B Co");
+        var (companyId2, _, onboardingResult2) = await CompleteOnboardingAsync(token2, "Race B Co");
+        var company2CashBeforeRace = onboardingResult2.GetProperty("data").GetProperty("completeOnboarding")
+            .GetProperty("company").GetProperty("cash").GetDecimal();
 
         // Find an available factory lot
         var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
@@ -3309,7 +3335,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var results = await Task.WhenAll(task1, task2);
 
         // Exactly one should succeed, the other should fail with LOT_ALREADY_OWNED
-        var successes = results.Count(r => r.TryGetProperty("data", out var d)
+        var successes = results.Count(r => !r.TryGetProperty("errors", out _)
+            && r.TryGetProperty("data", out var d)
             && d.ValueKind == JsonValueKind.Object
             && d.TryGetProperty("purchaseLot", out var pl)
             && pl.ValueKind == JsonValueKind.Object);
@@ -3334,7 +3361,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // Verify only the winning company was charged
         var company1 = await db.Companies.FirstAsync(c => c.Id == Guid.Parse(companyId1));
         var company2 = await db.Companies.FirstAsync(c => c.Id == Guid.Parse(companyId2));
-        var chargedCount = (company1.Cash < 500_000m ? 1 : 0) + (company2.Cash < 500_000m ? 1 : 0);
+        var chargedCount = (company1.Cash < company1CashBeforeRace ? 1 : 0) + (company2.Cash < company2CashBeforeRace ? 1 : 0);
         Assert.Equal(1, chargedCount);
     }
 

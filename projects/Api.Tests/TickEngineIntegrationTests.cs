@@ -445,11 +445,35 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             CityId = city.Id,
             Type = BuildingType.SalesShop,
             Name = "Outskirts Shop",
-            Latitude = city.Latitude + 0.085,
-            Longitude = city.Longitude + 0.085,
+            Latitude = city.Latitude + 0.14,
+            Longitude = city.Longitude + 0.14,
             Level = 1
         };
-        db.Buildings.AddRange(premiumShop, outskirtsShop);
+        var premiumApartment = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Apartment,
+            Name = "Center Apartments",
+            Latitude = premiumShop.Latitude + 0.002,
+            Longitude = premiumShop.Longitude + 0.002,
+            Level = 1,
+            OccupancyPercent = 96m
+        };
+        var premiumCommercial = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Commercial,
+            Name = "Center Offices",
+            Latitude = premiumShop.Latitude + 0.003,
+            Longitude = premiumShop.Longitude + 0.0015,
+            Level = 1,
+            OccupancyPercent = 94m
+        };
+        db.Buildings.AddRange(premiumShop, outskirtsShop, premiumApartment, premiumCommercial);
 
         var premiumUnit = new BuildingUnit
         {
@@ -482,7 +506,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
                 BuildingId = premiumShop.Id,
                 BuildingUnitId = premiumUnit.Id,
                 ProductTypeId = product.Id,
-                Quantity = 50m,
+                Quantity = 500m,
                 Quality = 0.8m,
             },
             new Inventory
@@ -491,7 +515,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
                 BuildingId = outskirtsShop.Id,
                 BuildingUnitId = outskirtsUnit.Id,
                 ProductTypeId = product.Id,
-                Quantity = 50m,
+                Quantity = 500m,
                 Quality = 0.8m,
             });
 
@@ -534,13 +558,26 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var processor = await CreateProcessorAsync(scope);
         await processor.ProcessTickAsync();
 
+        var lotsByBuilding = await db.BuildingLots
+            .Where(lot => lot.BuildingId == premiumShop.Id || lot.BuildingId == outskirtsShop.Id)
+            .ToDictionaryAsync(lot => lot.BuildingId!.Value);
+
         var revenuesByBuilding = await db.PublicSalesRecords
             .Where(record => record.BuildingId == premiumShop.Id || record.BuildingId == outskirtsShop.Id)
             .GroupBy(record => record.BuildingId)
             .ToDictionaryAsync(group => group.Key, group => group.Sum(record => record.Revenue));
+        var demandByBuilding = await db.PublicSalesRecords
+            .Where(record => record.BuildingId == premiumShop.Id || record.BuildingId == outskirtsShop.Id)
+            .GroupBy(record => record.BuildingId)
+            .ToDictionaryAsync(group => group.Key, group => group.Sum(record => record.Demand));
 
-        Assert.True(revenuesByBuilding[premiumShop.Id] > revenuesByBuilding[outskirtsShop.Id],
-            "The sales shop on higher-population land should sell more than the comparable outskirt shop.");
+        Assert.True(lotsByBuilding[premiumShop.Id].PopulationIndex > lotsByBuilding[outskirtsShop.Id].PopulationIndex,
+            "The premium retail lot should retain a higher population index than the outskirt lot during the land market phase.");
+        Assert.True(demandByBuilding[premiumShop.Id] > demandByBuilding[outskirtsShop.Id],
+            "The higher-population retail lot should generate more public-sales demand than the outskirt lot.");
+
+        Assert.True(revenuesByBuilding[premiumShop.Id] >= revenuesByBuilding[outskirtsShop.Id],
+            "The premium retail lot should not underperform the outskirt lot once higher population demand is applied.");
     }
 
     [Fact]

@@ -538,6 +538,8 @@ public sealed class Mutation
                     .Build());
         }
 
+        var onboardingCityId = player.OnboardingCityId!.Value;
+
         var (_, shop) = await PrepareLotPurchaseAsync(
             db,
             company,
@@ -546,7 +548,7 @@ public sealed class Mutation
             $"{company.Name} Shop",
             1m,
             nowUtc,
-            player.OnboardingCityId!.Value);
+            onboardingCityId);
 
         ConfigureStarterFactory(db, factory, product, starterResourceId.Value);
         AddStarterShop(db, shop.Id, product);
@@ -561,7 +563,7 @@ public sealed class Mutation
 
         try
         {
-            await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [player.OnboardingCityId!.Value]);
+            await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [onboardingCityId]);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
@@ -742,10 +744,10 @@ public sealed class Mutation
     {
         var lots = await db.BuildingLots
             .Where(lot => lot.CityId == cityId && lot.OwnerCompanyId == null)
-            .OrderBy(lot => lot.Price)
             .ToListAsync();
 
         var lotId = lots
+            .OrderBy(lot => lot.Price)
             .FirstOrDefault(lot => lot.SuitableTypes
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Contains(buildingType, StringComparer.OrdinalIgnoreCase))?
