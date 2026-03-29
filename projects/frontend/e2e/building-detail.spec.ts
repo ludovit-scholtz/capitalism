@@ -569,7 +569,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Vienna')).toBeVisible()
   })
 
-  test('shows configured resource image, inventory value, and new-unit cost while planning', async ({ page }) => {
+  test('shows configured resource image, sourcing costs, and new-unit cost while planning', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-display',
@@ -607,9 +607,20 @@ test.describe('Building detail upgrades', () => {
               linkUpRight: false,
               linkDownLeft: false,
               linkDownRight: false,
-              resourceTypeId: 'res-wood',
-              inventoryQuantity: 60,
-              inventoryQuality: 0.8,
+              inventoryItems: [
+                {
+                  resourceTypeId: 'res-wood',
+                  quantity: 40,
+                  quality: 0.84,
+                  sourcingCostTotal: 520,
+                },
+                {
+                  resourceTypeId: 'res-grain',
+                  quantity: 20,
+                  quality: 0.72,
+                  sourcingCostTotal: 80,
+                },
+              ],
             },
           ],
         },
@@ -620,7 +631,9 @@ test.describe('Building detail upgrades', () => {
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     const wood = state.resourceTypes.find((resource) => resource.id === 'res-wood')!
+    const grain = state.resourceTypes.find((resource) => resource.id === 'res-grain')!
     wood.imageUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
+    grain.imageUrl = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=='
 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -634,12 +647,19 @@ test.describe('Building detail upgrades', () => {
     const activeCell = getGridCell(activeSection, 0, 0)
 
     await expect(activeCell).toContainText('Wood')
+    await expect(activeCell).toContainText('+1')
     await expect(activeCell).toContainText('60/100')
-    await expect(activeCell).toContainText('Value $600')
+    await expect(activeCell).toContainText('Cost $600')
     await expect(activeCell.locator('img.cell-item-image')).toHaveCount(1)
 
     await activeCell.click()
-    await expect(page.getByText('Estimated value: $600')).toBeVisible()
+    await expect(page.getByText('Sourcing costs')).toBeVisible()
+    await expect(page.locator('.inventory-summary-stat').filter({ hasText: 'Sourcing costs' }).getByText('$600')).toBeVisible()
+    const inventoryTable = page.locator('.inventory-table').first()
+    await expect(inventoryTable.getByText('Wood', { exact: true })).toBeVisible()
+    await expect(inventoryTable.getByText('Grain', { exact: true })).toBeVisible()
+    await expect(inventoryTable.getByText('$520', { exact: true })).toBeVisible()
+    await expect(inventoryTable.getByText('$80', { exact: true })).toBeVisible()
 
     await page.getByRole('button', { name: 'Edit Building' }).click()
     await expect(page.locator('.upgrade-summary').getByText('Build cost: $0')).toBeVisible()

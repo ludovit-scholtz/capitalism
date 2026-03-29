@@ -4424,6 +4424,103 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             "cashFromOperations should be negative when marketing spend exceeds zero revenue.");
     }
 
+    [Fact]
+    public async Task BuildingUnitInventories_ReturnSourcingCostsForMixedUnitInventory()
+    {
+        var token = await RegisterAndGetTokenAsync($"inventory-{Guid.NewGuid():N}@test.com", "Inventory Tester");
+        var onboarding = await CompleteOnboardingAsync(token, "Inventory Works");
+        var factoryId = onboarding.Result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("factory").GetProperty("id").GetString()!;
+
+        Guid unitId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var factoryGuid = Guid.Parse(factoryId);
+
+            var unit = await db.BuildingUnits
+                .Where(candidate => candidate.BuildingId == factoryGuid && candidate.UnitType == UnitType.Purchase)
+                .FirstAsync();
+
+            var woodId = await db.ResourceTypes
+                .Where(resource => resource.Slug == "wood")
+                .Select(resource => resource.Id)
+                .FirstAsync();
+
+            var grainId = await db.ResourceTypes
+                .Where(resource => resource.Slug == "grain")
+                .Select(resource => resource.Id)
+                .FirstAsync();
+
+            unitId = unit.Id;
+            db.Inventories.AddRange(
+                new Inventory
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = factoryGuid,
+                    BuildingUnitId = unit.Id,
+                    ResourceTypeId = woodId,
+                    Quantity = 10m,
+                    SourcingCostTotal = 140m,
+                    Quality = 0.8m,
+                },
+                new Inventory
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = factoryGuid,
+                    BuildingUnitId = unit.Id,
+                    ResourceTypeId = grainId,
+                    Quantity = 5m,
+                    SourcingCostTotal = 40m,
+                    Quality = 0.6m,
+                });
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingInventory($buildingId: UUID!) {
+              buildingUnitInventorySummaries(buildingId: $buildingId) {
+                buildingUnitId
+                quantity
+                capacity
+                fillPercent
+                averageQuality
+                totalSourcingCost
+                sourcingCostPerUnit
+              }
+              buildingUnitInventories(buildingId: $buildingId) {
+                buildingUnitId
+                quantity
+                sourcingCostTotal
+                sourcingCostPerUnit
+                quality
+                resourceTypeId
+              }
+            }
+            """,
+            new { buildingId = factoryId },
+            token);
+
+        var data = result.GetProperty("data");
+        var summary = data.GetProperty("buildingUnitInventorySummaries").EnumerateArray()
+            .Single(item => item.GetProperty("buildingUnitId").GetString() == unitId.ToString());
+
+        Assert.Equal(15m, summary.GetProperty("quantity").GetDecimal());
+        Assert.Equal(180m, summary.GetProperty("totalSourcingCost").GetDecimal());
+        Assert.Equal(12m, summary.GetProperty("sourcingCostPerUnit").GetDecimal());
+        Assert.Equal(0.7333m, summary.GetProperty("averageQuality").GetDecimal());
+
+        var inventories = data.GetProperty("buildingUnitInventories").EnumerateArray()
+            .Where(item => item.GetProperty("buildingUnitId").GetString() == unitId.ToString())
+            .ToList();
+
+        Assert.Equal(2, inventories.Count);
+        Assert.Equal(180m, inventories.Sum(item => item.GetProperty("sourcingCostTotal").GetDecimal()));
+        Assert.Contains(inventories, item => item.GetProperty("sourcingCostPerUnit").GetDecimal() == 14m);
+        Assert.Contains(inventories, item => item.GetProperty("sourcingCostPerUnit").GetDecimal() == 8m);
+    }
+
     #endregion
 }
 

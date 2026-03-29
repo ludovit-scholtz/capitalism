@@ -61,6 +61,7 @@ public sealed class PurchasingPhase : ITickPhase
         var purchaseSource = unit.PurchaseSource ?? "OPTIMAL";
 
         var totalBought = 0m;
+        var totalSourcingCost = 0m;
         var inventoryQuality = 0m;
 
         // Phase 1: Player-placed exchange orders (LOCAL or OPTIMAL source).
@@ -126,6 +127,7 @@ public sealed class PurchasingPhase : ITickPhase
                     seller.Cash += cost;
 
                 totalBought += fill;
+                totalSourcingCost += cost;
                 // Quality is tracked per-source; for player orders use a default of 0.7 if not available.
                 inventoryQuality = 0.7m;
             }
@@ -143,6 +145,7 @@ public sealed class PurchasingPhase : ITickPhase
             if (globalBought > 0m)
             {
                 totalBought += globalBought;
+                totalSourcingCost += globalCost;
                 inventoryQuality = inventoryQuality > 0m
                     ? (inventoryQuality + globalQuality) / 2m  // blend with existing inventory quality
                     : globalQuality;
@@ -153,12 +156,7 @@ public sealed class PurchasingPhase : ITickPhase
         {
             var inv = context.GetOrCreateUnitInventory(
                 building.Id, unit.Id, resourceId, productId);
-            // Blend new inventory quality with existing.
-            var existingQty = inv.Quantity;
-            var newTotalQty = existingQty + totalBought;
-            if (newTotalQty > 0m)
-                inv.Quality = ((inv.Quality * existingQty) + (inventoryQuality * totalBought)) / newTotalQty;
-            inv.Quantity += totalBought;
+            context.AddInventory(inv, totalBought, totalSourcingCost, inventoryQuality);
         }
     }
 

@@ -132,7 +132,7 @@ public sealed class PublicSalesPhase : ITickPhase
                 SalesCapacity = salesCapacity,
             });
 
-            inv.Quantity -= sold;
+            context.WithdrawInventory(inv, sold);
             company.Cash += sold * price;
             totalSold += sold;
         }

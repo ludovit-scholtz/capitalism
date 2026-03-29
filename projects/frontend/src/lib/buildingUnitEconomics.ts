@@ -1,4 +1,4 @@
-import type { BuildingUnit, ProductType, ResourceType } from '@/types'
+import type { BuildingUnit } from '@/types'
 
 export type UnitIdentity = Pick<BuildingUnit, 'unitType' | 'gridX' | 'gridY'>
 
@@ -41,39 +41,23 @@ export function sumPlannedConfigurationCost(
   }, 0)
 }
 
-export function getConfiguredItemBasePrice(
-  resourceTypeId: string | null | undefined,
-  productTypeId: string | null | undefined,
-  resourceTypes: ResourceType[],
-  productTypes: ProductType[],
-): number | null {
-  if (productTypeId) {
-    return productTypes.find((product) => product.id === productTypeId)?.basePrice ?? null
-  }
-
-  if (resourceTypeId) {
-    return resourceTypes.find((resource) => resource.id === resourceTypeId)?.basePrice ?? null
-  }
-
-  return null
+export type InventoryCostEntry = {
+  quantity: number
+  sourcingCostTotal: number
 }
 
-export function getInventoryEstimatedValue(
+export function getInventorySourcingCostPerUnit(
   quantity: number | null | undefined,
-  resourceTypeId: string | null | undefined,
-  productTypeId: string | null | undefined,
-  resourceTypes: ResourceType[],
-  productTypes: ProductType[],
+  sourcingCostTotal: number | null | undefined,
 ): number | null {
-  if (quantity == null || quantity <= 0) return null
+  if (quantity == null || quantity <= 0 || sourcingCostTotal == null) return null
+  return Number((sourcingCostTotal / quantity).toFixed(2))
+}
 
-  const basePrice = getConfiguredItemBasePrice(
-    resourceTypeId,
-    productTypeId,
-    resourceTypes,
-    productTypes,
+export function getTotalInventorySourcingCost(entries: InventoryCostEntry[]): number {
+  return Number(
+    entries
+      .reduce((total, entry) => total + (entry.quantity > 0 ? entry.sourcingCostTotal : 0), 0)
+      .toFixed(2),
   )
-
-  if (basePrice == null) return null
-  return Number((quantity * basePrice).toFixed(2))
 }

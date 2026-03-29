@@ -4,8 +4,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
 import {
-  getInventoryEstimatedValue,
+  getInventorySourcingCostPerUnit,
   getPlannedUnitConstructionCost,
+  getTotalInventorySourcingCost,
   getUnitConstructionCost,
   sumPlannedConfigurationCost,
 } from '@/lib/buildingUnitEconomics'
@@ -245,8 +246,8 @@ const draftLinkChanges = computed<LinkChangeSummaryEntry[]>(() => {
   const draftByPos = new Map(draftUnits.value.map((u) => [`${u.gridX},${u.gridY}`, u]))
 
   // Check each grid position that appears in baseline or draft
-  const allPositions = new Set([...baselineByPos.keys(), ...draftByPos.keys()])
-  for (const pos of allPositions) {
+  const allPositions = new Set([...Array.from(baselineByPos.keys()), ...Array.from(draftByPos.keys())])
+  for (const pos of Array.from(allPositions)) {
     const baseline = baselineByPos.get(pos)
     const draft = draftByPos.get(pos)
     const linkDirs = [
@@ -1217,11 +1218,23 @@ function getUnitInventorySummary(unit: GridUnit | undefined): BuildingUnitInvent
 
 function getUnitInventories(unit: GridUnit | undefined): BuildingUnitInventory[] {
   if (!unit) return []
-  return unitInventories.value.filter((inventory) => inventory.buildingUnitId === unit.id)
+  const directInventories = unitInventories.value.filter((inventory) => inventory.buildingUnitId === unit.id)
+  if (directInventories.length > 0) {
+    return [...directInventories].sort((left, right) => right.quantity - left.quantity)
+  }
+
+  const activeUnit = activeUnits.value.find(
+    (candidate) => candidate.gridX === unit.gridX && candidate.gridY === unit.gridY,
+  )
+
+  if (!activeUnit) return []
+  return unitInventories.value
+    .filter((inventory) => inventory.buildingUnitId === activeUnit.id)
+    .sort((left, right) => right.quantity - left.quantity)
 }
 
-function hasUnitInventory(unit: GridUnit | undefined): boolean {
-  return getUnitInventories(unit).length > 0
+function getUnitInventoryItemCount(unit: GridUnit | undefined): number {
+  return getUnitInventories(unit).length
 }
 
 function formatCurrency(value: number | null | undefined): string {
@@ -1261,6 +1274,41 @@ function getInventoryItemImageUrl(inventory: BuildingUnitInventory): string | nu
   return null
 }
 
+function getPrimaryInventoryItem(unit: GridUnit | undefined): BuildingUnitInventory | undefined {
+  return getUnitInventories(unit)[0]
+}
+
+function getUnitDisplayLabel(unit: GridUnit | undefined): string | null {
+  const primaryInventory = getPrimaryInventoryItem(unit)
+  if (primaryInventory) {
+    const extraItems = getUnitInventoryItemCount(unit) - 1
+    const primaryName = getInventoryItemName(primaryInventory)
+    return extraItems > 0
+      ? `${primaryName} ${t('buildingDetail.inventory.moreItems', { count: extraItems })}`
+      : primaryName
+  }
+
+  return getUnitConfiguredItemLabel(unit)
+}
+
+function getUnitDisplayImageUrl(unit: GridUnit | undefined): string | null {
+  const primaryInventory = getPrimaryInventoryItem(unit)
+  if (primaryInventory) {
+    return getInventoryItemImageUrl(primaryInventory)
+  }
+
+  return getConfiguredItemImageUrl(unit)
+}
+
+function getUnitDisplayMonogram(unit: GridUnit | undefined): string {
+  const primaryInventory = getPrimaryInventoryItem(unit)
+  if (primaryInventory) {
+    return getInventoryItemMonogram(primaryInventory)
+  }
+
+  return getConfiguredItemMonogram(unit)
+}
+
 function getInventoryItemName(inventory: BuildingUnitInventory): string {
   if (inventory.resourceTypeId) {
     return getResourceName(inventory.resourceTypeId)
@@ -1281,25 +1329,40 @@ function getInventoryItemMonogram(inventory: BuildingUnitInventory): string {
     .join('')
 }
 
-function getUnitInventoryValue(unit: GridUnit | undefined): number | null {
+function getInventoryItemSourcingCostTotal(inventory: BuildingUnitInventory): number {
+  return inventory.sourcingCostTotal ?? 0
+}
+
+function getInventoryItemSourcingCostLabel(inventory: BuildingUnitInventory): string {
+  return formatCurrency(getInventoryItemSourcingCostTotal(inventory))
+}
+
+function getInventoryItemSourcingCostPerUnitLabel(inventory: BuildingUnitInventory): string | null {
+  const sourcingCostPerUnit = inventory.sourcingCostPerUnit
+    ?? getInventorySourcingCostPerUnit(inventory.quantity, inventory.sourcingCostTotal)
+  return sourcingCostPerUnit == null
+    ? null
+    : t('buildingDetail.inventory.perUnit', { value: formatCurrency(sourcingCostPerUnit) })
+}
+
+function getUnitInventoryCost(unit: GridUnit | undefined): number | null {
   if (!unit) return null
   const summary = getUnitInventorySummary(unit)
-  if (!summary) return null
+  if (summary) return summary.totalSourcingCost
 
-  const resourceTypeId = 'resourceTypeId' in unit ? unit.resourceTypeId : null
-  const productTypeId = 'productTypeId' in unit ? unit.productTypeId : null
+  const inventories = getUnitInventories(unit)
+  if (inventories.length === 0) return null
 
-  return getInventoryEstimatedValue(
-    summary.quantity,
-    resourceTypeId,
-    productTypeId,
-    resourceTypes.value,
-    productTypes.value,
+  return getTotalInventorySourcingCost(
+    inventories.map((inventory) => ({
+      quantity: inventory.quantity,
+      sourcingCostTotal: getInventoryItemSourcingCostTotal(inventory),
+    })),
   )
 }
 
-function getUnitInventoryValueLabel(unit: GridUnit | undefined): string | null {
-  const value = getUnitInventoryValue(unit)
+function getUnitInventoryCostLabel(unit: GridUnit | undefined): string | null {
+  const value = getUnitInventoryCost(unit)
   return value == null ? null : formatCurrency(value)
 }
 
@@ -1364,6 +1427,8 @@ async function loadUnitInventorySummaries() {
           capacity
           fillPercent
           averageQuality
+          totalSourcingCost
+          sourcingCostPerUnit
         }
       }`,
       { buildingId: buildingId.value },
@@ -1389,6 +1454,8 @@ async function loadUnitInventories() {
           resourceTypeId
           productTypeId
           quantity
+          sourcingCostTotal
+          sourcingCostPerUnit
           quality
         }
       }`,
@@ -1797,32 +1864,26 @@ watch(
                           <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
                           <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
                         </div>
-                        <div v-if="getUnitConfiguredItemLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-item-block" aria-hidden="true">
+                        <div v-if="getUnitDisplayLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-item-block" aria-hidden="true">
                           <img
-                            v-if="getConfiguredItemImageUrl(getUnitAtFrom(activeUnits, x, y))"
+                            v-if="getUnitDisplayImageUrl(getUnitAtFrom(activeUnits, x, y))"
                             class="cell-item-image"
-                            :src="getConfiguredItemImageUrl(getUnitAtFrom(activeUnits, x, y))!"
+                            :src="getUnitDisplayImageUrl(getUnitAtFrom(activeUnits, x, y))!"
                             alt=""
                           />
-                          <span v-else class="cell-item-avatar">{{ getConfiguredItemMonogram(getUnitAtFrom(activeUnits, x, y)) }}</span>
+                          <span v-else class="cell-item-avatar">{{ getUnitDisplayMonogram(getUnitAtFrom(activeUnits, x, y)) }}</span>
                           <div class="cell-item-copy">
-                            <span class="cell-item">{{ getUnitConfiguredItemLabel(getUnitAtFrom(activeUnits, x, y)) }}</span>
+                            <span class="cell-item">{{ getUnitDisplayLabel(getUnitAtFrom(activeUnits, x, y)) }}</span>
                             <span v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))" class="cell-stock">
                               {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.capacity) }}
                             </span>
                           </div>
                         </div>
-                        <div v-else-if="getUnitAtFrom(activeUnits, x, y)!.unitType === 'STORAGE' && hasUnitInventory(getUnitAtFrom(activeUnits, x, y))" class="cell-inventory-indicator" aria-hidden="true">
-                          <span class="inventory-icon">📦</span>
-                          <span class="cell-stock">
-                            {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.capacity) }}
-                          </span>
-                        </div>
                         <span v-if="getUnitPrimaryMetric(getUnitAtFrom(activeUnits, x, y))" class="cell-metric" aria-hidden="true">
                           {{ getUnitPrimaryMetric(getUnitAtFrom(activeUnits, x, y)) }}
                         </span>
-                        <span v-if="getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-value" aria-hidden="true">
-                          {{ t('buildingDetail.inventory.estimatedValueShort', { value: getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, x, y)) }) }}
+                        <span v-if="getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-value" aria-hidden="true">
+                          {{ t('buildingDetail.inventory.sourcingCostsShort', { value: getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, x, y)) }) }}
                         </span>
                         <div
                           v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.capacity"
@@ -1947,32 +2008,26 @@ watch(
                           <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, x, y)!.unitType}`) }}</span>
                           <span class="cell-level">Lv.{{ getUnitAtFrom(plannedUnits, x, y)!.level }}</span>
                         </div>
-                        <div v-if="getUnitConfiguredItemLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-item-block" aria-hidden="true">
+                        <div v-if="getUnitDisplayLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-item-block" aria-hidden="true">
                           <img
-                            v-if="getConfiguredItemImageUrl(getUnitAtFrom(plannedUnits, x, y))"
+                            v-if="getUnitDisplayImageUrl(getUnitAtFrom(plannedUnits, x, y))"
                             class="cell-item-image"
-                            :src="getConfiguredItemImageUrl(getUnitAtFrom(plannedUnits, x, y))!"
+                            :src="getUnitDisplayImageUrl(getUnitAtFrom(plannedUnits, x, y))!"
                             alt=""
                           />
-                          <span v-else class="cell-item-avatar">{{ getConfiguredItemMonogram(getUnitAtFrom(plannedUnits, x, y)) }}</span>
+                          <span v-else class="cell-item-avatar">{{ getUnitDisplayMonogram(getUnitAtFrom(plannedUnits, x, y)) }}</span>
                           <div class="cell-item-copy">
-                            <span class="cell-item">{{ getUnitConfiguredItemLabel(getUnitAtFrom(plannedUnits, x, y)) }}</span>
+                            <span class="cell-item">{{ getUnitDisplayLabel(getUnitAtFrom(plannedUnits, x, y)) }}</span>
                             <span v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))" class="cell-stock">
                               {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.capacity) }}
                             </span>
                           </div>
                         </div>
-                        <div v-else-if="getUnitAtFrom(plannedUnits, x, y)!.unitType === 'STORAGE' && hasUnitInventory(getUnitAtFrom(plannedUnits, x, y))" class="cell-inventory-indicator" aria-hidden="true">
-                          <span class="inventory-icon">📦</span>
-                          <span class="cell-stock">
-                            {{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.quantity) }}/{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.capacity) }}
-                          </span>
-                        </div>
                         <span v-if="getUnitPrimaryMetric(getUnitAtFrom(plannedUnits, x, y))" class="cell-metric" aria-hidden="true">
                           {{ getUnitPrimaryMetric(getUnitAtFrom(plannedUnits, x, y)) }}
                         </span>
-                        <span v-if="getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-value" aria-hidden="true">
-                          {{ t('buildingDetail.inventory.estimatedValueShort', { value: getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, x, y)) }) }}
+                        <span v-if="getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-value" aria-hidden="true">
+                          {{ t('buildingDetail.inventory.sourcingCostsShort', { value: getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, x, y)) }) }}
                         </span>
                         <div
                           v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.capacity"
@@ -2330,31 +2385,40 @@ watch(
 
               <div v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
                 <h5>{{ t('buildingDetail.inventory.title') }}</h5>
-                <div class="unit-stats">
-                  <span class="stat">
-                    {{
-                      t('buildingDetail.inventory.quantity', {
-                        quantity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.quantity),
-                        capacity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.capacity),
-                      })
-                    }}
-                  </span>
-                  <span class="stat" v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
-                    {{ t('buildingDetail.inventory.averageQuality') }}: {{ formatPercent(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}
-                  </span>
-                  <span class="stat" v-if="getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))">
-                    {{ t('buildingDetail.inventory.estimatedValue') }}: {{ getUnitInventoryValueLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}
-                  </span>
+                <div class="inventory-summary-grid">
+                  <div class="inventory-summary-stat">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.load') }}</span>
+                    <strong>
+                      {{
+                        t('buildingDetail.inventory.quantity', {
+                          quantity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.quantity),
+                          capacity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.capacity),
+                        })
+                      }}
+                    </strong>
+                  </div>
+                  <div class="inventory-summary-stat">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.distinctItems') }}</span>
+                    <strong>{{ getUnitInventoryItemCount(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}</strong>
+                  </div>
+                  <div class="inventory-summary-stat" v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.averageQuality') }}</span>
+                    <strong>{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}</strong>
+                  </div>
+                  <div class="inventory-summary-stat" v-if="getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
+                    <strong>{{ getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}</strong>
+                  </div>
                 </div>
                 <div v-if="getUnitInventories(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).length > 0" class="inventory-table">
                   <div class="inventory-table-header">
-                    <span class="inventory-col-icon">{{ t('buildingDetail.inventory.item') }}</span>
-                    <span class="inventory-col-name">{{ t('buildingDetail.inventory.name') }}</span>
-                    <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.quantity') }}</span>
+                    <span class="inventory-col-item">{{ t('buildingDetail.inventory.item') }}</span>
+                    <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.amount') }}</span>
                     <span class="inventory-col-quality">{{ t('buildingDetail.inventory.quality') }}</span>
+                    <span class="inventory-col-cost">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
                   </div>
                   <div v-for="inventory in getUnitInventories(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" :key="inventory.id" class="inventory-table-row">
-                    <div class="inventory-col-icon">
+                    <div class="inventory-col-item">
                       <img
                         v-if="getInventoryItemImageUrl(inventory)"
                         class="inventory-item-image"
@@ -2362,9 +2426,9 @@ watch(
                         :alt="getInventoryItemName(inventory)"
                       />
                       <span v-else class="inventory-item-avatar">{{ getInventoryItemMonogram(inventory) }}</span>
-                    </div>
-                    <div class="inventory-col-name">
-                      <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
+                      <div class="inventory-item-stack">
+                        <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
+                      </div>
                     </div>
                     <div class="inventory-col-quantity">
                       <span class="inventory-item-quantity">{{ formatUnitQuantity(inventory.quantity) }}</span>
@@ -2372,8 +2436,15 @@ watch(
                     <div class="inventory-col-quality">
                       <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
                     </div>
+                    <div class="inventory-col-cost">
+                      <span class="inventory-item-cost">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
+                      <span v-if="getInventoryItemSourcingCostPerUnitLabel(inventory)" class="inventory-item-secondary">
+                        {{ getInventoryItemSourcingCostPerUnitLabel(inventory) }}
+                      </span>
+                    </div>
                   </div>
                 </div>
+                <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
@@ -2495,22 +2566,66 @@ watch(
               </div>
               <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
                 <h5>{{ t('buildingDetail.inventory.title') }}</h5>
-                <div class="unit-stats">
-                  <span class="stat">
-                    {{
-                      t('buildingDetail.inventory.quantity', {
-                        quantity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.quantity),
-                        capacity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.capacity),
-                      })
-                    }}
-                  </span>
-                  <span class="stat" v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
-                    {{ t('buildingDetail.inventory.averageQuality') }}: {{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}
-                  </span>
-                  <span class="stat" v-if="getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))">
-                    {{ t('buildingDetail.inventory.estimatedValue') }}: {{ getUnitInventoryValueLabel(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)) }}
-                  </span>
+                <div class="inventory-summary-grid">
+                  <div class="inventory-summary-stat">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.load') }}</span>
+                    <strong>
+                      {{
+                        t('buildingDetail.inventory.quantity', {
+                          quantity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.quantity),
+                          capacity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.capacity),
+                        })
+                      }}
+                    </strong>
+                  </div>
+                  <div class="inventory-summary-stat">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.distinctItems') }}</span>
+                    <strong>{{ getUnitInventoryItemCount(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)) }}</strong>
+                  </div>
+                  <div class="inventory-summary-stat" v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.averageQuality') }}</span>
+                    <strong>{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}</strong>
+                  </div>
+                  <div class="inventory-summary-stat" v-if="getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))">
+                    <span class="inventory-summary-label">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
+                    <strong>{{ getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)) }}</strong>
+                  </div>
                 </div>
+                <div v-if="getUnitInventories(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).length > 0" class="inventory-table">
+                  <div class="inventory-table-header">
+                    <span class="inventory-col-item">{{ t('buildingDetail.inventory.item') }}</span>
+                    <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.amount') }}</span>
+                    <span class="inventory-col-quality">{{ t('buildingDetail.inventory.quality') }}</span>
+                    <span class="inventory-col-cost">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
+                  </div>
+                  <div v-for="inventory in getUnitInventories(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))" :key="inventory.id" class="inventory-table-row">
+                    <div class="inventory-col-item">
+                      <img
+                        v-if="getInventoryItemImageUrl(inventory)"
+                        class="inventory-item-image"
+                        :src="getInventoryItemImageUrl(inventory)!"
+                        :alt="getInventoryItemName(inventory)"
+                      />
+                      <span v-else class="inventory-item-avatar">{{ getInventoryItemMonogram(inventory) }}</span>
+                      <div class="inventory-item-stack">
+                        <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
+                      </div>
+                    </div>
+                    <div class="inventory-col-quantity">
+                      <span class="inventory-item-quantity">{{ formatUnitQuantity(inventory.quantity) }}</span>
+                    </div>
+                    <div class="inventory-col-quality">
+                      <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
+                    </div>
+                    <div class="inventory-col-cost">
+                      <span class="inventory-item-cost">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
+                      <span v-if="getInventoryItemSourcingCostPerUnitLabel(inventory)" class="inventory-item-secondary">
+                        {{ getInventoryItemSourcingCostPerUnitLabel(inventory) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
@@ -3546,6 +3661,36 @@ watch(
   font-size: 0.875rem;
 }
 
+.inventory-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+
+.inventory-summary-stat {
+  padding: 0.8rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 94%, white 6%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.inventory-summary-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.inventory-summary-stat strong {
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
 .detail-capacity {
   width: 100%;
   height: 0.5rem;
@@ -3603,7 +3748,7 @@ watch(
 .inventory-table-header,
 .inventory-table-row {
   display: grid;
-  grid-template-columns: 48px 1fr 80px 80px;
+  grid-template-columns: minmax(0, 1.4fr) 90px 90px minmax(110px, 0.9fr);
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   align-items: center;
@@ -3627,16 +3772,31 @@ watch(
   border-bottom: none;
 }
 
-.inventory-col-icon {
+.inventory-col-item {
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
-.inventory-col-name,
 .inventory-col-quantity,
-.inventory-col-quality {
+.inventory-col-quality,
+.inventory-col-cost {
   font-size: 0.8125rem;
+}
+
+.inventory-col-cost {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.125rem;
+}
+
+.inventory-item-stack {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 
 .inventory-item-image {
@@ -3664,6 +3824,28 @@ watch(
 .inventory-item-name {
   font-weight: 600;
   color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.inventory-item-cost {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.inventory-item-secondary {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.inventory-empty {
+  margin: 0;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-md, 8px);
+  background: color-mix(in srgb, var(--color-surface-raised, var(--color-surface)) 94%, white 6%);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
 }
 
 .inventory-item-quantity,

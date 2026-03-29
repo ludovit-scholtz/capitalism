@@ -120,6 +120,15 @@ export type MockBuilding = {
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }
 
+export type MockUnitInventoryItem = {
+  id?: string
+  resourceTypeId?: string | null
+  productTypeId?: string | null
+  quantity: number
+  quality?: number | null
+  sourcingCostTotal?: number | null
+}
+
 export type MockBuildingUnit = {
   id: string
   buildingId: string
@@ -148,6 +157,8 @@ export type MockBuildingUnit = {
   vendorLockCompanyId?: string | null
   inventoryQuantity?: number | null
   inventoryQuality?: number | null
+  inventorySourcingCostTotal?: number | null
+  inventoryItems?: MockUnitInventoryItem[]
 }
 
 export type MockBuildingConfigurationPlanUnit = MockBuildingUnit & {
@@ -257,7 +268,10 @@ export type MockState = {
 const STARTING_CASH_FOR_ONBOARDING = 500000
 
 function cloneUnit(unit: MockBuildingUnit): MockBuildingUnit {
-  return { ...unit }
+  return {
+    ...unit,
+    inventoryItems: unit.inventoryItems?.map((item) => ({ ...item })) ?? undefined,
+  }
 }
 
 function computeDistanceKm(
@@ -308,6 +322,38 @@ function getMockUnitCapacity(unit: MockBuildingUnit) {
     default:
       return 0
   }
+}
+
+function getMockUnitInventoryItems(unit: MockBuildingUnit) {
+  if (unit.inventoryItems && unit.inventoryItems.length > 0) {
+    return unit.inventoryItems.map((item, index) => ({
+      id: item.id ?? `${unit.id}-inventory-${index}`,
+      buildingUnitId: unit.id,
+      resourceTypeId: item.resourceTypeId ?? null,
+      productTypeId: item.productTypeId ?? null,
+      quantity: item.quantity,
+      quality: item.quality ?? unit.inventoryQuality ?? 0.5,
+      sourcingCostTotal: item.sourcingCostTotal ?? 0,
+      sourcingCostPerUnit: item.quantity > 0 ? Number(((item.sourcingCostTotal ?? 0) / item.quantity).toFixed(2)) : 0,
+    }))
+  }
+
+  if ((unit.inventoryQuantity ?? 0) <= 0) {
+    return []
+  }
+
+  return [{
+    id: `${unit.id}-inventory-legacy`,
+    buildingUnitId: unit.id,
+    resourceTypeId: unit.resourceTypeId ?? null,
+    productTypeId: unit.productTypeId ?? null,
+    quantity: unit.inventoryQuantity ?? 0,
+    quality: unit.inventoryQuality ?? 0.5,
+    sourcingCostTotal: unit.inventorySourcingCostTotal ?? 0,
+    sourcingCostPerUnit: (unit.inventoryQuantity ?? 0) > 0
+      ? Number(((unit.inventorySourcingCostTotal ?? 0) / (unit.inventoryQuantity ?? 0)).toFixed(2))
+      : 0,
+  }]
 }
 
 function areUnitsEquivalent(currentUnit: MockBuildingUnit | undefined, nextUnit: MockBuildingUnit): boolean {
@@ -1570,14 +1616,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const buildingUnitInventorySummaries = (building?.units ?? [])
         .map((unit) => {
-          const quantity = unit.inventoryQuantity ?? 0
+          const inventoryItems = getMockUnitInventoryItems(unit)
+          const quantity = inventoryItems.reduce((total, item) => total + item.quantity, 0)
           const capacity = getMockUnitCapacity(unit)
           return {
             buildingUnitId: unit.id,
             quantity,
             capacity,
             fillPercent: capacity > 0 ? Math.min(quantity / capacity, 1) : 0,
-            averageQuality: quantity > 0 ? (unit.inventoryQuality ?? null) : null,
+            averageQuality: quantity > 0
+              ? Number(
+                  (
+                    inventoryItems.reduce((total, item) => total + (item.quantity * item.quality), 0) / quantity
+                  ).toFixed(4),
+                )
+              : null,
+            totalSourcingCost: Number(inventoryItems.reduce((total, item) => total + item.sourcingCostTotal, 0).toFixed(2)),
+            sourcingCostPerUnit: quantity > 0
+              ? Number((inventoryItems.reduce((total, item) => total + item.sourcingCostTotal, 0) / quantity).toFixed(2))
+              : 0,
           }
         })
         .filter((summary) => summary.capacity > 0 || summary.quantity > 0)
@@ -1586,6 +1643,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { buildingUnitInventorySummaries } }),
+      })
+    }
+
+    if (query.includes('buildingUnitInventories')) {
+      const buildingId = body.variables?.buildingId
+      const building = state.players
+        .flatMap((player) => player.companies)
+        .flatMap((company) => company.buildings)
+        .find((candidate) => candidate.id === buildingId)
+
+      const buildingUnitInventories = (building?.units ?? [])
+        .flatMap((unit) => getMockUnitInventoryItems(unit))
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { buildingUnitInventories } }),
       })
     }
 

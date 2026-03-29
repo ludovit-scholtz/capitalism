@@ -153,6 +153,8 @@ export interface BuildingUnitInventorySummary {
   capacity: number
   fillPercent: number
   averageQuality: number | null
+  totalSourcingCost: number
+  sourcingCostPerUnit: number
 }
 
 export interface BuildingUnitInventory {
@@ -161,6 +163,8 @@ export interface BuildingUnitInventory {
   resourceTypeId: string | null
   productTypeId: string | null
   quantity: number
+  sourcingCostTotal: number
+  sourcingCostPerUnit: number
   quality: number
 }
 
@@ -315,6 +319,7 @@ export interface ProductType {
   energyConsumptionMwh: number
   unitName: string
   unitSymbol: string
+  imageUrl?: string | null
   isProOnly: boolean
   isUnlockedForCurrentPlayer: boolean
   description: string | null

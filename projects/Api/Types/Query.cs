@@ -422,7 +422,11 @@ public sealed class Query
                     FillPercent = capacity > 0m
                         ? decimal.Round(Math.Clamp(quantity / capacity, 0m, 1m), 4, MidpointRounding.AwayFromZero)
                         : 0m,
-                    AverageQuality = averageQuality
+                    AverageQuality = averageQuality,
+                    TotalSourcingCost = decimal.Round(unitInventories.Sum(entry => entry.SourcingCostTotal), 4, MidpointRounding.AwayFromZero),
+                    SourcingCostPerUnit = quantity > 0m
+                        ? decimal.Round(unitInventories.Sum(entry => entry.SourcingCostTotal) / quantity, 4, MidpointRounding.AwayFromZero)
+                        : 0m
                 };
             })
             .Where(summary => summary.Capacity > 0m || summary.Quantity > 0m)
@@ -463,6 +467,10 @@ public sealed class Query
                 ResourceTypeId = entry.ResourceTypeId,
                 ProductTypeId = entry.ProductTypeId,
                 Quantity = entry.Quantity,
+                SourcingCostTotal = entry.SourcingCostTotal,
+                SourcingCostPerUnit = entry.Quantity > 0m
+                    ? decimal.Round(entry.SourcingCostTotal / entry.Quantity, 4, MidpointRounding.AwayFromZero)
+                    : 0m,
                 Quality = entry.Quality
             })
             .ToListAsync();
@@ -838,4 +846,6 @@ public sealed class BuildingUnitInventorySummary
     public decimal Capacity { get; set; }
     public decimal FillPercent { get; set; }
     public decimal? AverageQuality { get; set; }
+    public decimal TotalSourcingCost { get; set; }
+    public decimal SourcingCostPerUnit { get; set; }
 }

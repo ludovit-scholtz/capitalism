@@ -59,11 +59,12 @@ public sealed class ResourceMovementPhase : ITickPhase
                 transfer = Math.Max(0m, Math.Floor(transfer * 10000m) / 10000m);
                 if (transfer <= 0m) continue;
 
+                var moved = context.WithdrawInventory(inv, transfer);
+                if (moved.Quantity <= 0m) continue;
+
                 var targetInv = context.GetOrCreateUnitInventory(
                     buildingId, neighbor.Id, inv.ResourceTypeId, inv.ProductTypeId);
-                targetInv.Quality = inv.Quality; // preserve quality
-                targetInv.Quantity += transfer;
-                inv.Quantity -= transfer;
+                context.AddInventory(targetInv, moved.Quantity, moved.SourcingCostTotal, inv.Quality);
 
                 if (inv.Quantity <= 0m) break;
             }
