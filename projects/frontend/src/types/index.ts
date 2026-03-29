@@ -396,6 +396,8 @@ export interface BuildingLot {
   district: string
   latitude: number
   longitude: number
+  populationIndex: number
+  basePrice: number
   price: number
   suitableTypes: string
   ownerCompanyId: string | null
@@ -436,6 +438,8 @@ export interface CompanyLedgerSummary {
   totalTaxPaid: number
   totalOtherCosts: number
   netIncome: number
+  propertyValue: number
+  propertyAppreciation: number
   buildingValue: number
   inventoryValue: number
   totalAssets: number
