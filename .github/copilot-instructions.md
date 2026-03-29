@@ -299,6 +299,20 @@ Root-cause of a past quality failure (March 2026, PR #46):
 - E2E: golden path + at least one interruption/resume test + at least one skip-path or error-recovery test.
 - All tests must pass locally before pushing; never push with known failures.
 
+## Onboarding product-proof quality — green CI is not enough
+
+Root-cause of a quality failure (March 2026, PR #51 onboarding follow-up):
+- The branch had green backend, unit, and Playwright suites, but the completion-step UX still did not *prove* the business launch outcome clearly enough for product review.
+- The onboarding guide used generic copy for pricing/time instead of explicit business context (for example the numeric starter price target and the current simulation tick).
+- Review feedback was therefore about product-definition alignment and proof quality, not just red CI.
+
+**When a first-session or guided-flow feature is "green but not ready":**
+1. Re-read the relevant ROADMAP acceptance text and inspect the actual rendered UI, not just the tests.
+2. Verify the completion state exposes the concrete business context a player needs (cash, numeric price target, current tick/time, next action).
+3. Add or tighten E2E assertions for those concrete values so future regressions are caught.
+4. Add backend assertions for authoritative starter configuration values when the guided flow depends on them (for example min/max prices, product/resource bindings, and unit links).
+5. Do not respond to product-review feedback with "tests already pass" alone — prove the player-visible outcome and then update the PR description accordingly.
+
 ## E2E test quality — preventing selector failures
 
 Root-cause of a quality failure (March 2026, PR #48 / global exchange):

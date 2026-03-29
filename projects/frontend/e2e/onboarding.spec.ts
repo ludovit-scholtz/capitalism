@@ -770,8 +770,10 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // All four guidance steps should be visible
     await expect(page.getByText('Review your cash')).toBeVisible()
     await expect(page.getByText('Set a selling price', { exact: true })).toBeVisible()
+    await expect(page.getByText('Start near the base market price of $45.')).toBeVisible()
     await expect(page.getByText('Enable public sales')).toBeVisible()
     await expect(page.getByText('Wait for the next tick')).toBeVisible()
+    await expect(page.getByText('Current simulation tick: 42.')).toBeVisible()
   })
 
   test('completion screen shows Configure My Sales Shop CTA linking to shop building', async ({

@@ -231,6 +231,26 @@ const configureGuideCash = computed(() => {
   return auth.player?.companies[0]?.cash ?? 0
 })
 
+function findResumedShopBasePrice(): number | null {
+  const resumedShop = auth.player?.companies
+    .flatMap((company) => company.buildings)
+    .find((building) => building.id === shopBuildingId.value)
+  const publicSalesUnit = resumedShop?.units.find((unit) => unit.unitType === 'PUBLIC_SALES')
+  return publicSalesUnit?.minPrice ?? null
+}
+
+const configureGuideBasePrice = computed(() => {
+  if (completionResult.value?.selectedProduct.basePrice) {
+    return completionResult.value.selectedProduct.basePrice
+  }
+
+  if (selectedProduct.value?.basePrice) {
+    return selectedProduct.value.basePrice
+  }
+
+  return findResumedShopBasePrice()
+})
+
 const industryIcons: Record<string, string> = {
   FURNITURE: '🪑',
   FOOD_PROCESSING: '🍞',
@@ -515,7 +535,7 @@ async function completeOnboarding() {
           company { id name cash }
           factory { id name type }
           salesShop { id name type }
-          selectedProduct { name industry }
+          selectedProduct { name industry basePrice }
           startupPackOffer {
             id
             offerKey
@@ -723,6 +743,10 @@ function getCityResourceName(city: City, index: number): string {
 }
 
 function formatCurrency(value: number): string {
+  return value.toLocaleString(locale.value)
+}
+
+function formatNumber(value: number): string {
   return value.toLocaleString(locale.value)
 }
 
@@ -1203,7 +1227,15 @@ onUnmounted(() => {
               <span class="configure-step-icon">💲</span>
               <div class="configure-step-body">
                 <strong>{{ t('onboarding.configureStepPrice') }}</strong>
-                <p>{{ t('onboarding.configureStepPriceDesc') }}</p>
+                <p>
+                  {{
+                    configureGuideBasePrice === null
+                      ? t('onboarding.configureStepPriceDesc')
+                      : t('onboarding.configureStepPriceDescWithPrice', {
+                          price: formatCurrency(configureGuideBasePrice),
+                        })
+                  }}
+                </p>
               </div>
             </article>
 
@@ -1220,6 +1252,9 @@ onUnmounted(() => {
               <div class="configure-step-body">
                 <strong>{{ t('onboarding.configureStepTick') }}</strong>
                 <p>{{ t('onboarding.configureStepTickDesc') }}</p>
+                <p v-if="gameState" class="tick-status">
+                  {{ t('onboarding.configureStepTickStatus', { tick: formatNumber(gameState.currentTick) }) }}
+                </p>
                 <p v-if="tickCountdown" class="tick-countdown" role="timer">{{ tickCountdown }}</p>
               </div>
             </article>
@@ -1966,6 +2001,10 @@ onUnmounted(() => {
 
 .configure-step-body p + p {
   margin-top: 0.5rem;
+}
+
+.tick-status {
+  font-size: 0.85rem !important;
 }
 
 .tick-countdown {
