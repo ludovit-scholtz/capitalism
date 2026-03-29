@@ -79,6 +79,12 @@ By default make sure the purchase is the optimal price.
 
 allows to manufacture products from raw materials linked to the manufacturing unit. The manufacturing speed and storage size can be increased by upgrading the unit. The player can set the product type to be manufactured. The quality of manufactured product depends on the quality of raw materials and the quality of the researched product. The quality can be increased by upgrading the unit. Unit holds max storage capacity resources for each resource.
 
+The game engine does not move the input resources from the manufacturing unit to output unit.
+
+The capacity in manufacturing unit for specific input resource must be lower then 1/(input resource count for product) % so that the manufacturing storage capacity is not halted by one input product.
+
+The manufacturing takes one tick to process. It converts the input resources to output resources. The costs for the unit such as labor or energy costs are compounded to the sourcing costs of the output product.
+
 ### Branding unit
 
 allows to set the brand of the products manufactured in the factory. The brand can be product specific, product category specific or company specific. This unit is not upgradable. Brand quality affects the sales of the products. Higher brand awareness and brand quality means more sales. Unit holds max storage capacity resources for each resource.

@@ -44,6 +44,10 @@ public sealed class ResourceMovementPhase : ITickPhase
         {
             if (inv.Quantity <= 0m) continue;
 
+            // For manufacturing units, only push the configured output product, keep inputs in place.
+            if (source.UnitType == UnitType.Manufacturing && inv.ProductTypeId != source.ProductTypeId)
+                continue;
+
             // Distribute evenly among neighbors with free space.
             var eligibleNeighbors = neighbors
                 .Where(n => context.GetUnitFreeSpace(n) > 0m)
