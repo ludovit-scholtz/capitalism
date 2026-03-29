@@ -320,7 +320,6 @@ export interface ProductType {
   energyConsumptionMwh: number
   unitName: string
   unitSymbol: string
-  imageUrl?: string | null
   isProOnly: boolean
   isUnlockedForCurrentPlayer: boolean
   description: string | null

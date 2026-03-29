@@ -324,6 +324,17 @@ Root-cause of a quality failure (March 2026, PR #52 onboarding follow-up):
 2. Re-run the frontend pipeline from a clean dependency state (`npm ci`, then `npm run lint`, `npm run test:unit`, `npm run build`) so CI and local validation match.
 3. If the failure is a missing property on a shared frontend GraphQL type, update the canonical type definition in `src/types/index.ts` and then rerun the affected build/tests.
 
+## Frontend merge/rebase hygiene — prevent duplicate type members
+
+Root-cause of a quality failure (March 2026, PR #52 after rebasing with `main`):
+- A merge from `main` changed the shared frontend type surface and left `ProductType.imageUrl` declared twice in `src/types/index.ts`.
+- ESLint stayed green, but `vue-tsc` in `frontend-ci-cd` correctly failed with `TS2300 Duplicate identifier`.
+
+**When your branch is rebased or merged with `main`:**
+1. Re-open `src/types/index.ts` (and any other shared type files touched by the merge) and scan for duplicated properties or merge leftovers before assuming the branch is still green.
+2. Re-run the clean frontend pipeline (`npm ci`, `npm run lint`, `npm run test:unit`, `npm run build`) after the merge/rebase, even if the branch was green before.
+3. Treat any new CI type-check failure after a merge/rebase as a real regression in the merged branch head and fix that head state directly.
+
 ## E2E test quality — preventing selector failures
 
 Root-cause of a quality failure (March 2026, PR #48 / global exchange):
