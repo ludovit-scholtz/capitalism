@@ -2331,6 +2331,76 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task FinishOnboarding_WhenShopLotIsUnsuitableType_Fails()
+    {
+        var token = await RegisterAndGetTokenAsync($"finish-unsuitable-shop-{Guid.NewGuid()}@test.com", "UnsuitableShop");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Unsuitable Shop Co");
+        var productId = await GetStarterProductIdAsync();
+        // Use a FACTORY-only lot as the shop lot — should be rejected
+        var factoryOnlyLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m, "Factory-Only Lot");
+
+        var result = await FinishOnboardingAsync(token, productId, factoryOnlyLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("UNSUITABLE_BUILDING_TYPE", code);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WhenShopLotIsInDifferentCity_Fails()
+    {
+        var token = await RegisterAndGetTokenAsync($"finish-city-mismatch-{Guid.NewGuid()}@test.com", "CityMismatch");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "City Mismatch Co");
+        var productId = await GetStarterProductIdAsync();
+
+        // Create a shop lot in a different city
+        var cities = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var allCities = cities.GetProperty("data").GetProperty("cities");
+        var otherCityId = Enumerable.Range(0, allCities.GetArrayLength())
+            .Select(i => allCities[i].GetProperty("id").GetString()!)
+            .FirstOrDefault(id => id != cityId.ToString());
+
+        if (otherCityId is null)
+        {
+            // Only one city seeded — skip the cross-city check gracefully
+            return;
+        }
+
+        var otherCityShopLotId = await CreateTestLotAsync(otherCityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Other City Shop");
+
+        var result = await FinishOnboardingAsync(token, productId, otherCityShopLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("LOT_CITY_MISMATCH", code);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WhenInsufficientFundsForShopLot_Fails()
+    {
+        var token = await RegisterAndGetTokenAsync($"finish-broke-{Guid.NewGuid()}@test.com", "BrokePlayer");
+        var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Broke Shop Co");
+        var productId = await GetStarterProductIdAsync();
+
+        // Drain the company's cash so it cannot afford the shop lot
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var company = await db.Companies.FirstAsync(c => c.Id == Guid.Parse(companyId));
+            company.Cash = 0;
+            await db.SaveChangesAsync();
+        }
+
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Affordable-Looking Shop");
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
+    }
+
+    [Fact]
     public async Task FullOnboardingCycle_AllThreeIndustries_ProducesValidState()
     {
         // Verify each starter industry produces a valid completed onboarding state
