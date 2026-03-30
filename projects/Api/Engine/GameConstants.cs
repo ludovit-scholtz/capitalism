@@ -6,6 +6,11 @@ namespace Api.Engine;
 /// </summary>
 public static class GameConstants
 {
+    public const int GameStartYear = 2000;
+    public const int TicksPerDay = 24;
+    public const int DaysPerYear = 365;
+    public const int TicksPerYear = TicksPerDay * DaysPerYear;
+
     /// <summary>Maximum storage capacity (units) per unit level.</summary>
     public static decimal StorageCapacity(int level) => level switch
     {

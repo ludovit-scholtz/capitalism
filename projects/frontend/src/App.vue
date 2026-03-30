@@ -4,11 +4,14 @@ import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import { usePwa } from '@/composables/usePwa'
 import { useAuthStore } from '@/stores/auth'
+import { useGameStateStore } from '@/stores/gameState'
 
 const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
 const auth = useAuthStore()
+const gameStateStore = useGameStateStore()
 auth.initFromStorage()
+gameStateStore.start()
 
 </script>
 

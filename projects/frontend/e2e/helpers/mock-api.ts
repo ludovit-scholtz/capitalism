@@ -48,12 +48,16 @@ export type MockStartupPackOffer = {
 export type MockLedgerSummary = {
   companyId: string
   companyName: string
+  gameYear?: number
+  isCurrentGameYear?: boolean
   currentCash: number
   totalRevenue: number
   totalPurchasingCosts: number
   totalMarketingCosts: number
   totalTaxPaid: number
   totalOtherCosts: number
+  taxableIncome?: number
+  estimatedIncomeTax?: number
   netIncome: number
   propertyValue: number
   propertyAppreciation: number
@@ -65,6 +69,11 @@ export type MockLedgerSummary = {
   cashFromInvestments: number
   firstRecordedTick: number
   lastRecordedTick: number
+  incomeTaxDueAtTick?: number
+  incomeTaxDueGameTimeUtc?: string
+  incomeTaxDueGameYear?: number
+  isIncomeTaxSettled?: boolean
+  history?: MockLedgerHistoryYear[]
   buildingSummaries: Array<{
     buildingId: string
     buildingName: string
@@ -72,6 +81,18 @@ export type MockLedgerSummary = {
     revenue: number
     costs: number
   }>
+}
+
+export type MockLedgerHistoryYear = {
+  gameYear: number
+  isCurrentGameYear: boolean
+  totalRevenue: number
+  netIncome: number
+  totalTaxPaid: number
+  taxableIncome: number
+  estimatedIncomeTax: number
+  firstRecordedTick: number
+  lastRecordedTick: number
 }
 
 export type MockLedgerEntry = {
@@ -282,6 +303,85 @@ export type MockState = {
 }
 
 const STARTING_CASH_FOR_ONBOARDING = 500000
+const GAME_START_YEAR = 2000
+const TICKS_PER_DAY = 24
+const TICKS_PER_YEAR = 24 * 365
+
+function computeMockGameYear(currentTick: number) {
+  return GAME_START_YEAR + Math.floor(Math.max(currentTick, 0) / TICKS_PER_YEAR)
+}
+
+function computeMockInGameTimeUtc(currentTick: number) {
+  const gameStart = new Date(Date.UTC(GAME_START_YEAR, 0, 1, 0, 0, 0))
+  gameStart.setUTCHours(gameStart.getUTCHours() + Math.max(currentTick, 0))
+  return gameStart.toISOString()
+}
+
+function computeMockNextTaxTick(currentTick: number, taxCycleTicks: number) {
+  const cycleTicks = taxCycleTicks > 0 ? taxCycleTicks : TICKS_PER_YEAR
+  const safeTick = Math.max(currentTick, 0)
+  const cyclesCompleted = Math.floor(safeTick / cycleTicks)
+  const currentCycleStart = cyclesCompleted * cycleTicks
+  return safeTick === currentCycleStart ? currentCycleStart + cycleTicks : (cyclesCompleted + 1) * cycleTicks
+}
+
+function buildMockGameStatePayload(gameState: MockState['gameState']) {
+  const currentGameYear = computeMockGameYear(gameState.currentTick)
+  const nextTaxTick = computeMockNextTaxTick(gameState.currentTick, gameState.taxCycleTicks)
+
+  return {
+    ...gameState,
+    currentGameYear,
+    currentGameTimeUtc: computeMockInGameTimeUtc(gameState.currentTick),
+    ticksPerDay: TICKS_PER_DAY,
+    ticksPerYear: TICKS_PER_YEAR,
+    nextTaxTick,
+    nextTaxGameTimeUtc: computeMockInGameTimeUtc(nextTaxTick),
+    nextTaxGameYear: computeMockGameYear(nextTaxTick),
+  }
+}
+
+function buildMockLedgerHistoryYear(summary: MockLedgerSummary, currentGameYear: number): MockLedgerHistoryYear {
+  const gameYear = summary.gameYear ?? currentGameYear
+  const taxableIncome = summary.taxableIncome ?? Math.max(
+    summary.totalRevenue - summary.totalPurchasingCosts - summary.totalMarketingCosts - summary.totalOtherCosts,
+    0,
+  )
+
+  return {
+    gameYear,
+    isCurrentGameYear: summary.isCurrentGameYear ?? gameYear === currentGameYear,
+    totalRevenue: summary.totalRevenue,
+    netIncome: summary.netIncome,
+    totalTaxPaid: summary.totalTaxPaid,
+    taxableIncome,
+    estimatedIncomeTax: summary.estimatedIncomeTax ?? summary.totalTaxPaid,
+    firstRecordedTick: summary.firstRecordedTick,
+    lastRecordedTick: summary.lastRecordedTick,
+  }
+}
+
+function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: MockState['gameState']) {
+  const currentGameYear = computeMockGameYear(gameState.currentTick)
+  const gameYear = summary.gameYear ?? currentGameYear
+  const incomeTaxDueAtTick = summary.incomeTaxDueAtTick ?? ((gameYear - GAME_START_YEAR + 1) * TICKS_PER_YEAR)
+
+  return {
+    ...summary,
+    gameYear,
+    isCurrentGameYear: summary.isCurrentGameYear ?? gameYear === currentGameYear,
+    taxableIncome: summary.taxableIncome ?? Math.max(
+      summary.totalRevenue - summary.totalPurchasingCosts - summary.totalMarketingCosts - summary.totalOtherCosts,
+      0,
+    ),
+    estimatedIncomeTax: summary.estimatedIncomeTax ?? summary.totalTaxPaid,
+    incomeTaxDueAtTick,
+    incomeTaxDueGameTimeUtc: summary.incomeTaxDueGameTimeUtc ?? computeMockInGameTimeUtc(incomeTaxDueAtTick),
+    incomeTaxDueGameYear: summary.incomeTaxDueGameYear ?? computeMockGameYear(incomeTaxDueAtTick),
+    isIncomeTaxSettled: summary.isIncomeTaxSettled ?? gameYear < currentGameYear,
+    history: summary.history ?? [buildMockLedgerHistoryYear(summary, currentGameYear)],
+  }
+}
 
 function cloneUnit(unit: MockBuildingUnit): MockBuildingUnit {
   return {
@@ -806,7 +906,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     productTypes: makeDefaultProducts(),
     currentUserId: null,
     currentToken: null,
-    gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 1440, taxRate: 15 },
+    gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 8760, taxRate: 15 },
     ledgerData: {},
     drillDownData: {},
     ...initial,
@@ -1880,7 +1980,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { gameState: state.gameState } }),
+        body: JSON.stringify({ data: { gameState: buildMockGameStatePayload(state.gameState) } }),
       })
     }
 
@@ -2035,7 +2135,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('companyLedger')) {
       const companyId = body.variables?.companyId
-      const summary = state.ledgerData[companyId]
+      const gameYear = body.variables?.gameYear
+      const summary = state.ledgerData[`${companyId}:${gameYear}`] ?? state.ledgerData[companyId]
       if (!summary) {
         const player = state.players.find((p) => p.id === state.currentUserId)
         const company = player?.companies.find((c) => c.id === companyId)
@@ -2065,12 +2166,16 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         const auto: MockLedgerSummary = {
           companyId: company.id,
           companyName: company.name,
+          gameYear: computeMockGameYear(state.gameState.currentTick),
+          isCurrentGameYear: true,
           currentCash: company.cash,
           totalRevenue: 0,
           totalPurchasingCosts: 0,
           totalMarketingCosts: 0,
           totalTaxPaid: 0,
           totalOtherCosts: 0,
+          taxableIncome: 0,
+          estimatedIncomeTax: 0,
           netIncome: 0,
           propertyValue: 0,
           propertyAppreciation: 0,
@@ -2082,25 +2187,29 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           cashFromInvestments: 0,
           firstRecordedTick: 0,
           lastRecordedTick: 0,
+          history: [],
           buildingSummaries: [],
         }
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ data: { companyLedger: auto } }),
+          body: JSON.stringify({ data: { companyLedger: buildMockLedgerSummaryPayload(auto, state.gameState) } }),
         })
       }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { companyLedger: summary } }),
+        body: JSON.stringify({ data: { companyLedger: buildMockLedgerSummaryPayload(summary, state.gameState) } }),
       })
     }
 
     if (query.includes('ledgerDrillDown')) {
       const companyId = body.variables?.companyId
       const category = body.variables?.category
-      const entries = state.drillDownData[`${companyId}:${category}`] ?? []
+      const gameYear = body.variables?.gameYear
+      const entries = state.drillDownData[`${companyId}:${category}:${gameYear}`]
+        ?? state.drillDownData[`${companyId}:${category}`]
+        ?? []
       return route.fulfill({
         status: 200,
         contentType: 'application/json',

@@ -139,6 +139,38 @@ test.describe('Dashboard — tick countdown', () => {
     await expect(page.locator('.tick-clock-widget')).toBeVisible()
     await expect(page.locator('.tick-clock-label')).toContainText('7')
   })
+
+  test('refreshes dashboard data after the next tick', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-live',
+          playerId: 'player-1',
+          name: 'Live Tick Corp',
+          cash: 400000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameState.currentTick = 42
+    state.gameState.lastTickAtUtc = new Date(Date.now() - 2000).toISOString()
+    state.gameState.tickIntervalSeconds = 1
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.tick-clock-label')).toContainText('42')
+
+    state.gameState.currentTick = 43
+    state.gameState.lastTickAtUtc = new Date().toISOString()
+
+    await expect(page.locator('.tick-clock-label')).toContainText('43', { timeout: 5000 })
+  })
 })
 
 test.describe('Dashboard — pending actions timeline', () => {

@@ -396,6 +396,13 @@ export interface GameState {
   tickIntervalSeconds: number
   taxCycleTicks: number
   taxRate: number
+  currentGameYear: number
+  currentGameTimeUtc: string
+  ticksPerDay: number
+  ticksPerYear: number
+  nextTaxTick: number
+  nextTaxGameTimeUtc: string
+  nextTaxGameYear: number
 }
 
 /** Matches backend BuildingLot entity */
@@ -442,12 +449,16 @@ export interface ScheduledActionSummary {
 export interface CompanyLedgerSummary {
   companyId: string
   companyName: string
+  gameYear: number
+  isCurrentGameYear: boolean
   currentCash: number
   totalRevenue: number
   totalPurchasingCosts: number
   totalMarketingCosts: number
   totalTaxPaid: number
   totalOtherCosts: number
+  taxableIncome: number
+  estimatedIncomeTax: number
   netIncome: number
   propertyValue: number
   propertyAppreciation: number
@@ -459,7 +470,24 @@ export interface CompanyLedgerSummary {
   cashFromInvestments: number
   firstRecordedTick: number
   lastRecordedTick: number
+  incomeTaxDueAtTick: number
+  incomeTaxDueGameTimeUtc: string
+  incomeTaxDueGameYear: number
+  isIncomeTaxSettled: boolean
   buildingSummaries: BuildingLedgerSummary[]
+  history: CompanyLedgerHistoryYear[]
+}
+
+export interface CompanyLedgerHistoryYear {
+  gameYear: number
+  isCurrentGameYear: boolean
+  totalRevenue: number
+  netIncome: number
+  totalTaxPaid: number
+  taxableIncome: number
+  estimatedIncomeTax: number
+  firstRecordedTick: number
+  lastRecordedTick: number
 }
 
 export interface BuildingLedgerSummary {

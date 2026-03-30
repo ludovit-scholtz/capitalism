@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
+import { useTickRefresh } from '@/composables/useTickRefresh'
 import type { PlayerRanking } from '@/types'
 
 const { t } = useI18n()
@@ -42,10 +43,12 @@ async function fetchRankings() {
 onMounted(async () => {
   auth.initFromStorage()
   if (auth.isAuthenticated) {
-    auth.fetchMe()
+    void auth.fetchMe()
   }
   await fetchRankings()
 })
+
+useTickRefresh(fetchRankings)
 
 function formatWealth(value: number): string {
   if (value >= 1_000_000) {

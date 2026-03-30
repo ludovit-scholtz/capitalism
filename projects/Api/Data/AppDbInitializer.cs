@@ -1,5 +1,6 @@
 using Api.Configuration;
 using Api.Data.Entities;
+using Api.Engine;
 using Api.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -42,6 +43,19 @@ public sealed class AppDbInitializer(
         if (!await dbContext.GameStates.AnyAsync())
         {
             dbContext.GameStates.Add(new GameState { Id = 1, CurrentTick = 0, TickIntervalSeconds = seedOptions.Value.TickIntervalSeconds });
+        }
+        else
+        {
+            var gameState = await dbContext.GameStates.FirstAsync();
+            if (gameState.TickIntervalSeconds <= 0)
+            {
+                gameState.TickIntervalSeconds = seedOptions.Value.TickIntervalSeconds;
+            }
+
+            if (gameState.TaxCycleTicks != GameConstants.TicksPerYear)
+            {
+                gameState.TaxCycleTicks = GameConstants.TicksPerYear;
+            }
         }
 
         if (!await dbContext.ResourceTypes.AnyAsync())

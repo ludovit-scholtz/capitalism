@@ -12,6 +12,7 @@ import {
   getLocalizedResourceName,
   getProductImageUrl,
 } from '@/lib/catalogPresentation'
+import { useTickRefresh } from '@/composables/useTickRefresh'
 import {
   canProceedStep3 as checkCanProceedStep3,
   canProceedStep4 as checkCanProceedStep4,
@@ -1060,6 +1061,14 @@ async function loadGameState() {
 
 onUnmounted(() => {
   stopTickCountdown()
+})
+
+useTickRefresh(async () => {
+  if (step.value !== 5) {
+    return
+  }
+
+  await loadGameState()
 })
 </script>
 

@@ -1,3 +1,7 @@
+using System.ComponentModel.DataAnnotations.Schema;
+using Api.Engine;
+using Api.Utilities;
+
 namespace Api.Data.Entities;
 
 /// <summary>
@@ -19,8 +23,29 @@ public sealed class GameState
     public int TickIntervalSeconds { get; set; } = 60;
 
     /// <summary>Ticks between tax calculation cycles.</summary>
-    public int TaxCycleTicks { get; set; } = 1440;
+    public int TaxCycleTicks { get; set; } = GameConstants.TicksPerYear;
 
     /// <summary>Global tax rate percentage (0-100).</summary>
     public decimal TaxRate { get; set; } = 15m;
+
+    [NotMapped]
+    public int CurrentGameYear => GameTime.GetGameYear(CurrentTick);
+
+    [NotMapped]
+    public DateTime CurrentGameTimeUtc => GameTime.GetInGameTimeUtc(CurrentTick);
+
+    [NotMapped]
+    public int TicksPerDay => GameConstants.TicksPerDay;
+
+    [NotMapped]
+    public int TicksPerYear => GameConstants.TicksPerYear;
+
+    [NotMapped]
+    public long NextTaxTick => GameTime.GetNextTaxTick(CurrentTick, TaxCycleTicks);
+
+    [NotMapped]
+    public DateTime NextTaxGameTimeUtc => GameTime.GetInGameTimeUtc(NextTaxTick);
+
+    [NotMapped]
+    public int NextTaxGameYear => GameTime.GetGameYear(NextTaxTick);
 }

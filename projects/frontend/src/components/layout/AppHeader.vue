@@ -1,11 +1,24 @@
 <script setup lang="ts">
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { formatInGameTime } from '@/lib/gameTime'
+import { useGameStateStore } from '@/stores/gameState'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const auth = useAuthStore()
+const gameStateStore = useGameStateStore()
+const { gameState } = storeToRefs(gameStateStore)
 const isMenuOpen = ref(false)
+
+const formattedGameTime = computed(() => {
+  if (!gameState.value?.currentGameTimeUtc) {
+    return null
+  }
+
+  return formatInGameTime(gameState.value.currentGameTimeUtc, locale.value)
+})
 
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
@@ -40,6 +53,10 @@ const closeMenu = () => {
         </RouterLink>
       </nav>
       <div class="header-actions">
+        <div v-if="gameState && formattedGameTime" class="game-time-chip" :title="t('nav.gameTime')">
+          <span class="game-time-label">{{ t('nav.gameTime') }}</span>
+          <span class="game-time-value">{{ formattedGameTime }}</span>
+        </div>
         <template v-if="auth.isAuthenticated">
           <span class="player-name">{{ auth.player?.displayName }}</span>
           <button
@@ -241,6 +258,31 @@ const closeMenu = () => {
   gap: 0.75rem;
 }
 
+.game-time-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
+}
+
+.game-time-label {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.game-time-value {
+  font-size: 0.8125rem;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .user-name {
   font-size: 0.875rem;
   font-weight: 500;
@@ -272,6 +314,10 @@ const closeMenu = () => {
 
   .nav-links {
     gap: 0.75rem;
+  }
+
+  .game-time-chip {
+    display: none;
   }
 }
 </style>

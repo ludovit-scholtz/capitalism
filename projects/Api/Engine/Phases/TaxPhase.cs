@@ -1,10 +1,11 @@
 using Api.Data.Entities;
+using Api.Engine;
+using Api.Utilities;
 
 namespace Api.Engine.Phases;
 
 /// <summary>
-/// Applies the global tax rate to all companies on every tax cycle tick.
-/// Tax is deducted as a percentage of each company's current cash balance.
+/// Applies annual income tax on the configured tax-cycle boundary.
 /// </summary>
 public sealed class TaxPhase : ITickPhase
 {
@@ -17,23 +18,40 @@ public sealed class TaxPhase : ITickPhase
         if (gs.TaxCycleTicks <= 0) return Task.CompletedTask;
         if (gs.CurrentTick % gs.TaxCycleTicks != 0) return Task.CompletedTask;
 
-        var rate = gs.TaxRate / 100m;
-        if (rate <= 0m) return Task.CompletedTask;
+        var settledGameYear = GameTime.GetGameYear(gs.CurrentTick - 1L);
+        var startTick = GameTime.GetStartTickForGameYear(settledGameYear);
+        var endTick = GameTime.GetEndTickForGameYear(settledGameYear);
+
+        var yearlyEntriesByCompany = context.Db.LedgerEntries
+            .Where(entry => entry.RecordedAtTick >= startTick
+                && entry.RecordedAtTick <= endTick
+                && entry.Category != LedgerCategory.Tax)
+            .ToList()
+            .GroupBy(entry => entry.CompanyId)
+            .ToDictionary(group => group.Key, group => group.ToList());
 
         foreach (var company in context.CompaniesById.Values)
         {
-            if (company.Cash <= 0m) continue;
-            var tax = company.Cash * rate;
-            company.Cash = Math.Max(0m, company.Cash - tax);
+            var yearlyEntries = yearlyEntriesByCompany.GetValueOrDefault(company.Id, []);
+            var taxableIncome = LedgerCalculator.ComputeTaxableIncome(yearlyEntries);
+            var incomeTaxDue = GameTime.ComputeEstimatedIncomeTax(taxableIncome, gs.TaxRate);
+            var settledTax = Math.Min(company.Cash, incomeTaxDue);
+
+            if (settledTax <= 0m)
+            {
+                continue;
+            }
+
+            company.Cash -= settledTax;
 
             context.Db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
                 CompanyId = company.Id,
                 Category = LedgerCategory.Tax,
-                Description = $"Tax ({gs.TaxRate}% rate)",
-                Amount = -tax,
-                RecordedAtTick = context.CurrentTick,
+                Description = $"Income tax for game year {settledGameYear} ({gs.TaxRate}% rate)",
+                Amount = -settledTax,
+                RecordedAtTick = endTick,
                 RecordedAtUtc = DateTime.UtcNow,
             });
         }

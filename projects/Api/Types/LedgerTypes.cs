@@ -5,6 +5,8 @@ public sealed class CompanyLedgerSummary
 {
     public Guid CompanyId { get; set; }
     public string CompanyName { get; set; } = string.Empty;
+    public int GameYear { get; set; }
+    public bool IsCurrentGameYear { get; set; }
     public decimal CurrentCash { get; set; }
     // Income Statement
     public decimal TotalRevenue { get; set; }
@@ -12,6 +14,8 @@ public sealed class CompanyLedgerSummary
     public decimal TotalMarketingCosts { get; set; }
     public decimal TotalTaxPaid { get; set; }
     public decimal TotalOtherCosts { get; set; }
+    public decimal TaxableIncome { get; set; }
+    public decimal EstimatedIncomeTax { get; set; }
     public decimal NetIncome { get; set; }
     // Balance Sheet
     public decimal PropertyValue { get; set; }
@@ -25,7 +29,25 @@ public sealed class CompanyLedgerSummary
     public decimal CashFromInvestments { get; set; }
     public long FirstRecordedTick { get; set; }
     public long LastRecordedTick { get; set; }
+    public long IncomeTaxDueAtTick { get; set; }
+    public DateTime IncomeTaxDueGameTimeUtc { get; set; }
+    public int IncomeTaxDueGameYear { get; set; }
+    public bool IsIncomeTaxSettled { get; set; }
     public List<BuildingLedgerSummary> BuildingSummaries { get; set; } = [];
+    public List<CompanyLedgerHistoryYear> History { get; set; } = [];
+}
+
+public sealed class CompanyLedgerHistoryYear
+{
+    public int GameYear { get; set; }
+    public bool IsCurrentGameYear { get; set; }
+    public decimal TotalRevenue { get; set; }
+    public decimal NetIncome { get; set; }
+    public decimal TotalTaxPaid { get; set; }
+    public decimal TaxableIncome { get; set; }
+    public decimal EstimatedIncomeTax { get; set; }
+    public long FirstRecordedTick { get; set; }
+    public long LastRecordedTick { get; set; }
 }
 
 public sealed class BuildingLedgerSummary

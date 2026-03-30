@@ -248,12 +248,17 @@ dotnet test ../Api.Tests  # Run integration tests
 - Offer banner appears in `DashboardView.vue` for ELIGIBLE/SHOWN/DISMISSED states; offer UI also appears in `OnboardingView.vue` completion step.
 
 ## Tick countdown and pending actions conventions
+- `useGameStateStore` (`src/stores/gameState.ts`) is the single source of truth for authoritative simulation time on the frontend. It is started in `App.vue`, polls around the next tick boundary, and exposes `currentTick`, `currentGameYear`, `currentGameTimeUtc`, `nextTaxTick`, `nextTaxGameTimeUtc`, and `nextTaxGameYear`.
+- Current in-game time in the navbar must come from the shared game-state store via `formatInGameTime()` from `src/lib/gameTime.ts`. Do not add separate page-local game-clock timers.
+- Any view that shows tick-sensitive simulation data must use `useTickRefresh` (`src/composables/useTickRefresh.ts`) to refetch its page-specific data when the authoritative tick changes. This includes dashboards, leaderboards, live building views, onboarding completion state, and ledger/tax summaries.
+- When refreshing a view on tick changes, preserve unsaved local draft state if the page supports editing. Do not wipe pending building-layout edits or similar client-side work-in-progress just because the authoritative tick advanced.
 - `useTickCountdown` composable (`src/composables/useTickCountdown.ts`) is the single source of truth for next-tick countdown display. Do not inline countdown logic in views.
 - `computeCountdownTimeStr(remainingMs)` is an exported pure helper from `useTickCountdown.ts` — use it when you need the raw time string, and test it in `src/composables/__tests__/useTickCountdown.test.ts`.
 - `PendingActionsTimeline` component (`src/components/dashboard/PendingActionsTimeline.vue`) renders the player's scheduled building upgrades. It accepts `pendingActions: ScheduledActionSummary[]` and `loading: boolean` props.
-- `DashboardView` fetches `gameState` and `myPendingActions` in parallel on mount. The tick clock widget and timeline are both driven by these responses.
+- `DashboardView` uses the shared `useGameStateStore` for the tick clock and in-game time, and refetches dashboard-specific data (`myCompanies`, `myPendingActions`) on tick changes.
 - Backend `myPendingActions` query (authenticated) returns `ScheduledActionSummary[]` ordered by `appliesAtTick` asc. Fields: `id`, `actionType`, `buildingId`, `buildingName`, `buildingType`, `submittedAtUtc`, `submittedAtTick`, `appliesAtTick`, `ticksRemaining`, `totalTicksRequired`.
 - When testing `myPendingActions` in E2E, set `state.pendingActions` in the mock-api helper before `page.goto()`.
+- Ledger summaries are tax-year scoped. Use `companyLedger(companyId, gameYear?)` for the selected year, show `history` for prior years, and keep `ledgerDrillDown(companyId, category, gameYear?)` aligned to the same selected year. The current year resets at the annual tax boundary, but historical years remain browsable in the ledger history UI.
 
 ## City map conventions
 - `CityMapView.vue` lives at route `/city/:id`. It uses the `leaflet` package with OpenStreetMap tiles and `L.divIcon` for color-coded lot markers (green = available, blue = yours, gray = other owner).

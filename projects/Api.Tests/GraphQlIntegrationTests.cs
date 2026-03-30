@@ -597,12 +597,18 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task GameState_ReturnsInitialState()
     {
         await ResetGameStateAsync();
-        var result = await ExecuteGraphQlAsync("{ gameState { currentTick tickIntervalSeconds taxRate } }");
+        var result = await ExecuteGraphQlAsync("{ gameState { currentTick tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc nextTaxTick nextTaxGameTimeUtc } }");
 
         var state = result.GetProperty("data").GetProperty("gameState");
         Assert.Equal(0, state.GetProperty("currentTick").GetInt64());
         Assert.Equal(10, state.GetProperty("tickIntervalSeconds").GetInt32());
+        Assert.Equal(8760, state.GetProperty("taxCycleTicks").GetInt32());
         Assert.Equal(15m, state.GetProperty("taxRate").GetDecimal());
+        Assert.Equal(2000, state.GetProperty("currentGameYear").GetInt32());
+        Assert.Equal(
+            DateTimeOffset.Parse("2000-01-01T00:00:00Z"),
+            state.GetProperty("currentGameTimeUtc").GetDateTimeOffset());
+        Assert.Equal(8760, state.GetProperty("nextTaxTick").GetInt64());
     }
 
     [Fact]
@@ -5378,6 +5384,71 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task CompanyLedger_ResetsCurrentYearButKeepsHistoryVisible()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-years@test.com", "LedgerYears");
+        var result = await ExecuteGraphQlAsync(
+            """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+            new { input = new { name = "Yearly Ledger Co" } },
+            token);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+        var companyGuid = Guid.Parse(companyId);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var gameState = await db.GameStates.FindAsync(1);
+            Assert.NotNull(gameState);
+
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = companyGuid,
+                    Category = LedgerCategory.Revenue,
+                    Description = "Year 2000 revenue",
+                    Amount = 1200m,
+                    RecordedAtTick = 12,
+                    RecordedAtUtc = DateTime.UtcNow,
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = companyGuid,
+                    Category = LedgerCategory.Revenue,
+                    Description = "Year 2001 revenue",
+                    Amount = 3400m,
+                    RecordedAtTick = 8760,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+
+            gameState!.CurrentTick = 8760;
+            gameState.LastTickAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+        }
+
+        var currentYearResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ gameYear totalRevenue history {{ gameYear totalRevenue }} }} }}",
+            token: token);
+
+        var currentYearLedger = currentYearResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.Equal(2001, currentYearLedger.GetProperty("gameYear").GetInt32());
+        Assert.Equal(3400m, currentYearLedger.GetProperty("totalRevenue").GetDecimal());
+
+        var historyYears = currentYearLedger.GetProperty("history").EnumerateArray().Select(entry => entry.GetProperty("gameYear").GetInt32()).ToList();
+        Assert.Contains(2001, historyYears);
+        Assert.Contains(2000, historyYears);
+
+        var previousYearResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\", gameYear: 2000) {{ gameYear totalRevenue }} }}",
+            token: token);
+
+        var previousYearLedger = previousYearResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.Equal(2000, previousYearLedger.GetProperty("gameYear").GetInt32());
+        Assert.Equal(1200m, previousYearLedger.GetProperty("totalRevenue").GetDecimal());
+    }
+
+    [Fact]
     public async Task CompanyLedger_AfterPropertyPurchase_ShowsPropertyCosts()
     {
         var token = await RegisterAndGetTokenAsync("ledger-prop@test.com", "LedgerProp");
@@ -5790,11 +5861,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     {
         await ResetGameStateAsync();
         var result = await ExecuteGraphQlAsync(
-            "{ gameState { currentTick tickIntervalSeconds lastTickAtUtc taxRate } }");
+            "{ gameState { currentTick tickIntervalSeconds lastTickAtUtc taxRate currentGameTimeUtc } }");
 
         var state = result.GetProperty("data").GetProperty("gameState");
         Assert.True(DateTime.TryParse(state.GetProperty("lastTickAtUtc").GetString(), out _),
             "lastTickAtUtc should be a parseable timestamp");
+        Assert.True(DateTime.TryParse(state.GetProperty("currentGameTimeUtc").GetString(), out _),
+            "currentGameTimeUtc should be a parseable timestamp");
         Assert.Equal(0, state.GetProperty("currentTick").GetInt64());
         Assert.True(state.GetProperty("tickIntervalSeconds").GetInt32() > 0,
             "tickIntervalSeconds must be positive");

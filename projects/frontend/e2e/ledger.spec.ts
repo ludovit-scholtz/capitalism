@@ -241,6 +241,115 @@ test.describe('Company Ledger', () => {
     await expect(page.getByText('No financial history recorded yet')).toBeVisible()
   })
 
+  test('shows tax-year metadata and switches ledger history years', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameState.currentTick = 8760
+
+    const company = {
+      id: 'company-history',
+      playerId: player.id,
+      name: 'History Corp',
+      cash: 420000,
+      foundedAtUtc: new Date().toISOString(),
+      buildings: [],
+    }
+    player.companies = [company]
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: 'History Corp',
+      gameYear: 2001,
+      isCurrentGameYear: true,
+      currentCash: 420000,
+      totalRevenue: 3400,
+      totalPurchasingCosts: 1000,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      taxableIncome: 2400,
+      estimatedIncomeTax: 360,
+      netIncome: 2400,
+      propertyValue: 0,
+      propertyAppreciation: 0,
+      buildingValue: 0,
+      inventoryValue: 0,
+      totalAssets: 420000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 2400,
+      cashFromInvestments: 0,
+      firstRecordedTick: 8760,
+      lastRecordedTick: 8760,
+      incomeTaxDueAtTick: 17520,
+      incomeTaxDueGameTimeUtc: '2002-01-01T00:00:00.000Z',
+      incomeTaxDueGameYear: 2002,
+      history: [
+        {
+          gameYear: 2001,
+          isCurrentGameYear: true,
+          totalRevenue: 3400,
+          netIncome: 2400,
+          totalTaxPaid: 0,
+          taxableIncome: 2400,
+          estimatedIncomeTax: 360,
+          firstRecordedTick: 8760,
+          lastRecordedTick: 8760,
+        },
+        {
+          gameYear: 2000,
+          isCurrentGameYear: false,
+          totalRevenue: 1200,
+          netIncome: 900,
+          totalTaxPaid: 135,
+          taxableIncome: 900,
+          estimatedIncomeTax: 135,
+          firstRecordedTick: 12,
+          lastRecordedTick: 8759,
+        },
+      ],
+      buildingSummaries: [],
+    }
+
+    state.ledgerData[`${company.id}:2000`] = {
+      ...state.ledgerData[company.id],
+      gameYear: 2000,
+      isCurrentGameYear: false,
+      totalRevenue: 1200,
+      taxableIncome: 900,
+      estimatedIncomeTax: 135,
+      totalTaxPaid: 135,
+      netIncome: 765,
+      firstRecordedTick: 12,
+      lastRecordedTick: 8759,
+      incomeTaxDueAtTick: 8760,
+      incomeTaxDueGameTimeUtc: '2001-01-01T00:00:00.000Z',
+      incomeTaxDueGameYear: 2001,
+      isIncomeTaxSettled: true,
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    await expect(page.locator('.kpi-card').getByText('Year 2001')).toBeVisible()
+    await expect(page.getByText('Income Tax Schedule')).toBeVisible()
+
+    await page.getByRole('button', { name: /Year 2000/ }).click()
+    await expect(page.locator('.kpi-card').getByText('Year 2000')).toBeVisible()
+    await expect(page.getByText('$1,200.00')).toBeVisible()
+  })
+
   test('back button returns to dashboard', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, {

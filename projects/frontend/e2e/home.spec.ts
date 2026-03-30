@@ -123,4 +123,16 @@ test.describe('Header navigation', () => {
     await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible()
     await expect(page.getByRole('banner').getByText(player.displayName)).toBeVisible()
   })
+
+  test('shows current in-game time in the header', async ({ page }) => {
+    const state = setupMockApi(page)
+    state.gameState.currentTick = 48
+
+    await page.goto('/')
+
+    const gameTimeChip = page.locator('.game-time-chip')
+    await expect(gameTimeChip).toBeVisible()
+    await expect(gameTimeChip).toContainText('Game Time')
+    await expect(gameTimeChip).toContainText('2000')
+  })
 })

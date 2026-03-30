@@ -36,6 +36,7 @@ import {
   getLocalizedResourceDescription,
   getLocalizedResourceName,
 } from '@/lib/catalogPresentation'
+import { useTickRefresh } from '@/composables/useTickRefresh'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { getUnitResourceHistoryItemKey, type UnitResourceHistoryItemOption } from '@/lib/unitResourceHistory'
@@ -1930,10 +1931,11 @@ async function loadGlobalExchangeOffers() {
   }
 }
 
-async function loadBuilding() {
+async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
   try {
     loading.value = true
     error.value = null
+    const preserveDraft = options.preserveDraft === true
 
     const [companiesData, gameStateData, resourceData, productData] = await Promise.all([
       gqlRequest<{ myCompanies: Company[] }>(
@@ -2092,12 +2094,15 @@ async function loadBuilding() {
 
     companyCash.value = companiesData.myCompanies.find((company) => company.id === building.value?.companyId)?.cash ?? null
 
-    const sourceUnits = pendingConfiguration.value?.units ?? building.value.units
-    setDraftUnitsFrom(sourceUnits)
-    setEditBaselineFrom(sourceUnits)
-    isEditing.value = false
-    selectedCell.value = null
-    showUnitPicker.value = false
+    if (!preserveDraft) {
+      const sourceUnits = pendingConfiguration.value?.units ?? building.value.units
+      setDraftUnitsFrom(sourceUnits)
+      setEditBaselineFrom(sourceUnits)
+      isEditing.value = false
+      selectedCell.value = null
+      showUnitPicker.value = false
+    }
+
     await Promise.all([
       loadUnitInventorySummaries(),
       loadUnitInventories(),
@@ -2118,6 +2123,14 @@ onMounted(async () => {
   }
 
   await loadBuilding()
+})
+
+useTickRefresh(async () => {
+  if (!auth.isAuthenticated || !building.value) {
+    return
+  }
+
+  await loadBuilding({ preserveDraft: isEditing.value })
 })
 
 watch(

@@ -1102,7 +1102,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
-    public async Task TaxPhase_DeductsTaxOnCycle()
+    public async Task TaxPhase_DeductsAnnualIncomeTaxOnPositiveTaxableIncome()
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -1127,6 +1127,28 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         };
         db.Companies.Add(company);
 
+        db.LedgerEntries.AddRange(
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Revenue,
+                Description = "Annual sales",
+                Amount = 100_000m,
+                RecordedAtTick = 10,
+                RecordedAtUtc = DateTime.UtcNow,
+            },
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.PurchasingCost,
+                Description = "Annual purchasing",
+                Amount = -40_000m,
+                RecordedAtTick = 25,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+
         // Set game state so the next tick is a tax cycle tick.
         var gs = await db.GameStates.FirstAsync();
         gs.CurrentTick = gs.TaxCycleTicks - 1; // Next tick will be tax cycle.
@@ -1136,10 +1158,13 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var processor = await CreateProcessorAsync(scope);
         await processor.ProcessTickAsync();
 
-        Assert.True(company.Cash < cashBefore,
-            "Tax should have been deducted on the tax cycle tick.");
-        Assert.True(company.Cash > 0m,
-            "Company should still have cash after tax.");
+        Assert.Equal(cashBefore - 9_000m, company.Cash);
+
+        var taxEntry = await db.LedgerEntries
+            .Where(entry => entry.CompanyId == company.Id && entry.Category == LedgerCategory.Tax)
+            .SingleAsync();
+
+        Assert.Equal(-9_000m, taxEntry.Amount);
     }
 
     [Fact]

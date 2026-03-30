@@ -1,17 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
+import { useGameStateStore } from '@/stores/gameState'
 import { gqlRequest } from '@/lib/graphql'
 import { trackStartupPackEvent } from '@/lib/startupPackAnalytics'
+import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import PendingActionsTimeline from '@/components/dashboard/PendingActionsTimeline.vue'
-import type { Company, GameState, ScheduledActionSummary, StartupPackOffer } from '@/types'
+import type { Company, ScheduledActionSummary, StartupPackOffer } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
+const gameStateStore = useGameStateStore()
+const { gameState } = storeToRefs(gameStateStore)
 
 const companies = ref<Company[]>([])
 const loading = ref(true)
@@ -19,11 +24,10 @@ const error = ref<string | null>(null)
 const offerLoading = ref(false)
 const offerError = ref<string | null>(null)
 const offerMessage = ref<string | null>(null)
-const gameState = ref<GameState | null>(null)
 const pendingActions = ref<ScheduledActionSummary[]>([])
 const pendingActionsLoading = ref(false)
 
-const { tickCountdown, startTickCountdown } = useTickCountdown(gameState)
+const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 
 const activeStartupPackOffer = computed(() =>
   auth.startupPackOffer && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(auth.startupPackOffer.status)
@@ -59,6 +63,17 @@ function formatBuildingType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+async function loadDashboardData() {
+  const companiesData = await gqlRequest<{ myCompanies: Company[] }>(
+    `{ myCompanies {
+      id name cash foundedAtUtc
+      buildings { id name type level cityId units { id unitType gridX gridY level } }
+    } }`,
+  )
+
+  companies.value = companiesData.myCompanies
+}
+
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -71,19 +86,7 @@ onMounted(async () => {
       router.push('/onboarding')
       return
     }
-    const [companiesData, gameStateData] = await Promise.all([
-      gqlRequest<{ myCompanies: Company[] }>(
-        `{ myCompanies {
-          id name cash foundedAtUtc
-          buildings { id name type level cityId units { id unitType gridX gridY level } }
-        } }`,
-      ),
-      gqlRequest<{ gameState: GameState }>(
-        '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate } }',
-      ),
-    ])
-    companies.value = companiesData.myCompanies
-    gameState.value = gameStateData.gameState
+    await Promise.all([loadDashboardData(), gameStateStore.refreshGameState(true)])
     startTickCountdown()
 
     if (auth.startupPackOffer?.status === 'ELIGIBLE') {
@@ -99,6 +102,17 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+useTickRefresh(async () => {
+  if (!auth.isAuthenticated) {
+    return
+  }
+
+  await Promise.all([loadDashboardData(), loadPendingActions()])
+  startTickCountdown()
+})
+
+onUnmounted(stopTickCountdown)
 
 async function loadPendingActions() {
   pendingActionsLoading.value = true

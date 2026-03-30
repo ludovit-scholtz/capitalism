@@ -2,10 +2,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { useTickRefresh } from '@/composables/useTickRefresh'
 import { gqlRequest } from '@/lib/graphql'
+import { formatInGameTime } from '@/lib/gameTime'
 import type { CompanyLedgerSummary, LedgerEntryResult } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -16,22 +18,28 @@ const error = ref<string | null>(null)
 const drillCategory = ref<string | null>(null)
 const drillEntries = ref<LedgerEntryResult[]>([])
 const drillLoading = ref(false)
+const selectedGameYear = ref<number | null>(null)
+const selectedResolvedGameYear = computed(() => selectedGameYear.value ?? ledger.value?.gameYear ?? null)
 
 const LEDGER_QUERY = `
-  query GetCompanyLedger($companyId: UUID!) {
-    companyLedger(companyId: $companyId) {
-      companyId companyName currentCash
-      totalRevenue totalPurchasingCosts totalMarketingCosts totalTaxPaid totalOtherCosts netIncome
+  query GetCompanyLedger($companyId: UUID!, $gameYear: Int) {
+    companyLedger(companyId: $companyId, gameYear: $gameYear) {
+      companyId companyName gameYear isCurrentGameYear currentCash
+      totalRevenue totalPurchasingCosts totalMarketingCosts totalTaxPaid totalOtherCosts taxableIncome estimatedIncomeTax netIncome
       propertyValue propertyAppreciation buildingValue inventoryValue totalAssets totalPropertyPurchases
       cashFromOperations cashFromInvestments firstRecordedTick lastRecordedTick
+      incomeTaxDueAtTick incomeTaxDueGameTimeUtc incomeTaxDueGameYear isIncomeTaxSettled
+      history {
+        gameYear isCurrentGameYear totalRevenue netIncome totalTaxPaid taxableIncome estimatedIncomeTax firstRecordedTick lastRecordedTick
+      }
       buildingSummaries { buildingId buildingName buildingType revenue costs }
     }
   }
 `
 
 const DRILL_QUERY = `
-  query GetLedgerDrillDown($companyId: UUID!, $category: String!) {
-    ledgerDrillDown(companyId: $companyId, category: $category) {
+  query GetLedgerDrillDown($companyId: UUID!, $category: String!, $gameYear: Int) {
+    ledgerDrillDown(companyId: $companyId, category: $category, gameYear: $gameYear) {
       id category description amount recordedAtTick
       buildingId buildingName buildingUnitId
       productTypeId productName resourceTypeId resourceName
@@ -45,6 +53,7 @@ async function fetchLedger() {
   try {
     const data = await gqlRequest<{ companyLedger: CompanyLedgerSummary | null }>(LEDGER_QUERY, {
       companyId: companyId.value,
+      gameYear: selectedGameYear.value,
     })
     if (!data.companyLedger) {
       error.value = t('ledger.notFound')
@@ -58,19 +67,14 @@ async function fetchLedger() {
   }
 }
 
-async function toggleDrill(category: string) {
-  if (drillCategory.value === category) {
-    drillCategory.value = null
-    drillEntries.value = []
-    return
-  }
-  drillCategory.value = category
+async function loadDrillEntries(category: string) {
   drillEntries.value = []
   drillLoading.value = true
   try {
     const data = await gqlRequest<{ ledgerDrillDown: LedgerEntryResult[] }>(DRILL_QUERY, {
       companyId: companyId.value,
       category,
+      gameYear: selectedResolvedGameYear.value,
     })
     drillEntries.value = data.ledgerDrillDown
   } catch {
@@ -78,6 +82,23 @@ async function toggleDrill(category: string) {
   } finally {
     drillLoading.value = false
   }
+}
+
+async function toggleDrill(category: string) {
+  if (drillCategory.value === category) {
+    drillCategory.value = null
+    drillEntries.value = []
+    return
+  }
+  drillCategory.value = category
+  await loadDrillEntries(category)
+}
+
+async function selectGameYear(gameYear: number | null) {
+  selectedGameYear.value = gameYear
+  drillCategory.value = null
+  drillEntries.value = []
+  await fetchLedger()
 }
 
 function formatAmount(amount: number): string {
@@ -88,7 +109,22 @@ function amountClass(amount: number): string {
   return amount >= 0 ? 'amount-positive' : 'amount-negative'
 }
 
+function formatGameTime(value: string): string {
+  return formatInGameTime(value, locale.value)
+}
+
 onMounted(fetchLedger)
+
+useTickRefresh(async () => {
+  if (selectedGameYear.value !== null && !ledger.value?.isCurrentGameYear) {
+    return
+  }
+
+  await fetchLedger()
+  if (drillCategory.value) {
+    await loadDrillEntries(drillCategory.value)
+  }
+})
 </script>
 
 <template>
@@ -115,6 +151,10 @@ onMounted(fetchLedger)
     <div v-else-if="ledger" class="ledger-content">
       <div class="kpi-row">
         <div class="kpi-card">
+          <span class="kpi-label">{{ t('ledger.gameYear') }}</span>
+          <span class="kpi-value">{{ t('ledger.gameYearLabel', { year: ledger.gameYear }) }}</span>
+        </div>
+        <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.cash') }}</span>
           <span class="kpi-value" :class="amountClass(ledger.currentCash)">{{
             formatAmount(ledger.currentCash)
@@ -127,12 +167,18 @@ onMounted(fetchLedger)
           }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">{{ t('ledger.totalAssets') }}</span>
-          <span class="kpi-value">{{ formatAmount(ledger.totalAssets) }}</span>
+          <span class="kpi-label">{{ t('ledger.taxableIncome') }}</span>
+          <span class="kpi-value" :class="amountClass(ledger.taxableIncome)">{{
+            formatAmount(ledger.taxableIncome)
+          }}</span>
         </div>
         <div class="kpi-card">
-          <span class="kpi-label">{{ t('ledger.totalRevenue') }}</span>
-          <span class="kpi-value amount-positive">{{ formatAmount(ledger.totalRevenue) }}</span>
+          <span class="kpi-label">{{ t('ledger.estimatedIncomeTax') }}</span>
+          <span class="kpi-value amount-negative">{{ formatAmount(-ledger.estimatedIncomeTax) }}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">{{ t('ledger.totalAssets') }}</span>
+          <span class="kpi-value">{{ formatAmount(ledger.totalAssets) }}</span>
         </div>
       </div>
 
@@ -143,6 +189,43 @@ onMounted(fetchLedger)
       <p v-else class="tick-range-note">
         {{ t('ledger.dataRange', { from: ledger.firstRecordedTick, to: ledger.lastRecordedTick }) }}
       </p>
+
+      <div class="year-meta-row">
+        <div class="statement-card meta-card">
+          <h2 class="statement-title">🧾 {{ t('ledger.incomeTaxSchedule') }}</h2>
+          <p class="meta-copy">
+            {{
+              ledger.isIncomeTaxSettled
+                ? t('ledger.incomeTaxSettledAtTick', { tick: ledger.incomeTaxDueAtTick })
+                : t('ledger.incomeTaxDueAtTick', { tick: ledger.incomeTaxDueAtTick })
+            }}
+          </p>
+          <p class="meta-copy">{{ t('ledger.incomeTaxDueAtTime', { time: formatGameTime(ledger.incomeTaxDueGameTimeUtc) }) }}</p>
+          <p class="meta-copy">{{ t('ledger.incomeTaxDueYear', { year: ledger.incomeTaxDueGameYear }) }}</p>
+        </div>
+
+        <div class="statement-card meta-card">
+          <h2 class="statement-title">🗂️ {{ t('ledger.historyTitle') }}</h2>
+          <div class="history-buttons">
+            <button
+              v-for="yearItem in ledger.history"
+              :key="yearItem.gameYear"
+              type="button"
+              class="history-button"
+              :class="{ active: yearItem.gameYear === selectedResolvedGameYear }"
+              @click="selectGameYear(yearItem.isCurrentGameYear ? null : yearItem.gameYear)"
+            >
+              <span>{{ t('ledger.gameYearShort', { year: yearItem.gameYear }) }}</span>
+              <span :class="amountClass(yearItem.netIncome)">{{ formatAmount(yearItem.netIncome) }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!ledger.isCurrentGameYear" class="info-banner historical-note">
+        <span>🕰️</span>
+        <span>{{ t('ledger.historicalYearNote') }}</span>
+      </div>
 
       <div class="statements-grid">
         <div class="statement-card">
@@ -407,6 +490,43 @@ onMounted(fetchLedger)
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
   margin-bottom: 1rem;
+}
+.year-meta-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.meta-card {
+  margin-bottom: 0;
+}
+.meta-copy {
+  margin: 0.35rem 0;
+  color: var(--color-text-secondary);
+}
+.history-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.history-button {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 120px;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.history-button.active {
+  border-color: var(--color-accent);
+  background: var(--color-surface-hover);
+}
+.historical-note {
+  margin-top: -0.25rem;
 }
 .statements-grid {
   display: grid;

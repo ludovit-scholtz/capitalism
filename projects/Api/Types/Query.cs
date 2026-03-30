@@ -589,6 +589,7 @@ public sealed class Query
     [Authorize]
     public async Task<CompanyLedgerSummary?> GetCompanyLedger(
         Guid companyId,
+        int? gameYear,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -600,16 +601,31 @@ public sealed class Query
 
         if (company is null) return null;
 
-        var entries = await db.LedgerEntries
+        var gameState = await db.GameStates
+            .AsNoTracking()
+            .FirstOrDefaultAsync();
+        var currentTick = gameState?.CurrentTick ?? 0L;
+        var currentGameYear = GameTime.GetGameYear(currentTick);
+        var selectedGameYear = gameYear ?? currentGameYear;
+
+        var allEntries = await db.LedgerEntries
             .Where(e => e.CompanyId == companyId)
             .ToListAsync();
 
-        var totalRevenue = entries.Where(e => e.Category == LedgerCategory.Revenue).Sum(e => e.Amount);
-        var totalPurchasingCosts = Math.Abs(entries.Where(e => e.Category == LedgerCategory.PurchasingCost).Sum(e => e.Amount));
-        var totalMarketingCosts = Math.Abs(entries.Where(e => e.Category == LedgerCategory.Marketing).Sum(e => e.Amount));
-        var totalTaxPaid = Math.Abs(entries.Where(e => e.Category == LedgerCategory.Tax).Sum(e => e.Amount));
-        var totalOtherCosts = Math.Abs(entries.Where(e => e.Category == LedgerCategory.Other && e.Amount < 0).Sum(e => e.Amount));
-        var totalPropertyPurchases = Math.Abs(entries.Where(e => e.Category == LedgerCategory.PropertyPurchase).Sum(e => e.Amount));
+        var entries = allEntries
+            .Where(entry => IsTickInGameYear(entry.RecordedAtTick, selectedGameYear))
+            .ToList();
+
+        var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
+        var totalPurchasingCosts = LedgerCalculator.GetTotalPurchasingCosts(entries);
+        var totalMarketingCosts = LedgerCalculator.GetTotalMarketingCosts(entries);
+        var totalTaxPaid = LedgerCalculator.GetTotalTaxPaid(entries);
+        var totalOtherCosts = LedgerCalculator.GetTotalOtherCosts(entries);
+        var totalPropertyPurchases = LedgerCalculator.GetTotalPropertyPurchases(entries);
+        var taxableIncome = LedgerCalculator.ComputeTaxableIncome(entries);
+        var estimatedIncomeTax = selectedGameYear == currentGameYear
+            ? GameTime.ComputeEstimatedIncomeTax(taxableIncome, gameState?.TaxRate ?? 0m)
+            : totalTaxPaid;
 
         var ownedLots = await db.BuildingLots
             .Where(lot => lot.OwnerCompanyId == companyId)
@@ -643,16 +659,32 @@ public sealed class Query
             })
             .ToList();
 
+        var history = allEntries
+            .GroupBy(entry => GameTime.GetGameYear(entry.RecordedAtTick))
+            .Select(group => BuildCompanyLedgerHistoryYear(group.Key, currentGameYear, gameState?.TaxRate ?? 0m, group.ToList()))
+            .ToDictionary(item => item.GameYear);
+
+        if (!history.ContainsKey(currentGameYear))
+        {
+            history[currentGameYear] = BuildCompanyLedgerHistoryYear(currentGameYear, currentGameYear, gameState?.TaxRate ?? 0m, []);
+        }
+
+        var incomeTaxDueAtTick = GameTime.GetIncomeTaxDueTickForGameYear(selectedGameYear);
+
         return new CompanyLedgerSummary
         {
             CompanyId = company.Id,
             CompanyName = company.Name,
+            GameYear = selectedGameYear,
+            IsCurrentGameYear = selectedGameYear == currentGameYear,
             CurrentCash = company.Cash,
             TotalRevenue = totalRevenue,
             TotalPurchasingCosts = totalPurchasingCosts,
             TotalMarketingCosts = totalMarketingCosts,
             TotalTaxPaid = totalTaxPaid,
             TotalOtherCosts = totalOtherCosts,
+            TaxableIncome = taxableIncome,
+            EstimatedIncomeTax = estimatedIncomeTax,
             TotalPropertyPurchases = totalPropertyPurchases,
             NetIncome = totalRevenue - totalPurchasingCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
             PropertyValue = propertyValue,
@@ -665,6 +697,13 @@ public sealed class Query
             FirstRecordedTick = entries.Count > 0 ? entries.Min(e => e.RecordedAtTick) : 0,
             LastRecordedTick = entries.Count > 0 ? entries.Max(e => e.RecordedAtTick) : 0,
             BuildingSummaries = buildingSummaries,
+            IncomeTaxDueAtTick = incomeTaxDueAtTick,
+            IncomeTaxDueGameTimeUtc = GameTime.GetInGameTimeUtc(incomeTaxDueAtTick),
+            IncomeTaxDueGameYear = GameTime.GetGameYear(incomeTaxDueAtTick),
+            IsIncomeTaxSettled = selectedGameYear < currentGameYear,
+            History = history.Values
+                .OrderByDescending(item => item.GameYear)
+                .ToList(),
         };
     }
 
@@ -673,6 +712,7 @@ public sealed class Query
     public async Task<List<LedgerEntryResult>> GetLedgerDrillDown(
         Guid companyId,
         string category,
+        int? gameYear,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -683,8 +723,17 @@ public sealed class Query
 
         if (!ownsCompany) return [];
 
-        var entries = await db.LedgerEntries
-            .Where(e => e.CompanyId == companyId && e.Category == category)
+        var entriesQuery = db.LedgerEntries
+            .Where(e => e.CompanyId == companyId && e.Category == category);
+
+        if (gameYear.HasValue)
+        {
+            var startTick = GameTime.GetStartTickForGameYear(gameYear.Value);
+            var endTick = GameTime.GetEndTickForGameYear(gameYear.Value);
+            entriesQuery = entriesQuery.Where(e => e.RecordedAtTick >= startTick && e.RecordedAtTick <= endTick);
+        }
+
+        var entries = await entriesQuery
             .OrderByDescending(e => e.RecordedAtTick)
             .Take(200)
             .Include(e => e.Building)
@@ -708,6 +757,43 @@ public sealed class Query
             ResourceTypeId = e.ResourceTypeId,
             ResourceName = e.ResourceType?.Name,
         }).ToList();
+    }
+
+    private static bool IsTickInGameYear(long tick, int gameYear)
+    {
+        var startTick = GameTime.GetStartTickForGameYear(gameYear);
+        var endTick = GameTime.GetEndTickForGameYear(gameYear);
+        return tick >= startTick && tick <= endTick;
+    }
+
+    private static CompanyLedgerHistoryYear BuildCompanyLedgerHistoryYear(
+        int gameYear,
+        int currentGameYear,
+        decimal taxRate,
+        List<LedgerEntry> entries)
+    {
+        var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
+        var totalPurchasingCosts = LedgerCalculator.GetTotalPurchasingCosts(entries);
+        var totalMarketingCosts = LedgerCalculator.GetTotalMarketingCosts(entries);
+        var totalTaxPaid = LedgerCalculator.GetTotalTaxPaid(entries);
+        var totalOtherCosts = LedgerCalculator.GetTotalOtherCosts(entries);
+        var taxableIncome = LedgerCalculator.ComputeTaxableIncome(entries);
+        var estimatedIncomeTax = gameYear == currentGameYear
+            ? GameTime.ComputeEstimatedIncomeTax(taxableIncome, taxRate)
+            : totalTaxPaid;
+
+        return new CompanyLedgerHistoryYear
+        {
+            GameYear = gameYear,
+            IsCurrentGameYear = gameYear == currentGameYear,
+            TotalRevenue = totalRevenue,
+            NetIncome = totalRevenue - totalPurchasingCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
+            TotalTaxPaid = totalTaxPaid,
+            TaxableIncome = taxableIncome,
+            EstimatedIncomeTax = estimatedIncomeTax,
+            FirstRecordedTick = entries.Count > 0 ? entries.Min(entry => entry.RecordedAtTick) : 0,
+            LastRecordedTick = entries.Count > 0 ? entries.Max(entry => entry.RecordedAtTick) : 0,
+        };
     }
 
     /// <summary>Returns analytics for a PUBLIC_SALES building unit.</summary>

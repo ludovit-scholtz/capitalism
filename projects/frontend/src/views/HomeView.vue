@@ -1,26 +1,26 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
+import { useTickRefresh } from '@/composables/useTickRefresh'
+import { useGameStateStore } from '@/stores/gameState'
 import type { PlayerRanking, GameState } from '@/types'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const gameStateStore = useGameStateStore()
+const { gameState } = storeToRefs(gameStateStore)
 
 const rankings = ref<PlayerRanking[]>([])
-const gameState = ref<GameState | null>(null)
 const loading = ref(true)
 
-onMounted(async () => {
-  auth.initFromStorage()
-  if (auth.isAuthenticated) {
-    auth.fetchMe()
-  }
+async function loadHomeData() {
   try {
     const [rankData, stateData] = await Promise.all([
       gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth cashTotal buildingValue inventoryValue companyCount } }'),
-      gqlRequest<{ gameState: GameState }>('{ gameState { currentTick tickIntervalSeconds taxRate } }'),
+      gqlRequest<{ gameState: GameState }>('{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }'),
     ])
     rankings.value = rankData.rankings
     gameState.value = stateData.gameState
@@ -29,7 +29,18 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+onMounted(async () => {
+  auth.initFromStorage()
+  if (auth.isAuthenticated) {
+    void auth.fetchMe()
+  }
+
+  await loadHomeData()
 })
+
+useTickRefresh(loadHomeData)
 </script>
 
 <template>
