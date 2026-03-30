@@ -1,21 +1,21 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 :root {
-  --color-primary: #0047FF;
-  --color-primary-hover: #0039CC;
+  --color-primary: #0047ff;
+  --color-primary-hover: #0039cc;
   --color-primary-light: rgba(0, 71, 255, 0.14);
-  --color-secondary: #00C853;
+  --color-secondary: #00c853;
   --color-success: #22c55e;
-  --color-tertiary: #FF6D00;
-  --color-warning: #FF6D00;
+  --color-tertiary: #ff6d00;
+  --color-warning: #ff6d00;
   --color-danger: #f87171;
   --color-error: #f87171;
-  --color-bg: #0D1117;
-  --color-surface: #161B22;
-  --color-surface-raised: #1E2430;
-  --color-text: #E6EDF3;
-  --color-text-secondary: #8B949E;
-  --color-border: #30363D;
+  --color-bg: #0d1117;
+  --color-surface: #161b22;
+  --color-surface-raised: #1e2430;
+  --color-text: #e6edf3;
+  --color-text-secondary: #8b949e;
+  --color-border: #30363d;
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -188,7 +188,7 @@ img {
 
 .badge-warning {
   background: rgba(255, 109, 0, 0.15);
-  color: #FF6D00;
+  color: #ff6d00;
 }
 
 .badge-danger {
