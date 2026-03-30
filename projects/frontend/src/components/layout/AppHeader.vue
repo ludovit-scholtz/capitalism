@@ -11,7 +11,6 @@ const auth = useAuthStore()
   <header class="app-header">
     <div class="container header-inner">
       <RouterLink to="/" class="logo">
-        <span class="logo-icon">🏭</span>
         <span class="logo-text">CAPITALISM V</span>
       </RouterLink>
       <nav class="nav-links">
@@ -58,6 +57,7 @@ const auth = useAuthStore()
   color: var(--color-text);
   text-decoration: none;
   letter-spacing: -0.02em;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
 }
 
 .logo-icon {
@@ -65,10 +65,13 @@ const auth = useAuthStore()
 }
 
 .logo-text {
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  background: linear-gradient(135deg, gold, orange);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  border-top: 1px solid gold;
+  border-bottom: 1px solid gold;
+  white-space: nowrap;
 }
 
 .nav-links {
