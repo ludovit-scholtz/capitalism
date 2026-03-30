@@ -30,17 +30,9 @@ const cityPowerBalances = ref<Record<string, CityPowerBalance>>({})
 
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 
-const activeStartupPackOffer = computed(() =>
-  auth.startupPackOffer && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(auth.startupPackOffer.status)
-    ? auth.startupPackOffer
-    : null,
-)
-const claimedStartupPackOffer = computed(() =>
-  auth.startupPackOffer?.status === 'CLAIMED' ? auth.startupPackOffer : null,
-)
-const expiredStartupPackOffer = computed(() =>
-  auth.startupPackOffer?.status === 'EXPIRED' ? auth.startupPackOffer : null,
-)
+const activeStartupPackOffer = computed(() => (auth.startupPackOffer && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(auth.startupPackOffer.status) ? auth.startupPackOffer : null))
+const claimedStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'CLAIMED' ? auth.startupPackOffer : null))
+const expiredStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'EXPIRED' ? auth.startupPackOffer : null))
 const targetCompany = computed(() => companies.value[0] ?? null)
 
 const buildingTypeIcons: Record<string, string> = {
@@ -129,9 +121,7 @@ onMounted(async () => {
     }
 
     // Load city power balances for each unique city that has buildings.
-    const cityIds = [
-      ...new Set(companiesData.myCompanies.flatMap((c) => c.buildings.map((b) => b.cityId))),
-    ]
+    const cityIds = [...new Set(companiesData.myCompanies.flatMap((c) => c.buildings.map((b) => b.cityId)))]
     await loadCityPowerBalances(cityIds)
 
     await loadPendingActions()
@@ -304,9 +294,7 @@ async function claimStartupPackOffer() {
     )
 
     auth.setStartupPackOffer(data.claimStartupPack.offer)
-    companies.value = companies.value.map((company) =>
-      company.id === data.claimStartupPack.company.id ? data.claimStartupPack.company : company,
-    )
+    companies.value = companies.value.map((company) => (company.id === data.claimStartupPack.company.id ? data.claimStartupPack.company : company))
     await auth.fetchMe()
     offerMessage.value = t('startupPack.claimedBody', {
       date: formatDateTime(data.claimStartupPack.proSubscriptionEndsAtUtc),
@@ -378,11 +366,7 @@ function formatTimeRemaining(expiresAtUtc: string): string {
     </div>
 
     <template v-else>
-      <section
-        v-if="auth.startupPackOffer"
-        class="startup-pack-panel"
-        aria-labelledby="dashboard-startup-pack-title"
-      >
+      <section v-if="auth.startupPackOffer" class="startup-pack-panel" aria-labelledby="dashboard-startup-pack-title">
         <div class="startup-pack-header">
           <div>
             <span class="startup-pack-eyebrow">{{ t('startupPack.eyebrow') }}</span>
@@ -442,11 +426,7 @@ function formatTimeRemaining(expiresAtUtc: string): string {
           <p v-if="offerError" class="startup-pack-error" role="alert">{{ offerError }}</p>
 
           <div class="startup-pack-actions">
-            <button
-              class="btn btn-primary"
-              :disabled="offerLoading || !targetCompany"
-              @click="claimStartupPackOffer"
-            >
+            <button class="btn btn-primary" :disabled="offerLoading || !targetCompany" @click="claimStartupPackOffer">
               {{ offerLoading ? t('common.loading') : t('startupPack.claim') }}
             </button>
             <button class="btn btn-secondary" :disabled="offerLoading" @click="dismissStartupPackOffer">
@@ -474,11 +454,7 @@ function formatTimeRemaining(expiresAtUtc: string): string {
         </div>
       </section>
 
-      <PendingActionsTimeline
-        :actions="pendingActions"
-        :loading="pendingActionsLoading"
-        :current-tick="gameState?.currentTick ?? null"
-      />
+      <PendingActionsTimeline :actions="pendingActions" :loading="pendingActionsLoading" :current-tick="gameState?.currentTick ?? null" />
 
       <div v-if="companies.length === 0" class="empty-state">
         <div class="empty-icon">🏗️</div>
@@ -488,97 +464,71 @@ function formatTimeRemaining(expiresAtUtc: string): string {
 
       <div v-else class="companies-section">
         <div v-for="company in companies" :key="company.id" class="company-card">
-        <div class="company-header">
-          <div>
-            <h2>{{ company.name }}</h2>
-            <div class="company-meta">
-              <span class="meta-item">
-                <span class="meta-label">{{ t('dashboard.cash') }}</span>
-                <span class="cash">${{ company.cash.toLocaleString() }}</span>
-              </span>
-              <span class="meta-item">
-                <span class="meta-label">{{ t('dashboard.buildings') }}</span>
-                <span>{{ company.buildings.length }}</span>
-              </span>
+          <div class="company-header">
+            <div>
+              <h2>{{ company.name }}</h2>
+              <div class="company-meta">
+                <span class="meta-item">
+                  <span class="meta-label">{{ t('dashboard.cash') }}</span>
+                  <span class="cash">${{ company.cash.toLocaleString() }}</span>
+                </span>
+                <span class="meta-item">
+                  <span class="meta-label">{{ t('dashboard.buildings') }}</span>
+                  <span>{{ company.buildings.length }}</span>
+                </span>
+              </div>
             </div>
+            <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
+              {{ t('dashboard.buyBuilding') }}
+            </RouterLink>
+            <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary"> 🗺️ {{ t('nav.cityMap') }} </RouterLink>
+            <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> 📒 {{ t('dashboard.viewLedger') }} </RouterLink>
           </div>
-          <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
-            {{ t('dashboard.buyBuilding') }}
-          </RouterLink>
-          <RouterLink
-            v-if="company.buildings.length > 0 && company.buildings[0]"
-            :to="`/city/${company.buildings[0].cityId}`"
-            class="btn btn-secondary"
-          >
-            🗺️ {{ t('nav.cityMap') }}
-          </RouterLink>
-          <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost">
-            📒 {{ t('dashboard.viewLedger') }}
-          </RouterLink>
-        </div>
 
-        <div v-if="company.buildings.length === 0" class="no-buildings">
-          <p>{{ t('dashboard.noBuildings') }}</p>
-        </div>
+          <div v-if="company.buildings.length === 0" class="no-buildings">
+            <p>{{ t('dashboard.noBuildings') }}</p>
+          </div>
 
-        <div v-else class="buildings-grid">
-          <RouterLink
-            v-for="building in company.buildings"
-            :key="building.id"
-            :to="`/building/${building.id}`"
-            class="building-card"
-          >
-            <div class="building-icon">{{ getBuildingIcon(building.type) }}</div>
-            <div class="building-info">
-              <span class="building-name">{{ building.name }}</span>
-              <span class="building-type-label">{{ formatBuildingType(building.type) }}</span>
-            </div>
-            <div class="building-stats">
-              <span class="building-level">Lv.{{ building.level }}</span>
-              <span class="building-units">{{ building.units.length }} units</span>
-              <span
-                v-if="building.powerStatus && building.powerStatus !== 'POWERED'"
-                :class="powerStatusClass(building.powerStatus)"
-                :aria-label="getBuildingPowerLabel(building.powerStatus)"
-              >
-                {{ building.powerStatus === 'OFFLINE' ? '🔴' : '🟡' }}
-                {{ getBuildingPowerLabel(building.powerStatus) }}
-              </span>
-            </div>
-          </RouterLink>
-        </div>
+          <div v-else class="buildings-grid">
+            <RouterLink v-for="building in company.buildings" :key="building.id" :to="`/building/${building.id}`" class="building-card">
+              <div class="building-icon">{{ getBuildingIcon(building.type) }}</div>
+              <div class="building-info">
+                <span class="building-name">{{ building.name }}</span>
+                <span class="building-type-label">{{ formatBuildingType(building.type) }}</span>
+              </div>
+              <div class="building-stats">
+                <span class="building-level">Lv.{{ building.level }}</span>
+                <span class="building-units">{{ building.units.length }} units</span>
+                <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
+                  {{ building.powerStatus === 'OFFLINE' ? '🔴' : '🟡' }}
+                  {{ getBuildingPowerLabel(building.powerStatus) }}
+                </span>
+              </div>
+            </RouterLink>
+          </div>
 
-        <!-- City power summary for this company's city -->
-        <div
-          v-if="company.buildings.length > 0 && company.buildings[0]"
-          class="city-power-row"
-        >
-          <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
-            <div
-              v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0"
-              :class="powerBalanceClass(cityPowerBalances[cityId].status)"
-              :aria-label="t('powerGrid.title')"
-            >
-              <span class="power-balance-icon">⚡</span>
-              <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
-              <span v-if="cityPowerBalances[cityId].status === 'BALANCED'" class="power-balance-value">
-                {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
-              </span>
-              <span v-else class="power-balance-warning">
-                {{ cityPowerBalances[cityId].status === 'CRITICAL'
-                  ? t('powerGrid.criticalWarning')
-                  : t('powerGrid.shortageWarning') }}
-              </span>
-              <RouterLink :to="`/city/${cityId}`" class="power-balance-link">{{ t('powerGrid.viewDetails') }}</RouterLink>
-            </div>
-            <div v-else class="power-balance power-balance--legacy">
-              <span class="power-balance-icon">⚡</span>
-              <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
-              <span class="power-balance-value">{{ t('powerGrid.powerCardNoPower') }}</span>
-            </div>
-          </template>
+          <!-- City power summary for this company's city -->
+          <div v-if="company.buildings.length > 0 && company.buildings[0]" class="city-power-row">
+            <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
+              <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
+                <span class="power-balance-icon">⚡</span>
+                <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
+                <span v-if="cityPowerBalances[cityId].status === 'BALANCED'" class="power-balance-value">
+                  {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
+                </span>
+                <span v-else class="power-balance-warning">
+                  {{ cityPowerBalances[cityId].status === 'CRITICAL' ? t('powerGrid.criticalWarning') : t('powerGrid.shortageWarning') }}
+                </span>
+                <RouterLink :to="`/city/${cityId}`" class="power-balance-link">{{ t('powerGrid.viewDetails') }}</RouterLink>
+              </div>
+              <div v-else class="power-balance power-balance--legacy">
+                <span class="power-balance-icon">⚡</span>
+                <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
+                <span class="power-balance-value">{{ t('powerGrid.powerCardNoPower') }}</span>
+              </div>
+            </template>
+          </div>
         </div>
-      </div>
       </div>
     </template>
   </div>
