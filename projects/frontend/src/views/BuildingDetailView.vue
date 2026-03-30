@@ -420,6 +420,11 @@ const allExchangeOffersBlocked = computed(
   () => exchangeOfferItems.value.length > 0 && exchangeOfferItems.value.every((o) => o.blocked),
 )
 
+const bestExchangeOfferCityId = computed<string | null>(() => {
+  const best = exchangeOfferItems.value.find((o) => !o.blocked)
+  return best?.cityId ?? null
+})
+
 function formatBuildingType(type: string): string {
   return type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
 }
@@ -1952,6 +1957,7 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
             longitude
             level
             powerConsumption
+            powerStatus
             isForSale
             askingPrice
             pricePerSqm
@@ -2196,6 +2202,20 @@ watch(
           <span class="meta-pill">
             <span class="meta-label">{{ t('buildings.power') }}</span>
             <span class="meta-value">{{ building.powerConsumption }} {{ t('buildings.powerUnit') }}</span>
+          </span>
+          <span
+            v-if="building.powerStatus"
+            class="meta-pill power-status-pill"
+            :class="{
+              'power-status-powered': building.powerStatus === 'POWERED',
+              'power-status-constrained': building.powerStatus === 'CONSTRAINED',
+              'power-status-offline': building.powerStatus === 'OFFLINE',
+            }"
+            :title="t(`powerGrid.buildingStatusHint.${building.powerStatus}`, { percent: 50 })"
+            role="status"
+          >
+            <span class="meta-label">{{ t('powerGrid.powerCardTitle') }}</span>
+            <span class="meta-value">{{ t(`powerGrid.buildingStatus.${building.powerStatus}`) }}</span>
           </span>
           <span class="meta-pill" :class="building.isForSale ? 'for-sale' : ''">
             {{ building.isForSale ? t('buildingDetail.forSale') : t('buildingDetail.notForSale') }}
@@ -3178,15 +3198,17 @@ watch(
               >
                 <h5>{{ t('buildingDetail.exchange.title') }}</h5>
                 <p class="config-help">{{ t('buildingDetail.exchange.subtitle') }}</p>
+                <p class="config-help exchange-selection-hint">{{ t('buildingDetail.exchange.selectionHint') }}</p>
                 <p class="config-help" v-if="exchangeOffersLoading">{{ t('common.loading') }}</p>
                 <template v-else>
                   <p v-if="allExchangeOffersBlocked" class="config-help exchange-no-valid-offers">
                     {{ t('buildingDetail.exchange.noValidOffers') }}
                   </p>
                   <ul class="exchange-offers-list">
-                    <li v-for="offer in exchangeOfferItems" :key="`${offer.cityId}-${offer.resourceTypeId}`" :class="['exchange-offer-item', { 'offer-blocked': offer.blocked }]">
+                    <li v-for="offer in exchangeOfferItems" :key="`${offer.cityId}-${offer.resourceTypeId}`" :class="['exchange-offer-item', { 'offer-blocked': offer.blocked, 'offer-best': offer.cityId === bestExchangeOfferCityId }]">
                       <div class="exchange-offer-header">
                         <strong>{{ offer.cityName }}</strong>
+                        <span class="offer-best-badge" v-if="offer.cityId === bestExchangeOfferCityId">{{ t('buildingDetail.exchange.bestOffer') }}</span>
                         <span>{{ t('buildingDetail.exchange.quality', { quality: formatPercent(offer.estimatedQuality) }) }}</span>
                       </div>
                       <div class="exchange-offer-metrics">
@@ -3365,15 +3387,17 @@ watch(
               >
                 <h5>{{ t('buildingDetail.exchange.title') }}</h5>
                 <p class="config-help">{{ t('buildingDetail.exchange.subtitle') }}</p>
+                <p class="config-help exchange-selection-hint">{{ t('buildingDetail.exchange.selectionHint') }}</p>
                 <p class="config-help" v-if="exchangeOffersLoading">{{ t('common.loading') }}</p>
                 <template v-else>
                   <p v-if="allExchangeOffersBlocked" class="config-help exchange-no-valid-offers">
                     {{ t('buildingDetail.exchange.noValidOffers') }}
                   </p>
                   <ul class="exchange-offers-list">
-                    <li v-for="offer in exchangeOfferItems" :key="`${offer.cityId}-${offer.resourceTypeId}`" :class="['exchange-offer-item', { 'offer-blocked': offer.blocked }]">
+                    <li v-for="offer in exchangeOfferItems" :key="`${offer.cityId}-${offer.resourceTypeId}`" :class="['exchange-offer-item', { 'offer-blocked': offer.blocked, 'offer-best': offer.cityId === bestExchangeOfferCityId }]">
                       <div class="exchange-offer-header">
                         <strong>{{ offer.cityName }}</strong>
+                        <span class="offer-best-badge" v-if="offer.cityId === bestExchangeOfferCityId">{{ t('buildingDetail.exchange.bestOffer') }}</span>
                         <span>{{ t('buildingDetail.exchange.quality', { quality: formatPercent(offer.estimatedQuality) }) }}</span>
                       </div>
                       <div class="exchange-offer-metrics">
@@ -3659,6 +3683,21 @@ watch(
 .meta-pill.for-sale {
   background: rgba(0, 200, 83, 0.1);
   color: var(--color-secondary);
+}
+
+.power-status-pill.power-status-powered {
+  background: rgba(34, 197, 94, 0.1);
+  color: #15803d;
+}
+
+.power-status-pill.power-status-constrained {
+  background: rgba(251, 191, 36, 0.15);
+  color: #b45309;
+}
+
+.power-status-pill.power-status-offline {
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--color-danger);
 }
 
 .meta-label,
@@ -4717,6 +4756,31 @@ watch(
 .exchange-no-valid-offers {
   color: var(--color-error, #ef4444);
   font-size: 0.8rem;
+}
+
+.exchange-selection-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin-bottom: 0.5rem;
+}
+
+.offer-best {
+  border-color: var(--color-primary, #3b82f6);
+  background: color-mix(in srgb, var(--color-primary, #3b82f6) 8%, var(--color-surface-raised, var(--color-surface)));
+}
+
+.offer-best-badge {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-primary, #3b82f6);
+  background: color-mix(in srgb, var(--color-primary, #3b82f6) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #3b82f6) 40%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.4rem;
+  white-space: nowrap;
 }
 
 /* Inventory table */
