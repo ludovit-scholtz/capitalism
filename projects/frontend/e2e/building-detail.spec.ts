@@ -2322,6 +2322,101 @@ test.describe('Building detail upgrades', () => {
     await expect(plannedPurchase).toHaveAttribute('aria-label', /Wood/)
     await expect(plannedPurchase).toHaveAttribute('aria-label', /Buy up to/)
   })
+
+  test('keeps the active configuration panel stable during async offer refreshes', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-focus',
+      playerId: player.id,
+      name: 'Focus Safe Industries',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-focus',
+          companyId: 'company-focus',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Focus Safe Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'focus-purchase',
+              buildingId: 'building-focus',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              maxPrice: 25,
+              purchaseSource: 'OPTIMAL',
+            },
+            {
+              id: 'focus-manufacturing',
+              buildingId: 'building-focus',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: true,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              productTypeId: makeChairProduct().id,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-focus')
+    await expect(page.getByRole('heading', { name: 'Focus Safe Factory' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    const searchInput = page.locator('.sidebar .selector-search')
+    await searchInput.fill('wood')
+    await expect(searchInput).toHaveValue('wood')
+
+    const purchaseSourceSelect = page.locator('.unit-config-fields select').first()
+    await purchaseSourceSelect.selectOption('EXCHANGE')
+    await purchaseSourceSelect.selectOption('OPTIMAL')
+
+    await expect(page.locator('.loading')).toHaveCount(0)
+    await expect(page.locator('.sidebar')).toBeVisible()
+    await expect(getGridCell(plannedSection, 0, 0)).toHaveClass(/selected/)
+    await expect(searchInput).toHaveValue('wood')
+  })
 })
 
 test.describe('Global exchange market', () => {
