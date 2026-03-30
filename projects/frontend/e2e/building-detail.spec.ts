@@ -3617,3 +3617,568 @@ test.describe('Production chain configuration', () => {
     await expect(page.getByRole('button', { name: /Store Upgrade/i })).toBeVisible()
   })
 })
+
+// ── Starter sales-shop setup banner ─────────────────────────────────────────
+
+test.describe('Starter sales-shop setup banner', () => {
+  function makeEmptySalesShopPlayer() {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-shop',
+          playerId: 'player-1',
+          name: 'Retail Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-empty-shop',
+              companyId: 'company-shop',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP',
+              name: 'New Sales Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+    return player
+  }
+
+  test('shows starter setup banner for an empty sales shop', async ({ page }) => {
+    const player = makeEmptySalesShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-empty-shop')
+
+    // Shop starter setup banner should be visible
+    await expect(page.getByRole('region', { name: /shop starter setup/i })).toBeVisible()
+    // Title and body text
+    await expect(page.getByText(/New Sales Shop — Ready for Your First Product/i)).toBeVisible()
+    await expect(page.getByText(/no units configured yet/i)).toBeVisible()
+    // Starter layout description (scope to the desc paragraph to avoid strict mode issues)
+    await expect(page.locator('.starter-setup-desc').filter({ hasText: /Purchase.*Public Sales/i })).toBeVisible()
+    // Apply Starter Shop Layout button
+    await expect(page.getByRole('button', { name: /Apply Starter Shop Layout/i })).toBeVisible()
+  })
+
+  test('apply starter shop layout pre-populates PURCHASE and PUBLIC_SALES units', async ({
+    page,
+  }) => {
+    const player = makeEmptySalesShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-empty-shop')
+
+    await expect(page.getByRole('button', { name: /Apply Starter Shop Layout/i })).toBeVisible()
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    // Planning grid should now be visible (edit mode)
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(planningSection).toBeVisible()
+
+    // PURCHASE unit should appear at position (0,0)
+    const purchaseCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await expect(purchaseCell).toContainText('Purchase')
+
+    // PUBLIC_SALES unit should appear at position (1,0)
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await expect(publicSalesCell).toContainText('Public Sales')
+
+    // Shop starter setup banner should no longer be visible (we are now in edit mode)
+    await expect(page.locator('.starter-setup-banner--shop')).toBeHidden()
+  })
+
+  test('apply starter shop layout can be saved via Store Upgrade', async ({ page }) => {
+    const player = makeEmptySalesShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-empty-shop')
+
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    // Store Upgrade button should be enabled
+    const storeBtn = page.getByRole('button', { name: /Store Upgrade/i })
+    await expect(storeBtn).toBeVisible()
+    await expect(storeBtn).toBeEnabled()
+    await storeBtn.click()
+
+    // After save, upgrade-in-progress banner should appear (pending configuration)
+    await expect(page.locator('.upgrade-banner')).toBeVisible()
+    // Starter setup banner should be gone
+    await expect(page.locator('.starter-setup-banner--shop')).toBeHidden()
+  })
+
+  test('starter shop banner is hidden for a sales shop that already has units', async ({
+    page,
+  }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-shop-units',
+          playerId: 'player-1',
+          name: 'Retail Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-shop-with-units',
+              companyId: 'company-shop-units',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP',
+              name: 'Running Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [
+                {
+                  id: 'u-public-sales',
+                  buildingId: 'building-shop-with-units',
+                  unitType: 'PUBLIC_SALES',
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkRight: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                },
+              ],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-shop-with-units')
+
+    // Should NOT show the starter setup banner for a shop that already has units
+    await expect(page.locator('.starter-setup-banner--shop')).toBeHidden()
+  })
+})
+
+// ── Sales chain status panel ─────────────────────────────────────────────────
+
+test.describe('Sales chain status panel', () => {
+  function makeShopWithUnits({
+    purchaseProductId = null as string | null,
+    publicSalesProductId = null as string | null,
+    publicSalesMinPrice = null as number | null,
+  } = {}) {
+    return makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-sales-chain',
+          playerId: 'player-1',
+          name: 'Sales Chain Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-sales-chain-shop',
+              companyId: 'company-sales-chain',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP',
+              name: 'My Sales Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [
+                {
+                  id: 'u-shop-purchase',
+                  buildingId: 'building-sales-chain-shop',
+                  unitType: 'PURCHASE',
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkRight: true,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                  productTypeId: purchaseProductId,
+                },
+                {
+                  id: 'u-shop-public-sales',
+                  buildingId: 'building-sales-chain-shop',
+                  unitType: 'PUBLIC_SALES',
+                  gridX: 1,
+                  gridY: 0,
+                  level: 1,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkRight: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                  productTypeId: publicSalesProductId,
+                  minPrice: publicSalesMinPrice,
+                },
+              ],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+  }
+
+  async function loginAndGoto(page: Parameters<typeof test>[0]['page'], player: ReturnType<typeof makePlayer>, url: string) {
+    const state = setupMockApi(page, { players: [player], products: [makeChairProduct()] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto(url)
+    return state
+  }
+
+  test('shows sales chain panel with incomplete status when units are unconfigured', async ({
+    page,
+  }) => {
+    const player = makeShopWithUnits()
+    await loginAndGoto(page, player, '/building/building-sales-chain-shop')
+
+    // Sales chain panel should be visible
+    await expect(page.getByRole('region', { name: /sales chain status/i })).toBeVisible()
+    // Status badge: incomplete
+    await expect(page.getByText(/Setup Required/i)).toBeVisible()
+    // Both steps should show "not configured"
+    const panel = page.getByRole('region', { name: /sales chain status/i })
+    await expect(panel.getByText(/Not configured yet/i).first()).toBeVisible()
+    // Guidance should appear
+    await expect(page.getByText(/What still needs to be configured/i)).toBeVisible()
+    await expect(page.getByText(/Purchase unit and select the product/i)).toBeVisible()
+    await expect(page.getByText(/Public Sales unit.*minimum selling price/i)).toBeVisible()
+  })
+
+  test('shows partial completion when only purchase is configured', async ({ page }) => {
+    const player = makeShopWithUnits({ purchaseProductId: 'prod-chair' })
+    await loginAndGoto(page, player, '/building/building-sales-chain-shop')
+
+    const panel = page.getByRole('region', { name: /sales chain status/i })
+    await expect(panel).toBeVisible()
+    // Status badge: still incomplete
+    await expect(panel.getByText(/Setup Required/i)).toBeVisible()
+    // Purchase is configured - shows product name
+    await expect(panel.getByText(/Wooden Chair/i)).toBeVisible()
+    // Only the public sales todo should remain
+    await expect(page.getByText(/Public Sales unit.*minimum selling price/i)).toBeVisible()
+  })
+
+  test('shows Ready to Sell when both purchase and public sales are fully configured', async ({
+    page,
+  }) => {
+    const player = makeShopWithUnits({
+      purchaseProductId: 'prod-chair',
+      publicSalesProductId: 'prod-chair',
+      publicSalesMinPrice: 49.99,
+    })
+    await loginAndGoto(page, player, '/building/building-sales-chain-shop')
+
+    const panel = page.getByRole('region', { name: /sales chain status/i })
+    await expect(panel).toBeVisible()
+    // Status badge: complete
+    await expect(panel.getByText(/Ready to Sell/i)).toBeVisible()
+    // Chain complete description mentions product and price
+    await expect(panel.locator('.chain-complete-message').getByText(/Wooden Chair/i)).toBeVisible()
+    await expect(panel.locator('.chain-complete-message').getByText(/49\.99/i)).toBeVisible()
+    // Next step hint
+    await expect(panel.getByText(/customers in the city can discover and buy/i)).toBeVisible()
+    // No guidance section (chain is complete)
+    await expect(page.getByText(/What still needs to be configured/i)).toBeHidden()
+  })
+})
+
+// ── Sales shop PUBLIC_SALES price validation and persistence ─────────────────
+
+test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => {
+  function makeEmptySalesShopForPricing() {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-pricing',
+          playerId: 'player-1',
+          name: 'Pricing Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-pricing-shop',
+              companyId: 'company-pricing',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP',
+              name: 'Pricing Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+    return player
+  }
+
+  test('save and reload shows configured product and price in sales chain panel', async ({
+    page,
+  }) => {
+    // Start with an empty shop, apply the starter layout, configure product and price, save,
+    // then simulate reload (navigate away and back) and verify the sales chain panel shows
+    // the saved product and price correctly.
+    const chair = makeChairProduct()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-persist-shop',
+          playerId: 'player-1',
+          name: 'Persistence Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-persist-shop',
+              companyId: 'company-persist-shop',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP',
+              name: 'Persist Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              // Pre-configure the shop with PURCHASE + PUBLIC_SALES saved as active units
+              // (simulating the post-save/post-upgrade state after some ticks)
+              units: [
+                {
+                  id: 'u-persist-purchase',
+                  buildingId: 'building-persist-shop',
+                  unitType: 'PURCHASE',
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkRight: true,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                  productTypeId: chair.id,
+                },
+                {
+                  id: 'u-persist-public-sales',
+                  buildingId: 'building-persist-shop',
+                  unitType: 'PUBLIC_SALES',
+                  gridX: 1,
+                  gridY: 0,
+                  level: 1,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkRight: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                  productTypeId: chair.id,
+                  minPrice: 67.5,
+                  saleVisibility: 'PUBLIC',
+                },
+              ],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-persist-shop')
+
+    // The sales chain panel should show the saved configuration (both units configured)
+    const panel = page.getByRole('region', { name: /sales chain status/i })
+    await expect(panel).toBeVisible()
+    await expect(panel.getByText(/Ready to Sell/i)).toBeVisible()
+
+    // The PUBLIC_SALES step shows the product name and price
+    await expect(panel.getByText(/Wooden Chair · \$67\.50/i)).toBeVisible()
+
+    // The PURCHASE step shows the product name
+    await expect(panel.locator('.chain-step--configured').first().getByText(/Wooden Chair/i)).toBeVisible()
+
+    // The complete message includes the price
+    await expect(panel.locator('.chain-complete-message').getByText(/67\.50/i)).toBeVisible()
+
+    // No starter banner should show (shop has units)
+    await expect(page.locator('.starter-setup-banner--shop')).toBeHidden()
+  })
+
+  test('negative price rejected — save error shown without exiting edit mode', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makeEmptySalesShopForPricing()
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-pricing-shop')
+
+    // Apply starter shop layout (PURCHASE → PUBLIC_SALES)
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    // Select the PUBLIC_SALES cell and configure a negative price
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await publicSalesCell.click()
+
+    // PUBLIC_SALES uses a <select> dropdown for product type (label has no `for` attr, scope by config-field)
+    const productTypeField = page.locator('.config-field').filter({ has: page.getByText('Product Type', { exact: true }) }).first()
+    await expect(productTypeField.locator('select')).toBeVisible()
+    await productTypeField.locator('select').selectOption({ label: 'Wooden Chair' })
+
+    // Set a negative min price in the number input
+    const minPriceField = page.locator('.config-field').filter({ has: page.getByText('Min Price', { exact: true }) }).first()
+    await minPriceField.locator('input').fill('-5')
+
+    // Attempt to save — should trigger INVALID_MIN_PRICE error from mock
+    await page.getByRole('button', { name: /Store Upgrade/i }).click()
+
+    // The save error banner should appear inline
+    await expect(page.locator('.save-error-banner')).toBeVisible()
+    await expect(page.locator('.save-error-banner')).toContainText(/INVALID_MIN_PRICE|price|minimum/i)
+
+    // Player should still be in edit mode (planning grid visible)
+    await expect(planningSection).toBeVisible()
+    await expect(page.getByRole('button', { name: /Store Upgrade/i })).toBeVisible()
+  })
+
+  test('zero price rejected — save error shown, shop not treated as ready', async ({ page }) => {
+    // The runtime engine silently replaces price <= 0 with base price, so we must block 0
+    // up front and honestly tell the player that pricing is a real decision.
+    const chair = makeChairProduct()
+    const player = makeEmptySalesShopForPricing()
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-pricing-shop')
+
+    // Apply starter shop layout
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await publicSalesCell.click()
+
+    const productTypeField = page.locator('.config-field').filter({ has: page.getByText('Product Type', { exact: true }) }).first()
+    await expect(productTypeField.locator('select')).toBeVisible()
+    await productTypeField.locator('select').selectOption({ label: 'Wooden Chair' })
+
+    // Set price to exactly 0
+    const minPriceField = page.locator('.config-field').filter({ has: page.getByText('Min Price', { exact: true }) }).first()
+    await minPriceField.locator('input').fill('0')
+
+    await page.getByRole('button', { name: /Store Upgrade/i }).click()
+
+    // Backend (mocked) must reject price = 0 with INVALID_MIN_PRICE
+    await expect(page.locator('.save-error-banner')).toBeVisible()
+    await expect(page.locator('.save-error-banner')).toContainText(/INVALID_MIN_PRICE|price|minimum/i)
+
+    // Chain should NOT show "Ready to Sell" — shop remains unconfigured
+    await expect(page.getByText(/Ready to Sell/i)).toBeHidden()
+
+    // Player remains in edit mode
+    await expect(planningSection).toBeVisible()
+    await expect(page.getByRole('button', { name: /Store Upgrade/i })).toBeVisible()
+  })
+})
