@@ -4921,6 +4921,210 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             $"Expected commercial avg population index ({avgCommercial:F2}) > industrial avg ({avgIndustrial:F2})");
     }
 
+    [Fact]
+    public async Task CityLots_MineLotsExposeRawMaterialAttributes()
+    {
+        // MINE-suitable lots seeded for Bratislava (Industrial Zone) should carry resourceType,
+        // materialQuality, and materialQuantity data so the frontend land panel
+        // can render the raw material strategic value.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Bratislava")
+            .GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id name district suitableTypes
+                materialQuality materialQuantity
+                resourceType { id name slug }
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityLots should not return GraphQL errors");
+
+        var lots = result.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+        // Only check seeded Industrial Zone lots (not dynamically created test lots)
+        var seededMineLots = lots
+            .Where(l => l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
+                     && l.GetProperty("district").GetString() == "Industrial Zone")
+            .ToList();
+
+        Assert.True(seededMineLots.Count > 0, "Expected at least one seeded MINE lot in Industrial Zone");
+
+        // At least one seeded mine lot should have raw material data
+        var lotsWithMaterial = seededMineLots
+            .Where(l => l.GetProperty("resourceType").ValueKind != JsonValueKind.Null)
+            .ToList();
+        Assert.True(lotsWithMaterial.Count > 0,
+            "Expected at least one seeded Industrial Zone MINE lot to have resourceType data");
+
+        foreach (var lot in lotsWithMaterial)
+        {
+            var name = lot.GetProperty("name").GetString();
+            Assert.True(lot.GetProperty("materialQuality").ValueKind != JsonValueKind.Null,
+                $"MINE lot '{name}' with resourceType should have materialQuality");
+            Assert.True(lot.GetProperty("materialQuantity").ValueKind != JsonValueKind.Null,
+                $"MINE lot '{name}' with resourceType should have materialQuantity");
+
+            var quality = lot.GetProperty("materialQuality").GetDecimal();
+            Assert.True(quality > 0 && quality <= 1.0m,
+                $"MINE lot '{name}' materialQuality {quality} should be in range (0,1]");
+
+            var quantity = lot.GetProperty("materialQuantity").GetDecimal();
+            Assert.True(quantity > 0, $"MINE lot '{name}' materialQuantity should be positive");
+
+            var slug = lot.GetProperty("resourceType").GetProperty("slug").GetString();
+            Assert.False(string.IsNullOrEmpty(slug), $"MINE lot '{name}' resourceType.slug should not be empty");
+        }
+    }
+
+    [Fact]
+    public async Task CityLots_NonMineLotsHaveNoRawMaterialData()
+    {
+        // Non-extraction lots (commercial, residential, business park) must NOT expose
+        // raw material data to avoid confusing the frontend land detail panel.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Bratislava")
+            .GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id name suitableTypes
+                materialQuality materialQuantity
+                resourceType { id name }
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        var lots = result.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+        // SALES_SHOP / APARTMENT / MEDIA_HOUSE lots have no raw material
+        var retailLots = lots
+            .Where(l =>
+            {
+                var types = l.GetProperty("suitableTypes").GetString()!;
+                return (types.Contains("SALES_SHOP") || types.Contains("APARTMENT") || types.Contains("MEDIA_HOUSE"))
+                    && !types.Contains("MINE");
+            })
+            .ToList();
+
+        Assert.True(retailLots.Count > 0, "Expected at least one non-extraction lot");
+
+        foreach (var lot in retailLots)
+        {
+            var name = lot.GetProperty("name").GetString();
+            Assert.True(lot.GetProperty("resourceType").ValueKind == JsonValueKind.Null,
+                $"Non-MINE lot '{name}' should not have resourceType");
+            Assert.True(lot.GetProperty("materialQuality").ValueKind == JsonValueKind.Null,
+                $"Non-MINE lot '{name}' should not have materialQuality");
+            Assert.True(lot.GetProperty("materialQuantity").ValueKind == JsonValueKind.Null,
+                $"Non-MINE lot '{name}' should not have materialQuantity");
+        }
+    }
+
+    [Fact]
+    public async Task GetLot_ByIdIncludesRawMaterialData()
+    {
+        // The lot(id) single-lot query should also include raw material data
+        // so the detail panel can be populated from either endpoint.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Bratislava")
+            .GetProperty("id").GetString();
+
+        // Fetch cityLots with district to find a seeded lot with raw material data
+        var lotsResult = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) { id name district suitableTypes materialQuality }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        // Pick a seeded Industrial Zone MINE lot that already has material data
+        var mineLot = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
+            .FirstOrDefault(l =>
+                l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
+                && l.GetProperty("district").GetString() == "Industrial Zone"
+                && l.GetProperty("materialQuality").ValueKind != JsonValueKind.Null);
+
+        Assert.NotEqual(default, mineLot);
+        var lotId = mineLot.GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GetLot($id: UUID!) {
+              lot(id: $id) {
+                id name suitableTypes
+                materialQuality materialQuantity
+                resourceType { id name slug }
+              }
+            }
+            """,
+            new { id = lotId });
+
+        Assert.False(result.TryGetProperty("errors", out _), "lot(id) should not return errors");
+        var lot = result.GetProperty("data").GetProperty("lot");
+        Assert.True(lot.GetProperty("resourceType").ValueKind != JsonValueKind.Null,
+            "lot(id) on a seeded MINE lot should include resourceType");
+        Assert.True(lot.GetProperty("materialQuality").ValueKind != JsonValueKind.Null,
+            "lot(id) on a seeded MINE lot should include materialQuality");
+        Assert.True(lot.GetProperty("materialQuantity").ValueKind != JsonValueKind.Null,
+            "lot(id) on a seeded MINE lot should include materialQuantity");
+    }
+
+    [Fact]
+    public async Task CityLots_MineLotsHaveResourcePremiumInPrice()
+    {
+        // ROADMAP: "The price to purchase the land includes also the base price for the
+        // raw material." Mine lots with resource deposits must have Price > BasePrice so
+        // the resource-premium badge and valuation transparency UI render correctly.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Bratislava")
+            .GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id name district suitableTypes basePrice price
+                resourceType { id name }
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityLots should not return errors");
+
+        var lots = result.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+
+        // Every seeded lot with a raw-material resource MUST have price > basePrice
+        var resourceLots = lots
+            .Where(l => l.GetProperty("resourceType").ValueKind != JsonValueKind.Null)
+            .ToList();
+
+        Assert.True(resourceLots.Count > 0,
+            "Expected at least one seeded lot with a raw material resource");
+
+        foreach (var lot in resourceLots)
+        {
+            var name = lot.GetProperty("name").GetString();
+            var basePrice = lot.GetProperty("basePrice").GetDecimal();
+            var price = lot.GetProperty("price").GetDecimal();
+
+            Assert.True(price > basePrice,
+                $"Mine lot '{name}' must have Price ({price}) > BasePrice ({basePrice}) because the land price includes the raw-material deposit premium.");
+        }
+    }
+
     #endregion
 
     #region First-sale milestone
@@ -6451,6 +6655,116 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { input = new { companyId, lotId, buildingType, buildingName, powerPlantType } },
             token);
         return result.GetProperty("data").GetProperty("purchaseLot").GetProperty("building").GetProperty("id").GetString()!;
+    }
+
+    #endregion
+
+    #region Database migration transition
+
+    [Fact]
+    public async Task StartupWithExistingEnsureCreatedDatabase_MigratesToMigrationsManagedSchema()
+    {
+        // Regression test for the EnsureCreatedAsync→MigrateAsync transition.
+        //
+        // SCENARIO: A developer or hosted environment has a SQLite database that was originally
+        // created by EnsureCreatedAsync (before migration support was introduced). It has all
+        // tables but no __EFMigrationsHistory table. A new deployment switches to MigrateAsync.
+        //
+        // EXPECTED BEHAVIOR: InitializeAsync should succeed — it detects the missing history
+        // table, baselines all current migrations as already applied, and then MigrateAsync
+        // finds nothing to do (no pending migrations).
+        //
+        // IMPLEMENTATION: We simulate the legacy database by creating a new temporary SQLite DB,
+        // applying the schema via EnsureCreatedAsync, dropping the __EFMigrationsHistory table
+        // (if it was created by EnsureCreated — it won't be since EnsureCreated never creates
+        // it, so the DB is already in the legacy state), then running InitializeAsync.
+
+        var dbPath = System.IO.Path.Combine(
+            System.IO.Path.GetTempPath(),
+            $"capitalism-migration-test-{Guid.NewGuid():N}.db");
+
+        try
+        {
+            var options = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .Options;
+
+            // Step 1: Create the legacy database — EnsureCreatedAsync creates all tables but
+            // does NOT create __EFMigrationsHistory (that is a migrations-specific artifact).
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                var wasCreated = await legacyCtx.Database.EnsureCreatedAsync();
+                Assert.True(wasCreated, "Fresh database should have been created");
+
+                // Confirm __EFMigrationsHistory is absent (legacy state).
+                var conn = legacyCtx.Database.GetDbConnection();
+                await conn.OpenAsync();
+                await using var checkCmd = conn.CreateCommand();
+                checkCmd.CommandText =
+                    "SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='__EFMigrationsHistory'";
+                var historyExists = Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0L) > 0;
+                conn.Close();
+
+                Assert.False(historyExists,
+                    "EnsureCreatedAsync must NOT create __EFMigrationsHistory — this test depends on the legacy state");
+            }
+
+            // Step 2: Now run InitializeAsync against this legacy database.
+            // The safe bootstrap in AppDbInitializer should detect the missing history table,
+            // create it, baseline all migrations, and complete without throwing.
+            await using var upgradeCtx = new AppDbContext(options);
+
+            var testSeedOptions = Microsoft.Extensions.Options.Options.Create(new Api.Configuration.SeedDataOptions
+            {
+                AdminEmail = "admin@migration-test.local",
+                AdminDisplayName = "Migration Test Admin",
+                AdminPassword = "TestPassword123!"
+            });
+
+            var initializer = new AppDbInitializer(upgradeCtx, testSeedOptions);
+            var exception = await Record.ExceptionAsync(() => initializer.InitializeAsync());
+            if (exception is not null)
+                throw new InvalidOperationException(
+                    $"InitializeAsync must succeed on a legacy EnsureCreated database. Got: {exception.Message}", exception);
+            Assert.Null(exception);
+
+            // Step 3: Verify __EFMigrationsHistory was created and populated.
+            await using var verifyCtx = new AppDbContext(options);
+            var conn2 = verifyCtx.Database.GetDbConnection();
+            await conn2.OpenAsync();
+            await using var histCheck = conn2.CreateCommand();
+            histCheck.CommandText =
+                "SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='__EFMigrationsHistory'";
+            var historyNowExists = Convert.ToInt64(await histCheck.ExecuteScalarAsync() ?? 0L) > 0;
+
+            await using var rowCheck = conn2.CreateCommand();
+            rowCheck.CommandText = "SELECT COUNT(1) FROM __EFMigrationsHistory";
+            var historyRowCount = Convert.ToInt64(await rowCheck.ExecuteScalarAsync() ?? 0L);
+            conn2.Close();
+
+            Assert.True(historyNowExists, "__EFMigrationsHistory must exist after safe migration bootstrap");
+            Assert.True(historyRowCount > 0, "__EFMigrationsHistory must have at least one baseline row");
+
+            // Step 4: A second call to InitializeAsync (simulating a server restart) must also
+            // succeed — the history table now exists so the baseline step is skipped.
+            await using var restartCtx = new AppDbContext(options);
+            var restartInitializer = new AppDbInitializer(restartCtx, testSeedOptions);
+            var restartException = await Record.ExceptionAsync(() => restartInitializer.InitializeAsync());
+            if (restartException is not null)
+                throw new InvalidOperationException(
+                    $"Second InitializeAsync (server restart) must succeed. Got: {restartException.Message}", restartException);
+            Assert.Null(restartException);
+        }
+        finally
+        {
+            // Clean up temp database files.
+            foreach (var suffix in new[] { "", "-wal", "-shm" })
+            {
+                var path = dbPath + suffix;
+                if (System.IO.File.Exists(path))
+                    System.IO.File.Delete(path);
+            }
+        }
     }
 
     #endregion
