@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { gqlRequest } from '@/lib/graphql'
+import { deepEqual } from '@/lib/utils'
 import type { GameState } from '@/types'
 
 const GAME_STATE_QUERY = `
@@ -70,7 +71,9 @@ export const useGameStateStore = defineStore('gameState', () => {
     inFlight = (async () => {
       try {
         const data = await gqlRequest<{ gameState: GameState | null }>(GAME_STATE_QUERY)
-        gameState.value = data.gameState
+        if (!deepEqual(gameState.value, data.gameState)) {
+          gameState.value = data.gameState
+        }
         return gameState.value
       } catch (reason: unknown) {
         error.value = reason instanceof Error ? reason.message : 'Failed to load game state'

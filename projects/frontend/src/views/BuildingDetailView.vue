@@ -38,6 +38,7 @@ import {
 } from '@/lib/catalogPresentation'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { gqlRequest } from '@/lib/graphql'
+import { deepEqual } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth'
 import { getUnitResourceHistoryItemKey, type UnitResourceHistoryItemOption } from '@/lib/unitResourceHistory'
 import type {
@@ -2086,11 +2087,18 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
     ])
 
     currentTick.value = gameStateData.gameState?.currentTick ?? 0
-    resourceTypes.value = resourceData.resourceTypes ?? []
-    productTypes.value = productData.productTypes ?? []
+    if (!deepEqual(resourceTypes.value, resourceData.resourceTypes ?? [])) {
+      resourceTypes.value = resourceData.resourceTypes ?? []
+    }
+    if (!deepEqual(productTypes.value, productData.productTypes ?? [])) {
+      productTypes.value = productData.productTypes ?? []
+    }
 
     const allBuildings = companiesData.myCompanies.flatMap((company) => company.buildings)
-    building.value = allBuildings.find((candidate) => candidate.id === buildingId.value) || null
+    const newBuilding = allBuildings.find((candidate) => candidate.id === buildingId.value) || null
+    if (!deepEqual(building.value, newBuilding)) {
+      building.value = newBuilding
+    }
 
     if (!building.value) {
       companyCash.value = null
@@ -2098,7 +2106,10 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
       return
     }
 
-    companyCash.value = companiesData.myCompanies.find((company) => company.id === building.value?.companyId)?.cash ?? null
+    const newCompanyCash = companiesData.myCompanies.find((company) => company.id === building.value?.companyId)?.cash ?? null
+    if (companyCash.value !== newCompanyCash) {
+      companyCash.value = newCompanyCash
+    }
 
     if (!preserveDraft) {
       const sourceUnits = pendingConfiguration.value?.units ?? building.value.units

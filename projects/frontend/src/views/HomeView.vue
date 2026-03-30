@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useGameStateStore } from '@/stores/gameState'
+import { deepEqual } from '@/lib/utils'
 import type { PlayerRanking, GameState } from '@/types'
 
 const { t } = useI18n()
@@ -22,8 +23,12 @@ async function loadHomeData() {
       gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth cashTotal buildingValue inventoryValue companyCount } }'),
       gqlRequest<{ gameState: GameState }>('{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }'),
     ])
-    rankings.value = rankData.rankings
-    gameState.value = stateData.gameState
+    if (!deepEqual(rankings.value, rankData.rankings)) {
+      rankings.value = rankData.rankings
+    }
+    if (!deepEqual(gameState.value, stateData.gameState)) {
+      gameState.value = stateData.gameState
+    }
   } catch {
     // Silently fail on home page
   } finally {

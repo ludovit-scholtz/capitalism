@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
+import { deepEqual } from '@/lib/utils'
 import type { PlayerRanking } from '@/types'
 
 const { t } = useI18n()
@@ -32,7 +33,9 @@ async function fetchRankings() {
   error.value = null
   try {
     const data = await gqlRequest<{ rankings: PlayerRanking[] }>(RANKINGS_QUERY)
-    rankings.value = data.rankings
+    if (!deepEqual(rankings.value, data.rankings)) {
+      rankings.value = data.rankings
+    }
   } catch (e) {
     error.value = e instanceof Error ? e.message : t('leaderboard.loadFailed')
   } finally {
