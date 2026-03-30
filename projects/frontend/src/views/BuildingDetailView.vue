@@ -110,7 +110,10 @@ const building = ref<Building | null>(null)
 const currentTick = ref(0)
 const loading = ref(true)
 const saving = ref(false)
+/** Page-level error (building not found, load failed). Shown as a full-page error state. */
 const error = ref<string | null>(null)
+/** Inline save error (e.g. RECIPE_INPUT_MISMATCH). Shown within the planning section. */
+const saveError = ref<string | null>(null)
 const companyCash = ref<number | null>(null)
 const isEditing = ref(false)
 const selectedCell = ref<{ x: number; y: number } | null>(null)
@@ -240,6 +243,47 @@ const projectedCompanyCashAfterApply = computed(() => {
   if (companyCash.value == null) return null
   return companyCash.value - draftConstructionCost.value
 })
+
+// ── Production chain status ──
+
+/**
+ * Returns the PURCHASE, MANUFACTURING and STORAGE units from the best available
+ * source: active live units first, pending-configuration units second.
+ * Shown in the production-chain status panel.
+ */
+const chainDisplayUnits = computed(() => {
+  const units = activeUnits.value.length > 0 ? activeUnits.value : pendingUnits.value
+  return {
+    purchase: units.find((u) => u.unitType === 'PURCHASE') ?? null,
+    manufacturing: units.find((u) => u.unitType === 'MANUFACTURING') ?? null,
+    storage: units.find((u) => u.unitType === 'STORAGE') ?? null,
+  }
+})
+
+const chainStatus = computed(() => {
+  const { purchase, manufacturing, storage } = chainDisplayUnits.value
+  const isPurchaseConfigured = !!(purchase && (purchase.resourceTypeId || purchase.productTypeId))
+  const isManufacturingConfigured = !!(manufacturing && manufacturing.productTypeId)
+  const isStoragePresent = !!storage
+  return {
+    isPurchaseConfigured,
+    isManufacturingConfigured,
+    isStoragePresent,
+    isChainComplete: isPurchaseConfigured && isManufacturingConfigured && isStoragePresent,
+  }
+})
+
+/**
+ * Shows the production-chain status panel for a factory that already has units
+ * saved (active or pending) but is not currently in edit mode.
+ */
+const showProductionChainPanel = computed(
+  () =>
+    !isEditing.value &&
+    building.value?.type === 'FACTORY' &&
+    (activeUnits.value.length > 0 || pendingConfiguration.value !== null) &&
+    !showStarterSetupBanner.value,
+)
 
 type LinkChangeSummaryEntry = {
   description: string
@@ -410,6 +454,7 @@ function cancelEditing() {
   isEditing.value = false
   selectedCell.value = null
   showUnitPicker.value = false
+  saveError.value = null
 }
 
 function applyStarterLayout() {
@@ -797,7 +842,7 @@ function storeConfiguration() {
   if (!building.value || saving.value || !hasDraftChanges.value) return
 
   saving.value = true
-  error.value = null
+  saveError.value = null
 
   gqlRequest<{
     storeBuildingConfiguration: {
@@ -848,7 +893,7 @@ function storeConfiguration() {
       return loadBuilding()
     })
     .catch((reason: unknown) => {
-      error.value = reason instanceof Error ? reason.message : t('buildingDetail.storeUpgradeFailed')
+      saveError.value = reason instanceof Error ? reason.message : t('buildingDetail.storeUpgradeFailed')
     })
     .finally(() => {
       saving.value = false
@@ -1009,6 +1054,41 @@ const configWarnings = computed<ValidationWarning[]>(() => {
     const linked = getLinkedUnits(su, units)
     if (linked.length === 0) {
       warnings.push({ key: 'buildingDetail.warnings.storageNotLinked', params: { x: su.gridX, y: su.gridY } })
+    }
+  }
+
+  // Check recipe compatibility: if a Manufacturing unit has a product configured,
+  // ensure at least one Purchase unit in the plan supplies a matching resource/product.
+  if (building.value.type === 'FACTORY' && isEditing.value) {
+    for (const mu of manufacturingUnits) {
+      if (!mu.productTypeId) continue
+      const product = productTypes.value.find((p) => p.id === mu.productTypeId)
+      if (!product || product.recipes.length === 0) continue
+
+      const configuredPurchaseResourceIds = purchaseUnits
+        .filter((pu) => pu.resourceTypeId)
+        .map((pu) => pu.resourceTypeId!)
+
+      const configuredPurchaseProductIds = purchaseUnits
+        .filter((pu) => pu.productTypeId)
+        .map((pu) => pu.productTypeId!)
+
+      if (configuredPurchaseResourceIds.length === 0 && configuredPurchaseProductIds.length === 0) {
+        continue // Incomplete (not incompatible) — missing resource is surfaced by the purchaseNoItem warning above
+      }
+
+      const anyRecipeSupplied = product.recipes.some(
+        (recipe) =>
+          (recipe.resourceType?.id && configuredPurchaseResourceIds.includes(recipe.resourceType.id)) ||
+          (recipe.inputProductType?.id && configuredPurchaseProductIds.includes(recipe.inputProductType.id)),
+      )
+
+      if (!anyRecipeSupplied) {
+        warnings.push({
+          key: 'buildingDetail.warnings.recipeMismatch',
+          params: { x: mu.gridX, y: mu.gridY, product: product.name },
+        })
+      }
     }
   }
 
@@ -2098,6 +2178,113 @@ watch(
         </p>
       </div>
 
+      <!-- Production chain status panel: shown for factories with the starter layout saved -->
+      <div
+        v-if="showProductionChainPanel"
+        class="production-chain-panel"
+        role="region"
+        aria-label="production chain status"
+      >
+        <div class="chain-panel-header">
+          <h3 class="chain-panel-title">⚙️ {{ t('buildingDetail.productionChain.title') }}</h3>
+          <span
+            v-if="chainStatus.isChainComplete"
+            class="chain-status-badge chain-status-badge--complete"
+          >✅ {{ t('buildingDetail.productionChain.chainComplete') }}</span>
+          <span v-else class="chain-status-badge chain-status-badge--incomplete"
+            >⚠️ {{ t('buildingDetail.productionChain.chainIncomplete') }}</span
+          >
+        </div>
+
+        <div class="chain-flow" role="list" aria-label="production chain steps">
+          <!-- PURCHASE step -->
+          <div
+            class="chain-step"
+            :class="chainStatus.isPurchaseConfigured ? 'chain-step--configured' : 'chain-step--missing'"
+            role="listitem"
+          >
+            <div class="chain-step-icon">🛒</div>
+            <div class="chain-step-type">{{ t('buildingDetail.unitTypes.PURCHASE') }}</div>
+            <div v-if="chainStatus.isPurchaseConfigured" class="chain-step-value">
+              {{
+                chainDisplayUnits.purchase?.resourceTypeId
+                  ? getResourceName(chainDisplayUnits.purchase.resourceTypeId)
+                  : getProductName(chainDisplayUnits.purchase?.productTypeId ?? null)
+              }}
+            </div>
+            <div v-else class="chain-step-missing-label">
+              {{ t('buildingDetail.productionChain.notConfigured') }}
+            </div>
+          </div>
+
+          <div class="chain-arrow" aria-hidden="true">→</div>
+
+          <!-- MANUFACTURING step -->
+          <div
+            class="chain-step"
+            :class="chainStatus.isManufacturingConfigured ? 'chain-step--configured' : 'chain-step--missing'"
+            role="listitem"
+          >
+            <div class="chain-step-icon">🏭</div>
+            <div class="chain-step-type">{{ t('buildingDetail.unitTypes.MANUFACTURING') }}</div>
+            <div v-if="chainStatus.isManufacturingConfigured" class="chain-step-value">
+              {{ getProductName(chainDisplayUnits.manufacturing?.productTypeId ?? null) }}
+            </div>
+            <div v-else class="chain-step-missing-label">
+              {{ t('buildingDetail.productionChain.notConfigured') }}
+            </div>
+          </div>
+
+          <div class="chain-arrow" aria-hidden="true">→</div>
+
+          <!-- STORAGE step -->
+          <div
+            class="chain-step"
+            :class="chainStatus.isStoragePresent ? 'chain-step--configured' : 'chain-step--missing'"
+            role="listitem"
+          >
+            <div class="chain-step-icon">📦</div>
+            <div class="chain-step-type">{{ t('buildingDetail.unitTypes.STORAGE') }}</div>
+            <div class="chain-step-value">
+              {{
+                chainStatus.isManufacturingConfigured
+                  ? getProductName(chainDisplayUnits.manufacturing?.productTypeId ?? null)
+                  : t('buildingDetail.productionChain.storageDesc')
+              }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Guidance when chain is incomplete -->
+        <div v-if="!chainStatus.isChainComplete" class="chain-guidance">
+          <h4 class="chain-guidance-title">{{ t('buildingDetail.productionChain.whatRemains') }}</h4>
+          <ul class="chain-todo">
+            <li v-if="!chainStatus.isPurchaseConfigured">
+              {{ t('buildingDetail.productionChain.todoSelectResource') }}
+            </li>
+            <li v-if="!chainStatus.isManufacturingConfigured">
+              {{ t('buildingDetail.productionChain.todoSelectProduct') }}
+            </li>
+          </ul>
+          <p class="chain-action-hint">{{ t('buildingDetail.productionChain.editHint') }}</p>
+        </div>
+
+        <!-- Chain complete celebration -->
+        <div v-else class="chain-complete-message">
+          <p>
+            {{
+              t('buildingDetail.productionChain.chainCompleteDesc', {
+                product: getProductName(chainDisplayUnits.manufacturing?.productTypeId ?? null),
+                resource: chainDisplayUnits.purchase?.resourceTypeId
+                  ? getResourceName(chainDisplayUnits.purchase.resourceTypeId)
+                  : getProductName(chainDisplayUnits.purchase?.productTypeId ?? null),
+              })
+            }}
+          </p>
+          <p class="chain-next-step">{{ t('buildingDetail.productionChain.nextStep') }}</p>
+        </div>
+      </div>
+
       <div class="main-content">
         <div class="grid-container">
           <div v-if="!isEditing" class="grid-section">
@@ -2227,6 +2414,12 @@ watch(
                   {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
                 </button>
               </div>
+            </div>
+
+            <!-- Inline save error (e.g. RECIPE_INPUT_MISMATCH, PRO_SUBSCRIPTION_REQUIRED) -->
+            <div v-if="saveError" class="save-error-banner" role="alert">
+              ⚠️ {{ saveError }}
+              <button class="btn btn-ghost btn-sm" @click="saveError = null">{{ t('common.close') }}</button>
             </div>
 
             <div class="upgrade-summary">
@@ -2431,6 +2624,10 @@ watch(
 
                 <!-- Purchase unit config -->
                 <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'PURCHASE'">
+                  <!-- Factory-specific onboarding guide for the Purchase unit -->
+                  <p v-if="building?.type === 'FACTORY'" class="config-onboarding-hint">
+                    {{ t('buildingDetail.config.factoryPurchaseGuide') }}
+                  </p>
                   <div class="config-field">
                     <AdvancedItemSelector
                       :model-value="getItemSelection(getDraftUnitAt(selectedCell.x, selectedCell.y))"
@@ -2463,6 +2660,10 @@ watch(
 
                 <!-- Manufacturing unit config -->
                 <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'MANUFACTURING'">
+                  <!-- Factory-specific onboarding guide for the Manufacturing unit -->
+                  <p v-if="building?.type === 'FACTORY'" class="config-onboarding-hint">
+                    {{ t('buildingDetail.config.factoryManufacturingGuide') }}
+                  </p>
                   <div class="config-field">
                     <AdvancedItemSelector
                       :model-value="getItemSelection(getDraftUnitAt(selectedCell.x, selectedCell.y))"
@@ -3276,6 +3477,21 @@ watch(
   font-size: 0.875rem;
 }
 
+.save-error-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(220, 38, 38, 0.35);
+  border-radius: var(--radius-lg);
+  background: rgba(220, 38, 38, 0.08);
+  color: #dc2626;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
 .pro-access-banner {
   margin-bottom: 1.5rem;
   padding: 1rem 1.25rem;
@@ -3344,6 +3560,159 @@ watch(
   margin: 0.35rem 0 0;
   font-size: 0.875rem;
   color: var(--color-text-secondary);
+}
+
+/* ── Production chain status panel ─────────────────────────────────────── */
+
+.production-chain-panel {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.chain-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.chain-panel-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.chain-status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+}
+
+.chain-status-badge--complete {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.chain-status-badge--incomplete {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.chain-flow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.chain-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 110px;
+  padding: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  text-align: center;
+  gap: 0.25rem;
+}
+
+.chain-step--configured {
+  border-color: #34d399;
+  background: #f0fdf4;
+}
+
+.chain-step--missing {
+  border-color: #fbbf24;
+  background: #fffbeb;
+}
+
+.chain-step-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.chain-step-type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.chain-step-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.chain-step-missing-label {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary, var(--color-text-secondary));
+  font-style: italic;
+}
+
+.chain-arrow {
+  font-size: 1.5rem;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.chain-guidance {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+.chain-guidance-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.chain-todo {
+  margin: 0 0 0.75rem;
+  padding-left: 1.25rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.chain-todo li {
+  margin-bottom: 0.3rem;
+}
+
+.chain-action-hint {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.chain-complete-message {
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  margin-top: 0.5rem;
+}
+
+.chain-complete-message p {
+  margin: 0 0 0.4rem;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.chain-next-step {
+  font-weight: 600;
+  color: var(--color-text-primary) !important;
 }
 
 .grid-header {
@@ -3998,6 +4367,17 @@ watch(
   margin: -0.25rem 0 0;
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+}
+
+.config-onboarding-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border-left: 3px solid #60a5fa;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 0.75rem;
+  line-height: 1.4;
 }
 
 .unit-config-readonly-details {
