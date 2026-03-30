@@ -1,31 +1,59 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
-import LanguageSwitcher from '@/components/layout/LanguageSwitcher.vue'
+import { ref } from 'vue'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const isMenuOpen = ref(false)
+
+const toggleMenu = () => {
+  isMenuOpen.value = !isMenuOpen.value
+}
+
+const closeMenu = () => {
+  isMenuOpen.value = false
+}
 </script>
 
 <template>
   <header class="app-header">
     <div class="container header-inner">
-      <RouterLink to="/" class="logo">
+      <RouterLink to="/" class="logo" @click="closeMenu">
         <span class="logo-text">CAPITALISM V</span>
       </RouterLink>
-      <nav class="nav-links">
-        <RouterLink to="/">{{ t('nav.home') }}</RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/dashboard">{{ t('nav.dashboard') }}</RouterLink>
-        <RouterLink to="/leaderboard">{{ t('nav.leaderboard') }}</RouterLink>
-        <RouterLink to="/encyclopedia">{{ t('nav.encyclopedia') }}</RouterLink>
+      <button class="menu-toggle" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
+        <font-awesome-icon :icon="['fas', 'bars']" />
+      </button>
+      <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
+        <RouterLink to="/" :title="t('nav.home')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'home']" /> <span class="">{{ t('nav.home') }}</span>
+        </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'tachometer-alt']" /> {{ t('nav.dashboard') }}
+        </RouterLink>
+        <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" @click="closeMenu"> <font-awesome-icon :icon="['fas', 'trophy']" /> {{ t('nav.leaderboard') }} </RouterLink>
+        <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" @click="closeMenu"> <font-awesome-icon :icon="['fas', 'book']" /> {{ t('nav.encyclopedia') }} </RouterLink>
       </nav>
       <div class="header-actions">
-        <LanguageSwitcher />
         <template v-if="auth.isAuthenticated">
           <span class="player-name">{{ auth.player?.displayName }}</span>
-          <button class="btn btn-secondary" @click="auth.logout()">{{ t('common.logout') }}</button>
+          <button
+            class="btn btn-secondary"
+            @click="
+              () => {
+                auth.logout()
+                closeMenu()
+              }
+            "
+            :title="t('common.logout')"
+          >
+            <font-awesome-icon :icon="['fas', 'sign-out-alt']" />
+          </button>
         </template>
-        <RouterLink v-else to="/login" class="btn btn-primary">{{ t('common.login') }}</RouterLink>
+        <RouterLink v-else to="/login" class="btn btn-primary" :title="t('common.login')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'sign-in-alt']" />
+        </RouterLink>
       </div>
     </div>
   </header>
@@ -48,6 +76,23 @@ const auth = useAuthStore()
   height: 64px;
 }
 
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s;
+}
+
+.menu-toggle:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
 .logo {
   display: flex;
   align-items: center;
@@ -57,7 +102,18 @@ const auth = useAuthStore()
   color: var(--color-text);
   text-decoration: none;
   letter-spacing: -0.02em;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
 }
 
 .logo-icon {
@@ -88,6 +144,13 @@ const auth = useAuthStore()
   transition: color 0.15s;
   position: relative;
   padding-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-links a svg {
+  font-size: 1.25rem;
 }
 
 .nav-links a::after {
@@ -112,6 +175,60 @@ const auth = useAuthStore()
 .nav-links a.router-link-active::after,
 .nav-links a:hover::after {
   transform: scaleX(1);
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+  .header-inner {
+    gap: 1rem;
+  }
+
+  .menu-toggle {
+    display: block;
+    order: 2;
+  }
+
+  .nav-links {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    flex-direction: column;
+    gap: 0;
+    padding: 1rem 0;
+    transform: translateY(-100%);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+
+  .nav-links.nav-open {
+    transform: translateY(0);
+    opacity: 1;
+    visibility: visible;
+  }
+
+  .nav-links a {
+    padding: 1rem 2rem;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    font-size: 1rem;
+  }
+
+  .nav-links a svg {
+    font-size: 1.5rem;
+  }
+
+  .nav-links a::after {
+    display: none;
+  }
+
+  .header-actions {
+    order: 3;
+  }
 }
 
 .header-actions {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
+import LanguageSwitcher from '@/components/layout/LanguageSwitcher.vue'
 
 const { t } = useI18n()
 </script>
@@ -8,6 +9,7 @@ const { t } = useI18n()
   <footer class="app-footer">
     <div class="container footer-inner">
       <p>{{ t('common.allRightsReserved', { year: new Date().getFullYear() }) }}</p>
+      <LanguageSwitcher />
     </div>
   </footer>
 </template>
@@ -22,7 +24,7 @@ const { t } = useI18n()
 .footer-inner {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   height: 48px;
   font-size: 0.8125rem;
   color: var(--color-text-secondary);

@@ -256,7 +256,7 @@ Pro subscription will cost $10/month.
 
 # Technical implementation
 
-Frontend is vue.js with source code located at projects/frontend.
+Frontend is vue.js with source code located at projects/frontend with tailwind styling.
 
 Backend is .NET with graphql engine with data stored in postgresql.
 

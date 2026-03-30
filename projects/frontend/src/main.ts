@@ -6,6 +6,13 @@ import router from './router'
 import i18n from './i18n'
 import './assets/styles/main.css'
 
+// Font Awesome
+import { library } from '@fortawesome/fontawesome-svg-core'
+import { faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars } from '@fortawesome/free-solid-svg-icons'
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
+
+library.add(faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars)
+
 export function createApp() {
   const app = createVueApp(App)
   const pinia = createPinia()
@@ -13,6 +20,9 @@ export function createApp() {
   app.use(pinia)
   app.use(router)
   app.use(i18n)
+
+  // Register Font Awesome component
+  app.component('font-awesome-icon', FontAwesomeIcon)
 
   return { app, router, pinia }
 }
