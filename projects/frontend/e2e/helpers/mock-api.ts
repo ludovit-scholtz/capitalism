@@ -53,6 +53,8 @@ export type MockLedgerSummary = {
   currentCash: number
   totalRevenue: number
   totalPurchasingCosts: number
+  totalLaborCosts: number
+  totalEnergyCosts: number
   totalMarketingCosts: number
   totalTaxPaid: number
   totalOtherCosts: number
@@ -87,6 +89,8 @@ export type MockLedgerHistoryYear = {
   gameYear: number
   isCurrentGameYear: boolean
   totalRevenue: number
+  totalLaborCosts: number
+  totalEnergyCosts: number
   netIncome: number
   totalTaxPaid: number
   taxableIncome: number
@@ -116,6 +120,8 @@ export type MockCompany = {
   name: string
   cash: number
   foundedAtUtc: string
+  foundedAtTick?: number
+  citySalaryMultipliers?: Record<string, number>
   buildings: MockBuilding[]
 }
 
@@ -235,6 +241,7 @@ export type MockCity = {
   longitude: number
   population: number
   averageRentPerSqm: number
+  baseSalaryPerManhour: number
   resources: { resourceType: { id: string; name: string; slug: string; category: string }; abundance: number }[]
 }
 
@@ -278,6 +285,7 @@ export type MockProductType = {
   baseCraftTicks: number
   outputQuantity?: number
   energyConsumptionMwh?: number
+  basicLaborHours?: number
   unitName?: string
   unitSymbol?: string
   imageUrl?: string | null
@@ -346,7 +354,7 @@ function buildMockGameStatePayload(gameState: MockState['gameState']) {
 function buildMockLedgerHistoryYear(summary: MockLedgerSummary, currentGameYear: number): MockLedgerHistoryYear {
   const gameYear = summary.gameYear ?? currentGameYear
   const taxableIncome = summary.taxableIncome ?? Math.max(
-    summary.totalRevenue - summary.totalPurchasingCosts - summary.totalMarketingCosts - summary.totalOtherCosts,
+    summary.totalRevenue - summary.totalPurchasingCosts - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts,
     0,
   )
 
@@ -354,6 +362,8 @@ function buildMockLedgerHistoryYear(summary: MockLedgerSummary, currentGameYear:
     gameYear,
     isCurrentGameYear: summary.isCurrentGameYear ?? gameYear === currentGameYear,
     totalRevenue: summary.totalRevenue,
+    totalLaborCosts: summary.totalLaborCosts,
+    totalEnergyCosts: summary.totalEnergyCosts,
     netIncome: summary.netIncome,
     totalTaxPaid: summary.totalTaxPaid,
     taxableIncome,
@@ -373,7 +383,7 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     gameYear,
     isCurrentGameYear: summary.isCurrentGameYear ?? gameYear === currentGameYear,
     taxableIncome: summary.taxableIncome ?? Math.max(
-      summary.totalRevenue - summary.totalPurchasingCosts - summary.totalMarketingCosts - summary.totalOtherCosts,
+      summary.totalRevenue - summary.totalPurchasingCosts - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts,
       0,
     ),
     estimatedIncomeTax: summary.estimatedIncomeTax ?? summary.totalTaxPaid,
@@ -731,6 +741,7 @@ export function makeBratislava(): MockCity {
     longitude: 17.1077,
     population: 475000,
     averageRentPerSqm: 14,
+    baseSalaryPerManhour: 18,
     resources: [
       { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
       { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
@@ -749,6 +760,7 @@ export function makeDefaultCities(): MockCity[] {
       longitude: 14.4378,
       population: 1350000,
       averageRentPerSqm: 18,
+      baseSalaryPerManhour: 22,
       resources: [
         { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
         { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
@@ -762,6 +774,7 @@ export function makeDefaultCities(): MockCity[] {
         longitude: 16.3738,
         population: 1900000,
         averageRentPerSqm: 22,
+        baseSalaryPerManhour: 28,
         resources: [
           { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
           { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
@@ -853,6 +866,7 @@ export function makeChairProduct(): MockProductType {
     baseCraftTicks: 2,
     outputQuantity: 20,
     energyConsumptionMwh: 1,
+    basicLaborHours: 1.6,
     unitName: 'Chair',
     unitSymbol: 'chairs',
     isProOnly: false,
@@ -873,6 +887,7 @@ export function makeDefaultProducts(): MockProductType[] {
       baseCraftTicks: 1,
       outputQuantity: 12,
       energyConsumptionMwh: 0.5,
+      basicLaborHours: 0.9,
       unitName: 'Loaf',
       unitSymbol: 'loaves',
       isProOnly: false,
@@ -888,6 +903,7 @@ export function makeDefaultProducts(): MockProductType[] {
       baseCraftTicks: 3,
       outputQuantity: 8,
       energyConsumptionMwh: 1,
+      basicLaborHours: 2.1,
       unitName: 'Bottle',
       unitSymbol: 'bottles',
       isProOnly: false,
@@ -1020,6 +1036,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         name: input.companyName,
         cash: STARTING_CASH_FOR_ONBOARDING - lot.price,
         foundedAtUtc: new Date().toISOString(),
+        foundedAtTick: state.gameState.currentTick,
         buildings: [
           {
             id: factoryId,
@@ -1159,6 +1176,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         name: input.companyName,
         cash: 500000,
         foundedAtUtc: new Date().toISOString(),
+        foundedAtTick: state.gameState.currentTick,
         buildings: [
           { id: `building-factory-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'FACTORY', name: `${input.companyName} Factory`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, powerStatus: 'POWERED', isForSale: false, builtAtUtc: new Date().toISOString(), units: [], pendingConfiguration: null },
           { id: `building-shop-${Date.now()}`, companyId: '', cityId: input.cityId, type: 'SALES_SHOP', name: `${input.companyName} Shop`, latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 1, powerStatus: 'POWERED', isForSale: false, builtAtUtc: new Date().toISOString(), units: [], pendingConfiguration: null },
@@ -1286,6 +1304,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         name: input.name,
         cash: 1000000,
         foundedAtUtc: new Date().toISOString(),
+        foundedAtTick: state.gameState.currentTick,
         buildings: [],
       }
       player.companies.push(company)
@@ -1293,6 +1312,27 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { createCompany: company } }),
+      })
+    }
+
+    if (query.includes('UpdateCompanySettings')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const company = player?.companies.find((candidate) => candidate.id === input?.companyId)
+
+      if (!company) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or you do not own it.' }] }) })
+      }
+
+      company.name = input.name
+      company.citySalaryMultipliers = Object.fromEntries(
+        (input.citySalarySettings ?? []).map((entry: { cityId: string; salaryMultiplier: number }) => [entry.cityId, entry.salaryMultiplier]),
+      )
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { updateCompanySettings: { id: company.id, name: company.name } } }),
       })
     }
 
@@ -1944,6 +1984,68 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('companySettings')) {
+      const companyId = body.variables?.companyId
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const company = player?.companies.find((candidate) => candidate.id === companyId)
+
+      if (!company) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { companySettings: null } }),
+        })
+      }
+
+      const baseValues: Record<string, number> = {
+        MINE: 250000,
+        FACTORY: 200000,
+        SALES_SHOP: 150000,
+        RESEARCH_DEVELOPMENT: 300000,
+        APARTMENT: 400000,
+        COMMERCIAL: 350000,
+        MEDIA_HOUSE: 500000,
+        BANK: 600000,
+        EXCHANGE: 450000,
+        POWER_PLANT: 350000,
+      }
+      const computeAssetValue = (candidate: MockCompany) => candidate.cash + candidate.buildings.reduce(
+        (sum, building) => sum + ((baseValues[building.type] ?? 0) * building.level),
+        0,
+      )
+      const companyAssetValue = computeAssetValue(company)
+      const maxAssetValue = Math.max(...state.players.flatMap((candidate) => candidate.companies).map(computeAssetValue), 0)
+      const ageTicks = Math.max(state.gameState.currentTick - (company.foundedAtTick ?? 0), 0)
+      const overheadRate = Number((0.5 * Math.min(ageTicks / (TICKS_PER_YEAR * 2), 1) * (maxAssetValue > 0 ? companyAssetValue / maxAssetValue : 0)).toFixed(4))
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            companySettings: {
+              companyId: company.id,
+              companyName: company.name,
+              cash: company.cash,
+              foundedAtTick: company.foundedAtTick ?? 0,
+              administrationOverheadRate: overheadRate,
+              assetValue: companyAssetValue,
+              citySalarySettings: state.cities.map((city) => {
+                const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
+                return {
+                  cityId: city.id,
+                  cityName: city.name,
+                  baseSalaryPerManhour: city.baseSalaryPerManhour,
+                  salaryMultiplier,
+                  effectiveSalaryPerManhour: Number((city.baseSalaryPerManhour * salaryMultiplier).toFixed(2)),
+                }
+              }),
+            },
+          },
+        }),
+      })
+    }
+
     if (query.includes('rankings')) {
       const rankings = state.players
         .filter((p) => p.role !== 'ADMIN')
@@ -2222,6 +2324,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           currentCash: company.cash,
           totalRevenue: 0,
           totalPurchasingCosts: 0,
+          totalLaborCosts: 0,
+          totalEnergyCosts: 0,
           totalMarketingCosts: 0,
           totalTaxPaid: 0,
           totalOtherCosts: 0,

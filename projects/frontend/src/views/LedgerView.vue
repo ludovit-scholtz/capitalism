@@ -25,12 +25,12 @@ const LEDGER_QUERY = `
   query GetCompanyLedger($companyId: UUID!, $gameYear: Int) {
     companyLedger(companyId: $companyId, gameYear: $gameYear) {
       companyId companyName gameYear isCurrentGameYear currentCash
-      totalRevenue totalPurchasingCosts totalMarketingCosts totalTaxPaid totalOtherCosts taxableIncome estimatedIncomeTax netIncome
+      totalRevenue totalPurchasingCosts totalLaborCosts totalEnergyCosts totalMarketingCosts totalTaxPaid totalOtherCosts taxableIncome estimatedIncomeTax netIncome
       propertyValue propertyAppreciation buildingValue inventoryValue totalAssets totalPropertyPurchases
       cashFromOperations cashFromInvestments firstRecordedTick lastRecordedTick
       incomeTaxDueAtTick incomeTaxDueGameTimeUtc incomeTaxDueGameYear isIncomeTaxSettled
       history {
-        gameYear isCurrentGameYear totalRevenue netIncome totalTaxPaid taxableIncome estimatedIncomeTax firstRecordedTick lastRecordedTick
+        gameYear isCurrentGameYear totalRevenue totalLaborCosts totalEnergyCosts netIncome totalTaxPaid taxableIncome estimatedIncomeTax firstRecordedTick lastRecordedTick
       }
       buildingSummaries { buildingId buildingName buildingType revenue costs }
     }
@@ -253,6 +253,30 @@ useTickRefresh(async () => {
                 @click="toggleDrill('PURCHASING_COST')"
               >
                 {{ drillCategory === 'PURCHASING_COST' ? '▲' : '▼' }}
+              </button>
+            </div>
+            <div v-if="ledger.totalLaborCosts > 0" class="statement-row cost-row">
+              <span class="row-label">{{ t('ledger.laborCosts') }}</span>
+              <span class="amount-negative">{{ formatAmount(-ledger.totalLaborCosts) }}</span>
+              <button
+                class="drill-btn"
+                :class="{ active: drillCategory === 'LABOR_COST' }"
+                :aria-label="t('ledger.drillDown') + ': ' + t('ledger.laborCosts')"
+                @click="toggleDrill('LABOR_COST')"
+              >
+                {{ drillCategory === 'LABOR_COST' ? '▲' : '▼' }}
+              </button>
+            </div>
+            <div v-if="ledger.totalEnergyCosts > 0" class="statement-row cost-row">
+              <span class="row-label">{{ t('ledger.energyCosts') }}</span>
+              <span class="amount-negative">{{ formatAmount(-ledger.totalEnergyCosts) }}</span>
+              <button
+                class="drill-btn"
+                :class="{ active: drillCategory === 'ENERGY_COST' }"
+                :aria-label="t('ledger.drillDown') + ': ' + t('ledger.energyCosts')"
+                @click="toggleDrill('ENERGY_COST')"
+              >
+                {{ drillCategory === 'ENERGY_COST' ? '▲' : '▼' }}
               </button>
             </div>
             <div v-if="ledger.totalMarketingCosts > 0" class="statement-row cost-row">

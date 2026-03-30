@@ -108,6 +108,8 @@ test.describe('Company Ledger', () => {
       currentCash: 300000,
       totalRevenue: 50000,
       totalPurchasingCosts: 20000,
+      totalLaborCosts: 2500,
+      totalEnergyCosts: 750,
       totalMarketingCosts: 0,
       totalTaxPaid: 5000,
       totalOtherCosts: 0,
@@ -134,6 +136,8 @@ test.describe('Company Ledger', () => {
     await expect(page.getByRole('heading', { name: 'Income Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Balance Sheet' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Cash Flow Statement' })).toBeVisible()
+    await expect(page.locator('.statement-row').filter({ hasText: 'Labor Costs' })).toContainText('-$2,500.00')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Energy Costs' })).toContainText('-$750.00')
   })
 
   test('drill-down shows entries when expanded', async ({ page }) => {
@@ -164,6 +168,8 @@ test.describe('Company Ledger', () => {
       currentCash: 400000,
       totalRevenue: 10000,
       totalPurchasingCosts: 0,
+      totalLaborCosts: 600,
+      totalEnergyCosts: 180,
       totalMarketingCosts: 0,
       totalTaxPaid: 0,
       totalOtherCosts: 0,
@@ -181,6 +187,20 @@ test.describe('Company Ledger', () => {
 
     const entries: MockLedgerEntry[] = [
       {
+        id: 'e-labor',
+        category: 'LABOR_COST',
+        description: 'Operating labor for MANUFACTURING',
+        amount: -600,
+        recordedAtTick: 10,
+        buildingId: null,
+        buildingName: null,
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: null,
+        resourceName: null,
+      },
+      {
         id: 'e1',
         category: 'REVENUE',
         description: 'Public sales',
@@ -196,6 +216,7 @@ test.describe('Company Ledger', () => {
       },
     ]
     state.drillDownData[`${company.id}:REVENUE`] = entries
+    state.drillDownData[`${company.id}:LABOR_COST`] = [entries[0]]
 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -208,6 +229,11 @@ test.describe('Company Ledger', () => {
     await revenueRow.getByRole('button').click()
 
     await expect(page.getByText('Wooden Chair')).toBeVisible()
+
+    const laborRow = page.locator('.statement-row').filter({ hasText: 'Labor Costs' }).first()
+    await laborRow.getByRole('button').click()
+
+    await expect(page.getByText('Operating labor for MANUFACTURING')).toBeVisible()
   })
 
   test('new company shows no-history banner', async ({ page }) => {
@@ -272,6 +298,8 @@ test.describe('Company Ledger', () => {
       currentCash: 420000,
       totalRevenue: 3400,
       totalPurchasingCosts: 1000,
+      totalLaborCosts: 240,
+      totalEnergyCosts: 90,
       totalMarketingCosts: 0,
       totalTaxPaid: 0,
       totalOtherCosts: 0,
@@ -296,6 +324,8 @@ test.describe('Company Ledger', () => {
           gameYear: 2001,
           isCurrentGameYear: true,
           totalRevenue: 3400,
+          totalLaborCosts: 240,
+          totalEnergyCosts: 90,
           netIncome: 2400,
           totalTaxPaid: 0,
           taxableIncome: 2400,
@@ -307,6 +337,8 @@ test.describe('Company Ledger', () => {
           gameYear: 2000,
           isCurrentGameYear: false,
           totalRevenue: 1200,
+          totalLaborCosts: 120,
+          totalEnergyCosts: 45,
           netIncome: 900,
           totalTaxPaid: 135,
           taxableIncome: 900,

@@ -117,6 +117,7 @@ watch(
             baseCraftTicks
             outputQuantity
             energyConsumptionMwh
+            basicLaborHours
             unitName
             unitSymbol
             isProOnly
@@ -324,7 +325,11 @@ function goBack() {
             </div>
             <div v-if="selectedProduct" class="meta-item">
               <span class="meta-label">{{ t('encyclopedia.energy') }}</span>
-              <strong class="meta-value">{{ selectedProduct.energyConsumptionMwh }} MW</strong>
+              <strong class="meta-value">{{ selectedProduct.energyConsumptionMwh }} MWh</strong>
+            </div>
+            <div v-if="selectedProduct" class="meta-item">
+              <span class="meta-label">{{ t('encyclopedia.basicLaborHours') }}</span>
+              <strong class="meta-value">{{ selectedProduct.basicLaborHours }} h</strong>
             </div>
             <div v-if="selectedProduct" class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.batchOutput') }}</span>

@@ -111,7 +111,8 @@ const catalogEntries = computed<CatalogEntry[]>(() => {
         badge: getLocalizedIndustry(product.industry, locale.value),
         meta: [
           `${t('encyclopedia.basePrice')}: $${product.basePrice}`,
-          `${t('encyclopedia.energy')}: ${product.energyConsumptionMwh} MW`,
+          `${t('encyclopedia.energy')}: ${product.energyConsumptionMwh} MWh`,
+          `${t('encyclopedia.basicLaborHours')}: ${product.basicLaborHours} h`,
           `${t('encyclopedia.output')}: ${product.outputQuantity} ${product.unitSymbol}`,
         ],
         industry: product.industry,
@@ -169,6 +170,7 @@ onMounted(async () => {
           baseCraftTicks
           outputQuantity
           energyConsumptionMwh
+          basicLaborHours
           unitName
           unitSymbol
           isProOnly
