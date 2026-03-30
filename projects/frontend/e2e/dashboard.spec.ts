@@ -9,11 +9,7 @@ async function authenticateViaLocalStorage(page: Parameters<typeof test>[0]['pag
   }, token)
 }
 
-function makePendingBuildingPlan(
-  buildingId: string,
-  currentTick: number,
-  ticksRequired = 3,
-): MockBuildingConfigurationPlan {
+function makePendingBuildingPlan(buildingId: string, currentTick: number, ticksRequired = 3): MockBuildingConfigurationPlan {
   return {
     id: `plan-${buildingId}`,
     buildingId,

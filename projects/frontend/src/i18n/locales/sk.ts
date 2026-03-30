@@ -399,7 +399,8 @@ export default {
       body: 'Táto továreň zatiaľ nemá nakonfigurované jednotky. Použite základné rozloženie a začnite produkovať, potom prispôsobte jednotky svojej stratégii.',
       applyStarter: 'Použiť základné rozloženie',
       starterLayoutDesc: 'Základné rozloženie: Nákup (0,0) → Výroba (1,0) → Sklad (2,0) — minimálny reťazec na nákup surovín, výrobu tovaru a uchovanie zásob.',
-      whatNext: 'Po uložení tohto rozloženia sa jednotky postavia v priebehu niekoľkých tickov. Potom nakonfigurujte každú jednotku so surovinou, produktom a cenou na dokončenie prvého výrobného reťazca.',
+      whatNext:
+        'Po uložení tohto rozloženia sa jednotky postavia v priebehu niekoľkých tickov. Potom nakonfigurujte každú jednotku so surovinou, produktom a cenou na dokončenie prvého výrobného reťazca.',
     },
     shopStarterSetup: {
       title: 'Nový obchod — pripravený na prvý produkt',
@@ -483,7 +484,8 @@ export default {
       outputProduct: 'Výstupný produkt',
       outputProductHelp: 'Zobrazujú sa len produkty podporované aktuálne prepojenými vstupmi.',
       factoryPurchaseGuide: 'Vyberte surovinu, ktorú bude táto továreň nakupovať na trhu. Vybraná surovina bude priamo dodávaná do výrobnej jednotky na premenu na hotový produkt.',
-      factoryManufacturingGuide: 'Vyberte produkt, ktorý bude táto továreň vyrábať. Zobrazujú sa len produkty, ktorých receptúra zodpovedá surovine dodávanej nákupnou jednotkou. Hotové výrobky sa uskladnia v skladovacej jednotke.',
+      factoryManufacturingGuide:
+        'Vyberte produkt, ktorý bude táto továreň vyrábať. Zobrazujú sa len produkty, ktorých receptúra zodpovedá surovine dodávanej nákupnou jednotkou. Hotové výrobky sa uskladnia v skladovacej jednotke.',
       outputResource: 'Výstupná surovina',
       resourceType: 'Typ suroviny',
       productType: 'Typ produktu',
@@ -563,7 +565,8 @@ export default {
       blockedMinQuality: 'Pod vašou min kvalitou ({minQuality})',
       noValidOffers: 'Žiadne ponuky nespĺňajú vaše cenové a kvalitatívne obmedzenia. Uvoľnite limity alebo zvoľte iný zdroj.',
       bestOffer: 'Najlepšia dodacia cena',
-      selectionHint: 'Systém vyberie ponuku s najnižšou dodacou cenou, ktorá spĺňa vaše kvalitatívne a cenové obmedzenia. Blízky dodávateľ s vyššou katalógovou cenou môže poraziť vzdialeného s nižšou katalógovou cenou, ak sa zohľadnia náklady na dopravu.',
+      selectionHint:
+        'Systém vyberie ponuku s najnižšou dodacou cenou, ktorá spĺňa vaše kvalitatívne a cenové obmedzenia. Blízky dodávateľ s vyššou katalógovou cenou môže poraziť vzdialeného s nižšou katalógovou cenou, ak sa zohľadnia náklady na dopravu.',
     },
     selector: {
       rawMaterials: 'Suroviny',

@@ -309,9 +309,7 @@ test.describe('Resource detail page', () => {
       productTypes: [
         {
           ...electronicTableProduct,
-          recipes: [
-            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 },
-          ],
+          recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
         },
       ],
     })

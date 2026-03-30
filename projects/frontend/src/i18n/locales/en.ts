@@ -483,8 +483,10 @@ export default {
       inputItem: 'Input Item',
       outputProduct: 'Output Product',
       outputProductHelp: 'Only products supported by the currently linked upstream resources and intermediate inputs are shown here.',
-      factoryPurchaseGuide: 'Choose the raw material this factory will buy from the market. The selected resource will feed directly into your Manufacturing unit to be turned into a finished product.',
-      factoryManufacturingGuide: 'Choose the product this factory will manufacture. Only products whose recipe ingredients match what your Purchase unit supplies are shown. The finished goods will be stored in your Storage unit ready for sale.',
+      factoryPurchaseGuide:
+        'Choose the raw material this factory will buy from the market. The selected resource will feed directly into your Manufacturing unit to be turned into a finished product.',
+      factoryManufacturingGuide:
+        'Choose the product this factory will manufacture. Only products whose recipe ingredients match what your Purchase unit supplies are shown. The finished goods will be stored in your Storage unit ready for sale.',
       outputResource: 'Output Resource',
       resourceType: 'Resource Type',
       productType: 'Product Type',
@@ -564,7 +566,8 @@ export default {
       blockedMinQuality: 'Below your min quality ({minQuality})',
       noValidOffers: 'No offers meet your price and quality constraints. Relax the limits or choose a different source.',
       bestOffer: 'Best delivered price',
-      selectionHint: 'The system selects the offer with the lowest delivered price that meets your quality and price constraints. A nearby supplier with a higher sticker price can win over a distant one with lower sticker price when transit costs are considered.',
+      selectionHint:
+        'The system selects the offer with the lowest delivered price that meets your quality and price constraints. A nearby supplier with a higher sticker price can win over a distant one with lower sticker price when transit costs are considered.',
     },
     selector: {
       rawMaterials: 'Raw Materials',

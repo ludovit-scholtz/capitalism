@@ -1,11 +1,5 @@
 import { test, expect } from '@playwright/test'
-import {
-  setupMockApi,
-  makePlayer,
-  makeDefaultCities,
-  makeDefaultResources,
-  makeDefaultProducts,
-} from './helpers/mock-api'
+import { setupMockApi, makePlayer, makeDefaultCities, makeDefaultResources, makeDefaultProducts } from './helpers/mock-api'
 import type { MockLedgerSummary, MockLedgerEntry } from './helpers/mock-api'
 
 function makeLedgerCompany(playerId: string) {
@@ -225,7 +219,10 @@ test.describe('Company Ledger', () => {
 
     await page.goto(`/ledger/${company.id}`)
 
-    const revenueRow = page.locator('.statement-row').filter({ hasText: /^Revenue/ }).first()
+    const revenueRow = page
+      .locator('.statement-row')
+      .filter({ hasText: /^Revenue/ })
+      .first()
     await revenueRow.getByRole('button').click()
 
     await expect(page.getByText('Wooden Chair')).toBeVisible()

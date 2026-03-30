@@ -64,9 +64,7 @@ async function loadSettings() {
 
     settings.value = data.companySettings
     companyName.value = data.companySettings.companyName
-    salaryMultipliers.value = Object.fromEntries(
-      data.companySettings.citySalarySettings.map((entry) => [entry.cityId, entry.salaryMultiplier]),
-    )
+    salaryMultipliers.value = Object.fromEntries(data.companySettings.citySalarySettings.map((entry) => [entry.cityId, entry.salaryMultiplier]))
   } catch (reason: unknown) {
     error.value = reason instanceof Error ? reason.message : t('companySettings.loadFailed')
   } finally {
