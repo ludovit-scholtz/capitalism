@@ -48,12 +48,7 @@ export const useGameStateStore = defineStore('gameState', () => {
     }
 
     const state = gameState.value
-    const nextRefreshInMs = !state
-      ? 5000
-      : Math.max(
-          new Date(state.lastTickAtUtc).getTime() + state.tickIntervalSeconds * 1000 + 250 - Date.now(),
-          250,
-        )
+    const nextRefreshInMs = !state ? 5000 : Math.max(new Date(state.lastTickAtUtc).getTime() + state.tickIntervalSeconds * 1000 + 250 - Date.now(), 250)
 
     refreshTimer = setTimeout(() => {
       void refreshGameState()

@@ -21,7 +21,9 @@ async function loadHomeData() {
   try {
     const [rankData, stateData] = await Promise.all([
       gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth cashTotal buildingValue inventoryValue companyCount } }'),
-      gqlRequest<{ gameState: GameState }>('{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }'),
+      gqlRequest<{ gameState: GameState }>(
+        '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }',
+      ),
     ])
     if (!deepEqual(rankings.value, rankData.rankings)) {
       rankings.value = rankData.rankings
@@ -66,11 +68,7 @@ useTickRefresh(loadHomeData)
           <RouterLink v-if="!auth.isAuthenticated" to="/onboarding" class="btn btn-primary">
             {{ t('home.getStarted') }}
           </RouterLink>
-          <RouterLink
-            v-else-if="auth.player && !auth.player.onboardingCompletedAtUtc"
-            to="/onboarding"
-            class="btn btn-primary"
-          >
+          <RouterLink v-else-if="auth.player && !auth.player.onboardingCompletedAtUtc" to="/onboarding" class="btn btn-primary">
             {{ t('home.startOnboarding') }}
           </RouterLink>
           <RouterLink v-else to="/dashboard" class="btn btn-primary">
@@ -129,11 +127,11 @@ useTickRefresh(loadHomeData)
 </template>
 
 <style scoped>
-section{
+section {
   position: relative;
 }
 .hero {
-  background: linear-gradient(160deg, #0D1117 0%, rgba(0, 71, 255, 0.12) 100%);
+  background: linear-gradient(160deg, #0d1117 0%, rgba(0, 71, 255, 0.12) 100%);
   border-bottom: 1px solid var(--color-border);
   padding: 4rem 0 3rem;
 }
@@ -161,7 +159,7 @@ section{
 }
 .hero-title {
   font-size: 3rem;
-  background: linear-gradient(135deg, rgba(246, 235, 17),rgb(246, 189, 17));
+  background: linear-gradient(135deg, rgba(246, 235, 17), rgb(246, 189, 17));
   border-top: 1px solid rgba(246, 235, 17);
   border-bottom: 1px solid rgba(246, 235, 17);
   -webkit-background-clip: text;
@@ -170,7 +168,18 @@ section{
   margin-bottom: 1rem;
   font-style: normal;
   text-transform: uppercase;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
 }
 
 .hero-description {
