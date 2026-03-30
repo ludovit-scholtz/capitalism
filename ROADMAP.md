@@ -169,7 +169,11 @@ Also each unit employs labor depending on the unit level. Labor costs are paid
 
 ## Ledger
 
-Accounting ledger allows to see the income statement, cash flow statment and balance sheet. Items in the statement can be opened and exact details on each item is visible. For example when the long-term tangible assets from balance sheet is opened, the list of all buildings is visible. When income is clicked the each sales item from each unit is visible and person can access the building. When costs are clicked every costs such as the property purchase, units upgrades, purchasing unit purchases, marketing costs or others are clickable to get to the source. 
+Accounting ledger allows to see the income statement, cash flow statment and balance sheet. Items in the statement can be opened and exact details on each item is visible. For example when the long-term tangible assets from balance sheet is opened, the list of all buildings is visible. When income is clicked the each sales item from each unit is visible and person can access the building. When costs are clicked every costs such as the property purchase, units upgrades, purchasing unit purchases, marketing costs or others are clickable to get to the source.
+
+Ledger information about the game year and information when income tax is going to be paid is displayed in the ledger.
+
+Ledger is reset in new tax year, but player can see the old years including the details in the ledger history.
 
 ## Timing & Game engine
 
