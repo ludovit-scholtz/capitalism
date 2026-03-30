@@ -10,7 +10,7 @@ import { trackStartupPackEvent } from '@/lib/startupPackAnalytics'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import PendingActionsTimeline from '@/components/dashboard/PendingActionsTimeline.vue'
-import type { Company, ScheduledActionSummary, StartupPackOffer, CityPowerBalance } from '@/types'
+import type { Company, GameState, ScheduledActionSummary, StartupPackOffer, CityPowerBalance } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -26,8 +26,6 @@ const offerError = ref<string | null>(null)
 const offerMessage = ref<string | null>(null)
 const pendingActions = ref<ScheduledActionSummary[]>([])
 const pendingActionsLoading = ref(false)
-const cityPowerBalances = ref<Record<string, CityPowerBalance>>({})
-const gameState = ref<GameState | null>(null)
 const cityPowerBalances = ref<Record<string, CityPowerBalance>>({})
 
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
@@ -142,8 +140,6 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
-
 })
 
 useTickRefresh(async () => {
