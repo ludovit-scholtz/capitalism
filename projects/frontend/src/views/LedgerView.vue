@@ -333,10 +333,7 @@ useTickRefresh(async () => {
           <h3>{{ t('ledger.drillDown') }}: {{ t(`ledger.category.${drillCategory}`) }}</h3>
           <button
             class="btn btn-ghost btn-sm"
-            @click="
-              drillCategory = null
-              drillEntries = []
-            "
+            @click="() => { drillCategory = null; drillEntries = []; }"
           >
             ✕ {{ t('common.close') }}
           </button>
