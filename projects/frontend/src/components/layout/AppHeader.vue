@@ -27,13 +27,17 @@ const closeMenu = () => {
       </button>
       <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
         <RouterLink to="/" :title="t('nav.home')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'home']" /> <span class="">{{ t('nav.home') }}</span>
+          <font-awesome-icon :icon="['fas', 'home']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.home') }}</span>
         </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'tachometer-alt']" /> {{ t('nav.dashboard') }}
+          <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.dashboard') }}</span>
         </RouterLink>
-        <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" @click="closeMenu"> <font-awesome-icon :icon="['fas', 'trophy']" /> {{ t('nav.leaderboard') }} </RouterLink>
-        <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" @click="closeMenu"> <font-awesome-icon :icon="['fas', 'book']" /> {{ t('nav.encyclopedia') }} </RouterLink>
+        <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.leaderboard') }}</span>
+        </RouterLink>
+        <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'book']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.encyclopedia') }}</span>
+        </RouterLink>
       </nav>
       <div class="header-actions">
         <template v-if="auth.isAuthenticated">
@@ -268,10 +272,6 @@ const closeMenu = () => {
 
   .nav-links {
     gap: 0.75rem;
-  }
-
-  .logo-text {
-    display: none;
   }
 }
 </style>

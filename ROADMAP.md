@@ -261,3 +261,5 @@ Frontend is vue.js with source code located at projects/frontend with tailwind s
 Backend is .NET with graphql engine with data stored in postgresql.
 
 Deployed to kubernetes.
+
+Players must receive near real time user experience.
