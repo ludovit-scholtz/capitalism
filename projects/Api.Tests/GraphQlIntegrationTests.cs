@@ -4280,6 +4280,194 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
     }
 
+    [Fact]
+    public async Task GuestMigration_FactoryLotConflict_PlayerCanRestartAndCompleteWithDifferentLot()
+    {
+        // ROADMAP: "If there is error such as the building was meanwhile purchased by someone else ...
+        // make sure to create their profile with the name they chose and start the wizard again
+        // with the authenticated user and this time save everything."
+        //
+        // This test verifies the full conflict-recovery cycle:
+        // 1. Player A registers and onboards
+        // 2. Player B (the guest) registers, but their factory lot was taken by Player A
+        // 3. Player B retries with a different factory lot and successfully completes onboarding
+        var tokenA = await RegisterAndGetTokenAsync($"conflict-a-{Guid.NewGuid()}@test.com", "Conflict A");
+        var cityId = await GetCityIdByNameAsync();
+
+        // Player A takes the shared lot
+        var sharedLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m, "Shared Factory Lot");
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Conflict A Corp", factoryLotId = sharedLotId } },
+            tokenA);
+
+        // Player B attempts to use the same lot — must get LOT_ALREADY_OWNED
+        var tokenB = await RegisterAndGetTokenAsync($"conflict-b-{Guid.NewGuid()}@test.com", "Conflict B");
+        var failedStart = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Conflict B Corp", factoryLotId = sharedLotId } },
+            tokenB);
+
+        Assert.True(failedStart.TryGetProperty("errors", out var failErrors), "Expected LOT_ALREADY_OWNED error");
+        var code = failErrors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("LOT_ALREADY_OWNED", code);
+
+        // Player B retries with a fresh lot — should succeed
+        var freshLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m, "Fresh Factory Lot");
+        var retryStart = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id cash } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Conflict B Corp", factoryLotId = freshLotId } },
+            tokenB);
+
+        Assert.False(retryStart.TryGetProperty("errors", out _), "Retry with fresh lot must not fail");
+        Assert.Equal("SHOP_SELECTION", retryStart.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("nextStep").GetString());
+
+        // Player B can now finish onboarding
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
+        var finishResult = await FinishOnboardingAsync(tokenB, productId, shopLotId);
+
+        Assert.False(finishResult.TryGetProperty("errors", out _), "FinishOnboarding after conflict retry must succeed");
+        var finishData = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.NotNull(finishData.GetProperty("company").GetProperty("id").GetString());
+        Assert.NotNull(finishData.GetProperty("salesShop").GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task GuestMigration_ShopLotConflict_PlayerCanRetryWithDifferentShopLot()
+    {
+        // Verifies that after FinishOnboarding fails with LOT_ALREADY_OWNED for the shop lot,
+        // the player (who is already authenticated and has a factory) can retry with a different
+        // shop lot and complete onboarding successfully.
+        var tokenA = await RegisterAndGetTokenAsync($"shop-conflict-a-{Guid.NewGuid()}@test.com", "Shop Conflict A");
+        var cityId = await GetCityIdByNameAsync();
+
+        // Player A creates a company and takes the shared shop lot
+        var sharedShopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Shared Shop Lot");
+        var createCompanyResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Shop Conflict A Corp" } },
+            tokenA);
+        var companyAId = createCompanyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+        await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { lot { id } }
+            }
+            """,
+            new { input = new { companyId = companyAId, lotId = sharedShopLotId, buildingType = "SALES_SHOP", buildingName = "Blocker Shop" } },
+            tokenA);
+
+        // Player B starts onboarding and progresses to shop selection
+        var tokenB = await RegisterAndGetTokenAsync($"shop-conflict-b-{Guid.NewGuid()}@test.com", "Shop Conflict B");
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m);
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Shop Conflict B Corp", factoryLotId } },
+            tokenB);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+
+        // First FinishOnboarding attempt fails because the shop lot is taken
+        var failedFinish = await FinishOnboardingAsync(tokenB, productId, sharedShopLotId);
+        Assert.True(failedFinish.TryGetProperty("errors", out var shopErrors), "Expected shop lot conflict error");
+        Assert.Contains("already been purchased", shopErrors[0].GetProperty("message").GetString());
+
+        // Player B retries with a different shop lot — must succeed
+        var freshShopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Fresh Shop Lot");
+        var retryFinish = await FinishOnboardingAsync(tokenB, productId, freshShopLotId);
+
+        Assert.False(retryFinish.TryGetProperty("errors", out _), "Retry with fresh shop lot must succeed");
+        var retryData = retryFinish.GetProperty("data").GetProperty("finishOnboarding");
+        Assert.NotNull(retryData.GetProperty("salesShop").GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_AfterCompletion_RejectsWithNotInProgress()
+    {
+        // A player who has already completed onboarding (via FinishOnboarding)
+        // cannot call FinishOnboarding a second time — the backend clears the
+        // OnboardingCurrentStep after completion, so subsequent calls are rejected
+        // as ONBOARDING_NOT_IN_PROGRESS rather than reaching a duplicate-completion check.
+        var token = await RegisterAndGetTokenAsync($"finish-already-done-{Guid.NewGuid()}@test.com", "AlreadyDoneFin");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Already Done Fin Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "First Shop Lot");
+
+        // First call succeeds
+        var firstResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        Assert.False(firstResult.TryGetProperty("errors", out _), "First FinishOnboarding must succeed");
+
+        // Second call on the same token must fail — OnboardingCurrentStep was cleared by the first call
+        var secondShopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m, "Second Shop Lot");
+        var secondResult = await FinishOnboardingAsync(token, productId, secondShopLotId);
+
+        Assert.True(secondResult.TryGetProperty("errors", out var errors), "Second FinishOnboarding call must return an error");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        // After completing onboarding the player's OnboardingCurrentStep is cleared,
+        // so FinishOnboarding treats it as "not in progress".
+        Assert.Equal("ONBOARDING_NOT_IN_PROGRESS", code);
+    }
+
+    [Fact]
+    public async Task GuestOnboardingPath_StartingCashAndBudgetDecisionAreConsistent()
+    {
+        // Verifies that the starting cash ($500,000), factory lot price, and remaining cash
+        // after purchase are all consistent — so the UI budget coaching panels show accurate data.
+        var token = await RegisterAndGetTokenAsync($"budget-check-{Guid.NewGuid()}@test.com", "BudgetChecker");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryPrice = 75_000m;
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", factoryPrice);
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                company { id cash }
+                factory { id }
+                nextStep
+              }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Budget Test Co", factoryLotId } },
+            token);
+
+        Assert.False(startResult.TryGetProperty("errors", out _), "StartOnboardingCompany must succeed");
+        var startData = startResult.GetProperty("data").GetProperty("startOnboardingCompany");
+        var cashAfterFactory = startData.GetProperty("company").GetProperty("cash").GetDecimal();
+
+        // Starting cash is $500,000; after buying the factory lot the balance should be exactly $425,000
+        Assert.Equal(500_000m - factoryPrice, cashAfterFactory);
+
+        // Finish onboarding with a shop lot and verify final cash is further reduced
+        var shopPrice = 90_000m;
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", shopPrice);
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        Assert.False(finishResult.TryGetProperty("errors", out _), "FinishOnboarding must succeed");
+
+        var finishData = finishResult.GetProperty("data").GetProperty("finishOnboarding");
+        var cashAfterShop = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
+
+        Assert.Equal(500_000m - factoryPrice - shopPrice, cashAfterShop);
+    }
+
     #endregion
 
     #region Rankings
