@@ -610,3 +610,28 @@ export interface CityPowerBalance {
   powerPlantCount: number
   consumerBuildingCount: number
 }
+
+/**
+ * Research brand state returned by the companyBrands query.
+ * Represents a brand entity accumulated by R&D research (product quality)
+ * and marketing activity (brand awareness).
+ */
+export interface ResearchBrandState {
+  id: string
+  companyId: string
+  name: string
+  /** PRODUCT | CATEGORY | COMPANY */
+  scope: string
+  productTypeId: string | null
+  productName: string | null
+  industryCategory: string | null
+  /** 0.0–1.0: Driven by marketing unit spend. Higher = stronger brand recognition with customers. */
+  awareness: number
+  /** 0.0–1.0: Driven by PRODUCT_QUALITY R&D. Higher = better manufactured output quality. */
+  quality: number
+  /**
+   * ≥ 1.0: Driven by BRAND_QUALITY R&D. A value of 1.5 means each unit of marketing budget
+   * produces 50% more brand awareness than baseline. Does NOT directly grant awareness.
+   */
+  marketingEfficiencyMultiplier: number
+}

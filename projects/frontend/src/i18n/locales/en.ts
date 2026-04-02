@@ -952,4 +952,15 @@ export default {
     scheduleRentBtn: 'Schedule Change',
     saveFailed: 'Failed to save rent change. Please try again.',
   },
+  research: {
+    panelTitle: 'Research Progress',
+    intro: 'Research advances each tick. Product Quality improves manufactured output quality. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
+    emptyState: 'No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.',
+    qualityLabel: 'Product Quality',
+    awarenessLabel: 'Brand Awareness',
+    marketingEfficiencyLabel: 'Marketing Efficiency',
+    qualityEffect: 'Contributes up to {pct}% quality bonus to manufactured output for this product.',
+    awarenessEffect: 'Brand recognition with customers: {pct}%.',
+    marketingEfficiencyEffect: 'Each unit of marketing budget produces {multiplier}× more brand awareness than baseline.',
+  },
 }
