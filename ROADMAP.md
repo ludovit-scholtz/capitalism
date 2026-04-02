@@ -4,6 +4,12 @@ Create a fun game on style of the capitalism II game. This game is economic simu
 
 It will use real world map. The game will start in single city and later other cities will be added.
 
+## Multiple Game Servers
+
+The master website is product pitching website where users can find in game documentation and list of active game servers. Existing users who authenticated can see their pro subscription on they can purchase prolonging their pro subscription.
+
+Master API has its own database and handles the subscription management.
+
 ## Buildings
 
 Every building must be placed on existing land. Land can be purchased on map and it has value which can be increased in time, has gps coordinates, and has attributes like population index which serves for the sale unit sales calculation.
@@ -272,9 +278,14 @@ Pro subscription will cost $10/month.
 
 # Technical implementation
 
-Frontend is vue.js with source code located at projects/frontend with tailwind styling.
+Game server frontend is vue.js with source code located at projects/frontend with tailwind styling.
 
-Backend is .NET with graphql engine with data stored in postgresql.
+Master server frontend is vue.js with source code located at projects/master-frontend with tailwind styling.
+
+Game server Backend is .NET with graphql engine with data stored in postgresql. Source code is at projects/Api.
+
+Master server Backend is .NET with graphql engine with data stored in postgresql. Source code is at projects/MasterApi.
+
 
 Deployed to kubernetes.
 
