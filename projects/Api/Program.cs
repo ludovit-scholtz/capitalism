@@ -16,6 +16,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.Configure<SeedDataOptions>(builder.Configuration.GetSection(SeedDataOptions.SectionName));
 builder.Services.Configure<VapidOptions>(builder.Configuration.GetSection("Vapid"));
 builder.Services.Configure<GameEngineOptions>(builder.Configuration.GetSection(GameEngineOptions.SectionName));
+builder.Services.Configure<MasterServerRegistrationOptions>(builder.Configuration.GetSection(MasterServerRegistrationOptions.SectionName));
 
 var jwtOptions = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
     ?? throw new InvalidOperationException("JWT configuration is missing.");
@@ -98,6 +99,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddScoped<AppDbInitializer>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient("push");
+builder.Services.AddHttpClient("master-server");
 builder.Services.AddScoped<WebPush.IWebPushClient>(serviceProvider =>
     new WebPush.WebPushClient(
         serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("push")));
@@ -142,6 +144,7 @@ builder.Services.AddScoped<ITickPhase, ResearchPhase>();
 builder.Services.AddScoped<ITickPhase, RentPhase>();
 builder.Services.AddScoped<ITickPhase, TaxPhase>();
 builder.Services.AddHostedService<GameTickHostedService>();
+builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
 
 var app = builder.Build();
 

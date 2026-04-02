@@ -9651,7 +9651,42 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             {
                 var path = dbPath + suffix;
                 if (System.IO.File.Exists(path))
-                    System.IO.File.Delete(path);
+                    DeleteFileWithRetry(path);
+            }
+        }
+    }
+
+    private static void DeleteFileWithRetry(string path)
+    {
+        const int maxAttempts = 10;
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (!System.IO.File.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                System.IO.File.Delete(path);
+                return;
+            }
+            catch (System.IO.IOException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(100);
+            }
+            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
+            {
+                Thread.Sleep(100);
+            }
+            catch (System.IO.IOException)
+            {
+                return;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return;
             }
         }
     }

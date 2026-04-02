@@ -24,7 +24,8 @@ public sealed class ApiWebApplicationFactory : WebApplicationFactory<Program>
                 ["SeedData:AdminEmail"] = "admin@capitalism.local",
                 ["SeedData:AdminDisplayName"] = "Platform Admin",
                 ["SeedData:AdminPassword"] = "ChangeMe123!",
-                ["GameEngine:Enabled"] = "false"
+                ["GameEngine:Enabled"] = "false",
+                ["MasterServer:RegistrationEnabled"] = "false"
             });
         });
     }

@@ -9,8 +9,16 @@
 			"path": "./projects/frontend"
 		},
 		{
+			"name": "Master Frontend",
+			"path": "./projects/master-frontend"
+		},
+		{
 			"name": "Api",
 			"path": "./projects/Api"
+		},
+		{
+			"name": "MasterApi",
+			"path": "./projects/MasterApi"
 		},
 		{
 			"name": "Api.Tests",

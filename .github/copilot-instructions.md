@@ -2,30 +2,38 @@
 
 ## Repository structure
 - Root repository contains both frontend and backend.
-- Backend API lives at `projects/Api` (ASP.NET Core).
+- Game backend API lives at `projects/Api` (ASP.NET Core).
+- Master backend API lives at `projects/MasterApi` (ASP.NET Core).
 - Backend tests live at `projects/Api.Tests`.
-- Frontend Vue app lives at `projects/frontend`.
+- Game frontend Vue app lives at `projects/frontend`.
+- Master frontend Vue app lives at `projects/master-frontend`.
 - The deployed backend is available at `https://capitalism.de-4.biatec.io/graphql`.
-- Main frontend source files are in `projects/frontend/src`.
+- Main game frontend source files are in `projects/frontend/src`.
+- Main master frontend source files are in `projects/master-frontend/src`.
 - Views (page-level components) are in `src/views/`.
 - Reusable components are in `src/components/`, organized by feature (e.g., `layout/`).
 - TypeScript type definitions are in `src/types/`.
 - Pinia stores are in `src/stores/`.
-- GraphQL client helper is in `src/lib/graphql.ts`.
+- Game frontend GraphQL client helper is in `projects/frontend/src/lib/graphql.ts`.
+- Master frontend GraphQL client helper is in `projects/master-frontend/src/lib/graphql.ts`.
 - Global CSS styles and design tokens are in `src/assets/styles/main.css`.
-- Vue Router configuration is in `src/router/index.ts`.
+- Game frontend router configuration is in `projects/frontend/src/router/index.ts`.
+- Master frontend router configuration is in `projects/master-frontend/src/router/index.ts`.
 
 ## Technology and conventions
-- Frontend uses Vue 3 + TypeScript + Vite.
-- Backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, Entity Framework Core (SQLite), and JWT bearer authentication.
-- Frontend communicates with the backend exclusively via GraphQL using a lightweight fetch-based client (`src/lib/graphql.ts`).
-- The GraphQL endpoint URL is configured via `VITE_GRAPHQL_URL` environment variable (defaults to `https://capitalism.de-4.biatec.io/graphql`).
+- Frontends use Vue 3 + TypeScript + Vite.
+- Game backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, Entity Framework Core (SQLite), and JWT bearer authentication.
+- Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, and Entity Framework Core (SQLite locally) to store the live game-server registry.
+- Frontends communicate with their backend exclusively via GraphQL using lightweight fetch-based clients.
+- The game frontend GraphQL endpoint URL is configured via `VITE_GRAPHQL_URL` environment variable (defaults to `https://capitalism.de-4.biatec.io/graphql`).
+- The master frontend GraphQL endpoint URL is configured via `VITE_GRAPHQL_URL` environment variable (defaults to `https://localhost:44364/graphql`).
 - State management uses Pinia with the Composition API (`defineStore` with `setup` function syntax).
 - Routing uses Vue Router 5 with lazy-loaded route components (except the home page).
 - Follow existing formatting conventions from `projects/frontend/.prettierrc.json`:
   - `semi: false`
   - `singleQuote: true`
   - `printWidth: 100`
+- Follow the same formatting conventions for `projects/master-frontend/.prettierrc.json`.
 - Keep changes minimal and scoped to the issue being solved.
 - For any UI change or new UI behavior, add or update Playwright end-to-end tests that cover the user-visible flow.
 - Use `<script setup lang="ts">` in all Vue single-file components.
@@ -33,6 +41,17 @@
 - Use CSS custom properties (variables) defined in `main.css` for theming/colors.
 - Prefer semantic HTML elements and accessibility attributes.
 - Use `@/` path alias for imports from the `src` directory.
+- Default local development ports are: game frontend `5173`, master frontend `5174`, game API `5095`, master API `44364`.
+
+## Multiple game servers infrastructure
+- The master website is the discovery and product-pitch surface. It lists active game servers and links players to the correct game frontend.
+- The master registry lives in `projects/MasterApi`. Core files are `Program.cs`, `Data/MasterDbContext.cs`, `Types/Query.cs`, and `Types/Mutation.cs`.
+- The master frontend landing page lives in `projects/master-frontend/src/views/HomeView.vue` and lists the `gameServers` query result from `MasterApi`.
+- Game servers register themselves to `MasterApi` through the `registerGameServer` GraphQL mutation.
+- Game-server registration is implemented in `projects/Api/Utilities/MasterServerRegistrationHostedService.cs` and configured through the `MasterServer` section in `projects/Api/appsettings*.json`.
+- The registration contract uses `projects/MasterApi/Types/RegisterGameServerInput` fields: `registrationKey`, `serverKey`, `displayName`, `description`, `region`, `environment`, `backendUrl`, `graphqlUrl`, `frontendUrl`, `version`, `playerCount`, `companyCount`, and `currentTick`.
+- The registration key in `projects/Api/appsettings*.json` must match `projects/MasterApi/appsettings*.json` for the game server to appear in the master frontend.
+- Treat `frontendUrl`, `backendUrl`, and `graphqlUrl` as server-owned infrastructure metadata. Do not let the master frontend invent or mutate them client-side.
 
 ## Game domain model
 This is a Capitalism II-style multiplayer economic strategy game. Key entities:
@@ -65,6 +84,7 @@ The game is seeded with:
   - **Queries**: `me`, `cities`, `city(id)`, `resourceTypes`, `productTypes(industry?)`, `rankings`, `myCompanies`, `gameState`, `starterIndustries`
   - **Mutations**: `register(input)`, `login(input)`, `createCompany(input)`, `placeBuilding(input)`, `completeOnboarding(input)`, `startOnboardingCompany(input)`, `finishOnboarding(input)`, `purchaseLot(input)`
 - The staged onboarding flow now uses `startOnboardingCompany` to create the first company and purchase the first factory lot, then `finishOnboarding` to select the starter product, purchase the first sales shop lot, configure both buildings, and complete onboarding.
+- Master-server GraphQL operations are `gameServers` and `registerGameServer(input)`.
 
 ## Server-controlled game state
 - Never trust client-provided values for derived or economy-sensitive fields. Activation ticks, upgrade durations, ownership, IDs, server timestamps, levels, prices, balances, and similar progression state must be computed or validated on the backend.
@@ -195,14 +215,29 @@ npm run build        # Full build: runs vue-tsc type-check + build:client + buil
 cd projects/Api
 dotnet run           # API server
 dotnet test ../Api.Tests  # Run integration tests
+
+# Master frontend
+cd projects/master-frontend
+npm install
+npm run dev          # Dev server on :5174
+npm run lint
+npm run test:unit
+npm run build
+
+# Master backend
+cd projects/MasterApi
+dotnet run           # API server on :44364
+dotnet build
 ```
 
 ## Validation requirements before reporting completion
 - For backend changes, do not stop at Debug-only targeted tests. Always run the workflow-equivalent Release pipeline locally:
   - `cd projects/Api && dotnet restore Api.slnx && dotnet build Api.slnx --configuration Release --no-restore && dotnet test Api.slnx --configuration Release --no-build`
+- For master-backend changes, run at least `cd projects/MasterApi && dotnet build` and, if you add tests later, run those too before reporting completion.
 - **NEVER push with known failing tests.** If a test fails because of your change, you MUST fix it before pushing — even if the test appears "pre-existing" or "unrelated". An existing test that breaks under your new validation is evidence that the test data was invalid under the new rule; fix the test data, not the validation.
 - For frontend changes that affect shipped UI, also run the workflow-equivalent frontend checks:
   - `cd projects/frontend && npm ci && npm run lint && npm run test:unit && npm run build`
+- For master-frontend changes, run `cd projects/master-frontend && npm install && npm run lint && npm run test:unit && npm run build` before reporting completion.
   - **Lint must exit 0 (no errors) before pushing.** Run `npm run lint` explicitly after every frontend code change, not just at the very end. Common lint errors include unused destructured variables (e.g., `const { a, unusedB } = composable()`) and unreachable imports.
 - For Playwright changes or UI flows covered by Playwright, install browsers if needed and run the relevant spec exactly as CI expects:
   - `cd projects/frontend && npx playwright install --with-deps chromium`

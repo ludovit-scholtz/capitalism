@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;700;800&display=swap');
+@import 'tailwindcss';
+
+:root {
+  --color-paper: #f5f0e8;
+  --color-paper-strong: #fffaf2;
+  --color-ink: #11294f;
+  --color-muted: #5d6c83;
+  --color-border: rgba(17, 41, 79, 0.14);
+  --color-accent: #f29c38;
+  --color-accent-deep: #d78220;
+  --shadow-soft: 0 18px 42px rgba(17, 41, 79, 0.12);
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'Manrope', 'Segoe UI', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(circle at top left, rgba(242, 156, 56, 0.16), transparent 28%),
+    radial-gradient(circle at bottom right, rgba(17, 41, 79, 0.14), transparent 34%),
+    linear-gradient(180deg, #fff8ee 0%, #f2eadf 100%);
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(17, 41, 79, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(17, 41, 79, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.7), transparent 88%);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+p,
+ul,
+dl,
+dd {
+  margin: 0;
+}
+
+ul {
+  list-style: disc;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
