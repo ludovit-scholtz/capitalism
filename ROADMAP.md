@@ -153,6 +153,8 @@ Allows to sell products directly to general public. The sales capacity can be in
 
 In the details is shown the pie chart of the player market share, other players market shares and non player's market share, product elasticity index, history of the sale price, the chart showing revenue earned in each tick in last 100 ticks.
 
+Quantity sold to public changes every tick with the saturation of the market, with branding or product quality, city population, property population index, the game currency collected by salaries in past 10 ticks and any other variables highlighting the elasticity, oversupply or scarcity. Quality of the public sales is one of the main factors for players having fun in the game.
+
 ### Product quality
 
 Allows to select a product which will increment the company's internal knowledge how to produce the product. When doing reserarch into the products the the manufacturing quality will be improved in time.
