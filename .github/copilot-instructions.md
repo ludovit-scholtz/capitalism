@@ -551,3 +551,16 @@ Root-cause of a ROADMAP alignment gap (March 2026, PR #125 guest onboarding):
 4. **GraphQL queries for completion results must request enough data to display what was configured.** If the backend configures units, the mutation result must include `units { id unitType gridX gridY level linkRight }` so the frontend can render the chain.
 5. **Add E2E tests that assert the configured unit types are VISIBLE on the completion screen** — `expect(page.locator('[aria-label="Factory layout"] .unit-chain-label', { hasText: 'Manufacturing' })).toBeVisible()` — not just that "factory was set up" text is present.
 6. **Add backend tests that request units in the mutation response** and verify the count and types are correct for each supported industry.
+
+## Ledger page quality — prevent flickering on tick updates
+
+Root-cause of flickering (current issue):
+- `useTickRefresh` calls `fetchLedger()` which sets `loading.value = true`, causing the loading spinner to appear briefly on every tick update, leading to app flickering.
+- The loading state is intended for initial load, not for background refreshes.
+
+**Rules to prevent recurrence:**
+1. **When using `useTickRefresh`, modify fetch functions to accept an `isRefresh` parameter.** Set `loading` only when `!isRefresh`.
+2. **Call fetch functions with `isRefresh: true` in `useTickRefresh` callbacks** to avoid showing loading states during automatic refreshes.
+3. **Ensure ledger data is tax-year scoped and drill-downs align with the selected year.** Use `ledgerDrillDown(companyId, category, gameYear?)` with the same `gameYear` as the ledger query.
+4. **Add drill-downs for all major statement items as per ROADMAP:** revenue (sales items), costs (purchases, labor, energy, marketing), assets (building list), etc.
+5. **For ledger improvements, always verify against ROADMAP requirements:** income statement, cash flow, balance sheet, drillable details, tax info, history.
