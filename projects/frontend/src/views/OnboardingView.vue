@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
-import { trackStartupPackEvent } from '@/lib/startupPackAnalytics'
+import { trackStartupPackEvent, emitStartupPackViewEvents } from '@/lib/startupPackAnalytics'
 import { computeSimulatedProfit, trackOnboardingEvent } from '@/lib/onboardingAnalytics'
 import {
   getLocalizedProductDescription,
@@ -757,7 +757,7 @@ async function completeOnboarding() {
     if (startupPackOffer.value?.status === 'ELIGIBLE') {
       await markStartupPackOfferShown()
     } else if (startupPackOffer.value) {
-      trackStartupPackEvent('view', { context: 'onboarding', status: startupPackOffer.value.status })
+      emitStartupPackViewEvents(startupPackOffer.value, 'onboarding')
     }
     step.value = 5
     await Promise.all([loadGameState(), loadFirstSaleMission()])
@@ -802,10 +802,7 @@ async function markStartupPackOfferShown() {
   startupPackOffer.value = data.markStartupPackOfferShown
   auth.setStartupPackOffer(data.markStartupPackOfferShown)
   if (data.markStartupPackOfferShown) {
-    trackStartupPackEvent('view', {
-      context: 'onboarding',
-      status: data.markStartupPackOfferShown.status,
-    })
+    emitStartupPackViewEvents(data.markStartupPackOfferShown, 'onboarding')
   }
 }
 
@@ -1179,6 +1176,9 @@ function blockerMessage(code: string): string {
 }
 
 function navigateToDashboard() {
+  if (startupPackOffer.value && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(startupPackOffer.value.status)) {
+    trackStartupPackEvent('continue', { context: 'onboarding' })
+  }
   stopTickCountdown()
   router.push('/dashboard')
 }
