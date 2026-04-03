@@ -84,6 +84,15 @@ const canSubmitPurchase = computed(() =>
   ),
 )
 
+const selectedCompany = computed(() =>
+  companies.value.find((c) => c.id === selectedCompanyId.value) ?? null,
+)
+
+const cashAfterPurchase = computed(() => {
+  if (!selectedCompany.value || !selectedLot.value) return null
+  return selectedCompany.value.cash - selectedLot.value.price
+})
+
 function getLotStatus(lot: BuildingLot): 'available' | 'owned' | 'yours' {
   return lotStatusFromOwnership(
     lot.ownerCompanyId,
@@ -111,6 +120,30 @@ function populationIndexLabel(value: number): string {
   if (value >= 1.3) return t('cityMap.populationIndexHigh')
   if (value >= 0.9) return t('cityMap.populationIndexMedium')
   return t('cityMap.populationIndexLow')
+}
+
+/**
+ * Returns a short strategic recommendation label for the lot based on its
+ * population index and resource data. This implements the ROADMAP requirement:
+ * "include a simple recommendation label such as 'strong for retail demand,'
+ * 'balanced starter location,' or 'resource-oriented.'"
+ */
+function strategicRecommendation(lot: BuildingLot): { key: string; cssClass: string } {
+  const suitable = lot.suitableTypes.split(',').map((s) => s.trim())
+  const hasMine = suitable.includes('MINE')
+  const hasRetail = suitable.includes('SALES_SHOP')
+  const hasFactory = suitable.includes('FACTORY')
+
+  if (hasMine && lot.resourceType) {
+    return { key: 'recommendationResourceOriented', cssClass: 'rec-resource' }
+  }
+  if (hasRetail && lot.populationIndex >= 1.3) {
+    return { key: 'recommendationStrongRetail', cssClass: 'rec-retail' }
+  }
+  if (hasFactory && lot.populationIndex < 0.9) {
+    return { key: 'recommendationIndustrialEfficiency', cssClass: 'rec-industrial' }
+  }
+  return { key: 'recommendationBalancedStarter', cssClass: 'rec-balanced' }
 }
 
 function materialQualityLabel(quality: number): string {
@@ -548,6 +581,16 @@ watch(viewMode, async (mode) => {
 
           <p class="lot-description">{{ selectedLot.description }}</p>
 
+          <!-- Strategic recommendation badge -->
+          <div
+            class="strategic-recommendation"
+            :class="strategicRecommendation(selectedLot).cssClass"
+            data-testid="strategic-recommendation"
+          >
+            <span class="rec-icon">🎯</span>
+            <span class="rec-label">{{ t(`cityMap.${strategicRecommendation(selectedLot).key}`) }}</span>
+          </div>
+
           <div class="detail-grid">
             <div class="detail-item">
               <span class="detail-label">{{ t('cityMap.district') }}</span>
@@ -728,6 +771,24 @@ watch(viewMode, async (mode) => {
                       {{ c.name }} ({{ formatCurrency(c.cash) }})
                     </option>
                   </select>
+                </div>
+
+                <!-- Purchase cost summary -->
+                <div class="purchase-cost-summary" aria-label="Purchase cost summary">
+                  <div class="cost-row">
+                    <span class="cost-label">{{ t('cityMap.costLotPrice') }}</span>
+                    <span class="cost-value cost-debit">{{ selectedLot ? formatCurrency(selectedLot.price) : '—' }}</span>
+                  </div>
+                  <div v-if="selectedCompany" class="cost-row">
+                    <span class="cost-label">{{ t('cityMap.costCurrentCash') }}</span>
+                    <span class="cost-value">{{ formatCurrency(selectedCompany.cash) }}</span>
+                  </div>
+                  <div v-if="cashAfterPurchase !== null" class="cost-row cost-row-result">
+                    <span class="cost-label">{{ t('cityMap.costRemainingCash') }}</span>
+                    <span class="cost-value" :class="cashAfterPurchase < 0 ? 'cost-negative' : 'cost-positive'">
+                      {{ formatCurrency(cashAfterPurchase) }}
+                    </span>
+                  </div>
                 </div>
 
                 <div v-if="purchaseError" class="error-message" role="alert">
@@ -1028,8 +1089,45 @@ watch(viewMode, async (mode) => {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
   line-height: 1.5;
-  margin: 0 0 1rem;
+  margin: 0 0 0.625rem;
 }
+
+.strategic-recommendation {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.875rem;
+  border: 1px solid currentColor;
+}
+
+.rec-icon {
+  font-size: 0.875rem;
+}
+
+.rec-retail {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.rec-resource {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.rec-industrial {
+  color: var(--color-text-secondary);
+  background: rgba(139, 148, 158, 0.08);
+}
+
+.rec-balanced {
+  color: var(--color-primary);
+  background: rgba(0, 71, 255, 0.06);
+}
+
 
 .detail-grid {
   display: grid;
@@ -1243,6 +1341,50 @@ watch(viewMode, async (mode) => {
   gap: 0.5rem;
   margin-top: 1rem;
 }
+
+.purchase-cost-summary {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.cost-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.125rem 0;
+}
+
+.cost-row-result {
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.cost-label {
+  color: var(--color-text-muted);
+}
+
+.cost-value {
+  font-weight: 500;
+}
+
+.cost-debit {
+  color: var(--color-text);
+}
+
+.cost-positive {
+  color: var(--color-success, #22c55e);
+}
+
+.cost-negative {
+  color: var(--color-danger, #ef4444);
+}
+
 
 .purchase-form {
   margin-top: 1rem;

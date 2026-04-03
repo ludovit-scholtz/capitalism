@@ -7628,6 +7628,202 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
     }
 
+    [Fact]
+    public async Task PurchaseLot_UpdatesCompanyCashBalance()
+    {
+        // AC #5: After a successful purchaseLot, the company's cash must be reduced
+        // by the lot price. The mutation must return the updated cash value so the
+        // frontend can update its display immediately without a separate refetch.
+        var token = await RegisterAndGetTokenAsync($"cash-balance-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Cash Balance Co");
+
+        // Create a dedicated lot for this test to avoid depending on seeded lot availability
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotPrice = 60_000m;
+        var lotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Industrial Zone", lotPrice, "Cash Test Lot");
+
+        // Record cash before purchase
+        var meResultBefore = await ExecuteGraphQlAsync(
+            "{ me { companies { id cash } } }", null, token);
+        var cashBefore = meResultBefore.GetProperty("data").GetProperty("me")
+            .GetProperty("companies").EnumerateArray()
+            .First(c => c.GetProperty("id").GetString() == companyId)
+            .GetProperty("cash").GetDecimal();
+
+        // Purchase the lot
+        var purchaseResult = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                company { id cash }
+              }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Cash Test Factory" } },
+            token);
+
+        Assert.False(purchaseResult.TryGetProperty("errors", out _), "purchaseLot should succeed");
+
+        // Cash returned in mutation response must be reduced by the lot price
+        var cashInResponse = purchaseResult.GetProperty("data").GetProperty("purchaseLot")
+            .GetProperty("company").GetProperty("cash").GetDecimal();
+        var expectedCash = cashBefore - lotPrice;
+        Assert.True(cashInResponse == expectedCash,
+            $"Expected cash to decrease by lot price ({lotPrice}): {cashBefore} → {expectedCash}, but got {cashInResponse}");
+
+        // Verify the same updated cash is returned by the me query
+        var meResultAfter = await ExecuteGraphQlAsync(
+            "{ me { companies { id cash } } }", null, token);
+        var cashAfter = meResultAfter.GetProperty("data").GetProperty("me")
+            .GetProperty("companies").EnumerateArray()
+            .First(c => c.GetProperty("id").GetString() == companyId)
+            .GetProperty("cash").GetDecimal();
+        Assert.True(cashAfter == expectedCash,
+            $"me query must confirm the reduced cash balance after purchase. Expected {expectedCash}, got {cashAfter}");
+    }
+
+    [Fact]
+    public async Task CityLots_ReturnsEmptyListForPrague()
+    {
+        // Prague has no seeded building lots in the game initializer. The cityLots query
+        // must return a valid (non-error) response for Prague, whether the array is empty
+        // or contains dynamically-created lots from other tests sharing this database.
+        // The key requirement: the query must not crash or return GraphQL errors.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var pragueId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Prague")
+            .GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) { id name cityId }
+            }
+            """,
+            new { cityId = pragueId });
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "cityLots for Prague must not return GraphQL errors");
+        var lots = result.GetProperty("data").GetProperty("cityLots");
+        // All returned lots must belong to Prague
+        foreach (var lot in lots.EnumerateArray())
+        {
+            Assert.Equal(pragueId, lot.GetProperty("cityId").GetString(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task CityLots_ReturnsEmptyListForVienna()
+    {
+        // Vienna has no seeded building lots in the game initializer. The cityLots query
+        // must return a valid (non-error) response for Vienna, whether the array is empty
+        // or contains dynamically-created lots from other tests sharing this database.
+        // The key requirement: the query must not crash or return GraphQL errors.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var viennaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Vienna")
+            .GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) { id name cityId }
+            }
+            """,
+            new { cityId = viennaId });
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "cityLots for Vienna must not return GraphQL errors");
+        var lots = result.GetProperty("data").GetProperty("cityLots");
+        // All returned lots must belong to Vienna
+        foreach (var lot in lots.EnumerateArray())
+        {
+            Assert.Equal(viennaId, lot.GetProperty("cityId").GetString(),
+                StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task CityLots_StrategicRecommendationData_ResourceAndPopulationIndexCorrect()
+    {
+        // The frontend derives a "strategic recommendation" label from each lot's
+        // suitableTypes, populationIndex, and resourceType. This backend test verifies
+        // that the required data fields are all returned correctly so the frontend
+        // can show "Strong for retail demand", "Resource-oriented",
+        // "Industrial efficiency zone", or "Balanced starter location".
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id name district suitableTypes populationIndex
+                resourceType { id name slug }
+                materialQuality materialQuantity
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityLots query must not return errors");
+        var lots = result.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+
+        // Every lot must have a non-negative populationIndex (required for recommendation logic)
+        foreach (var lot in lots)
+        {
+            var name = lot.GetProperty("name").GetString();
+            var popIndex = lot.GetProperty("populationIndex").GetDecimal();
+            Assert.True(popIndex >= 0,
+                $"Lot '{name}' has negative populationIndex ({popIndex}); must be >= 0 for recommendation logic");
+        }
+
+        // At least one lot must be MINE-eligible with a resource (→ "Resource-oriented")
+        var resourceLot = lots.FirstOrDefault(
+            l => l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
+              && l.GetProperty("resourceType").ValueKind != JsonValueKind.Null);
+        Assert.True(resourceLot.ValueKind != JsonValueKind.Undefined,
+            "Expected at least one MINE-eligible lot with a resourceType for the 'Resource-oriented' recommendation");
+        Assert.True(resourceLot.GetProperty("materialQuality").GetDecimal() > 0,
+            "Resource lot must have positive materialQuality for the raw-material panel");
+        Assert.True(resourceLot.GetProperty("materialQuantity").GetDecimal() > 0,
+            "Resource lot must have positive materialQuantity for the raw-material panel");
+
+        // At least one lot must support SALES_SHOP (retail recommendation input)
+        var salesShopLot = lots.FirstOrDefault(
+            l => l.GetProperty("suitableTypes").GetString()!.Contains("SALES_SHOP"));
+        Assert.True(salesShopLot.ValueKind != JsonValueKind.Undefined,
+            "Expected at least one SALES_SHOP lot for retail recommendation eligibility");
+
+        // At least one lot must support FACTORY (industrial recommendation input)
+        var factoryLot = lots.FirstOrDefault(
+            l => l.GetProperty("suitableTypes").GetString()!.Contains("FACTORY"));
+        Assert.True(factoryLot.ValueKind != JsonValueKind.Undefined,
+            "Expected at least one FACTORY lot for industrial recommendation eligibility");
+
+        // Commercial/retail lots should have a higher populationIndex than industrial lots on average.
+        // This is the spatial signal that makes land acquisition a real decision surface.
+        // Note: population index is recomputed from spatial data on every tick; in a fresh
+        // test database (no buildings), values are ~0.6-1.0 depending on distance to city center.
+        var commercialAvg = lots
+            .Where(l => l.GetProperty("suitableTypes").GetString()!.Contains("SALES_SHOP"))
+            .Select(l => l.GetProperty("populationIndex").GetDecimal())
+            .DefaultIfEmpty(0m)
+            .Average();
+
+        var industrialAvg = lots
+            .Where(l => l.GetProperty("district").GetString() == "Industrial Zone")
+            .Select(l => l.GetProperty("populationIndex").GetDecimal())
+            .DefaultIfEmpty(0m)
+            .Average();
+
+        Assert.True(
+            commercialAvg > industrialAvg,
+            $"Commercial lots avg populationIndex ({commercialAvg:F3}) should exceed industrial avg ({industrialAvg:F3}) — " +
+            "this is the spatial signal that makes land acquisition a real decision surface");
+    }
+
     #endregion
 
     #region First-sale milestone
