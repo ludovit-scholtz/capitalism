@@ -7664,12 +7664,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.False(purchaseResult.TryGetProperty("errors", out _), "purchaseLot should succeed");
 
-        // Cash returned in mutation response must be reduced by the lot price
+        // Cash returned in mutation response must be reduced by the lot price AND construction cost
         var cashInResponse = purchaseResult.GetProperty("data").GetProperty("purchaseLot")
             .GetProperty("company").GetProperty("cash").GetDecimal();
-        var expectedCash = cashBefore - lotPrice;
+        var constructionCost = Api.Engine.GameConstants.ConstructionCost("FACTORY");
+        var expectedCash = cashBefore - lotPrice - constructionCost;
         Assert.True(cashInResponse == expectedCash,
-            $"Expected cash to decrease by lot price ({lotPrice}): {cashBefore} → {expectedCash}, but got {cashInResponse}");
+            $"Expected cash to decrease by lot price ({lotPrice}) + construction cost ({constructionCost}): {cashBefore} → {expectedCash}, but got {cashInResponse}");
 
         // Verify the same updated cash is returned by the me query
         var meResultAfter = await ExecuteGraphQlAsync(
@@ -7822,6 +7823,312 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             commercialAvg > industrialAvg,
             $"Commercial lots avg populationIndex ({commercialAvg:F3}) should exceed industrial avg ({industrialAvg:F3}) — " +
             "this is the spatial signal that makes land acquisition a real decision surface");
+    }
+
+    [Fact]
+    public async Task PurchaseLot_BuildingStartsUnderConstruction()
+    {
+        // When a player purchases a lot via the city-map flow, the resulting building
+        // must start in IsUnderConstruction = true with a ConstructionCompletesAtTick
+        // set in the future, and a ConstructionCost > 0.
+        var token = await RegisterAndGetTokenAsync($"construction-start-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Construction Start Co");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Industrial Zone", 30_000m, "Build Test Lot");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                building {
+                  id type isUnderConstruction constructionCompletesAtTick constructionCost
+                }
+              }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Under Construction Factory" } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "purchaseLot must succeed");
+        var building = result.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+
+        Assert.True(building.GetProperty("isUnderConstruction").GetBoolean(),
+            "Building purchased via city-map PurchaseLot must start as IsUnderConstruction = true");
+        Assert.True(building.GetProperty("constructionCompletesAtTick").GetInt64() > 0,
+            "ConstructionCompletesAtTick must be set to a future tick");
+        Assert.True(building.GetProperty("constructionCost").GetDecimal() > 0m,
+            "ConstructionCost must be greater than zero");
+    }
+
+    [Fact]
+    public async Task PurchaseLot_ConstructionCostDeductedFromCash()
+    {
+        // Purchasing a lot must deduct both the land price AND the construction cost.
+        var token = await RegisterAndGetTokenAsync($"construction-cash-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Construction Cash Co");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotPrice = 40_000m;
+        var lotId = await CreateTestLotAsync(bratislavaId, "SALES_SHOP,COMMERCIAL", "Commercial District", lotPrice, "Sales Shop Test Lot");
+
+        var meResultBefore = await ExecuteGraphQlAsync("{ me { companies { id cash } } }", null, token);
+        var cashBefore = meResultBefore.GetProperty("data").GetProperty("me")
+            .GetProperty("companies").EnumerateArray()
+            .First(c => c.GetProperty("id").GetString() == companyId)
+            .GetProperty("cash").GetDecimal();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                building { constructionCost }
+                company { cash }
+              }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "SALES_SHOP", buildingName = "New Shop" } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "purchaseLot must succeed");
+        var purchaseData = result.GetProperty("data").GetProperty("purchaseLot");
+        var constructionCost = purchaseData.GetProperty("building").GetProperty("constructionCost").GetDecimal();
+        var cashAfter = purchaseData.GetProperty("company").GetProperty("cash").GetDecimal();
+
+        var expectedCash = cashBefore - lotPrice - constructionCost;
+        Assert.Equal(expectedCash, cashAfter);
+        Assert.True(constructionCost > 0m, "Construction cost for a SALES_SHOP must be positive");
+    }
+
+    [Fact]
+    public async Task PurchaseLot_InsufficientFundsForConstructionCost_Fails()
+    {
+        // If the company can afford the lot but not lot + construction cost, the purchase must fail.
+        var token = await RegisterAndGetTokenAsync($"construction-broke-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Broke Co");
+
+        // Drain cash so only the land price is coverable but not land + construction
+        var meResult = await ExecuteGraphQlAsync("{ me { companies { id cash } } }", null, token);
+        var currentCash = meResult.GetProperty("data").GetProperty("me")
+            .GetProperty("companies").EnumerateArray()
+            .First(c => c.GetProperty("id").GetString() == companyId)
+            .GetProperty("cash").GetDecimal();
+
+        // Use a lot priced just below current cash, but construction cost for FACTORY is 15,000
+        // so if lot price = currentCash - 5,000 → company has 5,000 left → cannot afford 15,000 construction
+        var lotPrice = currentCash - 5_000m;
+        Assert.True(lotPrice > 0,
+            $"Onboarding must grant sufficient cash for this test. Expected currentCash > $5,000 but got {currentCash}.");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Industrial Zone", lotPrice, "Broke Test Lot");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                building { id }
+              }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Unaffordable Factory" } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors when insufficient funds");
+        var errorCodes = errors.EnumerateArray()
+            .SelectMany(e => e.GetProperty("extensions").EnumerateObject()
+                .Where(p => p.Name == "code")
+                .Select(p => p.Value.GetString()))
+            .ToList();
+        Assert.Contains("INSUFFICIENT_FUNDS", errorCodes);
+    }
+
+    [Fact]
+    public async Task ConstructionPhase_CompletesBuilding_WhenTickReached()
+    {
+        // After processing enough ticks, an under-construction building should
+        // transition to IsUnderConstruction = false.
+        var token = await RegisterAndGetTokenAsync($"construction-tick-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Tick Builder Co");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Industrial Zone", 20_000m, "Tick Test Lot");
+
+        var purchaseResult = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                building { id isUnderConstruction constructionCompletesAtTick }
+              }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Tick Factory" } },
+            token);
+
+        Assert.False(purchaseResult.TryGetProperty("errors", out _), "purchaseLot must succeed");
+        var buildingElem = purchaseResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+        var buildingId = Guid.Parse(buildingElem.GetProperty("id").GetString()!);
+        Assert.True(buildingElem.GetProperty("isUnderConstruction").GetBoolean(),
+            "Building should be under construction after purchase");
+
+        // Move the completion tick to now so ConstructionPhase will complete it this tick.
+        await using var setupScope = _factory.Services.CreateAsyncScope();
+        var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var buildingToModify = await setupDb.Buildings.FindAsync(buildingId);
+        Assert.NotNull(buildingToModify);
+        var gameState = await setupDb.GameStates.FirstOrDefaultAsync();
+        Assert.NotNull(gameState);
+        buildingToModify.ConstructionCompletesAtTick = gameState.CurrentTick;
+        await setupDb.SaveChangesAsync();
+
+        // Process one tick through the full tick engine (includes ConstructionPhase)
+        await ProcessTicksAsync(1);
+
+        // Verify the building is now operational
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var completedBuilding = await verifyDb.Buildings.FindAsync(buildingId);
+        Assert.NotNull(completedBuilding);
+        Assert.False(completedBuilding.IsUnderConstruction,
+            "Building must become operational after ConstructionPhase processes the completion tick");
+        Assert.Null(completedBuilding.ConstructionCompletesAtTick);
+    }
+
+    [Fact]
+    public async Task GameConstants_AllBuildingTypes_HavePositiveConstructionCostAndTicks()
+    {
+        // Backend and frontend must agree on construction costs/ticks for each building type.
+        // This test validates that every known building type produces a positive cost and tick
+        // count from GameConstants, catching any future typo or missing branch.
+        var buildingTypes = new[]
+        {
+            Api.Data.Entities.BuildingType.Mine,
+            Api.Data.Entities.BuildingType.Factory,
+            Api.Data.Entities.BuildingType.SalesShop,
+            Api.Data.Entities.BuildingType.ResearchDevelopment,
+            Api.Data.Entities.BuildingType.Apartment,
+            Api.Data.Entities.BuildingType.Commercial,
+            Api.Data.Entities.BuildingType.MediaHouse,
+            Api.Data.Entities.BuildingType.Bank,
+            Api.Data.Entities.BuildingType.Exchange,
+            Api.Data.Entities.BuildingType.PowerPlant,
+        };
+
+        foreach (var type in buildingTypes)
+        {
+            var cost = Api.Engine.GameConstants.ConstructionCost(type);
+            var ticks = Api.Engine.GameConstants.ConstructionTicks(type);
+            Assert.True(cost > 0,
+                $"ConstructionCost for '{type}' must be > 0 (got {cost})");
+            Assert.True(ticks > 0,
+                $"ConstructionTicks for '{type}' must be > 0 (got {ticks})");
+        }
+    }
+
+    [Fact]
+    public async Task PurchaseLot_ConstructionState_VisibleInCityLotsQuery()
+    {
+        // After purchasing a lot, the cityLots query must expose the construction state
+        // so the frontend can display the under-construction panel without a separate fetch.
+        var token = await RegisterAndGetTokenAsync($"construction-query-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Query Construction Co");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Industrial Zone", 10_000m, "Query Test Lot");
+
+        // Purchase the lot to trigger construction
+        await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { building { id } }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Query Factory" } },
+            token);
+
+        // Now query the city lots — the purchased lot's building should show construction state
+        var lotsResult = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id building { id isUnderConstruction constructionCompletesAtTick constructionCost }
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        Assert.False(lotsResult.TryGetProperty("errors", out _), "cityLots query must not return errors");
+        var lots = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+        var purchasedLot = lots.FirstOrDefault(l => l.GetProperty("id").GetString() == lotId);
+        Assert.True(purchasedLot.ValueKind != JsonValueKind.Undefined, "Purchased lot must appear in cityLots result");
+
+        var building = purchasedLot.GetProperty("building");
+        Assert.True(building.ValueKind != JsonValueKind.Null, "Purchased lot must have a building");
+        Assert.True(building.GetProperty("isUnderConstruction").GetBoolean(),
+            "Building must show isUnderConstruction=true in cityLots query");
+        Assert.True(building.GetProperty("constructionCompletesAtTick").GetInt64() > 0,
+            "constructionCompletesAtTick must be set in cityLots query");
+        Assert.True(building.GetProperty("constructionCost").GetDecimal() > 0m,
+            "constructionCost must be set in cityLots query");
+    }
+
+    [Fact]
+    public async Task PurchaseLot_WrongCompany_CannotStartConstruction()
+    {
+        // Authorization: a player should not be able to start construction using
+        // another player's company ID (only companies owned by the authenticated player are valid).
+        var token1 = await RegisterAndGetTokenAsync($"const-auth-a-{Guid.NewGuid()}@test.com");
+        var (companyId1, _, _) = await CompleteOnboardingAsync(token1, "Auth A Corp");
+
+        var token2 = await RegisterAndGetTokenAsync($"const-auth-b-{Guid.NewGuid()}@test.com");
+        // Player 2 does not own companyId1
+        await CompleteOnboardingAsync(token2, "Auth B Corp");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(bratislavaId, "FACTORY,MINE", "Industrial Zone", 5_000m, "Auth Test Lot");
+
+        // Player 2 tries to purchase using Player 1's company → must fail
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { building { id } }
+            }
+            """,
+            new { input = new { companyId = companyId1, lotId, buildingType = "FACTORY", buildingName = "Unauthorized Factory" } },
+            token2);
+
+        Assert.True(result.TryGetProperty("errors", out _),
+            "Purchasing with another player's company must return errors");
+    }
+
+    [Fact]
+    public async Task PurchaseLot_SuitableTypes_OnlyAllowedBuildingTypesAccepted()
+    {
+        // Allowed building-type validation: a lot that only supports SALES_SHOP,COMMERCIAL
+        // must reject a FACTORY purchase attempt with UNSUITABLE_BUILDING_TYPE error.
+        var token = await RegisterAndGetTokenAsync($"suitable-type-{Guid.NewGuid()}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Type Validation Co");
+
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var shopOnlyLotId = await CreateTestLotAsync(
+            bratislavaId, "SALES_SHOP,COMMERCIAL", "Commercial District", 5_000m, "Shop-Only Lot");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { building { id } }
+            }
+            """,
+            new { input = new { companyId, lotId = shopOnlyLotId, buildingType = "FACTORY", buildingName = "Rejected Factory" } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Unsuitable building type must return errors");
+        var codes = errors.EnumerateArray()
+            .SelectMany(e => e.TryGetProperty("extensions", out var ext)
+                ? ext.EnumerateObject().Where(p => p.Name == "code").Select(p => p.Value.GetString())
+                : Enumerable.Empty<string?>())
+            .ToList();
+        Assert.Contains("UNSUITABLE_BUILDING_TYPE", codes);
     }
 
     #endregion
