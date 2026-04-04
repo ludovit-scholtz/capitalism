@@ -599,6 +599,244 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
     }
 
+    [Fact]
+    public async Task FinishOnboarding_ViennaCity_FoodProcessingSupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // AC2 + AC8: Supply chain tick-engine must work for non-default cities.
+        // Vienna is the third seeded city. Food Processing (Grain→Bread) must work here
+        // because city-specific resource abundance and exchange pricing differs from
+        // Bratislava and Prague. This test proves the city-exchange integration works
+        // for Vienna + FOOD_PROCESSING after onboarding.
+        var token = await RegisterAndGetTokenAsync(email: $"finish-vienna-food-{Guid.NewGuid():N}@test.com");
+        var cityId = await GetCityIdByNameAsync("Vienna");
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Vienna Industrial Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FOOD_PROCESSING", cityId, companyName = "Vienna Bakery Corp", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Vienna Commercial District", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for FOOD_PROCESSING in Vienna");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(productId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "Vienna FOOD_PROCESSING starter shop should fill from factory output after ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_PragueCity_FurnitureSupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // AC2 + AC8: Furniture (Wood→Wooden Chair) must work in Prague, the second seeded city.
+        // The default supply chain tests use Bratislava; this test proves Prague city-exchange
+        // pricing does not break the Furniture starter chain.
+        var token = await RegisterAndGetTokenAsync(email: $"finish-prague-furn-{Guid.NewGuid():N}@test.com");
+        var cityId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Prague Timber Works");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Prague Furniture House", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Prague High Street", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for FURNITURE in Prague");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(productId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "Prague FURNITURE starter shop should fill from factory output after ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_PragueCity_HealthcareSupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // AC2 + AC8: Healthcare (Chemical Minerals→Basic Medicine) must work in Prague.
+        // Prague's resource abundance for Chemical Minerals may differ from the other cities,
+        // so this test proves the starter chain is viable for all industries in Prague.
+        var token = await RegisterAndGetTokenAsync(email: $"finish-prague-health-{Guid.NewGuid():N}@test.com");
+        var cityId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Prague Pharma Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "HEALTHCARE", cityId, companyName = "Prague Pharma Corp", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("HEALTHCARE", "basic-medicine");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Prague Medical District", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for HEALTHCARE in Prague");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(productId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "Prague HEALTHCARE starter shop should fill from factory output after ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_ViennaCity_FurnitureSupplyChainFeedsShopAndMakesFirstSale()
+    {
+        // AC2 + AC8: Furniture (Wood→Wooden Chair) must work in Vienna, the third seeded city.
+        // This completes the full 3×3 city×industry supply chain tick matrix and proves that
+        // Vienna's resource exchange pricing supports all three starter industries.
+        var token = await RegisterAndGetTokenAsync(email: $"finish-vienna-furn-{Guid.NewGuid():N}@test.com");
+        var cityId = await GetCityIdByNameAsync("Vienna");
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Vienna Timber Works");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Vienna Furniture House", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Vienna High Street", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for FURNITURE in Vienna");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+        var shopId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        var productGuid = Guid.Parse(productId);
+
+        await ProcessTicksAsync(4);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var shopPurchaseUnit = await db.BuildingUnits
+                .SingleAsync(unit => unit.BuildingId == shopId && unit.UnitType == UnitType.Purchase);
+            var purchasedInventory = await db.Inventories
+                .Where(entry => entry.BuildingUnitId == shopPurchaseUnit.Id && entry.ProductTypeId == productGuid)
+                .ToListAsync();
+
+            Assert.True(
+                purchasedInventory.Sum(entry => entry.Quantity) > 0m,
+                "Vienna FURNITURE starter shop should fill from factory output after ticks.");
+        }
+
+        await ProcessTicksAsync(2);
+
+        await using (var verificationScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var salesRecords = await db.PublicSalesRecords
+                .Where(record => record.BuildingId == shopId && record.ProductTypeId == productGuid && record.QuantitySold > 0m)
+                .ToListAsync();
+
+            Assert.NotEmpty(salesRecords);
+        }
+    }
+
     #endregion
 
     #region Authentication
@@ -5238,6 +5476,154 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.True(result.TryGetProperty("errors", out var errors));
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("INSUFFICIENT_FUNDS", code);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WithNonExistentProductId_ReturnsInvalidProductError()
+    {
+        // Validates that FinishOnboarding rejects a completely non-existent product UUID
+        // rather than producing a null-reference error or bypassing validation.
+        var token = await RegisterAndGetTokenAsync($"finish-noexist-product-{Guid.NewGuid()}@test.com", "NoExistProduct");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Phantom Product Co");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
+        var phantomProductId = Guid.NewGuid();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { productTypeId = phantomProductId, shopLotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("INVALID_PRODUCT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_WithNonStarterProduct_ReturnsInvalidProductError()
+    {
+        // Validates that products seeded in the game (e.g. wooden-table) but NOT designated
+        // as the starter product for that industry (starter = wooden-chair) are rejected.
+        // This ensures the IsStarterOnboardingProduct guard in Mutation.cs is exercised.
+        var token = await RegisterAndGetTokenAsync($"finish-nonstarter-product-{Guid.NewGuid()}@test.com", "NonStarterProduct");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Fancy Furniture Co");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
+
+        // wooden-table is a valid FURNITURE product but is NOT the starter product (wooden-chair is).
+        var nonStarterProductId = await GetStarterProductIdAsync("FURNITURE", "wooden-table");
+
+        var result = await FinishOnboardingAsync(token, nonStarterProductId, shopLotId);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("INVALID_PRODUCT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_WithNonExistentLot_ReturnsError()
+    {
+        // Validates that StartOnboardingCompany rejects a factory lot UUID that doesn't exist
+        // in the database, rather than throwing an unhandled exception.
+        var token = await RegisterAndGetTokenAsync($"start-noexist-lot-{Guid.NewGuid()}@test.com", "PhantomLot");
+        var cityId = await GetCityIdByNameAsync();
+        var phantomLotId = Guid.NewGuid();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Phantom Lot Corp", factoryLotId = phantomLotId } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_FoodProcessing_ReturnsEligibleStartupPackOffer()
+    {
+        // Verifies that the startup-pack offer is activated for FOOD_PROCESSING industry
+        // via the staged FinishOnboarding mutation — not only via the legacy CompleteOnboarding.
+        // This is a critical monetization path: the offer must appear for every starter industry.
+        var token = await RegisterAndGetTokenAsync($"startup-pack-food-{Guid.NewGuid()}@test.com", "FoodStartupPack");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m);
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep }
+            }
+            """,
+            new { input = new { industry = "FOOD_PROCESSING", cityId, companyName = "Bread Empire", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                company { id }
+                startupPackOffer { status companyCashGrant proDurationDays expiresAtUtc }
+              }
+            }
+            """,
+            new { input = new { productTypeId = productId, shopLotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for FOOD_PROCESSING startup pack test");
+
+        var offer = result.GetProperty("data").GetProperty("finishOnboarding").GetProperty("startupPackOffer");
+        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
+        Assert.Equal(StartupPackService.CompanyCashGrant, offer.GetProperty("companyCashGrant").GetDecimal());
+        Assert.Equal(StartupPackService.ProDurationDays, offer.GetProperty("proDurationDays").GetInt32());
+        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_Healthcare_ReturnsEligibleStartupPackOffer()
+    {
+        // Verifies that the startup-pack offer is activated for HEALTHCARE industry
+        // via the staged FinishOnboarding mutation.
+        var token = await RegisterAndGetTokenAsync($"startup-pack-health-{Guid.NewGuid()}@test.com", "HealthStartupPack");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m);
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep }
+            }
+            """,
+            new { input = new { industry = "HEALTHCARE", cityId, companyName = "Medicine Empire", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("HEALTHCARE", "basic-medicine");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation FinishOnboarding($input: FinishOnboardingInput!) {
+              finishOnboarding(input: $input) {
+                company { id }
+                startupPackOffer { status companyCashGrant proDurationDays expiresAtUtc }
+              }
+            }
+            """,
+            new { input = new { productTypeId = productId, shopLotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for HEALTHCARE startup pack test");
+
+        var offer = result.GetProperty("data").GetProperty("finishOnboarding").GetProperty("startupPackOffer");
+        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
+        Assert.Equal(StartupPackService.CompanyCashGrant, offer.GetProperty("companyCashGrant").GetDecimal());
+        Assert.Equal(StartupPackService.ProDurationDays, offer.GetProperty("proDurationDays").GetInt32());
+        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
     }
 
     [Fact]
