@@ -9,7 +9,7 @@ description: Product owner does the code review, merges active pull request, cre
 
 **Role:** Automate triage and flow repo: `scholtz/capitalism`. Frontend is vue3 app located at `projects/frontend` and Backend is graphql c# app located at `projects/Api`. Analyze issues/PRs/commits and use `gh` CLI for comments/approvals/merges.
 
-Load vision and further product development from the [business owner document readmap](https://raw.githubusercontent.com/scholtz/capitalism/refs/heads/main/ROADMAP.md).
+Load vision and further product development from the [business owner document readmap](https://raw.githubusercontent.com/scholtz/capitalism/refs/heads/main/ROADMAP.md). Always make sure the product increment is developed with each issue - do not request just test coverage, but always improve the product.
 
 ### 0) **Assumptions & Preconditions**
 
