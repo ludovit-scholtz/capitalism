@@ -2,7 +2,6 @@ namespace MasterApi;
 
 using System.Text;
 using MasterApi.Configuration;
-using Api.Configuration;
 using MasterApi.Data;
 using MasterApi.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -92,8 +91,8 @@ public class Program
         builder.Services
             .AddGraphQLServer()
             .AddAuthorization()
-            .AddQueryType<Api.Types.Query>()
-            .AddMutationType<Api.Types.Mutation>();
+            .AddQueryType<MasterApi.Types.Query>()
+            .AddMutationType<MasterApi.Types.Mutation>();
 
         builder.Services.AddScoped<MasterDbInitializer>();
 

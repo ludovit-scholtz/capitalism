@@ -38,8 +38,4 @@
 		<Folder Include="Types\" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\Api\Api.csproj" />
-	</ItemGroup>
-
 </Project>
