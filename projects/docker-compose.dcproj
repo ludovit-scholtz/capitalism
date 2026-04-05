@@ -8,5 +8,6 @@
   </PropertyGroup>
   <ItemGroup>
     <None Include="docker-compose.yml" />
+    <None Include="Manage-ApiMigrations.ps1" />
   </ItemGroup>
 </Project>

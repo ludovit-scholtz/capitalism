@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data2
+      - postgres_data:/var/lib/postgresql/data3
 
   masterapi:
     build:
@@ -22,7 +22,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=https://+:44364
-      - ConnectionStrings__MasterCatalog=Host=postgresmaster;Port=5432;Database=master;Username=postgres;Password=password
+      - ConnectionStrings__MasterCatalog=Host=postgresmaster;Port=5432;Database=gamemaster;Username=postgres;Password=password
   game1:
     build:
       context: .

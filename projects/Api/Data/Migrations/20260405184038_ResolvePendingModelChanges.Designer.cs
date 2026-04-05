@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260405183516_UpdateModelSnapshot")]
-    partial class UpdateModelSnapshot
+    [Migration("20260405184038_ResolvePendingModelChanges")]
+    partial class ResolvePendingModelChanges
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
