@@ -8,6 +8,7 @@
 		<UserSecretsId>c94cdb38-4887-4843-aec4-a27a6e5b7e0e</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<RootNamespace>MasterApi</RootNamespace>
+		<DependencyAwareStart>true</DependencyAwareStart>
 	</PropertyGroup>
 
 	<ItemGroup Condition="'$(ImplicitUsings)' == 'enable'">
