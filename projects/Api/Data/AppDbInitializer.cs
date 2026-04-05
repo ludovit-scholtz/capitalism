@@ -804,8 +804,17 @@ public sealed class AppDbInitializer(
         {
             // Check whether the migrations-history table already exists.
             await using var checkCmd = connection.CreateCommand();
-            checkCmd.CommandText =
-                $"SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='{historyTable}'";
+            var provider = dbContext.Database.ProviderName ?? "Unknown";
+            string checkQuery;
+            if (provider.Contains("PostgreSQL"))
+            {
+                checkQuery = $"SELECT COUNT(1) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname = 'public' AND c.relname = '{historyTable}'";
+            }
+            else
+            {
+                checkQuery = $"SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='{historyTable}'";
+            }
+            checkCmd.CommandText = checkQuery;
             var historyExists =
                 Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0L) > 0;
 
