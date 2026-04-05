@@ -999,6 +999,35 @@ public sealed class Query
         return result;
     }
 
+    /// <summary>
+    /// Returns per-unit operational status for a building owned by the authenticated player.
+    /// Each record describes whether a unit is actively processing, idle, blocked due to a missing input, or not yet configured.
+    /// </summary>
+    [Authorize]
+    public async Task<ProcurementPreview> ProcurementPreview(
+        Guid buildingUnitId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building)
+            .ThenInclude(b => b.Company)
+            .FirstOrDefaultAsync(u => u.Id == buildingUnitId);
+
+        if (unit is null || unit.Building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building unit not found or you don't own it.")
+                    .SetCode("BUILDING_UNIT_NOT_FOUND")
+                    .Build());
+        }
+
+        return await ProcurementPreviewService.ComputeAsync(db, unit, unit.Building.Company);
+    }
+
     private static BuildingUnitOperationalStatus DeriveUnitOperationalStatus(
         Data.Entities.BuildingUnit unit,
         decimal inventoryTotal,

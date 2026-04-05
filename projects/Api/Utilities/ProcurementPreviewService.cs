@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Data.Entities;
+using Api.Types;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Utilities;
@@ -419,65 +420,4 @@ public static class ProcurementPreviewService
             BlockMessage = "No qualifying B2B supply found in this city. Check that you have a B2B Sales unit in another building with stock and a qualifying price.",
         };
     }
-}
-
-/// <summary>Result of evaluating a purchase unit's next-tick behavior without executing it.</summary>
-public sealed class ProcurementPreview
-{
-    /// <summary>The type of source that would be used.</summary>
-    public string SourceType { get; set; } = ProcurementSourceType.NoSource;
-
-    /// <summary>Source city ID (for global exchange sources).</summary>
-    public Guid? SourceCityId { get; set; }
-
-    /// <summary>Human-readable source city name.</summary>
-    public string? SourceCityName { get; set; }
-
-    /// <summary>Vendor company ID (for local or vendor-locked sources).</summary>
-    public Guid? SourceVendorCompanyId { get; set; }
-
-    /// <summary>Human-readable vendor name.</summary>
-    public string? SourceVendorName { get; set; }
-
-    /// <summary>Exchange price per unit at the source city (before transit).</summary>
-    public decimal? ExchangePricePerUnit { get; set; }
-
-    /// <summary>Transit cost per unit from source city to destination.</summary>
-    public decimal? TransitCostPerUnit { get; set; }
-
-    /// <summary>Total delivered price per unit (exchange price + transit cost).</summary>
-    public decimal? DeliveredPricePerUnit { get; set; }
-
-    /// <summary>Estimated quality of the goods that would be purchased (0–1).</summary>
-    public decimal? EstimatedQuality { get; set; }
-
-    /// <summary>Whether the purchase would execute on the next tick.</summary>
-    public bool CanExecute { get; set; }
-
-    /// <summary>Machine-readable block reason code.</summary>
-    public string? BlockReason { get; set; }
-
-    /// <summary>Human-readable explanation of why the purchase is blocked.</summary>
-    public string? BlockMessage { get; set; }
-}
-
-/// <summary>Well-known source type strings for <see cref="ProcurementPreview"/>.</summary>
-public static class ProcurementSourceType
-{
-    public const string GlobalExchange = "GLOBAL_EXCHANGE";
-    public const string PlayerExchangeOrder = "PLAYER_EXCHANGE_ORDER";
-    public const string LocalB2B = "LOCAL_B2B";
-    public const string LockedVendor = "LOCKED_VENDOR";
-    public const string NoSource = "NO_SOURCE";
-}
-
-/// <summary>Well-known block reason codes for <see cref="ProcurementPreview"/>.</summary>
-public static class ProcurementBlockReason
-{
-    public const string NotConfigured = "NOT_CONFIGURED";
-    public const string MaxPriceExceeded = "MAX_PRICE_EXCEEDED";
-    public const string MinQualityFailed = "MIN_QUALITY_FAILED";
-    public const string NoStock = "NO_STOCK";
-    public const string LockedSourceUnavailable = "LOCKED_SOURCE_UNAVAILABLE";
-    public const string InsufficientCash = "INSUFFICIENT_CASH";
 }

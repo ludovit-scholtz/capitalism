@@ -16350,7 +16350,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var player = await db.Players.FirstAsync(p => p.Email == email);
         var seller = await db.Players.FirstAsync(p => p.Email == sellerEmail);
         var city = await db.Cities.FirstAsync();
-        var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "iron-ore");
 
         var buyerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BuyerCoOpt", Cash = 100_000m };
         db.Companies.Add(buyerCompany);
