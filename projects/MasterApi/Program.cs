@@ -51,8 +51,16 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddDbContext<MasterDbContext>(options =>
 {
-    options.UseNpgsql(builder.Configuration.GetConnectionString("MasterCatalog")
-        ?? throw new InvalidOperationException("Connection string 'MasterCatalog' is missing."));
+    if (builder.Environment.IsEnvironment("Testing"))
+    {
+        options.UseSqlite(builder.Configuration.GetConnectionString("MasterCatalog")
+            ?? throw new InvalidOperationException("Connection string 'MasterCatalog' is missing."));
+    }
+    else
+    {
+        options.UseNpgsql(builder.Configuration.GetConnectionString("MasterCatalog")
+            ?? throw new InvalidOperationException("Connection string 'MasterCatalog' is missing."));
+    }
 });
 
 builder.Services
