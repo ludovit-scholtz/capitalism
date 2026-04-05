@@ -69,6 +69,8 @@ With bigger company there will be higher administration overhead. Show this info
 
 Administration overhead 50% is the maximum for 2 year old company with the highest asset equity.
 
+Company dividends can be set in the company settings page as well. Acting CEO of the company suggests change and the shareholders approves or reject any change. The dividend defaults to 20%.
+
 ## Land
 
 Game engine ensures there is always at least 10 available lands available for each building type in each city. Buildings can be purchased only on existing lands.
@@ -228,15 +230,35 @@ When unit is being modified user can still change it. For example when user upgr
 
 ## The onboarding 
 
-New players when comes to the web first select the industry type they want to start with. The Furniture, Food processing, or Healthcare.
-
-Then they pick the location of their first factory and select the first product which they want to produce. This will set the factory layout for them. Wizzard will show them important areas on the screen like how much money they have, the price configuration or public sales configuration.
-
-Next the player buys his first sales shop and configures it to set the sales price to public.
-
-The player is shown that the time goes on and he makes the profit from his business.
+Onboarding process:
+1. User is given $200000 to his personal account and he picks the game player name
+2. IPO Process - User puts his $50k to the business and has decision how much money he wants to raise - $800 000, $600000, or $400 000 varying his own shares to be 25% or 33% or 50% in the company. User picks the company name.
+3. Player selects the industry type they want to start with. The Furniture, Food processing, or Healthcare.
+4. Player selects the product he wants to produce - Each starting industry allows 3 basic products to be produced.
+5. Then they pick the location of their first factory. This will set the factory layout for them and user pays for all costs associated with it - the property as well company layout (show costs analysis before the purchase). Wizzard will show them important areas on the screen like how much money they have, the price configuration or public sales configuration.
+6. Next the player buys his first sales shop and configures it to set the sales price to public. User pays for the land and sales shop unit layour - make sure the user has clear information about this.
+7. The player is shown that the time goes on and he makes the profit from his business.
+8. User is asked to create the user account.
 
 Do not require authentication for new not authenticated users. Do not store the progress for these users to the backend, but make sure to show them they bought the buildings they setup the resources chain and they made some profit. After that ask them to log in to save their progress. If there is error such as the building was meanwhile purchased by someone else or profit is too big make sure to create their profile with the name they chosed and start the wizzard again with the authenticated user and this time save everything.
+
+## Stock exchange
+
+There is one global stock exchange where all company shares are traded. The share price is calculated as the sum of all equities of the company (including land, units, warehouse stocks, cash, owned stocks, and other assets) plus profit expectation divided by number of issued stocks.
+
+Profit expectation is complex formula where new companies has this as zero. The formula includes the profit this year, history of prifits in past years and dividends paid.
+
+Player acting for the company or person account can buy shares for any company including its own from public investors. Market bid price is 1% below the share price and offer is 1% above the share price. The buying of the company shares directly by the company is considered as the company buy back and reduces the number of issued shares.
+
+Player acting for the company or person account can sell shares it owns.
+
+When sum of ownerships for person account and all controlled companies in the other company reaches 50%, person can replace the CEO of the company which is considered as the take over and the player will control also this company.
+
+When sum of ownerships for person account and all controlled companies reaches 90%, person can merge this company into another company. This way all assets owned by the company are moved to the new company and the merged company is closed. Taxes for old company are paid on the tick of merge for old company.
+
+## Account switching
+
+Player can switch between his person account and any company he controls.
 
 ## City Global Exchanges
 
