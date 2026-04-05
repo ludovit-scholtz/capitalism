@@ -314,6 +314,15 @@ function goBack() {
               <strong class="meta-value">{{ selectedProduct.outputQuantity }} {{ selectedProduct.unitSymbol }}</strong>
             </div>
           </div>
+          <div v-if="selectedResource" class="hero-cta">
+            <RouterLink
+              to="/exchange"
+              class="btn-exchange-link"
+              :aria-label="t('resourceDetail.checkExchangePrices')"
+            >
+              {{ t('resourceDetail.checkExchangePrices') }}
+            </RouterLink>
+          </div>
         </div>
       </header>
 
@@ -548,6 +557,27 @@ function goBack() {
   display: flex;
   gap: 1.5rem;
   flex-wrap: wrap;
+}
+
+.hero-cta {
+  margin-top: 1rem;
+}
+
+.btn-exchange-link {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 40%, transparent);
+  border-radius: var(--radius-sm, 4px);
+  transition: background 0.15s;
+}
+
+.btn-exchange-link:hover {
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  text-decoration: none;
 }
 
 .meta-item {
