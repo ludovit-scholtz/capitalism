@@ -87,11 +87,12 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 {
     if (builder.Environment.IsDevelopment())
     {
-        options.UseInMemoryDatabase("events-tests");
+        options.UseNpgsql(builder.Configuration.GetConnectionString("EventsCatalog")
+            ?? throw new InvalidOperationException("Connection string 'EventsCatalog' is missing."));
     }
     else
     {
-        options.UseSqlite(builder.Configuration.GetConnectionString("EventsCatalog")
+        options.UseNpgsql(builder.Configuration.GetConnectionString("EventsCatalog")
             ?? throw new InvalidOperationException("Connection string 'EventsCatalog' is missing."));
     }
 });

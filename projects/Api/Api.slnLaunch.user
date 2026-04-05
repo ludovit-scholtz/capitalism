@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "MasterAndGameApi",
+    "Projects": [
+      {
+        "Path": "..\\MasterApi\\MasterApi.csproj",
+        "Action": "Start",
+        "DebugTarget": "IIS Express"
+      },
+      {
+        "Path": "Api.csproj",
+        "Action": "Start",
+        "DebugTarget": "IIS Express"
+      }
+    ]
+  }
+]

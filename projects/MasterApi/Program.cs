@@ -1,8 +1,10 @@
 using System.Text;
 using MasterApi.Configuration;
+using Api.Configuration;
 using MasterApi.Data;
 using MasterApi.Security;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
@@ -49,13 +51,7 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddDbContext<MasterDbContext>(options =>
 {
-    if (builder.Environment.IsEnvironment("Testing"))
-    {
-        options.UseInMemoryDatabase("master-api-tests");
-        return;
-    }
-
-    options.UseSqlite(builder.Configuration.GetConnectionString("MasterCatalog")
+    options.UseNpgsql(builder.Configuration.GetConnectionString("MasterCatalog")
         ?? throw new InvalidOperationException("Connection string 'MasterCatalog' is missing."));
 });
 
@@ -76,13 +72,16 @@ builder.Services
         };
     });
 
-builder.Services.AddScoped<MasterDbInitializer>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpClient("master-server");
 
 builder.Services
     .AddGraphQLServer()
     .AddAuthorization()
-    .AddQueryType<MasterApi.Types.Query>()
-    .AddMutationType<MasterApi.Types.Mutation>();
+    .AddQueryType<Api.Types.Query>()
+    .AddMutationType<Api.Types.Mutation>();
+
+builder.Services.AddScoped<MasterDbInitializer>();
 
 var app = builder.Build();
 
