@@ -260,6 +260,16 @@ When sum of ownerships for person account and all controlled companies reaches 9
 
 Player can switch between his person account and any company he controls.
 
+Game administrators can switch to any player account. In the player account they can switch to any of the player controlled person or company accounts.
+
+## Person account
+
+In the onboarding the player picks the game player name. This is the person account. At the start he owns certain amount of company shares the player creates. The ledger info for the player account is customized to person view.
+
+Person cannot own land or buildings and does not pay tax. He can only own the cash or shares in the companies. Person account income is the sale of shares and dividends.
+
+Player can switch to person view so that he can trade the stocks.
+
 ## City Global Exchanges
 
 In each city is one in game global exchange which serves as the hub between connecting the cities. Global Exchange acts never ending resource sale for every resource. Each city has different resource pricing and quality at the global exchange.
