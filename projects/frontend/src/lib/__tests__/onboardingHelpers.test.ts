@@ -123,6 +123,7 @@ describe('getMaxReachableStep', () => {
     hasCompletionResult: false,
     isResumingConfigureStep: false,
     onboardingCurrentStep: null,
+    hasLocalFactoryProgress: false,
     selectedCityId: '',
     selectedIndustry: '',
   }
@@ -148,6 +149,17 @@ describe('getMaxReachableStep', () => {
         selectedIndustry: 'FURNITURE',
         selectedCityId: 'city-1',
         onboardingCurrentStep: 'SHOP_SELECTION',
+      }),
+    ).toBe(4)
+  })
+
+  it('returns 4 when local factory progress exists after a reload', () => {
+    expect(
+      getMaxReachableStep({
+        ...baseState,
+        selectedIndustry: 'FURNITURE',
+        selectedCityId: 'city-1',
+        hasLocalFactoryProgress: true,
       }),
     ).toBe(4)
   })

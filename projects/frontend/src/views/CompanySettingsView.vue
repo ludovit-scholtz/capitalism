@@ -17,6 +17,7 @@ const error = ref<string | null>(null)
 const success = ref<string | null>(null)
 const settings = ref<CompanySettings | null>(null)
 const companyName = ref('')
+const dividendPayoutPercent = ref(20)
 const salaryMultipliers = ref<Record<string, number>>({})
 
 const SETTINGS_QUERY = `
@@ -25,6 +26,8 @@ const SETTINGS_QUERY = `
       companyId
       companyName
       cash
+      totalSharesIssued
+      dividendPayoutRatio
       foundedAtTick
       administrationOverheadRate
       ageFactor
@@ -46,6 +49,7 @@ const UPDATE_MUTATION = `
     updateCompanySettings(input: $input) {
       id
       name
+      dividendPayoutRatio
     }
   }
 `
@@ -67,6 +71,7 @@ async function loadSettings() {
 
     settings.value = data.companySettings
     companyName.value = data.companySettings.companyName
+    dividendPayoutPercent.value = data.companySettings.dividendPayoutRatio * 100
     salaryMultipliers.value = Object.fromEntries(data.companySettings.citySalarySettings.map((entry) => [entry.cityId, entry.salaryMultiplier]))
   } catch (reason: unknown) {
     error.value = reason instanceof Error ? reason.message : t('companySettings.loadFailed')
@@ -89,6 +94,7 @@ async function saveSettings() {
       input: {
         companyId: settings.value.companyId,
         name: companyName.value,
+        dividendPayoutRatio: Number((dividendPayoutPercent.value / 100).toFixed(4)),
         citySalarySettings: settings.value.citySalarySettings.map((entry) => ({
           cityId: entry.cityId,
           salaryMultiplier: Number(salaryMultipliers.value[entry.cityId] ?? entry.salaryMultiplier),
@@ -115,6 +121,12 @@ function formatCurrency(value: number): string {
 
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`
+}
+
+function formatShareCount(value: number): string {
+  return new Intl.NumberFormat(locale.value, {
+    maximumFractionDigits: Number.isInteger(value) ? 0 : 4,
+  }).format(value)
 }
 
 const overheadStatus = computed(() =>
@@ -160,6 +172,14 @@ onMounted(loadSettings)
             <strong>{{ settings.foundedAtTick }}</strong>
           </div>
           <div>
+            <span class="overview-label">{{ t('companySettings.totalSharesIssued') }}</span>
+            <strong>{{ formatShareCount(settings.totalSharesIssued) }}</strong>
+          </div>
+          <div>
+            <span class="overview-label">{{ t('companySettings.dividendPayoutRatio') }}</span>
+            <strong>{{ formatPercent(settings.dividendPayoutRatio) }}</strong>
+          </div>
+          <div>
             <span class="overview-label">{{ t('companySettings.administrationOverhead') }}</span>
             <strong :class="`overhead-value overhead-${overheadStatus}`">
               {{ formatPercent(settings.administrationOverheadRate) }}
@@ -188,6 +208,12 @@ onMounted(loadSettings)
         <label class="settings-field">
           <span>{{ t('companySettings.companyName') }}</span>
           <input v-model="companyName" type="text" maxlength="200" />
+        </label>
+
+        <label class="settings-field">
+          <span>{{ t('companySettings.dividendPayoutRatio') }}</span>
+          <input v-model.number="dividendPayoutPercent" type="number" min="0" max="100" step="1" />
+          <small class="field-help">{{ t('companySettings.dividendHelp') }}</small>
         </label>
 
         <div class="salary-table-wrapper">
@@ -357,6 +383,11 @@ onMounted(loadSettings)
   background: var(--color-surface-elevated, var(--color-surface));
   color: var(--color-text);
   padding: 0.65rem 0.8rem;
+}
+
+.field-help {
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
 }
 
 .salary-table-wrapper {

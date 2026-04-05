@@ -396,6 +396,7 @@ async function claimStartupPackOffer() {
     )
 
     auth.setStartupPackOffer(data.claimStartupPack.offer)
+    auth.setProSubscriptionEndsAtUtc(data.claimStartupPack.proSubscriptionEndsAtUtc)
     companies.value = companies.value.map((company) => (company.id === data.claimStartupPack.company.id ? data.claimStartupPack.company : company))
     await auth.fetchMe()
     offerMessage.value = t('startupPack.claimedBody', {
@@ -545,10 +546,10 @@ function formatTimeRemaining(expiresAtUtc: string): string {
 
         <div v-else-if="claimedStartupPackOffer" class="startup-pack-state success">
           <strong>{{ t('startupPack.claimedTitle') }}</strong>
-          <p v-if="auth.player?.proSubscriptionEndsAtUtc">
+          <p v-if="auth.effectiveProSubscriptionEndsAtUtc">
             {{
               t('startupPack.claimedBody', {
-                date: formatDateTime(auth.player.proSubscriptionEndsAtUtc),
+                date: formatDateTime(auth.effectiveProSubscriptionEndsAtUtc),
               })
             }}
           </p>

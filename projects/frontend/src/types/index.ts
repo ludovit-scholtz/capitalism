@@ -1,6 +1,8 @@
 /** Matches backend PlayerRole constants */
 export type PlayerRole = 'PLAYER' | 'ADMIN'
 
+export type AccountContextType = 'PERSON' | 'COMPANY'
+
 /** Matches backend Player entity */
 export interface Player {
   id: string
@@ -9,6 +11,9 @@ export interface Player {
   role: PlayerRole
   createdAtUtc: string
   lastLoginAtUtc: string | null
+  personalCash: number
+  activeAccountType: AccountContextType
+  activeCompanyId: string | null
   onboardingCompletedAtUtc: string | null
   onboardingCurrentStep: string | null
   onboardingIndustry: string | null
@@ -34,6 +39,8 @@ export interface Company {
   playerId: string
   name: string
   cash: number
+  totalSharesIssued?: number
+  dividendPayoutRatio?: number
   foundedAtUtc: string
   foundedAtTick?: number
   buildings: Building[]
@@ -51,6 +58,8 @@ export interface CompanySettings {
   companyId: string
   companyName: string
   cash: number
+  totalSharesIssued: number
+  dividendPayoutRatio: number
   foundedAtTick: number
   administrationOverheadRate: number
   /** 0–1: how much company age contributes to overhead (reaches 1 at 2 years old) */
@@ -413,6 +422,74 @@ export interface StartupPackClaimResult {
   offer: StartupPackOffer
   company: Company
   proSubscriptionEndsAtUtc: string
+}
+
+export interface AccountContextResult {
+  activeAccountType: AccountContextType
+  activeCompanyId: string | null
+  activeAccountName: string
+}
+
+export interface PortfolioHolding {
+  companyId: string
+  companyName: string
+  shareCount: number
+  ownershipRatio: number
+  sharePrice: number
+  marketValue: number
+}
+
+export interface DividendPayment {
+  id: string
+  companyId: string
+  companyName: string
+  shareCount: number
+  amountPerShare: number
+  totalAmount: number
+  gameYear: number
+  recordedAtTick: number
+  recordedAtUtc: string
+  description: string
+}
+
+export interface PersonAccount {
+  playerId: string
+  displayName: string
+  personalCash: number
+  activeAccountType: AccountContextType
+  activeCompanyId: string | null
+  shareholdings: PortfolioHolding[]
+  dividendPayments: DividendPayment[]
+}
+
+export interface StockExchangeListing {
+  companyId: string
+  companyName: string
+  totalSharesIssued: number
+  publicFloatShares: number
+  sharePrice: number
+  bidPrice: number
+  askPrice: number
+  dividendPayoutRatio: number
+  playerOwnedShares: number
+  controlledCompanyOwnedShares: number
+  combinedControlledOwnershipRatio: number
+  canClaimControl: boolean
+}
+
+export interface ShareTradeResult {
+  companyId: string
+  companyName: string
+  accountType: AccountContextType
+  accountCompanyId: string | null
+  accountName: string
+  shareCount: number
+  pricePerShare: number
+  totalValue: number
+  ownedShareCount: number
+  publicFloatShares: number
+  personalCash: number
+  companyCash: number | null
 }
 
 /** Matches backend PlayerRanking response */

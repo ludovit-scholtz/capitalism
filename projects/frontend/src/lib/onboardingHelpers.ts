@@ -42,6 +42,7 @@ export interface OnboardingStepState {
   hasCompletionResult: boolean
   isResumingConfigureStep: boolean
   onboardingCurrentStep: string | null | undefined
+  hasLocalFactoryProgress: boolean
   selectedCityId: string
   selectedIndustry: string
 }
@@ -55,6 +56,7 @@ export function getMaxReachableStep(state: OnboardingStepState): number {
   if (state.hasCompletionResult) return 5
   if (state.isResumingConfigureStep) return 5
   if (state.onboardingCurrentStep === 'SHOP_SELECTION') return 4
+  if (state.hasLocalFactoryProgress) return 4
   if (state.selectedCityId) return 3
   if (state.selectedIndustry) return 2
   return 1

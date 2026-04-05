@@ -21,6 +21,8 @@ namespace Api.Tests;
 /// </summary>
 public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFactory>
 {
+    private const decimal DefaultStarterCompanyCash = 450_000m;
+
     private readonly HttpClient _client;
     private readonly ApiWebApplicationFactory _factory;
 
@@ -32,7 +34,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
     #region Helpers
 
-    private async Task<JsonElement> ExecuteGraphQlAsync(string query, object? variables = null, string? token = null)
+    private static async Task<JsonElement> ExecuteGraphQlAsync(HttpClient client, string query, object? variables = null, string? token = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
         request.Content = new StringContent(
@@ -45,7 +47,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         }
 
-        var response = await _client.SendAsync(request);
+        var response = await client.SendAsync(request);
         var body = await response.Content.ReadAsStringAsync();
 
         if (!response.IsSuccessStatusCode)
@@ -55,6 +57,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         return JsonSerializer.Deserialize<JsonElement>(body);
     }
+
+    private Task<JsonElement> ExecuteGraphQlAsync(string query, object? variables = null, string? token = null)
+        => ExecuteGraphQlAsync(_client, query, variables, token);
 
     private async Task<string> RegisterAndGetTokenAsync(string email = "test@example.com", string displayName = "Tester", string password = "TestPass123!")
     {
@@ -115,55 +120,103 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
     }
 
-    private async Task<(string CompanyId, string ProductId, JsonElement Result)> CompleteOnboardingAsync(
-        string token,
-        string companyName = "My First Co")
+        private async Task<(string CompanyId, string ProductId, JsonElement Result)> CompleteOnboardingAsync(
+                string token,
+                string companyName = "My First Co")
+        {
+                await ResetGameStateAsync();
+
+                var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, companyName);
+                var productId = await GetStarterProductIdAsync();
+                var shopLotId = await GetAvailableLotIdAsync(cityId, "SALES_SHOP");
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation CompleteOnboarding($input: FinishOnboardingInput!) {
+                            completeOnboarding: finishOnboarding(input: $input) {
+                                company { id name cash }
+                                factory { id name type }
+                                salesShop { id name type }
+                                selectedProduct { id name industry }
+                                startupPackOffer {
+                                    status
+                                    companyCashGrant
+                                    proDurationDays
+                                    expiresAtUtc
+                                }
+                            }
+                        }
+                        """,
+                        new { input = new { productTypeId = productId, shopLotId } },
+                        token);
+
+                return (companyId, productId, result);
+        }
+
+    private async Task<Guid> GetCurrentPlayerIdAsync(string token)
     {
-        await ResetGameStateAsync();
-
-        var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
-        var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
-
-        var productsResult = await ExecuteGraphQlAsync(
-            "query { productTypes(industry: \"FURNITURE\") { id slug } }");
-        var productId = productsResult.GetProperty("data").GetProperty("productTypes")
-            .EnumerateArray()
-            .Single(product => product.GetProperty("slug").GetString() == "wooden-chair")
-            .GetProperty("id")
-            .GetString();
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation CompleteOnboarding($input: OnboardingInput!) {
-              completeOnboarding(input: $input) {
-                company { id name cash }
-                factory { id name type }
-                salesShop { id name type }
-                selectedProduct { name industry }
-                startupPackOffer {
-                  status
-                  companyCashGrant
-                  proDurationDays
-                  expiresAtUtc
-                }
-              }
-            }
-            """,
-            new { input = new { industry = "FURNITURE", cityId, productTypeId = productId, companyName } },
-            token);
-
-        var companyId = result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("company").GetProperty("id").GetString()!;
-        return (companyId, productId!, result);
+        var result = await ExecuteGraphQlAsync("{ me { id } }", token: token);
+        return Guid.Parse(result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
     }
 
-    private async Task<string> GetCityIdByNameAsync(string cityName = "Bratislava")
+    private async Task<Guid> SeedPublicCompanyAsync(
+        Guid controllerPlayerId,
+        string name = "Public Float Co",
+        decimal cash = 100_000m,
+        decimal totalShares = 10_000m,
+        decimal founderShares = 5_000m,
+        decimal dividendPayoutRatio = 0.2m)
     {
-        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = controllerPlayerId,
+            Name = name,
+            Cash = cash,
+            TotalSharesIssued = totalShares,
+            DividendPayoutRatio = dividendPayoutRatio,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = currentTick,
+        };
+
+        db.Companies.Add(company);
+        db.Shareholdings.Add(new Shareholding
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            OwnerPlayerId = controllerPlayerId,
+            ShareCount = founderShares,
+        });
+
+        await db.SaveChangesAsync();
+        return company.Id;
+    }
+
+    private async Task SetActiveCompanyContextAsync(Guid playerId, Guid companyId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = companyId;
+        await db.SaveChangesAsync();
+    }
+
+    private static async Task<string> GetCityIdByNameAsync(HttpClient client, string cityName = "Bratislava")
+    {
+        var citiesResult = await ExecuteGraphQlAsync(client, "{ cities { id name } }");
         return citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
             .First(city => city.GetProperty("name").GetString() == cityName)
             .GetProperty("id")
             .GetString()!;
     }
+
+    private Task<string> GetCityIdByNameAsync(string cityName = "Bratislava")
+        => GetCityIdByNameAsync(_client, cityName);
 
     private async Task<string> GetStarterProductIdAsync(string industry = "FURNITURE", string slug = "wooden-chair")
     {
@@ -185,12 +238,12 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             """,
             new { cityId });
 
-        // Filter to affordable lots (price within starting cash of $500,000) so that test lots
+        // Filter to affordable lots (price within the default starter-company cash of $450,000) so that test lots
         // intentionally priced above the starting cash do not interfere with other tests.
         return lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
             .First(lot => lot.GetProperty("suitableTypes").GetString()!.Contains(suitableType)
                           && lot.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null
-                          && lot.GetProperty("price").GetDecimal() < 500_000m)
+                  && lot.GetProperty("price").GetDecimal() < 450_000m)
             .GetProperty("id")
             .GetString()!;
     }
@@ -4577,60 +4630,148 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     #region Onboarding
 
     [Fact]
-    public async Task CompleteOnboarding_CreatesCompanyFactoryAndShop()
+        public async Task CreateCompany_IssuesFounderSharesAndSelectsCompanyContext()
     {
-        var token = await RegisterAndGetTokenAsync("onboard@test.com", "Onboarder");
-        var (_, productId, result) = await CompleteOnboardingAsync(token);
+                var token = await RegisterAndGetTokenAsync($"founder-shares-{Guid.NewGuid():N}@test.com", "Founder");
+                var createResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation CreateCompany($input: CreateCompanyInput!) {
+                            createCompany(input: $input) {
+                                id
+                                name
+                                cash
+                                totalSharesIssued
+                            }
+                        }
+                        """,
+                        new { input = new { name = "Founder Holdings Co" } },
+                        token);
 
-        var data = result.GetProperty("data").GetProperty("completeOnboarding");
-        Assert.Equal("My First Co", data.GetProperty("company").GetProperty("name").GetString());
-        Assert.Equal("FACTORY", data.GetProperty("factory").GetProperty("type").GetString());
-        Assert.Equal("SALES_SHOP", data.GetProperty("salesShop").GetProperty("type").GetString());
-        Assert.Equal("FURNITURE", data.GetProperty("selectedProduct").GetProperty("industry").GetString());
+                var company = createResult.GetProperty("data").GetProperty("createCompany");
+                var companyId = company.GetProperty("id").GetString()!;
+                Assert.Equal(10_000m, company.GetProperty("totalSharesIssued").GetDecimal());
 
-        var companiesResult = await ExecuteGraphQlAsync(
+                var personAccountResult = await ExecuteGraphQlAsync(
             """
             {
-              myCompanies {
-                buildings {
-                  type
-                  units { unitType resourceTypeId productTypeId }
+                            personAccount {
+                                personalCash
+                                activeAccountType
+                                activeCompanyId
+                                shareholdings {
+                                    companyId
+                                    shareCount
+                                    ownershipRatio
                 }
               }
             }
             """,
             token: token);
 
-        var buildings = companiesResult.GetProperty("data").GetProperty("myCompanies")[0].GetProperty("buildings").EnumerateArray().ToList();
-        var factory = buildings.Single(building => building.GetProperty("type").GetString() == "FACTORY");
-        var shop = buildings.Single(building => building.GetProperty("type").GetString() == "SALES_SHOP");
+                var personAccount = personAccountResult.GetProperty("data").GetProperty("personAccount");
+                Assert.Equal(200_000m, personAccount.GetProperty("personalCash").GetDecimal());
+                Assert.Equal("COMPANY", personAccount.GetProperty("activeAccountType").GetString());
+                Assert.Equal(companyId, personAccount.GetProperty("activeCompanyId").GetString());
 
-        Assert.Contains(factory.GetProperty("units").EnumerateArray(), unit =>
-            unit.GetProperty("unitType").GetString() == "PURCHASE"
-            && unit.GetProperty("resourceTypeId").ValueKind == JsonValueKind.String);
-        Assert.Contains(factory.GetProperty("units").EnumerateArray(), unit =>
-            unit.GetProperty("unitType").GetString() == "MANUFACTURING"
-            && unit.GetProperty("productTypeId").GetString() == productId);
-        Assert.Contains(shop.GetProperty("units").EnumerateArray(), unit =>
-            unit.GetProperty("unitType").GetString() == "PUBLIC_SALES"
-            && unit.GetProperty("productTypeId").GetString() == productId);
+                var holding = personAccount.GetProperty("shareholdings").EnumerateArray().Single();
+                Assert.Equal(companyId, holding.GetProperty("companyId").GetString());
+                Assert.Equal(10_000m, holding.GetProperty("shareCount").GetDecimal());
+                Assert.Equal(1m, holding.GetProperty("ownershipRatio").GetDecimal());
     }
 
     [Fact]
-    public async Task CompleteOnboarding_SetsOnboardingCompletedAtUtc()
+        public async Task StartOnboardingCompany_DefaultIpoProfile_DeductsFounderContributionAndIssuesFounderShares()
     {
-        var token = await RegisterAndGetTokenAsync("onboard_complete@test.com", "CompletionTester");
-        await CompleteOnboardingAsync(token, "Done Corp");
+                var token = await RegisterAndGetTokenAsync($"onboard-ipo-default-{Guid.NewGuid():N}@test.com", "Starter Founder");
+                var (companyId, _, _, result) = await StartOnboardingCompanyAsync(token, "Starter Founder Co");
 
-        // Verify me query returns onboardingCompletedAtUtc
-        var meResult = await ExecuteGraphQlAsync(
-            "{ me { onboardingCompletedAtUtc } }",
-            token: token);
+                var data = result.GetProperty("data").GetProperty("startOnboardingCompany");
+                Assert.True(data.GetProperty("company").GetProperty("cash").GetDecimal() < 450_000m);
 
-        var completedAt = meResult.GetProperty("data").GetProperty("me").GetProperty("onboardingCompletedAtUtc");
-        Assert.Equal(JsonValueKind.String, completedAt.ValueKind);
-        Assert.True(DateTime.TryParse(completedAt.GetString(), out _));
+                var personAccountResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            personAccount {
+                                personalCash
+                                activeAccountType
+                                activeCompanyId
+                                shareholdings {
+                                    companyId
+                                    shareCount
+                                    ownershipRatio
+                                }
+                            }
+                        }
+                        """,
+                        token: token);
+
+                var personAccount = personAccountResult.GetProperty("data").GetProperty("personAccount");
+                Assert.Equal(150_000m, personAccount.GetProperty("personalCash").GetDecimal());
+                Assert.Equal("COMPANY", personAccount.GetProperty("activeAccountType").GetString());
+                Assert.Equal(companyId, personAccount.GetProperty("activeCompanyId").GetString());
+
+                var founderHolding = personAccount.GetProperty("shareholdings").EnumerateArray().Single();
+                Assert.Equal(companyId, founderHolding.GetProperty("companyId").GetString());
+                Assert.Equal(5_000m, founderHolding.GetProperty("shareCount").GetDecimal());
+                Assert.Equal(0.5m, founderHolding.GetProperty("ownershipRatio").GetDecimal());
     }
+
+        [Fact]
+        public async Task StartOnboardingCompany_CustomIpoRaiseTarget_UsesRequestedOwnershipProfile()
+        {
+                var token = await RegisterAndGetTokenAsync($"onboard-ipo-custom-{Guid.NewGuid():N}@test.com", "IPO Founder");
+                var cityId = await GetCityIdByNameAsync();
+                var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "IPO District");
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+                            startOnboardingCompany(input: $input) {
+                                company { id cash totalSharesIssued }
+                            }
+                        }
+                        """,
+                        new
+                        {
+                                input = new
+                                {
+                                        industry = "FURNITURE",
+                                        cityId,
+                                        companyName = "IPO Founder Co",
+                                        factoryLotId,
+                                        ipoRaiseTarget = 800000m,
+                                }
+                        },
+                        token);
+
+                var company = result.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company");
+                var companyId = company.GetProperty("id").GetString()!;
+                Assert.True(company.GetProperty("cash").GetDecimal() < 850_000m);
+                Assert.True(company.GetProperty("cash").GetDecimal() > 700_000m);
+                Assert.Equal(10_000m, company.GetProperty("totalSharesIssued").GetDecimal());
+
+                var personAccountResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            personAccount {
+                                personalCash
+                                shareholdings {
+                                    companyId
+                                    shareCount
+                                    ownershipRatio
+                                }
+                            }
+                        }
+                        """,
+                        token: token);
+
+                var personAccount = personAccountResult.GetProperty("data").GetProperty("personAccount");
+                Assert.Equal(150_000m, personAccount.GetProperty("personalCash").GetDecimal());
+                var founderHolding = personAccount.GetProperty("shareholdings").EnumerateArray().Single();
+                Assert.Equal(companyId, founderHolding.GetProperty("companyId").GetString());
+                Assert.Equal(2_500m, founderHolding.GetProperty("shareCount").GetDecimal());
+                Assert.Equal(0.25m, founderHolding.GetProperty("ownershipRatio").GetDecimal());
+        }
 
     [Fact]
     public async Task StartOnboardingCompany_PurchasesFactoryLot_AndStoresResumeMetadata()
@@ -4642,7 +4783,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("SHOP_SELECTION", data.GetProperty("nextStep").GetString());
         Assert.Equal("FACTORY", data.GetProperty("factory").GetProperty("type").GetString());
         Assert.Equal("Factory Founder Co", data.GetProperty("company").GetProperty("name").GetString());
-        Assert.True(data.GetProperty("company").GetProperty("cash").GetDecimal() < 500_000m);
+        Assert.True(data.GetProperty("company").GetProperty("cash").GetDecimal() < 450_000m);
 
         var meResult = await ExecuteGraphQlAsync(
             """
@@ -4667,6 +4808,282 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(factoryLotId, me.GetProperty("onboardingFactoryLotId").GetString());
         Assert.Equal(1, me.GetProperty("companies").GetArrayLength());
     }
+
+        [Fact]
+        public async Task UpdateCompanySettings_PersistsDividendPayoutRatio()
+        {
+                var token = await RegisterAndGetTokenAsync($"company-dividend-{Guid.NewGuid():N}@test.com", "Dividend Owner");
+                var createResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation CreateCompany($input: CreateCompanyInput!) {
+                            createCompany(input: $input) { id }
+                        }
+                        """,
+                        new { input = new { name = "Dividend Co" } },
+                        token);
+
+                var companyId = createResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+                var updateResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation UpdateCompanySettings($input: UpdateCompanySettingsInput!) {
+                            updateCompanySettings(input: $input) { id name dividendPayoutRatio }
+                        }
+                        """,
+                        new
+                        {
+                                input = new
+                                {
+                                        companyId,
+                                        name = "Dividend Co",
+                                        dividendPayoutRatio = 0.35m,
+                                        citySalarySettings = Array.Empty<object>(),
+                                }
+                        },
+                        token);
+
+                var updated = updateResult.GetProperty("data").GetProperty("updateCompanySettings");
+                Assert.Equal(0.35m, updated.GetProperty("dividendPayoutRatio").GetDecimal());
+
+                var settingsResult = await ExecuteGraphQlAsync(
+                        """
+                        query GetCompanySettings($companyId: UUID!) {
+                            companySettings(companyId: $companyId) {
+                                companyId
+                                dividendPayoutRatio
+                                totalSharesIssued
+                            }
+                        }
+                        """,
+                        new { companyId },
+                        token);
+
+                var settings = settingsResult.GetProperty("data").GetProperty("companySettings");
+                Assert.Equal(companyId, settings.GetProperty("companyId").GetString());
+                Assert.Equal(0.35m, settings.GetProperty("dividendPayoutRatio").GetDecimal());
+                Assert.Equal(10_000m, settings.GetProperty("totalSharesIssued").GetDecimal());
+        }
+
+        [Fact]
+        public async Task BuyAndSellShares_WithPersonAccount_UpdatesPortfolioAndPersonalCash()
+        {
+                var controllerToken = await RegisterAndGetTokenAsync($"public-controller-{Guid.NewGuid():N}@test.com", "Public Controller");
+                var controllerPlayerId = await GetCurrentPlayerIdAsync(controllerToken);
+                var publicCompanyId = await SeedPublicCompanyAsync(controllerPlayerId);
+
+                var investorToken = await RegisterAndGetTokenAsync($"portfolio-investor-{Guid.NewGuid():N}@test.com", "Portfolio Investor");
+
+                var buyResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) {
+                                companyId
+                                shareCount
+                                pricePerShare
+                                totalValue
+                                ownedShareCount
+                                personalCash
+                            }
+                        }
+                        """,
+                        new { input = new { companyId = publicCompanyId, shareCount = 100m } },
+                        investorToken);
+
+                var bought = buyResult.GetProperty("data").GetProperty("buyShares");
+                Assert.Equal(publicCompanyId.ToString(), bought.GetProperty("companyId").GetString());
+                Assert.Equal(100m, bought.GetProperty("shareCount").GetDecimal());
+                Assert.True(bought.GetProperty("personalCash").GetDecimal() < 200_000m);
+                Assert.Equal(100m, bought.GetProperty("ownedShareCount").GetDecimal());
+
+                var sellResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation SellShares($input: SellSharesInput!) {
+                            sellShares(input: $input) {
+                                shareCount
+                                totalValue
+                                ownedShareCount
+                                personalCash
+                            }
+                        }
+                        """,
+                        new { input = new { companyId = publicCompanyId, shareCount = 40m } },
+                        investorToken);
+
+                var sold = sellResult.GetProperty("data").GetProperty("sellShares");
+                Assert.Equal(40m, sold.GetProperty("shareCount").GetDecimal());
+                Assert.Equal(60m, sold.GetProperty("ownedShareCount").GetDecimal());
+
+                var accountResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            personAccount {
+                                personalCash
+                                shareholdings {
+                                    shareCount
+                                }
+                            }
+                        }
+                        """,
+                        token: investorToken);
+
+                var account = accountResult.GetProperty("data").GetProperty("personAccount");
+                Assert.Equal(60m, account.GetProperty("shareholdings")[0].GetProperty("shareCount").GetDecimal());
+                Assert.Equal(sold.GetProperty("personalCash").GetDecimal(), account.GetProperty("personalCash").GetDecimal());
+        }
+
+        [Fact]
+        public async Task SwitchAccountContext_UsesControlledCompanyOwnershipToClaimControl()
+        {
+                var targetOwnerToken = await RegisterAndGetTokenAsync($"target-owner-{Guid.NewGuid():N}@test.com", "Target Owner");
+                var targetOwnerId = await GetCurrentPlayerIdAsync(targetOwnerToken);
+                var targetCompanyId = await SeedPublicCompanyAsync(targetOwnerId, name: "Takeover Target", cash: 100_000m);
+
+                var acquirerToken = await RegisterAndGetTokenAsync($"acquirer-{Guid.NewGuid():N}@test.com", "Acquirer");
+                var acquirerCreateResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation CreateCompany($input: CreateCompanyInput!) {
+                            createCompany(input: $input) { id }
+                        }
+                        """,
+                        new { input = new { name = "Acquirer Holdings" } },
+                        acquirerToken);
+
+                var acquirerCompanyId = Guid.Parse(acquirerCreateResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!);
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { ownedShareCount companyCash }
+                        }
+                        """,
+                        new { input = new { companyId = targetCompanyId, shareCount = 5_000m } },
+                        acquirerToken);
+
+                var switchResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation SwitchAccountContext($input: SwitchAccountContextInput!) {
+                            switchAccountContext(input: $input) {
+                                activeAccountType
+                                activeCompanyId
+                                activeAccountName
+                            }
+                        }
+                        """,
+                        new { input = new { accountType = "COMPANY", companyId = targetCompanyId } },
+                        acquirerToken);
+
+                var switched = switchResult.GetProperty("data").GetProperty("switchAccountContext");
+                Assert.Equal("COMPANY", switched.GetProperty("activeAccountType").GetString());
+                Assert.Equal(targetCompanyId.ToString(), switched.GetProperty("activeCompanyId").GetString());
+                Assert.Equal("Takeover Target", switched.GetProperty("activeAccountName").GetString());
+
+                var meResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            me {
+                                activeAccountType
+                                activeCompanyId
+                                companies { id name }
+                            }
+                        }
+                        """,
+                        token: acquirerToken);
+
+                var me = meResult.GetProperty("data").GetProperty("me");
+                Assert.Equal("COMPANY", me.GetProperty("activeAccountType").GetString());
+                Assert.Equal(targetCompanyId.ToString(), me.GetProperty("activeCompanyId").GetString());
+                Assert.Contains(me.GetProperty("companies").EnumerateArray(), company => company.GetProperty("id").GetString() == targetCompanyId.ToString());
+                Assert.Contains(me.GetProperty("companies").EnumerateArray(), company => company.GetProperty("id").GetString() == acquirerCompanyId.ToString());
+        }
+
+        [Fact]
+        public async Task BuyShares_AsCompanyBuyback_RetiresIssuedShares()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"buyback-owner-{Guid.NewGuid():N}@test.com", "Buyback Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Buyback Co", cash: 500_000m);
+                await SetActiveCompanyContextAsync(ownerId, companyId);
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) {
+                                companyId
+                                shareCount
+                                companyCash
+                            }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 1_000m } },
+                        ownerToken);
+
+                await using var scope = _factory.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var company = await db.Companies.FirstAsync(candidate => candidate.Id == companyId);
+                var treasuryHoldingCount = await db.Shareholdings.CountAsync(holding => holding.CompanyId == companyId && holding.OwnerCompanyId == companyId);
+
+                Assert.Equal(9_000m, company.TotalSharesIssued);
+                Assert.Equal(0, treasuryHoldingCount);
+        }
+
+        [Fact]
+        public async Task DividendPhase_PaysPersonShareholderAndRecordsPayment()
+        {
+            await ResetGameStateAsync();
+
+                var controllerToken = await RegisterAndGetTokenAsync($"div-controller-{Guid.NewGuid():N}@test.com", "Dividend Controller");
+                var controllerId = await GetCurrentPlayerIdAsync(controllerToken);
+                var investorToken = await RegisterAndGetTokenAsync($"div-investor-{Guid.NewGuid():N}@test.com", "Dividend Investor");
+                var investorId = await GetCurrentPlayerIdAsync(investorToken);
+                var companyId = await SeedPublicCompanyAsync(controllerId, name: "Dividend Issuer", cash: 50_000m, founderShares: 0m, dividendPayoutRatio: 0.5m);
+
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        db.Shareholdings.Add(new Shareholding
+                        {
+                                Id = Guid.NewGuid(),
+                                CompanyId = companyId,
+                                OwnerPlayerId = investorId,
+                                ShareCount = 5_000m,
+                        });
+                        db.LedgerEntries.Add(new LedgerEntry
+                        {
+                                Id = Guid.NewGuid(),
+                                CompanyId = companyId,
+                                Category = LedgerCategory.Revenue,
+                                Description = "Profitable year",
+                                Amount = 10_000m,
+                                RecordedAtTick = 1,
+                                RecordedAtUtc = DateTime.UtcNow,
+                        });
+                        await db.SaveChangesAsync();
+                }
+
+                await AdvanceGameTicksAsync(GameConstants.TicksPerYear - 1);
+                await ProcessTicksAsync(1);
+
+                var expectedDividend = 2_125m;
+
+                var accountResult = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            personAccount {
+                                personalCash
+                                dividendPayments {
+                                    totalAmount
+                                    gameYear
+                                }
+                            }
+                        }
+                        """,
+                        token: investorToken);
+
+                var personAccount = accountResult.GetProperty("data").GetProperty("personAccount");
+                    Assert.Equal(200_000m + expectedDividend, personAccount.GetProperty("personalCash").GetDecimal());
+                Assert.Equal(1, personAccount.GetProperty("dividendPayments").GetArrayLength());
+                    Assert.Equal(expectedDividend, personAccount.GetProperty("dividendPayments")[0].GetProperty("totalAmount").GetDecimal());
+        }
 
     [Fact]
     public async Task FinishOnboarding_UsesAuthoritativeLotValidation_AndCompletesFlow()
@@ -6725,9 +7142,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(productId, selectedProduct.GetProperty("id").GetString());
         Assert.Equal("HEALTHCARE", selectedProduct.GetProperty("industry").GetString());
 
-        // Verify money was correctly deducted: $500,000 - $75,000 (factory) - $90,000 (shop) = $335,000
+        // Verify money was correctly deducted: $450,000 - $75,000 (factory) - $90,000 (shop) = $285,000
         var cashAfterMigration = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
-        Assert.Equal(335_000m, cashAfterMigration);
+        Assert.Equal(285_000m, cashAfterMigration);
 
         // Verify both buildings exist in the final state
         Assert.NotNull(finishData.GetProperty("factory").GetProperty("id").GetString());
@@ -6773,7 +7190,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task GuestOnboardingPath_StartingCashAndBudgetDecisionAreConsistent()
     {
-        // Verifies that the starting cash ($500,000), factory lot price, and remaining cash
+        // Verifies that the starter-company cash ($450,000), factory lot price, and remaining cash
         // after purchase are all consistent — so the UI budget coaching panels show accurate data.
         var token = await RegisterAndGetTokenAsync($"budget-check-{Guid.NewGuid()}@test.com", "BudgetChecker");
         var cityId = await GetCityIdByNameAsync();
@@ -6797,8 +7214,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var startData = startResult.GetProperty("data").GetProperty("startOnboardingCompany");
         var cashAfterFactory = startData.GetProperty("company").GetProperty("cash").GetDecimal();
 
-        // Starting cash is $500,000; after buying the factory lot the balance should be exactly $425,000
-        Assert.Equal(500_000m - factoryPrice, cashAfterFactory);
+        // Starter-company cash is $450,000; after buying the factory lot the balance should be exactly $375,000
+        Assert.Equal(DefaultStarterCompanyCash - factoryPrice, cashAfterFactory);
 
         // Finish onboarding with a shop lot and verify final cash is further reduced
         var shopPrice = 90_000m;
@@ -6810,7 +7227,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var finishData = finishResult.GetProperty("data").GetProperty("finishOnboarding");
         var cashAfterShop = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
 
-        Assert.Equal(500_000m - factoryPrice - shopPrice, cashAfterShop);
+        Assert.Equal(DefaultStarterCompanyCash - factoryPrice - shopPrice, cashAfterShop);
     }
 
     [Fact]
@@ -7146,9 +7563,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(productId, selectedProduct.GetProperty("id").GetString());
         Assert.Equal("FURNITURE", selectedProduct.GetProperty("industry").GetString());
 
-        // Verify cash reduced by both lot purchases: $500,000 - $75,000 - $90,000 = $335,000
+        // Verify cash reduced by both lot purchases: $450,000 - $75,000 - $90,000 = $285,000
         var cashAfterMigration = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
-        Assert.Equal(335_000m, cashAfterMigration);
+        Assert.Equal(285_000m, cashAfterMigration);
 
         // Verify onboarding is marked complete
         var meResult = await ExecuteGraphQlAsync("query { me { onboardingCompletedAtUtc } }", null, token);
@@ -7197,9 +7614,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(productId, selectedProduct.GetProperty("id").GetString());
         Assert.Equal("FOOD_PROCESSING", selectedProduct.GetProperty("industry").GetString());
 
-        // Verify cash reduced by both lot purchases: $500,000 - $75,000 - $90,000 = $335,000
+        // Verify cash reduced by both lot purchases: $450,000 - $75,000 - $90,000 = $285,000
         var cashAfterMigration = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
-        Assert.Equal(335_000m, cashAfterMigration);
+        Assert.Equal(285_000m, cashAfterMigration);
 
         // Verify onboarding is marked complete
         var meResult = await ExecuteGraphQlAsync("query { me { onboardingCompletedAtUtc } }", null, token);
@@ -7250,9 +7667,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(productId, selectedProduct.GetProperty("id").GetString());
         Assert.Equal("HEALTHCARE", selectedProduct.GetProperty("industry").GetString());
 
-        // Verify cash reduced by both lot purchases: $500,000 - $75,000 - $90,000 = $335,000
+        // Verify cash reduced by both lot purchases: $450,000 - $75,000 - $90,000 = $285,000
         var cashAfterMigration = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
-        Assert.Equal(335_000m, cashAfterMigration);
+        Assert.Equal(285_000m, cashAfterMigration);
 
         // Verify onboarding is marked complete
         var meResult = await ExecuteGraphQlAsync("query { me { onboardingCompletedAtUtc } }", null, token);
@@ -7700,7 +8117,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var startData = startResult.GetProperty("data").GetProperty("startOnboardingCompany");
         Assert.Equal("SHOP_SELECTION", startData.GetProperty("nextStep").GetString());
         var cashAfterFactory = startData.GetProperty("company").GetProperty("cash").GetDecimal();
-        Assert.Equal(500_000m - 80_000m, cashAfterFactory);
+        Assert.Equal(DefaultStarterCompanyCash - 80_000m, cashAfterFactory);
 
         // Confirm the factory building was created in the correct city
         var factoryId = startData.GetProperty("factory").GetProperty("id").GetString()!;
@@ -7718,7 +8135,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var finishData = finishResult.GetProperty("data").GetProperty("finishOnboarding");
         Assert.Equal("FURNITURE", finishData.GetProperty("selectedProduct").GetProperty("industry").GetString());
         var finalCash = finishData.GetProperty("company").GetProperty("cash").GetDecimal();
-        Assert.Equal(500_000m - 80_000m - 75_000m, finalCash);
+        Assert.Equal(DefaultStarterCompanyCash - 80_000m - 75_000m, finalCash);
     }
 
     [Fact]
@@ -9356,12 +9773,12 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // Commercial city-center lots should have a meaningfully higher population
         // index than industrial lots on the outskirts — this is the strategic signal
         // that makes the city map a real decision surface.
-        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
-        var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
-            .First(c => c.GetProperty("name").GetString() == "Bratislava")
-            .GetProperty("id").GetString();
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var bratislavaId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query CityLots($cityId: UUID!) {
               cityLots(cityId: $cityId) { id name district suitableTypes populationIndex }
@@ -9722,9 +10139,12 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // can show "Strong for retail demand", "Resource-oriented",
         // "Industrial efficiency zone", or "Balanced starter location".
 
-        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+                await using var isolatedFactory = new ApiWebApplicationFactory();
+                using var isolatedClient = isolatedFactory.CreateClient();
+                var bratislavaId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
 
-        var result = await ExecuteGraphQlAsync(
+                var result = await ExecuteGraphQlAsync(
+                        isolatedClient,
             """
             query CityLots($cityId: UUID!) {
               cityLots(cityId: $cityId) {

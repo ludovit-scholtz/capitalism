@@ -18,6 +18,10 @@ export type MockPlayer = {
   displayName: string
   role: 'PLAYER' | 'ADMIN'
   createdAtUtc: string
+  lastLoginAtUtc: string | null
+  personalCash: number
+  activeAccountType: 'PERSON' | 'COMPANY'
+  activeCompanyId: string | null
   onboardingCompletedAtUtc: string | null
   onboardingCurrentStep: string | null
   onboardingIndustry: string | null
@@ -28,7 +32,21 @@ export type MockPlayer = {
   onboardingFirstSaleCompletedAtUtc: string | null
   proSubscriptionEndsAtUtc: string | null
   startupPackOffer: MockStartupPackOffer | null
+  dividendPayments: MockDividendPayment[]
   companies: MockCompany[]
+}
+
+export type MockDividendPayment = {
+  id: string
+  companyId: string
+  companyName: string
+  shareCount: number
+  amountPerShare: number
+  totalAmount: number
+  gameYear: number
+  recordedAtTick: number
+  recordedAtUtc: string
+  description: string
 }
 
 export type MockStartupPackOffer = {
@@ -119,10 +137,19 @@ export type MockCompany = {
   playerId: string
   name: string
   cash: number
+  totalSharesIssued?: number
+  dividendPayoutRatio?: number
   foundedAtUtc: string
   foundedAtTick?: number
   citySalaryMultipliers?: Record<string, number>
   buildings: MockBuilding[]
+}
+
+export type MockShareholding = {
+  companyId: string
+  ownerPlayerId: string | null
+  ownerCompanyId: string | null
+  shareCount: number
 }
 
 export type MockBuilding = {
@@ -408,6 +435,7 @@ export type MockLoan = {
 
 export type MockState = {
   players: MockPlayer[]
+  shareholdings: MockShareholding[]
   cities: MockCity[]
   buildingLots: MockBuildingLot[]
   resourceTypes: MockResourceType[]
@@ -431,10 +459,110 @@ export type MockState = {
   myLoans: MockLoan[]
 }
 
-const STARTING_CASH_FOR_ONBOARDING = 500000
+const mockStateByPage = new WeakMap<Page, MockState>()
+
+const PERSONAL_STARTING_CASH = 200000
+const STARTER_FOUNDER_CONTRIBUTION = 50000
+const DEFAULT_IPO_RAISE_TARGET = 400000
+const DEFAULT_COMPANY_SHARE_COUNT = 10000
+const DEFAULT_DIVIDEND_PAYOUT_RATIO = 0.2
 const GAME_START_YEAR = 2000
 const TICKS_PER_DAY = 24
 const TICKS_PER_YEAR = 24 * 365
+
+function resolveIpoSelection(raiseTarget?: number) {
+  switch (raiseTarget ?? DEFAULT_IPO_RAISE_TARGET) {
+    case 400000:
+      return { raiseTarget: 400000, founderOwnershipRatio: 0.5 }
+    case 600000:
+      return { raiseTarget: 600000, founderOwnershipRatio: 0.3333 }
+    case 800000:
+      return { raiseTarget: 800000, founderOwnershipRatio: 0.25 }
+    default:
+      return { raiseTarget: DEFAULT_IPO_RAISE_TARGET, founderOwnershipRatio: 0.5 }
+  }
+}
+
+function getCompanyTotalShares(company: MockCompany) {
+  return company.totalSharesIssued ?? DEFAULT_COMPANY_SHARE_COUNT
+}
+
+function getCompanyDividendPayoutRatio(company: MockCompany) {
+  return company.dividendPayoutRatio ?? DEFAULT_DIVIDEND_PAYOUT_RATIO
+}
+
+function getCompanyAssetBaseValue(company: MockCompany) {
+  const baseValues: Record<string, number> = {
+    MINE: 250000,
+    FACTORY: 200000,
+    SALES_SHOP: 150000,
+    RESEARCH_DEVELOPMENT: 300000,
+    APARTMENT: 400000,
+    COMMERCIAL: 350000,
+    MEDIA_HOUSE: 500000,
+    BANK: 600000,
+    EXCHANGE: 450000,
+    POWER_PLANT: 350000,
+  }
+
+  return company.buildings.reduce((total, building) => total + (baseValues[building.type] ?? 0) * building.level, 0)
+}
+
+function computeMockSharePrice(company: MockCompany) {
+  return Number(Math.max((company.cash + getCompanyAssetBaseValue(company)) / getCompanyTotalShares(company), 1).toFixed(2))
+}
+
+function getPlayerControlledCompanyIds(state: MockState, playerId: string) {
+  return new Set(
+    state.players
+      .flatMap((player) => player.companies)
+      .filter((company) => company.playerId === playerId)
+      .map((company) => company.id),
+  )
+}
+
+function getPublicFloatShares(state: MockState, company: MockCompany) {
+  const issued = getCompanyTotalShares(company)
+  const allocated = state.shareholdings
+    .filter((holding) => holding.companyId === company.id)
+    .reduce((total, holding) => total + holding.shareCount, 0)
+
+  return Number(Math.max(issued - allocated, 0).toFixed(4))
+}
+
+function getOrCreateShareholding(
+  state: MockState,
+  companyId: string,
+  ownerPlayerId: string | null,
+  ownerCompanyId: string | null,
+) {
+  let holding = state.shareholdings.find(
+    (candidate) =>
+      candidate.companyId === companyId
+      && candidate.ownerPlayerId === ownerPlayerId
+      && candidate.ownerCompanyId === ownerCompanyId,
+  )
+
+  if (!holding) {
+    holding = { companyId, ownerPlayerId, ownerCompanyId, shareCount: 0 }
+    state.shareholdings.push(holding)
+  }
+
+  return holding
+}
+
+function getCombinedControlledOwnershipRatio(state: MockState, playerId: string, company: MockCompany) {
+  const controlledCompanyIds = getPlayerControlledCompanyIds(state, playerId)
+  const controlledShares = state.shareholdings
+    .filter(
+      (holding) =>
+        holding.companyId === company.id
+        && (holding.ownerPlayerId === playerId || (holding.ownerCompanyId ? controlledCompanyIds.has(holding.ownerCompanyId) : false)),
+    )
+    .reduce((total, holding) => total + holding.shareCount, 0)
+
+  return Number((controlledShares / getCompanyTotalShares(company)).toFixed(4))
+}
 
 function computeMockGameYear(currentTick: number) {
   return GAME_START_YEAR + Math.floor(Math.max(currentTick, 0) / TICKS_PER_YEAR)
@@ -755,6 +883,10 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     displayName: 'Test Player',
     role: 'PLAYER',
     createdAtUtc: '2026-01-01T00:00:00Z',
+    lastLoginAtUtc: null,
+    personalCash: PERSONAL_STARTING_CASH,
+    activeAccountType: 'PERSON',
+    activeCompanyId: null,
     onboardingCompletedAtUtc: null,
     onboardingCurrentStep: null,
     onboardingIndustry: null,
@@ -765,6 +897,7 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     onboardingFirstSaleCompletedAtUtc: null,
     proSubscriptionEndsAtUtc: null,
     startupPackOffer: null,
+    dividendPayments: [],
     companies: [],
     ...overrides,
   }
@@ -1040,6 +1173,7 @@ export function makeDefaultProducts(): MockProductType[] {
 export function setupMockApi(page: Page, initial?: Partial<MockState>): MockState {
   const state: MockState = {
     players: [],
+    shareholdings: [],
     cities: makeDefaultCities(),
     buildingLots: makeDefaultBuildingLots(),
     resourceTypes: makeDefaultResources(),
@@ -1058,10 +1192,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     ...initial,
   }
 
+  const resolveCurrentPlayer = () => {
+    const tokenPlayerId = state.currentToken?.startsWith('token-')
+      ? state.currentToken.slice('token-'.length)
+      : null
+
+    return state.players.find((player) => player.id === state.currentUserId)
+      ?? (tokenPlayerId ? state.players.find((player) => player.id === tokenPlayerId) : undefined)
+      ?? (state.players.length === 1 ? state.players[0] : undefined)
+  }
+
+  mockStateByPage.set(page, state)
+
   page.route('**/graphql', async (route) => {
     const body = route.request().postDataJSON()
     const query: string = body?.query ?? ''
-
+    const isRegisterMutation = query.includes('mutation Register') || query.includes('register(input:')
+    const isLoginMutation = query.includes('mutation Login') || query.includes('login(input:')
     // Auth token check
     const authHeader = route.request().headers()['authorization'] ?? ''
     if (authHeader.startsWith('Bearer token-')) {
@@ -1070,7 +1217,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     // Mutations
-    if (query.includes('Register')) {
+    if (isRegisterMutation) {
       const input = body.variables?.input
       if (state.players.some((p) => p.email === input?.email)) {
         return route.fulfill({
@@ -1086,6 +1233,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         displayName: input.displayName,
         role: 'PLAYER',
         createdAtUtc: new Date().toISOString(),
+        lastLoginAtUtc: null,
+        personalCash: PERSONAL_STARTING_CASH,
+        activeAccountType: 'PERSON',
+        activeCompanyId: null,
         onboardingCompletedAtUtc: null,
         onboardingCurrentStep: null,
         onboardingIndustry: null,
@@ -1096,6 +1247,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         onboardingFirstSaleCompletedAtUtc: null,
         proSubscriptionEndsAtUtc: null,
         startupPackOffer: null,
+        dividendPayments: [],
         companies: [],
       }
       state.players.push(newPlayer)
@@ -1116,12 +1268,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('Login')) {
+    if (isLoginMutation) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.email === input?.email && p.password === input?.password)
       if (!player) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Invalid email or password.' }] }) })
       }
+      player.lastLoginAtUtc = new Date().toISOString()
       state.currentUserId = player.id
       state.currentToken = `token-${player.id}`
       return route.fulfill({
@@ -1165,7 +1318,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       ) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Building type FACTORY is not suitable for this lot.' }] }) })
       }
-      if (STARTING_CASH_FOR_ONBOARDING < lot.price) {
+      const ipoSelection = resolveIpoSelection(Number(body.variables?.input?.ipoRaiseTarget))
+      const startingCompanyCash = STARTER_FOUNDER_CONTRIBUTION + ipoSelection.raiseTarget
+
+      if (startingCompanyCash < lot.price) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: `Insufficient funds. This lot costs $${lot.price.toLocaleString()}.` }] }) })
       }
 
@@ -1175,7 +1331,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         id: companyId,
         playerId: player.id,
         name: input.companyName,
-        cash: STARTING_CASH_FOR_ONBOARDING - lot.price,
+        cash: startingCompanyCash - lot.price,
+        totalSharesIssued: DEFAULT_COMPANY_SHARE_COUNT,
+        dividendPayoutRatio: DEFAULT_DIVIDEND_PAYOUT_RATIO,
         foundedAtUtc: new Date().toISOString(),
         foundedAtTick: state.gameState.currentTick,
         buildings: [
@@ -1203,7 +1361,16 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       lot.ownerCompany = { id: company.id, name: company.name }
       lot.building = { id: factoryId, name: `${input.companyName} Factory`, type: 'FACTORY' }
 
+      player.personalCash -= STARTER_FOUNDER_CONTRIBUTION
+      player.activeAccountType = 'COMPANY'
+      player.activeCompanyId = company.id
       player.companies.push(company)
+      state.shareholdings.push({
+        companyId: company.id,
+        ownerPlayerId: player.id,
+        ownerCompanyId: null,
+        shareCount: Number((DEFAULT_COMPANY_SHARE_COUNT * ipoSelection.founderOwnershipRatio).toFixed(4)),
+      })
       player.onboardingCurrentStep = 'SHOP_SELECTION'
       player.onboardingIndustry = input.industry
       player.onboardingCityId = input.cityId
@@ -1349,6 +1516,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         playerId: player.id,
         name: input.companyName,
         cash: 500000,
+        totalSharesIssued: DEFAULT_COMPANY_SHARE_COUNT,
+        dividendPayoutRatio: DEFAULT_DIVIDEND_PAYOUT_RATIO,
         foundedAtUtc: new Date().toISOString(),
         foundedAtTick: state.gameState.currentTick,
         buildings: [
@@ -1395,6 +1564,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         ],
       }
       player.companies.push(company)
+      player.activeAccountType = 'COMPANY'
+      player.activeCompanyId = company.id
+      state.shareholdings.push({
+        companyId: company.id,
+        ownerPlayerId: player.id,
+        ownerCompanyId: null,
+        shareCount: DEFAULT_COMPANY_SHARE_COUNT,
+      })
       player.onboardingCompletedAtUtc = new Date().toISOString()
       player.onboardingShopBuildingId = company.buildings[1].id
       player.onboardingCurrentStep = null
@@ -1525,11 +1702,21 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         playerId: player.id,
         name: input.name,
         cash: 1000000,
+        totalSharesIssued: DEFAULT_COMPANY_SHARE_COUNT,
+        dividendPayoutRatio: DEFAULT_DIVIDEND_PAYOUT_RATIO,
         foundedAtUtc: new Date().toISOString(),
         foundedAtTick: state.gameState.currentTick,
         buildings: [],
       }
       player.companies.push(company)
+      player.activeAccountType = 'COMPANY'
+      player.activeCompanyId = company.id
+      state.shareholdings.push({
+        companyId: company.id,
+        ownerPlayerId: player.id,
+        ownerCompanyId: null,
+        shareCount: DEFAULT_COMPANY_SHARE_COUNT,
+      })
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -1547,12 +1734,208 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       company.name = input.name
+      company.dividendPayoutRatio = Number(input.dividendPayoutRatio ?? company.dividendPayoutRatio ?? DEFAULT_DIVIDEND_PAYOUT_RATIO)
       company.citySalaryMultipliers = Object.fromEntries((input.citySalarySettings ?? []).map((entry: { cityId: string; salaryMultiplier: number }) => [entry.cityId, entry.salaryMultiplier]))
 
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { updateCompanySettings: { id: company.id, name: company.name } } }),
+        body: JSON.stringify({ data: { updateCompanySettings: { id: company.id, name: company.name, dividendPayoutRatio: getCompanyDividendPayoutRatio(company) } } }),
+      })
+    }
+
+    if (query.includes('SwitchAccountContext')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
+      }
+
+      if (input?.accountType === 'PERSON') {
+        player.activeAccountType = 'PERSON'
+        player.activeCompanyId = null
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { switchAccountContext: { activeAccountType: 'PERSON', activeCompanyId: null, activeAccountName: player.displayName } } }),
+        })
+      }
+
+      const targetCompany = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === input?.companyId)
+      if (!targetCompany) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found.' }] }) })
+      }
+
+      const controlledRatio = getCombinedControlledOwnershipRatio(state, player.id, targetCompany)
+      if (targetCompany.playerId !== player.id && controlledRatio < 0.5) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'You need at least 50% combined ownership to switch into this company.', extensions: { code: 'COMPANY_CONTROL_REQUIRED' } }] }),
+        })
+      }
+
+      targetCompany.playerId = player.id
+      player.activeAccountType = 'COMPANY'
+      player.activeCompanyId = targetCompany.id
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { switchAccountContext: { activeAccountType: 'COMPANY', activeCompanyId: targetCompany.id, activeAccountName: targetCompany.name } } }),
+      })
+    }
+
+    if (query.includes('BuyShares')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === input?.companyId)
+
+      if (!player || !company) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
+      }
+
+      const shareCount = Number(input?.shareCount ?? 0)
+      const publicFloatShares = getPublicFloatShares(state, company)
+      const pricePerShare = Number((computeMockSharePrice(company) * 1.01).toFixed(2))
+      const totalValue = Number((shareCount * pricePerShare).toFixed(2))
+
+      if (shareCount <= 0) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Share count must be greater than zero.' }] }) })
+      }
+
+      if (publicFloatShares < shareCount) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough public float shares are available.', extensions: { code: 'INSUFFICIENT_PUBLIC_FLOAT' } }] }) })
+      }
+
+      let accountName = player.displayName
+      let accountCompanyId: string | null = null
+      let ownedShareCount = 0
+      let companyCash: number | null = null
+
+      if (player.activeAccountType === 'COMPANY' && player.activeCompanyId) {
+        const activeCompany = player.companies.find((candidate) => candidate.id === player.activeCompanyId)
+        if (!activeCompany || activeCompany.cash < totalValue) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough company cash.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }) })
+        }
+
+        activeCompany.cash = Number((activeCompany.cash - totalValue).toFixed(2))
+        accountName = activeCompany.name
+        accountCompanyId = activeCompany.id
+        companyCash = activeCompany.cash
+
+        if (activeCompany.id === company.id) {
+          company.totalSharesIssued = Number((Math.max(getCompanyTotalShares(company) - shareCount, 0)).toFixed(4))
+          ownedShareCount = getCompanyTotalShares(company)
+        } else {
+          const holding = getOrCreateShareholding(state, company.id, null, activeCompany.id)
+          holding.shareCount = Number((holding.shareCount + shareCount).toFixed(4))
+          ownedShareCount = holding.shareCount
+        }
+      } else {
+        if (player.personalCash < totalValue) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough personal cash.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }) })
+        }
+
+        player.personalCash = Number((player.personalCash - totalValue).toFixed(2))
+        const holding = getOrCreateShareholding(state, company.id, player.id, null)
+        holding.shareCount = Number((holding.shareCount + shareCount).toFixed(4))
+        ownedShareCount = holding.shareCount
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            buyShares: {
+              companyId: company.id,
+              companyName: company.name,
+              accountType: player.activeAccountType,
+              accountCompanyId,
+              accountName,
+              shareCount,
+              pricePerShare,
+              totalValue,
+              ownedShareCount,
+              publicFloatShares: getPublicFloatShares(state, company),
+              personalCash: player.personalCash,
+              companyCash,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('SellShares')) {
+      const input = body.variables?.input
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === input?.companyId)
+
+      if (!player || !company) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or not authenticated.' }] }) })
+      }
+
+      const shareCount = Number(input?.shareCount ?? 0)
+      const pricePerShare = Number((computeMockSharePrice(company) * 0.99).toFixed(2))
+      const totalValue = Number((shareCount * pricePerShare).toFixed(2))
+
+      if (shareCount <= 0) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Share count must be greater than zero.' }] }) })
+      }
+
+      let accountName = player.displayName
+      let accountCompanyId: string | null = null
+      let ownedShareCount = 0
+      let companyCash: number | null = null
+
+      if (player.activeAccountType === 'COMPANY' && player.activeCompanyId) {
+        const activeCompany = player.companies.find((candidate) => candidate.id === player.activeCompanyId)
+        const holding = activeCompany ? getOrCreateShareholding(state, company.id, null, activeCompany.id) : null
+
+        if (!activeCompany || !holding || holding.shareCount < shareCount) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough shares to sell.', extensions: { code: 'INSUFFICIENT_SHARES' } }] }) })
+        }
+
+        holding.shareCount = Number((holding.shareCount - shareCount).toFixed(4))
+        activeCompany.cash = Number((activeCompany.cash + totalValue).toFixed(2))
+        accountName = activeCompany.name
+        accountCompanyId = activeCompany.id
+        companyCash = activeCompany.cash
+        ownedShareCount = holding.shareCount
+      } else {
+        const holding = getOrCreateShareholding(state, company.id, player.id, null)
+        if (holding.shareCount < shareCount) {
+          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough shares to sell.', extensions: { code: 'INSUFFICIENT_SHARES' } }] }) })
+        }
+
+        holding.shareCount = Number((holding.shareCount - shareCount).toFixed(4))
+        player.personalCash = Number((player.personalCash + totalValue).toFixed(2))
+        ownedShareCount = holding.shareCount
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            sellShares: {
+              companyId: company.id,
+              companyName: company.name,
+              accountType: player.activeAccountType,
+              accountCompanyId,
+              accountName,
+              shareCount,
+              pricePerShare,
+              totalValue,
+              ownedShareCount,
+              publicFloatShares: getPublicFloatShares(state, company),
+              personalCash: player.personalCash,
+              companyCash,
+            },
+          },
+        }),
       })
     }
 
@@ -2468,19 +2851,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
 
-      const baseValues: Record<string, number> = {
-        MINE: 250000,
-        FACTORY: 200000,
-        SALES_SHOP: 150000,
-        RESEARCH_DEVELOPMENT: 300000,
-        APARTMENT: 400000,
-        COMMERCIAL: 350000,
-        MEDIA_HOUSE: 500000,
-        BANK: 600000,
-        EXCHANGE: 450000,
-        POWER_PLANT: 350000,
-      }
-      const computeAssetValue = (candidate: MockCompany) => candidate.cash + candidate.buildings.reduce((sum, building) => sum + (baseValues[building.type] ?? 0) * building.level, 0)
+      const computeAssetValue = (candidate: MockCompany) => candidate.cash + getCompanyAssetBaseValue(candidate)
       const companyAssetValue = computeAssetValue(company)
       const maxAssetValue = Math.max(...state.players.flatMap((candidate) => candidate.companies).map(computeAssetValue), 0)
       const ageTicks = Math.max(state.gameState.currentTick - (company.foundedAtTick ?? 0), 0)
@@ -2497,6 +2868,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               companyId: company.id,
               companyName: company.name,
               cash: company.cash,
+              totalSharesIssued: getCompanyTotalShares(company),
+              dividendPayoutRatio: getCompanyDividendPayoutRatio(company),
               foundedAtTick: company.foundedAtTick ?? 0,
               administrationOverheadRate: overheadRate,
               ageFactor,
@@ -2515,6 +2888,95 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             },
           },
         }),
+      })
+    }
+
+    if (query.includes('personAccount')) {
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
+      }
+
+      const shareholdings = state.shareholdings
+        .filter((holding) => holding.ownerPlayerId === player.id && holding.shareCount > 0)
+        .map((holding) => {
+          const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === holding.companyId)
+          if (!company) {
+            return null
+          }
+
+          const sharePrice = computeMockSharePrice(company)
+          return {
+            companyId: company.id,
+            companyName: company.name,
+            shareCount: holding.shareCount,
+            ownershipRatio: Number((holding.shareCount / getCompanyTotalShares(company)).toFixed(4)),
+            sharePrice,
+            marketValue: Number((holding.shareCount * sharePrice).toFixed(2)),
+          }
+        })
+        .filter((holding): holding is NonNullable<typeof holding> => holding !== null)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            personAccount: {
+              playerId: player.id,
+              displayName: player.displayName,
+              personalCash: player.personalCash,
+              activeAccountType: player.activeAccountType,
+              activeCompanyId: player.activeCompanyId,
+              shareholdings,
+              dividendPayments: player.dividendPayments,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('stockExchangeListings')) {
+      const player = state.players.find((candidate) => candidate.id === state.currentUserId)
+      const listings = state.players
+        .flatMap((candidate) => candidate.companies)
+        .map((company) => {
+          const playerOwnedShares = player
+            ? state.shareholdings
+                .filter((holding) => holding.companyId === company.id && holding.ownerPlayerId === player.id)
+                .reduce((total, holding) => total + holding.shareCount, 0)
+            : 0
+
+          const controlledCompanyIds = player ? getPlayerControlledCompanyIds(state, player.id) : new Set<string>()
+          const controlledCompanyOwnedShares = player
+            ? state.shareholdings
+                .filter((holding) => holding.companyId === company.id && holding.ownerCompanyId && controlledCompanyIds.has(holding.ownerCompanyId))
+                .reduce((total, holding) => total + holding.shareCount, 0)
+            : 0
+
+          const combinedControlledOwnershipRatio = player ? getCombinedControlledOwnershipRatio(state, player.id, company) : 0
+
+          return {
+            companyId: company.id,
+            companyName: company.name,
+            totalSharesIssued: getCompanyTotalShares(company),
+            publicFloatShares: getPublicFloatShares(state, company),
+            sharePrice: computeMockSharePrice(company),
+            bidPrice: Number((computeMockSharePrice(company) * 0.99).toFixed(2)),
+            askPrice: Number((computeMockSharePrice(company) * 1.01).toFixed(2)),
+            dividendPayoutRatio: getCompanyDividendPayoutRatio(company),
+            playerOwnedShares,
+            controlledCompanyOwnedShares,
+            combinedControlledOwnershipRatio,
+            canClaimControl: combinedControlledOwnershipRatio >= 0.5,
+          }
+        })
+        .sort((left, right) => left.companyName.localeCompare(right.companyName))
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { stockExchangeListings: listings } }),
       })
     }
 
@@ -2708,7 +3170,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     if (query.includes('startupPackOffer')) {
-      const player = state.players.find((p) => p.id === state.currentUserId)
+      const player = resolveCurrentPlayer()
       if (!player) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
       }
@@ -2755,7 +3217,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('acceptLoan')
 
     if (isStandaloneMeQuery(query)) {
-      const player = state.players.find((p) => p.id === state.currentUserId)
+      const player = resolveCurrentPlayer()
       if (!player) {
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
       }
@@ -3003,12 +3465,49 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
 // ── Login helper ─────────────────────────────────────────────────────────────
 
+export async function restoreMockSession(page: Page, token: string): Promise<void> {
+  const state = mockStateByPage.get(page)
+  if (!state) {
+    throw new Error('Mock API state was not initialized for this page.')
+  }
+
+  const playerId = token.replace(/^token-/, '')
+  const player = state.players.find((candidate) => candidate.id === playerId)
+  if (!player) {
+    throw new Error(`No mock player found for token ${token}.`)
+  }
+
+  await loginAs(page, state, player)
+}
+
 export async function loginAs(page: Page, state: MockState, player: MockPlayer): Promise<void> {
   await page.goto('/login')
   await page.getByLabel('Email').fill(player.email)
   await page.getByLabel('Password').fill(player.password)
-  await page.getByRole('button', { name: 'Sign In' }).click()
-  await page.waitForURL('/')
   state.currentUserId = player.id
   state.currentToken = `token-${player.id}`
+  const token = `token-${player.id}`
+  const expiresAtUtc = new Date(Date.now() + 7200000).toISOString()
+  const cookieUrl = process.env.CI ? 'http://localhost:4173' : 'http://localhost:5173'
+  await page.context().addCookies([
+    {
+      name: 'auth_token',
+      value: token,
+      url: cookieUrl,
+    },
+    {
+      name: 'auth_expires',
+      value: expiresAtUtc,
+      url: cookieUrl,
+    },
+  ])
+  await page.evaluate((token) => {
+    const expires = new Date(Date.now() + 7200000).toISOString()
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', expires)
+    document.cookie = `auth_token=${encodeURIComponent(token)}; path=/`
+    document.cookie = `auth_expires=${encodeURIComponent(expires)}; path=/`
+  }, token)
+  await page.getByRole('button', { name: 'Sign In' }).click()
+  await page.waitForURL('/')
 }

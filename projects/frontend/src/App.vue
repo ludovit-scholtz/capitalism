@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
@@ -10,8 +11,14 @@ const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
-auth.initFromStorage()
 gameStateStore.start()
+
+onMounted(() => {
+  auth.initFromStorage()
+  if (auth.token) {
+    void auth.fetchMe()
+  }
+})
 
 </script>
 

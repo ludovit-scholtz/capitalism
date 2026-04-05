@@ -12,9 +12,9 @@ import {
 } from './helpers/mock-api'
 
 async function authenticateViaLocalStorage(page: Page, token: string) {
-  await page.addInitScript((value) => {
-    localStorage.setItem('auth_token', value)
-    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  await page.addInitScript((storedToken) => {
+    localStorage.setItem('auth_token', storedToken)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7_200_000).toISOString())
   }, token)
 }
 
@@ -227,6 +227,40 @@ test.describe('Onboarding wizard', () => {
     await page.getByRole('link', { name: 'Go to Dashboard' }).click()
     await page.waitForURL('/dashboard')
     await expect(page).toHaveURL('/dashboard')
+  })
+
+  test('ipo plan selection updates launch capital before the first factory purchase', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/onboarding')
+
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText(
+      '$150,000',
+    )
+
+    const growthIpoCard = page.locator('.ipo-card', { hasText: 'Growth IPO' })
+    await growthIpoCard.click()
+    await expect(growthIpoCard).toContainText('$600,000')
+    await expect(growthIpoCard).toContainText('33.3%')
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$650,000')
+
+    await page.getByLabel('Company Name').fill('Growth Capital Works')
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText(
+      '$553,100',
+    )
   })
 
   test('renders mixed resource and intermediate-product recipes without runtime errors', async ({ page }) => {
@@ -1832,7 +1866,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // This test verifies that the "Review your cash" configure-guide step displays the player's
     // actual remaining cash balance after both factory and shop lot purchases — not just a heading.
     // Default mock lots: Industrial Plot A1 ($96,900) + High Street Retail Space ($120,000).
-    // Starting cash $500,000 - $96,900 - $120,000 = $283,100.
+    // Default starter IPO cash $450,000 - $96,900 - $120,000 = $233,100.
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -1848,8 +1882,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // The cash step must show the remaining balance, not just the label.
     const cashStep = page.locator('.configure-step').filter({ hasText: 'Review your cash' })
     await expect(cashStep).toBeVisible()
-    // Remaining cash after factory ($96,900) and shop ($120,000) from starting $500,000 = $283,100
-    await expect(cashStep).toContainText('283,100')
+    // Remaining cash after factory ($96,900) and shop ($120,000) from starter IPO cash $450,000 = $233,100
+    await expect(cashStep).toContainText('233,100')
   })
 
   test('configure-guide cash step shows different remaining balance for Food Processing (ROADMAP: show money available)', async ({
@@ -1872,8 +1906,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     const cashStep = page.locator('.configure-step').filter({ hasText: 'Review your cash' })
     await expect(cashStep).toBeVisible()
-    // Same lot prices as Furniture: $500,000 - $96,900 - $120,000 = $283,100
-    await expect(cashStep).toContainText('283,100')
+    // Same lot prices as Furniture: $450,000 - $96,900 - $120,000 = $233,100
+    await expect(cashStep).toContainText('233,100')
   })
 
   test('configure-guide public sales step shows description explaining city-wide buyer discovery (AC 7)', async ({

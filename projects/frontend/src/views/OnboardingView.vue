@@ -43,9 +43,61 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+auth.initFromStorage()
+
+function hasStoredSessionToken() {
+  if (typeof localStorage !== 'undefined') {
+    const stored = localStorage.getItem('auth_token')
+    const expires = localStorage.getItem('auth_expires')
+    if (stored && expires && new Date(expires) > new Date()) {
+      return true
+    }
+  }
+
+  if (typeof document === 'undefined') {
+    return false
+  }
+
+  const readCookie = (name: string) => {
+    const prefix = `${name}=`
+    const match = document.cookie.split('; ').find((entry) => entry.startsWith(prefix))
+    return match ? decodeURIComponent(match.slice(prefix.length)) : null
+  }
+
+  const cookieToken = readCookie('auth_token')
+  const cookieExpires = readCookie('auth_expires')
+  return !!cookieToken && !!cookieExpires && new Date(cookieExpires) > new Date()
+}
+
+const hasAuthenticatedSession = computed(
+  () => auth.isAuthenticated || !!auth.player || hasStoredSessionToken(),
+)
 
 const PROGRESS_KEY = 'onboarding_progress'
-const STARTING_CASH = 500_000
+const PERSONAL_STARTING_CASH = 200_000
+const FOUNDER_CONTRIBUTION = 50_000
+const DEFAULT_IPO_RAISE_TARGET = 400_000
+
+const ipoOptions = [
+  {
+    raiseTarget: 400_000,
+    founderOwnershipRatio: 0.5,
+    titleKey: 'onboarding.ipoOptionStarterTitle',
+    descriptionKey: 'onboarding.ipoOptionStarterDesc',
+  },
+  {
+    raiseTarget: 600_000,
+    founderOwnershipRatio: 0.3333,
+    titleKey: 'onboarding.ipoOptionGrowthTitle',
+    descriptionKey: 'onboarding.ipoOptionGrowthDesc',
+  },
+  {
+    raiseTarget: 800_000,
+    founderOwnershipRatio: 0.25,
+    titleKey: 'onboarding.ipoOptionExpansionTitle',
+    descriptionKey: 'onboarding.ipoOptionExpansionDesc',
+  },
+] as const
 
 const CITIES_QUERY = `
   {
@@ -155,7 +207,7 @@ const milestoneError = ref<string | null>(null)
 const milestoneCompleted = ref(false)
 
 // Guest mode state
-const isGuestMode = computed(() => !auth.isAuthenticated)
+const isGuestMode = computed(() => !hasAuthenticatedSession.value)
 const guestSaveError = ref<string | null>(null)
 const guestSaveLoading = ref(false)
 const guestAuthMode = ref<'register' | 'login'>('register')
@@ -173,6 +225,7 @@ const selectedCityId = ref('')
 const selectedProductId = ref('')
 const selectedFactoryLotId = ref('')
 const selectedShopLotId = ref('')
+const selectedIpoRaiseTarget = ref(DEFAULT_IPO_RAISE_TARGET)
 const companyName = ref('')
 
 const completionResult = ref<OnboardingResult | null>(null)
@@ -195,7 +248,12 @@ const starterCompany = computed(() => {
 
   return auth.player?.companies.find((company) => company.id === companyId) ?? null
 })
-const starterCash = computed(() => onboardingCompanyCash.value ?? starterCompany.value?.cash ?? STARTING_CASH)
+const selectedIpoOption = computed(
+  () => ipoOptions.find((option) => option.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoOptions[0],
+)
+const companyStartingCash = computed(() => FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget)
+const remainingPersonalCash = computed(() => PERSONAL_STARTING_CASH - FOUNDER_CONTRIBUTION)
+const starterCash = computed(() => onboardingCompanyCash.value ?? starterCompany.value?.cash ?? companyStartingCash.value)
 
 const availableFactoryLots = computed(() => getAvailableLots(cityLots.value, 'FACTORY'))
 const availableShopLots = computed(() => getAvailableLots(cityLots.value, 'SALES_SHOP'))
@@ -205,7 +263,7 @@ const recommendedShopLotIds = computed(() => getRecommendedShopLotIds(availableS
 const canProceedStep1 = computed(() => !!selectedIndustry.value)
 const canProceedStep2 = computed(() => !!selectedCityId.value)
 const canProceedStep3 = computed(() =>
-  checkCanProceedStep3(companyName.value, selectedFactoryLot.value, STARTING_CASH),
+  checkCanProceedStep3(companyName.value, selectedFactoryLot.value, companyStartingCash.value),
 )
 const canProceedStep4 = computed(() =>
   checkCanProceedStep4(selectedProductId.value, selectedShopLot.value, starterCash.value),
@@ -389,6 +447,7 @@ function resolveMaxReachableStep(): number {
       hasCompletionResult: false,
       isResumingConfigureStep: false,
       onboardingCurrentStep: null,
+      hasLocalFactoryProgress: false,
       selectedCityId: selectedCityId.value,
       selectedIndustry: selectedIndustry.value,
     })
@@ -397,6 +456,7 @@ function resolveMaxReachableStep(): number {
     hasCompletionResult: !!completionResult.value,
     isResumingConfigureStep: isResumingConfigureStep.value,
     onboardingCurrentStep: auth.player?.onboardingCurrentStep,
+    hasLocalFactoryProgress: !!selectedFactoryLotId.value && onboardingCompanyCash.value !== null,
     selectedCityId: selectedCityId.value,
     selectedIndustry: selectedIndustry.value,
   })
@@ -415,9 +475,11 @@ function saveProgress() {
         industry: selectedIndustry.value,
         cityId: selectedCityId.value,
         productId: selectedProductId.value,
+          ipoRaiseTarget: selectedIpoRaiseTarget.value,
         companyName: companyName.value,
         factoryLotId: selectedFactoryLotId.value,
         shopLotId: selectedShopLotId.value,
+        companyCash: onboardingCompanyCash.value ?? undefined,
         guestCash: isGuestMode.value ? (onboardingCompanyCash.value ?? undefined) : undefined,
       }),
     )
@@ -448,9 +510,11 @@ function restoreProgress() {
     if (typeof saved.industry === 'string') selectedIndustry.value = saved.industry
     if (typeof saved.cityId === 'string') selectedCityId.value = saved.cityId
     if (typeof saved.productId === 'string') selectedProductId.value = saved.productId
+    if ([400000, 600000, 800000].includes(saved.ipoRaiseTarget)) selectedIpoRaiseTarget.value = saved.ipoRaiseTarget
     if (typeof saved.companyName === 'string') companyName.value = saved.companyName
     if (typeof saved.factoryLotId === 'string') selectedFactoryLotId.value = saved.factoryLotId
     if (typeof saved.shopLotId === 'string') selectedShopLotId.value = saved.shopLotId
+    if (typeof saved.companyCash === 'number') onboardingCompanyCash.value = saved.companyCash
     if (typeof saved.guestCash === 'number') onboardingCompanyCash.value = saved.guestCash
     if (typeof saved.step === 'number') step.value = resolveClampStep(saved.step)
   } catch {
@@ -459,7 +523,7 @@ function restoreProgress() {
 }
 
 watch(
-  [step, selectedIndustry, selectedCityId, selectedProductId, companyName, selectedFactoryLotId, selectedShopLotId],
+  [step, selectedIndustry, selectedCityId, selectedProductId, selectedIpoRaiseTarget, companyName, selectedFactoryLotId, selectedShopLotId],
   saveProgress,
 )
 
@@ -505,6 +569,10 @@ async function loadLots() {
 }
 
 async function syncOngoingOnboardingState() {
+  if (!auth.player) {
+    return
+  }
+
   if (auth.player?.onboardingCurrentStep !== 'SHOP_SELECTION') {
     onboardingCompanyCash.value = null
     return
@@ -527,10 +595,10 @@ async function syncOngoingOnboardingState() {
 
 onMounted(async () => {
   // Track onboarding start event
-  trackOnboardingEvent('onboarding_start', { authenticated: auth.isAuthenticated })
+  trackOnboardingEvent('onboarding_start', { authenticated: hasAuthenticatedSession.value })
 
   // Authenticated users: check onboarding completion state first
-  if (auth.isAuthenticated) {
+  if (hasAuthenticatedSession.value) {
     if (!auth.player) {
       await auth.fetchMe()
     }
@@ -572,7 +640,7 @@ onMounted(async () => {
 
     restoreProgress()
 
-    if (auth.isAuthenticated) {
+    if (hasAuthenticatedSession.value) {
       await syncOngoingOnboardingState()
     }
 
@@ -620,12 +688,13 @@ async function startOnboardingCompany() {
 
   // Guest mode: simulate factory purchase locally without backend call
   if (isGuestMode.value) {
-    onboardingCompanyCash.value = STARTING_CASH - selectedFactoryLot.value.price
+    onboardingCompanyCash.value = companyStartingCash.value - selectedFactoryLot.value.price
     trackOnboardingEvent('factory_configured', {
       guest: true,
       lotId: selectedFactoryLotId.value,
       industry: selectedIndustry.value,
       cityId: selectedCityId.value,
+      ipoRaiseTarget: selectedIpoRaiseTarget.value,
     })
     await loadLots()
     step.value = 4
@@ -654,6 +723,7 @@ async function startOnboardingCompany() {
         input: {
           industry: selectedIndustry.value,
           cityId: selectedCityId.value,
+          ipoRaiseTarget: selectedIpoRaiseTarget.value,
           companyName: companyName.value.trim(),
           factoryLotId: selectedFactoryLotId.value,
         },
@@ -667,6 +737,7 @@ async function startOnboardingCompany() {
       lotId: selectedFactoryLotId.value,
       industry: selectedIndustry.value,
       cityId: selectedCityId.value,
+      ipoRaiseTarget: selectedIpoRaiseTarget.value,
     })
     await auth.fetchMe()
     await loadLots()
@@ -685,6 +756,7 @@ async function startOnboardingCompany() {
 async function completeOnboarding() {
   // Guest mode: simulate shop purchase locally, then show save-progress prompt
   if (isGuestMode.value) {
+    onboardingCompanyCash.value = Math.max(starterCash.value - (selectedShopLot.value?.price ?? 0), 0)
     clearProgress()
     trackOnboardingEvent('shop_configured', {
       guest: true,
@@ -874,6 +946,7 @@ async function saveGuestProgress() {
             input: {
               industry: selectedIndustry.value,
               cityId: selectedCityId.value,
+              ipoRaiseTarget: selectedIpoRaiseTarget.value,
               companyName: companyName.value.trim(),
               factoryLotId: selectedFactoryLotId.value,
             },
@@ -1030,6 +1103,7 @@ async function claimStartupPackOffer() {
 
     startupPackOffer.value = data.claimStartupPack.offer
     auth.setStartupPackOffer(data.claimStartupPack.offer)
+    auth.setProSubscriptionEndsAtUtc(data.claimStartupPack.proSubscriptionEndsAtUtc)
     if (completionResult.value) {
       completionResult.value = {
         ...completionResult.value,
@@ -1081,6 +1155,10 @@ function getCityResourceName(city: City, index: number): string {
 
 function formatCurrency(value: number): string {
   return value.toLocaleString(locale.value)
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`
 }
 
 function formatNumber(value: number): string {
@@ -1142,7 +1220,7 @@ const FIRST_SALE_MISSION_QUERY = `
 `
 
 async function loadFirstSaleMission() {
-  if (!auth.isAuthenticated || milestoneCompleted.value) return
+  if (!hasAuthenticatedSession.value || milestoneCompleted.value) return
   firstSaleMissionLoading.value = true
   try {
     const data = await gqlRequest<{ firstSaleMission: FirstSaleMission }>(FIRST_SALE_MISSION_QUERY)
@@ -1229,7 +1307,7 @@ useTickRefresh(async () => {
   await loadGameState()
 
   // Poll first-sale mission for authenticated players who are still in the configure step
-  if (auth.isAuthenticated && !milestoneCompleted.value) {
+  if (hasAuthenticatedSession.value && !milestoneCompleted.value) {
     await loadFirstSaleMission()
   }
 })
@@ -1345,12 +1423,40 @@ useTickRefresh(async () => {
         <div class="budget-grid">
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.startingCash') }}</span>
-            <strong>${{ formatCurrency(STARTING_CASH) }}</strong>
+            <strong>${{ formatCurrency(companyStartingCash) }}</strong>
           </article>
-          <article class="budget-card" :class="{ warning: !!selectedFactoryLot && STARTING_CASH < selectedFactoryLot.price }">
+          <article class="budget-card">
+            <span class="budget-label">{{ t('onboarding.founderContribution') }}</span>
+            <strong>${{ formatCurrency(FOUNDER_CONTRIBUTION) }}</strong>
+          </article>
+          <article class="budget-card">
+            <span class="budget-label">{{ t('onboarding.personalCash') }}</span>
+            <strong>${{ formatCurrency(remainingPersonalCash) }}</strong>
+          </article>
+          <article class="budget-card" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
             <span class="budget-label">{{ t('onboarding.cashAfterPurchase') }}</span>
-            <strong>${{ formatCurrency(Math.max(STARTING_CASH - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
+            <strong>${{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
           </article>
+        </div>
+
+        <div class="form-group">
+          <span class="form-section-title">{{ t('onboarding.ipoTitle') }}</span>
+          <p class="ipo-copy">{{ t('onboarding.ipoDesc') }}</p>
+          <div class="ipo-grid">
+            <button
+              v-for="option in ipoOptions"
+              :key="option.raiseTarget"
+              class="ipo-card"
+              :class="{ selected: selectedIpoRaiseTarget === option.raiseTarget }"
+              @click="selectedIpoRaiseTarget = option.raiseTarget"
+            >
+              <span class="card-title">{{ t(option.titleKey) }}</span>
+              <span class="ipo-metric">{{ t('onboarding.ipoRaise') }}: ${{ formatCurrency(option.raiseTarget) }}</span>
+              <span class="ipo-metric">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
+              <span class="ipo-metric">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
+              <span class="card-desc">{{ t(option.descriptionKey) }}</span>
+            </button>
+          </div>
         </div>
 
         <div class="form-group compact">
@@ -1383,7 +1489,7 @@ useTickRefresh(async () => {
           v-model:selected-lot-id="selectedFactoryLotId"
           :lots="availableFactoryLots"
           required-building-type="FACTORY"
-          :money-available="STARTING_CASH"
+          :money-available="companyStartingCash"
           :recommended-lot-ids="recommendedFactoryLotIds"
         />
 
@@ -1557,8 +1663,8 @@ useTickRefresh(async () => {
           <div class="achievement-item">
             <span class="achievement-icon">💰</span>
             <div class="achievement-text">
-              <strong>${{ formatCurrency(onboardingCompanyCash ?? STARTING_CASH) }}</strong>
-              <span>{{ t('onboarding.completionCapital', { amount: '$' + formatCurrency(onboardingCompanyCash ?? STARTING_CASH) }) }}</span>
+              <strong>${{ formatCurrency(onboardingCompanyCash ?? companyStartingCash) }}</strong>
+              <span>{{ t('onboarding.completionCapital', { amount: '$' + formatCurrency(onboardingCompanyCash ?? companyStartingCash) }) }}</span>
             </div>
           </div>
         </div>
@@ -1824,8 +1930,8 @@ useTickRefresh(async () => {
 
           <div v-else-if="claimedStartupPackOffer" class="startup-pack-state success">
             <strong>{{ t('startupPack.claimedTitle') }}</strong>
-            <p v-if="auth.player?.proSubscriptionEndsAtUtc">
-              {{ t('startupPack.claimedBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
+            <p v-if="auth.effectiveProSubscriptionEndsAtUtc">
+              {{ t('startupPack.claimedBody', { date: formatDateTime(auth.effectiveProSubscriptionEndsAtUtc) }) }}
             </p>
             <p v-else>{{ t('startupPack.claimedNoDate') }}</p>
             <p>
@@ -2383,6 +2489,48 @@ useTickRefresh(async () => {
   outline: none;
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.15);
+}
+
+.ipo-copy {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.ipo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.ipo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ipo-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.ipo-card.selected {
+  border-color: var(--color-primary);
+  background: rgba(0, 71, 255, 0.08);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 16px rgba(0, 71, 255, 0.15);
+}
+
+.ipo-metric {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
 }
 
 .guidance-panel,
@@ -3341,6 +3489,7 @@ useTickRefresh(async () => {
 @media (max-width: 640px) {
   .industry-grid,
   .city-grid,
+  .ipo-grid,
   .product-grid,
   .budget-grid,
   .configure-steps {

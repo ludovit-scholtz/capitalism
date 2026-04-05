@@ -8,10 +8,10 @@ import './assets/styles/main.css'
 
 // Font Awesome
 import { library } from '@fortawesome/fontawesome-svg-core'
-import { faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars, faChartBar, faLandmark } from '@fortawesome/free-solid-svg-icons'
+import { faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars, faChartBar, faLandmark, faWallet } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
-library.add(faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars, faChartBar, faLandmark)
+library.add(faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars, faChartBar, faLandmark, faWallet)
 
 export function createApp() {
   const app = createVueApp(App)
