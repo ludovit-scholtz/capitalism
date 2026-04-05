@@ -483,6 +483,19 @@ const selectedPublicSalesUnit = computed(() =>
 const selectedHistoryItemOptions = computed<UnitResourceHistoryItemOption[]>(() => getUnitResourceHistoryItemOptions(selectedDisplayUnit.value))
 const selectedUnitResourceHistory = computed(() => getSelectedUnitResourceHistory(selectedDisplayUnit.value))
 
+/** Max revenue across all history ticks – used to normalise the revenue bar chart heights. */
+const miMaxRevenue = computed(() =>
+  publicSalesAnalytics.value?.revenueHistory.reduce((m, s) => Math.max(m, s.revenue), 0) ?? 0,
+)
+/** Max quantity across all history ticks – used to normalise the quantity bar chart heights. */
+const miMaxQuantitySold = computed(() =>
+  publicSalesAnalytics.value?.revenueHistory.reduce((m, s) => Math.max(m, s.quantitySold), 0) ?? 0,
+)
+/** Max price per unit across all price history ticks – used to normalise the price bar chart heights. */
+const miMaxPricePerUnit = computed(() =>
+  publicSalesAnalytics.value?.priceHistory.reduce((m, s) => Math.max(m, s.pricePerUnit), 0) ?? 0,
+)
+
 type ExchangeOfferItem = AnnotatedExchangeOffer
 
 const annotatedExchangeOffers = computed<ExchangeOfferItem[]>(() => {
@@ -2314,9 +2327,14 @@ async function loadPublicSalesAnalytics(unitId: string | null) {
           demandSignal
           actionHint
           recentUtilization
+          elasticityIndex
+          unmetDemandShare
+          populationIndex
+          inventoryQuality
+          brandAwareness
           revenueHistory { tick revenue quantitySold }
           priceHistory { tick pricePerUnit }
-          marketShare { label companyId share }
+          marketShare { label companyId share isUnmet }
         }
       }`,
       { unitId },
@@ -4398,7 +4416,7 @@ watch(
                           :key="snap.tick"
                           class="mi-bar mi-bar-revenue"
                           :style="{
-                            height: `${Math.max(2, publicSalesAnalytics.revenueHistory.reduce((m, s) => Math.max(m, s.revenue), 0) > 0 ? (snap.revenue / publicSalesAnalytics.revenueHistory.reduce((m, s) => Math.max(m, s.revenue), 0)) * 100 : 0).toFixed(1)}%`,
+                            height: `${Math.max(2, miMaxRevenue > 0 ? (snap.revenue / miMaxRevenue) * 100 : 0).toFixed(1)}%`,
                           }"
                           :title="`T${snap.tick}: ${formatCurrency(snap.revenue)}`"
                         ></div>
@@ -4414,9 +4432,25 @@ watch(
                           :key="snap.tick"
                           class="mi-bar mi-bar-quantity"
                           :style="{
-                            height: `${Math.max(2, publicSalesAnalytics.revenueHistory.reduce((m, s) => Math.max(m, s.quantitySold), 0) > 0 ? (snap.quantitySold / publicSalesAnalytics.revenueHistory.reduce((m, s) => Math.max(m, s.quantitySold), 0)) * 100 : 0).toFixed(1)}%`,
+                            height: `${Math.max(2, miMaxQuantitySold > 0 ? (snap.quantitySold / miMaxQuantitySold) * 100 : 0).toFixed(1)}%`,
                           }"
                           :title="`T${snap.tick}: ${formatUnitQuantity(snap.quantitySold)}`"
+                        ></div>
+                      </div>
+                    </div>
+
+                    <!-- Price history chart -->
+                    <div v-if="publicSalesAnalytics.priceHistory.length > 0" class="mi-chart-section">
+                      <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.priceChart') }}</span>
+                      <div class="mi-bar-chart mi-bar-chart-price" role="img" :aria-label="t('buildingDetail.marketIntelligence.priceChart')">
+                        <div
+                          v-for="snap in publicSalesAnalytics.priceHistory.slice(-30)"
+                          :key="snap.tick"
+                          class="mi-bar mi-bar-price"
+                          :style="{
+                            height: `${Math.max(2, miMaxPricePerUnit > 0 ? (snap.pricePerUnit / miMaxPricePerUnit) * 100 : 0).toFixed(1)}%`,
+                          }"
+                          :title="`T${snap.tick}: ${formatCurrency(snap.pricePerUnit)}`"
                         ></div>
                       </div>
                     </div>
@@ -4433,13 +4467,47 @@ watch(
                         v-for="entry in publicSalesAnalytics.marketShare"
                         :key="entry.label"
                         class="mi-share-row"
-                        :class="{ 'mi-share-row-you': entry.companyId === building?.companyId }"
+                        :class="{ 'mi-share-row-you': entry.companyId === building?.companyId, 'mi-share-row-unmet': entry.isUnmet }"
                       >
-                        <span class="mi-share-label">{{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}</span>
+                        <span class="mi-share-label">
+                          {{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}{{ entry.isUnmet ? ' ⬚' : '' }}
+                        </span>
                         <div class="mi-share-bar-wrap">
-                          <div class="mi-share-bar" :style="{ width: `${(entry.share * 100).toFixed(1)}%` }"></div>
+                          <div class="mi-share-bar" :class="{ 'mi-share-bar-unmet': entry.isUnmet }" :style="{ width: `${(entry.share * 100).toFixed(1)}%` }"></div>
                         </div>
                         <span class="mi-share-pct">{{ (entry.share * 100).toFixed(1) }}%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Elasticity index + context card -->
+                  <div class="mi-context-card">
+                    <div class="mi-context-grid">
+                      <div v-if="publicSalesAnalytics.elasticityIndex !== null" class="mi-context-item">
+                        <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.elasticityIndex') }}</span>
+                        <strong class="mi-context-value" :class="{ 'mi-elastic-high': (publicSalesAnalytics.elasticityIndex ?? 0) < -1.5, 'mi-elastic-low': (publicSalesAnalytics.elasticityIndex ?? 0) > -0.5 }">
+                          {{ publicSalesAnalytics.elasticityIndex.toFixed(2) }}
+                        </strong>
+                        <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.elasticityHint') }}</span>
+                      </div>
+                      <div v-if="publicSalesAnalytics.populationIndex !== null" class="mi-context-item">
+                        <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.populationIndex') }}</span>
+                        <strong class="mi-context-value">{{ publicSalesAnalytics.populationIndex.toFixed(2) }}×</strong>
+                        <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.populationIndexHint') }}</span>
+                      </div>
+                      <div v-if="publicSalesAnalytics.inventoryQuality !== null" class="mi-context-item">
+                        <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.productQuality') }}</span>
+                        <strong class="mi-context-value" :class="{ 'mi-quality-high': publicSalesAnalytics.inventoryQuality >= 0.7, 'mi-quality-low': publicSalesAnalytics.inventoryQuality < 0.4 }">
+                          {{ Math.round(publicSalesAnalytics.inventoryQuality * 100) }}%
+                        </strong>
+                        <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.productQualityHint') }}</span>
+                      </div>
+                      <div v-if="publicSalesAnalytics.brandAwareness !== null" class="mi-context-item">
+                        <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.brandAwareness') }}</span>
+                        <strong class="mi-context-value" :class="{ 'mi-quality-high': publicSalesAnalytics.brandAwareness >= 0.6 }">
+                          {{ Math.round(publicSalesAnalytics.brandAwareness * 100) }}%
+                        </strong>
+                        <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.brandAwarenessHint') }}</span>
                       </div>
                     </div>
                   </div>
@@ -6545,6 +6613,11 @@ watch(
   opacity: 0.8;
 }
 
+.mi-bar-price {
+  background: #d97706;
+  opacity: 0.8;
+}
+
 .mi-section {
   margin-bottom: 1rem;
 }
@@ -6660,11 +6733,70 @@ watch(
   color: #9f1239;
 }
 
-.mi-action-hint {
-  font-size: 0.8125rem;
-  color: var(--color-text);
-  margin: 0;
-  line-height: 1.45;
+.mi-share-row-unmet .mi-share-label {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.mi-share-bar-unmet {
+  background: #94a3b8 !important;
+  opacity: 0.7;
+}
+
+/* Context card for elasticity, quality, brand */
+.mi-context-card {
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  padding: 0.6rem;
+  background: var(--color-surface);
+}
+
+.mi-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.mi-context-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mi-context-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.mi-context-value {
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mi-context-hint {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+.mi-elastic-high {
+  color: #dc2626;
+}
+
+.mi-elastic-low {
+  color: #16a34a;
+}
+
+.mi-quality-high {
+  color: #16a34a;
+}
+
+.mi-quality-low {
+  color: #d97706;
 }
 
 @media (max-width: 640px) {
@@ -6674,6 +6806,10 @@ watch(
 
   .mi-share-label {
     width: 5rem;
+  }
+
+  .mi-context-grid {
+    grid-template-columns: 1fr;
   }
 }
 
