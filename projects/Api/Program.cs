@@ -53,7 +53,7 @@ public class Program
             }
             else
             {
-                options.UseSqlite(builder.Configuration.GetConnectionString("GameCatalog")
+                options.UseNpgsql(builder.Configuration.GetConnectionString("GameCatalog")
                     ?? throw new InvalidOperationException("Connection string 'GameCatalog' is missing."));
             }
         });
