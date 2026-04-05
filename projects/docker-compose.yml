@@ -1,16 +1,6 @@
 ﻿version: '3.8'
 
 services:
-  postgresgame1:
-    image: postgres:18
-    environment:
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: master
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data2
-
   postgresmaster:
     image: postgres:18
     environment:
@@ -40,12 +30,12 @@ services:
     ports:
       - "44356:44356"
     depends_on:
-      - postgresgame1
+      - postgresmaster
       - masterapi
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=https://+:44356
-      - ConnectionStrings__GameCatalog=Host=postgresgame1;Port=5433;Database=master;Username=postgres;Password=password
+      - ConnectionStrings__GameCatalog=Host=postgresmaster;Port=5432;Database=game1;Username=postgres;Password=password
 
 volumes:
   postgres_data:
