@@ -49,6 +49,8 @@ public sealed class AppDbInitializer(
                 Email = seedOptions.Value.AdminEmail,
                 DisplayName = seedOptions.Value.AdminDisplayName,
                 Role = PlayerRole.Admin,
+                PersonalCash = 200_000m,
+                ActiveAccountType = AccountContextType.Person,
                 CreatedAtUtc = DateTime.UtcNow
             };
             admin.PasswordHash = hasher.HashPassword(admin, seedOptions.Value.AdminPassword);

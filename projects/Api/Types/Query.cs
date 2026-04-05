@@ -26,6 +26,182 @@ public sealed class Query
             .FirstOrDefaultAsync(p => p.Id == userId);
     }
 
+    /// <summary>Returns the authenticated player's personal account, portfolio, and dividend history.</summary>
+    [Authorize]
+    public async Task<PersonAccountResult?> GetPersonAccount(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players
+            .AsNoTracking()
+            .FirstOrDefaultAsync(candidate => candidate.Id == userId);
+
+        if (player is null)
+        {
+            return null;
+        }
+
+        var companies = await db.Companies
+            .AsNoTracking()
+            .OrderBy(company => company.Name)
+            .ToListAsync();
+        var buildings = await db.Buildings.AsNoTracking().ToListAsync();
+        var lots = await db.BuildingLots
+            .AsNoTracking()
+            .Where(lot => lot.OwnerCompanyId.HasValue)
+            .ToListAsync();
+        var inventories = await db.Inventories
+            .AsNoTracking()
+            .Include(inventory => inventory.ResourceType)
+            .Include(inventory => inventory.ProductType)
+            .ToListAsync();
+        var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
+        var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var companiesById = companies.ToDictionary(company => company.Id);
+
+        var portfolio = shareholdings
+            .Where(holding => holding.OwnerPlayerId == userId && holding.ShareCount > 0m)
+            .Select(holding =>
+            {
+                var company = companiesById[holding.CompanyId];
+                var sharePrice = sharePriceByCompany.GetValueOrDefault(holding.CompanyId);
+                return new PortfolioHoldingResult
+                {
+                    CompanyId = company.Id,
+                    CompanyName = company.Name,
+                    ShareCount = holding.ShareCount,
+                    OwnershipRatio = company.TotalSharesIssued > 0m
+                        ? decimal.Round(holding.ShareCount / company.TotalSharesIssued, 4, MidpointRounding.AwayFromZero)
+                        : 0m,
+                    SharePrice = sharePrice,
+                    MarketValue = decimal.Round(holding.ShareCount * sharePrice, 4, MidpointRounding.AwayFromZero),
+                };
+            })
+            .OrderByDescending(holding => holding.MarketValue)
+            .ThenBy(holding => holding.CompanyName)
+            .ToList();
+
+        var dividendPayments = await db.DividendPayments
+            .AsNoTracking()
+            .Where(payment => payment.RecipientPlayerId == userId)
+            .OrderByDescending(payment => payment.RecordedAtTick)
+            .ToListAsync();
+
+        return new PersonAccountResult
+        {
+            PlayerId = player.Id,
+            DisplayName = player.DisplayName,
+            PersonalCash = player.PersonalCash,
+            ActiveAccountType = player.ActiveAccountType,
+            ActiveCompanyId = player.ActiveCompanyId,
+            Shareholdings = portfolio,
+            DividendPayments = dividendPayments
+                .Select(payment => new DividendPaymentResult
+                {
+                    Id = payment.Id,
+                    CompanyId = payment.CompanyId,
+                    CompanyName = companiesById.GetValueOrDefault(payment.CompanyId)?.Name ?? string.Empty,
+                    ShareCount = payment.ShareCount,
+                    AmountPerShare = payment.AmountPerShare,
+                    TotalAmount = payment.TotalAmount,
+                    GameYear = payment.GameYear,
+                    RecordedAtTick = payment.RecordedAtTick,
+                    RecordedAtUtc = payment.RecordedAtUtc,
+                    Description = payment.Description,
+                })
+                .ToList(),
+        };
+    }
+
+    /// <summary>
+    /// Returns quoted company share prices and public-float availability for the stock exchange.
+    /// When authenticated, includes the current player's direct and controlled-company holdings.
+    /// </summary>
+    public async Task<List<StockExchangeListingResult>> GetStockExchangeListings(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var companies = await db.Companies
+            .AsNoTracking()
+            .OrderBy(company => company.Name)
+            .ToListAsync();
+        var buildings = await db.Buildings.AsNoTracking().ToListAsync();
+        var lots = await db.BuildingLots
+            .AsNoTracking()
+            .Where(lot => lot.OwnerCompanyId.HasValue)
+            .ToListAsync();
+        var inventories = await db.Inventories
+            .AsNoTracking()
+            .Include(inventory => inventory.ResourceType)
+            .Include(inventory => inventory.ProductType)
+            .ToListAsync();
+        var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
+        var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+
+        Guid? userId = null;
+        HashSet<Guid> controlledCompanyIds = [];
+        if (httpContextAccessor.HttpContext?.User.Identity?.IsAuthenticated == true)
+        {
+            userId = httpContextAccessor.HttpContext.User.GetRequiredUserId();
+            controlledCompanyIds = companies
+                .Where(company => company.PlayerId == userId.Value)
+                .Select(company => company.Id)
+                .ToHashSet();
+        }
+
+        return companies
+            .Select(company =>
+            {
+                var sharePrice = sharePriceByCompany.GetValueOrDefault(company.Id);
+                var playerOwnedShares = userId.HasValue
+                    ? shareholdings
+                        .Where(holding => holding.CompanyId == company.Id && holding.OwnerPlayerId == userId.Value)
+                        .Sum(holding => holding.ShareCount)
+                    : 0m;
+                var controlledCompanyOwnedShares = controlledCompanyIds.Count > 0
+                    ? shareholdings
+                        .Where(holding => holding.CompanyId == company.Id
+                            && holding.OwnerCompanyId.HasValue
+                            && controlledCompanyIds.Contains(holding.OwnerCompanyId.Value))
+                        .Sum(holding => holding.ShareCount)
+                    : 0m;
+                var combinedRatio = company.TotalSharesIssued > 0m
+                    ? decimal.Round((playerOwnedShares + controlledCompanyOwnedShares) / company.TotalSharesIssued, 4, MidpointRounding.AwayFromZero)
+                    : 0m;
+
+                return new StockExchangeListingResult
+                {
+                    CompanyId = company.Id,
+                    CompanyName = company.Name,
+                    TotalSharesIssued = company.TotalSharesIssued,
+                    PublicFloatShares = SharePriceCalculator.ComputePublicFloat(company, shareholdings.Where(holding => holding.CompanyId == company.Id)),
+                    SharePrice = sharePrice,
+                    BidPrice = SharePriceCalculator.ComputeBidPrice(sharePrice),
+                    AskPrice = SharePriceCalculator.ComputeAskPrice(sharePrice),
+                    DividendPayoutRatio = company.DividendPayoutRatio,
+                    PlayerOwnedShares = playerOwnedShares,
+                    ControlledCompanyOwnedShares = controlledCompanyOwnedShares,
+                    CombinedControlledOwnershipRatio = combinedRatio,
+                    CanClaimControl = userId.HasValue && company.PlayerId != userId.Value && combinedRatio >= 0.5m,
+                };
+            })
+            .OrderByDescending(listing => listing.SharePrice)
+            .ThenBy(listing => listing.CompanyName)
+            .ToList();
+    }
+
+    private static Dictionary<Guid, decimal> BuildQuotedSharePriceLookup(
+        IReadOnlyCollection<Company> companies,
+        IReadOnlyCollection<Building> buildings,
+        IReadOnlyCollection<BuildingLot> lots,
+        IReadOnlyCollection<Inventory> inventories,
+        IReadOnlyCollection<Shareholding> shareholdings)
+    {
+        var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, lots, inventories);
+        return SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
+    }
+
     /// <summary>Returns the current player's startup-pack offer if they are eligible.</summary>
     [Authorize]
     public async Task<StartupPackOffer?> GetStartupPackOffer(
@@ -370,6 +546,8 @@ public sealed class Query
             CompanyId = company.Id,
             CompanyName = company.Name,
             Cash = company.Cash,
+            TotalSharesIssued = company.TotalSharesIssued,
+            DividendPayoutRatio = company.DividendPayoutRatio,
             FoundedAtTick = company.FoundedAtTick,
             AdministrationOverheadRate = overheadRate,
             AgeFactor = ageFactor,

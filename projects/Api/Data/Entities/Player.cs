@@ -33,6 +33,9 @@ public sealed class Player
     /// <summary>UTC timestamp of the player's last login.</summary>
     public DateTime? LastLoginAtUtc { get; set; }
 
+    /// <summary>Cash held in the player's personal account outside any company.</summary>
+    public decimal PersonalCash { get; set; }
+
     /// <summary>UTC timestamp when the player completed the onboarding journey. Null if not yet completed.</summary>
     public DateTime? OnboardingCompletedAtUtc { get; set; }
 
@@ -41,6 +44,12 @@ public sealed class Player
 
     /// <summary>Application-managed concurrency token for optimistic concurrency control.</summary>
     public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
+
+    /// <summary>The currently selected acting account context: PERSON or COMPANY.</summary>
+    public string ActiveAccountType { get; set; } = AccountContextType.Person;
+
+    /// <summary>The company currently selected when <see cref="ActiveAccountType"/> is COMPANY.</summary>
+    public Guid? ActiveCompanyId { get; set; }
 
     /// <summary>Current resumable onboarding step. Null when onboarding has not started or is completed.</summary>
     public string? OnboardingCurrentStep { get; set; }
@@ -68,7 +77,13 @@ public sealed class Player
     public DateTime? OnboardingFirstSaleCompletedAtUtc { get; set; }
 
     /// <summary>Companies owned by this player.</summary>
-    public ICollection<Company> Companies { get; set; } = [];
+    public ICollection<Company> Companies { get; set; } = new List<Company>();
+
+    /// <summary>Share positions held directly by the player's personal account.</summary>
+    public ICollection<Shareholding> Shareholdings { get; set; } = new List<Shareholding>();
+
+    /// <summary>Dividend payments received directly into the player's personal account.</summary>
+    public ICollection<DividendPayment> DividendPayments { get; set; } = new List<DividendPayment>();
 }
 
 /// <summary>Defines the available player roles.</summary>
@@ -76,6 +91,13 @@ public static class PlayerRole
 {
     public const string Player = "PLAYER";
     public const string Admin = "ADMIN";
+}
+
+/// <summary>Defines the available acting account contexts for a player session.</summary>
+public static class AccountContextType
+{
+    public const string Person = "PERSON";
+    public const string Company = "COMPANY";
 }
 
 /// <summary>Resumable onboarding step identifiers stored on the player profile.</summary>

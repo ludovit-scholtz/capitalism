@@ -24,6 +24,12 @@ public sealed class Company
     /// <summary>Available cash balance in game currency.</summary>
     public decimal Cash { get; set; }
 
+    /// <summary>Total issued shares used for ownership, exchange pricing, and dividend distribution.</summary>
+    public decimal TotalSharesIssued { get; set; } = 10_000m;
+
+    /// <summary>Portion of post-tax annual profit paid out as dividends. Stored as a 0–1 ratio.</summary>
+    public decimal DividendPayoutRatio { get; set; } = 0.2m;
+
     /// <summary>UTC timestamp when the company was founded.</summary>
     public DateTime FoundedAtUtc { get; set; } = DateTime.UtcNow;
 
@@ -35,4 +41,10 @@ public sealed class Company
 
     /// <summary>Per-city salary multipliers chosen by the player.</summary>
     public ICollection<CompanyCitySalarySetting> CitySalarySettings { get; set; } = new List<CompanyCitySalarySetting>();
+
+    /// <summary>Share positions representing direct ownership in this company.</summary>
+    public ICollection<Shareholding> Shareholdings { get; set; } = new List<Shareholding>();
+
+    /// <summary>Dividend payments made by this company to shareholders.</summary>
+    public ICollection<DividendPayment> DividendPayments { get; set; } = new List<DividendPayment>();
 }

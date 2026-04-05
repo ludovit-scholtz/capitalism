@@ -21,6 +21,10 @@ namespace Api.Types;
 /// </summary>
 public sealed class Mutation
 {
+    private const decimal StarterFounderContribution = 50_000m;
+    private const decimal DefaultDividendPayoutRatio = 0.2m;
+    private const decimal DefaultCompanyShareCount = 10_000m;
+
     private static readonly IReadOnlyDictionary<string, string> StarterOnboardingProductByIndustry = new Dictionary<string, string>
     {
         [Industry.Furniture] = "wooden-chair",
@@ -49,6 +53,8 @@ public sealed class Mutation
             Email = input.Email,
             DisplayName = input.DisplayName,
             Role = PlayerRole.Player,
+            PersonalCash = 200_000m,
+            ActiveAccountType = AccountContextType.Person,
             CreatedAtUtc = DateTime.UtcNow
         };
 
@@ -127,11 +133,28 @@ public sealed class Mutation
             Name = input.Name,
             Cash = 1_000_000m // Starting capital
             ,
+            TotalSharesIssued = DefaultCompanyShareCount,
+            DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = DateTime.UtcNow,
             FoundedAtTick = currentTick
         };
 
         db.Companies.Add(company);
+        db.Shareholdings.Add(new Shareholding
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            OwnerPlayerId = userId,
+            ShareCount = company.TotalSharesIssued,
+        });
+
+        var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId);
+        if (player is not null)
+        {
+            player.ActiveAccountType = AccountContextType.Company;
+            player.ActiveCompanyId = company.Id;
+        }
+
         await db.SaveChangesAsync();
 
         return company;
@@ -182,6 +205,13 @@ public sealed class Mutation
         }
 
         company.Name = trimmedName;
+        if (input.DividendPayoutRatio.HasValue)
+        {
+            company.DividendPayoutRatio = decimal.Round(
+                Math.Clamp(input.DividendPayoutRatio.Value, 0m, 1m),
+                4,
+                MidpointRounding.AwayFromZero);
+        }
 
         foreach (var salarySetting in input.CitySalarySettings
                      .GroupBy(setting => setting.CityId)
@@ -387,16 +417,39 @@ public sealed class Mutation
         }
 
         // Create company
+        if (player.PersonalCash < StarterFounderContribution)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You do not have enough personal cash to fund the founder contribution.")
+                    .SetCode("INSUFFICIENT_PERSONAL_FUNDS")
+                    .Build());
+        }
+
+        var ipoSelection = ResolveStarterIpoSelection(null);
+
         var company = new Company
         {
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = trimmedCompanyName,
-            Cash = 500_000m,
+            Cash = StarterFounderContribution + ipoSelection.RaiseTarget,
+            TotalSharesIssued = DefaultCompanyShareCount,
+            DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
             FoundedAtTick = currentTick
         };
         db.Companies.Add(company);
+        player.PersonalCash -= StarterFounderContribution;
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
+        db.Shareholdings.Add(new Shareholding
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            OwnerPlayerId = userId,
+            ShareCount = ipoSelection.FounderShareCount,
+        });
 
         var factoryLotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, BuildingType.Factory);
         var (_, factory) = await PrepareLotPurchaseAsync(
@@ -516,16 +569,39 @@ public sealed class Mutation
                     .Build());
         }
 
+        if (player.PersonalCash < StarterFounderContribution)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You do not have enough personal cash to fund the founder contribution.")
+                    .SetCode("INSUFFICIENT_PERSONAL_FUNDS")
+                    .Build());
+        }
+
+        var ipoSelection = ResolveStarterIpoSelection(input.IpoRaiseTarget);
+
         var company = new Company
         {
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = trimmedCompanyName,
-            Cash = 500_000m,
+            Cash = StarterFounderContribution + ipoSelection.RaiseTarget,
+            TotalSharesIssued = DefaultCompanyShareCount,
+            DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
             FoundedAtTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync()
         };
         db.Companies.Add(company);
+        player.PersonalCash -= StarterFounderContribution;
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
+        db.Shareholdings.Add(new Shareholding
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            OwnerPlayerId = userId,
+            ShareCount = ipoSelection.FounderShareCount,
+        });
 
         var (factoryLot, factory) = await PrepareLotPurchaseAsync(
             db,
@@ -680,6 +756,8 @@ public sealed class Mutation
 
         player.OnboardingCompletedAtUtc = nowUtc;
         player.OnboardingShopBuildingId = shop.Id;
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = company.Id;
         ClearOnboardingProgress(player);
         var currentTick = await db.GameStates
             .AsNoTracking()
@@ -712,6 +790,399 @@ public sealed class Mutation
         };
     }
 
+    /// <summary>Switches the authenticated player's acting account between PERSON and one controlled COMPANY.</summary>
+    [Authorize]
+    public async Task<AccountContextResult> SwitchAccountContext(
+        SwitchAccountContextInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        if (string.Equals(input.AccountType, AccountContextType.Person, StringComparison.OrdinalIgnoreCase))
+        {
+            player.ActiveAccountType = AccountContextType.Person;
+            player.ActiveCompanyId = null;
+            await db.SaveChangesAsync();
+
+            return new AccountContextResult
+            {
+                ActiveAccountType = AccountContextType.Person,
+                ActiveCompanyId = null,
+                ActiveAccountName = player.DisplayName,
+            };
+        }
+
+        if (!string.Equals(input.AccountType, AccountContextType.Company, StringComparison.OrdinalIgnoreCase) || input.CompanyId is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A valid company account selection is required.")
+                    .SetCode("INVALID_ACCOUNT_CONTEXT")
+                    .Build());
+        }
+
+        var companies = await db.Companies.ToListAsync();
+        var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId.Value)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Company not found.")
+                    .SetCode("COMPANY_NOT_FOUND")
+                    .Build());
+
+        if (targetCompany.PlayerId != userId)
+        {
+            var shareholdings = await db.Shareholdings
+                .Where(holding => holding.CompanyId == targetCompany.Id)
+                .ToListAsync();
+            var controlledOwnershipRatio = ComputeControlledOwnershipRatio(userId, targetCompany, companies, shareholdings);
+
+            if (controlledOwnershipRatio < 0.5m)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("You need at least 50% combined ownership through your person account and controlled companies to switch into this company.")
+                        .SetCode("COMPANY_CONTROL_REQUIRED")
+                        .Build());
+            }
+
+            targetCompany.PlayerId = userId;
+        }
+
+        player.ActiveAccountType = AccountContextType.Company;
+        player.ActiveCompanyId = targetCompany.Id;
+        await db.SaveChangesAsync();
+
+        return new AccountContextResult
+        {
+            ActiveAccountType = AccountContextType.Company,
+            ActiveCompanyId = targetCompany.Id,
+            ActiveAccountName = targetCompany.Name,
+        };
+    }
+
+    /// <summary>Purchases shares from public investors using either the personal account or the selected company account.</summary>
+    [Authorize]
+    public async Task<ShareTradeResult> BuyShares(
+        BuySharesInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        if (input.ShareCount <= 0m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Share count must be greater than zero.")
+                    .SetCode("INVALID_SHARE_COUNT")
+                    .Build());
+        }
+
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var account = await ResolveActiveTradingAccountAsync(db, player);
+        var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
+        var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Company not found.")
+                    .SetCode("COMPANY_NOT_FOUND")
+                    .Build());
+
+        var shareCount = decimal.Round(input.ShareCount, 4, MidpointRounding.AwayFromZero);
+        var publicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(holding => holding.CompanyId == targetCompany.Id));
+        if (publicFloatShares < shareCount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Not enough public-float shares are available at the moment.")
+                    .SetCode("INSUFFICIENT_PUBLIC_FLOAT")
+                    .Build());
+        }
+
+        var sharePrice = sharePrices.GetValueOrDefault(targetCompany.Id);
+        var askPrice = SharePriceCalculator.ComputeAskPrice(sharePrice);
+        var totalValue = decimal.Round(askPrice * shareCount, 4, MidpointRounding.AwayFromZero);
+
+        if (account.Company is null)
+        {
+            if (player.PersonalCash < totalValue)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Insufficient personal cash for this share purchase.")
+                        .SetCode("INSUFFICIENT_PERSONAL_FUNDS")
+                        .Build());
+            }
+
+            player.PersonalCash -= totalValue;
+        }
+        else
+        {
+            if (account.Company.Cash < totalValue)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("The selected company does not have enough cash for this share purchase.")
+                        .SetCode("INSUFFICIENT_COMPANY_FUNDS")
+                        .Build());
+            }
+
+            account.Company.Cash -= totalValue;
+
+            if (account.Company.Id == targetCompany.Id)
+            {
+                targetCompany.TotalSharesIssued = Math.Max(0m, decimal.Round(targetCompany.TotalSharesIssued - shareCount, 4, MidpointRounding.AwayFromZero));
+                await db.SaveChangesAsync();
+
+                return new ShareTradeResult
+                {
+                    CompanyId = targetCompany.Id,
+                    CompanyName = targetCompany.Name,
+                    AccountType = AccountContextType.Company,
+                    AccountCompanyId = account.Company.Id,
+                    AccountName = account.AccountName,
+                    ShareCount = shareCount,
+                    PricePerShare = askPrice,
+                    TotalValue = totalValue,
+                    OwnedShareCount = 0m,
+                    PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(holding => holding.CompanyId == targetCompany.Id)),
+                    PersonalCash = player.PersonalCash,
+                    CompanyCash = account.Company.Cash,
+                };
+            }
+        }
+
+        var holding = GetOrCreateShareholding(
+            db,
+            shareholdings,
+            targetCompany.Id,
+            account.Company is null ? player.Id : null,
+            account.Company?.Id);
+        holding.ShareCount = decimal.Round(holding.ShareCount + shareCount, 4, MidpointRounding.AwayFromZero);
+
+        await db.SaveChangesAsync();
+
+        return new ShareTradeResult
+        {
+            CompanyId = targetCompany.Id,
+            CompanyName = targetCompany.Name,
+            AccountType = account.AccountType,
+            AccountCompanyId = account.Company?.Id,
+            AccountName = account.AccountName,
+            ShareCount = shareCount,
+            PricePerShare = askPrice,
+            TotalValue = totalValue,
+            OwnedShareCount = holding.ShareCount,
+            PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
+            PersonalCash = player.PersonalCash,
+            CompanyCash = account.Company?.Cash,
+        };
+    }
+
+    /// <summary>Sells shares back to the public exchange using either the personal account or the selected company account.</summary>
+    [Authorize]
+    public async Task<ShareTradeResult> SellShares(
+        SellSharesInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        if (input.ShareCount <= 0m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Share count must be greater than zero.")
+                    .SetCode("INVALID_SHARE_COUNT")
+                    .Build());
+        }
+
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var account = await ResolveActiveTradingAccountAsync(db, player);
+        var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
+        var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Company not found.")
+                    .SetCode("COMPANY_NOT_FOUND")
+                    .Build());
+
+        var shareCount = decimal.Round(input.ShareCount, 4, MidpointRounding.AwayFromZero);
+        var holding = shareholdings.FirstOrDefault(candidate =>
+            candidate.CompanyId == targetCompany.Id
+            && candidate.OwnerPlayerId == (account.Company is null ? player.Id : null)
+            && candidate.OwnerCompanyId == account.Company?.Id);
+
+        if (holding is null || holding.ShareCount < shareCount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You do not hold enough shares to complete this sale.")
+                    .SetCode("INSUFFICIENT_SHARES")
+                    .Build());
+        }
+
+        var sharePrice = sharePrices.GetValueOrDefault(targetCompany.Id);
+        var bidPrice = SharePriceCalculator.ComputeBidPrice(sharePrice);
+        var totalValue = decimal.Round(bidPrice * shareCount, 4, MidpointRounding.AwayFromZero);
+
+        holding.ShareCount = decimal.Round(holding.ShareCount - shareCount, 4, MidpointRounding.AwayFromZero);
+        if (holding.ShareCount <= 0m)
+        {
+            db.Shareholdings.Remove(holding);
+            shareholdings.Remove(holding);
+        }
+
+        if (account.Company is null)
+        {
+            player.PersonalCash += totalValue;
+        }
+        else
+        {
+            account.Company.Cash += totalValue;
+        }
+
+        await db.SaveChangesAsync();
+
+        return new ShareTradeResult
+        {
+            CompanyId = targetCompany.Id,
+            CompanyName = targetCompany.Name,
+            AccountType = account.AccountType,
+            AccountCompanyId = account.Company?.Id,
+            AccountName = account.AccountName,
+            ShareCount = shareCount,
+            PricePerShare = bidPrice,
+            TotalValue = totalValue,
+            OwnedShareCount = holding.ShareCount > 0m ? holding.ShareCount : 0m,
+            PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
+            PersonalCash = player.PersonalCash,
+            CompanyCash = account.Company?.Cash,
+        };
+    }
+
+    private static StarterIpoSelection ResolveStarterIpoSelection(decimal? raiseTarget)
+    {
+        var normalizedRaiseTarget = raiseTarget ?? 400_000m;
+        return normalizedRaiseTarget switch
+        {
+            400_000m => new StarterIpoSelection(400_000m, 0.5m),
+            600_000m => new StarterIpoSelection(600_000m, 0.3333m),
+            800_000m => new StarterIpoSelection(800_000m, 0.25m),
+            _ => throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Supported IPO raise targets are 400000, 600000, or 800000.")
+                    .SetCode("INVALID_IPO_RAISE_TARGET")
+                    .Build())
+        };
+    }
+
+    private static async Task<(List<Company> Companies, List<Shareholding> Shareholdings, Dictionary<Guid, decimal> SharePrices)> LoadSharePricingSnapshotAsync(AppDbContext db)
+    {
+        var companies = await db.Companies.ToListAsync();
+        var buildings = await db.Buildings.ToListAsync();
+        var lots = await db.BuildingLots.Where(lot => lot.OwnerCompanyId.HasValue).ToListAsync();
+        var inventories = await db.Inventories
+            .Include(inventory => inventory.ResourceType)
+            .Include(inventory => inventory.ProductType)
+            .ToListAsync();
+        var shareholdings = await db.Shareholdings.ToListAsync();
+
+        var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, lots, inventories);
+        var sharePrices = SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
+        return (companies, shareholdings, sharePrices);
+    }
+
+    private static async Task<ActiveTradingAccount> ResolveActiveTradingAccountAsync(AppDbContext db, Player player)
+    {
+        if (string.Equals(player.ActiveAccountType, AccountContextType.Company, StringComparison.Ordinal)
+            && player.ActiveCompanyId.HasValue)
+        {
+            var company = await db.Companies.FirstOrDefaultAsync(candidate =>
+                candidate.Id == player.ActiveCompanyId.Value && candidate.PlayerId == player.Id);
+            if (company is not null)
+            {
+                return new ActiveTradingAccount(AccountContextType.Company, company, company.Name);
+            }
+        }
+
+        player.ActiveAccountType = AccountContextType.Person;
+        player.ActiveCompanyId = null;
+        return new ActiveTradingAccount(AccountContextType.Person, null, player.DisplayName);
+    }
+
+    private static Shareholding GetOrCreateShareholding(
+        AppDbContext db,
+        List<Shareholding> shareholdings,
+        Guid companyId,
+        Guid? ownerPlayerId,
+        Guid? ownerCompanyId)
+    {
+        var existing = shareholdings.FirstOrDefault(holding =>
+            holding.CompanyId == companyId
+            && holding.OwnerPlayerId == ownerPlayerId
+            && holding.OwnerCompanyId == ownerCompanyId);
+
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var holding = new Shareholding
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            OwnerPlayerId = ownerPlayerId,
+            OwnerCompanyId = ownerCompanyId,
+            ShareCount = 0m,
+        };
+        db.Shareholdings.Add(holding);
+        shareholdings.Add(holding);
+        return holding;
+    }
+
+    private static decimal ComputeControlledOwnershipRatio(
+        Guid playerId,
+        Company targetCompany,
+        IEnumerable<Company> companies,
+        IEnumerable<Shareholding> shareholdings)
+    {
+        if (targetCompany.TotalSharesIssued <= 0m)
+        {
+            return 0m;
+        }
+
+        var controlledCompanyIds = companies
+            .Where(company => company.PlayerId == playerId)
+            .Select(company => company.Id)
+            .ToHashSet();
+
+        var controlledShares = shareholdings
+            .Where(holding => holding.CompanyId == targetCompany.Id
+                && (holding.OwnerPlayerId == playerId
+                    || (holding.OwnerCompanyId.HasValue && controlledCompanyIds.Contains(holding.OwnerCompanyId.Value))))
+            .Sum(holding => holding.ShareCount);
+
+        return decimal.Round(controlledShares / targetCompany.TotalSharesIssued, 4, MidpointRounding.AwayFromZero);
+    }
+
     private static bool IsStarterOnboardingProduct(ProductType product)
     {
         return StarterOnboardingProductByIndustry.TryGetValue(product.Industry, out var starterSlug)
@@ -726,6 +1197,13 @@ public sealed class Mutation
         player.OnboardingCompanyId = null;
         player.OnboardingFactoryLotId = null;
     }
+
+    private sealed record StarterIpoSelection(decimal RaiseTarget, decimal FounderOwnershipRatio)
+    {
+        public decimal FounderShareCount => decimal.Round(DefaultCompanyShareCount * FounderOwnershipRatio, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private sealed record ActiveTradingAccount(string AccountType, Company? Company, string AccountName);
 
     private static void AddStarterFactoryShell(AppDbContext db, Guid buildingId)
     {

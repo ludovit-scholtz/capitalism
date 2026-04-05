@@ -15,6 +15,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Companies owned by players.</summary>
     public DbSet<Company> Companies => Set<Company>();
 
+    /// <summary>Issued share positions held by players or companies.</summary>
+    public DbSet<Shareholding> Shareholdings => Set<Shareholding>();
+
+    /// <summary>Annual dividend settlement records.</summary>
+    public DbSet<DividendPayment> DividendPayments => Set<DividendPayment>();
+
     /// <summary>Per-city salary settings selected by company owners.</summary>
     public DbSet<CompanyCitySalarySetting> CompanyCitySalarySettings => Set<CompanyCitySalarySetting>();
 
@@ -94,6 +100,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(p => p.Email).HasMaxLength(256);
             e.Property(p => p.DisplayName).HasMaxLength(100);
             e.Property(p => p.Role).HasMaxLength(20);
+            e.Property(p => p.PersonalCash).HasPrecision(18, 2);
+            e.Property(p => p.ActiveAccountType).HasMaxLength(20);
             e.Property(p => p.OnboardingCurrentStep).HasMaxLength(40);
             e.Property(p => p.OnboardingIndustry).HasMaxLength(50);
             e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
@@ -124,11 +132,58 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasKey(c => c.Id);
             e.Property(c => c.Name).HasMaxLength(200);
             e.Property(c => c.Cash).HasPrecision(18, 2);
+            e.Property(c => c.TotalSharesIssued).HasPrecision(18, 4);
+            e.Property(c => c.DividendPayoutRatio).HasPrecision(8, 4);
             e.HasOne(c => c.Player).WithMany(p => p.Companies).HasForeignKey(c => c.PlayerId);
             e.HasMany(c => c.CitySalarySettings)
                 .WithOne(setting => setting.Company)
                 .HasForeignKey(setting => setting.CompanyId)
                 .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(c => c.Shareholdings)
+                .WithOne(holding => holding.Company)
+                .HasForeignKey(holding => holding.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(c => c.DividendPayments)
+                .WithOne(payment => payment.Company)
+                .HasForeignKey(payment => payment.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Shareholding
+        modelBuilder.Entity<Shareholding>(e =>
+        {
+            e.HasKey(holding => holding.Id);
+            e.Property(holding => holding.ShareCount).HasPrecision(18, 4);
+            e.HasOne(holding => holding.OwnerPlayer)
+                .WithMany(player => player.Shareholdings)
+                .HasForeignKey(holding => holding.OwnerPlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(holding => holding.OwnerCompany)
+                .WithMany()
+                .HasForeignKey(holding => holding.OwnerCompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(holding => new { holding.CompanyId, holding.OwnerPlayerId });
+            e.HasIndex(holding => new { holding.CompanyId, holding.OwnerCompanyId });
+        });
+
+        // DividendPayment
+        modelBuilder.Entity<DividendPayment>(e =>
+        {
+            e.HasKey(payment => payment.Id);
+            e.Property(payment => payment.ShareCount).HasPrecision(18, 4);
+            e.Property(payment => payment.AmountPerShare).HasPrecision(18, 4);
+            e.Property(payment => payment.TotalAmount).HasPrecision(18, 4);
+            e.Property(payment => payment.Description).HasMaxLength(200);
+            e.HasOne(payment => payment.RecipientPlayer)
+                .WithMany(player => player.DividendPayments)
+                .HasForeignKey(payment => payment.RecipientPlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(payment => payment.RecipientCompany)
+                .WithMany()
+                .HasForeignKey(payment => payment.RecipientCompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(payment => new { payment.CompanyId, payment.GameYear });
+            e.HasIndex(payment => new { payment.RecipientPlayerId, payment.RecordedAtTick });
         });
 
         // CompanyCitySalarySetting

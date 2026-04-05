@@ -46,6 +46,9 @@ public sealed class UpdateCompanySettingsInput
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
+    /// <summary>Portion of post-tax annual profit paid out as dividends. 0.2 means 20%.</summary>
+    public decimal? DividendPayoutRatio { get; set; }
+
     [Required]
     public List<CompanyCitySalarySettingInput> CitySalarySettings { get; set; } = [];
 }
@@ -115,6 +118,12 @@ public sealed class StartOnboardingCompanyInput
 
     /// <summary>Factory-capable lot chosen for the first building.</summary>
     public Guid FactoryLotId { get; set; }
+
+    /// <summary>
+    /// Optional IPO raise target for the starter company. Supported values: 400000, 600000, 800000.
+    /// When omitted, the onboarding flow defaults to the 400000 raise / 50% founder-share option.
+    /// </summary>
+    public decimal? IpoRaiseTarget { get; set; }
 }
 
 /// <summary>Input for finishing lot-based onboarding by choosing a starter product and first shop lot.</summary>
@@ -125,6 +134,31 @@ public sealed class FinishOnboardingInput
 
     /// <summary>Sales-shop-capable lot chosen for the first retail building.</summary>
     public Guid ShopLotId { get; set; }
+}
+
+/// <summary>Input for switching the authenticated player's active acting account.</summary>
+public sealed class SwitchAccountContextInput
+{
+    [Required, MaxLength(20)]
+    public string AccountType { get; set; } = string.Empty;
+
+    public Guid? CompanyId { get; set; }
+}
+
+/// <summary>Input for purchasing company shares from the public stock exchange.</summary>
+public sealed class BuySharesInput
+{
+    public Guid CompanyId { get; set; }
+
+    public decimal ShareCount { get; set; }
+}
+
+/// <summary>Input for selling company shares back to the public stock exchange.</summary>
+public sealed class SellSharesInput
+{
+    public Guid CompanyId { get; set; }
+
+    public decimal ShareCount { get; set; }
 }
 
 /// <summary>Input for claiming the post-onboarding startup pack.</summary>

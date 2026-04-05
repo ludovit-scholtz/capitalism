@@ -5,6 +5,8 @@ public sealed class CompanySettingsResult
     public Guid CompanyId { get; set; }
     public string CompanyName { get; set; } = string.Empty;
     public decimal Cash { get; set; }
+    public decimal TotalSharesIssued { get; set; }
+    public decimal DividendPayoutRatio { get; set; }
     public long FoundedAtTick { get; set; }
     public decimal AdministrationOverheadRate { get; set; }
     /// <summary>0–1 fraction representing how much company age contributes to overhead (reaches 1 at 2 years).</summary>
