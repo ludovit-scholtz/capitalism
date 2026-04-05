@@ -12206,6 +12206,320 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task PublicSalesAnalytics_ModerateDemand_ReturnsModerateDemandSignal()
+    {
+        var token = await RegisterAndGetTokenAsync("analytics-moderate@test.com", "AnalyticsModerate");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Analytics Moderate Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.Company)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+
+        // Seed ticks with moderate utilization: level=1 capacity=20, need 30-70% range
+        // 10 units sold / 20 capacity = 50% utilization → MODERATE
+        // Backend thresholds: STRONG >= 0.7, MODERATE >= 0.3, WEAK < 0.3
+        // The MODERATE interval is [0.3, 0.7) — exactly 0.7 is classified as STRONG.
+        for (var tick = 1; tick <= 5; tick++)
+        {
+            db.PublicSalesRecords.Add(new PublicSalesRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingUnitId = unit.Id,
+                BuildingId = unit.BuildingId,
+                CompanyId = unit.Building.CompanyId,
+                CityId = unit.Building.CityId,
+                ProductTypeId = productType.Id,
+                Tick = tick,
+                RecordedAtUtc = DateTime.UtcNow,
+                QuantitySold = 10m, // 10 / capacity(20) = 50% → MODERATE (0.3–0.7 range)
+                PricePerUnit = productType.BasePrice,
+                Revenue = 10m * productType.BasePrice,
+                Demand = 11m,
+                SalesCapacity = 20m,
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ demandSignal actionHint recentUtilization }} }}",
+            token: token);
+
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.Equal("MODERATE", analytics.GetProperty("demandSignal").GetString());
+        var actionHint = analytics.GetProperty("actionHint").GetString() ?? "";
+        Assert.False(string.IsNullOrWhiteSpace(actionHint));
+        var utilization = analytics.GetProperty("recentUtilization").GetDecimal();
+        Assert.True(utilization >= 0.3m && utilization < 0.7m, $"Moderate utilization should be in [0.3, 0.7) but was {utilization}");
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_MultiCompanyMarketShare_SplitsShareCorrectly()
+    {
+        // Company A registers and sets up a shop
+        var tokenA = await RegisterAndGetTokenAsync("analytics-msa@test.com", "AnalyticsMsA");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(tokenA, "Market Share Co A");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotA = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Zone A");
+        var finishA = await FinishOnboardingAsync(tokenA, productId, shopLotA);
+        var shopIdA = finishA.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        // Company B registers and sets up a shop in the same city
+        var tokenB = await RegisterAndGetTokenAsync("analytics-msb@test.com", "AnalyticsMsB");
+        var factoryLotB = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Zone B Factory");
+        var (_, _, _, _) = await StartOnboardingCompanyAsync(tokenB, "Market Share Co B", factoryLotId: factoryLotB);
+        var shopLotB = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Zone B");
+        var finishB = await FinishOnboardingAsync(tokenB, productId, shopLotB);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unitA = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.Company)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopIdA) && u.UnitType == "PUBLIC_SALES");
+
+        var shopIdB = finishB.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitB = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.Company)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopIdB) && u.UnitType == "PUBLIC_SALES");
+
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+        // All tests share the same SQLite database within a test class (IClassFixture).
+        // The market share query filters by the most recent tick for each unit's records,
+        // then fetches all records from the same city/product at that tick. Using a high
+        // tick value that no other test in this class seeds avoids cross-test contamination.
+        var tick = 99999L;
+
+        // A sells 75 units, B sells 25 units → A has 75% share, B has 25% share
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unitA.Id,
+            BuildingId = unitA.BuildingId,
+            CompanyId = unitA.Building.CompanyId,
+            CityId = unitA.Building.CityId,
+            ProductTypeId = productType.Id,
+            Tick = tick,
+            RecordedAtUtc = DateTime.UtcNow,
+            QuantitySold = 75m,
+            PricePerUnit = productType.BasePrice,
+            Revenue = 75m * productType.BasePrice,
+            Demand = 100m,
+            SalesCapacity = 100m,
+        });
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unitB.Id,
+            BuildingId = unitB.BuildingId,
+            CompanyId = unitB.Building.CompanyId,
+            CityId = unitB.Building.CityId,
+            ProductTypeId = productType.Id,
+            Tick = tick,
+            RecordedAtUtc = DateTime.UtcNow,
+            QuantitySold = 25m,
+            PricePerUnit = productType.BasePrice,
+            Revenue = 25m * productType.BasePrice,
+            Demand = 100m,
+            SalesCapacity = 100m,
+        });
+        await db.SaveChangesAsync();
+
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unitA.Id}\") {{ marketShare {{ label companyId share isUnmet }} }} }}",
+            token: tokenA);
+
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+        var marketShare = analytics.GetProperty("marketShare");
+        Assert.Equal(2, marketShare.GetArrayLength());
+
+        var entries = Enumerable.Range(0, marketShare.GetArrayLength())
+            .Select(i => marketShare[i])
+            .ToDictionary(
+                e => e.GetProperty("companyId").GetString()!,
+                e => e.GetProperty("share").GetDecimal());
+
+        Assert.True(entries.ContainsKey(unitA.Building.CompanyId.ToString()), "Company A should be in market share");
+        Assert.True(entries.ContainsKey(unitB.Building.CompanyId.ToString()), "Company B should be in market share");
+
+        var shareA = entries[unitA.Building.CompanyId.ToString()];
+        var shareB = entries[unitB.Building.CompanyId.ToString()];
+
+        Assert.True(Math.Abs(shareA - 0.75m) < 0.001m, $"Company A share should be 0.75 but was {shareA}");
+        Assert.True(Math.Abs(shareB - 0.25m) < 0.001m, $"Company B share should be 0.25 but was {shareB}");
+        Assert.True(Math.Abs(shareA + shareB - 1.0m) < 0.001m, "Shares should sum to 1.0");
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_Exactly100Ticks_ReturnsAll100Records()
+    {
+        var token = await RegisterAndGetTokenAsync("analytics-100t@test.com", "Analytics100T");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Analytics 100T Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.Company)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+
+        // Seed exactly 110 ticks; the API should return only the most recent 100
+        for (var tick = 1; tick <= 110; tick++)
+        {
+            db.PublicSalesRecords.Add(new PublicSalesRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingUnitId = unit.Id,
+                BuildingId = unit.BuildingId,
+                CompanyId = unit.Building.CompanyId,
+                CityId = unit.Building.CityId,
+                ProductTypeId = productType.Id,
+                Tick = tick,
+                RecordedAtUtc = DateTime.UtcNow,
+                QuantitySold = 60m,
+                PricePerUnit = productType.BasePrice,
+                Revenue = 60m * productType.BasePrice,
+                Demand = 70m,
+                SalesCapacity = 100m,
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ dataFromTick dataToTick revenueHistory {{ tick }} priceHistory {{ tick }} }} }}",
+            token: token);
+
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+        // The API takes the most recent 100 records (ticks 11–110)
+        Assert.Equal(100, analytics.GetProperty("revenueHistory").GetArrayLength());
+        Assert.Equal(100, analytics.GetProperty("priceHistory").GetArrayLength());
+        Assert.Equal(11L, analytics.GetProperty("dataFromTick").GetInt64());
+        Assert.Equal(110L, analytics.GetProperty("dataToTick").GetInt64());
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_ElasticityIndex_ReturnedWhenSalesExist()
+    {
+        var token = await RegisterAndGetTokenAsync("analytics-elas@test.com", "AnalyticsElas");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Elasticity Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.Company)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unit.Id,
+            BuildingId = unit.BuildingId,
+            CompanyId = unit.Building.CompanyId,
+            CityId = unit.Building.CityId,
+            ProductTypeId = productType.Id,
+            Tick = 1,
+            RecordedAtUtc = DateTime.UtcNow,
+            QuantitySold = 10m,
+            PricePerUnit = productType.BasePrice, // selling at base price → elasticity ≈ -1.0
+            Revenue = 10m * productType.BasePrice,
+            Demand = 10m,
+            SalesCapacity = 20m,
+        });
+        await db.SaveChangesAsync();
+
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ elasticityIndex unmetDemandShare }} }}",
+            token: token);
+
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+        // At price = basePrice: elasticity = -(1.0) / (2.0 - 1.0) = -1.0
+        Assert.False(analytics.GetProperty("elasticityIndex").ValueKind == System.Text.Json.JsonValueKind.Null, "ElasticityIndex should be returned");
+        var elas = analytics.GetProperty("elasticityIndex").GetDecimal();
+        Assert.True(Math.Abs(elas - (-1.0m)) < 0.01m, $"Elasticity at base price should be -1.0, got {elas}");
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_UnmetDemand_ReturnsNonZeroWhenDemandExceedsSales()
+    {
+        var token = await RegisterAndGetTokenAsync("analytics-unmet@test.com", "AnalyticsUnmet");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Unmet Demand Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.Company)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+
+        // Demand = 100, sold = 40 → 60% unmet demand
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unit.Id,
+            BuildingId = unit.BuildingId,
+            CompanyId = unit.Building.CompanyId,
+            CityId = unit.Building.CityId,
+            ProductTypeId = productType.Id,
+            Tick = 88888L, // unique tick to avoid cross-test contamination
+            RecordedAtUtc = DateTime.UtcNow,
+            QuantitySold = 40m,
+            PricePerUnit = productType.BasePrice,
+            Revenue = 40m * productType.BasePrice,
+            Demand = 100m, // demand far exceeds sold quantity
+            SalesCapacity = 50m,
+        });
+        await db.SaveChangesAsync();
+
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ unmetDemandShare marketShare {{ label isUnmet share }} }} }}",
+            token: token);
+
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+
+        // unmetDemandShare = (100 - 40) / 100 = 0.6
+        Assert.False(analytics.GetProperty("unmetDemandShare").ValueKind == System.Text.Json.JsonValueKind.Null, "UnmetDemandShare should be non-null");
+        var unmet = analytics.GetProperty("unmetDemandShare").GetDecimal();
+        Assert.True(Math.Abs(unmet - 0.6m) < 0.01m, $"Unmet share should be 0.60 but was {unmet}");
+
+        // Market share should include an "Unmet Demand" entry
+        var ms = analytics.GetProperty("marketShare");
+        var unmetEntry = Enumerable.Range(0, ms.GetArrayLength())
+            .Select(i => ms[i])
+            .FirstOrDefault(e => e.GetProperty("isUnmet").GetBoolean());
+        Assert.False(unmetEntry.ValueKind == System.Text.Json.JsonValueKind.Undefined, "Unmet Demand entry should be in marketShare");
+        Assert.True(Math.Abs(unmetEntry.GetProperty("share").GetDecimal() - 0.6m) < 0.01m);
+    }
+
+    [Fact]
     public async Task CompanyLedger_RequiresOwnership_ForbidsOtherPlayer()
     {
         var ownerToken = await RegisterAndGetTokenAsync("ledger-owner@test.com", "LedgerOwner");
