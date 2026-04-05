@@ -1646,6 +1646,7 @@ public sealed class Mutation
                 MinQuality = unit.MinQuality,
                 BrandScope = unit.BrandScope,
                 VendorLockCompanyId = unit.VendorLockCompanyId,
+                LockedCityId = unit.LockedCityId,
             })
             .ToList();
 

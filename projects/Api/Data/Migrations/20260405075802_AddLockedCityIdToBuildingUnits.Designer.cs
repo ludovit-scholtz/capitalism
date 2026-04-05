@@ -3,6 +3,7 @@ using System;
 using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260405075802_AddLockedCityIdToBuildingUnits")]
+    partial class AddLockedCityIdToBuildingUnits
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
@@ -644,10 +647,6 @@ namespace Api.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<decimal>("DividendPayoutRatio")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("TEXT");
-
                     b.Property<long>("FoundedAtTick")
                         .HasColumnType("INTEGER");
 
@@ -660,10 +659,6 @@ namespace Api.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<Guid>("PlayerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("TotalSharesIssued")
-                        .HasPrecision(18, 4)
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
@@ -697,58 +692,6 @@ namespace Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("CompanyCitySalarySettings");
-                });
-
-            modelBuilder.Entity("Api.Data.Entities.DividendPayment", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("AmountPerShare")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("GameYear")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<Guid?>("RecipientCompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("RecipientPlayerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("RecordedAtTick")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("ShareCount")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("TotalAmount")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("RecipientCompanyId");
-
-                    b.HasIndex("CompanyId", "GameYear");
-
-                    b.HasIndex("RecipientPlayerId", "RecordedAtTick");
-
-                    b.ToTable("DividendPayments");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.ExchangeOrder", b =>
@@ -1074,14 +1017,6 @@ namespace Api.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ActiveAccountType")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("ActiveCompanyId")
-                        .HasColumnType("TEXT");
-
                     b.Property<Guid>("ConcurrencyToken")
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
@@ -1130,10 +1065,6 @@ namespace Api.Data.Migrations
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("PersonalCash")
-                        .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("ProSubscriptionEndsAtUtc")
@@ -1367,41 +1298,6 @@ namespace Api.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("ResourceTypes");
-                });
-
-            modelBuilder.Entity("Api.Data.Entities.Shareholding", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("OwnerCompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid?>("OwnerPlayerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("ShareCount")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("OwnerCompanyId");
-
-                    b.HasIndex("OwnerPlayerId");
-
-                    b.HasIndex("CompanyId", "OwnerCompanyId");
-
-                    b.HasIndex("CompanyId", "OwnerPlayerId");
-
-                    b.ToTable("Shareholdings");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.StartupPackOffer", b =>
@@ -1650,31 +1546,6 @@ namespace Api.Data.Migrations
                     b.Navigation("Company");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.DividendPayment", b =>
-                {
-                    b.HasOne("Api.Data.Entities.Company", "Company")
-                        .WithMany("DividendPayments")
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Api.Data.Entities.Company", "RecipientCompany")
-                        .WithMany()
-                        .HasForeignKey("RecipientCompanyId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("Api.Data.Entities.Player", "RecipientPlayer")
-                        .WithMany("DividendPayments")
-                        .HasForeignKey("RecipientPlayerId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("Company");
-
-                    b.Navigation("RecipientCompany");
-
-                    b.Navigation("RecipientPlayer");
-                });
-
             modelBuilder.Entity("Api.Data.Entities.ExchangeOrder", b =>
                 {
                     b.HasOne("Api.Data.Entities.Company", "Company")
@@ -1891,31 +1762,6 @@ namespace Api.Data.Migrations
                     b.Navigation("ResourceType");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.Shareholding", b =>
-                {
-                    b.HasOne("Api.Data.Entities.Company", "Company")
-                        .WithMany("Shareholdings")
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Api.Data.Entities.Company", "OwnerCompany")
-                        .WithMany()
-                        .HasForeignKey("OwnerCompanyId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.HasOne("Api.Data.Entities.Player", "OwnerPlayer")
-                        .WithMany("Shareholdings")
-                        .HasForeignKey("OwnerPlayerId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
-                    b.Navigation("Company");
-
-                    b.Navigation("OwnerCompany");
-
-                    b.Navigation("OwnerPlayer");
-                });
-
             modelBuilder.Entity("Api.Data.Entities.StartupPackOffer", b =>
                 {
                     b.HasOne("Api.Data.Entities.Company", null)
@@ -1960,10 +1806,6 @@ namespace Api.Data.Migrations
                     b.Navigation("Buildings");
 
                     b.Navigation("CitySalarySettings");
-
-                    b.Navigation("DividendPayments");
-
-                    b.Navigation("Shareholdings");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.LoanOffer", b =>
@@ -1974,10 +1816,6 @@ namespace Api.Data.Migrations
             modelBuilder.Entity("Api.Data.Entities.Player", b =>
                 {
                     b.Navigation("Companies");
-
-                    b.Navigation("DividendPayments");
-
-                    b.Navigation("Shareholdings");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.ProductType", b =>

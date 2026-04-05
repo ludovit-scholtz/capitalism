@@ -232,6 +232,7 @@ export type MockBuildingUnit = {
   minQuality?: number | null
   brandScope?: string | null
   vendorLockCompanyId?: string | null
+  lockedCityId?: string | null
   inventoryQuantity?: number | null
   inventoryQuality?: number | null
   inventorySourcingCostTotal?: number | null
@@ -457,6 +458,8 @@ export type MockState = {
   loanOffers: MockLoanOffer[]
   /** Active loans for the current player's companies */
   myLoans: MockLoan[]
+  /** Mock procurement preview response keyed by unit ID. If null/missing, returns a default GLOBAL_EXCHANGE preview. */
+  procurementPreviews: Record<string, object | null>
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -764,7 +767,8 @@ function areUnitsEquivalent(currentUnit: MockBuildingUnit | undefined, nextUnit:
     (currentUnit.mediaHouseBuildingId ?? null) === (nextUnit.mediaHouseBuildingId ?? null) &&
     (currentUnit.minQuality ?? null) === (nextUnit.minQuality ?? null) &&
     (currentUnit.brandScope ?? null) === (nextUnit.brandScope ?? null) &&
-    (currentUnit.vendorLockCompanyId ?? null) === (nextUnit.vendorLockCompanyId ?? null)
+    (currentUnit.vendorLockCompanyId ?? null) === (nextUnit.vendorLockCompanyId ?? null) &&
+    (currentUnit.lockedCityId ?? null) === (nextUnit.lockedCityId ?? null)
   )
 }
 
@@ -827,7 +831,8 @@ function calculateUnitTicks(currentUnit: MockBuildingUnit | undefined, nextUnit:
     (currentUnit.mediaHouseBuildingId ?? null) !== (nextUnit.mediaHouseBuildingId ?? null) ||
     (currentUnit.minQuality ?? null) !== (nextUnit.minQuality ?? null) ||
     (currentUnit.brandScope ?? null) !== (nextUnit.brandScope ?? null) ||
-    (currentUnit.vendorLockCompanyId ?? null) !== (nextUnit.vendorLockCompanyId ?? null)
+    (currentUnit.vendorLockCompanyId ?? null) !== (nextUnit.vendorLockCompanyId ?? null) ||
+    (currentUnit.lockedCityId ?? null) !== (nextUnit.lockedCityId ?? null)
   ) {
     return 1
   }
@@ -1189,6 +1194,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     publicSalesAnalytics: {},
     loanOffers: [],
     myLoans: [],
+    procurementPreviews: {},
     ...initial,
   }
 
@@ -2105,6 +2111,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               minQuality: unit.minQuality ?? null,
               brandScope: unit.brandScope ?? null,
               vendorLockCompanyId: unit.vendorLockCompanyId ?? null,
+              lockedCityId: unit.lockedCityId ?? null,
             } satisfies MockBuildingUnit,
           ]
         }),
@@ -2765,13 +2772,38 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         .flatMap((company) => company.buildings)
         .find((candidate) => candidate.id === buildingId)
 
-      const buildingUnitOperationalStatuses = (building?.units ?? []).map((unit) => ({
-        buildingUnitId: unit.id,
-        status: unit.inventoryQuantity && unit.inventoryQuantity > 0 ? 'ACTIVE' : 'IDLE',
-        blockedCode: null,
-        blockedReason: null,
-        idleTicks: 0,
-      }))
+      const buildingUnitOperationalStatuses = (building?.units ?? []).map((unit) => {
+        // Base labor hours and energy MWh per unit type, mirroring backend:
+        // projects/Api/Utilities/CompanyEconomyCalculator.cs :: GetBaseUnitLaborHours / GetBaseUnitEnergyMwh
+        // Update here if the backend constants change.
+        const laborHoursMap: Record<string, number> = {
+          MINING: 1.4, STORAGE: 0.15, B2B_SALES: 0.45, PURCHASE: 0.35,
+          MANUFACTURING: 0.85, BRANDING: 0.3, MARKETING: 0.6, PUBLIC_SALES: 0.7,
+          PRODUCT_QUALITY: 0.55, BRAND_QUALITY: 0.55,
+        }
+        const energyMwhMap: Record<string, number> = {
+          MINING: 0.45, STORAGE: 0.04, B2B_SALES: 0.08, PURCHASE: 0.06,
+          MANUFACTURING: 0.18, BRANDING: 0.05, MARKETING: 0.07, PUBLIC_SALES: 0.12,
+          PRODUCT_QUALITY: 0.09, BRAND_QUALITY: 0.09,
+        }
+        const level = unit.level || 1
+        const laborHours = (laborHoursMap[unit.unitType] ?? 0) * level
+        const energyMwh = (energyMwhMap[unit.unitType] ?? 0) * level
+        // Bratislava base wage $18/hr × default salary multiplier 1.0
+        // (projects/Api/Data/AppDbInitializer.cs BaseSalaryPerManhour)
+        const hourlyWage = 18
+        // projects/Api/Engine/GameConstants.cs EnergyPricePerMwh
+        const energyPricePerMwh = 55
+        return {
+          buildingUnitId: unit.id,
+          status: unit.inventoryQuantity && unit.inventoryQuantity > 0 ? 'ACTIVE' : 'IDLE',
+          blockedCode: null,
+          blockedReason: null,
+          idleTicks: 0,
+          nextTickLaborCost: laborHours > 0 ? Math.round(laborHours * hourlyWage * 100) / 100 : null,
+          nextTickEnergyCost: energyMwh > 0 ? Math.round(energyMwh * energyPricePerMwh * 100) / 100 : null,
+        }
+      })
 
       return route.fulfill({
         status: 200,
@@ -3069,6 +3101,31 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('procurementPreview')) {
+      const unitId: string = body.variables?.unitId ?? body.variables?.buildingUnitId ?? ''
+      const customPreview = state.procurementPreviews[unitId]
+      const defaultPreview = {
+        sourceType: 'GLOBAL_EXCHANGE',
+        sourceCityId: 'city-ba',
+        sourceCityName: 'Bratislava',
+        sourceVendorCompanyId: null,
+        sourceVendorName: null,
+        exchangePricePerUnit: 8.5,
+        transitCostPerUnit: 1.2,
+        deliveredPricePerUnit: 9.7,
+        estimatedQuality: 0.7,
+        canExecute: true,
+        blockReason: null,
+        blockMessage: null,
+      }
+      const procurementPreview = customPreview !== undefined ? customPreview : defaultPreview
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { procurementPreview } }),
+      })
+    }
+
     if (query.includes('cityLots')) {
       const cityId = body.variables?.cityId
       const cityLots = state.buildingLots.filter((lot) => lot.cityId === cityId)
@@ -3214,7 +3271,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('myLoanOffers') &&
       !q.includes('bankLoans') &&
       // acceptLoan mutation response includes paymentAmount which contains 'me'
-      !q.includes('acceptLoan')
+      !q.includes('acceptLoan') &&
+      // procurementPreview contains 'me' as substring
+      !q.includes('procurementPreview')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()

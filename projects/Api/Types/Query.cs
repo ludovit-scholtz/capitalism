@@ -949,6 +949,16 @@ public sealed class Query
             .Select(g => new { UnitId = g.Key, TotalSold = g.Sum(r => r.QuantitySold) })
             .ToDictionaryAsync(x => x.UnitId, x => x.TotalSold);
 
+        // Load city and salary settings to compute per-unit next-tick operating costs.
+        var city = await db.Cities.FirstOrDefaultAsync(c => c.Id == building.CityId);
+        var salarySetting = await db.CompanyCitySalarySettings
+            .FirstOrDefaultAsync(s => s.CompanyId == building.CompanyId && s.CityId == building.CityId);
+        var salaryMultiplier = CompanyEconomyCalculator.ClampSalaryMultiplier(
+            salarySetting?.SalaryMultiplier ?? CompanyEconomyCalculator.DefaultSalaryMultiplier);
+        var hourlyWage = city is not null
+            ? CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier)
+            : 0m;
+
         var result = new List<BuildingUnitOperationalStatus>();
 
         foreach (var unit in units)
@@ -972,6 +982,16 @@ public sealed class Query
                 unit, inventoryTotal, capacity, fillRatio, history?.TotalInflow ?? 0m,
                 history?.TotalConsumed ?? 0m, history?.TotalProduced ?? 0m,
                 recentSales.GetValueOrDefault(unit.Id), idleTicks);
+
+            // Compute per-unit next-tick operating costs from game constants.
+            var laborHours = CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level);
+            var energyMwh = CompanyEconomyCalculator.GetBaseUnitEnergyMwh(unit.UnitType, unit.Level);
+            status.NextTickLaborCost = laborHours > 0m && hourlyWage > 0m
+                ? decimal.Round(laborHours * hourlyWage, 2, MidpointRounding.AwayFromZero)
+                : (decimal?)null;
+            status.NextTickEnergyCost = energyMwh > 0m
+                ? decimal.Round(energyMwh * Engine.GameConstants.EnergyPricePerMwh, 2, MidpointRounding.AwayFromZero)
+                : (decimal?)null;
 
             result.Add(status);
         }
@@ -2069,6 +2089,35 @@ public sealed class Query
         AcceptedAtUtc = l.AcceptedAtUtc,
         ClosedAtUtc = l.ClosedAtUtc,
     };
+
+    /// <summary>
+    /// Evaluates what a PURCHASE unit would do on the next tick given its current
+    /// configuration and live market state, without mutating any data.
+    /// Returns expected source, delivered price, quality, and any block reasons.
+    /// Requires authentication (the player must own the building).
+    /// </summary>
+    [Authorize]
+    public async Task<ProcurementPreview?> GetProcurementPreview(
+        Guid buildingUnitId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building)
+            .ThenInclude(b => b.Company)
+            .FirstOrDefaultAsync(u => u.Id == buildingUnitId);
+
+        if (unit is null || unit.Building.Company.PlayerId != userId)
+            return null;
+
+        if (unit.UnitType != Data.Entities.UnitType.Purchase)
+            return null;
+
+        var company = unit.Building.Company;
+        return await ProcurementPreviewService.ComputeAsync(db, unit, company);
+    }
 }
 
 /// <summary>Payload for player ranking.</summary>

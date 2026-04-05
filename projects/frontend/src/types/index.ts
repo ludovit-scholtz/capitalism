@@ -150,6 +150,7 @@ export interface BuildingConfigurationPlanUnit {
   minQuality: number | null
   brandScope: string | null
   vendorLockCompanyId: string | null
+  lockedCityId: string | null
 }
 
 export interface BuildingConfigurationPlanRemoval {
@@ -189,6 +190,7 @@ export interface BuildingUnit {
   minQuality: number | null
   brandScope: string | null
   vendorLockCompanyId: string | null
+  lockedCityId: string | null
 }
 
 export interface BuildingUnitInventorySummary {
@@ -781,6 +783,18 @@ export interface BuildingUnitOperationalStatus {
   blockedReason: string | null
   /** Number of consecutive ticks the unit has had no activity. */
   idleTicks: number
+  /**
+   * Estimated base labor cost per tick for this unit, in game currency.
+   * Derived from unit type, level, and the company's effective hourly wage for the building's city.
+   * Null if the unit carries no labor cost.
+   */
+  nextTickLaborCost: number | null
+  /**
+   * Estimated energy cost per tick for this unit, in game currency.
+   * Derived from unit type, level, and the fixed energy price per MWh.
+   * Null if the unit carries no energy cost.
+   */
+  nextTickEnergyCost: number | null
 }
 
 /**
@@ -867,4 +881,20 @@ export interface LoanSummary {
   accumulatedPenalty: number
   acceptedAtUtc: string
   closedAtUtc: string | null
+}
+
+/** Procurement preview result from the backend. */
+export interface ProcurementPreview {
+  sourceType: 'GLOBAL_EXCHANGE' | 'LOCAL_B2B' | 'LOCKED_VENDOR' | 'NO_SOURCE'
+  sourceCityId: string | null
+  sourceCityName: string | null
+  sourceVendorCompanyId: string | null
+  sourceVendorName: string | null
+  exchangePricePerUnit: number | null
+  transitCostPerUnit: number | null
+  deliveredPricePerUnit: number | null
+  estimatedQuality: number | null
+  canExecute: boolean
+  blockReason: string | null
+  blockMessage: string | null
 }
