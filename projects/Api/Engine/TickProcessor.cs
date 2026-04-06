@@ -95,10 +95,16 @@ public sealed class TickProcessor(
         // EF Core change-tracking is required for entities we modify (Company.Cash,
         // Inventory.Quantity, Brand, Building, ExchangeOrder, GameState).
 
+        // AsSplitQuery prevents EF Core from generating a single SQL query with a Cartesian
+        // product across three collection navigation properties (Units, PendingConfiguration.Units,
+        // PendingConfiguration.Removals).  Without it, the same BuildingUnit row can appear
+        // multiple times in the result set, and the subsequent ToDictionary call for
+        // UnitsByBuildingPosition throws "An item with the same key has already been added."
         var buildings = await db.Buildings
             .Include(b => b.Units)
             .Include(b => b.PendingConfiguration)!.ThenInclude(p => p!.Units)
             .Include(b => b.PendingConfiguration)!.ThenInclude(p => p!.Removals)
+            .AsSplitQuery()
             .ToListAsync(ct);
 
         var companies = await db.Companies.ToListAsync(ct);
@@ -127,7 +133,7 @@ public sealed class TickProcessor(
             UnitsByBuilding = buildings.ToDictionary(b => b.Id, b => b.Units.ToList()),
             UnitsByBuildingPosition = buildings.ToDictionary(
                 b => b.Id,
-                b => b.Units.ToDictionary(u => (u.GridX, u.GridY))),
+                b => b.Units.DistinctBy(u => (u.GridX, u.GridY)).ToDictionary(u => (u.GridX, u.GridY))),
             InventoryByUnit = inventories
                 .Where(i => i.BuildingUnitId.HasValue)
                 .GroupBy(i => i.BuildingUnitId!.Value)

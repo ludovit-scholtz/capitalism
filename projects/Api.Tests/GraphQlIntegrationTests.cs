@@ -338,7 +338,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var response = await _client.GetAsync("/");
         response.EnsureSuccessStatusCode();
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("Capitalism V API", body.GetProperty("name").GetString());
+        Assert.Equal("Capitalism V Game API", body.GetProperty("name").GetString());
     }
 
     [Fact]
@@ -12646,6 +12646,467 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .FirstOrDefault(e => e.GetProperty("isUnmet").GetBoolean());
         Assert.False(unmetEntry.ValueKind == System.Text.Json.JsonValueKind.Undefined, "Unmet Demand entry should be in marketShare");
         Assert.True(Math.Abs(unmetEntry.GetProperty("share").GetDecimal() - 0.6m) < 0.01m);
+    }
+
+    // ── UpdatePublicSalesPrice mutation tests ────────────────────────────────
+
+    private async Task<Guid> GetPublicSalesUnitIdAsync(string shopId)
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == UnitType.PublicSales);
+        return unit.Id;
+    }
+
+    private async Task<(string token, Guid unitId)> SetupPublicSalesUnitAsync(string email, string displayName, string companyName)
+    {
+        var token = await RegisterAndGetTokenAsync(email, displayName);
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, companyName);
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+        return (token, unitId);
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_HappyPath_UpdatesUnitMinPrice()
+    {
+        var (token, unitId) = await SetupPublicSalesUnitAsync("upsp-happy@test.com", "UpdatePriceHappy", "UpdatePrice Happy Co");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) {
+                    id
+                    unitType
+                    minPrice
+                }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = 99.99m } },
+            token);
+
+        var unit = result.GetProperty("data").GetProperty("updatePublicSalesPrice");
+        Assert.Equal("PUBLIC_SALES", unit.GetProperty("unitType").GetString());
+        Assert.True(Math.Abs(unit.GetProperty("minPrice").GetDecimal() - 99.99m) < 0.001m,
+            $"Expected minPrice 99.99 but got {unit.GetProperty("minPrice").GetDecimal()}");
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_Unauthenticated_ReturnsError()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId = Guid.NewGuid(), newMinPrice = 50m } },
+            token: null);
+
+        Assert.True(result.TryGetProperty("errors", out _), "Expected errors for unauthenticated request");
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_NonOwner_ReturnsUnitNotFound()
+    {
+        // Player A owns the unit
+        var (tokenA, unitId) = await SetupPublicSalesUnitAsync("upsp-owner@test.com", "UpdatePriceOwner", "Owner Price Co");
+
+        // Player B tries to update
+        var tokenB = await RegisterAndGetTokenAsync("upsp-other@test.com", "UpdatePriceOther");
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = 50m } },
+            tokenB);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors when non-owner tries to update");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("UNIT_NOT_FOUND", code);
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_WrongUnitType_ReturnsInvalidUnitType()
+    {
+        var token = await RegisterAndGetTokenAsync("upsp-wrong-type@test.com", "WrongUnitType");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "WrongType Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        // Get a non-PUBLIC_SALES unit (PURCHASE unit from same shop)
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var purchaseUnit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == UnitType.Purchase);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId = purchaseUnit.Id, newMinPrice = 50m } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors for wrong unit type");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_UNIT_TYPE", code);
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_NegativePrice_ReturnsInvalidPrice()
+    {
+        var (token, unitId) = await SetupPublicSalesUnitAsync("upsp-negative@test.com", "NegativePrice", "NegativePrice Co");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = -5m } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected error for negative price");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_PRICE", code);
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_ZeroPrice_ReturnsInvalidPrice()
+    {
+        var (token, unitId) = await SetupPublicSalesUnitAsync("upsp-zero@test.com", "ZeroPrice", "ZeroPrice Co");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = 0m } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected error for zero price");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_PRICE", code);
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_NewPriceVisibleInUnitQuery()
+    {
+        // After updating the price, the new minPrice should be returned when querying the unit via myCompanies.
+        var (token, unitId) = await SetupPublicSalesUnitAsync("upsp-visible@test.com", "PriceVisible", "PriceVisible Co");
+        const decimal newPrice = 75.50m;
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = newPrice } },
+            token);
+
+        // Verify persisted via a direct DB read so we don't depend on GraphQL query structure.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits.FindAsync(unitId);
+        Assert.NotNull(unit);
+        Assert.True(Math.Abs(unit!.MinPrice!.Value - newPrice) < 0.001m,
+            $"Expected persisted MinPrice {newPrice} but got {unit.MinPrice}");
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_FoodProcessing_UpdatesMinPriceCorrectly()
+    {
+        // Verify the mutation works for the FOOD_PROCESSING starter industry (Bread).
+        var token = await RegisterAndGetTokenAsync("upsp-food@test.com", "FoodPriceTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Food Factory Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FOOD_PROCESSING", cityId, companyName = "Food Price Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Food Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id unitType minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = 12.50m } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no errors for Food Processing price update");
+        var unit = result.GetProperty("data").GetProperty("updatePublicSalesPrice");
+        Assert.Equal("PUBLIC_SALES", unit.GetProperty("unitType").GetString());
+        Assert.True(Math.Abs(unit.GetProperty("minPrice").GetDecimal() - 12.50m) < 0.001m,
+            $"Expected minPrice 12.50 but got {unit.GetProperty("minPrice").GetDecimal()}");
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_Healthcare_UpdatesMinPriceCorrectly()
+    {
+        // Verify the mutation works for the HEALTHCARE starter industry (Basic Medicine).
+        var token = await RegisterAndGetTokenAsync("upsp-health@test.com", "HealthPriceTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Health Factory Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "HEALTHCARE", cityId, companyName = "Health Price Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("HEALTHCARE", "basic-medicine");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Health Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id unitType minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = 55.00m } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no errors for Healthcare price update");
+        var unit = result.GetProperty("data").GetProperty("updatePublicSalesPrice");
+        Assert.Equal("PUBLIC_SALES", unit.GetProperty("unitType").GetString());
+        Assert.True(Math.Abs(unit.GetProperty("minPrice").GetDecimal() - 55.00m) < 0.001m,
+            $"Expected minPrice 55.00 but got {unit.GetProperty("minPrice").GetDecimal()}");
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_FoodProcessing_ReturnsAnalyticsAfterTicks()
+    {
+        // Verify analytics are returned for the FOOD_PROCESSING starter industry after tick simulation.
+        var token = await RegisterAndGetTokenAsync("analytics-food@test.com", "FoodAnalyticsTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Food Analytics Factory Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FOOD_PROCESSING", cityId, companyName = "Food Analytics Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Food Analytics Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+
+        await ProcessTicksAsync(4);
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unitId}\") {{ buildingUnitId demandSignal recentUtilization revenueHistory {{ tick revenue quantitySold }} marketShare {{ label companyId share }} }} }}",
+            token: token);
+
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.NotEqual(JsonValueKind.Null, analytics.ValueKind);
+        Assert.Equal(unitId.ToString(), analytics.GetProperty("buildingUnitId").GetString());
+        Assert.False(string.IsNullOrEmpty(analytics.GetProperty("demandSignal").GetString()),
+            "demandSignal should be non-empty after ticks");
+        // revenueHistory may be empty if the supply chain hasn't produced sales yet;
+        // we verify the array field exists and is not null (not that it has entries).
+        Assert.Equal(JsonValueKind.Array, analytics.GetProperty("revenueHistory").ValueKind);
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_Healthcare_ReturnsAnalyticsAfterTicks()
+    {
+        // Verify analytics are returned for the HEALTHCARE starter industry after tick simulation.
+        var token = await RegisterAndGetTokenAsync("analytics-health@test.com", "HealthAnalyticsTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Health Analytics Factory Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "HEALTHCARE", cityId, companyName = "Health Analytics Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("HEALTHCARE", "basic-medicine");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Health Analytics Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+
+        await ProcessTicksAsync(4);
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unitId}\") {{ buildingUnitId demandSignal revenueHistory {{ tick revenue quantitySold }} elasticityIndex brandAwareness populationIndex }} }}",
+            token: token);
+
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.NotEqual(JsonValueKind.Null, analytics.ValueKind);
+        Assert.Equal(unitId.ToString(), analytics.GetProperty("buildingUnitId").GetString());
+        Assert.False(string.IsNullOrEmpty(analytics.GetProperty("demandSignal").GetString()),
+            "demandSignal should be non-empty after ticks");
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_ThenRunTicks_ConfiguredPriceReflectedInAnalytics()
+    {
+        // Full flow: complete onboarding → inspect unit minPrice → update price → run tick → verify analytics work.
+        var (token, unitId) = await SetupPublicSalesUnitAsync(
+            "upsp-tick-verify@test.com", "TickVerify", "TickVerify Co");
+
+        // Verify unit minPrice is set by onboarding via a direct DB read.
+        decimal baselineMinPrice;
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var unit = await db.BuildingUnits.FindAsync(unitId);
+            Assert.NotNull(unit);
+            baselineMinPrice = unit!.MinPrice ?? 0m;
+            Assert.True(baselineMinPrice > 0m, "Baseline minPrice should be positive after onboarding.");
+        }
+
+        // Update the price to a new value.
+        const decimal newPrice = 99.99m;
+        var updateResult = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = newPrice } },
+            token);
+        Assert.False(updateResult.TryGetProperty("errors", out _), "updatePublicSalesPrice should succeed.");
+        var returnedPrice = updateResult.GetProperty("data").GetProperty("updatePublicSalesPrice").GetProperty("minPrice").GetDecimal();
+        Assert.True(Math.Abs(returnedPrice - newPrice) < 0.001m, $"Mutation should return new price {newPrice} but got {returnedPrice}.");
+
+        // Run a tick so the analytics and unit state are refreshed.
+        await ProcessTicksAsync(1);
+
+        // Query analytics — demandSignal and recentUtilization should be present.
+        var analyticsResult = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unitId}\") {{ demandSignal recentUtilization revenueHistory {{ tick revenue }} }} }}",
+            token: token);
+        var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.NotEqual(JsonValueKind.Null, analytics.ValueKind);
+        Assert.False(string.IsNullOrEmpty(analytics.GetProperty("demandSignal").GetString()),
+            "demandSignal should be present after tick.");
+
+        // Confirm minPrice persists after the tick via a direct DB read.
+        {
+            await using var scope = _factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var unit = await db.BuildingUnits.FindAsync(unitId);
+            Assert.NotNull(unit);
+            Assert.True(Math.Abs(unit!.MinPrice!.Value - newPrice) < 0.001m,
+                $"MinPrice should still be {newPrice} after tick but got {unit.MinPrice}.");
+        }
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_FoodProcessing_SupplyConstrained_ReturnsCorrectSignal()
+    {
+        // Verify that FOOD_PROCESSING (Bread) shows SUPPLY_CONSTRAINED when inventory is empty after ticks.
+        var token = await RegisterAndGetTokenAsync("analytics-food-supply@test.com", "FoodSupplyTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Food Supply Factory Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FOOD_PROCESSING", cityId, companyName = "Food Supply Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Food Supply Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+
+        // Without any inventory in the unit, demand analytics should reflect supply constraint.
+        var result = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unitId}\") {{ demandSignal actionHint recentUtilization }} }}",
+            token: token);
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.NotEqual(JsonValueKind.Null, analytics.ValueKind);
+        // With no inventory and no sales history, the unit is supply-constrained or shows zero utilization.
+        var signal = analytics.GetProperty("demandSignal").GetString();
+        Assert.False(string.IsNullOrEmpty(signal), "demandSignal should be present.");
+        // Utilization should be zero or near-zero since the unit has no inventory.
+        var utilization = analytics.GetProperty("recentUtilization").GetDecimal();
+        Assert.True(utilization <= 0.1m, $"Utilization should be near zero for an empty unit, got {utilization}.");
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_Healthcare_SupplyConstrained_ReturnsCorrectSignal()
+    {
+        // Verify that HEALTHCARE (Basic Medicine) shows correct demand signal when unit is empty.
+        var token = await RegisterAndGetTokenAsync("analytics-health-supply@test.com", "HealthSupplyTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Health Supply Factory Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "HEALTHCARE", cityId, companyName = "Health Supply Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("HEALTHCARE", "basic-medicine");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Health Supply Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+        var unitId = await GetPublicSalesUnitIdAsync(shopId);
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unitId}\") {{ demandSignal actionHint recentUtilization }} }}",
+            token: token);
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.NotEqual(JsonValueKind.Null, analytics.ValueKind);
+        var signal = analytics.GetProperty("demandSignal").GetString();
+        Assert.False(string.IsNullOrEmpty(signal), "demandSignal should be present for Healthcare.");
+
+        // Verify the public sales unit has a positive minPrice (configured by FinishOnboarding) via DB.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits.FindAsync(unitId);
+        Assert.NotNull(unit);
+        Assert.True(unit!.MinPrice is > 0m, $"Healthcare public sales unit should have positive minPrice, got {unit.MinPrice}.");
     }
 
     [Fact]

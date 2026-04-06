@@ -32,7 +32,7 @@ public static class BuildingConfigurationService
             .Include(plan => plan.Removals)
             .FirstOrDefaultAsync(plan => plan.BuildingId == building.Id);
 
-        var currentUnits = building.Units.ToDictionary(unit => (unit.GridX, unit.GridY));
+        var currentUnits = building.Units.DistinctBy(unit => (unit.GridX, unit.GridY)).ToDictionary(unit => (unit.GridX, unit.GridY));
         var desiredUnits = submittedUnits
             .OrderBy(unit => unit.GridY)
             .ThenBy(unit => unit.GridX)
@@ -127,6 +127,11 @@ public static class BuildingConfigurationService
 
     public static async Task ApplyDuePlansAsync(AppDbContext db, long currentTick)
     {
+        // AsSplitQuery prevents EF Core Cartesian explosion when loading plan.Units,
+        // plan.Removals, and plan.Building.Units simultaneously.  Without it, the
+        // Building.Units navigation property can contain duplicate entries, causing
+        // liveUnitsByPosition to appear empty (or duplicate keys) and leading to
+        // spurious new BuildingUnit records being inserted for positions that already exist.
         var plans = await db.BuildingConfigurationPlans
             .Include(plan => plan.Units)
             .Include(plan => plan.Removals)
@@ -134,11 +139,12 @@ public static class BuildingConfigurationService
             .ThenInclude(building => building.Company)
             .Include(plan => plan.Building)
             .ThenInclude(building => building.Units)
+            .AsSplitQuery()
             .ToListAsync();
 
         foreach (var plan in plans)
         {
-            var liveUnitsByPosition = plan.Building.Units.ToDictionary(unit => (unit.GridX, unit.GridY));
+            var liveUnitsByPosition = plan.Building.Units.DistinctBy(unit => (unit.GridX, unit.GridY)).ToDictionary(unit => (unit.GridX, unit.GridY));
 
             foreach (var removal in plan.Removals.Where(removal => removal.AppliesAtTick <= currentTick).ToList())
             {

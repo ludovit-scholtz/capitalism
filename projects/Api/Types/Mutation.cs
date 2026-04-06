@@ -1537,6 +1537,7 @@ public sealed class Mutation
             .ThenInclude(plan => plan!.Units)
             .Include(candidate => candidate.PendingConfiguration)
             .ThenInclude(plan => plan!.Removals)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(candidate => candidate.Id == input.BuildingId);
 
         if (building is null || building.Company.PlayerId != userId)
@@ -1599,6 +1600,7 @@ public sealed class Mutation
             .ThenInclude(plan => plan!.Units)
             .Include(candidate => candidate.PendingConfiguration)
             .ThenInclude(plan => plan!.Removals)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(candidate => candidate.Id == input.BuildingId);
 
         if (building is null || building.Company.PlayerId != userId)
@@ -2472,6 +2474,57 @@ public sealed class Mutation
         await db.SaveChangesAsync();
 
         return loan;
+    }
+
+    /// <summary>
+    /// Instantly updates the minimum sale price on a PUBLIC_SALES building unit.
+    /// Unlike StoreBuildingConfiguration, this takes effect immediately (next tick)
+    /// without requiring a queued upgrade, because price is just a runtime parameter.
+    /// </summary>
+    [Authorize]
+    public async Task<BuildingUnit> UpdatePublicSalesPrice(
+        UpdatePublicSalesPriceInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building)
+            .ThenInclude(b => b.Company)
+            .FirstOrDefaultAsync(u => u.Id == input.UnitId);
+
+        if (unit is null || unit.Building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Unit not found or you don't own it.")
+                    .SetCode("UNIT_NOT_FOUND")
+                    .Build());
+        }
+
+        if (unit.UnitType != UnitType.PublicSales)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only PUBLIC_SALES units support instant price updates.")
+                    .SetCode("INVALID_UNIT_TYPE")
+                    .Build());
+        }
+
+        if (input.NewMinPrice <= 0m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Minimum sale price must be greater than zero.")
+                    .SetCode("INVALID_PRICE")
+                    .Build());
+        }
+
+        unit.MinPrice = input.NewMinPrice;
+        await db.SaveChangesAsync();
+
+        return unit;
     }
 
     private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)

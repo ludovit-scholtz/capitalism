@@ -49,7 +49,17 @@ public class Program
         {
             if (builder.Environment.IsEnvironment("Testing"))
             {
-                options.UseInMemoryDatabase("TestDb");
+                var connStr = builder.Configuration.GetConnectionString("GameCatalog");
+                if (!string.IsNullOrEmpty(connStr))
+                {
+                    // Integration tests provide a unique per-factory SQLite connection string
+                    // via ApiWebApplicationFactory so that each test class gets its own isolated database.
+                    options.UseSqlite(connStr, sqlite => sqlite.CommandTimeout(30));
+                }
+                else
+                {
+                    options.UseInMemoryDatabase("TestDb");
+                }
             }
             else
             {
@@ -85,19 +95,12 @@ public class Program
                 };
             });
 
-        builder.Services.AddHttpContextAccessor();
-
-        builder.Services.AddScoped<TickProcessor>();
-        builder.Services.AddHostedService<GameTickHostedService>();
-        builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
-
         builder.Services
             .AddGraphQLServer()
             .AddAuthorization()
             .AddQueryType<Query>()
             .AddMutationType<Mutation>();
 
-        builder.Services.AddScoped<AppDbInitializer>();
         // ── Game tick engine ──
         builder.Services.AddScoped<TickProcessor>();
         builder.Services.AddScoped<ITickPhase, PowerDistributionPhase>();
