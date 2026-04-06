@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
+import { getActiveCompany } from '@/lib/accountContext'
 import type { LoanOfferSummary, LoanSummary, Company } from '@/types'
 import {
   formatLoanDuration,
@@ -16,7 +17,6 @@ import {
 
 const { t } = useI18n()
 const auth = useAuthStore()
-
 const loading = ref(true)
 const error = ref<string | null>(null)
 const offers = ref<LoanOfferSummary[]>([])
@@ -113,6 +113,10 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
+    if (auth.isAuthenticated && !auth.player) {
+      await auth.fetchMe()
+    }
+
     const offersResult = await gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY)
     offers.value = offersResult.loanOffers ?? []
 
@@ -134,11 +138,20 @@ async function loadData() {
 onMounted(loadData)
 
 const activeLoans = computed(() => myLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE'))
+const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.value))
+const isCompanyAccountActive = computed(
+  () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
+)
 
 function openAcceptModal(offer: LoanOfferSummary) {
+  if (!isCompanyAccountActive.value || !activeCompany.value) {
+    acceptError.value = t('bank.companyAccountRequired')
+    return
+  }
+
   selectedOffer.value = offer
   principalAmount.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
-  selectedCompanyId.value = myCompanies.value[0]?.id ?? ''
+  selectedCompanyId.value = activeCompany.value.id
   acceptError.value = null
   showAcceptModal.value = true
 }
@@ -300,6 +313,7 @@ async function confirmAcceptLoan() {
               <button
                 v-if="auth.isAuthenticated"
                 class="btn btn-primary"
+                :disabled="!isCompanyAccountActive"
                 @click="openAcceptModal(offer)"
               >
                 {{ t('bank.acceptLoan') }}
@@ -308,6 +322,9 @@ async function confirmAcceptLoan() {
                 {{ t('auth.loginToAccess') }}
               </router-link>
             </div>
+            <p v-if="auth.isAuthenticated && !isCompanyAccountActive" class="offer-context-hint">
+              {{ t('bank.companyAccountRequired') }}
+            </p>
           </div>
         </div>
       </section>
@@ -338,11 +355,11 @@ async function confirmAcceptLoan() {
 
           <div class="form-group">
             <label for="borrow-company">{{ t('bank.borrower') }}</label>
-            <select id="borrow-company" v-model="selectedCompanyId" class="form-select">
-              <option v-for="company in myCompanies" :key="company.id" :value="company.id">
-                {{ company.name }} ({{ formatCurrency(company.cash) }})
-              </option>
-            </select>
+            <div id="borrow-company" class="active-borrower-company">
+              <strong>{{ activeCompany?.name ?? t('bank.activeBorrowerCompany') }}</strong>
+              <span>{{ activeCompany ? formatCurrency(activeCompany.cash) : '' }}</span>
+            </div>
+            <span class="form-hint">{{ t('bank.borrowerHint') }}</span>
           </div>
 
           <div class="form-group">
@@ -356,7 +373,7 @@ async function confirmAcceptLoan() {
               step="1000"
               class="form-input"
             />
-            <span class="form-hint">Company cash available: {{ formatCurrency(selectedCompanyCash) }}</span>
+            <span class="form-hint">{{ t('bank.companyCashAvailable', { amount: formatCurrency(selectedCompanyCash) }) }}</span>
           </div>
 
           <div class="repayment-summary">
@@ -369,7 +386,7 @@ async function confirmAcceptLoan() {
               <strong>{{ formatCurrency(estimatedPaymentAmount) }} × {{ estimatedTotalPayments }}</strong>
             </div>
             <div class="summary-row total-row">
-              <span>Total repayment</span>
+              <span>{{ t('bank.totalRepayment') }}</span>
               <strong>{{ formatCurrency(estimatedTotalRepayment) }}</strong>
             </div>
           </div>
@@ -457,6 +474,23 @@ async function confirmAcceptLoan() {
 .loan-card:hover,
 .offer-card:hover {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.offer-context-hint {
+  margin: 0.75rem 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.active-borrower-company {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
 }
 
 .loan-card.status-overdue {

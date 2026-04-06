@@ -262,6 +262,8 @@ Player can switch between his person account and any company he controls.
 
 Game administrators can switch to any player account. In the player account they can switch to any of the player controlled person or company accounts.
 
+In the top menu player can switch between person account or companies account. In the top navigation is menu, toswitch player's view to any account he controls. In this view the selected company view is used so if person controls more than one company he can act for different companies in this manner, for example he can see the accounting for the other company or he can build buildings for the selected company. Also personal account is selectable there. In such case the player cannot build buildings, but he can start new company.
+
 ## Person account
 
 In the onboarding the player picks the game player name. This is the person account. At the start he owns certain amount of company shares the player creates. The ledger info for the player account is customized to person view.

@@ -53,6 +53,8 @@ test.describe('Stock exchange', () => {
         { companyId: 'company-rival', ownerPlayerId: 'player-2', ownerCompanyId: null, shareCount: 4000 },
       ],
     })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
 

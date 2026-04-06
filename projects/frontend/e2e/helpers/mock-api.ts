@@ -913,6 +913,28 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
   }
 }
 
+function applyImplicitCompanyAccountContext(player: MockPlayer) {
+  if (player.companies.length === 0) {
+    return
+  }
+
+  const activeCompanyExists = player.activeCompanyId
+    ? player.companies.some((company) => company.id === player.activeCompanyId)
+    : false
+
+  if (player.activeAccountType === 'COMPANY' && activeCompanyExists) {
+    return
+  }
+
+  const firstCompany = player.companies[0]
+  if (!firstCompany) {
+    return
+  }
+
+  player.activeAccountType = 'COMPANY'
+  player.activeCompanyId = firstCompany.id
+}
+
 export function makeStartupPackOffer(overrides?: Partial<MockStartupPackOffer>): MockStartupPackOffer {
   const now = Date.now()
   return {
@@ -1202,6 +1224,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     procurementPreviews: {},
     ...initial,
   }
+
+  state.players.forEach(applyImplicitCompanyAccountContext)
 
   const resolveCurrentPlayer = () => {
     const tokenPlayerId = state.currentToken?.startsWith('token-')

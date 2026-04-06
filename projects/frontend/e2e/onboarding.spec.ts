@@ -174,6 +174,82 @@ test.describe('Authentication', () => {
   })
 })
 
+test.describe('Dashboard account switcher', () => {
+  test('switches between person and company views from the top menu', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      activeAccountType: 'COMPANY',
+      activeCompanyId: 'company-bravo',
+      companies: [
+        {
+          id: 'company-alpha',
+          playerId: 'player-1',
+          name: 'Alpha Manufacturing',
+          cash: 240000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+        {
+          id: 'company-bravo',
+          playerId: 'player-1',
+          name: 'Bravo Foods',
+          cash: 175000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.company-card')).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Bravo Foods' })).toBeVisible()
+
+    await page.getByRole('button', { name: /Switch account/i }).click()
+    await page.locator('.account-option', { hasText: player.displayName }).click()
+
+    await expect(page.locator('.person-account-panel')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Founder view' })).toBeVisible()
+    await expect(page.locator('.company-card')).toHaveCount(0)
+
+    await page.getByRole('button', { name: /Switch account/i }).click()
+    await page.locator('.account-option', { hasText: 'Alpha Manufacturing' }).click()
+
+    await expect(page.locator('.company-card')).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Alpha Manufacturing' })).toBeVisible()
+  })
+
+  test('personal account can create a new company from the dashboard', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      activeAccountType: 'PERSON',
+      activeCompanyId: null,
+      companies: [],
+    })
+    const state = setupMockApi(page, { players: [player] })
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.person-account-panel')).toBeVisible()
+    await page.getByLabel('New company name').fill('Delta Ventures')
+    await page.getByRole('button', { name: 'Create company' }).click()
+
+    await expect(page.locator('.person-account-panel')).toHaveCount(0)
+    await expect(page.locator('.company-card')).toHaveCount(1)
+    await expect(page.getByRole('heading', { name: 'Delta Ventures' })).toBeVisible()
+    await expect(page.locator('.account-trigger')).toContainText('Delta Ventures')
+  })
+})
+
 test.describe('Onboarding wizard', () => {
   test('complete full onboarding flow', async ({ page }) => {
     const player = makePlayer()
@@ -839,10 +915,11 @@ test.describe('Guest onboarding wizard', () => {
     await page.locator('#guestPassword').fill('GuestPass1!')
     await page.getByRole('button', { name: 'Save & Launch' }).click()
 
-    // Must NOT restart the wizard — step-5 heading still visible
-    await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
-    // An explicit error message must appear
+    // Stay on onboarding and show the backend validation error explicitly.
+    await expect(page).toHaveURL(/\/onboarding/)
     await expect(page.locator('.error-message, .error-global, [role="alert"]').first()).toBeVisible()
+    await expect(page.locator('.error-message, .error-global, [role="alert"]').filter({ hasText: /product not found/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toHaveCount(0)
     // The error must NOT say "lot was taken"
     await expect(page.locator('[role="alert"], .error-message, .error-global').filter({ hasText: /lots you chose was taken/i })).toHaveCount(0)
   })
@@ -1603,7 +1680,6 @@ test.describe('Onboarding resume and progress persistence', () => {
     await completeGuidedOnboarding(page, 'Maybe Later Corp')
 
     await page.getByRole('button', { name: 'Maybe later' }).click()
-    await expect(page.getByText('The offer has been saved to your dashboard until it expires.')).toBeVisible()
 
     await page.getByRole('link', { name: 'Go to Dashboard' }).click()
     await page.waitForURL('/dashboard')

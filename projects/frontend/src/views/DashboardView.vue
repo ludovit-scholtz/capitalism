@@ -10,6 +10,7 @@ import { trackStartupPackEvent, emitStartupPackViewEvents } from '@/lib/startupP
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { deepEqual } from '@/lib/utils'
+import { getActiveCompany } from '@/lib/accountContext'
 import PendingActionsTimeline from '@/components/dashboard/PendingActionsTimeline.vue'
 import SupplyChainPanel from '@/components/dashboard/SupplyChainPanel.vue'
 import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vue'
@@ -45,13 +46,22 @@ const ledgerLoading = ref(false)
 const cityNames = ref<Record<string, string>>({})
 /** Map from buildingId → per-unit operational statuses for supply-chain live status display. */
 const buildingUnitStatuses = ref<Record<string, BuildingUnitOperationalStatus[]>>({})
+const createCompanyName = ref('')
+const createCompanyLoading = ref(false)
+const createCompanyError = ref<string | null>(null)
+const createCompanyMessage = ref<string | null>(null)
 
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 
 const activeStartupPackOffer = computed(() => (auth.startupPackOffer && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(auth.startupPackOffer.status) ? auth.startupPackOffer : null))
 const claimedStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'CLAIMED' ? auth.startupPackOffer : null))
 const expiredStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'EXPIRED' ? auth.startupPackOffer : null))
-const targetCompany = computed(() => companies.value[0] ?? null)
+const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
+const isPersonAccount = computed(
+  () => auth.player?.activeAccountType !== 'COMPANY' || !activeCompany.value,
+)
+const visibleCompanies = computed(() => (activeCompany.value ? [activeCompany.value] : []))
+const targetCompany = computed(() => activeCompany.value)
 
 const buildingTypeIcons: Record<string, string> = {
   MINE: '⛏️',
@@ -107,6 +117,19 @@ async function loadDashboardData() {
   }
 }
 
+async function refreshCompanyDerivedData() {
+  const cityIds = [...new Set(companies.value.flatMap((company) => company.buildings.map((building) => building.cityId)))]
+  const companyIds = companies.value.map((company) => company.id)
+  const buildingIds = companies.value.flatMap((company) => company.buildings.map((building) => building.id))
+
+  await Promise.all([
+    loadCityPowerBalances(cityIds),
+    loadCityNames(),
+    loadLedgers(companyIds),
+    loadBuildingUnitStatuses(buildingIds),
+  ])
+}
+
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     router.push('/login')
@@ -141,15 +164,7 @@ onMounted(async () => {
     }
 
     // Load city power balances for each unique city that has buildings.
-    const cityIds = [...new Set(companiesData.myCompanies.flatMap((c) => c.buildings.map((b) => b.cityId)))]
-    const companyIds = companiesData.myCompanies.map((c) => c.id)
-    const buildingIds = companiesData.myCompanies.flatMap((c) => c.buildings.map((b) => b.id))
-    await Promise.all([
-      loadCityPowerBalances(cityIds),
-      loadCityNames(),
-      loadLedgers(companyIds),
-      loadBuildingUnitStatuses(buildingIds),
-    ])
+    await refreshCompanyDerivedData()
 
     await loadPendingActions()
   } catch (e: unknown) {
@@ -443,6 +458,45 @@ function formatTimeRemaining(expiresAtUtc: string): string {
 
   return t('startupPack.timeRemainingMinutes', { minutes })
 }
+
+async function createCompany() {
+  const trimmedName = createCompanyName.value.trim()
+  if (!trimmedName) {
+    createCompanyError.value = t('dashboard.companyNameRequired')
+    createCompanyMessage.value = null
+    return
+  }
+
+  createCompanyLoading.value = true
+  createCompanyError.value = null
+  createCompanyMessage.value = null
+
+  try {
+    await gqlRequest(
+      `mutation CreateCompany($input: CreateCompanyInput!) {
+        createCompany(input: $input) {
+          id
+        }
+      }`,
+      {
+        input: {
+          name: trimmedName,
+        },
+      },
+    )
+
+    createCompanyName.value = ''
+    createCompanyMessage.value = t('dashboard.createCompanySuccess', { company: trimmedName })
+
+    await auth.fetchMe()
+    await loadDashboardData()
+    await Promise.all([refreshCompanyDerivedData(), loadPendingActions()])
+  } catch (e: unknown) {
+    createCompanyError.value = e instanceof Error ? e.message : t('dashboard.createCompanyFailed')
+  } finally {
+    createCompanyLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -541,6 +595,7 @@ function formatTimeRemaining(expiresAtUtc: string): string {
               {{ t('startupPack.maybeLater') }}
             </button>
           </div>
+          <p v-if="!targetCompany" class="startup-pack-context-note">{{ t('dashboard.startupPackRequiresCompany') }}</p>
           <p class="startup-pack-free-path">{{ t('startupPack.freePath') }}</p>
         </div>
 
@@ -564,15 +619,70 @@ function formatTimeRemaining(expiresAtUtc: string): string {
 
       <PendingActionsTimeline :actions="pendingActions" :loading="pendingActionsLoading" :current-tick="gameState?.currentTick ?? null" />
 
-      <div v-if="companies.length === 0" class="empty-state">
-        <div class="empty-icon">🏗️</div>
-        <p>{{ t('dashboard.noCompanies') }}</p>
-        <RouterLink to="/onboarding" class="btn btn-primary btn-lg">{{ t('dashboard.startOnboarding') }}</RouterLink>
-        <RouterLink to="/encyclopedia" class="btn btn-secondary encyclopedia-link">{{ t('dashboard.browseEncyclopedia') }}</RouterLink>
-      </div>
+      <section v-if="isPersonAccount" class="person-account-panel">
+        <div class="person-account-header">
+          <div>
+            <p class="person-account-eyebrow">{{ t('dashboard.personModeEyebrow') }}</p>
+            <h2>{{ t('dashboard.personModeTitle') }}</h2>
+            <p class="person-account-copy">
+              {{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}
+            </p>
+          </div>
+        </div>
 
-      <div v-else class="companies-section">
-        <div v-for="company in companies" :key="company.id" class="company-card">
+        <div class="person-account-metrics">
+          <article class="person-metric-card">
+            <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
+            <strong class="person-metric-value">${{ formatCurrency(auth.player?.personalCash ?? 0) }}</strong>
+          </article>
+          <article class="person-metric-card">
+            <span class="person-metric-label">{{ t('dashboard.controlledCompanies') }}</span>
+            <strong class="person-metric-value">{{ companies.length }}</strong>
+          </article>
+        </div>
+
+        <div class="person-account-actions">
+          <div>
+            <h3>{{ t('dashboard.createCompanyTitle') }}</h3>
+            <p class="person-account-copy">{{ t('dashboard.createCompanyBody') }}</p>
+          </div>
+
+          <form class="new-company-form" @submit.prevent="createCompany">
+            <label class="new-company-field">
+              <span>{{ t('dashboard.companyNameLabel') }}</span>
+              <input
+                v-model="createCompanyName"
+                type="text"
+                maxlength="200"
+                :placeholder="t('dashboard.companyNamePlaceholder')"
+              />
+            </label>
+            <div class="new-company-buttons">
+              <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">
+                {{ createCompanyLoading ? t('common.loading') : t('dashboard.createCompany') }}
+              </button>
+              <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('dashboard.browseEncyclopedia') }}</RouterLink>
+            </div>
+          </form>
+
+          <p v-if="createCompanyMessage" class="person-account-message" role="status">{{ createCompanyMessage }}</p>
+          <p v-if="createCompanyError" class="person-account-error" role="alert">{{ createCompanyError }}</p>
+        </div>
+
+        <div v-if="companies.length > 0" class="controlled-companies-panel">
+          <h3>{{ t('dashboard.controlledCompaniesTitle') }}</h3>
+          <div class="controlled-companies-grid">
+            <article v-for="company in companies" :key="company.id" class="controlled-company-card">
+              <strong>{{ company.name }}</strong>
+              <span>${{ formatCurrency(company.cash) }}</span>
+              <small>{{ t('dashboard.switchCompanyHint') }}</small>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <div v-if="visibleCompanies.length > 0" class="companies-section">
+        <div v-for="company in visibleCompanies" :key="company.id" class="company-card">
           <div class="company-header">
             <div>
               <h2>{{ company.name }}</h2>
@@ -893,6 +1003,12 @@ function formatTimeRemaining(expiresAtUtc: string): string {
   font-size: 0.875rem;
 }
 
+.startup-pack-context-note {
+  margin-top: 0.875rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
 .startup-pack-state {
   padding: 1rem;
   border-radius: var(--radius-md);
@@ -909,6 +1025,142 @@ function formatTimeRemaining(expiresAtUtc: string): string {
 .btn-lg {
   padding: 0.75rem 1.75rem;
   font-size: 1rem;
+}
+
+.person-account-panel {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.person-account-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.person-account-eyebrow {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.person-account-copy {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.person-account-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.person-metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-hover);
+}
+
+.person-metric-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.person-metric-value {
+  font-size: 1.2rem;
+}
+
+.person-account-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.new-company-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.new-company-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.new-company-field span {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.new-company-field input {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.new-company-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.person-account-message,
+.person-account-error {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+}
+
+.person-account-message {
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+}
+
+.person-account-error {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--color-danger);
+}
+
+.controlled-companies-panel {
+  margin-top: 1rem;
+}
+
+.controlled-companies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.controlled-company-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.controlled-company-card small {
+  color: var(--color-text-secondary);
 }
 
 .companies-section {

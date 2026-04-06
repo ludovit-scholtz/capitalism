@@ -60,6 +60,26 @@ async function authenticateViaLocalStorage(
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 test.describe('City Map View', () => {
+  test('requires the active company account before purchasing a lot', async ({ page }) => {
+    const { player, state } = setupAuthenticatedPlayer(page)
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+
+    await expect(page.getByText('Switch to a company account in the top menu to purchase lots and place buildings.')).toBeVisible()
+    await expect(page.getByRole('button', { name: /Purchase Lot/i })).toHaveCount(0)
+
+    await page.getByRole('button', { name: /Switch account/i }).click()
+    await page.locator('.account-option', { hasText: 'Test Empire' }).click()
+
+    await expect(page.getByRole('button', { name: /Purchase Lot/i })).toBeVisible()
+    expect(state.players[0]?.activeAccountType).toBe('COMPANY')
+  })
+
   test('renders city map with building lots', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
@@ -1013,12 +1033,11 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    // With 2 companies the company selector shows cash values
-    // Select company-1 ($500,000)
-    const companySelect = page.locator('.form-select')
-    await expect(companySelect).toBeVisible()
-    // The selector shows cash before purchase (contains $500,000)
-    await expect(companySelect).toContainText('500,000')
+    // The purchase form now uses the active company from the header switcher.
+    const activeCompanySummary = page.locator('.active-company-summary')
+    await expect(activeCompanySummary).toBeVisible()
+    await expect(activeCompanySummary).toContainText('Test Empire')
+    await expect(activeCompanySummary).toContainText('500,000')
 
     await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
     await page.locator('.form-input').fill('Iron Works')
@@ -1032,9 +1051,9 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    // The company selector should now reflect the updated cash (contains $388,100)
-    await expect(companySelect).toBeVisible()
-    await expect(companySelect).toContainText('388,100')
+    // The active company summary should now reflect the updated cash (contains $388,100)
+    await expect(activeCompanySummary).toBeVisible()
+    await expect(activeCompanySummary).toContainText('388,100')
   })
 })
 

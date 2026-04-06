@@ -41,6 +41,8 @@ test.describe('Company Ledger', () => {
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     player.companies = [makeLedgerCompany(player.id)]
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = 'company-ledger-test'
     player.onboardingCompletedAtUtc = new Date().toISOString()
 
     await page.addInitScript((token) => {
@@ -63,6 +65,8 @@ test.describe('Company Ledger', () => {
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     player.companies = [makeLedgerCompany(player.id)]
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = 'company-ledger-test'
     player.onboardingCompletedAtUtc = new Date().toISOString()
 
     await page.addInitScript((token) => {
@@ -94,6 +98,8 @@ test.describe('Company Ledger', () => {
       buildings: [],
     }
     player.companies = [company]
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = company.id
     player.onboardingCompletedAtUtc = new Date().toISOString()
 
     const ledger: MockLedgerSummary = {

@@ -218,6 +218,8 @@ test.describe('Company Settings – dashboard navigation', () => {
       buildings: [],
     }
     player.companies.push(company)
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = company.id
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -247,6 +249,8 @@ test.describe('Company Settings – dashboard navigation', () => {
       buildings: [],
     }
     player.companies.push(company)
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = company.id
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`

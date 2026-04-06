@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { computed, ref } from 'vue'
 import { formatInGameTime } from '@/lib/gameTime'
 import { useGameStateStore } from '@/stores/gameState'
+import AccountSwitcher from '@/components/layout/AccountSwitcher.vue'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
@@ -67,7 +68,7 @@ const closeMenu = () => {
           <span class="game-time-value">{{ formattedGameTime }}</span>
         </div>
         <template v-if="auth.isAuthenticated">
-          <span class="player-name">{{ auth.player?.displayName }}</span>
+          <AccountSwitcher @switched="closeMenu" />
           <button
             class="btn btn-secondary"
             @click="
@@ -290,12 +291,6 @@ const closeMenu = () => {
   color: var(--color-text);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-}
-
-.user-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
 }
 
 .btn-ghost {

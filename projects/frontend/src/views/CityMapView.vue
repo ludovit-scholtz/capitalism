@@ -16,6 +16,7 @@ import {
   constructionTicksForType,
   constructionTicksRemaining as computeConstructionTicksRemaining,
 } from '@/lib/cityMapHelpers'
+import { getActiveCompany } from '@/lib/accountContext'
 import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -41,7 +42,6 @@ const viewMode = ref<'map' | 'list'>('map')
 const purchaseMode = ref(false)
 const selectedBuildingType = ref('')
 const buildingName = ref('')
-const selectedCompanyId = ref('')
 const selectedMediaType = ref('')
 const purchasing = ref(false)
 const purchaseError = ref<string | null>(null)
@@ -77,9 +77,21 @@ const isOwnedByPlayer = computed(() => {
   return companies.value.some((c) => c.id === selectedLot.value?.ownerCompanyId)
 })
 
+const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
+const isCompanyAccountActive = computed(
+  () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
+)
+const isOwnedByActiveCompany = computed(
+  () => !!selectedLot.value?.ownerCompanyId && selectedLot.value.ownerCompanyId === activeCompany.value?.id,
+)
+const isOwnedByDifferentControlledCompany = computed(
+  () => isOwnedByPlayer.value && !!selectedLot.value?.ownerCompanyId && selectedLot.value.ownerCompanyId !== activeCompany.value?.id,
+)
+
 const canPurchase = computed(() =>
   selectedLot.value
-    ? isPurchasable(
+    ? isCompanyAccountActive.value
+      && isPurchasable(
         auth.isAuthenticated,
         companies.value.length,
         selectedLot.value.ownerCompanyId,
@@ -91,7 +103,7 @@ const canSubmitPurchase = computed(() => {
   const baseValid = isFormSubmittable(
     selectedBuildingType.value,
     buildingName.value,
-    selectedCompanyId.value,
+    activeCompany.value?.id ?? '',
     purchasing.value,
   )
   // Media houses require a channel type selection.
@@ -99,9 +111,7 @@ const canSubmitPurchase = computed(() => {
   return baseValid
 })
 
-const selectedCompany = computed(() =>
-  companies.value.find((c) => c.id === selectedCompanyId.value) ?? null,
-)
+const selectedCompany = computed(() => activeCompany.value)
 
 const cashAfterPurchase = computed(() => {
   if (!selectedCompany.value || !selectedLot.value) return null
@@ -220,6 +230,10 @@ async function fetchData() {
   loading.value = true
   error.value = null
   try {
+    if (auth.isAuthenticated && !auth.player) {
+      await auth.fetchMe()
+    }
+
     const cityData = await gqlRequest<{ city: City }>(
       `query GetCity($id: UUID!) {
         city(id: $id) {
@@ -252,10 +266,6 @@ async function fetchData() {
     city.value = cityData.city
     lots.value = lotsData.cityLots
     companies.value = companiesData.myCompanies
-
-    if (companies.value.length > 0) {
-      selectedCompanyId.value = companies.value[0]!.id
-    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load city data'
   } finally {
@@ -381,7 +391,7 @@ function startPurchase() {
 }
 
 async function confirmPurchase() {
-  if (!selectedLot.value || !canSubmitPurchase.value) return
+  if (!selectedLot.value || !canSubmitPurchase.value || !activeCompany.value) return
 
   purchasing.value = true
   purchaseError.value = null
@@ -402,7 +412,7 @@ async function confirmPurchase() {
       }`,
       {
         input: {
-          companyId: selectedCompanyId.value,
+          companyId: activeCompany.value.id,
           lotId: selectedLot.value.id,
           buildingType: selectedBuildingType.value,
           buildingName: buildingName.value,
@@ -769,6 +779,9 @@ watch(viewMode, async (mode) => {
           <div v-else-if="companies.length === 0" class="purchase-notice">
             {{ t('cityMap.noCompany') }}
           </div>
+          <div v-else-if="!isCompanyAccountActive" class="purchase-notice">
+            {{ t('cityMap.companyAccountRequired') }}
+          </div>
           <template v-else>
             <!-- Stale-lot / general purchase error shown regardless of current lot availability -->
             <div v-if="purchaseError && !purchaseMode" class="error-message purchase-error-notice" role="alert" aria-live="polite">
@@ -816,13 +829,12 @@ watch(viewMode, async (mode) => {
                   />
                 </div>
 
-                <div v-if="companies.length > 1" class="form-group">
+                <div class="form-group">
                   <label>{{ t('cityMap.company') }}</label>
-                  <select v-model="selectedCompanyId" class="form-select">
-                    <option v-for="c in companies" :key="c.id" :value="c.id">
-                      {{ c.name }} ({{ formatCurrency(c.cash) }})
-                    </option>
-                  </select>
+                  <div class="active-company-summary">
+                    <strong>{{ selectedCompany?.name }}</strong>
+                    <span>{{ selectedCompany ? formatCurrency(selectedCompany.cash) : '' }}</span>
+                  </div>
                 </div>
 
                 <!-- Media house channel type (only for MEDIA_HOUSE) -->
@@ -887,7 +899,7 @@ watch(viewMode, async (mode) => {
 
           <!-- Post-purchase banner: under-construction state -->
           <div
-            v-if="justPurchasedBuildingId && isOwnedByPlayer && justPurchasedIsUnderConstruction"
+            v-if="justPurchasedBuildingId && isOwnedByActiveCompany && justPurchasedIsUnderConstruction"
             class="post-purchase-banner construction-banner"
             role="status"
             data-testid="construction-banner"
@@ -912,7 +924,7 @@ watch(viewMode, async (mode) => {
           </div>
 
           <!-- Post-purchase setup guidance (shown immediately after a successful purchase, operational) -->
-          <div v-else-if="justPurchasedBuildingId && isOwnedByPlayer" class="post-purchase-banner" role="status">
+          <div v-else-if="justPurchasedBuildingId && isOwnedByActiveCompany" class="post-purchase-banner" role="status">
             <div class="post-purchase-body">
               <strong class="post-purchase-title">{{ t(`buildings.typeIcons.${justPurchasedBuildingType ?? 'FACTORY'}`) }} {{ t('cityMap.postPurchaseTitle') }}</strong>
               <p class="post-purchase-text">{{ t(`cityMap.${postPurchaseBodyKey(justPurchasedBuildingType ?? 'FACTORY')}`) }}</p>
@@ -925,9 +937,13 @@ watch(viewMode, async (mode) => {
             </RouterLink>
           </div>
 
+          <div v-else-if="isOwnedByDifferentControlledCompany" class="purchase-notice">
+            {{ t('cityMap.switchCompanyToManage', { company: selectedLot.ownerCompany?.name ?? t('cityMap.company') }) }}
+          </div>
+
           <!-- Already owned by player: building under construction -->
           <div
-            v-else-if="isOwnedByPlayer && selectedLot.building && selectedLot.building.isUnderConstruction"
+            v-else-if="isOwnedByActiveCompany && selectedLot.building && selectedLot.building.isUnderConstruction"
             class="your-building-actions construction-state"
             data-testid="under-construction-panel"
           >
@@ -949,7 +965,7 @@ watch(viewMode, async (mode) => {
           </div>
 
           <!-- Already owned by player (standard manage link, building operational) -->
-          <div v-else-if="isOwnedByPlayer && selectedLot.buildingId" class="your-building-actions">
+          <div v-else-if="isOwnedByActiveCompany && selectedLot.buildingId" class="your-building-actions">
             <RouterLink
               :to="`/building/${selectedLot.buildingId}`"
               class="btn btn-primary"
@@ -1506,6 +1522,17 @@ watch(viewMode, async (mode) => {
   font-size: 0.8125rem;
   color: var(--color-tertiary);
   margin-top: 1rem;
+}
+
+.active-company-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-hover);
 }
 
 .purchase-actions {
