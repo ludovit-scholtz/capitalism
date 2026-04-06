@@ -132,8 +132,7 @@ export default {
     mapLegend: 'Green markers are recommended; orange markers are affordable alternatives.',
     mapViewLabel: 'Lot selection view',
     ipoTitle: 'Choose your IPO plan',
-    ipoDesc:
-      'You invest $50,000 personally, then the company raises outside capital. Bigger raises leave more cash in the treasury, but your founder ownership falls.',
+    ipoDesc: 'You invest $50,000 personally, then the company raises outside capital. Bigger raises leave more cash in the treasury, but your founder ownership falls.',
     ipoRaise: 'Raise',
     ipoFounderOwnership: 'Founder stake',
     ipoPublicFloat: 'Public float',
@@ -243,7 +242,8 @@ export default {
     guestProfitNet: 'Projected net profit',
     guestPriceTitle: '💲 Your Configured Sale Price',
     guestPriceDesc: 'Your {product} shop will sell at {price} per unit — 1.5× the base market price of {basePrice}. This markup gives you a solid margin while staying competitive.',
-    guestPriceTip: "After launching you can adjust the price anytime in the shop's PUBLIC_SALES unit. A higher price earns more per sale; a lower price attracts more buyers. Start near 1.5× and tune from there.",
+    guestPriceTip:
+      "After launching you can adjust the price anytime in the shop's PUBLIC_SALES unit. A higher price earns more per sale; a lower price attracts more buyers. Start near 1.5× and tune from there.",
     factoryLayoutTitle: '🔧 Your Factory Layout',
     factoryLayoutDesc: 'Your starter factory has been automatically configured with these production units:',
     factoryLayoutGuestDesc: 'When you save progress, your factory will be configured with these production units:',
@@ -1129,8 +1129,7 @@ export default {
     overheadDriverScale: 'Scale factor',
     salaryImpactHint:
       'Higher multipliers raise ongoing labor costs in that city but can improve worker quality and competitiveness. Lower multipliers reduce costs but may affect operational performance.',
-    dividendHelp:
-      'Choose how much post-tax annual profit is paid out to shareholders. 20% is a balanced default that still leaves room for reinvestment.',
+    dividendHelp: 'Choose how much post-tax annual profit is paid out to shareholders. 20% is a balanced default that still leaves room for reinvestment.',
     baseSalary: 'Base wage / hour',
     salaryMultiplier: 'Salary multiplier',
     effectiveSalary: 'Effective wage / hour',
@@ -1248,7 +1247,8 @@ export default {
   },
   research: {
     panelTitle: 'Research Progress',
-    intro: 'Research advances each tick. Product Quality improves manufactured output quality. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
+    intro:
+      'Research advances each tick. Product Quality improves manufactured output quality. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
     emptyState: 'No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.',
     qualityLabel: 'Product Quality',
     awarenessLabel: 'Brand Awareness',

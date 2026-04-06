@@ -4,12 +4,7 @@
  * Implements issue #54 — guest onboarding sandbox wizard with save-progress handoff.
  */
 import { test, expect, type Page } from '@playwright/test'
-import {
-  setupMockApi,
-  makePlayer,
-  makeStartupPackOffer,
-  makeDefaultBuildingLots,
-} from './helpers/mock-api'
+import { setupMockApi, makePlayer, makeStartupPackOffer, makeDefaultBuildingLots } from './helpers/mock-api'
 
 async function authenticateViaLocalStorage(page: Page, token: string) {
   await page.addInitScript((storedToken) => {
@@ -23,12 +18,7 @@ async function authenticateViaLocalStorage(page: Page, token: string) {
  * then returns the text content of `.profit-stat-revenue` on the step-5 screen.
  * Used by the revenue-comparison test to avoid duplicating navigation logic.
  */
-async function getGuestProfitRevenue(
-  page: Page,
-  industry: string,
-  productName: string,
-  companyName = `${industry} Revenue Corp`,
-): Promise<number> {
+async function getGuestProfitRevenue(page: Page, industry: string, productName: string, companyName = `${industry} Revenue Corp`): Promise<number> {
   setupMockApi(page)
   await page.goto('/onboarding')
   await page.locator('.industry-card', { hasText: industry }).click()
@@ -88,12 +78,7 @@ async function completeGuidedOnboarding(page: Page, companyName: string) {
  * Drives the authenticated guided onboarding wizard with a specified industry and product.
  * Used by configure-guide price tests to validate industry-specific benchmark prices.
  */
-async function completeGuidedOnboardingForIndustry(
-  page: Page,
-  companyName: string,
-  industryLabel: string,
-  productLabel: string,
-) {
+async function completeGuidedOnboardingForIndustry(page: Page, companyName: string, industryLabel: string, productLabel: string) {
   await page.locator('.industry-card', { hasText: industryLabel }).click()
   await page.getByRole('button', { name: 'Next' }).click()
   await page.locator('.city-card', { hasText: 'Bratislava' }).click()
@@ -291,9 +276,7 @@ test.describe('Onboarding wizard', () => {
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
-    await expect(
-      page.getByRole('heading', { name: 'Scale faster while your first business is taking off' }),
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Scale faster while your first business is taking off' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'View Leaderboard' })).toBeVisible()
     // AC 6: encyclopedia entry point is visible from the onboarding completion screen
@@ -321,9 +304,7 @@ test.describe('Onboarding wizard', () => {
     await page.getByRole('button', { name: 'Next' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText(
-      '$150,000',
-    )
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('$150,000')
 
     const growthIpoCard = page.locator('.ipo-card', { hasText: 'Growth IPO' })
     await growthIpoCard.click()
@@ -334,9 +315,7 @@ test.describe('Onboarding wizard', () => {
     await page.getByLabel('Company Name').fill('Growth Capital Works')
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText(
-      '$553,100',
-    )
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('$553,100')
   })
 
   test('renders mixed resource and intermediate-product recipes without runtime errors', async ({ page }) => {
@@ -358,7 +337,11 @@ test.describe('Onboarding wizard', () => {
           isProOnly: false,
           description: 'Starter furniture product.',
           recipes: [
-            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', imageUrl: null, description: 'Wood' }, inputProductType: null, quantity: 1 },
+            {
+              resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', imageUrl: null, description: 'Wood' },
+              inputProductType: null,
+              quantity: 1,
+            },
           ],
         },
         {
@@ -390,7 +373,11 @@ test.describe('Onboarding wizard', () => {
           isProOnly: false,
           description: 'Smart table with electronics.',
           recipes: [
-            { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', imageUrl: null, description: 'Wood' }, inputProductType: null, quantity: 1 },
+            {
+              resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC', basePrice: 10, weightPerUnit: 5, unitName: 'Ton', unitSymbol: 't', imageUrl: null, description: 'Wood' },
+              inputProductType: null,
+              quantity: 1,
+            },
             { resourceType: null, inputProductType: { id: 'prod-components', name: 'Electronic Components', slug: 'electronic-components', unitName: 'Pack', unitSymbol: 'packs' }, quantity: 10 },
           ],
         },
@@ -571,30 +558,18 @@ test.describe('Onboarding wizard', () => {
     // ROADMAP: "Each option should explain the fantasy, likely first product, and why a player might choose it."
     setupMockApi(page)
     await page.goto('/onboarding')
-    await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-first-product')).toContainText(
-      'Wooden Chair',
-    )
-    await expect(
-      page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-first-product'),
-    ).toContainText('Bread')
-    await expect(
-      page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-first-product'),
-    ).toContainText('Basic Medicine')
+    await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-first-product')).toContainText('Wooden Chair')
+    await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-first-product')).toContainText('Bread')
+    await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-first-product')).toContainText('Basic Medicine')
   })
 
   test('industry cards show why-choose tagline for each starter industry', async ({ page }) => {
     // ROADMAP: "Each option should explain ... why a player might choose it."
     setupMockApi(page)
     await page.goto('/onboarding')
-    await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-why')).toContainText(
-      'Low entry cost',
-    )
-    await expect(
-      page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-why'),
-    ).toContainText('High volume')
-    await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-why')).toContainText(
-      'Premium margin',
-    )
+    await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-why')).toContainText('Low entry cost')
+    await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-why')).toContainText('High volume')
+    await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-why')).toContainText('Premium margin')
   })
 
   test('industry card descriptions explain the business fantasy', async ({ page }) => {
@@ -602,17 +577,11 @@ test.describe('Onboarding wizard', () => {
     setupMockApi(page)
     await page.goto('/onboarding')
     // Furniture description explains timber → home goods supply chain
-    await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-desc')).toContainText(
-      'timber',
-    )
+    await expect(page.locator('.industry-card', { hasText: 'Furniture' }).locator('.card-desc')).toContainText('timber')
     // Food Processing description explains the volume/frequency trade-off
-    await expect(
-      page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-desc'),
-    ).toContainText('volume')
+    await expect(page.locator('.industry-card', { hasText: 'Food Processing' }).locator('.card-desc')).toContainText('volume')
     // Healthcare description explains premium pricing
-    await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-desc')).toContainText(
-      'premium',
-    )
+    await expect(page.locator('.industry-card', { hasText: 'Healthcare' }).locator('.card-desc')).toContainText('premium')
   })
 
   test('can complete onboarding with Food Processing industry', async ({ page }) => {
@@ -941,9 +910,7 @@ test.describe('Guest onboarding wizard', () => {
     expect(state.currentUserId).toBe(existingPlayer.id)
   })
 
-  test('already-onboarded login: redirects to dashboard without attempting migration', async ({
-    page,
-  }) => {
+  test('already-onboarded login: redirects to dashboard without attempting migration', async ({ page }) => {
     const completedPlayer = makePlayer({
       email: 'done@test.com',
       password: 'TestPass1!',
@@ -1019,9 +986,7 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.getByText(/Current simulation tick: \d+\./)).toBeVisible()
   })
 
-  test('guest completion screen shows tick countdown timer in the tick panel (AC 8)', async ({
-    page,
-  }) => {
+  test('guest completion screen shows tick countdown timer in the tick panel (AC 8)', async ({ page }) => {
     // AC 8: "The player can observe time progressing and receive clear feedback when production
     // and/or first sales occur." The tick countdown timer (`.tick-countdown`) must be visible
     // inside the guest tick panel so the player can see when the next simulation step occurs.
@@ -1175,9 +1140,7 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.locator('.price-panel-tip')).toBeVisible()
   })
 
-  test('analytics events fire for industry_selected, city_selected, and factory_configured during guest steps (AC 12)', async ({
-    page,
-  }) => {
+  test('analytics events fire for industry_selected, city_selected, and factory_configured during guest steps (AC 12)', async ({ page }) => {
     // AC 12: Analytics instrumentation must emit named events at each major onboarding step.
     // Verifies: onboarding_start → industry_selected → city_selected → factory_configured → shop_configured.
     setupMockApi(page)
@@ -1186,9 +1149,7 @@ test.describe('Guest onboarding wizard', () => {
     await page.addInitScript(() => {
       ;(window as unknown as Record<string, unknown>).__onboardingEvents = []
       window.addEventListener('capitalism:onboarding', (e: Event) => {
-        ;(window as unknown as Record<string, Array<unknown>>).__onboardingEvents.push(
-          (e as CustomEvent).detail,
-        )
+        ;(window as unknown as Record<string, Array<unknown>>).__onboardingEvents.push((e as CustomEvent).detail)
       })
     })
 
@@ -1196,9 +1157,7 @@ test.describe('Guest onboarding wizard', () => {
 
     // Collect events after the page loads — onboarding_start should fire on mount.
     await page.locator('.industry-card', { hasText: 'Furniture' }).first().waitFor()
-    const afterLoad = await page.evaluate(
-      () => (window as unknown as Record<string, unknown[]>).__onboardingEvents ?? [],
-    )
+    const afterLoad = await page.evaluate(() => (window as unknown as Record<string, unknown[]>).__onboardingEvents ?? [])
     expect(afterLoad.map((e) => (e as Record<string, string>).eventName)).toContain('onboarding_start')
 
     // Select industry and advance to step 2.
@@ -1223,9 +1182,7 @@ test.describe('Guest onboarding wizard', () => {
 
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
 
-    const allEvents = (await page.evaluate(
-      () => (window as unknown as Record<string, unknown[]>).__onboardingEvents ?? [],
-    )) as Array<Record<string, unknown>>
+    const allEvents = (await page.evaluate(() => (window as unknown as Record<string, unknown[]>).__onboardingEvents ?? [])) as Array<Record<string, unknown>>
 
     events.push(...allEvents.map((e) => e as { eventName: string }))
 
@@ -1243,9 +1200,7 @@ test.describe('Guest onboarding wizard', () => {
     expect(industryEvent?.industry).toBe('FURNITURE')
   })
 
-  test('guest completion screen fires onboarding_converted event on successful migration (AC 12)', async ({
-    page,
-  }) => {
+  test('guest completion screen fires onboarding_converted event on successful migration (AC 12)', async ({ page }) => {
     // AC 12: Analytics for "onboarding_converted" must fire when a guest successfully
     // registers and migrates their progress to an authenticated account.
     setupMockApi(page)
@@ -1255,11 +1210,11 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
 
     await page.evaluate(() => {
-      (window as unknown as Record<string, unknown[]>).__convertedEvents = []
+      ;(window as unknown as Record<string, unknown[]>).__convertedEvents = []
       window.addEventListener('capitalism:onboarding', (e: Event) => {
         const detail = (e as CustomEvent).detail
         if (detail?.eventName === 'onboarding_converted') {
-          (window as unknown as Record<string, unknown[]>).__convertedEvents.push(detail)
+          ;(window as unknown as Record<string, unknown[]>).__convertedEvents.push(detail)
         }
       })
     })
@@ -1271,9 +1226,7 @@ test.describe('Guest onboarding wizard', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    const events = await page.evaluate(
-      () => (window as unknown as Record<string, unknown[]>).__convertedEvents ?? [],
-    )
+    const events = await page.evaluate(() => (window as unknown as Record<string, unknown[]>).__convertedEvents ?? [])
     expect(events.length).toBeGreaterThan(0)
     const firstEvent = events[0] as Record<string, unknown>
     expect(firstEvent.eventName).toBe('onboarding_converted')
@@ -1304,7 +1257,20 @@ test.describe('Dashboard', () => {
       cash: 500000,
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [
-        { id: 'b1', companyId: 'comp-1', cityId: 'city-ba', type: 'FACTORY', name: 'Test Corp Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2, isForSale: false, units: [], pendingConfiguration: null },
+        {
+          id: 'b1',
+          companyId: 'comp-1',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Test Corp Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          units: [],
+          pendingConfiguration: null,
+        },
       ],
     })
     const state = setupMockApi(page, { players: [player] })
@@ -1364,9 +1330,7 @@ test.describe('Full onboarding journey', () => {
     await expect(page.locator('.company-card').first().getByRole('heading', { name: 'Journey Corp' })).toBeVisible()
   })
 
-  test('guest → home page Get Started → complete wizard → register → empire launched', async ({
-    page,
-  }) => {
+  test('guest → home page Get Started → complete wizard → register → empire launched', async ({ page }) => {
     setupMockApi(page)
 
     // Start at home page as unauthenticated visitor
@@ -1394,9 +1358,7 @@ test.describe('Full onboarding journey', () => {
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
   })
 
-  test('guest → home page → Food Processing → complete wizard → register → empire launched', async ({
-    page,
-  }) => {
+  test('guest → home page → Food Processing → complete wizard → register → empire launched', async ({ page }) => {
     // AC2 + AC9: Food Processing (Bread) industry must be completable end-to-end from the home page CTA.
     // This test mirrors the Furniture home-page test to ensure all starter industries
     // work through the same acquisition funnel entry point.
@@ -1436,9 +1398,7 @@ test.describe('Full onboarding journey', () => {
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
   })
 
-  test('guest → home page → Healthcare → complete wizard → register → empire launched', async ({
-    page,
-  }) => {
+  test('guest → home page → Healthcare → complete wizard → register → empire launched', async ({ page }) => {
     // AC2 + AC9: Healthcare (Basic Medicine) industry must be completable end-to-end from the home page CTA.
     // This test completes the 3-industry matrix for the home-page acquisition funnel.
     setupMockApi(page)
@@ -1574,9 +1534,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
   })
 
-  test('completion state shows achievement details and links to dashboard and leaderboard', async ({
-    page,
-  }) => {
+  test('completion state shows achievement details and links to dashboard and leaderboard', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -1589,9 +1547,7 @@ test.describe('Onboarding resume and progress persistence', () => {
 
     // Verify completion step UI
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
-    await expect(
-      page.getByRole('heading', { name: 'Scale faster while your first business is taking off' }),
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Scale faster while your first business is taking off' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'View Leaderboard' })).toBeVisible()
     await expect(page.getByText('3 months of Pro', { exact: true })).toBeVisible()
@@ -1616,9 +1572,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page).toHaveURL('/leaderboard')
   })
 
-  test('player can claim the startup pack after onboarding and see claimed entitlement state', async ({
-    page,
-  }) => {
+  test('player can claim the startup pack after onboarding and see claimed entitlement state', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -1639,9 +1593,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByText('Startup pack activated')).toBeVisible()
   })
 
-  test('pro subscription end date is displayed on dashboard after claiming startup pack (AC5)', async ({
-    page,
-  }) => {
+  test('pro subscription end date is displayed on dashboard after claiming startup pack (AC5)', async ({ page }) => {
     // AC5: "The user can verify their new subscription/pack status in the relevant account
     // or product surface after purchase." — the dashboard must show 'Your Pro access is active
     // until {date}' once the offer is claimed.
@@ -1687,9 +1639,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
   })
 
-  test('already-onboarded player visiting /onboarding is redirected to dashboard', async ({
-    page,
-  }) => {
+  test('already-onboarded player visiting /onboarding is redirected to dashboard', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       startupPackOffer: makeStartupPackOffer({
@@ -1719,9 +1669,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByText('Startup pack expired')).toBeVisible()
   })
 
-  test('startup pack offer remains visible after page reload when in SHOWN state', async ({
-    page,
-  }) => {
+  test('startup pack offer remains visible after page reload when in SHOWN state', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       startupPackOffer: makeStartupPackOffer({
@@ -1765,9 +1713,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.locator('.startup-pack-pro-monthly')).toContainText('$10')
   })
 
-  test('expired offer on dashboard shows expired message without claim button', async ({
-    page,
-  }) => {
+  test('expired offer on dashboard shows expired message without claim button', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       startupPackOffer: makeStartupPackOffer({
@@ -1796,9 +1742,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
   })
 
-  test('player can claim startup pack directly from the dashboard and see entitlement state', async ({
-    page,
-  }) => {
+  test('player can claim startup pack directly from the dashboard and see entitlement state', async ({ page }) => {
     const company = {
       id: 'comp-dashboard-claim',
       playerId: 'player-1',
@@ -1836,9 +1780,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
   })
 
-  test('player can dismiss startup pack from the dashboard and offer is no longer shown as active', async ({
-    page,
-  }) => {
+  test('player can dismiss startup pack from the dashboard and offer is no longer shown as active', async ({ page }) => {
     const company = {
       id: 'comp-dashboard-dismiss',
       playerId: 'player-1',
@@ -1869,14 +1811,10 @@ test.describe('Onboarding resume and progress persistence', () => {
     await page.getByRole('button', { name: 'Maybe later' }).click()
 
     // Confirmation message appears, offer is still accessible (dismissed but not removed)
-    await expect(
-      page.getByText('The offer has been saved to your dashboard until it expires.'),
-    ).toBeVisible()
+    await expect(page.getByText('The offer has been saved to your dashboard until it expires.')).toBeVisible()
   })
 
-  test('claim failure shows error message and player can still navigate to dashboard safely', async ({
-    page,
-  }) => {
+  test('claim failure shows error message and player can still navigate to dashboard safely', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -1927,17 +1865,13 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // All four guidance steps should be visible
     await expect(page.getByText('Review your cash')).toBeVisible()
     await expect(page.getByText('Set a selling price', { exact: true })).toBeVisible()
-    await expect(
-      page.getByText('The market benchmark is $45.', { exact: false }),
-    ).toBeVisible()
+    await expect(page.getByText('The market benchmark is $45.', { exact: false })).toBeVisible()
     await expect(page.getByText('Enable public sales')).toBeVisible()
     await expect(page.getByText('Wait for the next tick')).toBeVisible()
     await expect(page.getByText('Current simulation tick: 42.')).toBeVisible()
   })
 
-  test('configure-guide cash step shows remaining balance after lot purchases (ROADMAP: show money available)', async ({
-    page,
-  }) => {
+  test('configure-guide cash step shows remaining balance after lot purchases (ROADMAP: show money available)', async ({ page }) => {
     // ROADMAP: "Wizard will show them important areas on the screen like how much money they have."
     // This test verifies that the "Review your cash" configure-guide step displays the player's
     // actual remaining cash balance after both factory and shop lot purchases — not just a heading.
@@ -1962,9 +1896,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(cashStep).toContainText('233,100')
   })
 
-  test('configure-guide cash step shows different remaining balance for Food Processing (ROADMAP: show money available)', async ({
-    page,
-  }) => {
+  test('configure-guide cash step shows different remaining balance for Food Processing (ROADMAP: show money available)', async ({ page }) => {
     // ROADMAP: "Wizard will show them important areas on the screen like how much money they have."
     // Mirrors the Furniture cash test for the Food Processing industry to confirm that the cash
     // remaining is consistent across all three starter industries (same lot prices in mock).
@@ -1986,9 +1918,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(cashStep).toContainText('233,100')
   })
 
-  test('configure-guide public sales step shows description explaining city-wide buyer discovery (AC 7)', async ({
-    page,
-  }) => {
+  test('configure-guide public sales step shows description explaining city-wide buyer discovery (AC 7)', async ({ page }) => {
     // AC 7: "The UI highlights key concepts during onboarding, including available cash,
     // price configuration, and public sales configuration."
     // ROADMAP: "Wizard will show them important areas on the screen like ... public sales configuration."
@@ -2057,9 +1987,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.locator('.next-tick-process-list')).toContainText('offers the product publicly')
   })
 
-  test('completion screen shows Configure My Sales Shop CTA linking to shop building', async ({
-    page,
-  }) => {
+  test('completion screen shows Configure My Sales Shop CTA linking to shop building', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -2103,9 +2031,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     expect(text).toMatch(/tick/i)
   })
 
-  test('Go to Dashboard CTA is available as secondary action on completion screen', async ({
-    page,
-  }) => {
+  test('Go to Dashboard CTA is available as secondary action on completion screen', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -2120,9 +2046,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
   })
 
-  test('configure-guide resumes at step 5 after page refresh when onboarding is completed but first-sale milestone is not', async ({
-    page,
-  }) => {
+  test('configure-guide resumes at step 5 after page refresh when onboarding is completed but first-sale milestone is not', async ({ page }) => {
     // Simulate a player who already completed the lot flow (has onboardingCompletedAtUtc
     // and onboardingShopBuildingId) but has not yet called completeFirstSaleMilestone
     const shopBuildingId = 'building-shop-resume-test'
@@ -2192,9 +2116,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.getByRole('button', { name: /My Shop is Ready/i })).toBeVisible()
   })
 
-  test('first sale auto-detected: business-live panel shows with celebration details and navigates to dashboard', async ({
-    page,
-  }) => {
+  test('first sale auto-detected: business-live panel shows with celebration details and navigates to dashboard', async ({ page }) => {
     const shopBuildingId = 'building-shop-milestone-test'
     const player = makePlayer({
       onboardingCompletedAtUtc: new Date().toISOString(),
@@ -2264,9 +2186,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     // Business-live panel should appear automatically (auto-detection fired on load)
     await expect(page.locator('.business-live-panel')).toBeVisible()
-    await expect(
-      page.getByRole('heading', { name: /Your Business is Now Operational/i }),
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Your Business is Now Operational/i })).toBeVisible()
 
     // First-sale celebration should show concrete details
     await expect(page.locator('.first-sale-celebration')).toBeVisible()
@@ -2356,20 +2276,14 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     // Should show the next-tick process steps
     await expect(page.locator('.business-live-panel')).toContainText('Raw materials are purchased')
-    await expect(page.locator('.business-live-panel')).toContainText(
-      'Your product is manufactured',
-    )
+    await expect(page.locator('.business-live-panel')).toContainText('Your product is manufactured')
     await expect(page.locator('.business-live-panel')).toContainText('offers the product publicly')
 
     // Configure-guide should no longer be visible
-    await expect(
-      page.getByRole('heading', { name: 'Configure Your First Business' }),
-    ).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Configure Your First Business' })).toBeHidden()
   })
 
-  test('delayed-result: milestone shows error when shop has no configured sales unit', async ({
-    page,
-  }) => {
+  test('delayed-result: milestone shows error when shop has no configured sales unit', async ({ page }) => {
     const shopBuildingId = 'building-shop-not-configured'
     const player = makePlayer({
       onboardingCompletedAtUtc: new Date().toISOString(),
@@ -2424,9 +2338,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page).toHaveURL('/onboarding?step=complete')
   })
 
-  test('milestone button shows FIRST_SALE_NOT_RECORDED error when no real sale yet', async ({
-    page,
-  }) => {
+  test('milestone button shows FIRST_SALE_NOT_RECORDED error when no real sale yet', async ({ page }) => {
     const shopBuildingId = 'building-shop-no-sale'
     const player = makePlayer({
       onboardingCompletedAtUtc: new Date().toISOString(),
@@ -2494,9 +2406,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.locator('.milestone-error')).toContainText(/first real sale|next tick/i)
   })
 
-  test('mission status panel shows blocker when shop has no PUBLIC_SALES unit', async ({
-    page,
-  }) => {
+  test('mission status panel shows blocker when shop has no PUBLIC_SALES unit', async ({ page }) => {
     const shopBuildingId = 'building-shop-no-unit'
     const player = makePlayer({
       onboardingCompletedAtUtc: new Date().toISOString(),
@@ -2547,9 +2457,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.locator('.mission-blockers')).toContainText(/PUBLIC_SALES|sales unit/i)
   })
 
-  test('mission status panel shows awaiting state when shop is fully configured with real sale', async ({
-    page,
-  }) => {
+  test('mission status panel shows awaiting state when shop is fully configured with real sale', async ({ page }) => {
     const shopBuildingId = 'building-shop-awaiting'
     const player = makePlayer({
       onboardingCompletedAtUtc: new Date().toISOString(),
@@ -2717,12 +2625,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
 
     await page.goto('/onboarding')
-    await completeGuidedOnboardingForIndustry(
-      page,
-      'Medicine Corp',
-      'Healthcare',
-      'Basic Medicine',
-    )
+    await completeGuidedOnboardingForIndustry(page, 'Medicine Corp', 'Healthcare', 'Basic Medicine')
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
@@ -2758,9 +2661,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(priceStep).toContainText('margin')
   })
 
-  test('configure-guide tick panel explains the sequential supply chain flow (AC4)', async ({
-    page,
-  }) => {
+  test('configure-guide tick panel explains the sequential supply chain flow (AC4)', async ({ page }) => {
     // AC4: "The UI clearly explains what happened across recent ticks and why money or
     // throughput changed." The tick process list must show the three stages of the
     // buy-manufacture-sell loop so players understand why cash changes each tick.
@@ -2786,14 +2687,10 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // Stage 3: Public sales delivery
     await expect(processList).toContainText('offers the product publicly')
     // The tick step must also show the current tick number from the game state
-    await expect(page.locator('.configure-step').filter({ hasText: 'Wait for the next tick' })).toContainText(
-      'tick',
-    )
+    await expect(page.locator('.configure-step').filter({ hasText: 'Wait for the next tick' })).toContainText('tick')
   })
 
-  test('already-fully-onboarded player visiting /onboarding is redirected to dashboard immediately', async ({
-    page,
-  }) => {
+  test('already-fully-onboarded player visiting /onboarding is redirected to dashboard immediately', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       onboardingShopBuildingId: null,
@@ -2820,9 +2717,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page).toHaveURL('/dashboard')
   })
 
-  test('first sale auto-detected for Food Processing (Bread): celebration shows correct product and revenue (AC2, AC7)', async ({
-    page,
-  }) => {
+  test('first sale auto-detected for Food Processing (Bread): celebration shows correct product and revenue (AC2, AC7)', async ({ page }) => {
     // AC2: "The onboarding flow includes industry selection for Furniture, Food processing, and Healthcare."
     // AC7: "The player can observe visible tick progression and see the business generate an understandable first revenue."
     // This test verifies that when a Food Processing player (Bread, ~$3/unit) has a first real sale,
@@ -2905,9 +2800,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.locator('.first-sale-celebration')).toContainText('50')
   })
 
-  test('first sale auto-detected for Healthcare (Basic Medicine): celebration shows correct product and revenue (AC2, AC7)', async ({
-    page,
-  }) => {
+  test('first sale auto-detected for Healthcare (Basic Medicine): celebration shows correct product and revenue (AC2, AC7)', async ({ page }) => {
     // AC2: "The onboarding flow includes industry selection for Furniture, Food processing, and Healthcare."
     // AC7: "The player can observe visible tick progression and see the business generate an understandable first revenue."
     // This test verifies that when a Healthcare player (Basic Medicine, ~$50/unit) has a first real
@@ -2992,9 +2885,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 })
 
 test.describe('Onboarding skip and re-entry behavior', () => {
-  test('player who navigates away mid-flow can re-enter and resume from correct step', async ({
-    page,
-  }) => {
+  test('player who navigates away mid-flow can re-enter and resume from correct step', async ({ page }) => {
     // Issue #45 requirement: "Add at least one skip-path test verifying that the player can proceed
     // into the game without broken state."
     // This test simulates a player who starts step 2 (city), then navigates to the home page,
@@ -3021,9 +2912,7 @@ test.describe('Onboarding skip and re-entry behavior', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
   })
 
-  test('player who navigates away from the dashboard link after completing can still see dashboard', async ({
-    page,
-  }) => {
+  test('player who navigates away from the dashboard link after completing can still see dashboard', async ({ page }) => {
     // Player with completed onboarding, has a company and a shop building.
     // Navigating to /onboarding should redirect to /dashboard (not crash or loop).
     const player = makePlayer({
@@ -3075,9 +2964,7 @@ test.describe('Onboarding on narrow/mobile layouts', () => {
   // layout at ≤640px: industry/city/product cards stack vertically, step-actions go to column
   // direction, and progress-labels are hidden. Core interactions must still work at 375px width.
 
-  test('industry cards are visible and selectable on a narrow (375px) viewport', async ({
-    page,
-  }) => {
+  test('industry cards are visible and selectable on a narrow (375px) viewport', async ({ page }) => {
     setupMockApi(page)
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/onboarding')
@@ -3184,9 +3071,7 @@ test.describe('Onboarding on narrow/mobile layouts', () => {
     await expect(page.getByLabel('Password')).toBeVisible()
   })
 
-  test('progress bar step numbers are visible and labels are hidden on narrow viewport', async ({
-    page,
-  }) => {
+  test('progress bar step numbers are visible and labels are hidden on narrow viewport', async ({ page }) => {
     setupMockApi(page)
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/onboarding')
@@ -3207,9 +3092,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
   // ROADMAP: "Wizard will show them important areas on the screen like how much money they
   // have, the price configuration or public sales configuration."
 
-  test('guest wizard step 3 shows starting cash and post-purchase cash budget panel', async ({
-    page,
-  }) => {
+  test('guest wizard step 3 shows starting cash and post-purchase cash budget panel', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3240,9 +3123,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     expect(cashAfterText).toMatch(/^\$[\d,]+$/)
   })
 
-  test('guest wizard step 4 shows available cash and product base price per unit', async ({
-    page,
-  }) => {
+  test('guest wizard step 4 shows available cash and product base price per unit', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3302,9 +3183,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     expect(revenueText).toMatch(/\$\d/)
   })
 
-  test('guest completion screen achievement list names Basic Medicine for Healthcare industry (AC3/AC9)', async ({
-    page,
-  }) => {
+  test('guest completion screen achievement list names Basic Medicine for Healthcare industry (AC3/AC9)', async ({ page }) => {
     // AC3: Each starter industry presents a viable starter product/path.
     // AC9: The player reaches a first-profit milestone — the completion screen surfaces
     //      industry-specific context so the player knows their exact business outcome.
@@ -3348,9 +3227,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
   // make sure to create their profile with the name they chose and start the wizard again
   // with the authenticated user and this time save everything."
 
-  test('after lot-conflict restart, now-authenticated player can complete wizard and launch empire', async ({
-    page,
-  }) => {
+  test('after lot-conflict restart, now-authenticated player can complete wizard and launch empire', async ({ page }) => {
     const state = setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3369,9 +3246,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
 
     // Wizard restarts at step 1 — player IS now authenticated
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
-    await expect(
-      page.locator('.error-message, .error-global, [role="alert"]').filter({ hasText: /lots you chose was taken/i }),
-    ).toBeVisible()
+    await expect(page.locator('.error-message, .error-global, [role="alert"]').filter({ hasText: /lots you chose was taken/i })).toBeVisible()
 
     // Restore the factory lot so the player can pick it again
     factoryLot.ownerCompanyId = null
@@ -3403,9 +3278,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('after shop-lot-conflict restart, authenticated player can pick a different shop lot and complete', async ({
-    page,
-  }) => {
+  test('after shop-lot-conflict restart, authenticated player can pick a different shop lot and complete', async ({ page }) => {
     const state = setupMockApi(page)
     // Add a second factory lot so the player can use it after the shop-lot conflict restart
     // (the first factory lot gets owned by the new company during the first migration attempt)
@@ -3448,9 +3321,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
 
     // Wizard restarts at step 1 with lot-conflict error
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
-    await expect(
-      page.locator('.error-message, .error-global, [role="alert"]').filter({ hasText: /lots you chose was taken/i }),
-    ).toBeVisible()
+    await expect(page.locator('.error-message, .error-global, [role="alert"]').filter({ hasText: /lots you chose was taken/i })).toBeVisible()
 
     // Make backup lot suitable as a shop lot
     const backupLot = state.buildingLots.find((l) => l.id === 'lot-business-1')!
@@ -3486,9 +3357,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
   // consequences of player choices during onboarding."
   // This describes the CTA disabled-state enforcement and budget coaching.
 
-  test('guest step 3 — Purchase First Factory is disabled until company name and lot are both selected', async ({
-    page,
-  }) => {
+  test('guest step 3 — Purchase First Factory is disabled until company name and lot are both selected', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3518,9 +3387,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
     await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeDisabled()
   })
 
-  test('guest step 4 — Purchase First Sales Shop is disabled until product and lot are both selected', async ({
-    page,
-  }) => {
+  test('guest step 4 — Purchase First Sales Shop is disabled until product and lot are both selected', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
@@ -3549,9 +3416,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
     await expect(page.getByRole('button', { name: 'Purchase First Sales Shop' })).toBeEnabled()
   })
 
-  test('guest profit preview shows higher revenue for Healthcare vs Food Processing (AC6 business consequence)', async ({
-    browser,
-  }) => {
+  test('guest profit preview shows higher revenue for Healthcare vs Food Processing (AC6 business consequence)', async ({ browser }) => {
     // Verifies the profit preview makes industry value differentiation visible to the player.
     // Healthcare has a $50/unit product, Food Processing has $3/unit — this should be
     // clearly reflected in the estimated revenue shown on the completion screen.
@@ -3626,30 +3491,34 @@ test.describe('Factory and shop layout display after completion', () => {
     player.onboardingCompanyId = 'company-existing'
     player.onboardingFactoryLotId = state.buildingLots[0].id
     const factoryId = `building-factory-auth-test`
-    player.companies = [{
-      id: 'company-existing',
-      playerId: player.id,
-      name: 'Auth Test Corp',
-      cash: 450000,
-      foundedAtUtc: new Date().toISOString(),
-      foundedAtTick: 1,
-      buildings: [{
-        id: factoryId,
-        companyId: 'company-existing',
-        cityId: state.cities[0].id,
-        type: 'FACTORY',
-        name: 'Auth Test Corp Factory',
-        latitude: 48.15,
-        longitude: 17.11,
-        level: 1,
-        powerConsumption: 2,
-        powerStatus: 'POWERED',
-        isForSale: false,
-        builtAtUtc: new Date().toISOString(),
-        units: [],
-        pendingConfiguration: null,
-      }],
-    }]
+    player.companies = [
+      {
+        id: 'company-existing',
+        playerId: player.id,
+        name: 'Auth Test Corp',
+        cash: 450000,
+        foundedAtUtc: new Date().toISOString(),
+        foundedAtTick: 1,
+        buildings: [
+          {
+            id: factoryId,
+            companyId: 'company-existing',
+            cityId: state.cities[0].id,
+            type: 'FACTORY',
+            name: 'Auth Test Corp Factory',
+            latitude: 48.15,
+            longitude: 17.11,
+            level: 1,
+            powerConsumption: 2,
+            powerStatus: 'POWERED',
+            isForSale: false,
+            builtAtUtc: new Date().toISOString(),
+            units: [],
+            pendingConfiguration: null,
+          },
+        ],
+      },
+    ]
 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -3775,9 +3644,7 @@ test.describe('Guest registration error recovery (AC10 — resilience)', () => {
   // Specifically: a duplicate email during guest registration should show an inline error
   // and let the player try again without losing their wizard progress.
 
-  test('duplicate email during guest registration shows error and player can retry with different email', async ({
-    page,
-  }) => {
+  test('duplicate email during guest registration shows error and player can retry with different email', async ({ page }) => {
     const existingPlayer = makePlayer({ email: 'taken@test.com' })
     const state = setupMockApi(page, { players: [existingPlayer] })
     await page.goto('/onboarding')
@@ -3804,9 +3671,7 @@ test.describe('Guest registration error recovery (AC10 — resilience)', () => {
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('password too short during guest registration shows validation error without submitting', async ({
-    page,
-  }) => {
+  test('password too short during guest registration shows validation error without submitting', async ({ page }) => {
     // AC10: Client-side validation catches obviously invalid passwords before any API call,
     // giving the player immediate feedback and keeping them on the save-progress screen.
     setupMockApi(page)
@@ -3853,14 +3718,10 @@ test.describe('Guest registration error recovery (AC10 — resilience)', () => {
 // invalid state, the product handles it gracefully."
 // ─────────────────────────────────────────────────────────────────
 test.describe('Empty-lots graceful degradation (AC11)', () => {
-  test('step 3 shows no-factory-lots message when city has no suitable factory lots', async ({
-    page,
-  }) => {
+  test('step 3 shows no-factory-lots message when city has no suitable factory lots', async ({ page }) => {
     // Arrange: give the city a shop lot only — no FACTORY-capable lot
     const state = setupMockApi(page)
-    state.buildingLots = makeDefaultBuildingLots().filter((lot) =>
-      lot.suitableTypes.includes('SALES_SHOP'),
-    )
+    state.buildingLots = makeDefaultBuildingLots().filter((lot) => lot.suitableTypes.includes('SALES_SHOP'))
     await page.goto('/onboarding')
 
     // Steps 1 & 2
@@ -3873,23 +3734,17 @@ test.describe('Empty-lots graceful degradation (AC11)', () => {
 
     // The empty-state message should be shown instead of the lot selector
     await expect(page.locator('.empty-state-message').first()).toBeVisible()
-    await expect(page.locator('.empty-state-message').first()).toContainText(
-      /No factory-capable lots are available/i,
-    )
+    await expect(page.locator('.empty-state-message').first()).toContainText(/No factory-capable lots are available/i)
 
     // The "Purchase First Factory" CTA must remain disabled (no lot can be selected)
     await page.getByLabel('Company Name').fill('Empty Lot Corp')
     await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeDisabled()
   })
 
-  test('step 4 shows no-shop-lots message when city has no suitable sales-shop lots', async ({
-    page,
-  }) => {
+  test('step 4 shows no-shop-lots message when city has no suitable sales-shop lots', async ({ page }) => {
     // Arrange: supply only factory lots — strip all SALES_SHOP lots
     const state = setupMockApi(page)
-    state.buildingLots = makeDefaultBuildingLots().filter((lot) =>
-      lot.suitableTypes.includes('FACTORY'),
-    )
+    state.buildingLots = makeDefaultBuildingLots().filter((lot) => lot.suitableTypes.includes('FACTORY'))
     await page.goto('/onboarding')
 
     // Complete steps 1-3 (factory purchase succeeds — factory lot IS available)
@@ -3906,9 +3761,7 @@ test.describe('Empty-lots graceful degradation (AC11)', () => {
 
     // The no-shop-lots empty-state message should appear
     await expect(page.locator('.empty-state-message').first()).toBeVisible()
-    await expect(page.locator('.empty-state-message').first()).toContainText(
-      /No sales-shop lots are available/i,
-    )
+    await expect(page.locator('.empty-state-message').first()).toContainText(/No sales-shop lots are available/i)
 
     // "Purchase First Sales Shop" must stay disabled — no lot can be selected
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
@@ -3962,9 +3815,7 @@ test.describe('Tick feedback connected to simulation state', () => {
 // chooses Prague instead of Bratislava (all cities must work).
 // ─────────────────────────────────────────────────────────────────
 test.describe('City selection — Prague as starter city', () => {
-  test('guest can complete wizard steps 1-5 after selecting Prague as starter city', async ({
-    page,
-  }) => {
+  test('guest can complete wizard steps 1-5 after selecting Prague as starter city', async ({ page }) => {
     // Arrange: add Prague-specific lots so the factory and shop steps are available
     const state = setupMockApi(page)
     state.buildingLots = [
@@ -4046,9 +3897,7 @@ test.describe('City selection — Prague as starter city', () => {
 })
 
 test.describe('City selection — Vienna as starter city', () => {
-  test('guest can complete wizard steps 1-5 after selecting Vienna as starter city', async ({
-    page,
-  }) => {
+  test('guest can complete wizard steps 1-5 after selecting Vienna as starter city', async ({ page }) => {
     // ROADMAP: "The game will start in single city and later other cities will be added."
     // All three seeded cities (Bratislava, Prague, Vienna) must work for the onboarding wizard.
     // This test uses Vienna (the third city) to prove city-agnostic wizard behaviour.
@@ -4162,9 +4011,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
   // AC13: Automated tests cover the happy path, guest-mode boundaries, critical state transitions,
   //       and recovery scenarios — including one for each starter industry through the full migration path.
 
-  test('guest can register and migrate Food Processing (Bread) progress to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Food Processing (Bread) progress to authenticated account', async ({ page }) => {
     // Full guest → register → empire launched journey for the FOOD_PROCESSING industry.
     // Proves the login handoff preserves the Bread/Food Processing choice end-to-end.
     const state = setupMockApi(page)
@@ -4210,9 +4057,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     await expect(page.locator('.startup-pack-price')).toContainText('$20')
   })
 
-  test('guest can register and migrate Healthcare (Basic Medicine) progress to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Healthcare (Basic Medicine) progress to authenticated account', async ({ page }) => {
     // Full guest → register → empire launched journey for the HEALTHCARE industry.
     // Proves the login handoff preserves the Basic Medicine/Healthcare choice end-to-end.
     const state = setupMockApi(page)
@@ -4258,9 +4103,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     await expect(page.locator('.startup-pack-price')).toContainText('$20')
   })
 
-  test('guest migration completion: startup pack offer appears and player can claim it', async ({
-    page,
-  }) => {
+  test('guest migration completion: startup pack offer appears and player can claim it', async ({ page }) => {
     // AC: "After onboarding is successfully completed, an eligible user is shown a startup pack offer."
     // This test covers the guest-to-authenticated migration path specifically.
     // It verifies the full offer including price, pro benefit copy, and claimable state.
@@ -4296,9 +4139,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('guest can register and migrate Furniture progress in Prague city to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Furniture progress in Prague city to authenticated account', async ({ page }) => {
     // ROADMAP city coverage: guest migration must work for non-default cities.
     // This test verifies guest → register → empire launched for Furniture in Prague (the second city).
     // Complements the Bratislava-based Food Processing and Healthcare migration tests.
@@ -4388,9 +4229,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('guest can register and migrate Furniture progress in Vienna city to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Furniture progress in Vienna city to authenticated account', async ({ page }) => {
     // ROADMAP city coverage: guest migration must work for all three seeded cities.
     // This test verifies guest → register → empire launched for Furniture in Vienna (the third city).
     const state = setupMockApi(page)
@@ -4479,9 +4318,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('guest can register and migrate Food Processing progress in Vienna city to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Food Processing progress in Vienna city to authenticated account', async ({ page }) => {
     // ROADMAP city coverage: guest migration must work for all starter industries in all cities.
     // This test verifies guest → register → empire launched for Food Processing in Vienna.
     const state = setupMockApi(page)
@@ -4942,9 +4779,7 @@ test.describe('Cross-industry/city matrix — guest wizard completability (AC2, 
 })
 
 test.describe('Startup pack offer — analytics events (AC 10)', () => {
-  test('continue analytics event is dispatched when navigating to dashboard with offer still active', async ({
-    page,
-  }) => {
+  test('continue analytics event is dispatched when navigating to dashboard with offer still active', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -4964,9 +4799,7 @@ test.describe('Startup pack offer — analytics events (AC 10)', () => {
     await expect(page).toHaveURL('/dashboard')
   })
 
-  test('offer_expired analytics event is dispatched when expired state is displayed on dashboard', async ({
-    page,
-  }) => {
+  test('offer_expired analytics event is dispatched when expired state is displayed on dashboard', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       startupPackOffer: makeStartupPackOffer({
@@ -4997,9 +4830,7 @@ test.describe('Startup pack offer — analytics events (AC 10)', () => {
     await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
   })
 
-  test('countdown_active analytics event is dispatched when active offer is displayed', async ({
-    page,
-  }) => {
+  test('countdown_active analytics event is dispatched when active offer is displayed', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       startupPackOffer: makeStartupPackOffer({
@@ -5032,9 +4863,7 @@ test.describe('Startup pack offer — analytics events (AC 10)', () => {
 })
 
 test.describe('Startup pack offer — mobile viewport (AC 11)', () => {
-  test('startup pack offer is readable on a narrow (375px) mobile viewport after onboarding', async ({
-    page,
-  }) => {
+  test('startup pack offer is readable on a narrow (375px) mobile viewport after onboarding', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -5058,9 +4887,7 @@ test.describe('Startup pack offer — mobile viewport (AC 11)', () => {
     await expect(page.getByText('Free play continues even if you skip this offer.')).toBeVisible()
   })
 
-  test('startup pack panel is readable on dashboard at 375px mobile viewport', async ({
-    page,
-  }) => {
+  test('startup pack panel is readable on dashboard at 375px mobile viewport', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       startupPackOffer: makeStartupPackOffer({
@@ -5171,9 +4998,7 @@ test.describe('Guest save-progress conversion step — city, industry, and keeps
     await expect(achievementList).toContainText(/Healthcare/i)
   })
 
-  test('Save Your Progress section shows what-you-keep list with company, city, and product', async ({
-    page,
-  }) => {
+  test('Save Your Progress section shows what-you-keep list with company, city, and product', async ({ page }) => {
     // AC: "Clearly list what the player keeps: company identity, starter city, product choice, and initial setup."
     // The guest-keeps-list must appear and enumerate the 4 items so the player understands what is saved.
     setupMockApi(page)
@@ -5196,9 +5021,7 @@ test.describe('Guest save-progress conversion step — city, industry, and keeps
     await expect(saveSectionList).toContainText(/factory and shop layout/i)
   })
 
-  test('Save Your Progress section keeps list is usable on narrow (375px) viewport', async ({
-    page,
-  }) => {
+  test('Save Your Progress section keeps list is usable on narrow (375px) viewport', async ({ page }) => {
     // AC: "Ensure the conversion flow works well on desktop and responsive layouts."
     setupMockApi(page)
     await page.setViewportSize({ width: 375, height: 812 })
@@ -5278,9 +5101,7 @@ test.describe('IPO plan — Expansion option ($800k raise, 25% founder)', () => 
 })
 
 test.describe('Guest onboarding — Expansion IPO selection', () => {
-  test('guest can select Expansion IPO and wizard shows $850k starting company cash', async ({
-    page,
-  }) => {
+  test('guest can select Expansion IPO and wizard shows $850k starting company cash', async ({ page }) => {
     // ROADMAP step 2: the user can select how much capital to raise. In guest mode, the selection
     // must still update the budget coaching panels.
     setupMockApi(page)
@@ -5302,9 +5123,7 @@ test.describe('Guest onboarding — Expansion IPO selection', () => {
 
     // $50k founder + $800k raise = $850k company starting cash
     await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$850,000')
-    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText(
-      '$150,000',
-    )
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('$150,000')
   })
 
   test('guest Expansion IPO selection is preserved in localStorage progress', async ({ page }) => {

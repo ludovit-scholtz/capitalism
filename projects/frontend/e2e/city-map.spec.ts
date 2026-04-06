@@ -1,10 +1,5 @@
 import { test, expect } from '@playwright/test'
-import {
-  setupMockApi,
-  makePlayer,
-  makeDefaultBuildingLots,
-  type MockBuildingLot,
-} from './helpers/mock-api'
+import { setupMockApi, makePlayer, makeDefaultBuildingLots, type MockBuildingLot } from './helpers/mock-api'
 
 // ── Helper to set up an authenticated player with a company ──────────────────
 
@@ -44,17 +39,11 @@ function setupAuthenticatedPlayer(page: import('@playwright/test').Page) {
   return { state, player }
 }
 
-async function authenticateViaLocalStorage(
-  page: import('@playwright/test').Page,
-  playerId: string,
-) {
-  await page.addInitScript(
-    (token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    },
-    `token-${playerId}`,
-  )
+async function authenticateViaLocalStorage(page: import('@playwright/test').Page, playerId: string) {
+  await page.addInitScript((token) => {
+    localStorage.setItem('auth_token', token)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, `token-${playerId}`)
 }
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -105,12 +94,8 @@ test.describe('City Map View', () => {
 
     // Should show lot details in the detail panel
     await expect(page.getByRole('heading', { name: 'Industrial Plot A1' })).toBeVisible()
-    await expect(
-      page.getByRole('complementary').getByText('Industrial Zone'),
-    ).toBeVisible()
-    await expect(
-      page.getByRole('complementary').getByText(/96,900|96900/),
-    ).toBeVisible()
+    await expect(page.getByRole('complementary').getByText('Industrial Zone')).toBeVisible()
+    await expect(page.getByRole('complementary').getByText(/96,900|96900/)).toBeVisible()
     await expect(page.locator('.type-tag', { hasText: 'Factory' })).toBeVisible()
   })
 
@@ -166,16 +151,17 @@ test.describe('City Map View', () => {
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // Fill in purchase form
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.getByRole('complementary').locator('input[type="text"]').fill('My New Factory')
 
     // Click confirm
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // Should show success message or the lot should become owned
-    await expect(
-      page.getByText(/purchased successfully/i).or(page.locator('.status-badge.yours')),
-    ).toBeVisible()
+    await expect(page.getByText(/purchased successfully/i).or(page.locator('.status-badge.yours'))).toBeVisible()
   })
 
   test('shows owned lots with different status', async ({ page }) => {
@@ -249,7 +235,10 @@ test.describe('City Map View', () => {
     lot.ownerCompanyId = 'other-company'
     lot.ownerCompany = { id: 'other-company', name: 'Rival Corp' }
 
-    await page.locator('.building-type-card').filter({ hasText: /Sales Shop/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Sales Shop/i })
+      .click()
     await page.locator('.form-input').fill('My Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
@@ -410,7 +399,10 @@ test.describe('City Map View', () => {
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // Select building type via card picker, fill name, and submit
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.getByRole('complementary').locator('input[type="text"]').fill('Victory Factory')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
@@ -419,9 +411,7 @@ test.describe('City Map View', () => {
     await expect(page.getByText(/Construction started/i)).toBeVisible()
   })
 
-  test('previously owned lot shows manage building link (not post-purchase banner)', async ({
-    page,
-  }) => {
+  test('previously owned lot shows manage building link (not post-purchase banner)', async ({ page }) => {
     const lots = makeDefaultBuildingLots()
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
@@ -496,7 +486,10 @@ test.describe('City Map View', () => {
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.locator('.form-input').fill('Bankrupt Factory')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
@@ -634,9 +627,7 @@ test.describe('City Map View', () => {
 // ── Invalid/stale selection paths ────────────────────────────────────────────
 
 test.describe('City Map — invalid and stale selection paths', () => {
-  test('shows error when trying to purchase lot with unsuitable building type', async ({
-    page,
-  }) => {
+  test('shows error when trying to purchase lot with unsuitable building type', async ({ page }) => {
     // SALES_SHOP lot only allows SALES_SHOP,COMMERCIAL — not FACTORY
     const lots = makeDefaultBuildingLots()
     // Patch industrial lot to only accept MINE (so FACTORY is unsuitable)
@@ -670,9 +661,7 @@ test.describe('City Map — invalid and stale selection paths', () => {
     await expect(page.locator('.building-type-card').filter({ hasText: /Factory/i })).toHaveCount(0)
   })
 
-  test('shows stale-lot error when lot was claimed by another player before purchase completes', async ({
-    page,
-  }) => {
+  test('shows stale-lot error when lot was claimed by another player before purchase completes', async ({ page }) => {
     // Player selects a lot, another player claims it, then the first player submits purchase
     const lots = makeDefaultBuildingLots()
     const player = makePlayer({
@@ -702,21 +691,20 @@ test.describe('City Map — invalid and stale selection paths', () => {
     lots[0]!.ownerCompanyId = 'other-company-99'
 
     // Now submit the purchase
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.locator('.form-input').fill('Too Late Factory')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // Should show stale lot / already owned error message
-    await expect(
-      page.getByText(/just claimed by another player/i, { exact: false }),
-    ).toBeVisible()
+    await expect(page.getByText(/just claimed by another player/i, { exact: false })).toBeVisible()
     // Should prompt the player to choose a different lot
     await expect(page.getByText(/select a different available lot/i, { exact: false })).toBeVisible()
   })
 
-  test('lot detail shows district information to help player understand location context', async ({
-    page,
-  }) => {
+  test('lot detail shows district information to help player understand location context', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
@@ -758,9 +746,7 @@ test.describe('City Map — invalid and stale selection paths', () => {
     await expect(detailPanel.getByTestId('asking-price')).toBeVisible()
   })
 
-  test('mine lot with raw material shows resource premium badge on asking price', async ({
-    page,
-  }) => {
+  test('mine lot with raw material shows resource premium badge on asking price', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
@@ -798,9 +784,7 @@ test.describe('City Map — invalid and stale selection paths', () => {
 
     const detailPanel = page.getByRole('complementary')
     // The population index educational hint text is shown
-    await expect(
-      detailPanel.getByText(/Higher index.*more nearby residents/i, { exact: false }),
-    ).toBeVisible()
+    await expect(detailPanel.getByText(/Higher index.*more nearby residents/i, { exact: false })).toBeVisible()
   })
 
   test('placement guidance panel shows transport cost note', async ({ page }) => {
@@ -814,9 +798,7 @@ test.describe('City Map — invalid and stale selection paths', () => {
     const detailPanel = page.getByRole('complementary')
     // Transport cost note is shown in the placement guidance panel
     await expect(detailPanel.getByTestId('placement-guidance-panel')).toBeVisible()
-    await expect(
-      detailPanel.getByText(/Distance from your other buildings/i, { exact: false }),
-    ).toBeVisible()
+    await expect(detailPanel.getByText(/Distance from your other buildings/i, { exact: false })).toBeVisible()
   })
 
   test('lot detail shows GPS coordinates for logistics context', async ({ page }) => {
@@ -837,18 +819,14 @@ test.describe('City Map — invalid and stale selection paths', () => {
     await expect(coordEl).toContainText('48.15200°N')
     await expect(coordEl).toContainText('17.12500°E')
     // Logistics hint is shown
-    await expect(
-      detailPanel.getByText(/Coordinates are used for logistics/i, { exact: false }),
-    ).toBeVisible()
+    await expect(detailPanel.getByText(/Coordinates are used for logistics/i, { exact: false })).toBeVisible()
   })
 })
 
 // ── Building type card picker ────────────────────────────────────────────────
 
 test.describe('City Map — building type card picker', () => {
-  test('purchase form shows card-based building type picker with icon and description', async ({
-    page,
-  }) => {
+  test('purchase form shows card-based building type picker with icon and description', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
@@ -869,9 +847,7 @@ test.describe('City Map — building type card picker', () => {
     await expect(mineCard.locator('.card-type-icon')).toBeVisible()
   })
 
-  test('selecting a building type card marks it as selected and shows strategic guidance', async ({
-    page,
-  }) => {
+  test('selecting a building type card marks it as selected and shows strategic guidance', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
@@ -881,12 +857,13 @@ test.describe('City Map — building type card picker', () => {
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // Click the Factory card
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
 
     // Factory card should be selected
-    await expect(
-      page.locator('.building-type-card.selected').filter({ hasText: /Factory/i }),
-    ).toBeVisible()
+    await expect(page.locator('.building-type-card.selected').filter({ hasText: /Factory/i })).toBeVisible()
 
     // Strategic guidance for factory should appear below the cards
     await expect(page.locator('.selected-type-guidance')).toBeVisible()
@@ -904,14 +881,10 @@ test.describe('City Map — building type card picker', () => {
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // Should show Sales Shop card (suitable)
-    await expect(
-      page.locator('.building-type-card').filter({ hasText: /Sales Shop/i }),
-    ).toBeVisible()
+    await expect(page.locator('.building-type-card').filter({ hasText: /Sales Shop/i })).toBeVisible()
 
     // Should NOT show Factory card (not suitable for retail space)
-    await expect(
-      page.locator('.building-type-card').filter({ hasText: /Factory/i }),
-    ).toHaveCount(0)
+    await expect(page.locator('.building-type-card').filter({ hasText: /Factory/i })).toHaveCount(0)
   })
 
   test('post-purchase banner shows construction started state', async ({ page }) => {
@@ -923,7 +896,10 @@ test.describe('City Map — building type card picker', () => {
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.locator('.form-input').fill('Supply Chain Factory')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
@@ -954,9 +930,7 @@ test.describe('City Map — building type card picker', () => {
 
     // Success: construction-started banner appears
     await expect(page.locator('[data-testid="construction-banner"]')).toBeVisible()
-    await expect(page.locator('[data-testid="construction-banner"]')).toContainText(
-      /Construction started/i,
-    )
+    await expect(page.locator('[data-testid="construction-banner"]')).toContainText(/Construction started/i)
   })
 })
 
@@ -1039,7 +1013,10 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
     await expect(activeCompanySummary).toContainText('Test Empire')
     await expect(activeCompanySummary).toContainText('500,000')
 
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.locator('.form-input').fill('Iron Works')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
@@ -1070,9 +1047,7 @@ test.describe('City Map — multi-city navigation and graceful empty state', () 
     // City name should appear
     await expect(page.getByRole('heading', { name: /Prague/i })).toBeVisible()
     // No lots: shows 0 lots or "no lots" message
-    await expect(
-      page.getByText(/0 lots/i).or(page.getByText(/No building lots/i)),
-    ).toBeVisible()
+    await expect(page.getByText(/0 lots/i).or(page.getByText(/No building lots/i))).toBeVisible()
   })
 
   test('Vienna city map shows city name with no lots available', async ({ page }) => {
@@ -1087,9 +1062,7 @@ test.describe('City Map — multi-city navigation and graceful empty state', () 
     // City name should appear
     await expect(page.getByRole('heading', { name: /Vienna/i })).toBeVisible()
     // No lots: shows 0 lots or "no lots" message
-    await expect(
-      page.getByText(/0 lots/i).or(page.getByText(/No building lots/i)),
-    ).toBeVisible()
+    await expect(page.getByText(/0 lots/i).or(page.getByText(/No building lots/i))).toBeVisible()
   })
 })
 
@@ -1108,9 +1081,7 @@ test.describe('City Map — strategic recommendation badge (decision support)', 
     await expect(badge).toContainText(/Resource-oriented/i)
   })
 
-  test('high-population retail lot shows "Strong for retail demand" recommendation badge', async ({
-    page,
-  }) => {
+  test('high-population retail lot shows "Strong for retail demand" recommendation badge', async ({ page }) => {
     // High Street Retail Space has populationIndex 1.42 + SALES_SHOP → strong retail
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
@@ -1124,9 +1095,7 @@ test.describe('City Map — strategic recommendation badge (decision support)', 
     await expect(badge).toContainText(/Strong for retail demand/i)
   })
 
-  test('recommendation badge changes when switching between lots (decision support comparison)', async ({
-    page,
-  }) => {
+  test('recommendation badge changes when switching between lots (decision support comparison)', async ({ page }) => {
     // Players compare two lots and see how the recommendation changes —
     // this is the core "why location matters" decision-support feature.
     const { player } = setupAuthenticatedPlayer(page)
@@ -1150,9 +1119,7 @@ test.describe('City Map — strategic recommendation badge (decision support)', 
     await expect(badge).toContainText(/Resource-oriented/i)
   })
 
-  test('mobile viewport shows recommendation badge and population index decision-support', async ({
-    page,
-  }) => {
+  test('mobile viewport shows recommendation badge and population index decision-support', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
@@ -1164,9 +1131,7 @@ test.describe('City Map — strategic recommendation badge (decision support)', 
     const panel = page.getByRole('complementary')
     // Recommendation badge visible on mobile
     await expect(panel.locator('[data-testid="strategic-recommendation"]')).toBeVisible()
-    await expect(
-      panel.locator('[data-testid="strategic-recommendation"]'),
-    ).toContainText(/Strong for retail demand/i)
+    await expect(panel.locator('[data-testid="strategic-recommendation"]')).toContainText(/Strong for retail demand/i)
     // Population index educational hint visible on mobile
     await expect(panel.getByText(/Higher index.*more nearby residents/i)).toBeVisible()
   })
@@ -1186,9 +1151,7 @@ test.describe('City Map — strategic recommendation badge (decision support)', 
 })
 
 test.describe('City Map — construction order flow', () => {
-  test('purchase cost summary shows construction cost when building type selected', async ({
-    page,
-  }) => {
+  test('purchase cost summary shows construction cost when building type selected', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
@@ -1203,7 +1166,10 @@ test.describe('City Map — construction order flow', () => {
     await expect(summary.getByText(/Lot price/i)).toBeVisible()
 
     // Select a building type — construction cost should appear
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await expect(summary.getByText(/Construction cost/i)).toBeVisible()
     await expect(summary.getByText(/Build time/i)).toBeVisible()
   })
@@ -1265,9 +1231,7 @@ test.describe('City Map — construction order flow', () => {
 
     // The under-construction panel should be visible instead of "Manage Building"
     await expect(page.locator('[data-testid="under-construction-panel"]')).toBeVisible()
-    await expect(page.locator('[data-testid="under-construction-panel"]')).toContainText(
-      /Under Construction/i,
-    )
+    await expect(page.locator('[data-testid="under-construction-panel"]')).toContainText(/Under Construction/i)
     await expect(page.locator('[data-testid="construction-ticks-remaining"]')).toBeVisible()
     // "Manage Building" should not be present (building is not operational)
     await expect(page.getByRole('link', { name: /Manage Building/i })).toBeHidden()
@@ -1284,7 +1248,10 @@ test.describe('City Map — construction order flow', () => {
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.locator('.form-input').fill('Construction Test Factory')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
@@ -1322,21 +1289,20 @@ test.describe('City Map — construction order flow', () => {
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await page.locator('.form-input').fill('Underfunded Factory')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // The mock should return an INSUFFICIENT_FUNDS error (96,900 lot + 15,000 construction = 111,900 > 100,000)
-    await expect(
-      page.getByRole('alert').or(page.locator('.error-message')).first(),
-    ).toBeVisible()
+    await expect(page.getByRole('alert').or(page.locator('.error-message')).first()).toBeVisible()
   })
 })
 
 test.describe('City Map — construction completion transition', () => {
-  test('completed building (isUnderConstruction=false) shows Manage Building link, not construction panel', async ({
-    page,
-  }) => {
+  test('completed building (isUnderConstruction=false) shows Manage Building link, not construction panel', async ({ page }) => {
     // After ConstructionPhase fires, isUnderConstruction becomes false.
     // The lot detail panel should switch from the construction panel to "Manage Building".
     const lots = makeDefaultBuildingLots()

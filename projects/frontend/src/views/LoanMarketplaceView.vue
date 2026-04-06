@@ -5,15 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { getActiveCompany } from '@/lib/accountContext'
 import type { LoanOfferSummary, LoanSummary, Company } from '@/types'
-import {
-  formatLoanDuration,
-  computeTotalRepayment,
-  computePaymentAmount,
-  computeTotalPayments,
-  loanStatusClass,
-  formatCurrency,
-  formatPercent,
-} from '@/lib/loanHelpers'
+import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, computeTotalPayments, loanStatusClass, formatCurrency, formatPercent } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -121,10 +113,7 @@ async function loadData() {
     offers.value = offersResult.loanOffers ?? []
 
     if (auth.isAuthenticated) {
-      const [loansResult, companiesResult] = await Promise.all([
-        gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY),
-        gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY),
-      ])
+      const [loansResult, companiesResult] = await Promise.all([gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY), gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY)])
       myLoans.value = loansResult.myLoans ?? []
       myCompanies.value = companiesResult.me?.companies ?? []
     }
@@ -139,9 +128,7 @@ onMounted(loadData)
 
 const activeLoans = computed(() => myLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE'))
 const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.value))
-const isCompanyAccountActive = computed(
-  () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
-)
+const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 
 function openAcceptModal(offer: LoanOfferSummary) {
   if (!isCompanyAccountActive.value || !activeCompany.value) {
@@ -164,20 +151,12 @@ function closeAcceptModal() {
 
 const estimatedTotalRepayment = computed(() => {
   if (!selectedOffer.value || principalAmount.value <= 0) return 0
-  return computeTotalRepayment(
-    principalAmount.value,
-    selectedOffer.value.annualInterestRatePercent,
-    selectedOffer.value.durationTicks,
-  )
+  return computeTotalRepayment(principalAmount.value, selectedOffer.value.annualInterestRatePercent, selectedOffer.value.durationTicks)
 })
 
 const estimatedPaymentAmount = computed(() => {
   if (!selectedOffer.value || principalAmount.value <= 0) return 0
-  return computePaymentAmount(
-    principalAmount.value,
-    selectedOffer.value.annualInterestRatePercent,
-    selectedOffer.value.durationTicks,
-  )
+  return computePaymentAmount(principalAmount.value, selectedOffer.value.annualInterestRatePercent, selectedOffer.value.durationTicks)
 })
 
 const estimatedTotalPayments = computed(() => {
@@ -236,12 +215,7 @@ async function confirmAcceptLoan() {
       <section v-if="auth.isAuthenticated && activeLoans.length > 0" class="my-loans-section">
         <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
         <div class="loans-grid">
-          <div
-            v-for="loan in activeLoans"
-            :key="loan.id"
-            class="loan-card"
-            :class="loanStatusClass(loan.status)"
-          >
+          <div v-for="loan in activeLoans" :key="loan.id" class="loan-card" :class="loanStatusClass(loan.status)">
             <div class="loan-card-header">
               <span class="lender-name">{{ loan.lenderCompanyName }}</span>
               <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
@@ -266,9 +240,7 @@ async function confirmAcceptLoan() {
                 <span class="stat-value">{{ formatPercent(loan.annualInterestRatePercent) }}</span>
               </div>
             </div>
-            <div v-if="loan.missedPayments > 0" class="overdue-warning">
-              ⚠ {{ loan.missedPayments }} missed payment(s) — penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}
-            </div>
+            <div v-if="loan.missedPayments > 0" class="overdue-warning">⚠ {{ loan.missedPayments }} missed payment(s) — penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}</div>
           </div>
         </div>
       </section>
@@ -310,12 +282,7 @@ async function confirmAcceptLoan() {
               </div>
             </div>
             <div class="offer-card-footer">
-              <button
-                v-if="auth.isAuthenticated"
-                class="btn btn-primary"
-                :disabled="!isCompanyAccountActive"
-                @click="openAcceptModal(offer)"
-              >
+              <button v-if="auth.isAuthenticated" class="btn btn-primary" :disabled="!isCompanyAccountActive" @click="openAcceptModal(offer)">
                 {{ t('bank.acceptLoan') }}
               </button>
               <router-link v-else to="/login" class="btn btn-secondary">
@@ -397,11 +364,7 @@ async function confirmAcceptLoan() {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeAcceptModal">{{ t('common.cancel') }}</button>
-          <button
-            class="btn btn-primary"
-            :disabled="acceptLoading || principalAmount <= 0"
-            @click="confirmAcceptLoan"
-          >
+          <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0" @click="confirmAcceptLoan">
             <span v-if="acceptLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.acceptLoan') }}</span>
           </button>

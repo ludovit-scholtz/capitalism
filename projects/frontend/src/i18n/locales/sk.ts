@@ -132,8 +132,7 @@ export default {
     mapLegend: 'Zelené body sú odporúčané, oranžové sú dostupné alternatívy.',
     mapViewLabel: 'Zobrazenie výberu pozemku',
     ipoTitle: 'Vyberte IPO plán',
-    ipoDesc:
-      'Osobne investujete $50,000 a firma potom získa externý kapitál. Vyšší úpis ponechá vo firme viac hotovosti, ale zníži váš zakladateľský podiel.',
+    ipoDesc: 'Osobne investujete $50,000 a firma potom získa externý kapitál. Vyšší úpis ponechá vo firme viac hotovosti, ale zníži váš zakladateľský podiel.',
     ipoRaise: 'Úpis',
     ipoFounderOwnership: 'Zakladateľský podiel',
     ipoPublicFloat: 'Voľne obchodované akcie',
@@ -243,7 +242,8 @@ export default {
     guestProfitNet: 'Projektovaný čistý zisk',
     guestPriceTitle: '💲 Vaša nastavená predajná cena',
     guestPriceDesc: 'Váš obchod bude predávať {product} za {price} za kus — 1,5× základná trhová cena {basePrice}. Táto prirážka vám zaručuje solídnu maržu pri zachovaní konkurencieschopnosti.',
-    guestPriceTip: 'Po spustení môžete cenu kedykoľvek upraviť v jednotke PUBLIC_SALES vášho obchodu. Vyššia cena znamená väčší zisk na predaj; nižšia cena priláka viac kupujúcich. Začnite pri 1,5× a postupne optimalizujte.',
+    guestPriceTip:
+      'Po spustení môžete cenu kedykoľvek upraviť v jednotke PUBLIC_SALES vášho obchodu. Vyššia cena znamená väčší zisk na predaj; nižšia cena priláka viac kupujúcich. Začnite pri 1,5× a postupne optimalizujte.',
     factoryLayoutTitle: '🔧 Rozloženie vašej továrne',
     factoryLayoutDesc: 'Vaša štartovacia továreň bola automaticky nakonfigurovaná s týmito výrobnými jednotkami:',
     factoryLayoutGuestDesc: 'Po uložení pokroku bude vaša továreň nakonfigurovaná s týmito výrobnými jednotkami:',
@@ -1123,8 +1123,7 @@ export default {
     overheadDriverScale: 'Faktor rozsahu',
     salaryImpactHint:
       'Vyšší násobok zvyšuje priebežné mzdové náklady v tomto meste, ale môže zlepšiť kvalitu pracovníkov a konkurencieschopnosť. Nižší násobok znižuje náklady, ale môže ovplyvniť výkonnosť.',
-    dividendHelp:
-      'Určite, aká časť ročného zisku po zdanení sa vyplatí akcionárom. 20% je vyvážený základ, ktorý stále ponecháva priestor na reinvestície.',
+    dividendHelp: 'Určite, aká časť ročného zisku po zdanení sa vyplatí akcionárom. 20% je vyvážený základ, ktorý stále ponecháva priestor na reinvestície.',
     baseSalary: 'Základná mzda / hodina',
     salaryMultiplier: 'Mzdový násobok',
     effectiveSalary: 'Efektívna mzda / hodina',

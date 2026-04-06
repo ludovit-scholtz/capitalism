@@ -718,9 +718,7 @@ test.describe('Company Ledger', () => {
       cashFromInvestments: -150000,
       firstRecordedTick: 2,
       lastRecordedTick: 5,
-      buildingSummaries: [
-        { buildingId, buildingName: 'Main Factory', buildingType: 'FACTORY', revenue: 0, costs: 0 },
-      ],
+      buildingSummaries: [{ buildingId, buildingName: 'Main Factory', buildingType: 'FACTORY', revenue: 0, costs: 0 }],
     }
     state.ledgerData[company.id] = ledger
 

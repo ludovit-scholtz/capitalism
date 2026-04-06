@@ -132,8 +132,7 @@ export default {
     mapLegend: 'Grüne Marker sind empfohlen; orange Marker sind bezahlbare Alternativen.',
     mapViewLabel: 'Ansicht der Grundstücksauswahl',
     ipoTitle: 'Wählen Sie Ihren IPO-Plan',
-    ipoDesc:
-      'Sie investieren persönlich $50,000, danach nimmt das Unternehmen externes Kapital auf. Größere Emissionen lassen mehr Geld in der Kasse, senken aber Ihren Gründeranteil.',
+    ipoDesc: 'Sie investieren persönlich $50,000, danach nimmt das Unternehmen externes Kapital auf. Größere Emissionen lassen mehr Geld in der Kasse, senken aber Ihren Gründeranteil.',
     ipoRaise: 'Emission',
     ipoFounderOwnership: 'Gründeranteil',
     ipoPublicFloat: 'Streubesitz',
@@ -243,8 +242,10 @@ export default {
     guestProfitCost: 'Geschätzte Materialkosten',
     guestProfitNet: 'Projizierter Nettogewinn',
     guestPriceTitle: '💲 Ihr konfigurierter Verkaufspreis',
-    guestPriceDesc: 'Ihr {product}-Laden wird zu {price} pro Einheit verkaufen — 1,5× des Marktgrundpreises von {basePrice}. Dieser Aufschlag sichert Ihnen eine solide Marge und bleibt wettbewerbsfähig.',
-    guestPriceTip: 'Nach dem Start können Sie den Preis jederzeit in der PUBLIC_SALES-Einheit Ihres Ladens anpassen. Ein höherer Preis bringt mehr pro Verkauf; ein niedrigerer Preis zieht mehr Käufer an. Starten Sie bei 1,5× und optimieren Sie von dort aus.',
+    guestPriceDesc:
+      'Ihr {product}-Laden wird zu {price} pro Einheit verkaufen — 1,5× des Marktgrundpreises von {basePrice}. Dieser Aufschlag sichert Ihnen eine solide Marge und bleibt wettbewerbsfähig.',
+    guestPriceTip:
+      'Nach dem Start können Sie den Preis jederzeit in der PUBLIC_SALES-Einheit Ihres Ladens anpassen. Ein höherer Preis bringt mehr pro Verkauf; ein niedrigerer Preis zieht mehr Käufer an. Starten Sie bei 1,5× und optimieren Sie von dort aus.',
     factoryLayoutTitle: '🔧 Ihr Fabrik-Layout',
     factoryLayoutDesc: 'Ihre Startfabrik wurde automatisch mit diesen Produktionseinheiten konfiguriert:',
     factoryLayoutGuestDesc: 'Nach dem Speichern wird Ihre Fabrik mit diesen Produktionseinheiten konfiguriert:',
@@ -1128,8 +1129,7 @@ export default {
     overheadDriverScale: 'Skalenfaktor',
     salaryImpactHint:
       'Ein höherer Multiplikator erhöht die laufenden Arbeitskosten in dieser Stadt, kann aber die Mitarbeiterqualität und Wettbewerbsfähigkeit verbessern. Ein niedrigerer Multiplikator senkt die Kosten, kann aber die Betriebsleistung beeinträchtigen.',
-    dividendHelp:
-      'Legen Sie fest, welcher Anteil des jährlichen Gewinns nach Steuern an Aktionäre ausgeschüttet wird. 20% ist ein ausgewogener Standard mit Raum für Reinvestitionen.',
+    dividendHelp: 'Legen Sie fest, welcher Anteil des jährlichen Gewinns nach Steuern an Aktionäre ausgeschüttet wird. 20% ist ein ausgewogener Standard mit Raum für Reinvestitionen.',
     baseSalary: 'Grundlohn / Stunde',
     salaryMultiplier: 'Lohnmultiplikator',
     effectiveSalary: 'Effektiver Lohn / Stunde',
@@ -1248,7 +1248,8 @@ export default {
   },
   research: {
     panelTitle: 'Forschungsfortschritt',
-    intro: 'Die Forschung schreitet jeden Takt voran. Produktqualität verbessert die Ausgangsqualität der Fertigung. Markenqualitätsforschung verbessert die Effizienz Ihres Marketingbudgets — sie erhöht die Markenbekanntheit nicht direkt.',
+    intro:
+      'Die Forschung schreitet jeden Takt voran. Produktqualität verbessert die Ausgangsqualität der Fertigung. Markenqualitätsforschung verbessert die Effizienz Ihres Marketingbudgets — sie erhöht die Markenbekanntheit nicht direkt.',
     emptyState: 'Noch keine Forschung aufgezeichnet. Konfigurieren Sie Produktqualitäts- oder Markenqualitätseinheiten und lassen Sie die Simulation laufen, um hier Fortschritte zu sehen.',
     qualityLabel: 'Produktqualität',
     awarenessLabel: 'Markenbekanntheit',

@@ -15,16 +15,7 @@ import PendingActionsTimeline from '@/components/dashboard/PendingActionsTimelin
 import SupplyChainPanel from '@/components/dashboard/SupplyChainPanel.vue'
 import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vue'
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
-import type {
-  Company,
-  GameState,
-  ScheduledActionSummary,
-  StartupPackOffer,
-  CityPowerBalance,
-  CompanyLedgerSummary,
-  City,
-  BuildingUnitOperationalStatus,
-} from '@/types'
+import type { Company, GameState, ScheduledActionSummary, StartupPackOffer, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -57,9 +48,7 @@ const activeStartupPackOffer = computed(() => (auth.startupPackOffer && ['ELIGIB
 const claimedStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'CLAIMED' ? auth.startupPackOffer : null))
 const expiredStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'EXPIRED' ? auth.startupPackOffer : null))
 const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
-const isPersonAccount = computed(
-  () => auth.player?.activeAccountType !== 'COMPANY' || !activeCompany.value,
-)
+const isPersonAccount = computed(() => auth.player?.activeAccountType !== 'COMPANY' || !activeCompany.value)
 const visibleCompanies = computed(() => (activeCompany.value ? [activeCompany.value] : []))
 const targetCompany = computed(() => activeCompany.value)
 
@@ -122,12 +111,7 @@ async function refreshCompanyDerivedData() {
   const companyIds = companies.value.map((company) => company.id)
   const buildingIds = companies.value.flatMap((company) => company.buildings.map((building) => building.id))
 
-  await Promise.all([
-    loadCityPowerBalances(cityIds),
-    loadCityNames(),
-    loadLedgers(companyIds),
-    loadBuildingUnitStatuses(buildingIds),
-  ])
+  await Promise.all([loadCityPowerBalances(cityIds), loadCityNames(), loadLedgers(companyIds), loadBuildingUnitStatuses(buildingIds)])
 }
 
 onMounted(async () => {
@@ -650,12 +634,7 @@ async function createCompany() {
           <form class="new-company-form" @submit.prevent="createCompany">
             <label class="new-company-field">
               <span>{{ t('dashboard.companyNameLabel') }}</span>
-              <input
-                v-model="createCompanyName"
-                type="text"
-                maxlength="200"
-                :placeholder="t('dashboard.companyNamePlaceholder')"
-              />
+              <input v-model="createCompanyName" type="text" maxlength="200" :placeholder="t('dashboard.companyNamePlaceholder')" />
             </label>
             <div class="new-company-buttons">
               <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">
@@ -711,15 +690,8 @@ async function createCompany() {
 
           <!-- Financial summary and guidance row -->
           <div class="operations-row">
-            <FinancialSummaryCard
-              :ledger="companyLedgers[company.id] ?? null"
-              :loading="ledgerLoading"
-            />
-            <StarterGuidance
-              :company="company"
-              :revenue="companyLedgers[company.id]?.totalRevenue ?? 0"
-              :net-income="companyLedgers[company.id]?.netIncome ?? 0"
-            />
+            <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
+            <StarterGuidance :company="company" :revenue="companyLedgers[company.id]?.totalRevenue ?? 0" :net-income="companyLedgers[company.id]?.netIncome ?? 0" />
           </div>
 
           <div v-if="company.buildings.length === 0" class="no-buildings">
@@ -743,11 +715,7 @@ async function createCompany() {
                   </span>
                 </div>
               </RouterLink>
-              <SupplyChainPanel
-                v-if="building.units.length > 0"
-                :units="building.units"
-                :statuses="buildingUnitStatuses[building.id]"
-              />
+              <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" />
             </div>
           </div>
 

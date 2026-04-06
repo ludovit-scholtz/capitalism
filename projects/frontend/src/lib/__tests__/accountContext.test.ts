@@ -1,10 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  buildAccountOptions,
-  getActiveAccountName,
-  getActiveCompany,
-  getPreferredCompany,
-} from '../accountContext'
+import { buildAccountOptions, getActiveAccountName, getActiveCompany, getPreferredCompany } from '../accountContext'
 
 const companies = [
   { id: 'company-1', name: 'Alpha Manufacturing', cash: 240000 },

@@ -78,34 +78,14 @@ const isOwnedByPlayer = computed(() => {
 })
 
 const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
-const isCompanyAccountActive = computed(
-  () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
-)
-const isOwnedByActiveCompany = computed(
-  () => !!selectedLot.value?.ownerCompanyId && selectedLot.value.ownerCompanyId === activeCompany.value?.id,
-)
-const isOwnedByDifferentControlledCompany = computed(
-  () => isOwnedByPlayer.value && !!selectedLot.value?.ownerCompanyId && selectedLot.value.ownerCompanyId !== activeCompany.value?.id,
-)
+const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
+const isOwnedByActiveCompany = computed(() => !!selectedLot.value?.ownerCompanyId && selectedLot.value.ownerCompanyId === activeCompany.value?.id)
+const isOwnedByDifferentControlledCompany = computed(() => isOwnedByPlayer.value && !!selectedLot.value?.ownerCompanyId && selectedLot.value.ownerCompanyId !== activeCompany.value?.id)
 
-const canPurchase = computed(() =>
-  selectedLot.value
-    ? isCompanyAccountActive.value
-      && isPurchasable(
-        auth.isAuthenticated,
-        companies.value.length,
-        selectedLot.value.ownerCompanyId,
-      )
-    : false,
-)
+const canPurchase = computed(() => (selectedLot.value ? isCompanyAccountActive.value && isPurchasable(auth.isAuthenticated, companies.value.length, selectedLot.value.ownerCompanyId) : false))
 
 const canSubmitPurchase = computed(() => {
-  const baseValid = isFormSubmittable(
-    selectedBuildingType.value,
-    buildingName.value,
-    activeCompany.value?.id ?? '',
-    purchasing.value,
-  )
+  const baseValid = isFormSubmittable(selectedBuildingType.value, buildingName.value, activeCompany.value?.id ?? '', purchasing.value)
   // Media houses require a channel type selection.
   if (selectedBuildingType.value === 'MEDIA_HOUSE' && !selectedMediaType.value) return false
   return baseValid
@@ -115,9 +95,7 @@ const selectedCompany = computed(() => activeCompany.value)
 
 const cashAfterPurchase = computed(() => {
   if (!selectedCompany.value || !selectedLot.value) return null
-  const constructionCost = selectedBuildingType.value
-    ? constructionCostForType(selectedBuildingType.value)
-    : 0
+  const constructionCost = selectedBuildingType.value ? constructionCostForType(selectedBuildingType.value) : 0
   return selectedCompany.value.cash - selectedLot.value.price - constructionCost
 })
 
@@ -258,9 +236,7 @@ async function fetchData() {
       { cityId: cityId.value },
     )
     const companiesData: { myCompanies: Company[] } = auth.isAuthenticated
-      ? await gqlRequest<{ myCompanies: Company[] }>(
-          `{ myCompanies { id name cash foundedAtUtc buildings { id } } }`,
-        )
+      ? await gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`)
       : { myCompanies: [] }
 
     city.value = cityData.city
@@ -355,9 +331,7 @@ function updateMarkers() {
 
   // Fit bounds if we have lots
   if (filteredLots.value.length > 0) {
-    const bounds = L.latLngBounds(
-      filteredLots.value.map((lot) => [lot.latitude, lot.longitude] as [number, number]),
-    )
+    const bounds = L.latLngBounds(filteredLots.value.map((lot) => [lot.latitude, lot.longitude] as [number, number]))
     map.fitBounds(bounds.pad(0.15))
   }
 }
@@ -438,8 +412,7 @@ async function confirmPurchase() {
     justPurchasedBuildingId.value = data.purchaseLot.building.id
     justPurchasedBuildingType.value = data.purchaseLot.building.type
     justPurchasedIsUnderConstruction.value = data.purchaseLot.building.isUnderConstruction ?? false
-    justPurchasedConstructionCompletesAtTick.value =
-      data.purchaseLot.building.constructionCompletesAtTick ?? null
+    justPurchasedConstructionCompletesAtTick.value = data.purchaseLot.building.constructionCompletesAtTick ?? null
     purchaseMode.value = false
     updateMarkers()
   } catch (e: unknown) {
@@ -525,42 +498,20 @@ watch(viewMode, async (mode) => {
     <!-- Header -->
     <div class="page-header">
       <div>
-        <button class="btn btn-secondary btn-sm" @click="router.push('/dashboard')">
-          ← {{ t('cityMap.backToDashboard') }}
-        </button>
+        <button class="btn btn-secondary btn-sm" @click="router.push('/dashboard')">← {{ t('cityMap.backToDashboard') }}</button>
         <h1 v-if="city">🗺️ {{ city.name }} — {{ t('cityMap.title') }}</h1>
         <p class="subtitle">{{ t('cityMap.subtitle') }}</p>
       </div>
       <div class="header-controls">
         <div class="view-toggle">
-          <button
-            class="toggle-btn"
-            :class="{ active: viewMode === 'map' }"
-            @click="viewMode = 'map'"
-          >
-            🗺️ {{ t('cityMap.mapView') }}
-          </button>
-          <button
-            class="toggle-btn"
-            :class="{ active: viewMode === 'list' }"
-            @click="viewMode = 'list'"
-          >
-            📋 {{ t('cityMap.listView') }}
-          </button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">📋 {{ t('cityMap.listView') }}</button>
         </div>
         <div class="filter-toggle">
-          <button
-            class="toggle-btn"
-            :class="{ active: !showAvailableOnly }"
-            @click="showAvailableOnly = false"
-          >
+          <button class="toggle-btn" :class="{ active: !showAvailableOnly }" @click="showAvailableOnly = false">
             {{ t('cityMap.filterAll') }}
           </button>
-          <button
-            class="toggle-btn"
-            :class="{ active: showAvailableOnly }"
-            @click="showAvailableOnly = true"
-          >
+          <button class="toggle-btn" :class="{ active: showAvailableOnly }" @click="showAvailableOnly = true">
             {{ t('cityMap.filterAvailable') }}
           </button>
         </div>
@@ -603,17 +554,8 @@ watch(viewMode, async (mode) => {
               </div>
               <div class="lot-list-meta">
                 <span class="lot-list-price">{{ formatCurrency(lot.price) }}</span>
-                <span
-                  class="lot-list-status"
-                  :class="getLotStatus(lot)"
-                >
-                  {{
-                    getLotStatus(lot) === 'available'
-                      ? t('cityMap.available')
-                      : getLotStatus(lot) === 'yours'
-                        ? t('cityMap.yourProperty')
-                        : t('cityMap.owned')
-                  }}
+                <span class="lot-list-status" :class="getLotStatus(lot)">
+                  {{ getLotStatus(lot) === 'available' ? t('cityMap.available') : getLotStatus(lot) === 'yours' ? t('cityMap.yourProperty') : t('cityMap.owned') }}
                 </span>
               </div>
             </button>
@@ -627,28 +569,15 @@ watch(viewMode, async (mode) => {
         <aside v-if="selectedLot" class="detail-panel">
           <div class="detail-header">
             <h2>{{ selectedLot.name }}</h2>
-            <span
-              class="status-badge"
-              :class="getLotStatus(selectedLot)"
-            >
-              {{
-                getLotStatus(selectedLot) === 'available'
-                  ? t('cityMap.available')
-                  : getLotStatus(selectedLot) === 'yours'
-                    ? t('cityMap.yourProperty')
-                    : t('cityMap.owned')
-              }}
+            <span class="status-badge" :class="getLotStatus(selectedLot)">
+              {{ getLotStatus(selectedLot) === 'available' ? t('cityMap.available') : getLotStatus(selectedLot) === 'yours' ? t('cityMap.yourProperty') : t('cityMap.owned') }}
             </span>
           </div>
 
           <p class="lot-description">{{ selectedLot.description }}</p>
 
           <!-- Strategic recommendation badge -->
-          <div
-            class="strategic-recommendation"
-            :class="strategicRecommendation(selectedLot).cssClass"
-            data-testid="strategic-recommendation"
-          >
+          <div class="strategic-recommendation" :class="strategicRecommendation(selectedLot).cssClass" data-testid="strategic-recommendation">
             <span class="rec-icon">🎯</span>
             <span class="rec-label">{{ t(`cityMap.${strategicRecommendation(selectedLot).key}`) }}</span>
           </div>
@@ -666,11 +595,7 @@ watch(viewMode, async (mode) => {
               <span class="detail-label">{{ t('cityMap.price') }}</span>
               <span class="detail-value price" data-testid="asking-price">
                 {{ formatCurrency(selectedLot.price) }}
-                <span
-                  v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice"
-                  class="resource-premium-badge"
-                  :title="t('cityMap.resourcePremiumTooltip')"
-                >
+                <span v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice" class="resource-premium-badge" :title="t('cityMap.resourcePremiumTooltip')">
                   {{ t('cityMap.resourcePremium') }}
                 </span>
               </span>
@@ -688,11 +613,7 @@ watch(viewMode, async (mode) => {
             <div class="detail-item full-width">
               <span class="detail-label">{{ t('cityMap.suitableFor') }}</span>
               <div class="suitable-types">
-                <span
-                  v-for="type in suitableTypesForLot"
-                  :key="type"
-                  class="type-tag"
-                >
+                <span v-for="type in suitableTypesForLot" :key="type" class="type-tag">
                   {{ formatBuildingType(type) }}
                 </span>
               </div>
@@ -700,19 +621,16 @@ watch(viewMode, async (mode) => {
             <div class="detail-item full-width coordinates-item">
               <span class="detail-label">{{ t('cityMap.coordinates') }}</span>
               <span class="detail-value coordinates-value" data-testid="lot-coordinates">
-                {{ Math.abs(selectedLot.latitude).toFixed(5) }}°{{ selectedLot.latitude >= 0 ? 'N' : 'S' }},
-                {{ Math.abs(selectedLot.longitude).toFixed(5) }}°{{ selectedLot.longitude >= 0 ? 'E' : 'W' }}
+                {{ Math.abs(selectedLot.latitude).toFixed(5) }}°{{ selectedLot.latitude >= 0 ? 'N' : 'S' }}, {{ Math.abs(selectedLot.longitude).toFixed(5) }}°{{
+                  selectedLot.longitude >= 0 ? 'E' : 'W'
+                }}
               </span>
               <p class="coordinates-hint">{{ t('cityMap.coordinatesHint') }}</p>
             </div>
           </div>
 
           <!-- Raw material deposit panel (shown for MINE-eligible lots with resource data) -->
-          <div
-            v-if="selectedLot.resourceType && selectedLot.materialQuality != null && selectedLot.materialQuantity != null"
-            class="raw-material-panel"
-            data-testid="raw-material-panel"
-          >
+          <div v-if="selectedLot.resourceType && selectedLot.materialQuality != null && selectedLot.materialQuantity != null" class="raw-material-panel" data-testid="raw-material-panel">
             <h3 class="raw-material-title">⛏ {{ t('cityMap.rawMaterialTitle') }}</h3>
             <div class="raw-material-grid">
               <div class="raw-material-item">
@@ -721,10 +639,7 @@ watch(viewMode, async (mode) => {
               </div>
               <div class="raw-material-item">
                 <span class="detail-label">{{ t('cityMap.rawMaterialQuality') }}</span>
-                <span
-                  class="quality-badge"
-                  :class="materialQualityClass(selectedLot.materialQuality)"
-                >
+                <span class="quality-badge" :class="materialQualityClass(selectedLot.materialQuality)">
                   {{ materialQualityLabel(selectedLot.materialQuality) }}
                   ({{ Math.round(selectedLot.materialQuality * 100) }}%)
                 </span>
@@ -744,11 +659,7 @@ watch(viewMode, async (mode) => {
           <div class="placement-guidance-panel" data-testid="placement-guidance-panel">
             <h3 class="guidance-title">{{ t('cityMap.placementGuidanceTitle') }}</h3>
             <ul class="guidance-list">
-              <li
-                v-for="type in suitableTypesForLot"
-                :key="type"
-                class="guidance-item"
-              >
+              <li v-for="type in suitableTypesForLot" :key="type" class="guidance-item">
                 <span class="guidance-building-type">{{ formatBuildingType(type) }}</span>
                 <span class="guidance-text">{{ t(`cityMap.${placementGuidanceKey(type)}`) }}</span>
               </li>
@@ -821,12 +732,7 @@ watch(viewMode, async (mode) => {
 
                 <div class="form-group">
                   <label>{{ t('cityMap.buildingName') }}</label>
-                  <input
-                    v-model="buildingName"
-                    type="text"
-                    class="form-input"
-                    :placeholder="t('cityMap.buildingNamePlaceholder')"
-                  />
+                  <input v-model="buildingName" type="text" class="form-input" :placeholder="t('cityMap.buildingNamePlaceholder')" />
                 </div>
 
                 <div class="form-group">
@@ -885,11 +791,7 @@ watch(viewMode, async (mode) => {
                   <button class="btn btn-secondary" @click="purchaseMode = false">
                     {{ t('common.cancel') }}
                   </button>
-                  <button
-                    class="btn btn-primary"
-                    :disabled="!canSubmitPurchase"
-                    @click="confirmPurchase()"
-                  >
+                  <button class="btn btn-primary" :disabled="!canSubmitPurchase" @click="confirmPurchase()">
                     {{ purchasing ? t('cityMap.purchasing') : t('cityMap.confirmPurchase') }}
                   </button>
                 </div>
@@ -905,16 +807,16 @@ watch(viewMode, async (mode) => {
             data-testid="construction-banner"
           >
             <div class="post-purchase-body">
-              <strong class="post-purchase-title">
-                🏗️ {{ t('cityMap.constructionStartedTitle') }}
-              </strong>
+              <strong class="post-purchase-title"> 🏗️ {{ t('cityMap.constructionStartedTitle') }} </strong>
               <p class="post-purchase-text">
-                {{ t('cityMap.constructionStartedBody', {
-                  type: formatBuildingType(justPurchasedBuildingType ?? 'FACTORY'),
-                  ticks: justPurchasedConstructionCompletesAtTick
-                    ? constructionTicksRemaining(justPurchasedConstructionCompletesAtTick)
-                    : constructionTicksForType(justPurchasedBuildingType ?? 'FACTORY')
-                }) }}
+                {{
+                  t('cityMap.constructionStartedBody', {
+                    type: formatBuildingType(justPurchasedBuildingType ?? 'FACTORY'),
+                    ticks: justPurchasedConstructionCompletesAtTick
+                      ? constructionTicksRemaining(justPurchasedConstructionCompletesAtTick)
+                      : constructionTicksForType(justPurchasedBuildingType ?? 'FACTORY'),
+                  })
+                }}
               </p>
               <div class="construction-progress-bar" aria-label="Construction progress">
                 <div class="construction-progress-fill" style="width: 0%"></div>
@@ -929,12 +831,7 @@ watch(viewMode, async (mode) => {
               <strong class="post-purchase-title">{{ t(`buildings.typeIcons.${justPurchasedBuildingType ?? 'FACTORY'}`) }} {{ t('cityMap.postPurchaseTitle') }}</strong>
               <p class="post-purchase-text">{{ t(`cityMap.${postPurchaseBodyKey(justPurchasedBuildingType ?? 'FACTORY')}`) }}</p>
             </div>
-            <RouterLink
-              :to="`/building/${justPurchasedBuildingId}`"
-              class="btn btn-primary"
-            >
-              {{ t('cityMap.setupBuilding') }} →
-            </RouterLink>
+            <RouterLink :to="`/building/${justPurchasedBuildingId}`" class="btn btn-primary"> {{ t('cityMap.setupBuilding') }} → </RouterLink>
           </div>
 
           <div v-else-if="isOwnedByDifferentControlledCompany" class="purchase-notice">
@@ -954,9 +851,11 @@ watch(viewMode, async (mode) => {
                 ({{ formatBuildingType(selectedLot.building.type) }})
               </p>
               <p class="construction-ticks-info" data-testid="construction-ticks-remaining">
-                {{ t('cityMap.ticksRemaining', {
-                  ticks: constructionTicksRemaining(selectedLot.building.constructionCompletesAtTick)
-                }) }}
+                {{
+                  t('cityMap.ticksRemaining', {
+                    ticks: constructionTicksRemaining(selectedLot.building.constructionCompletesAtTick),
+                  })
+                }}
               </p>
             </div>
             <RouterLink :to="`/building/${selectedLot.buildingId}`" class="btn btn-ghost">
@@ -966,10 +865,7 @@ watch(viewMode, async (mode) => {
 
           <!-- Already owned by player (standard manage link, building operational) -->
           <div v-else-if="isOwnedByActiveCompany && selectedLot.buildingId" class="your-building-actions">
-            <RouterLink
-              :to="`/building/${selectedLot.buildingId}`"
-              class="btn btn-primary"
-            >
+            <RouterLink :to="`/building/${selectedLot.buildingId}`" class="btn btn-primary">
               {{ t('cityMap.manageBuilding') }}
             </RouterLink>
           </div>
@@ -984,9 +880,7 @@ watch(viewMode, async (mode) => {
 
     <!-- City media houses section -->
     <section class="media-houses-section" aria-labelledby="media-houses-heading">
-      <h2 id="media-houses-heading" class="section-heading">
-        📺 {{ t('cityMap.mediaHouses.title') }}
-      </h2>
+      <h2 id="media-houses-heading" class="section-heading">📺 {{ t('cityMap.mediaHouses.title') }}</h2>
       <p class="section-subtitle">{{ t('cityMap.mediaHouses.subtitle') }}</p>
       <div v-if="mediaHousesLoading" class="media-houses-loading">{{ t('common.loading') }}</div>
       <div v-else-if="cityMediaHouses.length === 0" class="media-houses-empty">
@@ -994,12 +888,7 @@ watch(viewMode, async (mode) => {
         <p class="hint">{{ t('cityMap.mediaHouses.emptyHint') }}</p>
       </div>
       <div v-else class="media-houses-grid">
-        <div
-          v-for="mh in cityMediaHouses"
-          :key="mh.id"
-          class="media-house-card"
-          :class="{ 'mh-offline': mh.powerStatus === 'OFFLINE', 'mh-construction': mh.isUnderConstruction }"
-        >
+        <div v-for="mh in cityMediaHouses" :key="mh.id" class="media-house-card" :class="{ 'mh-offline': mh.powerStatus === 'OFFLINE', 'mh-construction': mh.isUnderConstruction }">
           <div class="mh-channel-icon">
             <span v-if="mh.mediaType === 'TV'">📺</span>
             <span v-else-if="mh.mediaType === 'RADIO'">📻</span>
@@ -1019,11 +908,7 @@ watch(viewMode, async (mode) => {
               {{ t('cityMap.mediaHouses.effectiveness') }}:
               <strong>×{{ mh.effectivenessMultiplier.toFixed(1) }}</strong>
               <span class="effectiveness-hint">
-                {{
-                  mh.mediaType === 'TV' ? t('cityMap.mediaHouses.tvHint') :
-                  mh.mediaType === 'RADIO' ? t('cityMap.mediaHouses.radioHint') :
-                  t('cityMap.mediaHouses.newspaperHint')
-                }}
+                {{ mh.mediaType === 'TV' ? t('cityMap.mediaHouses.tvHint') : mh.mediaType === 'RADIO' ? t('cityMap.mediaHouses.radioHint') : t('cityMap.mediaHouses.newspaperHint') }}
               </span>
             </div>
           </div>
@@ -1316,7 +1201,6 @@ watch(viewMode, async (mode) => {
   background: rgba(0, 71, 255, 0.06);
 }
 
-
 .detail-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1584,7 +1468,6 @@ watch(viewMode, async (mode) => {
   color: var(--color-danger, #ef4444);
 }
 
-
 .purchase-form {
   margin-top: 1rem;
 }
@@ -1636,7 +1519,9 @@ watch(viewMode, async (mode) => {
   background: var(--color-bg);
   cursor: pointer;
   text-align: center;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
   color: var(--color-text);
 }
 

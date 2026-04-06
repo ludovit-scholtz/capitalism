@@ -19,14 +19,8 @@ const isOpen = ref(false)
 const switchingKey = ref<string | null>(null)
 
 const accountOptions = computed(() => buildAccountOptions(auth.player, auth.player?.companies ?? []))
-const activeAccountName = computed(
-  () => getActiveAccountName(auth.player, auth.player?.companies ?? []) ?? auth.player?.displayName ?? '',
-)
-const activeAccountBadge = computed(() =>
-  auth.player?.activeAccountType === 'COMPANY'
-    ? t('accountSwitcher.companyBadge')
-    : t('accountSwitcher.personBadge'),
-)
+const activeAccountName = computed(() => getActiveAccountName(auth.player, auth.player?.companies ?? []) ?? auth.player?.displayName ?? '')
+const activeAccountBadge = computed(() => (auth.player?.activeAccountType === 'COMPANY' ? t('accountSwitcher.companyBadge') : t('accountSwitcher.personBadge')))
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat(locale.value, {
@@ -91,10 +85,7 @@ async function switchAccount(accountType: 'PERSON' | 'COMPANY', companyId: strin
     return
   }
 
-  if (
-    auth.player.activeAccountType === accountType
-    && (accountType !== 'COMPANY' || auth.player.activeCompanyId === companyId)
-  ) {
+  if (auth.player.activeAccountType === accountType && (accountType !== 'COMPANY' || auth.player.activeCompanyId === companyId)) {
     closeMenu()
     emit('switched')
     return
@@ -129,14 +120,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="auth.player" ref="root" class="account-switcher">
-    <button
-      class="account-trigger"
-      type="button"
-      :aria-expanded="isOpen"
-      aria-haspopup="menu"
-      :aria-label="t('accountSwitcher.openMenu', { account: activeAccountName })"
-      @click="toggleMenu"
-    >
+    <button class="account-trigger" type="button" :aria-expanded="isOpen" aria-haspopup="menu" :aria-label="t('accountSwitcher.openMenu', { account: activeAccountName })" @click="toggleMenu">
       <span class="account-trigger-name">{{ activeAccountName }}</span>
       <span class="account-trigger-meta">{{ activeAccountBadge }}</span>
       <span class="account-trigger-caret" aria-hidden="true">v</span>
@@ -157,18 +141,11 @@ onUnmounted(() => {
         <span class="account-option-main">
           <span class="account-option-name">{{ option.name }}</span>
           <span class="account-option-type">
-            {{
-              option.accountType === 'PERSON'
-                ? t('accountSwitcher.personalAccountHint')
-                : t('accountSwitcher.companyAccountHint')
-            }}
+            {{ option.accountType === 'PERSON' ? t('accountSwitcher.personalAccountHint') : t('accountSwitcher.companyAccountHint') }}
           </span>
         </span>
         <span class="account-option-meta">
-          <span
-            v-if="option.accountType === 'PERSON' && auth.player?.personalCash != null"
-            class="account-option-cash"
-          >
+          <span v-if="option.accountType === 'PERSON' && auth.player?.personalCash != null" class="account-option-cash">
             {{ formatCurrency(auth.player.personalCash) }}
           </span>
           <span v-else-if="option.cash != null" class="account-option-cash">
@@ -197,7 +174,9 @@ onUnmounted(() => {
   background: var(--color-surface-hover);
   color: var(--color-text);
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .account-trigger:hover,

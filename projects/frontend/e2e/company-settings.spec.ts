@@ -12,10 +12,7 @@ import type { MockCompany, MockState } from './helpers/mock-api'
 const DEFAULT_MOCK_TICK = 42
 
 /** Creates an authenticated session with a company for company settings tests. */
-async function setupPlayerWithCompany(
-  page: Page,
-  companyOverrides: Partial<MockCompany> = {},
-): Promise<{ state: MockState; player: ReturnType<typeof makePlayer>; company: MockCompany }> {
+async function setupPlayerWithCompany(page: Page, companyOverrides: Partial<MockCompany> = {}): Promise<{ state: MockState; player: ReturnType<typeof makePlayer>; company: MockCompany }> {
   const player = makePlayer({
     id: 'player-cs',
     email: 'cs@test.com',
@@ -89,9 +86,7 @@ test.describe('Company Settings – page load', () => {
     const { company } = await setupPlayerWithCompany(page)
     await page.goto(`/company/${company.id}/settings`)
 
-    await expect(
-      page.getByText('Administration overhead increases manufacturing labor costs'),
-    ).toBeVisible()
+    await expect(page.getByText('Administration overhead increases manufacturing labor costs')).toBeVisible()
   })
 
   test('shows overhead driver chips (age factor, scale factor)', async ({ page }) => {
@@ -191,9 +186,7 @@ test.describe('Company Settings – salary multiplier', () => {
 
     await expect(page.locator('.salary-table tbody tr')).toHaveCount(3)
 
-    const bratislavaInput = page
-      .locator('tr', { hasText: 'Bratislava' })
-      .locator('.salary-input')
+    const bratislavaInput = page.locator('tr', { hasText: 'Bratislava' }).locator('.salary-input')
     const pragueInput = page.locator('tr', { hasText: 'Prague' }).locator('.salary-input')
     const viennaInput = page.locator('tr', { hasText: 'Vienna' }).locator('.salary-input')
 
@@ -270,9 +263,7 @@ test.describe('Company Settings – dashboard navigation', () => {
 })
 
 test.describe('Company Settings – unauthorized access', () => {
-  test('shows not found message when company does not belong to the authenticated player', async ({
-    page,
-  }) => {
+  test('shows not found message when company does not belong to the authenticated player', async ({ page }) => {
     // Player 1 owns company-1; player 2 is authenticated
     const owner = makePlayer({ id: 'player-owner', email: 'owner@test.com' })
     const intruder = makePlayer({
@@ -308,9 +299,7 @@ test.describe('Company Settings – unauthorized access', () => {
     await page.goto(`/company/${ownerCompany.id}/settings`)
 
     // Should show a not found / access denied message
-    await expect(
-      page.getByText('Company settings not found or access denied'),
-    ).toBeVisible()
+    await expect(page.getByText('Company settings not found or access denied')).toBeVisible()
   })
 })
 

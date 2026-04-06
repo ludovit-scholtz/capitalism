@@ -13,10 +13,7 @@ export interface AccountOption<TCompany extends CompanyAccountSnapshot = Company
   isActive: boolean
 }
 
-export function getActiveCompany<TCompany extends CompanyAccountSnapshot>(
-  player: PlayerAccountSnapshot,
-  companies: readonly TCompany[],
-): TCompany | null {
+export function getActiveCompany<TCompany extends CompanyAccountSnapshot>(player: PlayerAccountSnapshot, companies: readonly TCompany[]): TCompany | null {
   if (!player || player.activeAccountType !== 'COMPANY' || !player.activeCompanyId) {
     return null
   }
@@ -24,17 +21,11 @@ export function getActiveCompany<TCompany extends CompanyAccountSnapshot>(
   return companies.find((company) => company.id === player.activeCompanyId) ?? null
 }
 
-export function getPreferredCompany<TCompany extends CompanyAccountSnapshot>(
-  player: PlayerAccountSnapshot,
-  companies: readonly TCompany[],
-): TCompany | null {
+export function getPreferredCompany<TCompany extends CompanyAccountSnapshot>(player: PlayerAccountSnapshot, companies: readonly TCompany[]): TCompany | null {
   return getActiveCompany(player, companies) ?? companies[0] ?? null
 }
 
-export function getActiveAccountName<TCompany extends CompanyAccountSnapshot>(
-  player: PlayerAccountSnapshot,
-  companies: readonly TCompany[],
-): string | null {
+export function getActiveAccountName<TCompany extends CompanyAccountSnapshot>(player: PlayerAccountSnapshot, companies: readonly TCompany[]): string | null {
   const activeCompany = getActiveCompany(player, companies)
   if (activeCompany) {
     return activeCompany.name
@@ -43,10 +34,7 @@ export function getActiveAccountName<TCompany extends CompanyAccountSnapshot>(
   return player?.displayName ?? null
 }
 
-export function buildAccountOptions<TCompany extends CompanyAccountSnapshot>(
-  player: PlayerAccountSnapshot,
-  companies: readonly TCompany[],
-): AccountOption<TCompany>[] {
+export function buildAccountOptions<TCompany extends CompanyAccountSnapshot>(player: PlayerAccountSnapshot, companies: readonly TCompany[]): AccountOption<TCompany>[] {
   const isCompanyAccountActive = player?.activeAccountType === 'COMPANY' && !!player.activeCompanyId
 
   return [

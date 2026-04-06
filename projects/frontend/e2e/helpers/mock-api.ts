@@ -531,25 +531,13 @@ function getPlayerControlledCompanyIds(state: MockState, playerId: string) {
 
 function getPublicFloatShares(state: MockState, company: MockCompany) {
   const issued = getCompanyTotalShares(company)
-  const allocated = state.shareholdings
-    .filter((holding) => holding.companyId === company.id)
-    .reduce((total, holding) => total + holding.shareCount, 0)
+  const allocated = state.shareholdings.filter((holding) => holding.companyId === company.id).reduce((total, holding) => total + holding.shareCount, 0)
 
   return Number(Math.max(issued - allocated, 0).toFixed(4))
 }
 
-function getOrCreateShareholding(
-  state: MockState,
-  companyId: string,
-  ownerPlayerId: string | null,
-  ownerCompanyId: string | null,
-) {
-  let holding = state.shareholdings.find(
-    (candidate) =>
-      candidate.companyId === companyId
-      && candidate.ownerPlayerId === ownerPlayerId
-      && candidate.ownerCompanyId === ownerCompanyId,
-  )
+function getOrCreateShareholding(state: MockState, companyId: string, ownerPlayerId: string | null, ownerCompanyId: string | null) {
+  let holding = state.shareholdings.find((candidate) => candidate.companyId === companyId && candidate.ownerPlayerId === ownerPlayerId && candidate.ownerCompanyId === ownerCompanyId)
 
   if (!holding) {
     holding = { companyId, ownerPlayerId, ownerCompanyId, shareCount: 0 }
@@ -562,11 +550,7 @@ function getOrCreateShareholding(
 function getCombinedControlledOwnershipRatio(state: MockState, playerId: string, company: MockCompany) {
   const controlledCompanyIds = getPlayerControlledCompanyIds(state, playerId)
   const controlledShares = state.shareholdings
-    .filter(
-      (holding) =>
-        holding.companyId === company.id
-        && (holding.ownerPlayerId === playerId || (holding.ownerCompanyId ? controlledCompanyIds.has(holding.ownerCompanyId) : false)),
-    )
+    .filter((holding) => holding.companyId === company.id && (holding.ownerPlayerId === playerId || (holding.ownerCompanyId ? controlledCompanyIds.has(holding.ownerCompanyId) : false)))
     .reduce((total, holding) => total + holding.shareCount, 0)
 
   return Number((controlledShares / getCompanyTotalShares(company)).toFixed(4))
@@ -918,9 +902,7 @@ function applyImplicitCompanyAccountContext(player: MockPlayer) {
     return
   }
 
-  const activeCompanyExists = player.activeCompanyId
-    ? player.companies.some((company) => company.id === player.activeCompanyId)
-    : false
+  const activeCompanyExists = player.activeCompanyId ? player.companies.some((company) => company.id === player.activeCompanyId) : false
 
   if (player.activeAccountType === 'COMPANY' && activeCompanyExists) {
     return
@@ -1063,8 +1045,7 @@ export function makeDefaultBuildingLots(): MockBuildingLot[] {
       id: 'lot-industrial-1',
       cityId: 'city-ba',
       name: 'Industrial Plot A1',
-      description:
-        'Large industrial plot near the eastern logistics corridor. Sits above an Iron Ore deposit (18,000t at 72% quality).',
+      description: 'Large industrial plot near the eastern logistics corridor. Sits above an Iron Ore deposit (18,000t at 72% quality).',
       district: 'Industrial Zone',
       latitude: 48.152,
       longitude: 17.125,
@@ -1228,13 +1209,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
   state.players.forEach(applyImplicitCompanyAccountContext)
 
   const resolveCurrentPlayer = () => {
-    const tokenPlayerId = state.currentToken?.startsWith('token-')
-      ? state.currentToken.slice('token-'.length)
-      : null
+    const tokenPlayerId = state.currentToken?.startsWith('token-') ? state.currentToken.slice('token-'.length) : null
 
-    return state.players.find((player) => player.id === state.currentUserId)
-      ?? (tokenPlayerId ? state.players.find((player) => player.id === tokenPlayerId) : undefined)
-      ?? (state.players.length === 1 ? state.players[0] : undefined)
+    return (
+      state.players.find((player) => player.id === state.currentUserId) ??
+      (tokenPlayerId ? state.players.find((player) => player.id === tokenPlayerId) : undefined) ??
+      (state.players.length === 1 ? state.players[0] : undefined)
+    )
   }
 
   mockStateByPage.set(page, state)
@@ -1485,8 +1466,60 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         isForSale: false,
         builtAtUtc: new Date().toISOString(),
         units: [
-          { id: `unit-shop-purchase-${Date.now()}`, buildingId: shopId, unitType: 'PURCHASE', gridX: 0, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: null, maxPrice: null, purchaseSource: 'LOCAL', saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: company.id },
-          { id: `unit-shop-publicsales-${Date.now() + 1}`, buildingId: shopId, unitType: 'PUBLIC_SALES', gridX: 1, gridY: 0, level: 1, linkRight: false, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: product?.basePrice != null ? product.basePrice * 1.5 : null, maxPrice: null, purchaseSource: null, saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
+          {
+            id: `unit-shop-purchase-${Date.now()}`,
+            buildingId: shopId,
+            unitType: 'PURCHASE',
+            gridX: 0,
+            gridY: 0,
+            level: 1,
+            linkRight: true,
+            linkLeft: false,
+            linkUp: false,
+            linkDown: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: productId,
+            resourceTypeId: null,
+            minPrice: null,
+            maxPrice: null,
+            purchaseSource: 'LOCAL',
+            saleVisibility: null,
+            budget: null,
+            mediaHouseBuildingId: null,
+            minQuality: null,
+            brandScope: null,
+            vendorLockCompanyId: company.id,
+          },
+          {
+            id: `unit-shop-publicsales-${Date.now() + 1}`,
+            buildingId: shopId,
+            unitType: 'PUBLIC_SALES',
+            gridX: 1,
+            gridY: 0,
+            level: 1,
+            linkRight: false,
+            linkLeft: false,
+            linkUp: false,
+            linkDown: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: productId,
+            resourceTypeId: null,
+            minPrice: product?.basePrice != null ? product.basePrice * 1.5 : null,
+            maxPrice: null,
+            purchaseSource: null,
+            saleVisibility: null,
+            budget: null,
+            mediaHouseBuildingId: null,
+            minQuality: null,
+            brandScope: null,
+            vendorLockCompanyId: null,
+          },
         ],
         pendingConfiguration: null,
       }
@@ -1496,10 +1529,114 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (factoryBuilding && factoryBuilding.units.length === 0) {
         const resourceTypeId = product?.recipes[0]?.resourceType?.id ?? null
         factoryBuilding.units = [
-          { id: `unit-factory-purchase-${Date.now()}`, buildingId: factoryBuilding.id, unitType: 'PURCHASE', gridX: 0, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: null, resourceTypeId, minPrice: null, maxPrice: null, purchaseSource: 'OPTIMAL', saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-          { id: `unit-factory-manufacturing-${Date.now() + 1}`, buildingId: factoryBuilding.id, unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: null, maxPrice: null, purchaseSource: null, saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-          { id: `unit-factory-storage-${Date.now() + 2}`, buildingId: factoryBuilding.id, unitType: 'STORAGE', gridX: 2, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: null, resourceTypeId: null, minPrice: null, maxPrice: null, purchaseSource: null, saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-          { id: `unit-factory-b2bsales-${Date.now() + 3}`, buildingId: factoryBuilding.id, unitType: 'B2B_SALES', gridX: 3, gridY: 0, level: 1, linkRight: false, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: product?.basePrice ?? null, maxPrice: null, purchaseSource: null, saleVisibility: 'COMPANY', budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
+          {
+            id: `unit-factory-purchase-${Date.now()}`,
+            buildingId: factoryBuilding.id,
+            unitType: 'PURCHASE',
+            gridX: 0,
+            gridY: 0,
+            level: 1,
+            linkRight: true,
+            linkLeft: false,
+            linkUp: false,
+            linkDown: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: null,
+            resourceTypeId,
+            minPrice: null,
+            maxPrice: null,
+            purchaseSource: 'OPTIMAL',
+            saleVisibility: null,
+            budget: null,
+            mediaHouseBuildingId: null,
+            minQuality: null,
+            brandScope: null,
+            vendorLockCompanyId: null,
+          },
+          {
+            id: `unit-factory-manufacturing-${Date.now() + 1}`,
+            buildingId: factoryBuilding.id,
+            unitType: 'MANUFACTURING',
+            gridX: 1,
+            gridY: 0,
+            level: 1,
+            linkRight: true,
+            linkLeft: false,
+            linkUp: false,
+            linkDown: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: productId,
+            resourceTypeId: null,
+            minPrice: null,
+            maxPrice: null,
+            purchaseSource: null,
+            saleVisibility: null,
+            budget: null,
+            mediaHouseBuildingId: null,
+            minQuality: null,
+            brandScope: null,
+            vendorLockCompanyId: null,
+          },
+          {
+            id: `unit-factory-storage-${Date.now() + 2}`,
+            buildingId: factoryBuilding.id,
+            unitType: 'STORAGE',
+            gridX: 2,
+            gridY: 0,
+            level: 1,
+            linkRight: true,
+            linkLeft: false,
+            linkUp: false,
+            linkDown: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: null,
+            resourceTypeId: null,
+            minPrice: null,
+            maxPrice: null,
+            purchaseSource: null,
+            saleVisibility: null,
+            budget: null,
+            mediaHouseBuildingId: null,
+            minQuality: null,
+            brandScope: null,
+            vendorLockCompanyId: null,
+          },
+          {
+            id: `unit-factory-b2bsales-${Date.now() + 3}`,
+            buildingId: factoryBuilding.id,
+            unitType: 'B2B_SALES',
+            gridX: 3,
+            gridY: 0,
+            level: 1,
+            linkRight: false,
+            linkLeft: false,
+            linkUp: false,
+            linkDown: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: productId,
+            resourceTypeId: null,
+            minPrice: product?.basePrice ?? null,
+            maxPrice: null,
+            purchaseSource: null,
+            saleVisibility: 'COMPANY',
+            budget: null,
+            mediaHouseBuildingId: null,
+            minQuality: null,
+            brandScope: null,
+            vendorLockCompanyId: null,
+          },
         ]
       }
       company.buildings.push(shopBuilding)
@@ -1570,10 +1707,114 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             isForSale: false,
             builtAtUtc: new Date().toISOString(),
             units: [
-              { id: `unit-factory-purchase-${Date.now()}`, buildingId: factoryBuildingId, unitType: 'PURCHASE', gridX: 0, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: null, resourceTypeId, minPrice: null, maxPrice: null, purchaseSource: 'OPTIMAL', saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-              { id: `unit-factory-manufacturing-${Date.now() + 1}`, buildingId: factoryBuildingId, unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: null, maxPrice: null, purchaseSource: null, saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-              { id: `unit-factory-storage-${Date.now() + 2}`, buildingId: factoryBuildingId, unitType: 'STORAGE', gridX: 2, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: null, resourceTypeId: null, minPrice: null, maxPrice: null, purchaseSource: null, saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-              { id: `unit-factory-b2bsales-${Date.now() + 3}`, buildingId: factoryBuildingId, unitType: 'B2B_SALES', gridX: 3, gridY: 0, level: 1, linkRight: false, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: product?.basePrice ?? null, maxPrice: null, purchaseSource: null, saleVisibility: 'COMPANY', budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
+              {
+                id: `unit-factory-purchase-${Date.now()}`,
+                buildingId: factoryBuildingId,
+                unitType: 'PURCHASE',
+                gridX: 0,
+                gridY: 0,
+                level: 1,
+                linkRight: true,
+                linkLeft: false,
+                linkUp: false,
+                linkDown: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                productTypeId: null,
+                resourceTypeId,
+                minPrice: null,
+                maxPrice: null,
+                purchaseSource: 'OPTIMAL',
+                saleVisibility: null,
+                budget: null,
+                mediaHouseBuildingId: null,
+                minQuality: null,
+                brandScope: null,
+                vendorLockCompanyId: null,
+              },
+              {
+                id: `unit-factory-manufacturing-${Date.now() + 1}`,
+                buildingId: factoryBuildingId,
+                unitType: 'MANUFACTURING',
+                gridX: 1,
+                gridY: 0,
+                level: 1,
+                linkRight: true,
+                linkLeft: false,
+                linkUp: false,
+                linkDown: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                productTypeId: productId,
+                resourceTypeId: null,
+                minPrice: null,
+                maxPrice: null,
+                purchaseSource: null,
+                saleVisibility: null,
+                budget: null,
+                mediaHouseBuildingId: null,
+                minQuality: null,
+                brandScope: null,
+                vendorLockCompanyId: null,
+              },
+              {
+                id: `unit-factory-storage-${Date.now() + 2}`,
+                buildingId: factoryBuildingId,
+                unitType: 'STORAGE',
+                gridX: 2,
+                gridY: 0,
+                level: 1,
+                linkRight: true,
+                linkLeft: false,
+                linkUp: false,
+                linkDown: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                productTypeId: null,
+                resourceTypeId: null,
+                minPrice: null,
+                maxPrice: null,
+                purchaseSource: null,
+                saleVisibility: null,
+                budget: null,
+                mediaHouseBuildingId: null,
+                minQuality: null,
+                brandScope: null,
+                vendorLockCompanyId: null,
+              },
+              {
+                id: `unit-factory-b2bsales-${Date.now() + 3}`,
+                buildingId: factoryBuildingId,
+                unitType: 'B2B_SALES',
+                gridX: 3,
+                gridY: 0,
+                level: 1,
+                linkRight: false,
+                linkLeft: false,
+                linkUp: false,
+                linkDown: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                productTypeId: productId,
+                resourceTypeId: null,
+                minPrice: product?.basePrice ?? null,
+                maxPrice: null,
+                purchaseSource: null,
+                saleVisibility: 'COMPANY',
+                budget: null,
+                mediaHouseBuildingId: null,
+                minQuality: null,
+                brandScope: null,
+                vendorLockCompanyId: null,
+              },
             ],
             pendingConfiguration: null,
           },
@@ -1591,8 +1832,60 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             isForSale: false,
             builtAtUtc: new Date().toISOString(),
             units: [
-              { id: `unit-shop-purchase-${Date.now() + 4}`, buildingId: shopBuildingId, unitType: 'PURCHASE', gridX: 0, gridY: 0, level: 1, linkRight: true, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: null, maxPrice: null, purchaseSource: 'LOCAL', saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
-              { id: `unit-shop-publicsales-${Date.now() + 5}`, buildingId: shopBuildingId, unitType: 'PUBLIC_SALES', gridX: 1, gridY: 0, level: 1, linkRight: false, linkLeft: false, linkUp: false, linkDown: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false, productTypeId: productId, resourceTypeId: null, minPrice: product?.basePrice != null ? product.basePrice * 1.5 : null, maxPrice: null, purchaseSource: null, saleVisibility: null, budget: null, mediaHouseBuildingId: null, minQuality: null, brandScope: null, vendorLockCompanyId: null },
+              {
+                id: `unit-shop-purchase-${Date.now() + 4}`,
+                buildingId: shopBuildingId,
+                unitType: 'PURCHASE',
+                gridX: 0,
+                gridY: 0,
+                level: 1,
+                linkRight: true,
+                linkLeft: false,
+                linkUp: false,
+                linkDown: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                productTypeId: productId,
+                resourceTypeId: null,
+                minPrice: null,
+                maxPrice: null,
+                purchaseSource: 'LOCAL',
+                saleVisibility: null,
+                budget: null,
+                mediaHouseBuildingId: null,
+                minQuality: null,
+                brandScope: null,
+                vendorLockCompanyId: null,
+              },
+              {
+                id: `unit-shop-publicsales-${Date.now() + 5}`,
+                buildingId: shopBuildingId,
+                unitType: 'PUBLIC_SALES',
+                gridX: 1,
+                gridY: 0,
+                level: 1,
+                linkRight: false,
+                linkLeft: false,
+                linkUp: false,
+                linkDown: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+                productTypeId: productId,
+                resourceTypeId: null,
+                minPrice: product?.basePrice != null ? product.basePrice * 1.5 : null,
+                maxPrice: null,
+                purchaseSource: null,
+                saleVisibility: null,
+                budget: null,
+                mediaHouseBuildingId: null,
+                minQuality: null,
+                brandScope: null,
+                vendorLockCompanyId: null,
+              },
             ],
             pendingConfiguration: null,
           },
@@ -1841,7 +2134,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       if (publicFloatShares < shareCount) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough public float shares are available.', extensions: { code: 'INSUFFICIENT_PUBLIC_FLOAT' } }] }) })
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not enough public float shares are available.', extensions: { code: 'INSUFFICIENT_PUBLIC_FLOAT' } }] }),
+        })
       }
 
       let accountName = player.displayName
@@ -1852,7 +2149,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (player.activeAccountType === 'COMPANY' && player.activeCompanyId) {
         const activeCompany = player.companies.find((candidate) => candidate.id === player.activeCompanyId)
         if (!activeCompany || activeCompany.cash < totalValue) {
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough company cash.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }) })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ errors: [{ message: 'Not enough company cash.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }),
+          })
         }
 
         activeCompany.cash = Number((activeCompany.cash - totalValue).toFixed(2))
@@ -1861,7 +2162,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         companyCash = activeCompany.cash
 
         if (activeCompany.id === company.id) {
-          company.totalSharesIssued = Number((Math.max(getCompanyTotalShares(company) - shareCount, 0)).toFixed(4))
+          company.totalSharesIssued = Number(Math.max(getCompanyTotalShares(company) - shareCount, 0).toFixed(4))
           ownedShareCount = getCompanyTotalShares(company)
         } else {
           const holding = getOrCreateShareholding(state, company.id, null, activeCompany.id)
@@ -1870,7 +2171,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         }
       } else {
         if (player.personalCash < totalValue) {
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough personal cash.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }) })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ errors: [{ message: 'Not enough personal cash.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }),
+          })
         }
 
         player.personalCash = Number((player.personalCash - totalValue).toFixed(2))
@@ -1930,7 +2235,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         const holding = activeCompany ? getOrCreateShareholding(state, company.id, null, activeCompany.id) : null
 
         if (!activeCompany || !holding || holding.shareCount < shareCount) {
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough shares to sell.', extensions: { code: 'INSUFFICIENT_SHARES' } }] }) })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ errors: [{ message: 'Not enough shares to sell.', extensions: { code: 'INSUFFICIENT_SHARES' } }] }),
+          })
         }
 
         holding.shareCount = Number((holding.shareCount - shareCount).toFixed(4))
@@ -1942,7 +2251,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       } else {
         const holding = getOrCreateShareholding(state, company.id, player.id, null)
         if (holding.shareCount < shareCount) {
-          return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not enough shares to sell.', extensions: { code: 'INSUFFICIENT_SHARES' } }] }) })
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ errors: [{ message: 'Not enough shares to sell.', extensions: { code: 'INSUFFICIENT_SHARES' } }] }),
+          })
         }
 
         holding.shareCount = Number((holding.shareCount - shareCount).toFixed(4))
@@ -2357,15 +2670,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('SetRentPerSqm') || query.includes('setRentPerSqm')) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.id === state.currentUserId)
-      const building = player?.companies
-        .flatMap((company) => company.buildings)
-        .find((candidate) => candidate.id === input?.buildingId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
 
       if (!building) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'Building not found or you don\'t own it.', extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+          body: JSON.stringify({ errors: [{ message: "Building not found or you don't own it.", extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
         })
       }
 
@@ -2435,14 +2746,28 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
       const constructionCostsByType: Record<string, number> = {
-        MINE: 5000, FACTORY: 15000, SALES_SHOP: 8000, RESEARCH_DEVELOPMENT: 25000,
-        APARTMENT: 40000, COMMERCIAL: 20000, MEDIA_HOUSE: 30000, BANK: 50000,
-        EXCHANGE: 60000, POWER_PLANT: 80000,
+        MINE: 5000,
+        FACTORY: 15000,
+        SALES_SHOP: 8000,
+        RESEARCH_DEVELOPMENT: 25000,
+        APARTMENT: 40000,
+        COMMERCIAL: 20000,
+        MEDIA_HOUSE: 30000,
+        BANK: 50000,
+        EXCHANGE: 60000,
+        POWER_PLANT: 80000,
       }
       const constructionTicksByType: Record<string, number> = {
-        MINE: 24, FACTORY: 48, SALES_SHOP: 24, RESEARCH_DEVELOPMENT: 72,
-        APARTMENT: 96, COMMERCIAL: 48, MEDIA_HOUSE: 48, BANK: 72,
-        EXCHANGE: 96, POWER_PLANT: 120,
+        MINE: 24,
+        FACTORY: 48,
+        SALES_SHOP: 24,
+        RESEARCH_DEVELOPMENT: 72,
+        APARTMENT: 96,
+        COMMERCIAL: 48,
+        MEDIA_HOUSE: 48,
+        BANK: 72,
+        EXCHANGE: 96,
+        POWER_PLANT: 120,
       }
       const constructionCost = constructionCostsByType[input.buildingType] ?? 10000
       const constructionTicks = constructionTicksByType[input.buildingType] ?? 24
@@ -2452,7 +2777,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: `Insufficient funds. Total cost (lot + construction) is $${(lot.price + constructionCost).toLocaleString()} but you only have $${company.cash.toLocaleString()}.`, extensions: { code: 'INSUFFICIENT_FUNDS' } }],
+            errors: [
+              {
+                message: `Insufficient funds. Total cost (lot + construction) is $${(lot.price + constructionCost).toLocaleString()} but you only have $${company.cash.toLocaleString()}.`,
+                extensions: { code: 'INSUFFICIENT_FUNDS' },
+              },
+            ],
           }),
         })
       }
@@ -2560,9 +2890,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       // Validate backend-authoritative condition: a real public sale must have occurred
-      const hasRealSale = state.publicSalesRecords.some(
-        (r) => r.buildingId === player.onboardingShopBuildingId && r.quantitySold > 0,
-      )
+      const hasRealSale = state.publicSalesRecords.some((r) => r.buildingId === player.onboardingShopBuildingId && r.quantitySold > 0)
 
       if (!hasRealSale) {
         return route.fulfill({
@@ -2644,9 +2972,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const shopBuilding = player.companies.flatMap((c) => c.buildings).find((b) => b.id === player.onboardingShopBuildingId)
 
       // Check for real sale
-      const firstSaleRecord = state.publicSalesRecords
-        .filter((r) => r.buildingId === player.onboardingShopBuildingId && r.quantitySold > 0)
-        .sort((a, b) => a.tick - b.tick)[0]
+      const firstSaleRecord = state.publicSalesRecords.filter((r) => r.buildingId === player.onboardingShopBuildingId && r.quantitySold > 0).sort((a, b) => a.tick - b.tick)[0]
 
       if (firstSaleRecord) {
         return route.fulfill({
@@ -2806,14 +3132,28 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         // projects/Api/Utilities/CompanyEconomyCalculator.cs :: GetBaseUnitLaborHours / GetBaseUnitEnergyMwh
         // Update here if the backend constants change.
         const laborHoursMap: Record<string, number> = {
-          MINING: 1.4, STORAGE: 0.15, B2B_SALES: 0.45, PURCHASE: 0.35,
-          MANUFACTURING: 0.85, BRANDING: 0.3, MARKETING: 0.6, PUBLIC_SALES: 0.7,
-          PRODUCT_QUALITY: 0.55, BRAND_QUALITY: 0.55,
+          MINING: 1.4,
+          STORAGE: 0.15,
+          B2B_SALES: 0.45,
+          PURCHASE: 0.35,
+          MANUFACTURING: 0.85,
+          BRANDING: 0.3,
+          MARKETING: 0.6,
+          PUBLIC_SALES: 0.7,
+          PRODUCT_QUALITY: 0.55,
+          BRAND_QUALITY: 0.55,
         }
         const energyMwhMap: Record<string, number> = {
-          MINING: 0.45, STORAGE: 0.04, B2B_SALES: 0.08, PURCHASE: 0.06,
-          MANUFACTURING: 0.18, BRANDING: 0.05, MARKETING: 0.07, PUBLIC_SALES: 0.12,
-          PRODUCT_QUALITY: 0.09, BRAND_QUALITY: 0.09,
+          MINING: 0.45,
+          STORAGE: 0.04,
+          B2B_SALES: 0.08,
+          PURCHASE: 0.06,
+          MANUFACTURING: 0.18,
+          BRANDING: 0.05,
+          MARKETING: 0.07,
+          PUBLIC_SALES: 0.12,
+          PRODUCT_QUALITY: 0.09,
+          BRAND_QUALITY: 0.09,
         }
         const level = unit.level || 1
         const laborHours = (laborHoursMap[unit.unitType] ?? 0) * level
@@ -3003,9 +3343,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         .flatMap((candidate) => candidate.companies)
         .map((company) => {
           const playerOwnedShares = player
-            ? state.shareholdings
-                .filter((holding) => holding.companyId === company.id && holding.ownerPlayerId === player.id)
-                .reduce((total, holding) => total + holding.shareCount, 0)
+            ? state.shareholdings.filter((holding) => holding.companyId === company.id && holding.ownerPlayerId === player.id).reduce((total, holding) => total + holding.shareCount, 0)
             : 0
 
           const controlledCompanyIds = player ? getPlayerControlledCompanyIds(state, player.id) : new Set<string>()
@@ -3450,9 +3788,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('bankLoans')) {
       const bankBuildingId = body.variables?.bankBuildingId
-      const loans = bankBuildingId
-        ? state.myLoans.filter((l) => l.bankBuildingId === bankBuildingId)
-        : state.myLoans
+      const loans = bankBuildingId ? state.myLoans.filter((l) => l.bankBuildingId === bankBuildingId) : state.myLoans
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
