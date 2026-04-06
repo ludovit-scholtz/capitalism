@@ -4,6 +4,26 @@ Create a fun game on style of the capitalism II game. This game is economic simu
 
 It will use real world map. The game will start in single city and later other cities will be added.
 
+## Issues to work on
+
+- Improve public sales calculation engine
+- Game is flickery. When data updates on many pages such as building overview or unit detail overview is unusuable because when player scrolls the page and tick refresh the data the context is lost. Make sure to use the routing for all navigation for example unit selection. Leaderboard and stock exchange are also flickery and many other pages as well.
+- Unable to fast change price in unit detail overview. The price change works in building edit mode
+- Add to the resource flow chart (or create new chart) in unit detail also the sales chart and profit chart so that player can see how much money he made on specific product.
+- Limited startup pack can be activated even if user does not pay $20
+- Make product select in units much more better for users. For example add there pictures and make the connected products in the top and for R&D make the most used products by company at the top
+- Make units upgradable
+- In encyclpedia ensure spacing between components - search bar has no space between search bar and products
+- In global exchange should be list of all products not just raw materials
+- Stock exchange model must allow purchase of stocks of any company from any other person or company account and see the stock price history. UX must allow to buy the stock of any company with public ownership. Remove account switching from stock exchange as it is implemented now in the top navigation bar. Add to the buy and sell information about the bid and offer. In company ledger overview in cash flow should be column stock buy back and all operations in the stock exchange must be visible somewhere in the ledger.
+- Leaderboard should be split to most rich person and most rich company
+- Do not request players to select the building names when creating building - generate them natural names automatically
+- When creating storage unit, do not request the type of resource - storage unit can accept any resources. Create flush storage feature in any storage capable units. Make sure after this action it is visible in ledger as discarted resources.
+- When creating b2b sale unit, make sure to suggest the competetive price
+- When creating new factory the default layout does not include the b2b sale unit
+- When updating building the spacing on page is wrong. Component touch each other. Also show the remaining ticks to apply the changes.
+- In each factory or sales building show chart of total costs, total revenue and total profit in the top building overview
+
 ## Multiple Game Servers
 
 The master website is product pitching website where users can find in game documentation and list of active game servers. Existing users who authenticated can see their pro subscription on they can purchase prolonging their pro subscription.
