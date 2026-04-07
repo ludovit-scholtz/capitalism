@@ -409,6 +409,59 @@ public sealed class Query
             .ToList();
     }
 
+    /// <summary>Returns per-company wealth rankings for the leaderboard.</summary>
+    public async Task<List<CompanyRanking>> GetCompanyRankings([Service] AppDbContext db)
+    {
+        var companies = await db.Companies
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.Units)
+            .Include(c => c.Player)
+            .Where(c => c.Player != null && c.Player.Role != PlayerRole.Admin)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        var buildingIds = companies
+            .SelectMany(c => c.Buildings)
+            .Select(b => b.Id)
+            .ToList();
+
+        var inventories = await db.Inventories
+            .Where(i => buildingIds.Contains(i.BuildingId))
+            .Include(i => i.ResourceType)
+            .Include(i => i.ProductType)
+            .ToListAsync();
+
+        var inventoryByBuilding = inventories
+            .GroupBy(i => i.BuildingId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        return companies
+            .Select(c =>
+            {
+                var buildingValue = c.Buildings
+                    .Sum(b => WealthCalculator.GetBuildingValue(b));
+                var inventoryValue = c.Buildings
+                    .Sum(b => inventoryByBuilding.TryGetValue(b.Id, out var inv)
+                        ? inv.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i))
+                        : 0m);
+
+                return new CompanyRanking
+                {
+                    CompanyId = c.Id,
+                    CompanyName = c.Name,
+                    PlayerId = c.PlayerId,
+                    OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
+                    Cash = c.Cash,
+                    BuildingValue = buildingValue,
+                    InventoryValue = inventoryValue,
+                    TotalWealth = c.Cash + buildingValue + inventoryValue,
+                    BuildingCount = c.Buildings.Count
+                };
+            })
+            .OrderByDescending(r => r.TotalWealth)
+            .ToList();
+    }
+
     /// <summary>Gets the current player's companies with their buildings.</summary>
     [Authorize]
     public async Task<List<Company>> GetMyCompanies(
@@ -1298,6 +1351,110 @@ public sealed class Query
             .ToList();
     }
 
+    private static readonly HashSet<string> BuildingFinancialRevenueCategories =
+    [
+        LedgerCategory.Revenue,
+        LedgerCategory.MediaHouseIncome,
+        LedgerCategory.RentIncome,
+    ];
+
+    private static readonly HashSet<string> BuildingFinancialCostCategories =
+    [
+        LedgerCategory.PurchasingCost,
+        LedgerCategory.LaborCost,
+        LedgerCategory.EnergyCost,
+        LedgerCategory.Marketing,
+        LedgerCategory.DiscardedResources,
+    ];
+
+    /// <summary>
+    /// Returns recent per-tick operational sales, costs, and profit for a building across all of its units.
+    /// Uses building-scoped ledger entries and excludes one-time capital events such as property purchase,
+    /// construction, and upgrades so the chart reflects operating performance.
+    /// </summary>
+    [Authorize]
+    public async Task<BuildingFinancialTimeline> GetBuildingFinancialTimeline(
+        Guid buildingId,
+        int? limit,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .AsNoTracking()
+            .Include(candidate => candidate.Company)
+            .FirstOrDefaultAsync(candidate => candidate.Id == buildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        var safeLimit = Math.Clamp(limit ?? 100, 1, 100);
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => (long?)state.CurrentTick)
+            .FirstOrDefaultAsync() ?? 0L;
+        var windowStart = Math.Max(0L, currentTick - (safeLimit - 1L));
+
+        var entries = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(entry => entry.BuildingId == buildingId
+                && entry.RecordedAtTick >= windowStart
+                && entry.RecordedAtTick <= currentTick
+                && (BuildingFinancialRevenueCategories.Contains(entry.Category)
+                    || BuildingFinancialCostCategories.Contains(entry.Category)))
+            .Select(entry => new
+            {
+                entry.RecordedAtTick,
+                entry.Category,
+                entry.Amount,
+            })
+            .OrderBy(entry => entry.RecordedAtTick)
+            .ToListAsync();
+
+        var entriesByTick = entries
+            .GroupBy(entry => entry.RecordedAtTick)
+            .ToDictionary(group => group.Key, group => group.ToList());
+
+        var snapshots = new List<BuildingFinancialTickSnapshot>();
+        for (var tick = windowStart; tick <= currentTick; tick++)
+        {
+            var tickEntries = entriesByTick.GetValueOrDefault(tick) ?? [];
+            var sales = tickEntries
+                .Where(entry => BuildingFinancialRevenueCategories.Contains(entry.Category))
+                .Sum(entry => entry.Amount);
+            var costs = tickEntries
+                .Where(entry => BuildingFinancialCostCategories.Contains(entry.Category))
+                .Sum(entry => Math.Abs(entry.Amount));
+
+            snapshots.Add(new BuildingFinancialTickSnapshot
+            {
+                Tick = tick,
+                Sales = sales,
+                Costs = costs,
+                Profit = sales - costs,
+            });
+        }
+
+        return new BuildingFinancialTimeline
+        {
+            BuildingId = building.Id,
+            BuildingName = building.Name,
+            DataFromTick = windowStart,
+            DataToTick = currentTick,
+            TotalSales = snapshots.Sum(snapshot => snapshot.Sales),
+            TotalCosts = snapshots.Sum(snapshot => snapshot.Costs),
+            TotalProfit = snapshots.Sum(snapshot => snapshot.Profit),
+            Timeline = snapshots,
+        };
+    }
+
     private static string FormatQuantity(decimal qty) =>
         qty == Math.Floor(qty) ? ((int)qty).ToString() : qty.ToString("0.####");
 
@@ -1712,26 +1869,16 @@ public sealed class Query
             }
         }
 
-        // Elasticity index: derived analytically from the demand formula
-        // demand = baseDemand * (2 - price/basePrice) * quality * brand
-        // Point elasticity: E = (dQ/Q) / (dP/P) = -price / (basePrice * (2 - price/basePrice))
-        // Uses the average recent price and the product's base price.
+        // Elasticity index: product-level buyer sensitivity used by the public-sales
+        // pricing model. More elastic products return a more negative value.
         decimal? elasticityIndex = null;
         var productTypeIdForElasticity = unit.ProductTypeId ?? records.FirstOrDefault()?.ProductTypeId;
-        if (productTypeIdForElasticity.HasValue && recentRecords.Count > 0)
+        if (productTypeIdForElasticity.HasValue)
         {
             var productType = await db.ProductTypes.FindAsync(productTypeIdForElasticity.Value);
-            if (productType is not null && productType.BasePrice > 0m)
+            if (productType is not null)
             {
-                var avgRecentPrice = recentRecords.Average(r => (double)r.PricePerUnit);
-                var basePrice = (double)productType.BasePrice;
-                var priceRatio = avgRecentPrice / basePrice;
-                var demandAtPrice = 2.0 - priceRatio; // linear demand factor from formula
-                if (demandAtPrice > 0.01)
-                {
-                    // Point elasticity E = -priceRatio / demandAtPrice
-                    elasticityIndex = (decimal)Math.Round(-priceRatio / demandAtPrice, 2);
-                }
+                elasticityIndex = PublicSalesPricingModel.ComputeElasticityIndex(productType.PriceElasticity);
             }
         }
 
@@ -2314,6 +2461,37 @@ public sealed class PlayerRanking
 
     /// <summary>Number of companies owned.</summary>
     public int CompanyCount { get; set; }
+}
+
+/// <summary>Individual company ranking for the leaderboard.</summary>
+public sealed class CompanyRanking
+{
+    /// <summary>Company identifier.</summary>
+    public Guid CompanyId { get; set; }
+
+    /// <summary>Company display name.</summary>
+    public string CompanyName { get; set; } = string.Empty;
+
+    /// <summary>Owner player identifier.</summary>
+    public Guid PlayerId { get; set; }
+
+    /// <summary>Owner player display name.</summary>
+    public string OwnerDisplayName { get; set; } = string.Empty;
+
+    /// <summary>Total company wealth = Cash + BuildingValue + InventoryValue.</summary>
+    public decimal TotalWealth { get; set; }
+
+    /// <summary>Cash on hand for this company.</summary>
+    public decimal Cash { get; set; }
+
+    /// <summary>Estimated value of company buildings.</summary>
+    public decimal BuildingValue { get; set; }
+
+    /// <summary>Estimated value of inventory in company buildings.</summary>
+    public decimal InventoryValue { get; set; }
+
+    /// <summary>Number of buildings owned by this company.</summary>
+    public int BuildingCount { get; set; }
 }
 
 /// <summary>Payload for starter industries.</summary>

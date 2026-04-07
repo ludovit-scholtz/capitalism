@@ -12612,10 +12612,10 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             token: token);
 
         var analytics = analyticsResult.GetProperty("data").GetProperty("publicSalesAnalytics");
-        // At price = basePrice: elasticity = -(1.0) / (2.0 - 1.0) = -1.0
         Assert.False(analytics.GetProperty("elasticityIndex").ValueKind == System.Text.Json.JsonValueKind.Null, "ElasticityIndex should be returned");
         var elas = analytics.GetProperty("elasticityIndex").GetDecimal();
-        Assert.True(Math.Abs(elas - (-1.0m)) < 0.01m, $"Elasticity at base price should be -1.0, got {elas}");
+        var expectedElasticity = PublicSalesPricingModel.ComputeElasticityIndex(productType.PriceElasticity);
+        Assert.True(Math.Abs(elas - expectedElasticity) < 0.01m, $"Elasticity should reflect the product definition. Expected {expectedElasticity}, got {elas}");
     }
 
     [Fact]
@@ -13059,6 +13059,180 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             Assert.True(Math.Abs(unit!.MinPrice!.Value - newPrice) < 0.001m,
                 $"MinPrice should still be {newPrice} after tick but got {unit.MinPrice}.");
         }
+    }
+
+    [Fact]
+    public async Task FlushStorage_ClearsInventoryAndCreatesLedgerEntry()
+    {
+        // Arrange: create a player with a factory that has inventory in a storage unit.
+        var token = await RegisterAndGetTokenAsync("flush-storage@test.com", "FlushStorageTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Flush Storage Zone");
+
+        // Build the factory via onboarding.
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Flush Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Flush Shop Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var factoryId = finishResult
+            .GetProperty("data").GetProperty("finishOnboarding")
+            .GetProperty("factory").GetProperty("id").GetString()!;
+        var companyId = finishResult
+            .GetProperty("data").GetProperty("finishOnboarding")
+            .GetProperty("company").GetProperty("id").GetString()!;
+
+        // Find the storage unit in the factory.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var storageUnit = await db.BuildingUnits
+            .FirstOrDefaultAsync(u => u.BuildingId == Guid.Parse(factoryId) && u.UnitType == "STORAGE");
+        Assert.NotNull(storageUnit);
+
+        // Manually seed inventory so we have something to flush.
+        var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        db.Inventories.Add(new Api.Data.Entities.Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = storageUnit!.BuildingId,
+            BuildingUnitId = storageUnit.Id,
+            ResourceTypeId = woodResource.Id,
+            Quantity = 50m,
+            SourcingCostTotal = 500m,
+            Quality = 0.6m,
+        });
+        await db.SaveChangesAsync();
+
+        // Act: flush the storage unit.
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation FlushStorage($input: FlushStorageInput!) {
+              flushStorage(input: $input) {
+                discardedItemCount
+                totalDiscardedValue
+                discardedEntries { itemName quantity sourcingCostLost }
+              }
+            }
+            """,
+            new { input = new { buildingUnitId = storageUnit.Id } },
+            token);
+
+        var flushData = result.GetProperty("data").GetProperty("flushStorage");
+        Assert.Equal(1, flushData.GetProperty("discardedItemCount").GetInt32());
+        Assert.True(flushData.GetProperty("totalDiscardedValue").GetDecimal() > 0m);
+        Assert.Equal(1, flushData.GetProperty("discardedEntries").GetArrayLength());
+
+        // Verify inventory is gone from DB.
+        var remaining = await db.Inventories
+            .CountAsync(i => i.BuildingUnitId == storageUnit.Id && i.Quantity > 0m);
+        Assert.Equal(0, remaining);
+
+        // Verify a DISCARDED_RESOURCES ledger entry was created.
+        var ledgerEntry = await db.LedgerEntries
+            .FirstOrDefaultAsync(e => e.CompanyId == Guid.Parse(companyId) && e.Category == "DISCARDED_RESOURCES");
+        Assert.NotNull(ledgerEntry);
+        Assert.True(ledgerEntry!.Amount <= 0m, "Discard should be a negative ledger amount (loss).");
+    }
+
+    [Fact]
+    public async Task FlushStorage_EmptyUnit_ReturnsZeroItems()
+    {
+        var token = await RegisterAndGetTokenAsync("flush-empty@test.com", "FlushEmptyTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Flush Empty Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Flush Empty Co", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Flush Empty Shop Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var factoryId = finishResult
+            .GetProperty("data").GetProperty("finishOnboarding")
+            .GetProperty("factory").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var storageUnit = await db.BuildingUnits
+            .FirstOrDefaultAsync(u => u.BuildingId == Guid.Parse(factoryId) && u.UnitType == "STORAGE");
+        Assert.NotNull(storageUnit);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation FlushStorage($input: FlushStorageInput!) {
+              flushStorage(input: $input) {
+                discardedItemCount
+                totalDiscardedValue
+              }
+            }
+            """,
+            new { input = new { buildingUnitId = storageUnit!.Id } },
+            token);
+
+        var flushData = result.GetProperty("data").GetProperty("flushStorage");
+        Assert.Equal(0, flushData.GetProperty("discardedItemCount").GetInt32());
+        Assert.Equal(0m, flushData.GetProperty("totalDiscardedValue").GetDecimal());
+    }
+
+    [Fact]
+    public async Task FlushStorage_WrongOwner_ReturnsBuildingNotFound()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync("flush-owner@test.com", "FlushOwnerTest");
+        var otherToken = await RegisterAndGetTokenAsync("flush-other@test.com", "FlushOtherTest");
+        var cityId = await GetCityIdByNameAsync();
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Flush Owner Zone");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Flush Owner Co", factoryLotId } },
+            ownerToken);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Flush Owner Shop Zone");
+        var finishResult = await FinishOnboardingAsync(ownerToken, productId, shopLotId);
+        var factoryId = finishResult
+            .GetProperty("data").GetProperty("finishOnboarding")
+            .GetProperty("factory").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var storageUnit = await db.BuildingUnits
+            .FirstOrDefaultAsync(u => u.BuildingId == Guid.Parse(factoryId) && u.UnitType == "STORAGE");
+        Assert.NotNull(storageUnit);
+
+        // Attempt flush as a different player — should fail.
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation FlushStorage($input: FlushStorageInput!) {
+              flushStorage(input: $input) { discardedItemCount }
+            }
+            """,
+            new { input = new { buildingUnitId = storageUnit!.Id } },
+            otherToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should get an error when trying to flush someone else's unit.");
+        Assert.Contains("UNIT_NOT_FOUND", errors[0].GetProperty("extensions").GetProperty("code").GetString()!);
     }
 
     [Fact]
@@ -14924,7 +15098,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         _client = factory.CreateClient();
     }
 
-    private async Task<JsonElement> ExecuteGraphQlAsync(string query, object? variables = null, string? token = null)
+    private static async Task<JsonElement> ExecuteGraphQlAsync(HttpClient client, string query, object? variables = null, string? token = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/graphql");
         request.Content = new System.Net.Http.StringContent(
@@ -14937,14 +15111,18 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
         }
 
-        var response = await _client.SendAsync(request);
+        var response = await client.SendAsync(request);
         var body = await response.Content.ReadAsStringAsync();
         return System.Text.Json.JsonSerializer.Deserialize<JsonElement>(body);
     }
 
-    private async Task<string> RegisterAndGetTokenAsync(string email, string displayName = "Tester", string password = "TestPass123!")
+    private Task<JsonElement> ExecuteGraphQlAsync(string query, object? variables = null, string? token = null)
+        => ExecuteGraphQlAsync(_client, query, variables, token);
+
+    private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email, string displayName = "Tester", string password = "TestPass123!")
     {
         var result = await ExecuteGraphQlAsync(
+            client,
             """
             mutation Register($input: RegisterInput!) {
               register(input: $input) { token }
@@ -14953,6 +15131,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { input = new { email, displayName, password } });
         return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
     }
+
+    private Task<string> RegisterAndGetTokenAsync(string email, string displayName = "Tester", string password = "TestPass123!")
+        => RegisterAndGetTokenAsync(_client, email, displayName, password);
 
     private async Task ResetGameStateAsync()
     {
@@ -15732,6 +15913,320 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             }
             """,
             new { buildingId = Guid.NewGuid(), limit = 10 });
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated call must return errors.");
+    }
+
+    [Fact]
+    public async Task BuildingFinancialTimeline_ReturnsSalesCostsAndProfitByTick()
+    {
+        var (token, buildingId) = await SeedOperationalStatusTestAsync("building-financial",
+            (db, bid, companyId, _) =>
+            {
+                var primaryUnitId = Guid.NewGuid();
+                var secondaryUnitId = Guid.NewGuid();
+                var gameState = db.GameStates.First();
+                gameState.CurrentTick = 42;
+
+                db.BuildingUnits.AddRange(
+                    new BuildingUnit
+                    {
+                        Id = primaryUnitId,
+                        BuildingId = bid,
+                        UnitType = UnitType.PublicSales,
+                        GridX = 0,
+                        GridY = 0,
+                        Level = 1,
+                    },
+                    new BuildingUnit
+                    {
+                        Id = secondaryUnitId,
+                        BuildingId = bid,
+                        UnitType = UnitType.Purchase,
+                        GridX = 1,
+                        GridY = 0,
+                        Level = 1,
+                    });
+
+                db.LedgerEntries.AddRange(
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = primaryUnitId,
+                        Category = LedgerCategory.Revenue,
+                        Description = "Retail sale",
+                        Amount = 120m,
+                        RecordedAtTick = 40,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = secondaryUnitId,
+                        Category = LedgerCategory.PurchasingCost,
+                        Description = "Input sourcing",
+                        Amount = -30m,
+                        RecordedAtTick = 40,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = secondaryUnitId,
+                        Category = LedgerCategory.LaborCost,
+                        Description = "Labor",
+                        Amount = -10m,
+                        RecordedAtTick = 41,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = primaryUnitId,
+                        Category = LedgerCategory.Revenue,
+                        Description = "Wholesale sale",
+                        Amount = 80m,
+                        RecordedAtTick = 42,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = primaryUnitId,
+                        Category = LedgerCategory.Marketing,
+                        Description = "Campaign spend",
+                        Amount = -20m,
+                        RecordedAtTick = 42,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    });
+            });
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingFinancialTimeline($buildingId: UUID!, $limit: Int) {
+              buildingFinancialTimeline(buildingId: $buildingId, limit: $limit) {
+                buildingId
+                buildingName
+                dataFromTick
+                dataToTick
+                totalSales
+                totalCosts
+                totalProfit
+                timeline {
+                  tick
+                  sales
+                  costs
+                  profit
+                }
+              }
+            }
+            """,
+            new { buildingId, limit = 3 },
+            token);
+
+        var timeline = result.GetProperty("data").GetProperty("buildingFinancialTimeline");
+        Assert.Equal(buildingId.ToString(), timeline.GetProperty("buildingId").GetString());
+        Assert.Equal(40, timeline.GetProperty("dataFromTick").GetInt64());
+        Assert.Equal(42, timeline.GetProperty("dataToTick").GetInt64());
+        Assert.Equal(200m, timeline.GetProperty("totalSales").GetDecimal());
+        Assert.Equal(60m, timeline.GetProperty("totalCosts").GetDecimal());
+        Assert.Equal(140m, timeline.GetProperty("totalProfit").GetDecimal());
+
+        var snapshots = timeline.GetProperty("timeline").EnumerateArray().ToList();
+        Assert.Equal(3, snapshots.Count);
+
+        Assert.Equal(40, snapshots[0].GetProperty("tick").GetInt64());
+        Assert.Equal(120m, snapshots[0].GetProperty("sales").GetDecimal());
+        Assert.Equal(30m, snapshots[0].GetProperty("costs").GetDecimal());
+        Assert.Equal(90m, snapshots[0].GetProperty("profit").GetDecimal());
+
+        Assert.Equal(41, snapshots[1].GetProperty("tick").GetInt64());
+        Assert.Equal(0m, snapshots[1].GetProperty("sales").GetDecimal());
+        Assert.Equal(10m, snapshots[1].GetProperty("costs").GetDecimal());
+        Assert.Equal(-10m, snapshots[1].GetProperty("profit").GetDecimal());
+
+        Assert.Equal(42, snapshots[2].GetProperty("tick").GetInt64());
+        Assert.Equal(80m, snapshots[2].GetProperty("sales").GetDecimal());
+        Assert.Equal(20m, snapshots[2].GetProperty("costs").GetDecimal());
+        Assert.Equal(60m, snapshots[2].GetProperty("profit").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BuildingFinancialTimeline_DefaultWindow_AggregatesOperationalEntriesAcrossUnits()
+    {
+        var (token, buildingId) = await SeedOperationalStatusTestAsync("building-financial-window",
+            (db, bid, companyId, _) =>
+            {
+                var salesUnitId = Guid.NewGuid();
+                var purchaseUnitId = Guid.NewGuid();
+                var gameState = db.GameStates.First();
+                gameState.CurrentTick = 140;
+
+                db.BuildingUnits.AddRange(
+                    new BuildingUnit
+                    {
+                        Id = salesUnitId,
+                        BuildingId = bid,
+                        UnitType = UnitType.PublicSales,
+                        GridX = 0,
+                        GridY = 0,
+                        Level = 1,
+                    },
+                    new BuildingUnit
+                    {
+                        Id = purchaseUnitId,
+                        BuildingId = bid,
+                        UnitType = UnitType.Purchase,
+                        GridX = 1,
+                        GridY = 0,
+                        Level = 1,
+                    });
+
+                db.LedgerEntries.AddRange(
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = salesUnitId,
+                        Category = LedgerCategory.Revenue,
+                        Description = "Outside window sale",
+                        Amount = 999m,
+                        RecordedAtTick = 40,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = salesUnitId,
+                        Category = LedgerCategory.Revenue,
+                        Description = "Window sale one",
+                        Amount = 50m,
+                        RecordedAtTick = 41,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = salesUnitId,
+                        Category = LedgerCategory.Revenue,
+                        Description = "Window sale two",
+                        Amount = 70m,
+                        RecordedAtTick = 75,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = purchaseUnitId,
+                        Category = LedgerCategory.PurchasingCost,
+                        Description = "Window sourcing cost",
+                        Amount = -20m,
+                        RecordedAtTick = 75,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        BuildingUnitId = purchaseUnitId,
+                        Category = LedgerCategory.Marketing,
+                        Description = "Window marketing cost",
+                        Amount = -10m,
+                        RecordedAtTick = 140,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    },
+                    new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = companyId,
+                        BuildingId = bid,
+                        Category = LedgerCategory.PropertyPurchase,
+                        Description = "Capital purchase should not affect operations",
+                        Amount = -5000m,
+                        RecordedAtTick = 140,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    });
+            });
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingFinancialTimeline($buildingId: UUID!) {
+              buildingFinancialTimeline(buildingId: $buildingId) {
+                dataFromTick
+                dataToTick
+                totalSales
+                totalCosts
+                totalProfit
+                timeline {
+                  tick
+                  sales
+                  costs
+                  profit
+                }
+              }
+            }
+            """,
+            new { buildingId },
+            token);
+
+        var timeline = result.GetProperty("data").GetProperty("buildingFinancialTimeline");
+        Assert.Equal(41, timeline.GetProperty("dataFromTick").GetInt64());
+        Assert.Equal(140, timeline.GetProperty("dataToTick").GetInt64());
+        Assert.Equal(120m, timeline.GetProperty("totalSales").GetDecimal());
+        Assert.Equal(30m, timeline.GetProperty("totalCosts").GetDecimal());
+        Assert.Equal(90m, timeline.GetProperty("totalProfit").GetDecimal());
+
+        var snapshots = timeline.GetProperty("timeline").EnumerateArray().ToList();
+        Assert.Equal(100, snapshots.Count);
+
+        var snapshotsByTick = snapshots.ToDictionary(
+            snapshot => snapshot.GetProperty("tick").GetInt64(),
+            snapshot => snapshot);
+
+        Assert.Equal(50m, snapshotsByTick[41].GetProperty("sales").GetDecimal());
+        Assert.Equal(0m, snapshotsByTick[41].GetProperty("costs").GetDecimal());
+        Assert.Equal(50m, snapshotsByTick[41].GetProperty("profit").GetDecimal());
+
+        Assert.Equal(70m, snapshotsByTick[75].GetProperty("sales").GetDecimal());
+        Assert.Equal(20m, snapshotsByTick[75].GetProperty("costs").GetDecimal());
+        Assert.Equal(50m, snapshotsByTick[75].GetProperty("profit").GetDecimal());
+
+        Assert.Equal(0m, snapshotsByTick[140].GetProperty("sales").GetDecimal());
+        Assert.Equal(10m, snapshotsByTick[140].GetProperty("costs").GetDecimal());
+        Assert.Equal(-10m, snapshotsByTick[140].GetProperty("profit").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BuildingFinancialTimeline_Unauthenticated_ReturnsError()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingFinancialTimeline($buildingId: UUID!) {
+              buildingFinancialTimeline(buildingId: $buildingId) {
+                buildingId
+              }
+            }
+            """,
+            new { buildingId = Guid.NewGuid() });
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Unauthenticated call must return errors.");
@@ -17483,9 +17978,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task SourcingCandidates_GlobalExchange_ReturnsRankedCandidatesWithLandedCost()
     {
         var email = $"sc-ranked-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "SCRanked");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCRanked");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -17519,6 +18016,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { sourceType sourceCityId sourceCityName exchangePricePerUnit transitCostPerUnit deliveredPricePerUnit estimatedQuality distanceKm isEligible blockReason isRecommended rank } }",
             new { unitId = unit.Id.ToString() },
             token);
@@ -17558,9 +18056,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task SourcingCandidates_MaxPriceFilter_MarksExpensiveCandidatesIneligible()
     {
         var email = $"sc-maxprice-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "SCMaxPrice");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCMaxPrice");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -17596,6 +18096,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { isEligible blockReason } }",
             new { unitId = unit.Id.ToString() },
             token);
@@ -17613,9 +18114,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task SourcingCandidates_MinQualityFilter_MarksLowQualityCandidatesIneligible()
     {
         var email = $"sc-minquality-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "SCMinQuality");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCMinQuality");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -17651,6 +18154,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { isEligible blockReason } }",
             new { unitId = unit.Id.ToString() },
             token);
@@ -17667,9 +18171,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task SourcingCandidates_NotConfigured_ReturnsEmptyList()
     {
         var email = $"sc-noconfig-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "SCNoConfig");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCNoConfig");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -17701,6 +18207,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { rank } }",
             new { unitId = unit.Id.ToString() },
             token);
@@ -17713,9 +18220,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task SourcingCandidates_Unauthenticated_ReturnsEmptyList()
     {
         var email = $"sc-anon-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "SCAnonOwner");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCAnonOwner");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -17749,6 +18258,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         // Query without auth token – returns empty list (unit not found for unauthenticated caller)
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { rank } }",
             new { unitId = unit.Id.ToString() },
             null);
@@ -17765,9 +18275,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     public async Task SourcingCandidates_SameCityCandidate_HasZeroTransitCost()
     {
         var email = $"sc-local-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "SCLocal");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCLocal");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -17801,6 +18313,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { sourceCityId transitCostPerUnit distanceKm } }",
             new { unitId = unit.Id.ToString() },
             token);

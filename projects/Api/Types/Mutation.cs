@@ -1198,6 +1198,25 @@ public sealed class Mutation
         player.OnboardingFactoryLotId = null;
     }
 
+    /// <summary>
+    /// Returns a human-readable display name for a building type constant.
+    /// Used when auto-generating building names.
+    /// </summary>
+    private static string BuildingTypeDisplayName(string buildingType) => buildingType switch
+    {
+        BuildingType.Mine => "Mine",
+        BuildingType.Factory => "Factory",
+        BuildingType.SalesShop => "Sales Shop",
+        BuildingType.ResearchDevelopment => "R&D Lab",
+        BuildingType.Apartment => "Apartment",
+        BuildingType.Commercial => "Office",
+        BuildingType.MediaHouse => "Media House",
+        BuildingType.Bank => "Bank",
+        BuildingType.Exchange => "Exchange",
+        BuildingType.PowerPlant => "Power Plant",
+        _ => "Building"
+    };
+
     private sealed record StarterIpoSelection(decimal RaiseTarget, decimal FounderOwnershipRatio)
     {
         public decimal FounderShareCount => decimal.Round(DefaultCompanyShareCount * FounderOwnershipRatio, 4, MidpointRounding.AwayFromZero);
@@ -1244,7 +1263,7 @@ public sealed class Mutation
         Company company,
         Guid lotId,
         string buildingType,
-        string buildingName,
+        string? buildingName,
         decimal powerConsumption,
         DateTime builtAtUtc,
         Guid? expectedCityId = null,
@@ -1317,6 +1336,15 @@ public sealed class Mutation
         company.Cash -= totalCost;
 
         var constructionTicks = applyConstructionDelay ? Engine.GameConstants.ConstructionTicks(buildingType) : 0;
+
+        // Auto-generate a natural building name when not provided.
+        if (string.IsNullOrWhiteSpace(buildingName))
+        {
+            var existingCount = await db.Buildings
+                .CountAsync(b => b.CompanyId == company.Id && b.Type == buildingType);
+            var typeLabel = BuildingTypeDisplayName(buildingType);
+            buildingName = $"{typeLabel} #{existingCount + 1}";
+        }
 
         var building = new Building
         {
@@ -2527,6 +2555,133 @@ public sealed class Mutation
         return unit;
     }
 
+    /// <summary>
+    /// Discards all inventory stored in a storage-capable building unit.
+    /// A ledger entry with category DISCARDED_RESOURCES is recorded for each
+    /// distinct item flushed, so the loss is visible in the company ledger.
+    /// Returns a summary of what was discarded.
+    /// </summary>
+    [Authorize]
+    public async Task<FlushStorageResult> FlushStorage(
+        FlushStorageInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building)
+            .ThenInclude(b => b.Company)
+            .FirstOrDefaultAsync(u => u.Id == input.BuildingUnitId);
+
+        if (unit is null || unit.Building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Unit not found or you don't own it.")
+                    .SetCode("UNIT_NOT_FOUND")
+                    .Build());
+        }
+
+        // Only allow flushing units that can physically hold inventory.
+        var flushableTypes = new HashSet<string>
+        {
+            UnitType.Storage,
+            UnitType.Mining,
+            UnitType.Manufacturing,
+        };
+
+        if (!flushableTypes.Contains(unit.UnitType))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only STORAGE, MINING and MANUFACTURING units can be flushed.")
+                    .SetCode("INVALID_UNIT_TYPE")
+                    .Build());
+        }
+
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstAsync();
+
+        var inventory = await db.Inventories
+            .Where(i => i.BuildingUnitId == unit.Id && i.Quantity > 0m)
+            .ToListAsync();
+
+        if (inventory.Count == 0)
+        {
+            return new FlushStorageResult
+            {
+                DiscardedItemCount = 0,
+                TotalDiscardedValue = 0m,
+                DiscardedEntries = [],
+            };
+        }
+
+        var nowUtc = DateTime.UtcNow;
+        var discardedEntries = new List<FlushStorageEntry>();
+
+        // Pre-load resource and product names in a single query each to avoid N+1.
+        var resourceTypeIds = inventory.Where(i => i.ResourceTypeId.HasValue).Select(i => i.ResourceTypeId!.Value).ToHashSet();
+        var productTypeIds = inventory.Where(i => i.ProductTypeId.HasValue).Select(i => i.ProductTypeId!.Value).ToHashSet();
+
+        var resourceNames = resourceTypeIds.Count > 0
+            ? await db.ResourceTypes.AsNoTracking()
+                .Where(r => resourceTypeIds.Contains(r.Id))
+                .ToDictionaryAsync(r => r.Id, r => r.Name)
+            : new Dictionary<Guid, string>();
+
+        var productNames = productTypeIds.Count > 0
+            ? await db.ProductTypes.AsNoTracking()
+                .Where(p => productTypeIds.Contains(p.Id))
+                .ToDictionaryAsync(p => p.Id, p => p.Name)
+            : new Dictionary<Guid, string>();
+
+        foreach (var item in inventory)
+        {
+            var itemName = item.ResourceTypeId.HasValue
+                ? (resourceNames.TryGetValue(item.ResourceTypeId.Value, out var rn) ? rn : "Resource")
+                : item.ProductTypeId.HasValue
+                    ? (productNames.TryGetValue(item.ProductTypeId.Value, out var pn) ? pn : "Product")
+                    : "Item";
+
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = unit.Building.CompanyId,
+                BuildingId = unit.BuildingId,
+                BuildingUnitId = unit.Id,
+                Category = LedgerCategory.DiscardedResources,
+                Description = $"Flushed {item.Quantity:F2} × {itemName} from storage",
+                Amount = -item.SourcingCostTotal,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+                ResourceTypeId = item.ResourceTypeId,
+                ProductTypeId = item.ProductTypeId,
+            });
+
+            discardedEntries.Add(new FlushStorageEntry
+            {
+                ItemName = itemName,
+                Quantity = item.Quantity,
+                SourcingCostLost = item.SourcingCostTotal,
+                ResourceTypeId = item.ResourceTypeId,
+                ProductTypeId = item.ProductTypeId,
+            });
+        }
+
+        db.Inventories.RemoveRange(inventory);
+        await db.SaveChangesAsync();
+
+        return new FlushStorageResult
+        {
+            DiscardedItemCount = discardedEntries.Count,
+            TotalDiscardedValue = discardedEntries.Sum(e => e.SourcingCostLost),
+            DiscardedEntries = discardedEntries,
+        };
+    }
+
     private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));
@@ -2626,4 +2781,27 @@ public sealed class PurchaseLotResult
 
     /// <summary>The company with updated cash balance.</summary>
     public Company Company { get; set; } = null!;
+}
+
+/// <summary>Summary of a flush-storage operation.</summary>
+public sealed class FlushStorageResult
+{
+    /// <summary>Number of distinct inventory lines discarded.</summary>
+    public int DiscardedItemCount { get; set; }
+
+    /// <summary>Total sourcing-cost value of all discarded items.</summary>
+    public decimal TotalDiscardedValue { get; set; }
+
+    /// <summary>Per-item breakdown of what was discarded.</summary>
+    public List<FlushStorageEntry> DiscardedEntries { get; set; } = [];
+}
+
+/// <summary>A single item line in a flush-storage result.</summary>
+public sealed class FlushStorageEntry
+{
+    public string ItemName { get; set; } = string.Empty;
+    public decimal Quantity { get; set; }
+    public decimal SourcingCostLost { get; set; }
+    public Guid? ResourceTypeId { get; set; }
+    public Guid? ProductTypeId { get; set; }
 }

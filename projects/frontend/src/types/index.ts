@@ -505,6 +505,19 @@ export interface PlayerRanking {
   companyCount: number
 }
 
+/** Matches backend CompanyRanking response */
+export interface CompanyRanking {
+  companyId: string
+  companyName: string
+  playerId: string
+  ownerDisplayName: string
+  totalWealth: number
+  cash: number
+  buildingValue: number
+  inventoryValue: number
+  buildingCount: number
+}
+
 /** Matches backend GameState entity */
 export interface GameState {
   currentTick: number
@@ -629,6 +642,24 @@ export interface BuildingLedgerSummary {
   buildingType: string
   revenue: number
   costs: number
+}
+
+export interface BuildingFinancialTickSnapshot {
+  tick: number
+  sales: number
+  costs: number
+  profit: number
+}
+
+export interface BuildingFinancialTimeline {
+  buildingId: string
+  buildingName: string
+  dataFromTick: number
+  dataToTick: number
+  totalSales: number
+  totalCosts: number
+  totalProfit: number
+  timeline: BuildingFinancialTickSnapshot[]
 }
 
 export interface LedgerEntryResult {

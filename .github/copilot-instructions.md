@@ -425,6 +425,10 @@ Root-cause of a CI failure (March 2026, PR #82 / power grid — second attempt):
 5. **To test locale/language changes, use `page.addInitScript(() => localStorage.setItem('app_locale', 'sk'))` before `page.goto()`.** Do NOT use `page.locator('#language-select').selectOption(...)` — the UI element can be unreliable across CI build variants.
 6. **After placing a unit via the picker (`placeUnit`), `selectedCell` is reset to null.** The cell must be clicked again before the config panel is visible.
 7. **Always run the targeted spec before `report_progress` with `CI=true`:** `CI=true npx playwright test --project=chromium e2e/<spec>.ts`. Only then run the full suite. Running without `CI=true` uses dev server which may behave differently from the production build used in CI.
+8. **When you replace an existing UI workflow (for example inline selector to full-page dialog, or removing a field like `Lock to Vendor`), update every existing Playwright assertion that references the old UI in the same session.** Do not leave legacy expectations in the suite.
+9. **Add a regression test for the new workflow itself, not just the old test rewritten.** Example: if purchase configuration moves to a full-page selector, add a test that opens the selector, chooses the item/vendor, saves, and verifies the persisted state.
+10. **Do not assert on dialog fields after the dialog is closed.** If the user clicks `Done` in a full-page selector, assert against the persisted summary/state in the sidebar instead of a removed search input or closed overlay element.
+11. **For mini-chart UIs, assert rendered data presence rather than per-bar visibility heuristics.** Prefer checking that the chart label is visible and that bars exist (count/title/style), because narrow bar divs inside compact charts may be reported as `hidden` by Playwright even when the chart rendered correctly.
 
 ## Minimal-change PR quality — prove the gap, don't just fix the symptom
 
@@ -439,6 +443,19 @@ Root-cause of a quality failure (March 2026, PR #63 onboarding routing fix):
 3. **Include at least one golden-path E2E test that covers the full flow affected by the fix.** For this routing fix: home → guest onboarding → register → empire launched.
 4. **Explain in the PR description what the gap was and how the test proves it is fixed.** Link to the acceptance criterion it satisfies.
 5. **Do not consider a routing-only fix "done" without E2E proof.** Routing changes are easy to regress; tests are the safety net.
+
+## Leaderboard / multi-query UI resilience — do not blank a healthy tab
+
+Root-cause of a quality gap (April 2026, PR #239 / leaderboard split):
+- `LeaderboardView` requested `rankings` and `companyRankings` in one combined GraphQL query.
+- If `companyRankings` failed (for example due to backend/schema mismatch or mocked API drift), the whole page fell into a global error state and even the working player-rankings tab showed "Failed to fetch".
+- Existing E2E coverage only exercised the player tab happy path, so the company tab and partial-failure behavior were not proven.
+
+**Rules to prevent recurrence:**
+1. **When a page has multiple independently-usable tabs backed by different GraphQL fields, fetch them independently.** A failure in one tab must not blank the content of another healthy tab.
+2. **Do not use a single page-level error/loading state for independent tab datasets.** Keep per-tab loading/error state so the active working tab can still render.
+3. **When adding a new GraphQL field to a page that already works, add E2E coverage for both the new happy path and a partial-failure fallback.** For leaderboard, that means proving the companies tab renders and proving players still render when `companyRankings` fails.
+4. **Update the shared mock API helper for every new query field used by shipped UI.** Do not rely on partial mock payloads when the real page depends on the new field.
 
 ## PR draft state and CI triggering — do not leave PRs in draft
 

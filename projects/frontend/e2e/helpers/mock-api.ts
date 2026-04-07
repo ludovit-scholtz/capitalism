@@ -394,6 +394,17 @@ export type MockPublicSalesAnalytics = {
   brandAwareness: number | null
 }
 
+export type MockBuildingFinancialTimeline = {
+  buildingId: string
+  buildingName: string
+  dataFromTick: number
+  dataToTick: number
+  totalSales: number
+  totalCosts: number
+  totalProfit: number
+  timeline: Array<{ tick: number; sales: number; costs: number; profit: number }>
+}
+
 export type MockLoanOffer = {
   id: string
   bankBuildingId: string
@@ -459,6 +470,8 @@ export type MockState = {
   publicSalesRecords: MockPublicSalesRecord[]
   /** Public sales analytics by unit ID */
   publicSalesAnalytics: Record<string, MockPublicSalesAnalytics>
+  /** Building financial history keyed by building ID */
+  buildingFinancialTimelines: Record<string, MockBuildingFinancialTimeline>
   /** Loan offers available in the marketplace */
   loanOffers: MockLoanOffer[]
   /** Active loans for the current player's companies */
@@ -631,6 +644,42 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     incomeTaxDueGameYear: summary.incomeTaxDueGameYear ?? computeMockGameYear(incomeTaxDueAtTick),
     isIncomeTaxSettled: summary.isIncomeTaxSettled ?? gameYear < currentGameYear,
     history: summary.history ?? [buildMockLedgerHistoryYear(summary, currentGameYear)],
+  }
+}
+
+function buildMockBuildingFinancialTimeline(state: MockState, buildingId: string, limit = 100): MockBuildingFinancialTimeline | null {
+  const explicitTimeline = state.buildingFinancialTimelines[buildingId]
+  if (explicitTimeline) {
+    return explicitTimeline
+  }
+
+  const building = state.players
+    .flatMap((player) => player.companies)
+    .flatMap((company) => company.buildings)
+    .find((candidate) => candidate.id === buildingId)
+
+  if (!building) {
+    return null
+  }
+
+  const safeLimit = Math.max(1, limit)
+  const dataToTick = state.gameState.currentTick
+  const dataFromTick = Math.max(0, dataToTick - (safeLimit - 1))
+
+  return {
+    buildingId,
+    buildingName: building.name,
+    dataFromTick,
+    dataToTick,
+    totalSales: 0,
+    totalCosts: 0,
+    totalProfit: 0,
+    timeline: Array.from({ length: dataToTick - dataFromTick + 1 }, (_, index) => ({
+      tick: dataFromTick + index,
+      sales: 0,
+      costs: 0,
+      profit: 0,
+    })),
   }
 }
 
@@ -1202,6 +1251,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     researchBrands: {},
     publicSalesRecords: [],
     publicSalesAnalytics: {},
+    buildingFinancialTimelines: {},
     loanOffers: [],
     myLoans: [],
     procurementPreviews: {},
@@ -3192,6 +3242,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('buildingFinancialTimeline')) {
+      const buildingId = body.variables?.buildingId
+      const limit = Number(body.variables?.limit ?? 100)
+      const buildingFinancialTimeline = buildMockBuildingFinancialTimeline(state, buildingId, limit)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { buildingFinancialTimeline } }),
+      })
+    }
+
     if (query.includes('globalExchangeOffers')) {
       const destinationCityId = body.variables?.destinationCityId
       const resourceTypeId = body.variables?.resourceTypeId
@@ -3423,6 +3485,50 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { rankings } }),
+      })
+    }
+
+    if (query.includes('companyRankings')) {
+      const companyRankings = state.players
+        .filter((player) => player.role !== 'ADMIN')
+        .flatMap((player) =>
+          player.companies.map((company) => {
+            const buildingValue = company.buildings.reduce((sum, building) => {
+              const baseValues: Record<string, number> = {
+                MINE: 250000,
+                FACTORY: 200000,
+                SALES_SHOP: 150000,
+                RESEARCH_DEVELOPMENT: 300000,
+                APARTMENT: 400000,
+                COMMERCIAL: 350000,
+                MEDIA_HOUSE: 500000,
+                BANK: 600000,
+                EXCHANGE: 450000,
+                POWER_PLANT: 350000,
+              }
+              return sum + (baseValues[building.type] ?? 0) * building.level
+            }, 0)
+            const inventoryValue = 0
+
+            return {
+              companyId: company.id,
+              companyName: company.name,
+              playerId: player.id,
+              ownerDisplayName: player.displayName,
+              cash: company.cash,
+              buildingValue,
+              inventoryValue,
+              totalWealth: company.cash + buildingValue + inventoryValue,
+              buildingCount: company.buildings.length,
+            }
+          }),
+        )
+        .sort((left, right) => right.totalWealth - left.totalWealth)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { companyRankings } }),
       })
     }
 
@@ -3866,7 +3972,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'Unit not found or you don\'t own it.', extensions: { code: 'UNIT_NOT_FOUND' } }] }),
+          body: JSON.stringify({ errors: [{ message: "Unit not found or you don't own it.", extensions: { code: 'UNIT_NOT_FOUND' } }] }),
         })
       }
 
@@ -4001,6 +4107,64 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { acceptLoan: newLoan } }),
+      })
+    }
+
+    if (query.includes('FlushStorage') || query.includes('flushStorage')) {
+      const input = body.variables?.input
+      const buildingUnitId: string = input?.buildingUnitId ?? ''
+
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated', extensions: { code: 'AUTH_NOT_AUTHORIZED' } }] }),
+        })
+      }
+
+      // Find unit and validate ownership
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      let foundUnit: MockBuildingUnit | undefined
+      for (const company of player?.companies ?? []) {
+        for (const building of company.buildings ?? []) {
+          const u = building.units?.find((unit) => unit.id === buildingUnitId)
+          if (u) {
+            foundUnit = u
+            break
+          }
+        }
+        if (foundUnit) break
+      }
+
+      if (!foundUnit) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: "Unit not found or you don't own it.", extensions: { code: 'UNIT_NOT_FOUND' } }] }),
+        })
+      }
+
+      const flushableTypes = ['STORAGE', 'MINING', 'MANUFACTURING']
+      if (!flushableTypes.includes(foundUnit.unitType)) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Only STORAGE, MINING and MANUFACTURING units can be flushed.', extensions: { code: 'INVALID_UNIT_TYPE' } }] }),
+        })
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            flushStorage: {
+              discardedItemCount: 1,
+              totalDiscardedValue: 100,
+              discardedEntries: [{ itemName: 'Wood', quantity: 10, sourcingCostLost: 100 }],
+            },
+          },
+        }),
       })
     }
 
