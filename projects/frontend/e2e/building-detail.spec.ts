@@ -7586,7 +7586,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(pricePanel.locator('.mi-price-error')).toContainText(/not found|failed|error/i)
 
     // Success message should NOT appear
-    await expect(pricePanel.locator('.mi-price-success')).not.toBeVisible()
+    await expect(pricePanel.locator('.mi-price-success')).toBeHidden()
   })
 
   test('quick price update preserves route, unit selection, and analytics panel after applying price', async ({
@@ -10947,5 +10947,153 @@ test.describe('Building detail tick-refresh stability', () => {
     await expect(page).toHaveURL(/\/building\/building-unit-stable\?unit=0(?:,|%2C)0$/)
     // Main loading spinner must not appear
     await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
+  })
+
+  test('in-progress draft layout edit is preserved after a background tick refresh', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-draft-stable',
+      playerId: player.id,
+      name: 'Draft Stable Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-draft-stable',
+          companyId: 'company-draft-stable',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Draft Stable Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-draft-stable-1',
+              buildingId: 'building-draft-stable',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              maxPrice: 50,
+              purchaseSource: 'EXCHANGE',
+            } satisfies MockBuildingUnit,
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameState.currentTick = 30
+    state.gameState.tickIntervalSeconds = 1
+    state.gameState.lastTickAtUtc = new Date(Date.now() - 500).toISOString()
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-draft-stable')
+    await expect(page.getByRole('heading', { name: 'Draft Stable Factory' })).toBeVisible()
+
+    // Enter edit mode — this opens the draft layout editor (shows "Planned Upgrade" section)
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    // "Cancel Editing" is always visible when isEditing = true, regardless of whether draft has changes
+    await expect(page.getByRole('button', { name: 'Cancel Editing' })).toBeVisible()
+    // The planned-upgrade section heading confirms edit mode is active
+    await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+
+    // Simulate a tick advancing while we have unsaved draft edits
+    state.gameState.currentTick = 31
+    state.gameState.lastTickAtUtc = new Date().toISOString()
+
+    // Edit mode must still be active — preserveDraft: true prevents tick refresh from resetting isEditing
+    await expect(page.getByRole('button', { name: 'Cancel Editing' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Planned Upgrade' })).toBeVisible()
+    // No loading spinner must have appeared
+    await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
+  })
+
+  test('unit selection is restored from ?unit= query param on direct navigation', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-deeplink',
+      playerId: player.id,
+      name: 'Deeplink Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-deeplink',
+          companyId: 'company-deeplink',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Deeplink Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-deeplink-1',
+              buildingId: 'building-deeplink',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              maxPrice: 80,
+              purchaseSource: 'EXCHANGE',
+            } satisfies MockBuildingUnit,
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    // Navigate directly with the unit query param to test deep-link restore
+    await page.goto('/building/building-deeplink?unit=0,0')
+    await expect(page.getByRole('heading', { name: 'Deeplink Factory' })).toBeVisible()
+
+    // The unit details panel must open automatically from the URL param
+    await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
+    // URL must still contain the unit param
+    await expect(page).toHaveURL(/\/building\/building-deeplink\?unit=0(?:,|%2C)0$/)
   })
 })
