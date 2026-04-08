@@ -22,6 +22,7 @@ import {
 import { annotateExchangeOffers, selectOptimalOffer, sortExchangeOffers, detectLogisticsTrap, type AnnotatedExchangeOffer, type ExchangeSortBy } from '@/lib/globalExchange'
 import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedResourceDescription, getLocalizedResourceName } from '@/lib/catalogPresentation'
 import { useTickRefresh } from '@/composables/useTickRefresh'
+import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { deepEqual } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth'
@@ -260,6 +261,8 @@ const cancelPlanError = ref<string | null>(null)
 const layoutName = ref('')
 const showLayoutDialog = ref(false)
 const selectedHistoryItemKey = ref<string | null>(null)
+
+const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 // Property management (APARTMENT / COMMERCIAL)
 const showRentDialog = ref(false)
@@ -3190,7 +3193,15 @@ useTickRefresh(async () => {
     return
   }
 
-  await loadBuilding({ preserveDraft: isEditing.value })
+  // Save scroll position before data update so the player's reading context is preserved
+  const scrollPos = saveScrollPosition()
+  try {
+    await loadBuilding({ preserveDraft: isEditing.value })
+  } finally {
+    // Always restore scroll so the player's position is preserved regardless of errors
+    await restoreScrollPosition(scrollPos)
+  }
+
   // Refresh analytics for the selected PUBLIC_SALES unit on tick change
   const unitId = getResolvedLiveUnitId(selectedPublicSalesUnit.value)
   if (unitId) {
