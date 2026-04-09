@@ -5,24 +5,34 @@ Create a fun game on style of the capitalism II game. This game is economic simu
 It will use real world map. The game will start in single city and later other cities will be added.
 
 ## Issues to work on
-
-- Improve public sales calculation engine
-- Game is flickery. When data updates on many pages such as building overview or unit detail overview is unusuable because when player scrolls the page and tick refresh the data the context is lost. Make sure to use the routing for all navigation for example unit selection. Leaderboard and stock exchange are also flickery and many other pages as well.
-- Unable to fast change price in unit detail overview. The price change works in building edit mode
-- Add to the resource flow chart (or create new chart) in unit detail also the sales chart and profit chart so that player can see how much money he made on specific product.
-- Limited startup pack can be activated even if user does not pay $20
-- Make product select in units much more better for users. For example add there pictures and make the connected products in the top and for R&D make the most used products by company at the top
-- Make units upgradable
-- In encyclpedia ensure spacing between components - search bar has no space between search bar and products
-- In global exchange should be list of all products not just raw materials
-- Stock exchange model must allow purchase of stocks of any company from any other person or company account and see the stock price history. UX must allow to buy the stock of any company with public ownership. Remove account switching from stock exchange as it is implemented now in the top navigation bar. Add to the buy and sell information about the bid and offer. In company ledger overview in cash flow should be column stock buy back and all operations in the stock exchange must be visible somewhere in the ledger.
-- Leaderboard should be split to most rich person and most rich company
-- Do not request players to select the building names when creating building - generate them natural names automatically
-- When creating storage unit, do not request the type of resource - storage unit can accept any resources. Create flush storage feature in any storage capable units. Make sure after this action it is visible in ledger as discarted resources.
+- Leaderboard - change richest players to show their cash and stocks value (wealth of personal account) instead of buildings and inventory. Keep cash, buildings and inventory for company side ranking.
+- Remove startup pack from the game side, and add it only to the master web and api. In the game frontend just show if pro subscription is active and give there link to the master web to get more information abount it.
+- --color-surface-secondary is defined as #f3f4f6, but --color-text-primary is not defined and in some components this combination makes the color of text white and background white so it does not show the text; --color-background is not defined and color text is defined as #e6edf3 - this make the white text on white background making the text not readable. Fix all similar issues.
+- Improve public sales calculation engine - add trending and random component. The 
+- Improve product selection in sales and storage unit - select products only from connected units or current stock items.
+- Product picker does not work at the moment - looks like lines are shrinked and it does not show the products. Perhaps the list should be hidden by the default until the select button is clicked?
+- Show save layout and load layout not in the unit editation but in the building editation. Building layout should be loadable and storeable. Allow user to store this to the master game api, so that he can reuse the layouts between different games.
+- While upgrade of unit is in progress do not move the items from or to the unit or do not produce the items. Allow upgrades UX to be the same as the edit building. Show the upgrade buttons in the edit mode and allow multiple units in the building to be upgraded at the same time.
+- Allow in the sale show build the storage unit
+- For upgrading the units show true changes what effect it will have. For example the storage capacity of the unit will expand from 100 to 250 and power consumption will increase from 1MW to 1.5MW and salaries will increase from 1 manhour to 2 manhour for example.
+- Global exchange should provide bid and offer for every product. The prices and qualities should be subject of small changes.
+- In stock exchange should be clear list of all companies in the game with public ownership with the stock price, market value, and player aggregated ownership information listed in the table which can be sorted and filtered and paginated
+- Stock exchange model must allow purchase of stocks of any company from any other person or company account and see the stock price history. 
+- UX in stock exchange must allow to buy the stock of any company with public ownership. 
+- Remove account switching from stock exchange as it is implemented now in the top navigation bar. 
+- When error occurs with the buy or sell of the stock, show the error right next to the button. When UX is scrolled to the bottom to do the actions and the error is in the top of the screen user is not aware of the error. Or implement the toast window so that this can be solved in the whole app.
+- Add to the buy and sell buttons information about the exact bid and offer price. Add it on the same line as the quantity selection.
+- All stock exchange operations should be also visible in the ledger overview
+- Dashboard and ledger is loading slow, make sure to use the caching headers so that when user goes fast between the panels it does not have to load all information from the database again. Analyze the issue of the slow requests and if the database is missing an indexes make sure they are created.
 - When creating b2b sale unit, make sure to suggest the competetive price
-- When creating new factory the default layout does not include the b2b sale unit
-- When updating building the spacing on page is wrong. Component touch each other. Also show the remaining ticks to apply the changes.
-- In each factory or sales building show chart of total costs, total revenue and total profit in the top building overview
+- Choose product and vendor does not show icons and the top of the window is hidden by the navbar
+- When updating building the spacing on page is wrong. Component touch each other. Sell building button touches the cancel editing button. 
+- Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging
+- In each building header right below the building name show chart of total costs, total revenue and total profit in the top building overview
+- Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. 
+- In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
+- Create ingame chat
+- Administrators role management, dashboard, impersonalization
 
 ## Multiple Game Servers
 
@@ -65,6 +75,7 @@ Factories unit grid allows:
 Sales shops unit grid allows:
 - Purchase unit
 - Marketing unit
+- Storage unit
 - Public sales unit
 
 Research and development building allows units:
@@ -320,7 +331,21 @@ Every resource must have unique picture.
 
 ## Chat
 
-In game chat will be possible if user links his account with the discord.
+In game chat will be possible
+
+## Game administrators
+
+Game administrators have a dashboard where they can see all critical issues in the game like inflow of money, highlighting users which may be doing multiaccount gaming where they boost one of the account.
+
+Game administrators can switch person as invisible - In this mode the person can see his chat messages, but others do not see them. 
+
+Game administrators can do impersonalization to the player's view. In this mode they can do anything on behalf of the player or player's person account or any of the player's company. Make sure the logs handle this issue and show the game administrator who is acting, user on behalf of which the admin is acting and person or company account on behalf of which is the admin acting.
+
+There are roles in the game which can be assigned to any user account. The root administrator can assign or remove the global game administrator role and local game administrator role. The user with global game administrator role can access every game admin dashboard, and do game administrator actions. Local game administor can manage only single game instance.
+
+Game administration is managed in the master api, but local game administrator role can be managed at the game server.
+
+List of the root game administrators is managed by the master api configuration.
 
 ## Monetization
 
@@ -346,3 +371,4 @@ Master server Backend is .NET with graphql engine with data stored in postgresql
 Deployed to kubernetes.
 
 Players must receive near real time user experience.
+
