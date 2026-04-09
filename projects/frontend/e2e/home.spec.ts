@@ -8,6 +8,15 @@ async function authenticate(page: Parameters<typeof test>[0]['page'], token: str
   }, token)
 }
 
+function addPlayerShareholding(state: ReturnType<typeof setupMockApi>, playerId: string, companyId: string, shareCount = 10000) {
+  state.shareholdings.push({
+    companyId,
+    ownerPlayerId: playerId,
+    ownerCompanyId: null,
+    shareCount,
+  })
+}
+
 test.describe('Home page', () => {
   test('shows hero section with Get Started link when not authenticated', async ({ page }) => {
     setupMockApi(page)
@@ -42,10 +51,11 @@ test.describe('Home page', () => {
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [],
     })
-    setupMockApi(page, { players: [player] })
+    const state = setupMockApi(page, { players: [player] })
+    addPlayerShareholding(state, player.id, 'comp-1')
     await page.goto('/')
     await expect(page.getByText('Tycoon')).toBeVisible()
-    await expect(page.getByText('$750,000')).toBeVisible()
+    await expect(page.getByText('$950,000')).toBeVisible()
   })
 
   test('shows empty leaderboard message when no players', async ({ page }) => {

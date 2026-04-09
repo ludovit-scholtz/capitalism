@@ -8349,52 +8349,57 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task Rankings_ReturnsPlayerRankings()
     {
         // Register a player with a company
-        var token = await RegisterAndGetTokenAsync("rank@test.com", "Ranker");
+        var token = await RegisterAndGetTokenAsync($"rank-{Guid.NewGuid():N}@test.com", "Ranker");
         await ExecuteGraphQlAsync(
             "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
             new { input = new { name = "Rank Corp" } },
             token);
 
         var result = await ExecuteGraphQlAsync(
-            "{ rankings { displayName totalWealth cashTotal buildingValue inventoryValue companyCount } }");
+            "{ rankings { displayName totalWealth personalCash sharesValue companyCount } }");
 
         var rankings = result.GetProperty("data").GetProperty("rankings");
         Assert.True(rankings.GetArrayLength() >= 1);
     }
 
     [Fact]
-    public async Task Rankings_ReturnsAllWealthComponents()
+    public async Task Rankings_UsesPersonalCashAndHeldShares()
     {
-        var token = await RegisterAndGetTokenAsync("wealth@test.com", "WealthPlayer");
-        await ExecuteGraphQlAsync(
-            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
-            new { input = new { name = "Wealth Corp" } },
-            token);
+        var token = await RegisterAndGetTokenAsync($"wealth-{Guid.NewGuid():N}@test.com", "WealthPlayer");
+        var playerId = await GetCurrentPlayerIdAsync(token);
+        await SeedPublicCompanyAsync(playerId, name: "Wealth Corp", cash: 120_000m, totalShares: 10_000m, founderShares: 2_500m);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+            player.PersonalCash = 123_456m;
+            await db.SaveChangesAsync();
+        }
 
         var result = await ExecuteGraphQlAsync(
-            "{ rankings { playerId displayName totalWealth cashTotal buildingValue inventoryValue companyCount } }");
+            "{ me { personalCash } personAccount { shareholdings { marketValue } } rankings { playerId totalWealth personalCash sharesValue companyCount } }",
+            token: token);
 
-        var rankings = result.GetProperty("data").GetProperty("rankings");
-        var entry = rankings.EnumerateArray()
-            .FirstOrDefault(r => r.GetProperty("displayName").GetString() == "WealthPlayer");
+        var data = result.GetProperty("data");
+        var meCash = data.GetProperty("me").GetProperty("personalCash").GetDecimal();
+        var expectedSharesValue = data.GetProperty("personAccount").GetProperty("shareholdings")
+            .EnumerateArray()
+            .Sum(holding => holding.GetProperty("marketValue").GetDecimal());
+        var entry = data.GetProperty("rankings").EnumerateArray()
+            .FirstOrDefault(r => r.GetProperty("playerId").GetString() == playerId.ToString());
 
         Assert.True(entry.ValueKind != System.Text.Json.JsonValueKind.Undefined, "WealthPlayer ranking entry not found");
-        Assert.True(entry.GetProperty("cashTotal").GetDecimal() >= 0);
-        Assert.True(entry.GetProperty("buildingValue").GetDecimal() >= 0);
-        Assert.True(entry.GetProperty("inventoryValue").GetDecimal() >= 0);
-
-        // totalWealth must equal the sum of its components
-        var cash = entry.GetProperty("cashTotal").GetDecimal();
-        var building = entry.GetProperty("buildingValue").GetDecimal();
-        var inventory = entry.GetProperty("inventoryValue").GetDecimal();
-        var total = entry.GetProperty("totalWealth").GetDecimal();
-        Assert.Equal(cash + building + inventory, total);
+        Assert.Equal(meCash, entry.GetProperty("personalCash").GetDecimal());
+        Assert.Equal(expectedSharesValue, entry.GetProperty("sharesValue").GetDecimal());
+        Assert.Equal(meCash + expectedSharesValue, entry.GetProperty("totalWealth").GetDecimal());
+        Assert.Equal(1, entry.GetProperty("companyCount").GetInt32());
     }
 
     [Fact]
-    public async Task Rankings_AggregatesMultipleCompanies()
+    public async Task Rankings_AggregatesMultipleCompaniesIntoShareValue()
     {
-        var token = await RegisterAndGetTokenAsync("multi@test.com", "MultiCo");
+        var token = await RegisterAndGetTokenAsync($"multi-{Guid.NewGuid():N}@test.com", "MultiCo");
         await ExecuteGraphQlAsync(
             "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
             new { input = new { name = "Company A" } },
@@ -8405,7 +8410,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             token);
 
         var result = await ExecuteGraphQlAsync(
-            "{ rankings { displayName totalWealth cashTotal companyCount } }");
+            "{ rankings { displayName totalWealth personalCash sharesValue companyCount } }");
 
         var rankings = result.GetProperty("data").GetProperty("rankings");
         var entry = rankings.EnumerateArray()
@@ -8413,15 +8418,17 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.True(entry.ValueKind != System.Text.Json.JsonValueKind.Undefined, "MultiCo ranking entry not found");
         Assert.Equal(2, entry.GetProperty("companyCount").GetInt32());
-        // cashTotal must reflect both companies (default starting capital is $1,000,000 each)
-        Assert.True(entry.GetProperty("cashTotal").GetDecimal() >= 2_000_000m);
+        Assert.True(entry.GetProperty("sharesValue").GetDecimal() > 0m);
+        Assert.Equal(
+            entry.GetProperty("personalCash").GetDecimal() + entry.GetProperty("sharesValue").GetDecimal(),
+            entry.GetProperty("totalWealth").GetDecimal());
     }
 
     [Fact]
     public async Task Rankings_OrderedByTotalWealthDescending()
     {
-        var richToken = await RegisterAndGetTokenAsync("rich@test.com", "RichPlayer");
-        var poorToken = await RegisterAndGetTokenAsync("poor@test.com", "PoorPlayer");
+        var richToken = await RegisterAndGetTokenAsync($"rich-{Guid.NewGuid():N}@test.com", "RichPlayer");
+        var poorToken = await RegisterAndGetTokenAsync($"poor-{Guid.NewGuid():N}@test.com", "PoorPlayer");
 
         // Rich player gets two companies, poor player gets none.
         await ExecuteGraphQlAsync(
@@ -8462,13 +8469,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
-    public async Task Rankings_ZeroWealthPlayerIncluded()
+    public async Task Rankings_PlayerWithoutCompaniesUsesPersonalCashOnly()
     {
-        // A player who registered but has no companies should appear with zero wealth.
-        await RegisterAndGetTokenAsync("zero@test.com", "ZeroPlayer");
+        var token = await RegisterAndGetTokenAsync($"zero-{Guid.NewGuid():N}@test.com", "ZeroPlayer");
 
         var result = await ExecuteGraphQlAsync(
-            "{ rankings { displayName totalWealth companyCount } }");
+            "{ rankings { displayName totalWealth personalCash sharesValue companyCount } }",
+            token: token);
 
         var rankings = result.GetProperty("data").GetProperty("rankings");
         var entry = rankings.EnumerateArray()
@@ -8476,7 +8483,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.True(entry.ValueKind != System.Text.Json.JsonValueKind.Undefined, "ZeroPlayer ranking entry not found");
         Assert.Equal(0, entry.GetProperty("companyCount").GetInt32());
-        Assert.Equal(0m, entry.GetProperty("totalWealth").GetDecimal());
+        Assert.Equal(200_000m, entry.GetProperty("personalCash").GetDecimal());
+        Assert.Equal(0m, entry.GetProperty("sharesValue").GetDecimal());
+        Assert.Equal(200_000m, entry.GetProperty("totalWealth").GetDecimal());
     }
 
     #endregion

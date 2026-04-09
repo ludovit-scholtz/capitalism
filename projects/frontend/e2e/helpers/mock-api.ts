@@ -3539,35 +3539,30 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const rankings = state.players
         .filter((p) => p.role !== 'ADMIN')
         .map((p) => {
-          const cashTotal = p.companies.reduce((sum, c) => sum + c.cash, 0)
-          const buildingValue = p.companies.reduce(
-            (sum, c) =>
-              sum +
-              c.buildings.reduce((bSum, b) => {
-                const baseValues: Record<string, number> = {
-                  MINE: 250000,
-                  FACTORY: 200000,
-                  SALES_SHOP: 150000,
-                  RESEARCH_DEVELOPMENT: 300000,
-                  APARTMENT: 400000,
-                  COMMERCIAL: 350000,
-                  MEDIA_HOUSE: 500000,
-                  BANK: 600000,
-                  EXCHANGE: 450000,
-                  POWER_PLANT: 350000,
+          const personalCash = p.personalCash ?? 0
+          const sharesValue = Number(
+            state.shareholdings
+              .filter((holding) => holding.ownerPlayerId === p.id && holding.shareCount > 0)
+              .reduce((total, holding) => {
+                const company = state.players
+                  .flatMap((candidate) => candidate.companies)
+                  .find((candidate) => candidate.id === holding.companyId)
+
+                if (!company) {
+                  return total
                 }
-                return bSum + (baseValues[b.type] ?? 0) * b.level
-              }, 0),
-            0,
+
+                return total + holding.shareCount * computeMockSharePrice(company)
+              }, 0)
+              .toFixed(2),
           )
-          const inventoryValue = 0 // inventory not tracked in mock state
+
           return {
             playerId: p.id,
             displayName: p.displayName,
-            cashTotal,
-            buildingValue,
-            inventoryValue,
-            totalWealth: cashTotal + buildingValue + inventoryValue,
+            personalCash,
+            sharesValue,
+            totalWealth: Number((personalCash + sharesValue).toFixed(2)),
             companyCount: p.companies.length,
           }
         })

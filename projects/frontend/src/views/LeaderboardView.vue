@@ -39,9 +39,8 @@ const PLAYER_RANKINGS_QUERY = `
       playerId
       displayName
       totalWealth
-      cashTotal
-      buildingValue
-      inventoryValue
+      personalCash
+      sharesValue
       companyCount
     }
   }
@@ -248,11 +247,9 @@ const currentTick = computed(() => gameStateStore.gameState?.currentTick ?? null
             <div class="rank-wealth">
               <div class="total-wealth">{{ formatWealth(rank.totalWealth) }}</div>
               <div class="wealth-breakdown">
-                <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.cashTotal) }} </span>
+                <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.personalCash) }} </span>
                 <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.buildingsTooltip')"> 🏗️ {{ formatWealth(rank.buildingValue) }} </span>
-                <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.inventoryTooltip')"> 📦 {{ formatWealth(rank.inventoryValue) }} </span>
+                <span class="breakdown-item" :title="t('leaderboard.stocksTooltip')"> 📈 {{ formatWealth(rank.sharesValue) }} </span>
               </div>
             </div>
           </div>
@@ -320,8 +317,22 @@ const currentTick = computed(() => gameStateStore.gameState?.currentTick ?? null
 
       <div class="leaderboard-explainer">
         <h3>{{ t('leaderboard.howItWorksTitle') }}</h3>
-        <p>{{ t('leaderboard.howItWorksBody') }}</p>
-        <ul class="formula-list">
+        <p>
+          {{
+            activeTab === 'players'
+              ? t('leaderboard.playerHowItWorksBody')
+              : t('leaderboard.companyHowItWorksBody')
+          }}
+        </p>
+        <ul class="formula-list" v-if="activeTab === 'players'">
+          <li>
+            💵 <strong>{{ t('leaderboard.cashLabel') }}</strong> — {{ t('leaderboard.personalCashExplain') }}
+          </li>
+          <li>
+            📈 <strong>{{ t('leaderboard.stocksLabel') }}</strong> — {{ t('leaderboard.stocksExplain') }}
+          </li>
+        </ul>
+        <ul class="formula-list" v-else>
           <li>
             💵 <strong>{{ t('leaderboard.cashLabel') }}</strong> — {{ t('leaderboard.cashExplain') }}
           </li>

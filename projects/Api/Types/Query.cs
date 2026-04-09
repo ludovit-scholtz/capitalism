@@ -462,63 +462,48 @@ public sealed class Query
     /// <summary>
     /// Gets the player ranking (leaderboard) sorted by total wealth.
     ///
-    /// Wealth formula (interim, will evolve as the economy simulation matures):
-    ///   TotalWealth = CashTotal + BuildingValue + InventoryValue
-    ///   - CashTotal:      Sum of company.Cash across all owned companies.
-    ///   - BuildingValue:  Sum of (BuildingBaseValue[type] × level) for each building.
-    ///                     Base values reflect construction cost and are documented in
-    ///                     <see cref="WealthCalculator.BuildingBaseValues"/>.
-    ///   - InventoryValue: Sum of (inventory.Quantity × item.BasePrice) for all
-    ///                     resource and product stock in company buildings.
+    /// Wealth formula for players: Personal cash + value of owned shares.
+    /// Wealth formula for companies: Cash + BuildingValue + InventoryValue (unchanged).
     /// </summary>
     public async Task<List<PlayerRanking>> GetRankings([Service] AppDbContext db)
     {
         var players = await db.Players
-            .Include(p => p.Companies)
-            .ThenInclude(c => c.Buildings)
-            .ThenInclude(b => b.Units)
             .Where(p => p.Role != PlayerRole.Admin)
             .ToListAsync();
 
-        // Load all inventory for non-admin players' buildings with price lookups.
-        var companyIds = players.SelectMany(p => p.Companies).Select(c => c.Id).ToList();
-        var buildingIds = players.SelectMany(p => p.Companies)
-            .SelectMany(c => c.Buildings)
-            .Select(b => b.Id)
-            .ToList();
-
+        // Load all companies, buildings, lots, inventories, and shareholdings for share price calculation
+        var companies = await db.Companies.ToListAsync();
+        var buildings = await db.Buildings.ToListAsync();
+        var lots = await db.BuildingLots
+            .Where(l => l.OwnerCompanyId.HasValue)
+            .ToListAsync();
         var inventories = await db.Inventories
-            .Where(i => buildingIds.Contains(i.BuildingId))
             .Include(i => i.ResourceType)
             .Include(i => i.ProductType)
             .ToListAsync();
+        var shareholdings = await db.Shareholdings.ToListAsync();
 
-        var inventoryByBuilding = inventories
-            .GroupBy(i => i.BuildingId)
-            .ToDictionary(g => g.Key, g => g.ToList());
+        var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
 
         return players
             .Select(p =>
             {
-                var cashTotal = p.Companies.Sum(c => c.Cash);
-                var buildingValue = p.Companies
-                    .SelectMany(c => c.Buildings)
-                    .Sum(b => WealthCalculator.GetBuildingValue(b));
-                var inventoryValue = p.Companies
-                    .SelectMany(c => c.Buildings)
-                    .Sum(b => inventoryByBuilding.TryGetValue(b.Id, out var inv)
-                        ? inv.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i))
-                        : 0m);
+                var personalCash = p.PersonalCash;
+                var sharesValue = shareholdings
+                    .Where(sh => sh.OwnerPlayerId == p.Id && sh.ShareCount > 0m)
+                    .Sum(sh => decimal.Round(
+                        sh.ShareCount * sharePriceByCompany.GetValueOrDefault(sh.CompanyId),
+                        4,
+                        MidpointRounding.AwayFromZero));
 
                 return new PlayerRanking
                 {
                     PlayerId = p.Id,
                     DisplayName = p.DisplayName,
-                    CashTotal = cashTotal,
-                    BuildingValue = buildingValue,
-                    InventoryValue = inventoryValue,
-                    TotalWealth = cashTotal + buildingValue + inventoryValue,
-                    CompanyCount = p.Companies.Count
+                    PersonalCash = personalCash,
+                    SharesValue = sharesValue,
+                    TotalWealth = decimal.Round(personalCash + sharesValue, 4, MidpointRounding.AwayFromZero),
+                    CompanyCount = companies.Count(c => c.PlayerId == p.Id)
                 };
             })
             .OrderByDescending(r => r.TotalWealth)
@@ -3131,25 +3116,16 @@ public sealed class PlayerRanking
     public string DisplayName { get; set; } = string.Empty;
 
     /// <summary>
-    /// Total wealth = CashTotal + BuildingValue + InventoryValue.
+    /// Total wealth = PersonalCash + SharesValue.
     /// See <see cref="Query.GetRankings"/> for the full valuation formula.
     /// </summary>
     public decimal TotalWealth { get; set; }
 
-    /// <summary>Sum of all company cash balances (liquid funds).</summary>
-    public decimal CashTotal { get; set; }
+    /// <summary>Cash held in the player's personal account.</summary>
+    public decimal PersonalCash { get; set; }
 
-    /// <summary>
-    /// Estimated value of all owned buildings.
-    /// Calculated as BuildingBaseValue[type] × level for each building.
-    /// </summary>
-    public decimal BuildingValue { get; set; }
-
-    /// <summary>
-    /// Estimated value of all inventory held in company buildings.
-    /// Calculated as quantity × basePrice for each resource or product in stock.
-    /// </summary>
-    public decimal InventoryValue { get; set; }
+    /// <summary>Market value of all shares held by the player's personal account.</summary>
+    public decimal SharesValue { get; set; }
 
     /// <summary>Number of companies owned.</summary>
     public int CompanyCount { get; set; }

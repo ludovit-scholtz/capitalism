@@ -23,7 +23,7 @@ async function loadHomeData(isRefresh = false) {
   }
   try {
     const [rankData, stateData] = await Promise.all([
-      gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth cashTotal buildingValue inventoryValue companyCount } }'),
+      gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth personalCash sharesValue companyCount } }'),
       gqlRequest<{ gameState: GameState }>(
         '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }',
       ),

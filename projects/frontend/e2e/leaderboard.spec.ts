@@ -1,12 +1,21 @@
 import { test, expect } from '@playwright/test'
 import { setupMockApi, makePlayer } from './helpers/mock-api'
 
+function addPlayerShareholding(state: ReturnType<typeof setupMockApi>, playerId: string, companyId: string, shareCount = 10000) {
+  state.shareholdings.push({
+    companyId,
+    ownerPlayerId: playerId,
+    ownerCompanyId: null,
+    shareCount,
+  })
+}
+
 test.describe('Leaderboard page', () => {
   test('shows leaderboard heading and subtitle', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/leaderboard')
     await expect(page.getByRole('heading', { name: 'Wealth Leaderboard' })).toBeVisible()
-    await expect(page.getByText('Rankings are based on total wealth')).toBeVisible()
+    await expect(page.getByText('Player rankings show personal wealth')).toBeVisible()
   })
 
   test('shows empty state when no players', async ({ page }) => {
@@ -34,7 +43,9 @@ test.describe('Leaderboard page', () => {
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [],
     })
-    setupMockApi(page, { players: [player1, player2] })
+    const state = setupMockApi(page, { players: [player1, player2] })
+    addPlayerShareholding(state, 'player-1', 'comp-1')
+    addPlayerShareholding(state, 'player-2', 'comp-2')
     await page.goto('/leaderboard')
     await expect(page.getByText('Alice')).toBeVisible()
     await expect(page.getByText('Bob')).toBeVisible()
@@ -53,11 +64,11 @@ test.describe('Leaderboard page', () => {
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [],
     })
-    setupMockApi(page, { players: [player] })
+    const state = setupMockApi(page, { players: [player] })
+    addPlayerShareholding(state, player.id, 'comp-1')
     await page.goto('/leaderboard')
     await expect(page.getByText('Tycoon')).toBeVisible()
-    // Total wealth displayed — 750000 formats as $750.0K
-    await expect(page.locator('.total-wealth').getByText('$750.0K')).toBeVisible()
+    await expect(page.locator('.total-wealth').getByText('$950.0K')).toBeVisible()
   })
 
   test('shows ranked entries for companies on the companies tab', async ({ page }) => {
@@ -155,10 +166,14 @@ test.describe('Leaderboard page', () => {
       foundedAtUtc: '2026-01-01T00:00:00Z',
       buildings: [],
     })
-    setupMockApi(page, { players: [player] })
+    const state = setupMockApi(page, { players: [player] })
+    addPlayerShareholding(state, player.id, 'comp-1')
     await page.goto('/leaderboard')
     await expect(page.getByText('How is wealth calculated?')).toBeVisible()
     await expect(page.locator('.formula-list').getByText('Cash', { exact: true })).toBeVisible()
+    await expect(page.locator('.formula-list').getByText('Stocks', { exact: true })).toBeVisible()
+
+    await page.getByRole('tab', { name: 'Richest Companies' }).click()
     await expect(page.locator('.formula-list').getByText('Buildings', { exact: true })).toBeVisible()
     await expect(page.locator('.formula-list').getByText('Inventory', { exact: true })).toBeVisible()
   })
