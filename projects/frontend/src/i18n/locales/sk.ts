@@ -326,7 +326,8 @@ export default {
   leaderboard: {
     eyebrow: 'Kompet\u00edt\u00edvne poradie',
     title: 'Rebr\u00ed\u010dek bohatstva',
-    subtitle: 'Poradie hr\u00e1\u010dov zobrazuje osobn\u00e9 bohatstvo (hotovos\u0165 + akciov\u00fd portfoli\u00f3). Poradie spolo\u010dnost\u00ed zobrazuje firemn\u00e9 akt\u00edva (hotovos\u0165 + budovy + sklady).',
+    subtitle:
+      'Poradie hr\u00e1\u010dov zobrazuje osobn\u00e9 bohatstvo (hotovos\u0165 + akciov\u00fd portfoli\u00f3). Poradie spolo\u010dnost\u00ed zobrazuje firemn\u00e9 akt\u00edva (hotovos\u0165 + budovy + sklady).',
     loadFailed: 'Nepodarilo sa na\u010d\u00edta\u0165 rebr\u00ed\u010dek',
     tabPlayers: 'Najbohat\u0161\u00ed hr\u00e1\u010di',
     tabCompanies: 'Najbohat\u0161ie spolo\u010dnosti',

@@ -306,9 +306,7 @@ test.describe('Leaderboard tab URL persistence', () => {
 })
 
 test.describe('Leaderboard tick-refresh stability', () => {
-  test('background tick refresh does not blank the players tab or show a loading spinner', async ({
-    page,
-  }) => {
+  test('background tick refresh does not blank the players tab or show a loading spinner', async ({ page }) => {
     const player1 = makePlayer({ id: 'player-tick-1', displayName: 'Tick Alice' })
     player1.companies.push({
       id: 'comp-tick-1',
@@ -376,10 +374,7 @@ test.describe('Leaderboard tick-refresh stability', () => {
     state.gameState.lastTickAtUtc = new Date(Date.now() - 400).toISOString()
 
     await page.goto('/leaderboard?tab=companies')
-    await expect(page.getByRole('tab', { name: 'Richest Companies' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    await expect(page.getByRole('tab', { name: 'Richest Companies' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText('Tab Alice Holdings')).toBeVisible()
 
     // Simulate tick advance
@@ -387,18 +382,13 @@ test.describe('Leaderboard tick-refresh stability', () => {
     state.gameState.lastTickAtUtc = new Date().toISOString()
 
     // Companies tab must remain active and content still visible after refresh
-    await expect(page.getByRole('tab', { name: 'Richest Companies' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    await expect(page.getByRole('tab', { name: 'Richest Companies' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText('Tab Alice Holdings')).toBeVisible()
     // No loading spinner must appear over the existing companies list
     await expect(page.locator('.state-box', { hasText: 'loading' })).toBeHidden()
   })
 
-  test('multiple entries remain visible and content does not jump during a tick refresh', async ({
-    page,
-  }) => {
+  test('multiple entries remain visible and content does not jump during a tick refresh', async ({ page }) => {
     // Create enough players to fill the leaderboard
     const players = Array.from({ length: 5 }, (_, i) =>
       makePlayer({

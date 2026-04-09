@@ -111,25 +111,17 @@ onMounted(async () => {
 
 useTickRefresh(async () => {
   const scrollPos = saveScrollPosition()
-  await Promise.allSettled([
-    fetchPlayerRankings(true),
-    companyRankingsLoaded.value || activeTab.value === 'companies'
-      ? fetchCompanyRankings(true)
-      : Promise.resolve(),
-  ])
+  await Promise.allSettled([fetchPlayerRankings(true), companyRankingsLoaded.value || activeTab.value === 'companies' ? fetchCompanyRankings(true) : Promise.resolve()])
   await restoreScrollPosition(scrollPos)
 })
 
-watch(
-  activeTab,
-  (tab: 'players' | 'companies') => {
-    // Persist the active tab in the URL so back/forward navigation and page reloads restore context
-    void router.replace({ query: { ...route.query, tab: tab === 'players' ? undefined : tab } })
-    if (tab === 'companies' && !companyRankingsLoaded.value && !companyLoading.value) {
-      void fetchCompanyRankings()
-    }
-  },
-)
+watch(activeTab, (tab: 'players' | 'companies') => {
+  // Persist the active tab in the URL so back/forward navigation and page reloads restore context
+  void router.replace({ query: { ...route.query, tab: tab === 'players' ? undefined : tab } })
+  if (tab === 'companies' && !companyRankingsLoaded.value && !companyLoading.value) {
+    void fetchCompanyRankings()
+  }
+})
 
 function retryActiveTab() {
   if (activeTab.value === 'companies') {
@@ -179,22 +171,10 @@ const currentTick = computed(() => gameStateStore.gameState?.currentTick ?? null
     <div class="container leaderboard-content">
       <!-- Tab switcher -->
       <div class="tab-switcher" role="tablist">
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'players'"
-          class="tab-btn"
-          :class="{ active: activeTab === 'players' }"
-          @click="activeTab = 'players'"
-        >
+        <button role="tab" :aria-selected="activeTab === 'players'" class="tab-btn" :class="{ active: activeTab === 'players' }" @click="activeTab = 'players'">
           👤 {{ t('leaderboard.tabPlayers') }}
         </button>
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'companies'"
-          class="tab-btn"
-          :class="{ active: activeTab === 'companies' }"
-          @click="activeTab = 'companies'"
-        >
+        <button role="tab" :aria-selected="activeTab === 'companies'" class="tab-btn" :class="{ active: activeTab === 'companies' }" @click="activeTab = 'companies'">
           🏢 {{ t('leaderboard.tabCompanies') }}
         </button>
       </div>
@@ -297,9 +277,7 @@ const currentTick = computed(() => gameStateStore.gameState?.currentTick ?? null
                 {{ rank.companyName }}
                 <span v-if="rank.playerId === currentPlayerId" class="you-badge">{{ t('leaderboard.you') }}</span>
               </div>
-              <div class="rank-companies">
-                {{ t('leaderboard.ownedBy', { name: rank.ownerDisplayName }) }} · {{ t('leaderboard.buildingsCount', { n: rank.buildingCount }) }}
-              </div>
+              <div class="rank-companies">{{ t('leaderboard.ownedBy', { name: rank.ownerDisplayName }) }} · {{ t('leaderboard.buildingsCount', { n: rank.buildingCount }) }}</div>
             </div>
             <div class="rank-wealth">
               <div class="total-wealth">{{ formatWealth(rank.totalWealth) }}</div>
@@ -318,11 +296,7 @@ const currentTick = computed(() => gameStateStore.gameState?.currentTick ?? null
       <div class="leaderboard-explainer">
         <h3>{{ t('leaderboard.howItWorksTitle') }}</h3>
         <p>
-          {{
-            activeTab === 'players'
-              ? t('leaderboard.playerHowItWorksBody')
-              : t('leaderboard.companyHowItWorksBody')
-          }}
+          {{ activeTab === 'players' ? t('leaderboard.playerHowItWorksBody') : t('leaderboard.companyHowItWorksBody') }}
         </p>
         <ul class="formula-list" v-if="activeTab === 'players'">
           <li>

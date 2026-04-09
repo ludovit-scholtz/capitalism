@@ -3375,9 +3375,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('globalExchangeProductListings')) {
       const productTypeIdFilter = body.variables?.productTypeId
-      const listings = state.productExchangeListings.filter(
-        (l) => !productTypeIdFilter || l.productTypeId === productTypeIdFilter,
-      )
+      const listings = state.productExchangeListings.filter((l) => !productTypeIdFilter || l.productTypeId === productTypeIdFilter)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -3544,9 +3542,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             state.shareholdings
               .filter((holding) => holding.ownerPlayerId === p.id && holding.shareCount > 0)
               .reduce((total, holding) => {
-                const company = state.players
-                  .flatMap((candidate) => candidate.companies)
-                  .find((candidate) => candidate.id === holding.companyId)
+                const company = state.players.flatMap((candidate) => candidate.companies).find((candidate) => candidate.id === holding.companyId)
 
                 if (!company) {
                   return total
@@ -4266,11 +4262,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     // unitUpgradeInfo query — check precisely to avoid false substring matches
-    if (
-      (query.includes('unitUpgradeInfo') || query.includes('UUI')) &&
-      !query.includes('scheduleUnitUpgrade') &&
-      !query.includes('ScheduleUnitUpgrade')
-    ) {
+    if ((query.includes('unitUpgradeInfo') || query.includes('UUI')) && !query.includes('scheduleUnitUpgrade') && !query.includes('ScheduleUnitUpgrade')) {
       const unitId: string = body.variables?.unitId ?? ''
       const override = state.unitUpgradeInfoOverrides[unitId]
       if (override === null) {

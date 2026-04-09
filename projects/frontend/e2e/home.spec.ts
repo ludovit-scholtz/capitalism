@@ -64,9 +64,7 @@ test.describe('Home page', () => {
     await expect(page.getByText('No players yet')).toBeVisible()
   })
 
-  test('shows Start Your Empire CTA for authenticated player with unfinished onboarding', async ({
-    page,
-  }) => {
+  test('shows Start Your Empire CTA for authenticated player with unfinished onboarding', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -79,9 +77,7 @@ test.describe('Home page', () => {
     await expect(startLink).toHaveAttribute('href', '/onboarding')
   })
 
-  test('shows Go to Dashboard CTA for authenticated player who finished onboarding', async ({
-    page,
-  }) => {
+  test('shows Go to Dashboard CTA for authenticated player who finished onboarding', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
       companies: [
@@ -117,7 +113,10 @@ test.describe('Header navigation', () => {
   test('logo navigates to home', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/login')
-    await page.getByRole('link', { name: /CAPITALISM V/i }).first().click()
+    await page
+      .getByRole('link', { name: /CAPITALISM V/i })
+      .first()
+      .click()
     await expect(page).toHaveURL(/\/$/)
   })
 
