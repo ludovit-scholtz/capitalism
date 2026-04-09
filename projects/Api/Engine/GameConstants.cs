@@ -66,6 +66,29 @@ public static class GameConstants
     /// <summary>Base demand per capita per product per tick.</summary>
     public const decimal BaseDemandPerCapita = 0.001m;
 
+    /// <summary>
+    /// Reference city salary used to normalise purchasing-power demand.
+    /// Cities with a <see cref="Api.Data.Entities.City.BaseSalaryPerManhour"/> equal to this
+    /// value produce a purchasing-power factor of 1.0 (no boost or penalty).
+    /// Higher-wage cities attract proportionally more consumer spending.
+    /// </summary>
+    public const decimal ReferenceSalaryPerManhour = 20m;
+
+    /// <summary>
+    /// Number of past ticks included in the "recent salary" window used to
+    /// compute dynamic purchasing-power demand (ROADMAP: "game currency
+    /// collected by salaries in past 10 ticks").
+    /// </summary>
+    public const int RecentSalaryWindowTicks = 10;
+
+    /// <summary>
+    /// Expected fraction of a city's population that generates LaborCost
+    /// ledger entries per tick through player-owned companies.  Used to
+    /// normalise the dynamic salary spending signal into a [0.5, 2.0]
+    /// purchasing-power factor.  0.001 = 0.1 % of population employed.
+    /// </summary>
+    public const decimal ExpectedSalaryParticipationRate = 0.001m;
+
     /// <summary>Standard cost of electricity used by unit operations and manufacturing.</summary>
     public const decimal EnergyPricePerMwh = 55m;
 

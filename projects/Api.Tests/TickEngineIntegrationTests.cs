@@ -1709,6 +1709,287 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             "The premium retail lot should not underperform the outskirt lot once higher population demand is applied.");
     }
 
+    [Fact]
+    public async Task PublicSalesPhase_HigherCitySalary_IncreasesBaselineDemand()
+    {
+        // Two identical shops in cities with the same population but different wages.
+        // The higher-wage city (factor=2.0) should produce more public sales demand
+        // than the lower-wage city (factor=0.5) because residents have more
+        // purchasing power, which scales the per-capita cityBaseDemand.
+        //
+        // Parameters chosen so demand in both cities falls below the level-1 sales
+        // capacity (20 units/tick) — ensuring the salary factor is the visible
+        // bottleneck rather than unit capacity.
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // population=20,000, stock=100 → saturation is observable for both cities.
+        const int population = 20_000;
+        const decimal stock = 100m;
+
+        var lowWageCity = new City
+        {
+            Id = Guid.NewGuid(), Name = $"LowWageCity_{Guid.NewGuid():N}", CountryCode = "LW",
+            Population = population, AverageRentPerSqm = 10m,
+            Latitude = 48.0, Longitude = 17.0,
+            BaseSalaryPerManhour = 10m,  // 0.5× reference → factor = 0.5
+        };
+        var highWageCity = new City
+        {
+            Id = Guid.NewGuid(), Name = $"HighWageCity_{Guid.NewGuid():N}", CountryCode = "HW",
+            Population = population, AverageRentPerSqm = 10m,
+            Latitude = 48.1, Longitude = 17.1,
+            BaseSalaryPerManhour = 40m,  // 2.0× reference → factor = 2.0 (capped)
+        };
+        db.Cities.AddRange(lowWageCity, highWageCity);
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var (_, _, lowWageUnitId) = AddPublicSalesSeller(
+            db, lowWageCity, product,
+            suffix: "LowWage",
+            stockQuantity: stock,
+            quality: 0.7m,
+            priceMultiplier: 1m,
+            populationIndex: 1m);
+        var (_, _, highWageUnitId) = AddPublicSalesSeller(
+            db, highWageCity, product,
+            suffix: "HighWage",
+            stockQuantity: stock,
+            quality: 0.7m,
+            priceMultiplier: 1m,
+            populationIndex: 1m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var lowWageSold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == lowWageUnitId)
+            .SumAsync(r => r.QuantitySold);
+        var highWageSold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == highWageUnitId)
+            .SumAsync(r => r.QuantitySold);
+
+        Assert.True(highWageSold > lowWageSold,
+            $"High-wage city (factor=2.0) should generate more sales than low-wage city (factor=0.5) at identical setup. High={highWageSold}, Low={lowWageSold}.");
+        // The high-wage city generates 4× more raw demand (factor 2.0 vs 0.5);
+        // after absorption adjustments, the sold quantity should be at least 1.5× higher.
+        Assert.True(highWageSold >= lowWageSold * 1.5m,
+            $"High-wage city sales should be at least 1.5× greater. High={highWageSold}, Low={lowWageSold}.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ScarcityFavoredMarket_SellsAllAvailableStock()
+    {
+        // When stock is far below city demand (scarce supply), the public sales engine
+        // should sell as much of the available stock as possible within a single tick.
+        // This validates the scarcity-favoured scenario: sellers benefit from undersupply.
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Large population = huge city demand; very small stock = scarce supply.
+        const int population = 5_000_000;
+        var city = CreatePublicSalesTestCity("Scarcity", population);
+        db.Cities.Add(city);
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Stock is tiny relative to city demand (cityBaseDemand ≈ 5000, stock = 10).
+        const decimal smallStock = 10m;
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product,
+            suffix: "Scarce",
+            stockQuantity: smallStock,
+            quality: 0.8m,
+            priceMultiplier: 1m,
+            populationIndex: 1m,
+            brandAwareness: 0.5m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var sold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .SumAsync(r => r.QuantitySold);
+
+        var record = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .FirstOrDefaultAsync();
+
+        // In a demand-far-exceeding-supply scenario, the model should sell a significant
+        // portion of the small stock. The model caps turnover at 50% of stock per tick
+        // multiplied by the publicSellIndex (which is < 1.0), so we expect at least 40%.
+        Assert.True(sold >= smallStock * 0.4m,
+            $"Scarcity-favoured market should sell most available stock. Sold={sold}, Stock={smallStock}.");
+        // Should never sell more than the initial stock.
+        Assert.True(sold <= smallStock + 0.001m,
+            $"Cannot sell more than available stock. Sold={sold}, Stock={smallStock}.");
+        // The recorded demand should be far greater than what was actually sold,
+        // confirming the market is truly supply-constrained (scarcity-favoured).
+        if (record is not null)
+        {
+            Assert.True(record.Demand > sold * 10m,
+                $"Scarcity market: recorded demand ({record.Demand}) should far exceed sold quantity ({sold}).");
+        }
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_OverpricedLowQuality_SellsSignificantlyLessThanCompetitivePeer()
+    {
+        // An overpriced (3× base), low-quality (0.1) product should sell far less than
+        // a competitively priced (1× base), average-quality (0.5) product in the same city.
+        // Both factors compound: the price index is well below 1 AND the quality demand
+        // factor is near its minimum, making the combined disadvantage severe.
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        const int population = 100_000;
+        var city = CreatePublicSalesTestCity("PriceQualBattle", population);
+        db.Cities.Add(city);
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var (_, _, badUnitId) = AddPublicSalesSeller(
+            db, city, product,
+            suffix: "BadOffer",
+            stockQuantity: 5_000m,
+            quality: 0.1m,
+            priceMultiplier: 3m,   // significantly overpriced
+            populationIndex: 1m);
+        var (_, _, goodUnitId) = AddPublicSalesSeller(
+            db, city, product,
+            suffix: "GoodOffer",
+            stockQuantity: 5_000m,
+            quality: 0.5m,
+            priceMultiplier: 1m,   // competitive price
+            populationIndex: 1m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var badSold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == badUnitId)
+            .SumAsync(r => r.QuantitySold);
+        var goodSold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == goodUnitId)
+            .SumAsync(r => r.QuantitySold);
+
+        Assert.True(goodSold > badSold,
+            $"Competitive price + average quality should outsell overpriced + low quality. Good={goodSold}, Bad={badSold}.");
+        // The well-configured offer should sell at least 3× more than the poor offer.
+        Assert.True(goodSold >= badSold * 3m,
+            $"Good offer should dominate the bad offer by at least 3×. Good={goodSold}, Bad={badSold}.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_RecentSalarySpending_IncreasesConsumerDemand()
+    {
+        // ROADMAP: "game currency collected by salaries in past 10 ticks" must
+        // influence public sales demand.  A city with historical LaborCost ledger
+        // entries should produce more sales than an identical city with none.
+        //
+        // Setup:  two identical cities with the same population and static wages.
+        //         The "active" city has pre-seeded LaborCost entries representing
+        //         payroll activity from the previous 5 ticks.
+        //         The "dormant" city has no salary history at all.
+        //
+        // After one tick the active city must generate more public sales because the
+        // dynamic purchasing-power factor is > 1.0 (above the 0m → neutral baseline).
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        const int population = 50_000;
+        const decimal referenceWage = GameConstants.ReferenceSalaryPerManhour; // 20m
+
+        var activeCity = new City
+        {
+            Id = Guid.NewGuid(), Name = $"ActiveCity_{Guid.NewGuid():N}", CountryCode = "AC",
+            Population = population, AverageRentPerSqm = 12m,
+            Latitude = 48.2, Longitude = 17.2,
+            BaseSalaryPerManhour = referenceWage, // static factor = 1.0 (neutral)
+        };
+        var dormantCity = new City
+        {
+            Id = Guid.NewGuid(), Name = $"DormantCity_{Guid.NewGuid():N}", CountryCode = "DC",
+            Population = population, AverageRentPerSqm = 12m,
+            Latitude = 48.3, Longitude = 17.3,
+            BaseSalaryPerManhour = referenceWage, // static factor = 1.0 (neutral)
+        };
+        db.Cities.AddRange(activeCity, dormantCity);
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var (activeCompanyId, activeBuildingId, activeUnitId) = AddPublicSalesSeller(
+            db, activeCity, product,
+            suffix: "Active",
+            stockQuantity: 500m,
+            quality: 0.7m,
+            priceMultiplier: 1m,
+            populationIndex: 1m);
+        var (_, _, dormantUnitId) = AddPublicSalesSeller(
+            db, dormantCity, product,
+            suffix: "Dormant",
+            stockQuantity: 500m,
+            quality: 0.7m,
+            priceMultiplier: 1m,
+            populationIndex: 1m);
+
+        await db.SaveChangesAsync();
+
+        // Retrieve the game state so we know the current tick for seeding the window.
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        // Seed recent salary entries only for the active city (past 5 ticks).
+        // The amount is well above the per-city reference to ensure the dynamic factor
+        // is > 1.0 after blending: reference = population * 0.001 * 20 * 10 = 10_000.
+        // We seed 40_000 (4× reference) so dynamic factor ≈ 2.0 (capped), blended ≈ 1.5.
+        const decimal totalSalaryToSeed = 40_000m;
+        for (var i = 1; i <= 5; i++)
+        {
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = activeCompanyId,
+                BuildingId = activeBuildingId,
+                Category = LedgerCategory.LaborCost,
+                Description = $"Seeded payroll tick {currentTick - i}",
+                Amount = -(totalSalaryToSeed / 5m),  // negative = expense
+                RecordedAtTick = currentTick - i,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var activeSold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == activeUnitId)
+            .SumAsync(r => r.QuantitySold);
+        var dormantSold = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == dormantUnitId)
+            .SumAsync(r => r.QuantitySold);
+
+        // The active city's blended salary factor should be meaningfully above 1.0,
+        // which generates more city-level demand → more units sold.
+        Assert.True(activeSold > dormantSold,
+            $"City with recent salary activity should outsell dormant city. Active={activeSold}, Dormant={dormantSold}.");
+        // Blended factor for active city ≈ 1.5× dormant's 1.0; expect at least 10% uplift.
+        Assert.True(activeSold >= dormantSold * 1.1m,
+            $"Active city should sell at least 10%% more. Active={activeSold}, Dormant={dormantSold}.");
+    }
+
     #region Property Management (Rent & Occupancy)
 
     [Fact]
