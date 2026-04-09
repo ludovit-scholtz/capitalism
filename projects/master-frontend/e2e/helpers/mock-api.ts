@@ -165,7 +165,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            errors: [{ message: 'Invalid email or password.', extensions: { code: 'INVALID_CREDENTIALS' } }],
+            errors: [
+              {
+                message: 'Invalid email or password.',
+                extensions: { code: 'INVALID_CREDENTIALS' },
+              },
+            ],
           }),
         })
       }
@@ -221,7 +226,12 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     }
 
     // Me query — must not match gameServers, mySubscription, or prolongSubscription
-    if (query.includes('me') && !query.includes('gameServers') && !query.includes('mySubscription') && !query.includes('prolongSubscription')) {
+    if (
+      query.includes('me') &&
+      !query.includes('gameServers') &&
+      !query.includes('mySubscription') &&
+      !query.includes('prolongSubscription')
+    ) {
       if (state.currentPlayer) {
         await route.fulfill({
           status: 200,
@@ -232,7 +242,11 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         await route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }] }),
+          body: JSON.stringify({
+            errors: [
+              { message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } },
+            ],
+          }),
         })
       }
       return
@@ -245,16 +259,15 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         contentType: 'application/json',
         body: JSON.stringify({
           data: {
-            mySubscription:
-              state.subscription ?? {
-                tier: 'FREE',
-                status: 'NONE',
-                isActive: false,
-                daysRemaining: null,
-                canProlong: true,
-                expiresAtUtc: null,
-                startsAtUtc: null,
-              },
+            mySubscription: state.subscription ?? {
+              tier: 'FREE',
+              status: 'NONE',
+              isActive: false,
+              daysRemaining: null,
+              canProlong: true,
+              expiresAtUtc: null,
+              startsAtUtc: null,
+            },
           },
         }),
       })

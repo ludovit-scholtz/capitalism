@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
-import { formatProlongLabel, formatRenewalNote, formatStatusLabel, formatTierLabel } from '../subscription'
+import {
+  formatProlongLabel,
+  formatRenewalNote,
+  formatStatusLabel,
+  formatTierLabel,
+} from '../subscription'
 import type { SubscriptionInfo } from '../masterApi'
 
 const makeActiveSub = (daysRemaining: number, expiresAtUtc: string): SubscriptionInfo => ({
@@ -69,9 +74,7 @@ describe('formatRenewalNote', () => {
   })
 
   it('returns "Expires tomorrow" when daysRemaining is 1', () => {
-    expect(formatRenewalNote(makeActiveSub(1, '2026-04-04T00:00:00.000Z'))).toBe(
-      'Expires tomorrow',
-    )
+    expect(formatRenewalNote(makeActiveSub(1, '2026-04-04T00:00:00.000Z'))).toBe('Expires tomorrow')
   })
 
   it('returns "Expires in N days" for ≤30 days', () => {

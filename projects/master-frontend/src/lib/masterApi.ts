@@ -197,7 +197,10 @@ export async function fetchMySubscription(token: string): Promise<SubscriptionIn
   return data.mySubscription
 }
 
-export async function prolongSubscription(token: string, months: number): Promise<SubscriptionInfo> {
+export async function prolongSubscription(
+  token: string,
+  months: number,
+): Promise<SubscriptionInfo> {
   const data = await gqlRequest<{ prolongSubscription: SubscriptionInfo }>(
     PROLONG_SUBSCRIPTION_MUTATION,
     { input: { months } },

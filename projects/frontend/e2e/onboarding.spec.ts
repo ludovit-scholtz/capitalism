@@ -1618,7 +1618,7 @@ test.describe('Onboarding resume and progress persistence', () => {
 
     const proPanel = page.locator('.startup-pack-panel')
     await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
-  await expect(proPanel.locator('.startup-pack-status')).toHaveText('Active')
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Active')
     await expect(proPanel.getByText(/Pro is active on your account until/i)).toBeVisible()
     await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
   })
@@ -4174,9 +4174,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('guest can register and migrate Healthcare progress in Vienna city to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Healthcare progress in Vienna city to authenticated account', async ({ page }) => {
     // ROADMAP city coverage: completes the 3×3 migration matrix (all industries × all cities).
     // Verifies guest → register → empire launched for Healthcare in Vienna.
     const state = setupMockApi(page)
@@ -4265,9 +4263,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     expect(state.currentUserId).toBeTruthy()
   })
 
-  test('guest can register and migrate Healthcare progress in Prague city to authenticated account', async ({
-    page,
-  }) => {
+  test('guest can register and migrate Healthcare progress in Prague city to authenticated account', async ({ page }) => {
     // ROADMAP city coverage: completes the 3×3 migration matrix (all industries × all cities).
     // Verifies guest → register → empire launched for Healthcare in Prague.
     const state = setupMockApi(page)

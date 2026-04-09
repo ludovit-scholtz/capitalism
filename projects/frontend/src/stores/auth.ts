@@ -44,9 +44,7 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const prefix = `${name}=`
-    const match = document.cookie
-      .split('; ')
-      .find((entry) => entry.startsWith(prefix))
+    const match = document.cookie.split('; ').find((entry) => entry.startsWith(prefix))
 
     return match ? decodeURIComponent(match.slice(prefix.length)) : null
   }

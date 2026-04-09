@@ -500,9 +500,7 @@ test.describe('Encyclopedia discoverability and routing', () => {
     await expect(page.getByRole('button', { name: /Wood/ })).toBeVisible()
   })
 
-  test('resource detail page loads correctly when navigated to directly (bookmark / refresh)', async ({
-    page,
-  }) => {
+  test('resource detail page loads correctly when navigated to directly (bookmark / refresh)', async ({ page }) => {
     // ROADMAP: Validate the route can be refreshed/bookmarked without breaking data loading.
     setupMockApi(page, {
       resourceTypes: [woodResource],
@@ -517,9 +515,7 @@ test.describe('Encyclopedia discoverability and routing', () => {
     await expect(page.getByRole('heading', { name: 'Used in Production Chains' })).toBeVisible()
   })
 
-  test('product detail page loads correctly when navigated to directly (bookmark / refresh)', async ({
-    page,
-  }) => {
+  test('product detail page loads correctly when navigated to directly (bookmark / refresh)', async ({ page }) => {
     setupMockApi(page, {
       resourceTypes: [woodResource],
       productTypes: [electronicComponents, electronicTableProduct],
@@ -533,9 +529,7 @@ test.describe('Encyclopedia discoverability and routing', () => {
     await expect(page.locator('.composition-node.ingredient')).toHaveCount(2)
   })
 
-  test('key resource relationships are visible without scrolling on a standard desktop viewport', async ({
-    page,
-  }) => {
+  test('key resource relationships are visible without scrolling on a standard desktop viewport', async ({ page }) => {
     // ROADMAP: "When user clicks on the resource he can see at the same screen
     // without scrolling all manufacturable resources associated with it."
     await page.setViewportSize({ width: 1280, height: 800 })
@@ -606,9 +600,7 @@ test.describe('Encyclopedia discoverability and routing', () => {
     await expect(page.getByPlaceholder('Search resources, ingredients, or descriptions')).toBeVisible()
   })
 
-  test('full user journey: home nav → encyclopedia → search → detail → related resource', async ({
-    page,
-  }) => {
+  test('full user journey: home nav → encyclopedia → search → detail → related resource', async ({ page }) => {
     // End-to-end scenario: a player opens the encyclopedia from the nav bar,
     // searches for a resource, opens its detail, and navigates to a related product.
     setupMockApi(page, {
@@ -677,9 +669,7 @@ test.describe('Encyclopedia discoverability and routing', () => {
     await expect(page.locator('.composition-node.ingredient').first()).toContainText('Grain')
   })
 
-  test('Healthcare chain: Chemical Minerals detail shows Basic Medicine as downstream product', async ({
-    page,
-  }) => {
+  test('Healthcare chain: Chemical Minerals detail shows Basic Medicine as downstream product', async ({ page }) => {
     // ROADMAP: All combinations visible. Verify the Chemical Minerals → Basic Medicine
     // supply chain is discoverable from the encyclopedia.
     const { makeDefaultResources, makeDefaultProducts } = await import('./helpers/mock-api.js')
@@ -749,9 +739,7 @@ test.describe('Encyclopedia discoverability and routing', () => {
 })
 
 test.describe('Encyclopedia contextual entry points', () => {
-  test('encyclopedia is reachable from dashboard empty state when player has no companies', async ({
-    page,
-  }) => {
+  test('encyclopedia is reachable from dashboard empty state when player has no companies', async ({ page }) => {
     // AC 6: relevant user flows expose entry points into the encyclopedia from current product surfaces.
     // A player with completed onboarding but no companies should see a "Browse Encyclopedia" link
     // in the dashboard empty state.
@@ -787,9 +775,7 @@ test.describe('Encyclopedia contextual entry points', () => {
 // ── Cross-linking: encyclopedia resource detail ↔ global exchange ─────────────
 
 test.describe('Encyclopedia resource detail — exchange cross-links', () => {
-  test('resource detail page shows "Check exchange prices" link for raw materials', async ({
-    page,
-  }) => {
+  test('resource detail page shows "Check exchange prices" link for raw materials', async ({ page }) => {
     setupMockApi(page, {
       resourceTypes: [woodResource],
       productTypes: [electronicTableProduct],
@@ -819,9 +805,7 @@ test.describe('Encyclopedia resource detail — exchange cross-links', () => {
     await expect(page.getByRole('heading', { name: 'Global Exchange' })).toBeVisible()
   })
 
-  test('Grain detail page has "Check exchange prices" link (Food Processing raw material)', async ({
-    page,
-  }) => {
+  test('Grain detail page has "Check exchange prices" link (Food Processing raw material)', async ({ page }) => {
     const grainResource = {
       id: 'res-grain',
       name: 'Grain',

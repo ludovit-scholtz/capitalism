@@ -1,11 +1,5 @@
 import { expect, test } from '@playwright/test'
-import {
-  loginAs,
-  makePlayer,
-  makeServer,
-  makeSubscription,
-  setupMockApi,
-} from './helpers/mock-api'
+import { loginAs, makePlayer, makeServer, makeSubscription, setupMockApi } from './helpers/mock-api'
 
 // ── Unauthenticated home page ───────────────────────────────────────────────
 
@@ -26,7 +20,9 @@ test.describe('Unauthenticated home page', () => {
     await page.goto('/')
 
     await expect(
-      page.getByRole('heading', { name: 'Master infrastructure keeps discovery separate from simulation.' }),
+      page.getByRole('heading', {
+        name: 'Master infrastructure keeps discovery separate from simulation.',
+      }),
     ).toBeVisible()
     await expect(page.getByRole('link', { name: 'Register free' })).toBeVisible()
   })
@@ -222,7 +218,9 @@ test.describe('Authenticated home page', () => {
 
     await page.getByRole('button', { name: 'Claim Startup Pack' }).click()
 
-    await expect(page.locator('.prolong-success')).toContainText('Startup Pack claimed successfully')
+    await expect(page.locator('.prolong-success')).toContainText(
+      'Startup Pack claimed successfully',
+    )
     await expect(page.locator('.tier-badge.tier-pro')).toContainText('Pro')
     await expect(page.locator('.startup-pack-pill--claimed')).toContainText('Claimed')
     await expect(page.getByText(/Claimed on/)).toBeVisible()
