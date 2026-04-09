@@ -415,7 +415,6 @@ export interface OnboardingResult {
   factory: Building
   salesShop: Building
   selectedProduct: ProductType
-  startupPackOffer: StartupPackOffer | null
 }
 
 export interface RankedProductResult {
@@ -429,26 +428,6 @@ export interface OnboardingStartResult {
   factory: Building
   factoryLot: BuildingLot
   nextStep: string
-}
-
-export interface StartupPackOffer {
-  id: string
-  offerKey: string
-  status: 'ELIGIBLE' | 'SHOWN' | 'DISMISSED' | 'CLAIMED' | 'EXPIRED'
-  createdAtUtc: string
-  expiresAtUtc: string
-  shownAtUtc: string | null
-  dismissedAtUtc: string | null
-  claimedAtUtc: string | null
-  companyCashGrant: number
-  proDurationDays: number
-  grantedCompanyId: string | null
-}
-
-export interface StartupPackClaimResult {
-  offer: StartupPackOffer
-  company: Company
-  proSubscriptionEndsAtUtc: string
 }
 
 export interface AccountContextResult {

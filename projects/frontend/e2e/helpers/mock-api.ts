@@ -31,7 +31,6 @@ export type MockPlayer = {
   onboardingShopBuildingId: string | null
   onboardingFirstSaleCompletedAtUtc: string | null
   proSubscriptionEndsAtUtc: string | null
-  startupPackOffer: MockStartupPackOffer | null
   dividendPayments: MockDividendPayment[]
   companies: MockCompany[]
 }
@@ -48,21 +47,6 @@ export type MockDividendPayment = {
   recordedAtUtc: string
   description: string
 }
-
-export type MockStartupPackOffer = {
-  id: string
-  offerKey: string
-  status: 'ELIGIBLE' | 'SHOWN' | 'DISMISSED' | 'CLAIMED' | 'EXPIRED'
-  createdAtUtc: string
-  expiresAtUtc: string
-  shownAtUtc: string | null
-  dismissedAtUtc: string | null
-  claimedAtUtc: string | null
-  companyCashGrant: number
-  proDurationDays: number
-  grantedCompanyId: string | null
-}
-
 export type MockLedgerSummary = {
   companyId: string
   companyName: string
@@ -508,8 +492,6 @@ export type MockState = {
   gameState: { currentTick: number; lastTickAtUtc: string; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
   ledgerData: Record<string, MockLedgerSummary>
   drillDownData: Record<string, MockLedgerEntry[]>
-  /** When true, the next ClaimStartupPack mutation returns a server error instead of succeeding. */
-  forceStartupPackClaimError: boolean
   /** Research brand states keyed by companyId for the companyBrands query. */
   researchBrands: Record<string, MockResearchBrandState[]>
   /** Public sales records for first-sale milestone detection. */
@@ -995,7 +977,6 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     onboardingShopBuildingId: null,
     onboardingFirstSaleCompletedAtUtc: null,
     proSubscriptionEndsAtUtc: null,
-    startupPackOffer: null,
     dividendPayments: [],
     companies: [],
     ...overrides,
@@ -1020,24 +1001,6 @@ function applyImplicitCompanyAccountContext(player: MockPlayer) {
 
   player.activeAccountType = 'COMPANY'
   player.activeCompanyId = firstCompany.id
-}
-
-export function makeStartupPackOffer(overrides?: Partial<MockStartupPackOffer>): MockStartupPackOffer {
-  const now = Date.now()
-  return {
-    id: `startup-pack-${now}`,
-    offerKey: 'STARTUP_PACK_V1',
-    status: 'ELIGIBLE',
-    createdAtUtc: new Date(now).toISOString(),
-    expiresAtUtc: new Date(now + 72 * 60 * 60 * 1000).toISOString(),
-    shownAtUtc: null,
-    dismissedAtUtc: null,
-    claimedAtUtc: null,
-    companyCashGrant: 250000,
-    proDurationDays: 90,
-    grantedCompanyId: null,
-    ...overrides,
-  }
 }
 
 export function makeAdminPlayer(overrides?: Partial<MockPlayer>): MockPlayer {
@@ -1301,7 +1264,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 8760, taxRate: 15 },
     ledgerData: {},
     drillDownData: {},
-    forceStartupPackClaimError: false,
     researchBrands: {},
     publicSalesRecords: [],
     publicSalesAnalytics: {},
@@ -1373,7 +1335,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         onboardingShopBuildingId: null,
         onboardingFirstSaleCompletedAtUtc: null,
         proSubscriptionEndsAtUtc: null,
-        startupPackOffer: null,
         dividendPayments: [],
         companies: [],
       }
@@ -1764,7 +1725,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       player.onboardingCityId = null
       player.onboardingCompanyId = null
       player.onboardingFactoryLotId = null
-      player.startupPackOffer = player.startupPackOffer ?? makeStartupPackOffer()
 
       return route.fulfill({
         status: 200,
@@ -1776,7 +1736,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               factory: company.buildings.find((candidate) => candidate.type === 'FACTORY'),
               salesShop: shopBuilding,
               selectedProduct: product,
-              startupPackOffer: player.startupPackOffer,
             },
           },
         }),
@@ -2018,7 +1977,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       player.onboardingCityId = null
       player.onboardingCompanyId = null
       player.onboardingFactoryLotId = null
-      player.startupPackOffer = player.startupPackOffer ?? makeStartupPackOffer()
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -2029,101 +1987,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               factory: company.buildings[0],
               salesShop: company.buildings[1],
               selectedProduct: product ?? state.productTypes[0],
-              startupPackOffer: player.startupPackOffer,
-            },
-          },
-        }),
-      })
-    }
-
-    if (query.includes('markStartupPackOfferShown')) {
-      const player = state.players.find((p) => p.id === state.currentUserId)
-      if (!player?.startupPackOffer) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { markStartupPackOfferShown: null } }) })
-      }
-
-      if (player.startupPackOffer.status === 'ELIGIBLE') {
-        player.startupPackOffer.status = 'SHOWN'
-      }
-      player.startupPackOffer.shownAtUtc ??= new Date().toISOString()
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { markStartupPackOfferShown: player.startupPackOffer } }),
-      })
-    }
-
-    if (query.includes('dismissStartupPackOffer')) {
-      const player = state.players.find((p) => p.id === state.currentUserId)
-      if (!player?.startupPackOffer) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: { dismissStartupPackOffer: null } }) })
-      }
-
-      if (new Date(player.startupPackOffer.expiresAtUtc).getTime() <= Date.now()) {
-        player.startupPackOffer.status = 'EXPIRED'
-      } else if (player.startupPackOffer.status !== 'CLAIMED') {
-        player.startupPackOffer.status = 'DISMISSED'
-        player.startupPackOffer.shownAtUtc ??= new Date().toISOString()
-        player.startupPackOffer.dismissedAtUtc ??= new Date().toISOString()
-      }
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { dismissStartupPackOffer: player.startupPackOffer } }),
-      })
-    }
-
-    if (query.includes('ClaimStartupPack')) {
-      if (state.forceStartupPackClaimError) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'We could not activate the startup pack. Please try again.' }] }),
-        })
-      }
-
-      const player = state.players.find((p) => p.id === state.currentUserId)
-      const companyId = body.variables?.input?.companyId
-      const company = player?.companies.find((candidate) => candidate.id === companyId)
-
-      if (!player?.startupPackOffer || !company) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Company not found or you do not own it.' }] }) })
-      }
-
-      if (new Date(player.startupPackOffer.expiresAtUtc).getTime() <= Date.now() && player.startupPackOffer.status !== 'CLAIMED') {
-        player.startupPackOffer.status = 'EXPIRED'
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({ errors: [{ message: 'Startup pack offer has expired.', extensions: { code: 'STARTUP_PACK_EXPIRED' } }] }),
-        })
-      }
-
-      if (player.startupPackOffer.status !== 'CLAIMED') {
-        company.cash += player.startupPackOffer.companyCashGrant
-        const now = new Date()
-        // Keep this stacking rule aligned with projects/Api/Types/Mutation.cs so
-        // the mock mirrors the backend-authoritative entitlement behavior.
-        const baseDate = player.proSubscriptionEndsAtUtc && new Date(player.proSubscriptionEndsAtUtc) > now ? new Date(player.proSubscriptionEndsAtUtc) : now
-        baseDate.setUTCDate(baseDate.getUTCDate() + player.startupPackOffer.proDurationDays)
-        player.proSubscriptionEndsAtUtc = baseDate.toISOString()
-        player.startupPackOffer.status = 'CLAIMED'
-        player.startupPackOffer.claimedAtUtc = now.toISOString()
-        player.startupPackOffer.shownAtUtc ??= now.toISOString()
-        player.startupPackOffer.grantedCompanyId = company.id
-      }
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            claimStartupPack: {
-              offer: player.startupPackOffer,
-              company,
-              proSubscriptionEndsAtUtc: player.proSubscriptionEndsAtUtc,
             },
           },
         }),
@@ -3848,36 +3711,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('startupPackOffer')) {
-      const player = resolveCurrentPlayer()
-      if (!player) {
-        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
-      }
-
-      if (player.startupPackOffer && new Date(player.startupPackOffer.expiresAtUtc).getTime() <= Date.now() && player.startupPackOffer.status !== 'CLAIMED') {
-        player.startupPackOffer.status = 'EXPIRED'
-      }
-
-      if (query.includes('me')) {
-        return route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: {
-              me: { ...player, password: undefined },
-              startupPackOffer: player.startupPackOffer,
-            },
-          }),
-        })
-      }
-
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ data: { startupPackOffer: player.startupPackOffer } }),
-      })
-    }
-
     // Helper: true if the query is a standalone `me` query (not a more-specific query whose field names happen to include "me" as a substring).
     // NOTE: Many field names end in "Name" (e.g. bankBuildingName, lenderCompanyName, cityName) which contain "me" as a substring.
     // Also "payment" contains "me" (pay-me-nt). Always add exclusions here for any new query/mutation with such fields.
@@ -3909,7 +3742,6 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         body: JSON.stringify({
           data: {
             me: { ...player, password: undefined },
-            startupPackOffer: player.startupPackOffer,
           },
         }),
       })

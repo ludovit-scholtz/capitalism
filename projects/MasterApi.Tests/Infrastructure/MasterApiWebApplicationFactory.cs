@@ -7,6 +7,8 @@ namespace MasterApi.Tests.Infrastructure;
 
 public sealed class MasterApiWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly string _connectionString = $"Data Source={Path.Combine(Path.GetTempPath(), $"masterapi-tests-{Guid.NewGuid():N}.db")}";
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -15,6 +17,7 @@ public sealed class MasterApiWebApplicationFactory : WebApplicationFactory<Progr
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
+                ["ConnectionStrings:MasterCatalog"] = _connectionString,
                 ["MasterServer:RegistrationKey"] = "test-registration-key",
                 ["MasterServer:ActiveThresholdSeconds"] = "90",
             });

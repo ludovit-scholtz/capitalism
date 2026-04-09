@@ -41,13 +41,7 @@ public sealed class Query
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        return new MasterPlayerProfile
-        {
-            Id = player.Id,
-            Email = player.Email,
-            DisplayName = player.DisplayName,
-            CreatedAtUtc = player.CreatedAtUtc,
-        };
+        return ToProfile(player);
     }
 
     [HotChocolate.Authorization.Authorize]
@@ -102,6 +96,19 @@ public sealed class Query
                     .Build());
 
         return Guid.Parse(idClaim);
+    }
+
+    internal static MasterPlayerProfile ToProfile(PlayerAccount player)
+    {
+        return new MasterPlayerProfile
+        {
+            Id = player.Id,
+            Email = player.Email,
+            DisplayName = player.DisplayName,
+            CreatedAtUtc = player.CreatedAtUtc,
+            StartupPackClaimedAtUtc = player.StartupPackClaimedAtUtc,
+            CanClaimStartupPack = player.StartupPackClaimedAtUtc is null,
+        };
     }
 
     internal static SubscriptionInfo BuildSubscriptionInfo(ProSubscription? sub, DateTime now)

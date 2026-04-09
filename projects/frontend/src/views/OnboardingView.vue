@@ -3,7 +3,6 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
-import { trackStartupPackEvent, emitStartupPackViewEvents } from '@/lib/startupPackAnalytics'
 import { computeSimulatedProfit, trackOnboardingEvent } from '@/lib/onboardingAnalytics'
 import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedRecipeIngredientName, getLocalizedResourceName, getProductImageUrl } from '@/lib/catalogPresentation'
 import { useTickRefresh } from '@/composables/useTickRefresh'
@@ -21,13 +20,14 @@ import {
 import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTickCountdown } from '@/composables/useTickCountdown'
-import type { BuildingLot, City, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType, StartupPackClaimResult, StartupPackOffer } from '@/types'
+import type { BuildingLot, City, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 auth.initFromStorage()
+const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
 
 function hasStoredSessionToken() {
   if (typeof localStorage !== 'undefined') {
@@ -180,9 +180,6 @@ const starterProductSlugByIndustry: Record<string, string[]> = {
 const step = ref(1)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const offerLoading = ref(false)
-const offerError = ref<string | null>(null)
-const offerMessage = ref<string | null>(null)
 const onboardingCompanyCash = ref<number | null>(null)
 const milestoneLoading = ref(false)
 const milestoneError = ref<string | null>(null)
@@ -211,7 +208,6 @@ const selectedIpoRaiseTarget = ref(DEFAULT_IPO_RAISE_TARGET)
 const companyName = ref('')
 
 const completionResult = ref<OnboardingResult | null>(null)
-const startupPackOffer = ref<StartupPackOffer | null>(null)
 const gameState = ref<GameState | null>(null)
 const firstSaleMission = ref<FirstSaleMission | null>(null)
 const firstSaleMissionLoading = ref(false)
@@ -257,9 +253,6 @@ const canProceedStep2 = computed(() => !!selectedCityId.value)
 const canProceedStep3 = computed(() => checkCanProceedStep3(companyName.value, selectedFactoryLot.value, companyStartingCash.value))
 const canProceedStep4 = computed(() => checkCanProceedStep4(selectedProductId.value, selectedShopLot.value, starterCash.value))
 const canShowStep4Summary = computed(() => !!selectedProduct.value && !!selectedFactoryLot.value && !!selectedShopLot.value)
-const activeStartupPackOffer = computed(() => (startupPackOffer.value && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(startupPackOffer.value.status) ? startupPackOffer.value : null))
-const claimedStartupPackOffer = computed(() => (startupPackOffer.value?.status === 'CLAIMED' ? startupPackOffer.value : null))
-const expiredStartupPackOffer = computed(() => (startupPackOffer.value?.status === 'EXPIRED' ? startupPackOffer.value : null))
 
 /**
  * True when the player has completed the lot flow but has not yet completed
@@ -746,19 +739,6 @@ async function completeOnboarding() {
           factory { id name type units { id unitType gridX gridY level linkRight } }
           salesShop { id name type units { id unitType gridX gridY level linkRight } }
           selectedProduct { name industry basePrice }
-          startupPackOffer {
-            id
-            offerKey
-            status
-            createdAtUtc
-            expiresAtUtc
-            shownAtUtc
-            dismissedAtUtc
-            claimedAtUtc
-            companyCashGrant
-            proDurationDays
-            grantedCompanyId
-          }
         }
       }`,
       {
@@ -770,8 +750,6 @@ async function completeOnboarding() {
     )
 
     completionResult.value = result.finishOnboarding
-    startupPackOffer.value = result.finishOnboarding.startupPackOffer
-    auth.setStartupPackOffer(result.finishOnboarding.startupPackOffer)
     onboardingCompanyCash.value = result.finishOnboarding.company.cash
     clearProgress()
     trackOnboardingEvent('shop_configured', {
@@ -781,12 +759,6 @@ async function completeOnboarding() {
     })
     trackOnboardingEvent('completed', { guest: false })
     await auth.fetchMe()
-    startupPackOffer.value = auth.startupPackOffer ?? startupPackOffer.value
-    if (startupPackOffer.value?.status === 'ELIGIBLE') {
-      await markStartupPackOfferShown()
-    } else if (startupPackOffer.value) {
-      emitStartupPackViewEvents(startupPackOffer.value, 'onboarding')
-    }
     step.value = 5
     await Promise.all([loadGameState(), loadFirstSaleMission()])
   } catch (e: unknown) {
@@ -799,36 +771,6 @@ async function completeOnboarding() {
     }
   } finally {
     loading.value = false
-  }
-}
-
-async function markStartupPackOfferShown() {
-  if (!startupPackOffer.value || startupPackOffer.value.status !== 'ELIGIBLE') {
-    return
-  }
-
-  const data = await gqlRequest<{ markStartupPackOfferShown: StartupPackOffer | null }>(
-    `mutation {
-      markStartupPackOfferShown {
-        id
-        offerKey
-        status
-        createdAtUtc
-        expiresAtUtc
-        shownAtUtc
-        dismissedAtUtc
-        claimedAtUtc
-        companyCashGrant
-        proDurationDays
-        grantedCompanyId
-      }
-    }`,
-  )
-
-  startupPackOffer.value = data.markStartupPackOfferShown
-  auth.setStartupPackOffer(data.markStartupPackOfferShown)
-  if (data.markStartupPackOfferShown) {
-    emitStartupPackViewEvents(data.markStartupPackOfferShown, 'onboarding')
   }
 }
 
@@ -911,10 +853,6 @@ async function saveGuestProgress() {
               factory { id name type units { id unitType gridX gridY level linkRight } }
               salesShop { id name type units { id unitType gridX gridY level linkRight } }
               selectedProduct { name industry basePrice }
-              startupPackOffer {
-                id offerKey status createdAtUtc expiresAtUtc shownAtUtc
-                dismissedAtUtc claimedAtUtc companyCashGrant proDurationDays grantedCompanyId
-              }
             }
           }`,
           {
@@ -926,14 +864,8 @@ async function saveGuestProgress() {
         )
 
         completionResult.value = finishResult.finishOnboarding
-        startupPackOffer.value = finishResult.finishOnboarding.startupPackOffer
-        auth.setStartupPackOffer(finishResult.finishOnboarding.startupPackOffer)
         onboardingCompanyCash.value = finishResult.finishOnboarding.company.cash
         await auth.fetchMe()
-        startupPackOffer.value = auth.startupPackOffer ?? startupPackOffer.value
-        if (startupPackOffer.value?.status === 'ELIGIBLE') {
-          await markStartupPackOfferShown()
-        }
         // Guest progress has been successfully persisted to the backend — clear local state
         // so stale sandbox choices don't persist in localStorage or confuse future sessions.
         clearProgress()
@@ -972,101 +904,6 @@ async function saveGuestProgress() {
     guestSaveError.value = e instanceof Error ? e.message : t('auth.loginFailed')
   } finally {
     guestSaveLoading.value = false
-  }
-}
-
-async function dismissStartupPackOffer() {
-  offerLoading.value = true
-  offerError.value = null
-  offerMessage.value = null
-
-  try {
-    const data = await gqlRequest<{ dismissStartupPackOffer: StartupPackOffer | null }>(
-      `mutation {
-        dismissStartupPackOffer {
-          id
-          offerKey
-          status
-          createdAtUtc
-          expiresAtUtc
-          shownAtUtc
-          dismissedAtUtc
-          claimedAtUtc
-          companyCashGrant
-          proDurationDays
-          grantedCompanyId
-        }
-      }`,
-    )
-
-    startupPackOffer.value = data.dismissStartupPackOffer
-    auth.setStartupPackOffer(data.dismissStartupPackOffer)
-    offerMessage.value = t('startupPack.dismissedBody')
-    trackStartupPackEvent('dismiss', { context: 'onboarding' })
-  } catch (e: unknown) {
-    offerError.value = e instanceof Error ? e.message : t('startupPack.claimFailed')
-  } finally {
-    offerLoading.value = false
-  }
-}
-
-async function claimStartupPackOffer() {
-  const targetCompanyId = completionResult.value?.company.id
-  if (!targetCompanyId) {
-    return
-  }
-
-  offerLoading.value = true
-  offerError.value = null
-  offerMessage.value = null
-  trackStartupPackEvent('claim_click', { context: 'onboarding' })
-
-  try {
-    const data = await gqlRequest<{ claimStartupPack: StartupPackClaimResult }>(
-      `mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-        claimStartupPack(input: $input) {
-          offer {
-            id
-            offerKey
-            status
-            createdAtUtc
-            expiresAtUtc
-            shownAtUtc
-            dismissedAtUtc
-            claimedAtUtc
-            companyCashGrant
-            proDurationDays
-            grantedCompanyId
-          }
-          company { id name cash }
-          proSubscriptionEndsAtUtc
-        }
-      }`,
-      { input: { companyId: targetCompanyId } },
-    )
-
-    startupPackOffer.value = data.claimStartupPack.offer
-    auth.setStartupPackOffer(data.claimStartupPack.offer)
-    auth.setProSubscriptionEndsAtUtc(data.claimStartupPack.proSubscriptionEndsAtUtc)
-    if (completionResult.value) {
-      completionResult.value = {
-        ...completionResult.value,
-        company: {
-          ...completionResult.value.company,
-          cash: data.claimStartupPack.company.cash,
-        },
-      }
-    }
-    await auth.fetchMe()
-    offerMessage.value = t('startupPack.claimedBody', {
-      date: formatDateTime(data.claimStartupPack.proSubscriptionEndsAtUtc),
-    })
-    trackStartupPackEvent('claim_success', { context: 'onboarding' })
-  } catch (e: unknown) {
-    offerError.value = e instanceof Error ? e.message : t('startupPack.claimFailed')
-    trackStartupPackEvent('claim_error', { context: 'onboarding' })
-  } finally {
-    offerLoading.value = false
   }
 }
 
@@ -1194,33 +1031,8 @@ function blockerMessage(code: string): string {
 }
 
 function navigateToDashboard() {
-  if (startupPackOffer.value && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(startupPackOffer.value.status)) {
-    trackStartupPackEvent('continue', { context: 'onboarding' })
-  }
   stopTickCountdown()
   router.push('/dashboard')
-}
-
-function formatTimeRemaining(expiresAtUtc: string): string {
-  const diffMs = new Date(expiresAtUtc).getTime() - Date.now()
-  if (diffMs <= 0) {
-    return t('startupPack.expiredNow')
-  }
-
-  const totalMinutes = Math.max(Math.ceil(diffMs / 60000), 1)
-  const days = Math.floor(totalMinutes / (60 * 24))
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
-  const minutes = totalMinutes % 60
-
-  if (days > 0) {
-    return t('startupPack.timeRemainingDaysHours', { days, hours })
-  }
-
-  if (hours > 0) {
-    return t('startupPack.timeRemainingHoursMinutes', { hours, minutes })
-  }
-
-  return t('startupPack.timeRemainingMinutes', { minutes })
 }
 
 async function loadGameState() {
@@ -1784,90 +1596,31 @@ useTickRefresh(async () => {
           </div>
         </div>
 
-        <section v-if="startupPackOffer" class="startup-pack-panel" aria-labelledby="startup-pack-title">
+        <section v-if="!isGuestMode" class="startup-pack-panel" aria-labelledby="startup-pack-title">
           <div class="startup-pack-header">
             <div>
-              <span class="startup-pack-eyebrow">{{ t('startupPack.eyebrow') }}</span>
-              <h3 id="startup-pack-title">{{ t('startupPack.title') }}</h3>
+              <span class="startup-pack-eyebrow">{{ t('proAccess.eyebrow') }}</span>
+              <h3 id="startup-pack-title">{{ t('proAccess.title') }}</h3>
             </div>
-            <div class="startup-pack-header-right">
-              <span class="startup-pack-price">{{ t('startupPack.price') }}</span>
-              <span class="startup-pack-pro-monthly">{{ t('startupPack.proMonthlyPrice') }}</span>
-              <span class="startup-pack-status" :class="{ claimed: claimedStartupPackOffer, expired: expiredStartupPackOffer }">
-                {{ t(`startupPack.status.${startupPackOffer.status.toLowerCase()}`) }}
-              </span>
-            </div>
+            <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+              {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
+            </span>
           </div>
 
           <p class="startup-pack-subtitle">
-            {{ t('startupPack.subtitle', { amount: '$' + formatCurrency(startupPackOffer.companyCashGrant) }) }}
+            <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
+              {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
+            </template>
+            <template v-else>
+              {{ t('proAccess.inactiveBody') }}
+            </template>
           </p>
-          <p v-if="activeStartupPackOffer" class="startup-pack-savings">{{ t('startupPack.proSavings') }}</p>
+          <p class="startup-pack-free-path">{{ t('proAccess.manageBody') }}</p>
 
-          <div v-if="activeStartupPackOffer" class="startup-pack-active">
-            <div class="startup-pack-benefits">
-              <article class="startup-pack-benefit">
-                <span class="benefit-icon">👑</span>
-                <div>
-                  <strong>{{ t('startupPack.proBenefitTitle') }}</strong>
-                  <p>{{ t('startupPack.proBenefitBody', { days: activeStartupPackOffer.proDurationDays }) }}</p>
-                </div>
-              </article>
-              <article class="startup-pack-benefit">
-                <span class="benefit-icon">💵</span>
-                <div>
-                  <strong>{{ t('startupPack.cashBenefitTitle') }}</strong>
-                  <p>
-                    {{
-                      t('startupPack.cashBenefitBody', {
-                        amount: '$' + formatCurrency(activeStartupPackOffer.companyCashGrant),
-                        company: completionResult?.company.name ?? '',
-                      })
-                    }}
-                  </p>
-                </div>
-              </article>
-            </div>
-
-            <div class="startup-pack-deadline">
-              <strong>{{ t('startupPack.deadlineLabel') }}</strong>
-              <span>{{ formatTimeRemaining(activeStartupPackOffer.expiresAtUtc) }}</span>
-              <span>{{ t('startupPack.deadlineExact', { date: formatDateTime(activeStartupPackOffer.expiresAtUtc) }) }}</span>
-            </div>
-
-            <p v-if="offerMessage" class="startup-pack-message" role="status">{{ offerMessage }}</p>
-            <p v-if="offerError" class="startup-pack-error" role="alert">{{ offerError }}</p>
-
-            <div class="startup-pack-actions">
-              <button class="btn btn-primary btn-lg" :disabled="offerLoading" @click="claimStartupPackOffer">
-                {{ offerLoading ? t('common.loading') : t('startupPack.claim') }}
-              </button>
-              <button class="btn btn-secondary" :disabled="offerLoading" @click="dismissStartupPackOffer">
-                {{ t('startupPack.maybeLater') }}
-              </button>
-            </div>
-            <p class="startup-pack-free-path">{{ t('startupPack.freePath') }}</p>
-          </div>
-
-          <div v-else-if="claimedStartupPackOffer" class="startup-pack-state success">
-            <strong>{{ t('startupPack.claimedTitle') }}</strong>
-            <p v-if="auth.effectiveProSubscriptionEndsAtUtc">
-              {{ t('startupPack.claimedBody', { date: formatDateTime(auth.effectiveProSubscriptionEndsAtUtc) }) }}
-            </p>
-            <p v-else>{{ t('startupPack.claimedNoDate') }}</p>
-            <p>
-              {{
-                t('startupPack.cashBenefitBody', {
-                  amount: '$' + formatCurrency(claimedStartupPackOffer.companyCashGrant),
-                  company: completionResult?.company.name ?? '',
-                })
-              }}
-            </p>
-          </div>
-
-          <div v-else class="startup-pack-state muted">
-            <strong>{{ t('startupPack.expiredTitle') }}</strong>
-            <p>{{ t('startupPack.expiredBody') }}</p>
+          <div class="startup-pack-actions">
+            <a class="btn btn-primary btn-lg" :href="masterPortalUrl" target="_blank" rel="noreferrer">
+              {{ t('proAccess.openPortal') }}
+            </a>
           </div>
         </section>
 

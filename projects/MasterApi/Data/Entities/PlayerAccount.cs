@@ -14,5 +14,7 @@ public sealed class PlayerAccount
 
     public DateTime? LastLoginAtUtc { get; set; }
 
+    public DateTime? StartupPackClaimedAtUtc { get; set; }
+
     public ICollection<ProSubscription> Subscriptions { get; set; } = [];
 }

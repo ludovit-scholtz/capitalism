@@ -104,6 +104,10 @@ public sealed class MasterPlayerProfile
     public string DisplayName { get; set; } = string.Empty;
 
     public DateTime CreatedAtUtc { get; set; }
+
+    public DateTime? StartupPackClaimedAtUtc { get; set; }
+
+    public bool CanClaimStartupPack { get; set; }
 }
 
 public sealed class SubscriptionInfo

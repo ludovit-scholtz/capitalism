@@ -482,15 +482,13 @@ public sealed class Mutation
 
         await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
         await db.SaveChangesAsync();
-        var startupPackOffer = await StartupPackService.EnsureOfferForPlayerAsync(db, player, nowUtc);
 
         return new OnboardingResult
         {
             Company = company,
             Factory = factory,
             SalesShop = shop,
-            SelectedProduct = product,
-            StartupPackOffer = startupPackOffer
+            SelectedProduct = product
         };
     }
 
@@ -778,15 +776,12 @@ public sealed class Mutation
                     .Build());
         }
 
-        var startupPackOffer = await StartupPackService.EnsureOfferForPlayerAsync(db, player, nowUtc);
-
         return new OnboardingResult
         {
             Company = company,
             Factory = factory,
             SalesShop = shop,
-            SelectedProduct = product,
-            StartupPackOffer = startupPackOffer
+            SelectedProduct = product
         };
     }
 
@@ -1687,182 +1682,6 @@ public sealed class Mutation
             .Include(candidate => candidate.Units)
             .Include(candidate => candidate.Removals)
             .FirstAsync(candidate => candidate.Id == plan.Id);
-    }
-
-    /// <summary>Marks the player's startup-pack offer as shown when the UI presents it.</summary>
-    [Authorize]
-    public async Task<StartupPackOffer?> MarkStartupPackOfferShown(
-        [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId);
-        if (player is null)
-        {
-            return null;
-        }
-
-        var offer = await StartupPackService.EnsureOfferForPlayerAsync(db, player, DateTime.UtcNow);
-        if (offer is null)
-        {
-            return null;
-        }
-
-        if (StartupPackService.MarkShown(offer, DateTime.UtcNow))
-        {
-            await db.SaveChangesAsync();
-        }
-
-        return offer;
-    }
-
-    /// <summary>Stores a player dismissal while keeping the offer revisit-able until expiry.</summary>
-    [Authorize]
-    public async Task<StartupPackOffer?> DismissStartupPackOffer(
-        [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        var player = await db.Players.FirstOrDefaultAsync(candidate => candidate.Id == userId);
-        if (player is null)
-        {
-            return null;
-        }
-
-        var offer = await StartupPackService.EnsureOfferForPlayerAsync(db, player, DateTime.UtcNow);
-        if (offer is null)
-        {
-            return null;
-        }
-
-        if (StartupPackService.Dismiss(offer, DateTime.UtcNow))
-        {
-            await db.SaveChangesAsync();
-        }
-
-        return offer;
-    }
-
-    /// <summary>Claims the startup pack and grants both Pro time and expansion capital exactly once.</summary>
-    [Authorize]
-    public async Task<StartupPackClaimResult> ClaimStartupPack(
-        ClaimStartupPackInput input,
-        [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-        for (var attempt = 0; attempt < StartupPackService.MaxClaimRetryAttempts; attempt++)
-        {
-            try
-            {
-                var nowUtc = DateTime.UtcNow;
-                var player = await db.Players
-                    .Include(candidate => candidate.Companies)
-                    .FirstOrDefaultAsync(candidate => candidate.Id == userId)
-                    ?? throw new GraphQLException(
-                        ErrorBuilder.New()
-                            .SetMessage("Player not found.")
-                            .SetCode("PLAYER_NOT_FOUND")
-                            .Build());
-
-                var offer = await StartupPackService.EnsureOfferForPlayerAsync(db, player, nowUtc)
-                    ?? throw new GraphQLException(
-                        ErrorBuilder.New()
-                            .SetMessage("Startup pack is not available for this player.")
-                            .SetCode("STARTUP_PACK_NOT_AVAILABLE")
-                            .Build());
-
-                if (StartupPackService.TryExpireOffer(offer, nowUtc))
-                {
-                    await db.SaveChangesAsync();
-                }
-
-                if (offer.Status == StartupPackOfferStatus.Expired)
-                {
-                    throw new GraphQLException(
-                        ErrorBuilder.New()
-                            .SetMessage("Startup pack offer has expired.")
-                            .SetCode("STARTUP_PACK_EXPIRED")
-                            .Build());
-                }
-
-                if (offer.Status == StartupPackOfferStatus.Claimed && offer.GrantedCompanyId is null)
-                {
-                    throw new GraphQLException(
-                        ErrorBuilder.New()
-                            .SetMessage("Startup pack claim state is incomplete.")
-                            .SetCode("STARTUP_PACK_CLAIM_INTEGRITY")
-                            .Build());
-                }
-
-                Company? company;
-                if (offer.Status == StartupPackOfferStatus.Claimed && offer.GrantedCompanyId is not null)
-                {
-                    company = player.Companies.FirstOrDefault(candidate => candidate.Id == offer.GrantedCompanyId);
-                }
-                else
-                {
-                    company = player.Companies.FirstOrDefault(candidate => candidate.Id == input.CompanyId);
-                }
-
-                if (company is null)
-                {
-                    throw new GraphQLException(
-                        ErrorBuilder.New()
-                            .SetMessage("Company not found or you don't own it.")
-                            .SetCode("COMPANY_NOT_FOUND")
-                            .Build());
-                }
-
-                if (offer.Status != StartupPackOfferStatus.Claimed)
-                {
-                    StartupPackService.MarkShown(offer, nowUtc);
-                    company.Cash += offer.CompanyCashGrant;
-                    // If the player already has active Pro time from another source, extend from that
-                    // future end-date instead of overwriting it or restarting from "now".
-                    var subscriptionStart = player.ProSubscriptionEndsAtUtc is { } endsAt && endsAt > offer.CreatedAtUtc
-                        ? endsAt
-                        : offer.CreatedAtUtc;
-                    player.ProSubscriptionEndsAtUtc = subscriptionStart.AddDays(offer.ProDurationDays);
-                    StartupPackService.MarkClaimed(offer, company.Id, nowUtc);
-
-                    // Bump concurrency tokens for atomic settlement
-                    player.ConcurrencyToken = Guid.NewGuid();
-
-                    // The startup-pack offer carries the concurrency token for the atomic settlement.
-                    // If another request claims first, this SaveChanges rolls back the entire grant
-                    // and the retry path below re-reads the already-claimed durable state.
-                    await db.SaveChangesAsync();
-                }
-
-                var companySnapshot = await db.Companies
-                    .AsNoTracking()
-                    .FirstAsync(candidate =>
-                        candidate.Id == offer.GrantedCompanyId!.Value
-                        && candidate.PlayerId == player.Id);
-                var playerSnapshot = await db.Players
-                    .AsNoTracking()
-                    .FirstAsync(candidate => candidate.Id == player.Id);
-
-                return new StartupPackClaimResult
-                {
-                    Offer = offer,
-                    Company = companySnapshot,
-                    ProSubscriptionEndsAtUtc = playerSnapshot.ProSubscriptionEndsAtUtc ?? nowUtc
-                };
-            }
-            catch (DbUpdateConcurrencyException) when (attempt < StartupPackService.MaxClaimRetryAttempts - 1)
-            {
-                db.ChangeTracker.Clear();
-                await Task.Delay(StartupPackService.ClaimRetryBaseDelayMs * (attempt + 1));
-            }
-        }
-
-        throw new GraphQLException(
-            ErrorBuilder.New()
-                .SetMessage("Startup pack claim could not be completed safely. Please try again.")
-                .SetCode("STARTUP_PACK_CLAIM_RETRY")
-                .Build());
     }
 
     /// <summary>Sets or clears the for-sale status and asking price of a building.</summary>
@@ -2901,9 +2720,6 @@ public sealed class OnboardingResult
 
     /// <summary>The product selected for manufacturing.</summary>
     public ProductType SelectedProduct { get; set; } = null!;
-
-    /// <summary>The player's startup-pack offer, if one is available after onboarding.</summary>
-    public StartupPackOffer? StartupPackOffer { get; set; }
 }
 
 /// <summary>Result of purchasing the first factory during lot-based onboarding.</summary>
@@ -2920,19 +2736,6 @@ public sealed class OnboardingStartResult
 
     /// <summary>The next onboarding step the client should guide the player to.</summary>
     public string NextStep { get; set; } = string.Empty;
-}
-
-/// <summary>Claim result payload for the startup-pack offer.</summary>
-public sealed class StartupPackClaimResult
-{
-    /// <summary>Updated lifecycle state for the startup-pack offer.</summary>
-    public StartupPackOffer Offer { get; set; } = null!;
-
-    /// <summary>Company that received the startup capital grant.</summary>
-    public Company Company { get; set; } = null!;
-
-    /// <summary>UTC timestamp until which the player now has Pro access.</summary>
-    public DateTime ProSubscriptionEndsAtUtc { get; set; }
 }
 
 /// <summary>Result of purchasing a building lot.</summary>

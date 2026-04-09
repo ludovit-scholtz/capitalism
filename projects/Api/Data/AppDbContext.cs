@@ -69,9 +69,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Exchange buy/sell orders.</summary>
     public DbSet<ExchangeOrder> ExchangeOrders => Set<ExchangeOrder>();
 
-    /// <summary>Player-specific startup-pack offer lifecycle records.</summary>
-    public DbSet<StartupPackOffer> StartupPackOffers => Set<StartupPackOffer>();
-
     /// <summary>Purchasable building lots within cities.</summary>
     public DbSet<BuildingLot> BuildingLots => Set<BuildingLot>();
 
@@ -105,25 +102,6 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(p => p.OnboardingCurrentStep).HasMaxLength(40);
             e.Property(p => p.OnboardingIndustry).HasMaxLength(50);
             e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
-        });
-
-        // StartupPackOffer
-        modelBuilder.Entity<StartupPackOffer>(e =>
-        {
-            e.HasKey(offer => offer.Id);
-            e.HasIndex(offer => offer.PlayerId).IsUnique();
-            e.Property(offer => offer.OfferKey).HasMaxLength(50);
-            e.Property(offer => offer.Status).HasMaxLength(20);
-            e.Property(offer => offer.CompanyCashGrant).HasPrecision(18, 2);
-            e.Property(offer => offer.ConcurrencyToken).IsConcurrencyToken();
-            e.HasOne(offer => offer.Player)
-                .WithOne()
-                .HasForeignKey<StartupPackOffer>(offer => offer.PlayerId)
-                .OnDelete(DeleteBehavior.Cascade);
-            e.HasOne<Company>()
-                .WithMany()
-                .HasForeignKey(offer => offer.GrantedCompanyId)
-                .OnDelete(DeleteBehavior.Restrict);
         });
 
         // Company

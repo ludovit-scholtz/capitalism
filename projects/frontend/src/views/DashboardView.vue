@@ -6,7 +6,6 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
 import { gqlRequest } from '@/lib/graphql'
-import { trackStartupPackEvent, emitStartupPackViewEvents } from '@/lib/startupPackAnalytics'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
@@ -16,7 +15,7 @@ import PendingActionsTimeline from '@/components/dashboard/PendingActionsTimelin
 import SupplyChainPanel from '@/components/dashboard/SupplyChainPanel.vue'
 import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vue'
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
-import type { Company, GameState, ScheduledActionSummary, StartupPackOffer, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
+import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -27,9 +26,6 @@ const { gameState } = storeToRefs(gameStateStore)
 const companies = ref<Company[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
-const offerLoading = ref(false)
-const offerError = ref<string | null>(null)
-const offerMessage = ref<string | null>(null)
 const pendingActions = ref<ScheduledActionSummary[]>([])
 const pendingActionsLoading = ref(false)
 const cityPowerBalances = ref<Record<string, CityPowerBalance>>({})
@@ -42,17 +38,14 @@ const createCompanyName = ref('')
 const createCompanyLoading = ref(false)
 const createCompanyError = ref<string | null>(null)
 const createCompanyMessage = ref<string | null>(null)
+const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
 
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
-const activeStartupPackOffer = computed(() => (auth.startupPackOffer && ['ELIGIBLE', 'SHOWN', 'DISMISSED'].includes(auth.startupPackOffer.status) ? auth.startupPackOffer : null))
-const claimedStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'CLAIMED' ? auth.startupPackOffer : null))
-const expiredStartupPackOffer = computed(() => (auth.startupPackOffer?.status === 'EXPIRED' ? auth.startupPackOffer : null))
 const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
 const isPersonAccount = computed(() => auth.player?.activeAccountType !== 'COMPANY' || !activeCompany.value)
 const visibleCompanies = computed(() => (activeCompany.value ? [activeCompany.value] : []))
-const targetCompany = computed(() => activeCompany.value)
 
 const buildingTypeIcons: Record<string, string> = {
   MINE: '⛏️',
@@ -142,12 +135,6 @@ onMounted(async () => {
     companies.value = companiesData.myCompanies
     gameState.value = gameStateData.gameState
     startTickCountdown()
-
-    if (auth.startupPackOffer?.status === 'ELIGIBLE') {
-      await markStartupPackOfferShown()
-    } else if (auth.startupPackOffer) {
-      emitStartupPackViewEvents(auth.startupPackOffer, 'dashboard')
-    }
 
     // Load city power balances for each unique city that has buildings.
     await refreshCompanyDerivedData()
@@ -290,130 +277,6 @@ async function loadBuildingUnitStatuses(buildingIds: string[]) {
   }
 }
 
-async function markStartupPackOfferShown() {
-  if (!auth.startupPackOffer || auth.startupPackOffer.status !== 'ELIGIBLE') {
-    return
-  }
-
-  const data = await gqlRequest<{ markStartupPackOfferShown: StartupPackOffer | null }>(
-    `mutation {
-      markStartupPackOfferShown {
-        id
-        offerKey
-        status
-        createdAtUtc
-        expiresAtUtc
-        shownAtUtc
-        dismissedAtUtc
-        claimedAtUtc
-        companyCashGrant
-        proDurationDays
-        grantedCompanyId
-      }
-    }`,
-  )
-
-  auth.setStartupPackOffer(data.markStartupPackOfferShown)
-  if (data.markStartupPackOfferShown) {
-    emitStartupPackViewEvents(data.markStartupPackOfferShown, 'dashboard')
-  }
-}
-
-async function dismissStartupPackOffer() {
-  offerLoading.value = true
-  offerError.value = null
-  offerMessage.value = null
-
-  try {
-    const data = await gqlRequest<{ dismissStartupPackOffer: StartupPackOffer | null }>(
-      `mutation {
-        dismissStartupPackOffer {
-          id
-          offerKey
-          status
-          createdAtUtc
-          expiresAtUtc
-          shownAtUtc
-          dismissedAtUtc
-          claimedAtUtc
-          companyCashGrant
-          proDurationDays
-          grantedCompanyId
-        }
-      }`,
-    )
-    auth.setStartupPackOffer(data.dismissStartupPackOffer)
-    offerMessage.value = t('startupPack.dismissedBody')
-    trackStartupPackEvent('dismiss', { context: 'dashboard' })
-  } catch (e: unknown) {
-    offerError.value = e instanceof Error ? e.message : t('startupPack.claimFailed')
-  } finally {
-    offerLoading.value = false
-  }
-}
-
-async function claimStartupPackOffer() {
-  if (!targetCompany.value) {
-    return
-  }
-
-  offerLoading.value = true
-  offerError.value = null
-  offerMessage.value = null
-  trackStartupPackEvent('claim_click', { context: 'dashboard' })
-
-  try {
-    const data = await gqlRequest<{
-      claimStartupPack: {
-        offer: StartupPackOffer
-        company: Company
-        proSubscriptionEndsAtUtc: string
-      }
-    }>(
-      `mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-        claimStartupPack(input: $input) {
-          offer {
-            id
-            offerKey
-            status
-            createdAtUtc
-            expiresAtUtc
-            shownAtUtc
-            dismissedAtUtc
-            claimedAtUtc
-            companyCashGrant
-            proDurationDays
-            grantedCompanyId
-          }
-          company {
-            id
-            name
-            cash
-            foundedAtUtc
-            buildings { id name type level units { id unitType gridX gridY level } }
-          }
-          proSubscriptionEndsAtUtc
-        }
-      }`,
-      { input: { companyId: targetCompany.value.id } },
-    )
-
-    auth.setStartupPackOffer(data.claimStartupPack.offer)
-    auth.setProSubscriptionEndsAtUtc(data.claimStartupPack.proSubscriptionEndsAtUtc)
-    companies.value = companies.value.map((company) => (company.id === data.claimStartupPack.company.id ? data.claimStartupPack.company : company))
-    await auth.fetchMe()
-    offerMessage.value = t('startupPack.claimedBody', {
-      date: formatDateTime(data.claimStartupPack.proSubscriptionEndsAtUtc),
-    })
-    trackStartupPackEvent('claim_success', { context: 'dashboard' })
-  } catch (e: unknown) {
-    offerError.value = e instanceof Error ? e.message : t('startupPack.claimFailed')
-    trackStartupPackEvent('claim_error', { context: 'dashboard' })
-  } finally {
-    offerLoading.value = false
-  }
-}
-
 function formatCurrency(value: number): string {
   return value.toLocaleString(locale.value)
 }
@@ -423,28 +286,6 @@ function formatDateTime(value: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(new Date(value))
-}
-
-function formatTimeRemaining(expiresAtUtc: string): string {
-  const diffMs = new Date(expiresAtUtc).getTime() - Date.now()
-  if (diffMs <= 0) {
-    return t('startupPack.expiredNow')
-  }
-
-  const totalMinutes = Math.max(Math.ceil(diffMs / 60000), 1)
-  const days = Math.floor(totalMinutes / (60 * 24))
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60)
-  const minutes = totalMinutes % 60
-
-  if (days > 0) {
-    return t('startupPack.timeRemainingDaysHours', { days, hours })
-  }
-
-  if (hours > 0) {
-    return t('startupPack.timeRemainingHoursMinutes', { hours, minutes })
-  }
-
-  return t('startupPack.timeRemainingMinutes', { minutes })
 }
 
 async function createCompany() {
@@ -511,97 +352,31 @@ async function createCompany() {
     </div>
 
     <template v-else>
-      <section v-if="auth.startupPackOffer" class="startup-pack-panel" aria-labelledby="dashboard-startup-pack-title">
+      <section class="startup-pack-panel" aria-labelledby="dashboard-startup-pack-title">
         <div class="startup-pack-header">
           <div>
-            <span class="startup-pack-eyebrow">{{ t('startupPack.eyebrow') }}</span>
-            <h2 id="dashboard-startup-pack-title">{{ t('startupPack.revisitTitle') }}</h2>
+            <span class="startup-pack-eyebrow">{{ t('proAccess.eyebrow') }}</span>
+            <h2 id="dashboard-startup-pack-title">{{ t('proAccess.title') }}</h2>
           </div>
-          <div class="startup-pack-header-right">
-            <span class="startup-pack-price">{{ t('startupPack.price') }}</span>
-            <span class="startup-pack-pro-monthly">{{ t('startupPack.proMonthlyPrice') }}</span>
-            <span
-              class="startup-pack-status"
-              :class="{
-                claimed: claimedStartupPackOffer,
-                expired: expiredStartupPackOffer,
-              }"
-            >
-              {{ t(`startupPack.status.${auth.startupPackOffer.status.toLowerCase()}`) }}
-            </span>
-          </div>
+          <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+            {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
+          </span>
         </div>
 
         <p class="startup-pack-subtitle">
-          {{
-            t('startupPack.subtitle', {
-              amount: '$' + formatCurrency(auth.startupPackOffer.companyCashGrant),
-            })
-          }}
+          <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
+            {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
+          </template>
+          <template v-else>
+            {{ t('proAccess.inactiveBody') }}
+          </template>
         </p>
-        <p v-if="activeStartupPackOffer" class="startup-pack-savings">{{ t('startupPack.proSavings') }}</p>
+        <p class="startup-pack-free-path">{{ t('proAccess.manageBody') }}</p>
 
-        <div v-if="activeStartupPackOffer" class="startup-pack-active">
-          <div class="startup-pack-benefits">
-            <article class="startup-pack-benefit">
-              <span class="benefit-icon">👑</span>
-              <div>
-                <strong>{{ t('startupPack.proBenefitTitle') }}</strong>
-                <p>{{ t('startupPack.proBenefitBody', { days: activeStartupPackOffer.proDurationDays }) }}</p>
-              </div>
-            </article>
-            <article class="startup-pack-benefit">
-              <span class="benefit-icon">💵</span>
-              <div>
-                <strong>{{ t('startupPack.cashBenefitTitle') }}</strong>
-                <p>
-                  {{
-                    t('startupPack.cashBenefitBody', {
-                      amount: '$' + formatCurrency(activeStartupPackOffer.companyCashGrant),
-                      company: targetCompany?.name ?? t('dashboard.title'),
-                    })
-                  }}
-                </p>
-              </div>
-            </article>
-          </div>
-
-          <div class="startup-pack-deadline">
-            <strong>{{ t('startupPack.deadlineLabel') }}</strong>
-            <span>{{ formatTimeRemaining(activeStartupPackOffer.expiresAtUtc) }}</span>
-            <span>{{ t('startupPack.deadlineExact', { date: formatDateTime(activeStartupPackOffer.expiresAtUtc) }) }}</span>
-          </div>
-
-          <p v-if="offerMessage" class="startup-pack-message" role="status">{{ offerMessage }}</p>
-          <p v-if="offerError" class="startup-pack-error" role="alert">{{ offerError }}</p>
-
-          <div class="startup-pack-actions">
-            <button class="btn btn-primary" :disabled="offerLoading || !targetCompany" @click="claimStartupPackOffer">
-              {{ offerLoading ? t('common.loading') : t('startupPack.claim') }}
-            </button>
-            <button class="btn btn-secondary" :disabled="offerLoading" @click="dismissStartupPackOffer">
-              {{ t('startupPack.maybeLater') }}
-            </button>
-          </div>
-          <p v-if="!targetCompany" class="startup-pack-context-note">{{ t('dashboard.startupPackRequiresCompany') }}</p>
-          <p class="startup-pack-free-path">{{ t('startupPack.freePath') }}</p>
-        </div>
-
-        <div v-else-if="claimedStartupPackOffer" class="startup-pack-state success">
-          <strong>{{ t('startupPack.claimedTitle') }}</strong>
-          <p v-if="auth.effectiveProSubscriptionEndsAtUtc">
-            {{
-              t('startupPack.claimedBody', {
-                date: formatDateTime(auth.effectiveProSubscriptionEndsAtUtc),
-              })
-            }}
-          </p>
-          <p v-else>{{ t('startupPack.claimedNoDate') }}</p>
-        </div>
-
-        <div v-else class="startup-pack-state muted">
-          <strong>{{ t('startupPack.expiredTitle') }}</strong>
-          <p>{{ t('startupPack.expiredBody') }}</p>
+        <div class="startup-pack-actions">
+          <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
+            {{ t('proAccess.openPortal') }}
+          </a>
         </div>
       </section>
 

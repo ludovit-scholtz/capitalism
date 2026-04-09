@@ -77,6 +77,23 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
     }
 
+    private static async Task<string> RegisterAndGetTokenAsync(HttpClient client, string email = "test@example.com", string displayName = "Tester", string password = "TestPass123!")
+    {
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Register($input: RegisterInput!) {
+              register(input: $input) {
+                token
+                player { id displayName email role }
+              }
+            }
+            """,
+            new { input = new { email, displayName, password } });
+
+        return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+    }
+
     private async Task AdvanceGameTicksAsync(long ticks)
     {
         await using var scope = _factory.Services.CreateAsyncScope();
@@ -138,12 +155,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                                 factory { id name type }
                                 salesShop { id name type }
                                 selectedProduct { id name industry }
-                                startupPackOffer {
-                                    status
-                                    companyCashGrant
-                                    proDurationDays
-                                    expiresAtUtc
-                                }
                             }
                         }
                         """,
@@ -5621,587 +5632,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
-    public async Task CompleteOnboarding_ReturnsEligibleStartupPackOffer()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack@test.com", "StartupPacker");
-
-        var (_, _, result) = await CompleteOnboardingAsync(token, "Offer Corp");
-
-        var offer = result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("startupPackOffer");
-        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
-        Assert.Equal(StartupPackService.CompanyCashGrant, offer.GetProperty("companyCashGrant").GetDecimal());
-        Assert.Equal(StartupPackService.ProDurationDays, offer.GetProperty("proDurationDays").GetInt32());
-        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
-    }
-
-    [Fact]
-    public void StartupPackService_PriceUsd_MatchesRoadmapDefinition()
-    {
-        // The ROADMAP defines the startup pack price as $20.
-        // This test documents and enforces that contract so any accidental change is caught.
-        Assert.Equal(20m, StartupPackService.PriceUsd);
-        // Pro monthly reference price must match the roadmap ($10/month).
-        Assert.Equal(10m, StartupPackService.ProMonthlyPriceUsd);
-        // Pro and cash-grant constants must also stay within expected ranges.
-        Assert.Equal(90, StartupPackService.ProDurationDays);
-        Assert.True(StartupPackService.CompanyCashGrant > 0,
-            "CompanyCashGrant must be a positive in-game currency amount.");
-        // The startup pack price must be less than the full-price equivalent so the savings are real.
-        var fullPriceEquivalent = StartupPackService.ProMonthlyPriceUsd * (StartupPackService.ProDurationDays / 30m);
-        Assert.True(StartupPackService.PriceUsd < fullPriceEquivalent,
-            $"Startup pack price ${StartupPackService.PriceUsd} must be less than full Pro price ${fullPriceEquivalent}.");
-    }
-
-    [Fact]
-    public async Task StartupPackOffer_PreviouslyOnboardedPlayer_IsBackfilledOnFirstQuery()
-    {
-        const string email = "backfill@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "BackfillPlayer");
-
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var player = await db.Players.SingleAsync(candidate => candidate.Email == email);
-            player.OnboardingCompletedAtUtc = DateTime.UtcNow.AddDays(-2);
-            db.Companies.Add(new Api.Data.Entities.Company
-            {
-                Id = Guid.NewGuid(),
-                PlayerId = player.Id,
-                Name = "Legacy Corp",
-                Cash = 600000m,
-                FoundedAtUtc = DateTime.UtcNow.AddDays(-2)
-            });
-            await db.SaveChangesAsync();
-        }
-
-        var result = await ExecuteGraphQlAsync(
-            "{ startupPackOffer { status companyCashGrant proDurationDays } }",
-            token: token);
-
-        var offer = result.GetProperty("data").GetProperty("startupPackOffer");
-        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
-        Assert.Equal(250000m, offer.GetProperty("companyCashGrant").GetDecimal());
-        Assert.Equal(90, offer.GetProperty("proDurationDays").GetInt32());
-    }
-
-    [Fact]
-    public async Task StartupPackOffer_BeforeOnboarding_ReturnsNull()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack-none@test.com", "NoOfferYet");
-
-        var result = await ExecuteGraphQlAsync(
-            "{ startupPackOffer { status } }",
-            token: token);
-
-        Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("startupPackOffer").ValueKind);
-    }
-
-    [Fact]
-    public async Task StartupPackOffer_ShownAndDismissed_StoresLifecycleState()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack-lifecycle@test.com", "LifecyclePlayer");
-        await CompleteOnboardingAsync(token, "Lifecycle Corp");
-
-        var shownResult = await ExecuteGraphQlAsync(
-            """
-            mutation {
-              markStartupPackOfferShown {
-                status
-                shownAtUtc
-                dismissedAtUtc
-              }
-            }
-            """,
-            token: token);
-
-        var shownOffer = shownResult.GetProperty("data").GetProperty("markStartupPackOfferShown");
-        Assert.Equal("SHOWN", shownOffer.GetProperty("status").GetString());
-        Assert.Equal(JsonValueKind.String, shownOffer.GetProperty("shownAtUtc").ValueKind);
-        Assert.Equal(JsonValueKind.Null, shownOffer.GetProperty("dismissedAtUtc").ValueKind);
-
-        var dismissedResult = await ExecuteGraphQlAsync(
-            """
-            mutation {
-              dismissStartupPackOffer {
-                status
-                shownAtUtc
-                dismissedAtUtc
-              }
-            }
-            """,
-            token: token);
-
-        var dismissedOffer = dismissedResult.GetProperty("data").GetProperty("dismissStartupPackOffer");
-        Assert.Equal("DISMISSED", dismissedOffer.GetProperty("status").GetString());
-        Assert.Equal(JsonValueKind.String, dismissedOffer.GetProperty("shownAtUtc").ValueKind);
-        Assert.Equal(JsonValueKind.String, dismissedOffer.GetProperty("dismissedAtUtc").ValueKind);
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_IsIdempotentAndGrantsEntitlementsOnce()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack-claim@test.com", "ClaimPlayer");
-        var (companyId, _, onboardingResult) = await CompleteOnboardingAsync(token, "Claim Corp");
-        var companyCashBeforeClaim = onboardingResult.GetProperty("data").GetProperty("completeOnboarding")
-            .GetProperty("company").GetProperty("cash").GetDecimal();
-
-        var firstClaim = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status claimedAtUtc grantedCompanyId }
-                company { id cash }
-                proSubscriptionEndsAtUtc
-              }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-
-        var firstClaimData = firstClaim.GetProperty("data").GetProperty("claimStartupPack");
-        Assert.Equal("CLAIMED", firstClaimData.GetProperty("offer").GetProperty("status").GetString());
-        Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, firstClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
-        var firstProEndsAt = firstClaimData.GetProperty("proSubscriptionEndsAtUtc").GetString();
-
-        var secondClaim = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status claimedAtUtc grantedCompanyId }
-                company { id cash }
-                proSubscriptionEndsAtUtc
-              }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-
-        var secondClaimData = secondClaim.GetProperty("data").GetProperty("claimStartupPack");
-        Assert.Equal("CLAIMED", secondClaimData.GetProperty("offer").GetProperty("status").GetString());
-        Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, secondClaimData.GetProperty("company").GetProperty("cash").GetDecimal());
-        Assert.Equal(firstProEndsAt, secondClaimData.GetProperty("proSubscriptionEndsAtUtc").GetString());
-
-        var meResult = await ExecuteGraphQlAsync(
-            "{ me { proSubscriptionEndsAtUtc } }",
-            token: token);
-        Assert.Equal(firstProEndsAt, meResult.GetProperty("data").GetProperty("me").GetProperty("proSubscriptionEndsAtUtc").GetString());
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_ConcurrentRequests_SettleEconomyAndPremiumOnce()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack-concurrent@test.com", "ConcurrentPlayer");
-        var (companyId, _, onboardingResult) = await CompleteOnboardingAsync(token, "Concurrent Corp");
-        var companyCashBeforeClaim = onboardingResult.GetProperty("data").GetProperty("completeOnboarding")
-            .GetProperty("company").GetProperty("cash").GetDecimal();
-
-        const string claimMutation = """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status claimedAtUtc grantedCompanyId }
-                company { id cash }
-                proSubscriptionEndsAtUtc
-              }
-            }
-            """;
-
-        // Monetization integrity matters here: duplicate network submits or two tabs racing
-        // must converge on a single durable grant so premium time and company cash never double-credit.
-        var claimTasks = Enumerable.Range(0, 8)
-            .Select(_ => ExecuteGraphQlAsync(claimMutation, new { input = new { companyId } }, token))
-            .ToArray();
-
-        var claimResults = await Task.WhenAll(claimTasks);
-
-        var claimPayloads = claimResults
-            .Select(result => result.GetProperty("data").GetProperty("claimStartupPack"))
-            .ToList();
-
-        Assert.All(claimPayloads, payload =>
-        {
-            Assert.Equal("CLAIMED", payload.GetProperty("offer").GetProperty("status").GetString());
-            Assert.Equal(companyId, payload.GetProperty("offer").GetProperty("grantedCompanyId").GetString());
-            Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, payload.GetProperty("company").GetProperty("cash").GetDecimal());
-        });
-
-        var distinctProEndTimes = claimPayloads
-            .Select(payload => payload.GetProperty("proSubscriptionEndsAtUtc").GetString())
-            .Distinct()
-            .ToList();
-        Assert.Single(distinctProEndTimes);
-
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.SingleAsync(candidate => candidate.Email == "startup-pack-concurrent@test.com");
-        var offer = await db.StartupPackOffers.SingleAsync(candidate => candidate.PlayerId == player.Id);
-        var company = await db.Companies.SingleAsync(candidate => candidate.Id == Guid.Parse(companyId));
-
-        Assert.Equal(StartupPackOfferStatus.Claimed, offer.Status);
-        Assert.NotNull(offer.ClaimedAtUtc);
-        Assert.Equal(Guid.Parse(companyId), offer.GrantedCompanyId);
-        Assert.Equal(companyCashBeforeClaim + StartupPackService.CompanyCashGrant, company.Cash);
-        Assert.NotNull(player.ProSubscriptionEndsAtUtc);
-    }
-
-    [Fact]
-    public async Task StartupPackOffer_ExpiresAndRejectsClaims()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack-expired@test.com", "ExpiredPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Expired Corp");
-
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var player = await db.Players.SingleAsync(candidate => candidate.Email == "startup-pack-expired@test.com");
-            var offer = await db.StartupPackOffers.SingleAsync(candidate => candidate.PlayerId == player.Id);
-            offer.ExpiresAtUtc = DateTime.UtcNow.AddMinutes(-5);
-            await db.SaveChangesAsync();
-        }
-
-        var offerResult = await ExecuteGraphQlAsync(
-            "{ startupPackOffer { status } }",
-            token: token);
-        Assert.Equal("EXPIRED", offerResult.GetProperty("data").GetProperty("startupPackOffer").GetProperty("status").GetString());
-
-        var claimResult = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status }
-              }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-
-        Assert.True(claimResult.TryGetProperty("errors", out var errors));
-        Assert.Contains(errors.EnumerateArray(), error => error.GetProperty("extensions").GetProperty("code").GetString() == "STARTUP_PACK_EXPIRED");
-    }
-
-    [Fact]
-    public async Task FinishOnboarding_ReturnsEligibleStartupPackOffer()
-    {
-        var token = await RegisterAndGetTokenAsync($"finish-onboard-offer-{Guid.NewGuid()}@test.com", "FinishOfferPlayer");
-        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Finish Offer Co");
-        var productId = await GetStarterProductIdAsync();
-        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 95_000m, "Finish Offer Shop");
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation FinishOnboarding($input: FinishOnboardingInput!) {
-              finishOnboarding(input: $input) {
-                company { id }
-                startupPackOffer {
-                  status
-                  companyCashGrant
-                  proDurationDays
-                  expiresAtUtc
-                }
-              }
-            }
-            """,
-            new { input = new { productTypeId = productId, shopLotId } },
-            token);
-
-        var offer = result.GetProperty("data").GetProperty("finishOnboarding").GetProperty("startupPackOffer");
-        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
-        Assert.Equal(250_000m, offer.GetProperty("companyCashGrant").GetDecimal());
-        Assert.Equal(90, offer.GetProperty("proDurationDays").GetInt32());
-        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
-    }
-
-    [Fact]
-    public async Task StartupPackOffer_MarkShown_IsIdempotent()
-    {
-        var token = await RegisterAndGetTokenAsync("startup-pack-shown-idempotent@test.com", "IdempotentShown");
-        await CompleteOnboardingAsync(token, "Idempotent Shown Corp");
-
-        var first = await ExecuteGraphQlAsync(
-            "mutation { markStartupPackOfferShown { status shownAtUtc } }",
-            token: token);
-        var firstOffer = first.GetProperty("data").GetProperty("markStartupPackOfferShown");
-        Assert.Equal("SHOWN", firstOffer.GetProperty("status").GetString());
-        var firstShownAt = firstOffer.GetProperty("shownAtUtc").GetString();
-
-        var second = await ExecuteGraphQlAsync(
-            "mutation { markStartupPackOfferShown { status shownAtUtc } }",
-            token: token);
-        var secondOffer = second.GetProperty("data").GetProperty("markStartupPackOfferShown");
-        Assert.Equal("SHOWN", secondOffer.GetProperty("status").GetString());
-        // shownAtUtc must not be overwritten on subsequent calls
-        Assert.Equal(firstShownAt, secondOffer.GetProperty("shownAtUtc").GetString());
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_GrantsProSubscriptionThatUnlocksProProducts()
-    {
-        var token = await RegisterAndGetTokenAsync($"startup-pro-unlock-{Guid.NewGuid()}@test.com", "ProUnlockPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Pro Unlock Corp");
-
-        // Before claiming: electronics products should be pro-locked
-        var beforeResult = await ExecuteGraphQlAsync(
-            """
-            {
-              productTypes(industry: "ELECTRONICS") {
-                slug
-                isProOnly
-                isUnlockedForCurrentPlayer
-              }
-            }
-            """,
-            token: token);
-        var electronicsBefore = beforeResult.GetProperty("data").GetProperty("productTypes")
-            .EnumerateArray()
-            .First(p => p.GetProperty("slug").GetString() == "electronic-components");
-        Assert.True(electronicsBefore.GetProperty("isProOnly").GetBoolean());
-        Assert.False(electronicsBefore.GetProperty("isUnlockedForCurrentPlayer").GetBoolean());
-
-        // Claim the startup pack
-        await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status }
-                proSubscriptionEndsAtUtc
-              }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-
-        // After claiming: electronics products should now be unlocked
-        var afterResult = await ExecuteGraphQlAsync(
-            """
-            {
-              productTypes(industry: "ELECTRONICS") {
-                slug
-                isProOnly
-                isUnlockedForCurrentPlayer
-              }
-            }
-            """,
-            token: token);
-        var electronicsAfter = afterResult.GetProperty("data").GetProperty("productTypes")
-            .EnumerateArray()
-            .First(p => p.GetProperty("slug").GetString() == "electronic-components");
-        Assert.True(electronicsAfter.GetProperty("isProOnly").GetBoolean());
-        Assert.True(electronicsAfter.GetProperty("isUnlockedForCurrentPlayer").GetBoolean());
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_Unauthenticated_ReturnsError()
-    {
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status }
-              }
-            }
-            """,
-            new { input = new { companyId = Guid.NewGuid() } });
-
-        Assert.True(result.TryGetProperty("errors", out _));
-    }
-
-    [Fact]
-    public async Task DismissStartupPackOffer_Unauthenticated_ReturnsError()
-    {
-        var result = await ExecuteGraphQlAsync(
-            "mutation { dismissStartupPackOffer { status } }");
-
-        Assert.True(result.TryGetProperty("errors", out _));
-    }
-
-    [Fact]
-    public async Task MarkStartupPackOfferShown_Unauthenticated_ReturnsError()
-    {
-        var result = await ExecuteGraphQlAsync(
-            "mutation { markStartupPackOfferShown { status } }");
-
-        Assert.True(result.TryGetProperty("errors", out _));
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_WrongCompany_ReturnsError()
-    {
-        var token = await RegisterAndGetTokenAsync($"startup-wrong-co-{Guid.NewGuid()}@test.com", "WrongCoPlayer");
-        await CompleteOnboardingAsync(token, "Wrong Co Corp");
-
-        // Register a second player and get their company id
-        var otherToken = await RegisterAndGetTokenAsync($"startup-other-co-{Guid.NewGuid()}@test.com", "OtherCoPlayer");
-        var (otherCompanyId, _, _) = await CompleteOnboardingAsync(otherToken, "Other Co Corp");
-
-        // First player tries to claim using the other player's company
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status }
-              }
-            }
-            """,
-            new { input = new { companyId = otherCompanyId } },
-            token);
-
-        Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Contains(errors.EnumerateArray(), error => error.GetProperty("extensions").GetProperty("code").GetString() == "COMPANY_NOT_FOUND");
-    }
-
-    [Fact]
-    public async Task DismissStartupPackOffer_AlreadyDismissed_IsIdempotent()
-    {
-        var token = await RegisterAndGetTokenAsync($"startup-dismiss-idem-{Guid.NewGuid()}@test.com", "DismissIdemPlayer");
-        await CompleteOnboardingAsync(token, "Dismiss Idem Corp");
-
-        var first = await ExecuteGraphQlAsync(
-            "mutation { dismissStartupPackOffer { status dismissedAtUtc } }",
-            token: token);
-        var firstOffer = first.GetProperty("data").GetProperty("dismissStartupPackOffer");
-        Assert.Equal("DISMISSED", firstOffer.GetProperty("status").GetString());
-        var firstDismissedAt = firstOffer.GetProperty("dismissedAtUtc").GetString();
-
-        var second = await ExecuteGraphQlAsync(
-            "mutation { dismissStartupPackOffer { status dismissedAtUtc } }",
-            token: token);
-        var secondOffer = second.GetProperty("data").GetProperty("dismissStartupPackOffer");
-        Assert.Equal("DISMISSED", secondOffer.GetProperty("status").GetString());
-        // dismissedAtUtc must not be overwritten on subsequent calls
-        Assert.Equal(firstDismissedAt, secondOffer.GetProperty("dismissedAtUtc").GetString());
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_FromDismissedState_GrantsEntitlements()
-    {
-        var token = await RegisterAndGetTokenAsync($"startup-claim-from-dismissed-{Guid.NewGuid()}@test.com", "ClaimDismissedPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Claim Dismissed Corp");
-
-        // Dismiss the offer first
-        var dismissResult = await ExecuteGraphQlAsync(
-            "mutation { dismissStartupPackOffer { status } }",
-            token: token);
-        Assert.Equal("DISMISSED", dismissResult.GetProperty("data").GetProperty("dismissStartupPackOffer").GetProperty("status").GetString());
-
-        // Claim after dismissal – must still succeed
-        var claimResult = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status claimedAtUtc grantedCompanyId }
-                company { cash }
-                proSubscriptionEndsAtUtc
-              }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-
-        Assert.False(claimResult.TryGetProperty("errors", out _));
-        var payload = claimResult.GetProperty("data").GetProperty("claimStartupPack");
-        Assert.Equal("CLAIMED", payload.GetProperty("offer").GetProperty("status").GetString());
-        Assert.True(payload.GetProperty("company").GetProperty("cash").GetDecimal() >= StartupPackService.CompanyCashGrant);
-        Assert.True(DateTime.TryParse(payload.GetProperty("proSubscriptionEndsAtUtc").GetString(), out _));
-    }
-
-    [Fact]
-    public async Task StartupPackOffer_Query_Unauthenticated_ReturnsError()
-    {
-        // The startupPackOffer query has [Authorize] and must reject unauthenticated requests.
-        var result = await ExecuteGraphQlAsync(
-            "{ startupPackOffer { status } }");
-
-        Assert.True(result.TryGetProperty("errors", out _));
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_BeforeOnboarding_ReturnsError()
-    {
-        // A player who has not completed onboarding has no startup-pack offer.
-        // Attempting to claim must fail with STARTUP_PACK_NOT_AVAILABLE.
-        var token = await RegisterAndGetTokenAsync($"startup-pack-pre-onboard-{Guid.NewGuid()}@test.com", "PreOnboardClaimer");
-        // Do NOT complete onboarding — player has no offer record.
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status }
-              }
-            }
-            """,
-            new { input = new { companyId = Guid.NewGuid() } },
-            token);
-
-        Assert.True(result.TryGetProperty("errors", out var errors));
-        Assert.Contains(errors.EnumerateArray(), error =>
-            error.GetProperty("extensions").GetProperty("code").GetString() == "STARTUP_PACK_NOT_AVAILABLE");
-    }
-
-    [Fact]
-    public async Task ClaimStartupPack_VerifiesProSubscriptionEndsAtUtcIsInFuture()
-    {
-        // AC5: the user must be able to verify their new subscription status after purchase.
-        // The proSubscriptionEndsAtUtc returned by claimStartupPack must be strictly in the future
-        // and at least 89 days from now (90-day Pro entitlement).
-        var token = await RegisterAndGetTokenAsync($"startup-pro-sub-verify-{Guid.NewGuid()}@test.com", "ProSubVerifyPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Pro Sub Verify Corp");
-
-        var claimResult = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) {
-                offer { status claimedAtUtc }
-                company { cash }
-                proSubscriptionEndsAtUtc
-              }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-
-        Assert.False(claimResult.TryGetProperty("errors", out _), "ClaimStartupPack should succeed");
-        var payload = claimResult.GetProperty("data").GetProperty("claimStartupPack");
-
-        var proEndsStr = payload.GetProperty("proSubscriptionEndsAtUtc").GetString();
-        Assert.NotNull(proEndsStr);
-        Assert.True(DateTime.TryParse(proEndsStr, out var proEndsAt));
-        // Must be in the future
-        Assert.True(proEndsAt > DateTime.UtcNow, $"proSubscriptionEndsAtUtc ({proEndsAt:O}) must be in the future");
-        // Must be at least 89 days from now (allowing 1-day clock tolerance)
-        Assert.True((proEndsAt - DateTime.UtcNow).TotalDays >= StartupPackService.ProDurationDays - 1,
-            $"proSubscriptionEndsAtUtc should be ~{StartupPackService.ProDurationDays} days ahead; got {(proEndsAt - DateTime.UtcNow).TotalDays:F1} days");
-    }
-
-    [Fact]
-    public async Task MarkStartupPackOfferShown_AlreadyClaimed_DoesNotChangeStatus()
-    {
-        // Calling markStartupPackOfferShown on an already-claimed offer must return the offer
-        // with the CLAIMED status unchanged (the backend must be idempotent for CLAIMED offers).
-        var token = await RegisterAndGetTokenAsync($"startup-show-claimed-{Guid.NewGuid()}@test.com", "ShowClaimedPlayer");
-        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Show Claimed Corp");
-
-        // Claim the offer first
-        var claimResult = await ExecuteGraphQlAsync(
-            """
-            mutation ClaimStartupPack($input: ClaimStartupPackInput!) {
-              claimStartupPack(input: $input) { offer { status } }
-            }
-            """,
-            new { input = new { companyId } },
-            token);
-        Assert.Equal("CLAIMED",
-            claimResult.GetProperty("data").GetProperty("claimStartupPack").GetProperty("offer").GetProperty("status").GetString());
-
-        // markStartupPackOfferShown after claiming must not change status back to SHOWN
-        var shownResult = await ExecuteGraphQlAsync(
-            "mutation { markStartupPackOfferShown { status shownAtUtc } }",
-            token: token);
-
-        var shownOffer = shownResult.GetProperty("data").GetProperty("markStartupPackOfferShown");
-        Assert.Equal("CLAIMED", shownOffer.GetProperty("status").GetString());
-    }
-
-    [Fact]
     public async Task CompleteOnboarding_InvalidIndustry_ReturnsError()
     {
         var token = await RegisterAndGetTokenAsync("badindustry@test.com", "BadInd");
@@ -6721,91 +6151,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Contains("FOOD_PROCESSING", industryList);
         Assert.Contains("HEALTHCARE", industryList);
         Assert.Equal(3, industryList.Count);
-    }
-
-    [Fact]
-    public async Task FinishOnboarding_FoodProcessing_ReturnsEligibleStartupPackOffer()
-    {
-        // Verifies that the startup-pack offer is activated for FOOD_PROCESSING industry
-        // via the staged FinishOnboarding mutation — not only via the legacy CompleteOnboarding.
-        // This is a critical monetization path: the offer must appear for every starter industry.
-        var token = await RegisterAndGetTokenAsync($"startup-pack-food-{Guid.NewGuid()}@test.com", "FoodStartupPack");
-        var cityId = await GetCityIdByNameAsync();
-        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m);
-
-        await ExecuteGraphQlAsync(
-            """
-            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
-              startOnboardingCompany(input: $input) { nextStep }
-            }
-            """,
-            new { input = new { industry = "FOOD_PROCESSING", cityId, companyName = "Bread Empire", factoryLotId } },
-            token);
-
-        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
-        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation FinishOnboarding($input: FinishOnboardingInput!) {
-              finishOnboarding(input: $input) {
-                company { id }
-                startupPackOffer { status companyCashGrant proDurationDays expiresAtUtc }
-              }
-            }
-            """,
-            new { input = new { productTypeId = productId, shopLotId } },
-            token);
-
-        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for FOOD_PROCESSING startup pack test");
-
-        var offer = result.GetProperty("data").GetProperty("finishOnboarding").GetProperty("startupPackOffer");
-        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
-        Assert.Equal(StartupPackService.CompanyCashGrant, offer.GetProperty("companyCashGrant").GetDecimal());
-        Assert.Equal(StartupPackService.ProDurationDays, offer.GetProperty("proDurationDays").GetInt32());
-        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
-    }
-
-    [Fact]
-    public async Task FinishOnboarding_Healthcare_ReturnsEligibleStartupPackOffer()
-    {
-        // Verifies that the startup-pack offer is activated for HEALTHCARE industry
-        // via the staged FinishOnboarding mutation.
-        var token = await RegisterAndGetTokenAsync($"startup-pack-health-{Guid.NewGuid()}@test.com", "HealthStartupPack");
-        var cityId = await GetCityIdByNameAsync();
-        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m);
-
-        await ExecuteGraphQlAsync(
-            """
-            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
-              startOnboardingCompany(input: $input) { nextStep }
-            }
-            """,
-            new { input = new { industry = "HEALTHCARE", cityId, companyName = "Medicine Empire", factoryLotId } },
-            token);
-
-        var productId = await GetStarterProductIdAsync("HEALTHCARE", "basic-medicine");
-        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation FinishOnboarding($input: FinishOnboardingInput!) {
-              finishOnboarding(input: $input) {
-                company { id }
-                startupPackOffer { status companyCashGrant proDurationDays expiresAtUtc }
-              }
-            }
-            """,
-            new { input = new { productTypeId = productId, shopLotId } },
-            token);
-
-        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding failed for HEALTHCARE startup pack test");
-
-        var offer = result.GetProperty("data").GetProperty("finishOnboarding").GetProperty("startupPackOffer");
-        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
-        Assert.Equal(StartupPackService.CompanyCashGrant, offer.GetProperty("companyCashGrant").GetDecimal());
-        Assert.Equal(StartupPackService.ProDurationDays, offer.GetProperty("proDurationDays").GetInt32());
-        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out _));
     }
 
     [Fact]
@@ -7676,64 +7021,6 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var completedAt = meResult.GetProperty("data").GetProperty("me").GetProperty("onboardingCompletedAtUtc").GetString();
         Assert.NotNull(completedAt);
         Assert.NotEmpty(completedAt);
-    }
-
-    [Fact]
-    public async Task GuestMigration_HappyPath_StartupPackOfferActivatedAfterMigration()
-    {
-        // AC: "Support both onboarding completion paths: guest-to-authenticated migration and already
-        // authenticated onboarding completion." The startup pack offer must be activated and returned
-        // in the finishOnboarding mutation result when a guest migrates to an authenticated account.
-        var token = await RegisterAndGetTokenAsync($"guest-pack-{Guid.NewGuid()}@test.com", "Guest Pack Migrator");
-        var cityId = await GetCityIdByNameAsync();
-        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Industrial Zone", 75_000m);
-
-        // StartOnboardingCompany (equivalent of the guest's factory purchase being saved)
-        var startResult = await ExecuteGraphQlAsync(
-            """
-            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
-              startOnboardingCompany(input: $input) {
-                nextStep
-                company { id }
-              }
-            }
-            """,
-            new { input = new { industry = "FURNITURE", cityId, companyName = "Guest Pack Corp", factoryLotId } },
-            token);
-
-        Assert.False(startResult.TryGetProperty("errors", out _), "StartOnboardingCompany must succeed");
-
-        // FinishOnboarding (equivalent of the guest's shop purchase + product selection being saved)
-        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
-        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
-
-        var finishResult = await ExecuteGraphQlAsync(
-            """
-            mutation FinishOnboarding($input: FinishOnboardingInput!) {
-              finishOnboarding(input: $input) {
-                company { id }
-                startupPackOffer {
-                  status
-                  companyCashGrant
-                  proDurationDays
-                  expiresAtUtc
-                }
-              }
-            }
-            """,
-            new { input = new { productTypeId = productId, shopLotId } },
-            token);
-
-        Assert.False(finishResult.TryGetProperty("errors", out _), "FinishOnboarding must succeed in guest migration path");
-        var offer = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("startupPackOffer");
-
-        // AC: startup pack must be ELIGIBLE immediately after guest migration completes
-        Assert.Equal("ELIGIBLE", offer.GetProperty("status").GetString());
-        Assert.Equal(StartupPackService.CompanyCashGrant, offer.GetProperty("companyCashGrant").GetDecimal());
-        Assert.Equal(StartupPackService.ProDurationDays, offer.GetProperty("proDurationDays").GetInt32());
-        // Expiry window must be a valid future timestamp
-        Assert.True(DateTime.TryParse(offer.GetProperty("expiresAtUtc").GetString(), out var expiresAt));
-        Assert.True(expiresAt > DateTime.UtcNow, "Startup pack expiry must be in the future");
     }
 
     [Fact]
@@ -9639,7 +8926,11 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         // With a freshly seeded DB and no player exchange orders for products,
         // the product listings query must return an empty list.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
+
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -9664,7 +8955,11 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task GlobalExchangeProductListings_IsPublicQuery_WorksWithoutAuthentication()
     {
         // The product listings query must be publicly accessible like globalExchangeOffers.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
+
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -9689,17 +8984,20 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.False(result.TryGetProperty("errors", out _), "globalExchangeProductListings must be publicly accessible without auth");
         var listings = result.GetProperty("data").GetProperty("globalExchangeProductListings");
         // Empty by default (no orders placed) — just check no auth error.
-        Assert.NotNull(listings);
+        Assert.Equal(JsonValueKind.Array, listings.ValueKind);
     }
 
     [Fact]
     public async Task GlobalExchangeProductListings_ReturnsActiveSellOrdersForProducts()
     {
         // Arrange: create a player, company, exchange building, and a SELL order for a product.
-        var email = $"prod-listing-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "ProdListTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"prod-listing-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "ProdListTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -9732,6 +9030,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         // Act
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -9771,10 +9070,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task GlobalExchangeProductListings_InactiveOrDepletedOrdersNotReturned()
     {
         // Orders that are IsActive=false or RemainingQuantity=0 must not appear.
-        var email = $"prod-listing-inactive-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(email, "ProdListInactTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"prod-listing-inactive-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "ProdListInactTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -9808,6 +9110,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -9825,17 +9128,20 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .Where(l => l.GetProperty("sellerCompanyName").GetString() == "ProdInactCo")
             .ToList();
 
-        Assert.Equal(0, listings.Count);
+        Assert.Empty(listings);
     }
 
     [Fact]
     public async Task GlobalExchangeProductListings_FilteredByProductType_ReturnsOnlyMatchingProduct()
     {
         // Setup two product types with orders; filter by one should return only that product.
-        var email = $"prod-listing-filter-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(email, "ProdListFilterTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"prod-listing-filter-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "ProdListFilterTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -9869,6 +9175,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         // Filter by chair only
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query ProductListings($productTypeId: UUID) {
               globalExchangeProductListings(productTypeId: $productTypeId) {
@@ -9886,7 +9193,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .Where(l => l.GetProperty("sellerCompanyName").GetString() == "ProdFilterCo")
             .ToList();
 
-        Assert.Equal(1, listings.Count);
+        Assert.Single(listings);
         Assert.Equal("wooden-chair", listings[0].GetProperty("productSlug").GetString());
     }
 
@@ -9894,10 +9201,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task GlobalExchangeProductListings_BuyOrdersNotIncluded()
     {
         // Only SELL orders should appear in product listings.
-        var email = $"prod-buy-order-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(email, "ProdBuyTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"prod-buy-order-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "ProdBuyTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -9924,6 +9234,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -9941,17 +9252,22 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .Where(l => l.GetProperty("sellerCompanyName").GetString() == "ProdBuyCo")
             .ToList();
 
-        Assert.Equal(0, listings.Count);
+        Assert.Empty(listings);
     }
 
     [Fact]
     public async Task GlobalExchangeProductListings_MultipleIndustries_AllReturned()
     {
         // Listings for Furniture, Food Processing, and Healthcare should all appear when present.
-        var email = $"prod-multi-industry-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(email, "ProdMultiTester");
+        // Use a dedicated factory here because the shared class-fixture database can retain
+        // exchange-market state from earlier tests and make this public-query assertion order-dependent.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"prod-multi-industry-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "ProdMultiTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -9994,6 +9310,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -10023,10 +9340,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task GlobalExchangeProductListings_ResourceOrdersNotIncluded()
     {
         // Exchange orders for raw materials (ResourceTypeId set) must not appear in product listings.
-        var email = $"prod-res-order-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(email, "ProdResTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"prod-res-order-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "ProdResTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -10053,6 +9373,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -10070,7 +9391,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .Where(l => l.GetProperty("sellerCompanyName").GetString() == "ProdResCo")
             .ToList();
 
-        Assert.Equal(0, listings.Count);
+        Assert.Empty(listings);
     }
 
     [Fact]
@@ -10078,10 +9399,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         // An exchange order that has BOTH ProductTypeId and ResourceTypeId set is an ambiguous/corrupt record.
         // It must NOT appear in the product marketplace so raw-material orders cannot leak into the Products tab.
-        var email = $"mixed-order-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(email, "MixedOrderTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var isolatedClient = isolatedFactory.CreateClient();
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        var email = $"mixed-order-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, email, "MixedOrderTester");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
@@ -10109,6 +9433,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             query {
               globalExchangeProductListings {
@@ -10126,7 +9451,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .Where(l => l.GetProperty("sellerCompanyName").GetString() == "MixedOrderCo")
             .ToList();
 
-        Assert.Equal(0, listings.Count);
+        Assert.Empty(listings);
     }
 
 

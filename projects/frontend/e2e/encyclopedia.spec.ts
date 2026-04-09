@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { makePlayer, makeStartupPackOffer, setupMockApi } from './helpers/mock-api.js'
+import { makePlayer, setupMockApi } from './helpers/mock-api.js'
 
 const woodResource = {
   id: 'res-wood',
@@ -132,10 +132,10 @@ test.describe('Manufacturing encyclopedia', () => {
     await expect(page.locator('.not-found')).toContainText('Turn on the Pro products switch')
   })
 
-  test('updates visible Pro products after claiming startup pack', async ({ page }) => {
+  test('shows Pro products for players with an active Pro subscription', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer(),
+      proSubscriptionEndsAtUtc: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       companies: [
         {
           id: 'company-pro',
@@ -184,18 +184,8 @@ test.describe('Manufacturing encyclopedia', () => {
     await page.getByLabel('Show Pro subscription products').check()
 
     const premiumDeskCard = page.getByRole('button', { name: /Premium Desk/ })
-    await expect(premiumDeskCard).toContainText('Requires Pro')
+    await expect(premiumDeskCard).toContainText('Pro unlocked')
     await premiumDeskCard.click()
-    await expect(page.locator('.resource-description').nth(1)).toContainText('Pro unlocks this product and other advanced goods')
-
-    await page.goto('/dashboard')
-    await page.getByRole('button', { name: 'Claim startup pack' }).click()
-    await expect(page.getByText('Your Pro access is active until')).toBeVisible()
-
-    await page.goto('/encyclopedia?showPro=1')
-    await expect(page.getByRole('button', { name: /Premium Desk/ })).toContainText('Pro unlocked')
-
-    await page.getByRole('button', { name: /Premium Desk/ }).click()
     await expect(page.locator('.resource-description').nth(1)).toContainText('Your active Pro access unlocks this product immediately.')
   })
 })

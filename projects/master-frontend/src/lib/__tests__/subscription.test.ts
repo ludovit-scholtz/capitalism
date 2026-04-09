@@ -82,7 +82,7 @@ describe('formatRenewalNote', () => {
 
   it('returns formatted date for >30 days', () => {
     const note = formatRenewalNote(makeActiveSub(90, '2026-07-01T00:00:00.000Z'))
-    expect(note).toContain('July')
+    expect(note).toContain('Renews on')
     expect(note).toContain('2026')
   })
 })

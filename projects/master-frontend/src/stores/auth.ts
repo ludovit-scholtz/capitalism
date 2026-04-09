@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import type { MasterAuthPayload, MasterPlayerProfile, SubscriptionInfo } from '@/lib/masterApi'
 import {
+  claimStartupPack,
   fetchMe,
   fetchMySubscription,
   loginAccount,
@@ -101,6 +102,21 @@ export const useAuthStore = defineStore('masterAuth', () => {
     }
   }
 
+  async function claimStartupPackOffer() {
+    if (!token.value) return
+    loading.value = true
+    error.value = null
+    try {
+      subscription.value = await claimStartupPack(token.value)
+      await fetchProfile()
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : 'Failed to claim startup pack'
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   function logout() {
     token.value = null
     player.value = null
@@ -122,6 +138,7 @@ export const useAuthStore = defineStore('masterAuth', () => {
     fetchProfile,
     fetchSubscription,
     prolong,
+    claimStartupPackOffer,
     logout,
   }
 })

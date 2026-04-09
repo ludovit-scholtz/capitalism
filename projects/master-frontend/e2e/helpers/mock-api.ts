@@ -34,6 +34,8 @@ export interface MockPlayer {
   email: string
   displayName: string
   createdAtUtc: string
+  startupPackClaimedAtUtc: string | null
+  canClaimStartupPack: boolean
 }
 
 export interface MockState {
@@ -71,6 +73,8 @@ export function makePlayer(overrides: Partial<MockPlayer> = {}): MockPlayer {
     email: 'alice@example.com',
     displayName: 'Alice',
     createdAtUtc: '2026-01-01T00:00:00.000Z',
+    startupPackClaimedAtUtc: null,
+    canClaimStartupPack: true,
     ...overrides,
   }
 }
@@ -109,10 +113,20 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         email: vars?.input?.email ?? 'test@example.com',
         displayName: vars?.input?.displayName ?? 'Test Player',
         createdAtUtc: new Date().toISOString(),
+        startupPackClaimedAtUtc: null,
+        canClaimStartupPack: true,
       }
       state.currentPlayer = player
       state.currentToken = 'mock-token-abc'
-      state.subscription = { tier: 'FREE', status: 'NONE', isActive: false, daysRemaining: null, canProlong: true, expiresAtUtc: null, startsAtUtc: null }
+      state.subscription = {
+        tier: 'FREE',
+        status: 'NONE',
+        isActive: false,
+        daysRemaining: null,
+        canProlong: true,
+        expiresAtUtc: null,
+        startsAtUtc: null,
+      }
 
       await route.fulfill({
         status: 200,
@@ -178,6 +192,34 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
+    if (query.includes('mutation') && query.includes('claimStartupPack')) {
+      const now = new Date().toISOString()
+      if (state.currentPlayer?.canClaimStartupPack) {
+        state.currentPlayer = {
+          ...state.currentPlayer,
+          canClaimStartupPack: false,
+          startupPackClaimedAtUtc: now,
+        }
+      }
+
+      state.subscription = {
+        tier: 'PRO',
+        status: 'ACTIVE',
+        isActive: true,
+        daysRemaining: 90,
+        canProlong: true,
+        expiresAtUtc: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
+        startsAtUtc: state.subscription?.startsAtUtc ?? now,
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { claimStartupPack: state.subscription } }),
+      })
+      return
+    }
+
     // Me query — must not match gameServers, mySubscription, or prolongSubscription
     if (query.includes('me') && !query.includes('gameServers') && !query.includes('mySubscription') && !query.includes('prolongSubscription')) {
       if (state.currentPlayer) {
@@ -203,7 +245,16 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         contentType: 'application/json',
         body: JSON.stringify({
           data: {
-            mySubscription: state.subscription ?? { tier: 'FREE', status: 'NONE', isActive: false, daysRemaining: null, canProlong: true, expiresAtUtc: null, startsAtUtc: null },
+            mySubscription:
+              state.subscription ?? {
+                tier: 'FREE',
+                status: 'NONE',
+                isActive: false,
+                daysRemaining: null,
+                canProlong: true,
+                expiresAtUtc: null,
+                startsAtUtc: null,
+              },
           },
         }),
       })

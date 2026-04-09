@@ -254,6 +254,16 @@ export default {
     unitRoleFactory: 'Sources raw materials and manufactures your product',
     unitRoleShop: 'Receives your product and sells it to the public',
   },
+  proAccess: {
+    eyebrow: 'Master account',
+    title: 'Pro access',
+    activeBadge: 'Active',
+    inactiveBadge: 'Inactive',
+    activeBody: 'Pro is active on your account until {date}.',
+    inactiveBody: 'Pro is not active on this account right now.',
+    manageBody: 'Open the master portal to manage Pro, subscriptions, and startup-pack offers.',
+    openPortal: 'Open master portal',
+  },
   startupPack: {
     eyebrow: 'Limited-time startup pack',
     price: '$20',

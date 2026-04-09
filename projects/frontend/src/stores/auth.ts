@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { deepEqual } from '@/lib/utils'
-import type { AccountContextResult, AccountContextType, Player, AuthPayload, StartupPackOffer } from '@/types'
+import type { AccountContextResult, AccountContextType, Player, AuthPayload } from '@/types'
 
 const PLAYER_SELECTION = `
   id
@@ -34,9 +34,7 @@ const PLAYER_SELECTION = `
 
 export const useAuthStore = defineStore('auth', () => {
   const player = ref<Player | null>(null)
-  const startupPackOffer = ref<StartupPackOffer | null>(null)
   const token = ref<string | null>(null)
-  const proSubscriptionEndsAtUtcOverride = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -91,9 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!token.value || !!getStoredToken())
   const isAdmin = computed(() => player.value?.role === 'ADMIN')
   const isProSubscriber = computed(() => !!player.value?.proSubscriptionEndsAtUtc && new Date(player.value.proSubscriptionEndsAtUtc).getTime() > Date.now())
-  const effectiveProSubscriptionEndsAtUtc = computed(
-    () => player.value?.proSubscriptionEndsAtUtc ?? proSubscriptionEndsAtUtcOverride.value,
-  )
+  const effectiveProSubscriptionEndsAtUtc = computed(() => player.value?.proSubscriptionEndsAtUtc ?? null)
 
   function initFromStorage() {
     token.value = getStoredToken()
@@ -102,27 +98,11 @@ export const useAuthStore = defineStore('auth', () => {
   function setSession(auth: AuthPayload) {
     token.value = auth.token
     player.value = auth.player
-    startupPackOffer.value = null
-    proSubscriptionEndsAtUtcOverride.value = auth.player.proSubscriptionEndsAtUtc
     localStorage.setItem('auth_token', auth.token)
     localStorage.setItem('auth_expires', auth.expiresAtUtc)
     if (typeof document !== 'undefined') {
       document.cookie = `auth_token=${encodeURIComponent(auth.token)}; path=/`
       document.cookie = `auth_expires=${encodeURIComponent(auth.expiresAtUtc)}; path=/`
-    }
-  }
-
-  function setStartupPackOffer(offer: StartupPackOffer | null) {
-    startupPackOffer.value = offer
-  }
-
-  function setProSubscriptionEndsAtUtc(value: string | null) {
-    proSubscriptionEndsAtUtcOverride.value = value
-    if (player.value) {
-      player.value = {
-        ...player.value,
-        proSubscriptionEndsAtUtc: value,
-      }
     }
   }
 
@@ -179,30 +159,9 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) return
     loading.value = true
     try {
-      const data = await gqlRequest<{ me: Player; startupPackOffer: StartupPackOffer | null }>(
-        `{
-          me {${PLAYER_SELECTION}}
-          startupPackOffer {
-            id
-            offerKey
-            status
-            createdAtUtc
-            expiresAtUtc
-            shownAtUtc
-            dismissedAtUtc
-            claimedAtUtc
-            companyCashGrant
-            proDurationDays
-            grantedCompanyId
-          }
-        }`,
-      )
+      const data = await gqlRequest<{ me: Player }>(`{ me {${PLAYER_SELECTION}} }`)
       if (!deepEqual(player.value, data.me)) {
         player.value = data.me
-      }
-      proSubscriptionEndsAtUtcOverride.value = data.me.proSubscriptionEndsAtUtc ?? proSubscriptionEndsAtUtcOverride.value
-      if (!deepEqual(startupPackOffer.value, data.startupPackOffer)) {
-        startupPackOffer.value = data.startupPackOffer
       }
     } catch (e: unknown) {
       error.value = e instanceof Error ? e.message : 'Failed to load account'
@@ -248,14 +207,11 @@ export const useAuthStore = defineStore('auth', () => {
   function logout() {
     token.value = null
     player.value = null
-    startupPackOffer.value = null
-    proSubscriptionEndsAtUtcOverride.value = null
     clearStoredSession()
   }
 
   return {
     player,
-    startupPackOffer,
     token,
     loading,
     error,
@@ -264,8 +220,6 @@ export const useAuthStore = defineStore('auth', () => {
     isProSubscriber,
     effectiveProSubscriptionEndsAtUtc,
     initFromStorage,
-    setStartupPackOffer,
-    setProSubscriptionEndsAtUtc,
     register,
     login,
     fetchMe,

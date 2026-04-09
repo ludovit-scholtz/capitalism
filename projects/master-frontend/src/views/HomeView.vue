@@ -4,7 +4,12 @@ import { useRouter } from 'vue-router'
 
 import { fetchGameServers, type GameServerSummary } from '@/lib/masterApi'
 import { formatHeartbeatDistance } from '@/lib/time'
-import { formatProlongLabel, formatRenewalNote, formatStatusLabel, formatTierLabel } from '@/lib/subscription'
+import {
+  formatProlongLabel,
+  formatRenewalNote,
+  formatStatusLabel,
+  formatTierLabel,
+} from '@/lib/subscription'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -18,8 +23,23 @@ const prolongMonths = ref(1)
 const prolongLoading = ref(false)
 const prolongError = ref('')
 const prolongSuccess = ref(false)
+const startupPackLoading = ref(false)
+const startupPackError = ref('')
+const startupPackSuccess = ref(false)
 
 const onlineCount = computed(() => servers.value.filter((server) => server.isOnline).length)
+const startupPackClaimedAtLabel = computed(() => {
+  const claimedAt = auth.player?.startupPackClaimedAtUtc
+  if (!claimedAt) {
+    return ''
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  }).format(new Date(claimedAt))
+})
 
 function heartbeatLabel(server: GameServerSummary) {
   return formatHeartbeatDistance(server.lastHeartbeatAtUtc)
@@ -52,6 +72,20 @@ async function handleProlong() {
   }
 }
 
+async function handleStartupPackClaim() {
+  startupPackLoading.value = true
+  startupPackError.value = ''
+  startupPackSuccess.value = false
+  try {
+    await auth.claimStartupPackOffer()
+    startupPackSuccess.value = true
+  } catch (e: unknown) {
+    startupPackError.value = e instanceof Error ? e.message : 'Failed to claim startup pack.'
+  } finally {
+    startupPackLoading.value = false
+  }
+}
+
 function logout() {
   auth.logout()
   void router.push('/')
@@ -63,35 +97,34 @@ onMounted(() => {
 </script>
 
 <template>
+  <div class="hero-video-wrapper">
+    <div class="hero-video-overlay">
+      <div class="hero-video-uplayer"></div>
+      <video autoplay muted playsinline class="hero-video">
+        <source src="../assets/hero-video.webm" type="video/webm" />
+      </video>
+    </div>
+  </div>
   <main class="master-shell">
-    <!-- Navigation header -->
-    <header class="site-header">
-      <div class="site-logo">
-        <span class="logo-text">Capitalism</span>
-        <span class="logo-tag">Network</span>
-      </div>
-
-      <nav class="site-nav">
-        <template v-if="auth.isAuthenticated">
-          <span class="nav-player">{{ auth.player?.displayName ?? 'Account' }}</span>
-          <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>
-        </template>
-        <template v-else>
-          <a class="nav-btn" href="/login">Sign in</a>
-        </template>
-      </nav>
-    </header>
-
     <!-- Hero panel -->
     <section class="hero-panel">
       <div class="hero-copy">
+        <span class="hero-title">CAPITALISM V</span>
         <p class="eyebrow">Capitalism Network</p>
-        <h1>One master website, multiple live economies.</h1>
         <p class="hero-text">
-          Discover active game servers, compare their live heartbeat, and jump directly into the
-          world that is currently running.
+          Free to play, <b>play to earn</b>, market simulation game - Build your business empire,
+          compete on the global leaderboard, and discover the economic ecosystem.
         </p>
-        <a v-if="!auth.isAuthenticated" class="hero-cta" href="/login">Get started free →</a>
+
+        <nav class="site-nav">
+          <template v-if="auth.isAuthenticated">
+            <span class="nav-player">{{ auth.player?.displayName ?? 'Account' }}</span>
+            <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>
+          </template>
+          <template v-else>
+            <a class="hero-cta" href="/login">Get started free →</a>
+          </template>
+        </nav>
       </div>
 
       <div class="hero-metrics">
@@ -99,14 +132,7 @@ onMounted(() => {
           <span class="metric-label">Active Servers</span>
           <strong>{{ onlineCount }}</strong>
         </article>
-        <article class="metric-card">
-          <span class="metric-label">Known Servers</span>
-          <strong>{{ servers.length }}</strong>
-        </article>
-        <article class="metric-card">
-          <span class="metric-label">Architecture</span>
-          <strong>Master + Game</strong>
-        </article>
+        <div></div>
       </div>
     </section>
 
@@ -114,16 +140,83 @@ onMounted(() => {
       <!-- Left column: pitch or subscription panel -->
       <aside>
         <!-- Subscription dashboard for authenticated users -->
-        <section v-if="auth.isAuthenticated" class="subscription-panel" aria-label="Subscription dashboard">
+        <section
+          v-if="auth.isAuthenticated"
+          class="subscription-panel"
+          aria-label="Subscription dashboard"
+        >
           <p class="section-kicker">Your account</p>
           <h2>Subscription</h2>
 
+          <section class="startup-pack-card" aria-label="Startup Pack">
+            <div class="startup-pack-header">
+              <div>
+                <p class="startup-pack-kicker">New account bonus</p>
+                <h3>Startup Pack</h3>
+              </div>
+              <span
+                :class="[
+                  'startup-pack-pill',
+                  auth.player?.canClaimStartupPack
+                    ? 'startup-pack-pill--available'
+                    : 'startup-pack-pill--claimed',
+                ]"
+              >
+                {{ auth.player?.canClaimStartupPack ? 'Available once' : 'Claimed' }}
+              </span>
+            </div>
+
+            <p class="startup-pack-copy">
+              Claim once on the master portal to add 3 months of Pro to your account. The game
+              clients only reflect the resulting Pro status.
+            </p>
+
+            <ul class="startup-pack-benefits">
+              <li>Stacks onto any active Pro time instead of replacing it.</li>
+              <li>Unlocks the shared Pro tier used across all Capitalism worlds.</li>
+              <li>Remains tied to your master identity, not a single game shard.</li>
+            </ul>
+
+            <div v-if="auth.player?.canClaimStartupPack" class="startup-pack-actions">
+              <button
+                class="startup-pack-btn"
+                type="button"
+                :disabled="startupPackLoading"
+                @click="handleStartupPackClaim"
+              >
+                {{ startupPackLoading ? 'Claiming…' : 'Claim Startup Pack' }}
+              </button>
+              <p class="startup-pack-note">One claim per master account.</p>
+            </div>
+
+            <div v-else class="startup-pack-state">
+              <p class="startup-pack-note">
+                <template v-if="startupPackClaimedAtLabel">
+                  Claimed on {{ startupPackClaimedAtLabel }}.
+                </template>
+                <template v-else> Already claimed on this account. </template>
+              </p>
+            </div>
+
+            <p v-if="startupPackError" class="prolong-error" role="alert">{{ startupPackError }}</p>
+            <p v-if="startupPackSuccess" class="prolong-success" role="status">
+              ✓ Startup Pack claimed successfully!
+            </p>
+          </section>
+
           <div v-if="auth.subscription" class="sub-status-card">
             <div class="sub-tier-row">
-              <span :class="['tier-badge', auth.subscription.tier === 'PRO' ? 'tier-pro' : 'tier-free']">
+              <span
+                :class="['tier-badge', auth.subscription.tier === 'PRO' ? 'tier-pro' : 'tier-free']"
+              >
                 {{ formatTierLabel(auth.subscription.tier) }}
               </span>
-              <span :class="['status-pill', auth.subscription.isActive ? 'status-online' : 'status-offline']">
+              <span
+                :class="[
+                  'status-pill',
+                  auth.subscription.isActive ? 'status-online' : 'status-offline',
+                ]"
+              >
                 {{ formatStatusLabel(auth.subscription) }}
               </span>
             </div>
@@ -132,7 +225,10 @@ onMounted(() => {
               {{ formatRenewalNote(auth.subscription) }}
             </p>
 
-            <div v-if="auth.subscription.isActive && auth.subscription.tier === 'PRO'" class="pro-perks">
+            <div
+              v-if="auth.subscription.isActive && auth.subscription.tier === 'PRO'"
+              class="pro-perks"
+            >
               <p class="perks-label">Pro unlocks</p>
               <ul class="perks-list">
                 <li>Advanced market analytics</li>
@@ -151,12 +247,16 @@ onMounted(() => {
           </div>
 
           <div v-if="auth.subscription?.canProlong" class="prolong-section">
-            <p class="prolong-label">{{ auth.subscription ? formatProlongLabel(auth.subscription) : '' }}</p>
+            <p class="prolong-label">
+              {{ auth.subscription ? formatProlongLabel(auth.subscription) : '' }}
+            </p>
             <div class="prolong-controls">
               <div class="months-picker">
                 <label for="months-select">Months</label>
                 <select id="months-select" v-model="prolongMonths">
-                  <option v-for="m in [1, 3, 6, 12]" :key="m" :value="m">{{ m }} month{{ m > 1 ? 's' : '' }}</option>
+                  <option v-for="m in [1, 3, 6, 12]" :key="m" :value="m">
+                    {{ m }} month{{ m > 1 ? 's' : '' }}
+                  </option>
                 </select>
               </div>
               <button
@@ -178,15 +278,22 @@ onMounted(() => {
         <!-- How it works for unauthenticated users -->
         <article v-else class="pitch-card">
           <p class="section-kicker">How it works</p>
-          <h2>Master infrastructure keeps discovery separate from simulation.</h2>
+          <h2>Play to earn</h2>
           <ul>
-            <li>Master API stores the live registry of game servers.</li>
-            <li>Each game server heartbeats into the master server on startup.</li>
-            <li>The master frontend lists the servers and links players to the correct client.</li>
+            <li>Players can swap ingame dollars to real-world currency.</li>
+            <li>
+              The in game gold is the real
+              <a href="https://asa.gold" target="_blank" rel="noreferrer">tokenized gold</a>. You
+              can mine it and trade it and use it between the different game servers.
+            </li>
+            <li>
+              Start playing with the free account. If you enjoy the game, consider upgrading to Pro
+              subscription for additional product manufacturing.
+            </li>
           </ul>
 
           <div class="pitch-cta-area">
-            <p class="pitch-cta-text">Create a free account to track your Pro subscription across all Capitalism worlds.</p>
+            <p class="pitch-cta-text">Create a free account to start mining real gold.</p>
             <a class="pitch-cta-btn" href="/login">Register free</a>
           </div>
         </article>
@@ -214,7 +321,9 @@ onMounted(() => {
             <div class="server-card-header">
               <div>
                 <p class="server-name">{{ server.displayName }}</p>
-                <p class="server-meta">{{ server.region }} · {{ server.environment }} · v{{ server.version }}</p>
+                <p class="server-meta">
+                  {{ server.region }} · {{ server.environment }} · v{{ server.version }}
+                </p>
               </div>
               <span :class="['status-pill', server.isOnline ? 'status-online' : 'status-offline']">
                 {{ server.isOnline ? 'Online' : 'Offline' }}
@@ -222,7 +331,9 @@ onMounted(() => {
             </div>
 
             <p class="server-description">
-              {{ server.description || 'Economic simulation shard registered with the master node.' }}
+              {{
+                server.description || 'Economic simulation shard registered with the master node.'
+              }}
             </p>
 
             <dl class="server-stats">
@@ -260,6 +371,24 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.hero-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -2;
+}
+
+.hero-video-uplayer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 246, 67, 0.2);
+  z-index: -1;
+}
+
 .master-shell {
   width: min(1180px, calc(100vw - 2rem));
   margin: 0 auto;
@@ -350,7 +479,6 @@ onMounted(() => {
 .hero-copy h1 {
   font-size: clamp(2.6rem, 7vw, 4.4rem);
   line-height: 0.92;
-  max-width: 10ch;
 }
 
 .hero-text {
@@ -393,7 +521,7 @@ onMounted(() => {
 .metric-card {
   padding: 1rem 1.1rem;
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
@@ -404,7 +532,7 @@ onMounted(() => {
 }
 
 .metric-label {
-  color: rgba(245, 242, 235, 0.74);
+  color: rgba(8, 13, 100, 0.74);
   font-size: 0.82rem;
 }
 
@@ -480,6 +608,105 @@ onMounted(() => {
   padding: 1rem;
   border-radius: 18px;
   background: rgba(18, 44, 83, 0.04);
+}
+
+.startup-pack-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(236, 145, 5, 0.16), transparent 42%),
+    rgba(18, 44, 83, 0.04);
+  border: 1px solid rgba(236, 145, 5, 0.18);
+}
+
+.startup-pack-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.startup-pack-kicker {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.startup-pack-header h3 {
+  margin-top: 0.25rem;
+  font-size: 1.2rem;
+}
+
+.startup-pack-pill {
+  height: fit-content;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.startup-pack-pill--available {
+  background: rgba(236, 145, 5, 0.18);
+  color: #a06010;
+}
+
+.startup-pack-pill--claimed {
+  background: rgba(58, 140, 92, 0.14);
+  color: #2d7d4e;
+}
+
+.startup-pack-copy {
+  margin-top: 0.8rem;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+}
+
+.startup-pack-benefits {
+  margin-top: 0.9rem;
+  padding-left: 1rem;
+  color: var(--color-ink);
+  font-size: 0.9rem;
+}
+
+.startup-pack-benefits li + li {
+  margin-top: 0.35rem;
+}
+
+.startup-pack-actions,
+.startup-pack-state {
+  margin-top: 1rem;
+}
+
+.startup-pack-btn {
+  padding: 0.65rem 1.2rem;
+  border-radius: 999px;
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    transform 0.15s,
+    opacity 0.15s;
+}
+
+.startup-pack-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.startup-pack-btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.startup-pack-note {
+  margin-top: 0.65rem;
+  font-size: 0.88rem;
+  color: var(--color-muted);
 }
 
 .sub-tier-row {
@@ -594,7 +821,9 @@ onMounted(() => {
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: transform 0.15s, opacity 0.15s;
+  transition:
+    transform 0.15s,
+    opacity 0.15s;
 }
 
 .prolong-btn:disabled {
@@ -642,7 +871,9 @@ onMounted(() => {
   padding: 0.75rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--color-border);
-  transition: transform 0.18s ease, background-color 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    background-color 0.18s ease;
 }
 
 .refresh-button {
@@ -802,5 +1033,35 @@ onMounted(() => {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .startup-pack-header {
+    flex-direction: column;
+  }
+}
+
+.hero-title {
+  font-size: 3rem;
+  white-space: nowrap;
+  background: linear-gradient(135deg, rgba(246, 235, 17), rgb(246, 189, 17));
+  border-top: 1px solid rgba(246, 235, 17);
+  border-bottom: 1px solid rgba(246, 235, 17);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1rem;
+  font-style: normal;
+  text-transform: uppercase;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Open Sans',
+    'Helvetica Neue',
+    sans-serif;
 }
 </style>

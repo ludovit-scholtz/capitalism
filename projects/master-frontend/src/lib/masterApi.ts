@@ -24,6 +24,8 @@ export interface MasterPlayerProfile {
   email: string
   displayName: string
   createdAtUtc: string
+  startupPackClaimedAtUtc: string | null
+  canClaimStartupPack: boolean
 }
 
 export interface MasterAuthPayload {
@@ -74,7 +76,14 @@ const REGISTER_MUTATION = `
     register(input: $input) {
       token
       expiresAtUtc
-      player { id email displayName createdAtUtc }
+      player {
+        id
+        email
+        displayName
+        createdAtUtc
+        startupPackClaimedAtUtc
+        canClaimStartupPack
+      }
     }
   }
 `
@@ -84,13 +93,29 @@ const LOGIN_MUTATION = `
     login(input: $input) {
       token
       expiresAtUtc
-      player { id email displayName createdAtUtc }
+      player {
+        id
+        email
+        displayName
+        createdAtUtc
+        startupPackClaimedAtUtc
+        canClaimStartupPack
+      }
     }
   }
 `
 
 const ME_QUERY = `
-  query { me { id email displayName createdAtUtc } }
+  query {
+    me {
+      id
+      email
+      displayName
+      createdAtUtc
+      startupPackClaimedAtUtc
+      canClaimStartupPack
+    }
+  }
 `
 
 const MY_SUBSCRIPTION_QUERY = `
@@ -110,6 +135,20 @@ const MY_SUBSCRIPTION_QUERY = `
 const PROLONG_SUBSCRIPTION_MUTATION = `
   mutation ProlongSubscription($input: ProlongSubscriptionInput!) {
     prolongSubscription(input: $input) {
+      tier
+      status
+      isActive
+      daysRemaining
+      canProlong
+      expiresAtUtc
+      startsAtUtc
+    }
+  }
+`
+
+const CLAIM_STARTUP_PACK_MUTATION = `
+  mutation ClaimStartupPack {
+    claimStartupPack {
       tier
       status
       isActive
@@ -165,4 +204,13 @@ export async function prolongSubscription(token: string, months: number): Promis
     token,
   )
   return data.prolongSubscription
+}
+
+export async function claimStartupPack(token: string): Promise<SubscriptionInfo> {
+  const data = await gqlRequest<{ claimStartupPack: SubscriptionInfo }>(
+    CLAIM_STARTUP_PACK_MUTATION,
+    undefined,
+    token,
+  )
+  return data.claimStartupPack
 }

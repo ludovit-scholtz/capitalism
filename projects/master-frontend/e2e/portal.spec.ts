@@ -201,6 +201,46 @@ test.describe('Authenticated home page', () => {
     await expect(page.getByRole('heading', { name: 'Subscription' })).toBeVisible()
     await expect(page.locator('.tier-badge.tier-pro')).toContainText('Pro')
     await expect(page.locator('.status-pill.status-online')).toContainText('Active')
+    await expect(page.getByRole('heading', { name: 'Startup Pack' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Claim Startup Pack' })).toBeVisible()
+  })
+
+  test('claiming startup pack activates Pro on the master account', async ({ page }) => {
+    const player = makePlayer({ canClaimStartupPack: true, startupPackClaimedAtUtc: null })
+    const state = setupMockApi(page, { servers: [] })
+    state.subscription = {
+      tier: 'FREE',
+      status: 'NONE',
+      isActive: false,
+      daysRemaining: null,
+      canProlong: true,
+      expiresAtUtc: null,
+      startsAtUtc: null,
+    }
+    await loginAs(page, state, player)
+    await page.goto('/')
+
+    await page.getByRole('button', { name: 'Claim Startup Pack' }).click()
+
+    await expect(page.locator('.prolong-success')).toContainText('Startup Pack claimed successfully')
+    await expect(page.locator('.tier-badge.tier-pro')).toContainText('Pro')
+    await expect(page.locator('.startup-pack-pill--claimed')).toContainText('Claimed')
+    await expect(page.getByText(/Claimed on/)).toBeVisible()
+  })
+
+  test('shows claimed startup-pack state without claim CTA', async ({ page }) => {
+    const player = makePlayer({
+      canClaimStartupPack: false,
+      startupPackClaimedAtUtc: '2026-04-02T00:00:00.000Z',
+    })
+    const state = setupMockApi(page, { servers: [] })
+    state.subscription = makeSubscription()
+    await loginAs(page, state, player)
+    await page.goto('/')
+
+    await expect(page.locator('.startup-pack-pill--claimed')).toContainText('Claimed')
+    await expect(page.getByText('Claimed on Apr 2, 2026.')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Claim Startup Pack' })).toHaveCount(0)
   })
 
   test('shows Pro perks list for active Pro subscriber', async ({ page }) => {

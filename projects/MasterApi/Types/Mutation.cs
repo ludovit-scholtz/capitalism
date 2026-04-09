@@ -14,6 +14,8 @@ namespace MasterApi.Types;
 
 public sealed class Mutation
 {
+    private const int StartupPackDurationMonths = 3;
+
     /// <summary>Registers a new master-portal account.</summary>
     public async Task<MasterAuthPayload> Register(
         RegisterInput input,
@@ -78,7 +80,7 @@ public sealed class Mutation
         {
             Token = session.Token,
             ExpiresAtUtc = session.ExpiresAtUtc,
-            Player = ToProfile(player),
+            Player = Query.ToProfile(player),
         };
     }
 
@@ -119,7 +121,7 @@ public sealed class Mutation
         {
             Token = session.Token,
             ExpiresAtUtc = session.ExpiresAtUtc,
-            Player = ToProfile(player),
+            Player = Query.ToProfile(player),
         };
     }
 
@@ -142,51 +144,39 @@ public sealed class Mutation
         var userId = Query.GetCurrentUserId(claimsPrincipal);
         var now = DateTime.UtcNow;
 
-        // Find the most recent subscription for this player (any status).
-        // We use this to determine whether to extend or to create a new one.
-        var latestSub = await db.ProSubscriptions
-            .Where(s => s.PlayerAccountId == userId)
-            .OrderByDescending(s => s.ExpiresAtUtc)
-            .FirstOrDefaultAsync();
+        var latestSub = await GetLatestSubscriptionAsync(db, userId);
+        var resultSub = GrantOrCreateProSubscription(db, userId, now, input.Months, latestSub);
 
-        ProSubscription resultSub;
+        await db.SaveChangesAsync();
 
-        if (latestSub is not null
-            && latestSub.Status == SubscriptionStatus.Active
-            && latestSub.ExpiresAtUtc > now)
+        return Query.BuildSubscriptionInfo(resultSub, now);
+    }
+
+    /// <summary>Claims the one-time startup pack on the master portal and grants 3 months of Pro access.</summary>
+    [HotChocolate.Authorization.Authorize]
+    public async Task<SubscriptionInfo> ClaimStartupPack(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var userId = Query.GetCurrentUserId(claimsPrincipal);
+        var now = DateTime.UtcNow;
+
+        var player = await db.PlayerAccounts.FirstOrDefaultAsync(candidate => candidate.Id == userId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var latestSub = await GetLatestSubscriptionAsync(db, userId);
+
+        if (player.StartupPackClaimedAtUtc is not null)
         {
-            // Genuinely active subscription — extend it in place.
-            latestSub.ExpiresAtUtc = latestSub.ExpiresAtUtc.AddMonths(input.Months);
-            latestSub.UpdatedAtUtc = now;
-            resultSub = latestSub;
+            return Query.BuildSubscriptionInfo(latestSub, now);
         }
-        else
-        {
-            // No subscription, or the latest one has expired.
-            // Explicitly mark any stale "Active" record as Expired so the DB status
-            // stays consistent with the time-based reality, preventing duplicate
-            // Active records from accumulating.
-            if (latestSub is not null && latestSub.Status == SubscriptionStatus.Active)
-            {
-                latestSub.Status = SubscriptionStatus.Expired;
-                latestSub.UpdatedAtUtc = now;
-            }
 
-            // Create a fresh Active subscription starting now.
-            var newSub = new ProSubscription
-            {
-                Id = Guid.NewGuid(),
-                PlayerAccountId = userId,
-                Tier = SubscriptionTier.Pro,
-                Status = SubscriptionStatus.Active,
-                StartsAtUtc = now,
-                ExpiresAtUtc = now.AddMonths(input.Months),
-                CreatedAtUtc = now,
-                UpdatedAtUtc = now,
-            };
-            db.ProSubscriptions.Add(newSub);
-            resultSub = newSub;
-        }
+        var resultSub = GrantOrCreateProSubscription(db, userId, now, StartupPackDurationMonths, latestSub);
+        player.StartupPackClaimedAtUtc = now;
 
         await db.SaveChangesAsync();
 
@@ -296,14 +286,51 @@ public sealed class Mutation
         return (new JwtSecurityTokenHandler().WriteToken(token), expires);
     }
 
-    private static MasterPlayerProfile ToProfile(PlayerAccount player) =>
-        new()
+    private static async Task<ProSubscription?> GetLatestSubscriptionAsync(MasterDbContext db, Guid userId)
+    {
+        return await db.ProSubscriptions
+            .Where(subscription => subscription.PlayerAccountId == userId)
+            .OrderByDescending(subscription => subscription.ExpiresAtUtc)
+            .FirstOrDefaultAsync();
+    }
+
+    private static ProSubscription GrantOrCreateProSubscription(
+        MasterDbContext db,
+        Guid userId,
+        DateTime now,
+        int months,
+        ProSubscription? latestSub)
+    {
+        if (latestSub is not null
+            && latestSub.Status == SubscriptionStatus.Active
+            && latestSub.ExpiresAtUtc > now)
         {
-            Id = player.Id,
-            Email = player.Email,
-            DisplayName = player.DisplayName,
-            CreatedAtUtc = player.CreatedAtUtc,
+            latestSub.ExpiresAtUtc = latestSub.ExpiresAtUtc.AddMonths(months);
+            latestSub.UpdatedAtUtc = now;
+            return latestSub;
+        }
+
+        if (latestSub is not null && latestSub.Status == SubscriptionStatus.Active)
+        {
+            latestSub.Status = SubscriptionStatus.Expired;
+            latestSub.UpdatedAtUtc = now;
+        }
+
+        var newSub = new ProSubscription
+        {
+            Id = Guid.NewGuid(),
+            PlayerAccountId = userId,
+            Tier = SubscriptionTier.Pro,
+            Status = SubscriptionStatus.Active,
+            StartsAtUtc = now,
+            ExpiresAtUtc = now.AddMonths(months),
+            CreatedAtUtc = now,
+            UpdatedAtUtc = now,
         };
+
+        db.ProSubscriptions.Add(newSub);
+        return newSub;
+    }
 
     private static bool IsValidEmail(string email)
     {

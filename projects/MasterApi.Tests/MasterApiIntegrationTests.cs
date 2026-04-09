@@ -283,13 +283,15 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         var (token, _) = await RegisterAndGetTokenAsync(email, "My Name");
 
         var result = await GraphQlAsync("""
-            query { me { id email displayName createdAtUtc } }
+            query { me { id email displayName createdAtUtc startupPackClaimedAtUtc canClaimStartupPack } }
             """, token: token);
 
         Assert.False(result.TryGetProperty("errors", out _));
         var me = result.GetProperty("data").GetProperty("me");
         Assert.Equal(email, me.GetProperty("email").GetString());
         Assert.Equal("My Name", me.GetProperty("displayName").GetString());
+        Assert.Equal(JsonValueKind.Null, me.GetProperty("startupPackClaimedAtUtc").ValueKind);
+        Assert.True(me.GetProperty("canClaimStartupPack").GetBoolean());
     }
 
     [Fact]
@@ -430,6 +432,92 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         // 12 months spans 365–366 days depending on leap year and month length variation
         Assert.True(days >= 364 && days <= 367);
     }
+
+        [Fact]
+        public async Task ClaimStartupPack_NewPlayer_ActivatesProAndMarksProfile()
+        {
+                var email = $"startup-pack-{Guid.NewGuid():N}@example.com";
+                var (token, _) = await RegisterAndGetTokenAsync(email, "Starter");
+
+                var claimResult = await GraphQlAsync("""
+                        mutation {
+                            claimStartupPack {
+                                tier
+                                status
+                                isActive
+                                daysRemaining
+                                expiresAtUtc
+                            }
+                        }
+                        """, token: token);
+
+                Assert.False(claimResult.TryGetProperty("errors", out _));
+                var subscription = claimResult.GetProperty("data").GetProperty("claimStartupPack");
+                Assert.Equal("PRO", subscription.GetProperty("tier").GetString());
+                Assert.Equal("ACTIVE", subscription.GetProperty("status").GetString());
+                Assert.True(subscription.GetProperty("isActive").GetBoolean());
+                Assert.True(subscription.GetProperty("daysRemaining").GetInt32() >= 89);
+
+                var meResult = await GraphQlAsync("""
+                        query { me { startupPackClaimedAtUtc canClaimStartupPack } }
+                        """, token: token);
+
+                Assert.False(meResult.TryGetProperty("errors", out _));
+                var me = meResult.GetProperty("data").GetProperty("me");
+                Assert.NotEqual(JsonValueKind.Null, me.GetProperty("startupPackClaimedAtUtc").ValueKind);
+                Assert.False(me.GetProperty("canClaimStartupPack").GetBoolean());
+        }
+
+        [Fact]
+        public async Task ClaimStartupPack_AlreadyClaimed_IsIdempotent()
+        {
+                var email = $"startup-pack-idempotent-{Guid.NewGuid():N}@example.com";
+                var (token, _) = await RegisterAndGetTokenAsync(email, "Idempotent Starter");
+
+                var firstClaim = await GraphQlAsync("""
+                        mutation {
+                            claimStartupPack {
+                                tier
+                                status
+                                isActive
+                                expiresAtUtc
+                            }
+                        }
+                        """, token: token);
+                var firstExpiry = firstClaim.GetProperty("data").GetProperty("claimStartupPack").GetProperty("expiresAtUtc").GetString();
+
+                var secondClaim = await GraphQlAsync("""
+                        mutation {
+                            claimStartupPack {
+                                tier
+                                status
+                                isActive
+                                expiresAtUtc
+                            }
+                        }
+                        """, token: token);
+
+                Assert.False(secondClaim.TryGetProperty("errors", out _));
+                var secondSubscription = secondClaim.GetProperty("data").GetProperty("claimStartupPack");
+                Assert.Equal("PRO", secondSubscription.GetProperty("tier").GetString());
+                Assert.Equal("ACTIVE", secondSubscription.GetProperty("status").GetString());
+                Assert.True(secondSubscription.GetProperty("isActive").GetBoolean());
+                Assert.Equal(firstExpiry, secondSubscription.GetProperty("expiresAtUtc").GetString());
+        }
+
+        [Fact]
+        public async Task ClaimStartupPack_Unauthenticated_ReturnsAuthError()
+        {
+                var result = await GraphQlAsync("""
+                        mutation {
+                            claimStartupPack {
+                                tier
+                            }
+                        }
+                        """);
+
+                Assert.True(result.TryGetProperty("errors", out _));
+        }
 
     #endregion
 
@@ -702,7 +790,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             "profile-fields@example.com", "Profile User", "password123");
 
         var result = await GraphQlAsync("""
-            query { me { id email displayName createdAtUtc } }
+            query { me { id email displayName createdAtUtc startupPackClaimedAtUtc canClaimStartupPack } }
             """, token: token);
 
         Assert.False(result.TryGetProperty("errors", out _));
@@ -711,6 +799,8 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         Assert.Equal("Profile User", me.GetProperty("displayName").GetString());
         Assert.False(string.IsNullOrEmpty(me.GetProperty("id").GetString()));
         Assert.False(string.IsNullOrEmpty(me.GetProperty("createdAtUtc").GetString()));
+        Assert.Equal(JsonValueKind.Null, me.GetProperty("startupPackClaimedAtUtc").ValueKind);
+        Assert.True(me.GetProperty("canClaimStartupPack").GetBoolean());
     }
 
     [Fact]

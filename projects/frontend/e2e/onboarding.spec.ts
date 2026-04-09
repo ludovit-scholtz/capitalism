@@ -4,7 +4,7 @@
  * Implements issue #54 — guest onboarding sandbox wizard with save-progress handoff.
  */
 import { test, expect, type Page } from '@playwright/test'
-import { setupMockApi, makePlayer, makeStartupPackOffer, makeDefaultBuildingLots } from './helpers/mock-api'
+import { setupMockApi, makePlayer, makeDefaultBuildingLots } from './helpers/mock-api'
 
 async function authenticateViaLocalStorage(page: Page, token: string) {
   await page.addInitScript((storedToken) => {
@@ -276,7 +276,7 @@ test.describe('Onboarding wizard', () => {
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Scale faster while your first business is taking off' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Pro access' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'View Leaderboard' })).toBeVisible()
     // AC 6: encyclopedia entry point is visible from the onboarding completion screen
@@ -1534,7 +1534,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
   })
 
-  test('completion state shows achievement details and links to dashboard and leaderboard', async ({ page }) => {
+  test('completion state shows achievement details, Pro access status, and portal link', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -1545,107 +1545,27 @@ test.describe('Onboarding resume and progress persistence', () => {
     await page.goto('/onboarding')
     await completeGuidedOnboarding(page, 'Celebration Corp')
 
-    // Verify completion step UI
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Scale faster while your first business is taking off' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Go to Dashboard' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'View Leaderboard' })).toBeVisible()
-    await expect(page.getByText('3 months of Pro', { exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    // AC #2: offer must clearly display the $20 price
-    await expect(page.locator('.startup-pack-price')).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
-    // AC #3: offer must clearly display the regular Pro reference price ($10/month)
-    await expect(page.locator('.startup-pack-pro-monthly')).toBeVisible()
-    await expect(page.locator('.startup-pack-pro-monthly')).toContainText('$10')
-    // AC #3: savings callout must be visible to make the value proposition understandable
-    await expect(page.locator('.startup-pack-savings')).toBeVisible()
-    // AC #4: pro benefit copy must mention more products to manufacture and sell
-    await expect(page.getByText(/more products to.*sell/i)).toBeVisible()
-
-    // Should show achievement items (factory and shop names)
     await expect(page.locator('.achievement-item')).toHaveCount(4)
 
-    // Click leaderboard link
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.getByText('Master account')).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
+    await expect(proPanel.getByText('Pro is not active on this account right now.')).toBeVisible()
+    await expect(proPanel.getByText('Open the master portal to manage Pro, subscriptions, and startup-pack offers.')).toBeVisible()
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
+
     await page.getByRole('link', { name: 'View Leaderboard' }).click()
     await page.waitForURL('/leaderboard')
     await expect(page).toHaveURL('/leaderboard')
   })
 
-  test('player can claim the startup pack after onboarding and see claimed entitlement state', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-
-    await page.goto('/onboarding')
-    await completeGuidedOnboarding(page, 'Claim Pack Corp')
-
-    await page.getByRole('button', { name: 'Claim startup pack' }).click()
-
-    await expect(page.getByText('Startup pack activated')).toBeVisible()
-    await expect(page.getByText('$250,000 will be credited to Claim Pack Corp.')).toBeVisible()
-
-    await page.getByRole('link', { name: 'Go to Dashboard' }).click()
-    await page.waitForURL('/dashboard')
-    await expect(page.getByText('Startup pack activated')).toBeVisible()
-  })
-
-  test('pro subscription end date is displayed on dashboard after claiming startup pack (AC5)', async ({ page }) => {
-    // AC5: "The user can verify their new subscription/pack status in the relevant account
-    // or product surface after purchase." — the dashboard must show 'Your Pro access is active
-    // until {date}' once the offer is claimed.
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/onboarding')
-
-    await completeGuidedOnboarding(page, 'Pro Sub Display Corp')
-
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await page.getByRole('button', { name: 'Claim startup pack' }).click()
-
-    await expect(page.getByText('Startup pack activated')).toBeVisible()
-
-    // Navigate to dashboard and confirm proSubscriptionEndsAtUtc is surfaced
-    await page.getByRole('link', { name: 'Go to Dashboard' }).click()
-    await page.waitForURL('/dashboard')
-
-    // The dashboard must show 'Your Pro access is active until …' (AC5: verify entitlement state)
-    await expect(page.getByText(/Your Pro access is active until/i)).toBeVisible()
-  })
-
-  test('player can dismiss the startup pack and revisit it from the dashboard', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-
-    await page.goto('/onboarding')
-    await completeGuidedOnboarding(page, 'Maybe Later Corp')
-
-    await page.getByRole('button', { name: 'Maybe later' }).click()
-
-    await page.getByRole('link', { name: 'Go to Dashboard' }).click()
-    await page.waitForURL('/dashboard')
-    await expect(page.getByRole('heading', { name: 'Your startup pack is still available' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-  })
-
-  test('already-onboarded player visiting /onboarding is redirected to dashboard', async ({ page }) => {
+  test('dashboard shows inactive Pro status and master portal link after onboarding', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'EXPIRED',
-        expiresAtUtc: '2026-01-02T12:00:00Z',
-      }),
       companies: [
         {
           id: 'comp-existing',
@@ -1662,26 +1582,24 @@ test.describe('Onboarding resume and progress persistence', () => {
     state.currentToken = `token-${player.id}`
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
 
-    await page.goto('/onboarding')
-    await page.waitForURL('/dashboard')
-    await expect(page).toHaveURL('/dashboard')
-    await expect(page.getByText('Startup pack expired')).toBeVisible()
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
+    await expect(proPanel.getByText('Pro is not active on this account right now.')).toBeVisible()
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
   })
 
-  test('startup pack offer remains visible after page reload when in SHOWN state', async ({ page }) => {
+  test('already-onboarded player visiting /onboarding redirects to dashboard and shows active Pro status', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'SHOWN',
-        shownAtUtc: '2026-01-01T13:00:00Z',
-        expiresAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      }),
+      proSubscriptionEndsAtUtc: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       companies: [
         {
-          id: 'comp-shown',
+          id: 'comp-pro-existing',
           playerId: 'player-1',
-          name: 'Reload Corp',
+          name: 'Existing Pro Corp',
           cash: 500000,
           foundedAtUtc: '2026-01-01T00:00:00Z',
           buildings: [],
@@ -1693,155 +1611,16 @@ test.describe('Onboarding resume and progress persistence', () => {
     state.currentToken = `token-${player.id}`
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/dashboard')
-
-    await expect(page.getByRole('heading', { name: 'Your startup pack is still available' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    // AC #2: price must be visible on dashboard offer panel
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
-    // AC #3: Pro reference price must be visible on dashboard offer panel
-    await expect(page.locator('.startup-pack-pro-monthly')).toContainText('$10')
-    await expect(page.locator('.startup-pack-savings')).toBeVisible()
-
-    // Reload the page — offer must still be visible (state persisted in backend)
-    await page.reload()
-
-    await expect(page.getByRole('heading', { name: 'Your startup pack is still available' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
-    // AC #3: Pro reference price must still be visible after reload
-    await expect(page.locator('.startup-pack-pro-monthly')).toContainText('$10')
-  })
-
-  test('expired offer on dashboard shows expired message without claim button', async ({ page }) => {
-    const player = makePlayer({
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'EXPIRED',
-        expiresAtUtc: '2026-01-01T12:00:00Z',
-      }),
-      companies: [
-        {
-          id: 'comp-expired',
-          playerId: 'player-1',
-          name: 'Expired Offer Corp',
-          cash: 500000,
-          foundedAtUtc: '2026-01-01T00:00:00Z',
-          buildings: [],
-        },
-      ],
-    })
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/dashboard')
-
-    await expect(page.getByText('Startup pack expired')).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
-  })
-
-  test('player can claim startup pack directly from the dashboard and see entitlement state', async ({ page }) => {
-    const company = {
-      id: 'comp-dashboard-claim',
-      playerId: 'player-1',
-      name: 'Dashboard Claim Corp',
-      cash: 500000,
-      foundedAtUtc: '2026-01-01T00:00:00Z',
-      buildings: [],
-    }
-    const player = makePlayer({
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'SHOWN',
-        shownAtUtc: '2026-01-01T13:00:00Z',
-        expiresAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      }),
-      companies: [company],
-    })
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/dashboard')
-
-    // The revisit banner should be visible since the offer is SHOWN
-    await expect(page.getByRole('heading', { name: 'Your startup pack is still available' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-
-    // Claim from dashboard
-    await page.getByRole('button', { name: 'Claim startup pack' }).click()
-
-    // Confirmed claimed state appears
-    await expect(page.getByText('Startup pack activated')).toBeVisible()
-    // Claim button should no longer be visible after successful claim
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
-  })
-
-  test('player can dismiss startup pack from the dashboard and offer is no longer shown as active', async ({ page }) => {
-    const company = {
-      id: 'comp-dashboard-dismiss',
-      playerId: 'player-1',
-      name: 'Dashboard Dismiss Corp',
-      cash: 500000,
-      foundedAtUtc: '2026-01-01T00:00:00Z',
-      buildings: [],
-    }
-    const player = makePlayer({
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'ELIGIBLE',
-        expiresAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      }),
-      companies: [company],
-    })
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/dashboard')
-
-    // Offer should be visible (ELIGIBLE transitions to SHOWN on dashboard load)
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-
-    // Dismiss the offer
-    await page.getByRole('button', { name: 'Maybe later' }).click()
-
-    // Confirmation message appears, offer is still accessible (dismissed but not removed)
-    await expect(page.getByText('The offer has been saved to your dashboard until it expires.')).toBeVisible()
-  })
-
-  test('claim failure shows error message and player can still navigate to dashboard safely', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-    state.forceStartupPackClaimError = true
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
 
     await page.goto('/onboarding')
-    await completeGuidedOnboarding(page, 'Resilience Corp')
+    await page.waitForURL(/\/dashboard/)
+    await expect(page).toHaveURL(/\/dashboard/)
 
-    // Startup pack offer is visible after onboarding
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-
-    // Claim fails due to simulated server error
-    await page.getByRole('button', { name: 'Claim startup pack' }).click()
-
-    // Error message should be shown so the player understands what happened
-    await expect(page.getByText(/could not activate the startup pack/i)).toBeVisible()
-
-    // The claim button should still be available for retry
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-
-    // Player can still navigate away to the dashboard without being blocked
-    await page.getByRole('link', { name: 'Go to Dashboard' }).click()
-    await page.waitForURL('/dashboard')
-    await expect(page).toHaveURL('/dashboard')
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+  await expect(proPanel.locator('.startup-pack-status')).toHaveText('Active')
+    await expect(proPanel.getByText(/Pro is active on your account until/i)).toBeVisible()
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
   })
 })
 
@@ -4052,9 +3831,10 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     // After migration: authenticated completion screen
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
     expect(state.currentUserId).toBeTruthy()
-    // AC: startup pack offer must appear after guest migration (Food Processing path)
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
   })
 
   test('guest can register and migrate Healthcare (Basic Medicine) progress to authenticated account', async ({ page }) => {
@@ -4098,19 +3878,17 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     // After migration: authenticated completion screen
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
     expect(state.currentUserId).toBeTruthy()
-    // AC: startup pack offer must appear after guest migration (Healthcare path)
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
   })
 
-  test('guest migration completion: startup pack offer appears and player can claim it', async ({ page }) => {
-    // AC: "After onboarding is successfully completed, an eligible user is shown a startup pack offer."
-    // This test covers the guest-to-authenticated migration path specifically.
-    // It verifies the full offer including price, pro benefit copy, and claimable state.
+  test('guest migration completion shows the Pro access panel and master portal link', async ({ page }) => {
     const state = setupMockApi(page)
     await page.goto('/onboarding')
 
-    await completeGuestSteps1to4(page, 'Startup Pack Migration Corp')
+    await completeGuestSteps1to4(page, 'Master Portal Migration Corp')
 
     // Register as new user to trigger migration
     await page.locator('#guestEmail').fill('startup-migration@test.com')
@@ -4118,24 +3896,13 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     await page.locator('#guestPassword').fill('MigrPass1!')
     await page.getByRole('button', { name: 'Save & Launch' }).click()
 
-    // Completion screen with startup pack
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    // AC #2: price clearly stated
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
-
-    // AC #3: 3 months Pro + in-game currency listed
-    await expect(page.getByText('3 months of Pro', { exact: true })).toBeVisible()
-
-    // AC #4: gameplay value of Pro explained
-    await expect(page.getByText(/more products to.*sell/i)).toBeVisible()
-
-    // AC #7: player can claim
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await page.getByRole('button', { name: 'Claim startup pack' }).click()
-
-    // After claiming, the claim button disappears and claimed state is shown
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
+    await expect(proPanel.getByText('Pro is not active on this account right now.')).toBeVisible()
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toHaveAttribute('href', 'http://localhost:5174')
     expect(state.currentUserId).toBeTruthy()
   })
 
@@ -4960,92 +4727,8 @@ test.describe('Cross-industry/city matrix — guest wizard completability (AC2, 
   })
 })
 
-test.describe('Startup pack offer — analytics events (AC 10)', () => {
-  test('continue analytics event is dispatched when navigating to dashboard with offer still active', async ({ page }) => {
-    const player = makePlayer()
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/onboarding')
-
-    await completeGuidedOnboarding(page, 'Analytics Continue Corp')
-
-    // Startup pack should be visible after onboarding
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-
-    // Click "Go to Dashboard" — must navigate away without blocking
-    await page.getByRole('link', { name: 'Go to Dashboard' }).click()
-    await page.waitForURL('/dashboard')
-    await expect(page).toHaveURL('/dashboard')
-  })
-
-  test('offer_expired analytics event is dispatched when expired state is displayed on dashboard', async ({ page }) => {
-    const player = makePlayer({
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'EXPIRED',
-        expiresAtUtc: '2026-01-01T13:00:00Z',
-      }),
-      companies: [
-        {
-          id: 'comp-expired-analytics',
-          playerId: 'player-1',
-          name: 'Expired Analytics Corp',
-          cash: 500000,
-          foundedAtUtc: '2026-01-01T00:00:00Z',
-          buildings: [],
-        },
-      ],
-    })
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/dashboard')
-
-    // The expired state must be visible
-    await expect(page.getByText('Startup pack expired')).toBeVisible()
-    // The claim button must not be visible for an expired offer
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeHidden()
-  })
-
-  test('countdown_active analytics event is dispatched when active offer is displayed', async ({ page }) => {
-    const player = makePlayer({
-      onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'SHOWN',
-        shownAtUtc: '2026-01-01T13:00:00Z',
-        expiresAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      }),
-      companies: [
-        {
-          id: 'comp-countdown',
-          playerId: 'player-1',
-          name: 'Countdown Analytics Corp',
-          cash: 500000,
-          foundedAtUtc: '2026-01-01T00:00:00Z',
-          buildings: [],
-        },
-      ],
-    })
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-
-    await authenticateViaLocalStorage(page, `token-${player.id}`)
-    await page.goto('/dashboard')
-
-    // The active offer must be visible (confirming countdown is shown)
-    await expect(page.getByRole('heading', { name: 'Your startup pack is still available' })).toBeVisible()
-    await expect(page.locator('.startup-pack-deadline')).toBeVisible()
-  })
-})
-
-test.describe('Startup pack offer — mobile viewport (AC 11)', () => {
-  test('startup pack offer is readable on a narrow (375px) mobile viewport after onboarding', async ({ page }) => {
+test.describe('Pro access panel — mobile viewport', () => {
+  test('completion screen keeps the Pro access panel usable on a 375px mobile viewport', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -5055,27 +4738,18 @@ test.describe('Startup pack offer — mobile viewport (AC 11)', () => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/onboarding')
 
-    await completeGuidedOnboarding(page, 'Mobile Pack Corp')
+    await completeGuidedOnboarding(page, 'Mobile Pro Corp')
 
-    // Startup pack offer must be visible on mobile
-    await expect(page.getByRole('heading', { name: /Scale faster/i })).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
-    await expect(page.locator('.startup-pack-pro-monthly')).toBeVisible()
-    await expect(page.locator('.startup-pack-pro-monthly')).toContainText('$10')
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Maybe later' })).toBeVisible()
-    // Free-play safety copy must be visible
-    await expect(page.getByText('Free play continues even if you skip this offer.')).toBeVisible()
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toBeVisible()
   })
 
-  test('startup pack panel is readable on dashboard at 375px mobile viewport', async ({ page }) => {
+  test('dashboard keeps active Pro status readable on a 375px mobile viewport', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T12:00:00Z',
-      startupPackOffer: makeStartupPackOffer({
-        status: 'ELIGIBLE',
-        expiresAtUtc: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
-      }),
+      proSubscriptionEndsAtUtc: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
       companies: [
         {
           id: 'comp-mobile-dashboard',
@@ -5095,12 +4769,11 @@ test.describe('Startup pack offer — mobile viewport (AC 11)', () => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/dashboard')
 
-    // Offer panel must render and be usable on mobile
-    await expect(page.getByRole('heading', { name: 'Your startup pack is still available' })).toBeVisible()
-    await expect(page.locator('.startup-pack-price')).toContainText('$20')
-    await expect(page.locator('.startup-pack-pro-monthly')).toContainText('$10')
-    await expect(page.getByRole('button', { name: 'Claim startup pack' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Maybe later' })).toBeVisible()
+    const proPanel = page.locator('.startup-pack-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toHaveText('Active')
+    await expect(proPanel.getByText(/Pro is active on your account until/i)).toBeVisible()
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toBeVisible()
   })
 })
 

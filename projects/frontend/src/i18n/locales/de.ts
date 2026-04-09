@@ -256,6 +256,16 @@ export default {
     unitRoleFactory: 'Bezieht Rohstoffe und stellt Ihr Produkt her',
     unitRoleShop: 'Empfängt Ihr Produkt und verkauft es an die Öffentlichkeit',
   },
+  proAccess: {
+    eyebrow: 'Master-Konto',
+    title: 'Pro-Zugang',
+    activeBadge: 'Aktiv',
+    inactiveBadge: 'Inaktiv',
+    activeBody: 'Pro ist auf Ihrem Konto bis {date} aktiv.',
+    inactiveBody: 'Pro ist für dieses Konto derzeit nicht aktiv.',
+    manageBody: 'Öffnen Sie das Master-Portal, um Pro, Abonnements und Startup-Paket-Angebote zu verwalten.',
+    openPortal: 'Master-Portal öffnen',
+  },
   startupPack: {
     eyebrow: 'Zeitlich begrenztes Startup-Paket',
     price: '20 $',

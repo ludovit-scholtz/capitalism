@@ -254,6 +254,16 @@ export default {
     unitRoleFactory: 'Získava suroviny a vyrába váš produkt',
     unitRoleShop: 'Preberá váš produkt a predáva ho verejnosti',
   },
+  proAccess: {
+    eyebrow: 'Master účet',
+    title: 'Pro prístup',
+    activeBadge: 'Aktívny',
+    inactiveBadge: 'Neaktívny',
+    activeBody: 'Pro je na vašom účte aktívne do {date}.',
+    inactiveBody: 'Pro na tomto účte momentálne nie je aktívne.',
+    manageBody: 'Otvorte master portál pre správu Pro, predplatného a ponúk štartovacieho balíka.',
+    openPortal: 'Otvoriť master portál',
+  },
   startupPack: {
     eyebrow: 'Časovo obmedzený štartovací balík',
     price: '20 $',
