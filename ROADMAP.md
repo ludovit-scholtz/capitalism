@@ -5,8 +5,6 @@ Create a fun game on style of the capitalism II game. This game is economic simu
 It will use real world map. The game will start in single city and later other cities will be added.
 
 ## Issues to work on
-- Leaderboard - change richest players to show their cash and stocks value (wealth of personal account) instead of buildings and inventory. Keep cash, buildings and inventory for company side ranking.
-- Remove startup pack from the game side, and add it only to the master web and api. In the game frontend just show if pro subscription is active and give there link to the master web to get more information abount it.
 - --color-surface-secondary is defined as #f3f4f6, but --color-text-primary is not defined and in some components this combination makes the color of text white and background white so it does not show the text; --color-background is not defined and color text is defined as #e6edf3 - this make the white text on white background making the text not readable. Fix all similar issues.
 - Improve public sales calculation engine - add trending and random component. The 
 - Improve product selection in sales and storage unit - select products only from connected units or current stock items.
