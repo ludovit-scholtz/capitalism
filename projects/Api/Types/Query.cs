@@ -2153,12 +2153,28 @@ public sealed class Query
             marketShare, unmetDemandShare, city?.BaseSalaryPerManhour,
             recentCitySalary, city?.Population ?? 0);
 
+        // ── Trend direction ─────────────────────────────────────────────────────
+        // Compare average revenue in the most-recent 5 ticks vs the prior 5 ticks to give
+        // a simple UP / FLAT / DOWN direction signal. Helps the player see at a glance
+        // whether the last few decisions improved or hurt performance.
+        var trendDirection = ComputeTrendDirection(revenueHistory);
+
+        // Resolve the product type ID used for the analytics response.  Priority:
+        //   1. The product type loaded for analytics (based on unit or recent record)
+        //   2. The product type ID on the unit itself
+        //   3. The product type ID from the most-recent sales record
+        var resolvedProductTypeId = productTypeForAnalytics?.Id
+            ?? unit.ProductTypeId
+            ?? records.FirstOrDefault()?.ProductTypeId;
+
         return new PublicSalesAnalytics
         {
             BuildingUnitId = unit.Id,
             BuildingId = building.Id,
             BuildingName = building.Name,
             CityName = city?.Name ?? string.Empty,
+            ProductTypeId = resolvedProductTypeId,
+            ProductName = productTypeForAnalytics?.Name,
             TotalRevenue = totalRevenue,
             TotalQuantitySold = totalQuantity,
             AveragePricePerUnit = averagePrice,
@@ -2168,6 +2184,7 @@ public sealed class Query
             RevenueHistory = revenueHistory,
             MarketShare = marketShare,
             PriceHistory = priceHistory,
+            TrendDirection = trendDirection,
             DemandSignal = demandSignal,
             ActionHint = actionHint,
             RecentUtilization = recentUtilization,
@@ -2180,6 +2197,36 @@ public sealed class Query
             ProfitHistory = profitHistory,
             DemandDrivers = demandDrivers,
         };
+    }
+
+    /// <summary>
+    /// Computes a revenue trend direction by comparing average revenue in the most-recent
+    /// 5 ticks vs the prior 5 ticks. Returns UP, FLAT, or DOWN. Returns NO_DATA when there
+    /// are fewer than 2 ticks of history (not enough to compute a meaningful comparison).
+    /// A 5 % threshold separates FLAT from directional movement.
+    /// </summary>
+    private static string ComputeTrendDirection(List<SalesTickSnapshot> revenueHistory)
+    {
+        // Require two full equal windows (5 ticks each = 10 ticks minimum) so that the
+        // comparison is always fair.  Histories shorter than 10 ticks cannot produce a
+        // trustworthy directional verdict and are classified as NO_DATA.  This prevents
+        // the early-game period (6-9 ticks) from showing a misleading UP/DOWN/FLAT badge
+        // to players who are actively learning price elasticity and supply dynamics.
+        if (revenueHistory.Count < 10) return "NO_DATA";
+
+        var recent = revenueHistory.TakeLast(5).ToList();
+        var prior  = revenueHistory.SkipLast(5).TakeLast(5).ToList();
+
+        var recentAvg = recent.Average(s => s.Revenue);
+        var priorAvg  = prior.Average(s => s.Revenue);
+
+        if (priorAvg == 0)
+            return recentAvg > 0 ? "UP" : "FLAT";
+
+        var change = (recentAvg - priorAvg) / priorAvg;
+        return change > GameConstants.FlatTrendThresholdPct ? "UP"
+             : change < -GameConstants.FlatTrendThresholdPct ? "DOWN"
+             : "FLAT";
     }
 
     /// <summary>
