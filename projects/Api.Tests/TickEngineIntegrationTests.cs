@@ -4008,6 +4008,753 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.InRange(trendState.TrendFactor, GameConstants.TrendMin, GameConstants.TrendMax);
     }
 
+    [Fact]
+    public async Task PublicSalesPhase_HotTrend_IncreasesQuantitySold_VsNeutralTrend()
+    {
+        // ROADMAP AC 1: "Public sales outcomes are influenced by at least one explicit demand
+        // trend mechanism that evolves over time rather than staying flat."
+        // This test directly proves the trend AFFECTS quantity sold, not just that
+        // the trend STATE changes.
+        //
+        // Design: population=50,000 and stock=200 yields demand in range [7.9, 9.8] units for
+        // neutral trend and [13.6, 17.0] units for hot trend (TrendMax=1.5). These ranges
+        // are non-overlapping even after factoring in the ±TrendRandomAmplitude (0.08)
+        // applied with different random seeds per city, because:
+        //   hot_min  = 50_000 × 0.001 × 0.6 × TrendMax × (1 - 0.08) × effectiveFactor_min ≈ 13.6
+        //   neut_max = 50_000 × 0.001 × 0.6 × TrendNeutral × (1 + 0.08) × effectiveFactor_max ≈ 9.8
+        //   13.6 > 9.8  →  hot always sells more than neutral ✓
+        // Both demands stay below the level-1 sales capacity (20), so the unit capacity cap
+        // never becomes the binding constraint.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var hotCity = CreatePublicSalesTestCity("HotTrendImpact", 50_000);
+        var neutralCity = CreatePublicSalesTestCity("NeutralTrendImpact", 50_000);
+        db.Cities.AddRange(hotCity, neutralCity);
+
+        var (_, _, hotUnitId) = AddPublicSalesSeller(
+            db, hotCity, product, "HotImpact",
+            stockQuantity: 200m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        var (_, _, neutralUnitId) = AddPublicSalesSeller(
+            db, neutralCity, product, "NeutralImpact",
+            stockQuantity: 200m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        // Pre-seed trend: hot city at TrendMax, neutral city at TrendNeutral.
+        db.MarketTrendStates.AddRange(
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = hotCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendMax,
+                LastUpdatedTick = 0,
+            },
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = neutralCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendNeutral,
+                LastUpdatedTick = 0,
+            });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var hotRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == hotUnitId)
+            .FirstOrDefaultAsync();
+        var neutralRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == neutralUnitId)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(hotRecord);
+        Assert.NotNull(neutralRecord);
+
+        // The hot-trend city should sell strictly more than the neutral-trend city,
+        // because all other conditions are identical and the hot trend boosts cityBaseDemand.
+        Assert.True(hotRecord.QuantitySold > neutralRecord.QuantitySold,
+            $"Hot trend (TrendFactor={GameConstants.TrendMax}) should yield more sales " +
+            $"({hotRecord.QuantitySold}) than neutral trend ({neutralRecord.QuantitySold}).");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ColdTrend_DecreasesQuantitySold_VsNeutralTrend()
+    {
+        // ROADMAP AC 1 + 3: Proves the trend mechanism affects actual gameplay outcomes
+        // and does not drown out existing demand signals.
+        //
+        // Design: population=50,000, stock=200, cold trend=TrendMin (0.5).
+        //   cold_max  = 50_000 × 0.001 × 0.6 × TrendMin × (1 + 0.08) × effectiveFactor_max ≈ 4.1
+        //   neut_min  = 50_000 × 0.001 × 0.6 × TrendNeutral × (1 - 0.08) × effectiveFactor_min ≈ 7.9
+        //   4.1 < 7.9  →  cold always sells less than neutral ✓
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var coldCity = CreatePublicSalesTestCity("ColdTrendImpact", 50_000);
+        var neutralCity2 = CreatePublicSalesTestCity("NeutralTrendImpact2", 50_000);
+        db.Cities.AddRange(coldCity, neutralCity2);
+
+        var (_, _, coldUnitId) = AddPublicSalesSeller(
+            db, coldCity, product, "ColdImpact",
+            stockQuantity: 200m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        var (_, _, neutralUnitId2) = AddPublicSalesSeller(
+            db, neutralCity2, product, "NeutralImpact2",
+            stockQuantity: 200m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        db.MarketTrendStates.AddRange(
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = coldCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendMin,
+                LastUpdatedTick = 0,
+            },
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = neutralCity2.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendNeutral,
+                LastUpdatedTick = 0,
+            });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var coldRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == coldUnitId)
+            .FirstOrDefaultAsync();
+        var neutralRecord2 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == neutralUnitId2)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(coldRecord);
+        Assert.NotNull(neutralRecord2);
+
+        Assert.True(coldRecord.QuantitySold < neutralRecord2.QuantitySold,
+            $"Cold trend (TrendFactor={GameConstants.TrendMin}) should yield fewer sales " +
+            $"({coldRecord.QuantitySold}) than neutral trend ({neutralRecord2.QuantitySold}).");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ZeroStock_WithHotTrend_GeneratesNoSalesRecord()
+    {
+        // ROADMAP AC #7: Edge-case coverage — hot trend cannot manufacture sales from thin air.
+        // A pre-seeded TrendMax should not cause the engine to sell more than what's in stock.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("ZeroStockHotTrend", 200_000);
+        db.Cities.Add(city);
+
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product, "ZeroStockHot",
+            stockQuantity: 0m,          // zero stock
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        // Pre-seed a hot trend — it should NOT allow selling non-existent stock.
+        db.MarketTrendStates.Add(new MarketTrendState
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            ItemId = product.Id,
+            TrendFactor = GameConstants.TrendMax,
+            LastUpdatedTick = 0,
+        });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var record = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .FirstOrDefaultAsync();
+
+        // Either no record created or zero sold — hot trend cannot create sales from zero stock.
+        Assert.True(record == null || record.QuantitySold == 0m,
+            $"Expected zero sales from zero-stock unit even with hot trend (TrendMax={GameConstants.TrendMax}), " +
+            $"but sold {record?.QuantitySold} units.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_OversuppliedMarket_ColdTrend_ReducesSalesFurther()
+    {
+        // ROADMAP AC #3: Both saturation AND cold trend stack to reduce demand.
+        // With huge stock (oversupply) saturation already depresses demand; cold trend should
+        // reduce it further compared to an oversupplied neutral-trend city.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var coldCity = CreatePublicSalesTestCity("OversupplyCold", 50_000);
+        var neutralCity = CreatePublicSalesTestCity("OversupplyNeutral", 50_000);
+        db.Cities.AddRange(coldCity, neutralCity);
+
+        // Large stock → saturation presses demand down in both cities.
+        var (_, _, coldUnitId) = AddPublicSalesSeller(
+            db, coldCity, product, "OvCold",
+            stockQuantity: 5000m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        var (_, _, neutralUnitId) = AddPublicSalesSeller(
+            db, neutralCity, product, "OvNeutral",
+            stockQuantity: 5000m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        // Cold trend compounds the saturation penalty.
+        db.MarketTrendStates.AddRange(
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = coldCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendMin,
+                LastUpdatedTick = 0,
+            },
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = neutralCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendNeutral,
+                LastUpdatedTick = 0,
+            });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var coldRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == coldUnitId)
+            .FirstOrDefaultAsync();
+        var neutralRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == neutralUnitId)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(coldRecord);
+        Assert.NotNull(neutralRecord);
+
+        // The cold-trend city should sell ≤ neutral even in an oversupplied market.
+        Assert.True(coldRecord.QuantitySold <= neutralRecord.QuantitySold,
+            $"Oversupplied cold-trend city ({coldRecord.QuantitySold}) should sell ≤ neutral-trend city " +
+            $"({neutralRecord.QuantitySold}).");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ExtremeMarkup_HotTrendCannotRescueSales()
+    {
+        // ROADMAP AC #3: Existing drivers (price) are not drowned out by trend.
+        // An extreme price markup (PriceIndex → 0) should suppress sales even with TrendMax.
+        // The hot city sells at max-markup; neutral city at base price.
+        // Hot city should sell less (or nothing) despite its trend boost, because price
+        // elasticity is the binding constraint.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var hotMarkupCity = CreatePublicSalesTestCity("HotExtreme", 200_000);
+        var neutralBaseCity = CreatePublicSalesTestCity("NeutralBase", 200_000);
+        db.Cities.AddRange(hotMarkupCity, neutralBaseCity);
+
+        // Hot-trend city: extreme markup → PriceIndex ≈ 0
+        var maxRatio = PublicSalesPricingModel.ComputeMaxPriceRatio(product.PriceElasticity);
+        var extremePrice = product.BasePrice * (maxRatio + 0.1m); // just above the ceiling
+
+        var (_, _, hotUnitId) = AddPublicSalesSeller(
+            db, hotMarkupCity, product, "HotExtreme",
+            stockQuantity: 200m,
+            quality: 0.85m,
+            priceMultiplier: maxRatio + 0.1m,   // above price ceiling
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        // Neutral city: base-price seller at TrendNeutral (1.0).
+        var (_, _, neutralUnitId) = AddPublicSalesSeller(
+            db, neutralBaseCity, product, "NeutralBase",
+            stockQuantity: 200m,
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        db.MarketTrendStates.AddRange(
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = hotMarkupCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendMax,
+                LastUpdatedTick = 0,
+            },
+            new MarketTrendState
+            {
+                Id = Guid.NewGuid(),
+                CityId = neutralBaseCity.Id,
+                ItemId = product.Id,
+                TrendFactor = GameConstants.TrendNeutral,
+                LastUpdatedTick = 0,
+            });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var hotRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == hotUnitId)
+            .FirstOrDefaultAsync();
+        var neutralRecord = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == neutralUnitId)
+            .FirstOrDefaultAsync();
+
+        // Price floor enforcement: hot trend cannot overcome a zero-priceIndex seller.
+        // Either hot record is null (no sales) or it sold less than the fairly-priced neutral.
+        if (hotRecord == null)
+        {
+            // Best case: PriceIndex=0 suppressed all sales — pass.
+            Assert.NotNull(neutralRecord);
+            Assert.True(neutralRecord.QuantitySold > 0m,
+                "Neutral base-price seller should have positive sales.");
+        }
+        else
+        {
+            Assert.True(hotRecord.QuantitySold <= neutralRecord!.QuantitySold,
+                $"Extreme-markup hot-trend city ({hotRecord.QuantitySold}) should sell ≤ base-price neutral city " +
+                $"({neutralRecord?.QuantitySold}), because price elasticity dominates.");
+        }
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_TwoProductsSameCity_HaveIndependentTrendStates()
+    {
+        // Each (city, product) pair must have its own separate MarketTrendState.
+        // Pre-seed one product at TrendMax and another at TrendMin; after a tick,
+        // each product's trend state must be updated independently.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chair = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var table = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-table");
+
+        var city = CreatePublicSalesTestCity("MultiProduct", 100_000);
+        db.Cities.Add(city);
+
+        var (_, _, chairUnitId) = AddPublicSalesSeller(
+            db, city, chair, "MultiProdChair",
+            stockQuantity: 500m, quality: 0.85m, priceMultiplier: 1.0m,
+            populationIndex: 1m, brandAwareness: 0m);
+
+        var (_, _, tableUnitId) = AddPublicSalesSeller(
+            db, city, table, "MultiProdTable",
+            stockQuantity: 500m, quality: 0.85m, priceMultiplier: 1.0m,
+            populationIndex: 1m, brandAwareness: 0m);
+
+        // Pre-seed different trend states for each product.
+        db.MarketTrendStates.AddRange(
+            new MarketTrendState { Id = Guid.NewGuid(), CityId = city.Id, ItemId = chair.Id, TrendFactor = GameConstants.TrendMax, LastUpdatedTick = 0 },
+            new MarketTrendState { Id = Guid.NewGuid(), CityId = city.Id, ItemId = table.Id, TrendFactor = GameConstants.TrendMin, LastUpdatedTick = 0 });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var chairTrend = await db.MarketTrendStates.FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == chair.Id);
+        var tableTrend = await db.MarketTrendStates.FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == table.Id);
+
+        Assert.NotNull(chairTrend);
+        Assert.NotNull(tableTrend);
+
+        // The two products must have different trend factors — they started at opposite extremes.
+        Assert.NotEqual(chairTrend.TrendFactor, tableTrend.TrendFactor);
+
+        // Both must remain within valid bounds.
+        Assert.InRange(chairTrend.TrendFactor, GameConstants.TrendMin, GameConstants.TrendMax);
+        Assert.InRange(tableTrend.TrendFactor, GameConstants.TrendMin, GameConstants.TrendMax);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ConsecutiveStrongSales_TrendReachesMax()
+    {
+        // After enough ticks of high-utilisation sales, the trend factor must reach TrendMax.
+        // We pre-seed at (TrendMax - 2×TrendRiseRate) so that exactly 2 RISE ticks are
+        // needed to reach TrendMax — guaranteeing the test is deterministic and fast.
+        // With population 10M and stock 100,000 the seller is demand-constrained every tick
+        // (demand ≈ 8,000 >> sales capacity = 20), so utilisation = 1.0 → RISE every tick.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("TrendToMax", 10_000_000);
+        db.Cities.Add(city);
+
+        // Large stock (100,000) ensures stockTurnoverCap (= stock × 0.5 × ~0.9) >> capacity (20)
+        // throughout the test run, so sales are always capacity-limited (util = 1.0 every tick).
+        AddPublicSalesSeller(
+            db, city, product, "TrendToMax",
+            stockQuantity: 100_000m,
+            quality: 0.9m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        // Pre-seed trend state close to max so we only need a few ticks to confirm the cap.
+        var preSeedFactor = GameConstants.TrendMax - 2m * GameConstants.TrendRiseRate;
+        db.MarketTrendStates.Add(new MarketTrendState
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            ItemId = product.Id,
+            TrendFactor = preSeedFactor,
+            LastUpdatedTick = 0,
+        });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+
+        // 5 ticks is far more than the 2 needed to reach TrendMax from preSeedFactor.
+        for (var i = 0; i < 5; i++)
+            await processor.ProcessTickAsync();
+
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == product.Id);
+
+        Assert.NotNull(trendState);
+        // The trend must have reached the maximum.
+        Assert.Equal(GameConstants.TrendMax, trendState.TrendFactor);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ConsecutiveWeakSales_TrendReachesMin()
+    {
+        // After enough ticks of low-utilisation sales in a saturated market,
+        // the trend factor must reach TrendMin.
+        // (TrendNeutral - TrendMin) / TrendFallRate = 0.5 / 0.03 ≈ 17 ticks.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Tiny city population → very low demand → low utilisation → trend falls.
+        var city = CreatePublicSalesTestCity("TrendToMin", 100);
+        db.Cities.Add(city);
+
+        AddPublicSalesSeller(
+            db, city, product, "TrendToMin",
+            stockQuantity: 10_000m,   // huge stock → always ample supply (required for fall condition)
+            quality: 0.85m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+
+        // 25 ticks is more than enough to reach TrendMin at 0.03/tick from neutral.
+        for (var i = 0; i < 25; i++)
+            await processor.ProcessTickAsync();
+
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == product.Id);
+
+        Assert.NotNull(trendState);
+        // The trend must have fallen to the minimum.
+        Assert.Equal(GameConstants.TrendMin, trendState.TrendFactor);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_ResourceType_CreatesMarketTrendStateAndSalesRecord()
+    {
+        // Verifies that the public sales phase works correctly for RAW MATERIAL inventory
+        // (ResourceTypeId instead of ProductTypeId), including creation of a MarketTrendState row.
+        // This exercises the inventory branch in PublicSalesPhase that handles resource types.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"rawsales-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Raw Sales Player",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Wood Retailer Corp",
+            Cash = 1_000_000m,
+        };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Wood Retail Shop",
+            Latitude = city.Latitude + 0.002,
+            Longitude = city.Longitude + 0.002,
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+
+        var unit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            // No ProductTypeId — selling a resource type directly
+            MinPrice = wood.BasePrice,
+        };
+        db.BuildingUnits.Add(unit);
+
+        // Inventory holds raw material (ResourceTypeId, not ProductTypeId)
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuildingUnitId = unit.Id,
+            ResourceTypeId = wood.Id,  // raw material
+            Quantity = 1000m,
+            Quality = 0.8m,
+        });
+
+        db.BuildingLots.Add(new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            Name = "Wood Lot",
+            Description = "Test lot for raw material retail.",
+            District = "Wood District",
+            Latitude = building.Latitude,
+            Longitude = building.Longitude,
+            PopulationIndex = 1m,
+            BasePrice = 80_000m,
+            Price = 80_000m,
+            SuitableTypes = BuildingType.SalesShop,
+            OwnerCompanyId = company.Id,
+            BuildingId = building.Id,
+        });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // A MarketTrendState row must be created for this (city, wood) pair.
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == wood.Id);
+        Assert.NotNull(trendState);
+        // Trend factor must be within the valid range [TrendMin, TrendMax].
+        Assert.True(trendState.TrendFactor >= GameConstants.TrendMin,
+            $"TrendFactor {trendState.TrendFactor} should be ≥ TrendMin ({GameConstants.TrendMin})");
+        Assert.True(trendState.TrendFactor <= GameConstants.TrendMax,
+            $"TrendFactor {trendState.TrendFactor} should be ≤ TrendMax ({GameConstants.TrendMax})");
+
+        // At least some raw material must have been sold (large stock, normal price, populated city).
+        var soldRecords = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unit.Id)
+            .ToListAsync();
+        Assert.NotEmpty(soldRecords);
+        Assert.True(soldRecords.Sum(r => r.QuantitySold) > 0m, "Raw material shop should sell some inventory.");
+
+        // TrendFactor recorded on the sales record must match the state.
+        foreach (var record in soldRecords)
+        {
+            Assert.True(record.TrendFactor >= GameConstants.TrendMin,
+                $"PublicSalesRecord.TrendFactor {record.TrendFactor} must be ≥ TrendMin.");
+            Assert.True(record.TrendFactor <= GameConstants.TrendMax,
+                $"PublicSalesRecord.TrendFactor {record.TrendFactor} must be ≤ TrendMax.");
+        }
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_HighSalaryActivity_PlusTrend_CompoundsPositively_VsLowSalaryPlusColdTrend()
+    {
+        // Verifies that the dynamic salary signal and the trend signal compound multiplicatively:
+        // City A — recent high salary spending + pre-seeded hot trend (TrendMax)
+        // City B — zero recent salary spending + pre-seeded cold trend (TrendMin)
+        // After one tick, city A should sell strictly more units than city B.
+        //
+        // Non-flakiness proof (population=10_000, stock=5000):
+        //   marketFactor ≈ satFactor(0.05) × marketAbsorption(0.2875) × attractiveness(0.8) ≈ 0.23
+        //   (satFactor clamped at 0.05 floor because demand ≪ stock for both cities)
+        //   (marketAbsorption = 0.25 + 0.75 × satFactor; attractiveness ≈ 0.8 for default quality/price)
+        //   (marketFactor is equal for both cities so the relative ordering is preserved regardless of value)
+        //   City A cityBaseDemand  ≈ 10000 × 0.001 × 2.0(salary) × 1.5(trend) × 0.92(rand_min) ≈ 27.6
+        //   City A effectiveDemand ≈ 27.6 × 0.23(marketFactor) ≈ 6.4   (below cap=20 ✓)
+        //   City B cityBaseDemand  ≈ 10000 × 0.001 × 0.5(salary) × 0.5(trend) × 1.08(rand_max) ≈ 2.7
+        //   City B effectiveDemand ≈ 2.7 × 0.23(marketFactor) ≈ 0.63   (< city A ✓)
+        //   → A always sells more than B regardless of random seeds ✓
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Industry == "FURNITURE");
+
+        // Small populations (10k) so demand stays below level-1 sales capacity (20).
+        // City A: high static wage (2× reference) + hot trend
+        var cityA = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "HighSalaryHotCity",
+            CountryCode = "TS",
+            Latitude = 50.0,
+            Longitude = 14.0,
+            Population = 10_000,
+            BaseSalaryPerManhour = GameConstants.ReferenceSalaryPerManhour * 2m, // high wage
+        };
+        // City B: low static wage (0.5× reference) + cold trend, zero recent salary
+        var cityB = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "LowSalaryColdCity",
+            CountryCode = "TS",
+            Latitude = 51.0,
+            Longitude = 15.0,
+            Population = 10_000,
+            BaseSalaryPerManhour = GameConstants.ReferenceSalaryPerManhour * 0.5m, // low wage
+        };
+        db.Cities.AddRange(cityA, cityB);
+
+        // Create a dummy company and building in city A to anchor the salary ledger entries.
+        var gs = await db.GameStates.FirstAsync();
+        var salaryPlayer = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"salary-anchor-{Guid.NewGuid():N}@test.com",
+            DisplayName = "SalaryAnchor",
+            PasswordHash = "h",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(salaryPlayer);
+        var salaryCompany = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = salaryPlayer.Id,
+            Name = "SalaryRef Corp",
+            Cash = 10_000_000m,
+        };
+        db.Companies.Add(salaryCompany);
+        var salaryBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = salaryCompany.Id,
+            CityId = cityA.Id,
+            Type = BuildingType.Factory,
+            Name = "Salary Anchor Factory",
+            Level = 1,
+        };
+        db.Buildings.Add(salaryBuilding);
+
+            // Seed a large LaborCost entry for city A (via the building).
+            // The reference equivalent for this city is: population × participationRate × refSalary × windowTicks.
+            // Multiplying by 5× ensures the raw total greatly exceeds the reference, so
+            // ComputeRecentSalaryPurchasingPowerFactor returns the maximum (2.0, capped),
+            // and the blended factor = 0.5 × staticFactor(2.0) + 0.5 × dynamicFactor(2.0) = 2.0.
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = salaryCompany.Id,
+                BuildingId = salaryBuilding.Id,
+                Category = LedgerCategory.LaborCost,
+                Description = "Seed salary for city A",
+                Amount = -(cityA.Population * GameConstants.ExpectedSalaryParticipationRate
+                           * GameConstants.ReferenceSalaryPerManhour
+                           * GameConstants.RecentSalaryWindowTicks * 5m), // 5× reference → capped at 2.0
+                RecordedAtTick = gs.CurrentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        // City B gets NO salary ledger entries → dynamic factor = 0 → blended = static only (0.5)
+
+        await db.SaveChangesAsync();
+
+        // Pre-seed trend states: city A hot (TrendMax), city B cold (TrendMin)
+        db.MarketTrendStates.Add(new MarketTrendState
+        {
+            Id = Guid.NewGuid(),
+            CityId = cityA.Id,
+            ItemId = product.Id,
+            TrendFactor = GameConstants.TrendMax,
+            LastUpdatedTick = gs.CurrentTick - 1,
+        });
+        db.MarketTrendStates.Add(new MarketTrendState
+        {
+            Id = Guid.NewGuid(),
+            CityId = cityB.Id,
+            ItemId = product.Id,
+            TrendFactor = GameConstants.TrendMin,
+            LastUpdatedTick = gs.CurrentTick - 1,
+        });
+
+        // Add identical sellers in each city: same stock, price, quality.
+        var (_, _, unitIdA) = AddPublicSalesSeller(db, cityA, product, "compound-a", stockQuantity: 5000m);
+        var (_, _, unitIdB) = AddPublicSalesSeller(db, cityB, product, "compound-b", stockQuantity: 5000m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var soldA = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitIdA)
+            .SumAsync(r => r.QuantitySold);
+        var soldB = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitIdB)
+            .SumAsync(r => r.QuantitySold);
+
+        Assert.True(soldA > soldB,
+            $"City A (high-salary + hot trend) should outsell city B (low-salary + cold trend). " +
+            $"A sold {soldA}, B sold {soldB}.");
+    }
+
     #endregion
 
     #region LockedCityId Procurement
