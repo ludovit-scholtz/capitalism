@@ -3,10 +3,10 @@ param(
     [string]$Command = 'list',
     [string]$Name,
     [string]$Migration = '',
-    [string]$Output = 'Api\Data\Migrations\migration.sql',
-    [string]$Project = 'Api\Api.csproj',
-    [string]$StartupProject = 'Api\Api.csproj',
-    [string]$Context = 'AppDbContext',
+    [string]$Output = 'MasterApi\Data\Migrations\migration.sql',
+    [string]$Project = 'MasterApi\MasterApi.csproj',
+    [string]$StartupProject = 'MasterApi\MasterApi.csproj',
+    [string]$Context = 'MasterDbContext',
     [string]$OutputDir = 'Data\Migrations',
     [string]$Configuration = 'Debug'
 )
@@ -23,7 +23,7 @@ try {
         '--context', $Context,
         '--configuration', $Configuration
     )
-
+    
     switch ($Command) {
         'add' {
             if ([string]::IsNullOrWhiteSpace($Name)) {
