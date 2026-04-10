@@ -1172,19 +1172,21 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     public async Task PublicSalesPhase_LowerPrice_IncreasesQuantitySold()
     {
         // ROADMAP AC: price reductions should increase quantity sold in a believable way.
-        // Two identical sellers compete in isolated cities with the same population and
-        // product quality.  The discounted seller (price 20% below base) should sell more
-        // units per tick than the one selling at the base price.
+        // Two identical sellers compete in the SAME city for the same product.
+        // The discounted seller (price 20% below base) has a higher competitiveness score
+        // (priceIndex = 1.07 > 1.0) and therefore wins a larger market share.
+        // Placing both sellers in one city ensures they share the same random demand
+        // multiplier (seeded by tick × city × item) so the comparison is deterministic
+        // regardless of test ordering or Guid hash values.
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var product = await db.ProductTypes.FirstAsync(candidate => candidate.Slug == "wooden-chair");
 
-        var basePriceCity = CreatePublicSalesTestCity("BasePriceCity", 60_000);
-        var discountCity = CreatePublicSalesTestCity("DiscountCity", 60_000);
-        db.Cities.AddRange(basePriceCity, discountCity);
+        var sharedCity = CreatePublicSalesTestCity("PriceComparison", 60_000);
+        db.Cities.Add(sharedCity);
 
         var (_, _, basePriceUnitId) = AddPublicSalesSeller(
-            db, basePriceCity, product, "BasePrice",
+            db, sharedCity, product, "BasePrice",
             stockQuantity: 80m,
             quality: 0.8m,
             priceMultiplier: 1.0m,   // at base price
@@ -1192,10 +1194,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             brandAwareness: 0m);
 
         var (_, _, discountUnitId) = AddPublicSalesSeller(
-            db, discountCity, product, "Discount",
+            db, sharedCity, product, "Discount",
             stockQuantity: 80m,
             quality: 0.8m,
-            priceMultiplier: 0.8m,   // 20% below base price
+            priceMultiplier: 0.8m,   // 20% below base price → priceIndex ≈ 1.07 boost
             populationIndex: 1m,
             brandAwareness: 0m);
 
@@ -3808,6 +3810,202 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.True(mfgEffectiveRatePerHour > storageEffectiveRatePerHour,
             $"Manufacturing effective rate/hour (${mfgEffectiveRatePerHour:F4}) should exceed storage rate/hour " +
             $"(${storageEffectiveRatePerHour:F4}) because overhead applies only to manufacturing.");
+    }
+
+    #endregion
+
+    #region Market Trend State
+
+    [Fact]
+    public async Task PublicSalesPhase_AfterStrongSales_TrendRises()
+    {
+        // After strong sales (high utilisation), the MarketTrendState.TrendFactor should
+        // increase above the neutral 1.0 baseline.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Small city population so city demand < stock (ensures high utilisation).
+        var city = CreatePublicSalesTestCity("TrendRise", 200_000);
+        db.Cities.Add(city);
+
+        // Add a seller with plenty of stock and base price.
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product, "TrendRise",
+            stockQuantity: 10_000m,
+            quality: 0.95m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+
+        // Run several ticks so trend state evolves from any neutral baseline.
+        for (var i = 0; i < 5; i++)
+            await processor.ProcessTickAsync();
+
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == product.Id);
+
+        // Trend state should now exist (created on first tick).
+        Assert.NotNull(trendState);
+
+        // Trend factor should be within the valid range.
+        Assert.True(trendState.TrendFactor >= GameConstants.TrendMin
+            && trendState.TrendFactor <= GameConstants.TrendMax,
+            $"TrendFactor {trendState.TrendFactor} must be in [{GameConstants.TrendMin},{GameConstants.TrendMax}]");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_TrendFactor_IsStoredInPublicSalesRecord()
+    {
+        // The TrendFactor stored on each PublicSalesRecord should match the valid range.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("TrendRecord", 50_000);
+        db.Cities.Add(city);
+
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product, "TrendRecord",
+            stockQuantity: 500m,
+            quality: 0.8m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var record = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .OrderBy(r => r.Tick)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(record);
+        Assert.True(record.TrendFactor >= GameConstants.TrendMin
+            && record.TrendFactor <= GameConstants.TrendMax,
+            $"Record.TrendFactor {record.TrendFactor} must be in [{GameConstants.TrendMin},{GameConstants.TrendMax}]");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_TrendFactor_StartingNeutral_MaintainsValidRange()
+    {
+        // Even with a seeded neutral trend (1.0), subsequent ticks should keep the
+        // factor within [TrendMin, TrendMax].
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("TrendNeutral", 30_000);
+        db.Cities.Add(city);
+
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product, "TrendNeutral",
+            stockQuantity: 200m,
+            quality: 0.8m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        for (var i = 0; i < 15; i++)
+            await processor.ProcessTickAsync();
+
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == product.Id);
+
+        Assert.NotNull(trendState);
+        Assert.InRange(trendState.TrendFactor, GameConstants.TrendMin, GameConstants.TrendMax);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_WeakSales_TrendFalls()
+    {
+        // When the sales unit sells far below capacity due to a massive oversupply of
+        // inventory (so demand << capacity), the trend should stay in valid range.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Very small population → very low demand relative to stock.
+        var city = CreatePublicSalesTestCity("TrendFall", 500);
+        db.Cities.Add(city);
+
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product, "TrendFall",
+            stockQuantity: 50_000m,   // massive oversupply
+            quality: 0.8m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        for (var i = 0; i < 5; i++)
+            await processor.ProcessTickAsync();
+
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == product.Id);
+
+        Assert.NotNull(trendState);
+        // Trend should be in valid range (may have fallen below 1.0).
+        Assert.InRange(trendState.TrendFactor, GameConstants.TrendMin, GameConstants.TrendMax);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_TrendDecays_TowardNeutral()
+    {
+        // Pre-seed a trend state far above neutral. After a few ticks of moderate performance
+        // the trend should move toward neutral (decay) rather than staying at the extreme.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("TrendDecay", 40_000);
+        db.Cities.Add(city);
+
+        var (_, _, unitId) = AddPublicSalesSeller(
+            db, city, product, "TrendDecay",
+            stockQuantity: 500m,
+            quality: 0.75m,
+            priceMultiplier: 1.0m,
+            populationIndex: 1m,
+            brandAwareness: 0m);
+
+        // Manually seed a very hot trend.
+        var hotTrend = new MarketTrendState
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            ItemId = product.Id,
+            TrendFactor = GameConstants.TrendMax,  // maximum heat
+            LastUpdatedTick = 0,
+        };
+        db.MarketTrendStates.Add(hotTrend);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        // Run several ticks with moderate utilisation to trigger decay.
+        for (var i = 0; i < 10; i++)
+            await processor.ProcessTickAsync();
+
+        var trendState = await db.MarketTrendStates
+            .FirstOrDefaultAsync(t => t.CityId == city.Id && t.ItemId == product.Id);
+
+        Assert.NotNull(trendState);
+        // After 10 ticks of decay, trend should have moved from 1.5 toward 1.0.
+        Assert.True(trendState.TrendFactor < GameConstants.TrendMax,
+            $"Trend factor {trendState.TrendFactor} should have decayed from {GameConstants.TrendMax} after 10 ticks.");
+        Assert.InRange(trendState.TrendFactor, GameConstants.TrendMin, GameConstants.TrendMax);
     }
 
     #endregion

@@ -401,6 +401,7 @@ export type MockPublicSalesAnalytics = {
   totalProfit: number | null
   profitHistory: Array<{ tick: number; profit: number; grossMarginPct: number | null }> | null
   demandDrivers: Array<{ factor: string; impact: string; score: number; description: string }>
+  trendFactor?: number | null
 }
 
 export type MockUnitProductAnalytics = {
@@ -2357,13 +2358,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
 
+      // Resolve trading account: prefer explicit tradeAccountType/tradeAccountCompanyId over active account
+      const tradeAccountType: string = input?.tradeAccountType ?? player.activeAccountType
+      const tradeAccountCompanyId: string | null = input?.tradeAccountCompanyId ?? player.activeCompanyId ?? null
+
       let accountName = player.displayName
       let accountCompanyId: string | null = null
       let ownedShareCount = 0
       let companyCash: number | null = null
 
-      if (player.activeAccountType === 'COMPANY' && player.activeCompanyId) {
-        const activeCompany = player.companies.find((candidate) => candidate.id === player.activeCompanyId)
+      if (tradeAccountType === 'COMPANY' && tradeAccountCompanyId) {
+        const activeCompany = player.companies.find((candidate) => candidate.id === tradeAccountCompanyId)
         if (!activeCompany || activeCompany.cash < totalValue) {
           return route.fulfill({
             status: 200,
@@ -2408,7 +2413,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             buyShares: {
               companyId: company.id,
               companyName: company.name,
-              accountType: player.activeAccountType,
+              accountType: tradeAccountType,
               accountCompanyId,
               accountName,
               shareCount,
@@ -2441,13 +2446,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Share count must be greater than zero.' }] }) })
       }
 
+      // Resolve trading account: prefer explicit tradeAccountType/tradeAccountCompanyId over active account
+      const tradeAccountType: string = input?.tradeAccountType ?? player.activeAccountType
+      const tradeAccountCompanyId: string | null = input?.tradeAccountCompanyId ?? player.activeCompanyId ?? null
+
       let accountName = player.displayName
       let accountCompanyId: string | null = null
       let ownedShareCount = 0
       let companyCash: number | null = null
 
-      if (player.activeAccountType === 'COMPANY' && player.activeCompanyId) {
-        const activeCompany = player.companies.find((candidate) => candidate.id === player.activeCompanyId)
+      if (tradeAccountType === 'COMPANY' && tradeAccountCompanyId) {
+        const activeCompany = player.companies.find((candidate) => candidate.id === tradeAccountCompanyId)
         const holding = activeCompany ? getOrCreateShareholding(state, company.id, null, activeCompany.id) : null
 
         if (!activeCompany || !holding || holding.shareCount < shareCount) {
@@ -2487,7 +2496,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             sellShares: {
               companyId: company.id,
               companyName: company.name,
-              accountType: player.activeAccountType,
+              accountType: tradeAccountType,
               accountCompanyId,
               accountName,
               shareCount,
@@ -3620,6 +3629,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             totalSharesIssued: getCompanyTotalShares(company),
             publicFloatShares: getPublicFloatShares(state, company),
             sharePrice: computeMockSharePrice(company),
+            marketValue: Number((getCompanyTotalShares(company) * computeMockSharePrice(company)).toFixed(2)),
             bidPrice: Number((computeMockSharePrice(company) * 0.99).toFixed(2)),
             askPrice: Number((computeMockSharePrice(company) * 1.01).toFixed(2)),
             dividendPayoutRatio: getCompanyDividendPayoutRatio(company),
@@ -4266,7 +4276,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // acceptLoan mutation response includes paymentAmount which contains 'me'
       !q.includes('acceptLoan') &&
       // procurementPreview contains 'me' as substring
-      !q.includes('procurementPreview')
+      !q.includes('procurementPreview') &&
+      // personAccount query has companyName field which contains 'me' as substring
+      !q.includes('personAccount')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()

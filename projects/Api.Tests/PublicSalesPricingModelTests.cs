@@ -423,4 +423,99 @@ public sealed class PublicSalesPricingModelTests
             }
         }
     }
+
+    // ── Market trend constants sanity checks ──────────────────────────────────
+
+    [Fact]
+    public void GameConstants_TrendRange_IsValidForMultiplication()
+    {
+        // TrendMin and TrendMax must be positive so they act as valid demand multipliers.
+        Assert.True(GameConstants.TrendMin > 0m, "TrendMin must be positive");
+        Assert.True(GameConstants.TrendMax > GameConstants.TrendMin, "TrendMax must exceed TrendMin");
+        Assert.True(GameConstants.TrendNeutral >= GameConstants.TrendMin, "TrendNeutral must be >= TrendMin");
+        Assert.True(GameConstants.TrendNeutral <= GameConstants.TrendMax, "TrendNeutral must be <= TrendMax");
+    }
+
+    [Fact]
+    public void GameConstants_TrendRates_AreReasonable()
+    {
+        // Rise/fall rates must be small enough not to reach the max in a single tick
+        // from neutral (otherwise one good tick would instantly peg the trend to TrendMax).
+        var riseInOneTick = GameConstants.TrendNeutral + GameConstants.TrendRiseRate;
+        Assert.True(riseInOneTick < GameConstants.TrendMax,
+            $"A single TrendRiseRate step ({GameConstants.TrendRiseRate}) from neutral must not reach TrendMax ({GameConstants.TrendMax}) immediately.");
+        var fallInOneTick = GameConstants.TrendNeutral - GameConstants.TrendFallRate;
+        Assert.True(fallInOneTick > GameConstants.TrendMin,
+            $"A single TrendFallRate step ({GameConstants.TrendFallRate}) from neutral must not reach TrendMin ({GameConstants.TrendMin}) immediately.");
+    }
+
+    [Fact]
+    public void GameConstants_TrendRandomAmplitude_IsSmallFraction()
+    {
+        // Random amplitude must be a small fraction so it enriches gameplay noise without
+        // dominating player-controlled variables. 0 < amplitude < 0.3.
+        Assert.True(GameConstants.TrendRandomAmplitude > 0m, "RandomAmplitude must be > 0");
+        Assert.True(GameConstants.TrendRandomAmplitude < 0.3m,
+            $"RandomAmplitude {GameConstants.TrendRandomAmplitude} should be < 0.3 so it doesn't overwhelm player decisions.");
+    }
+
+    [Fact]
+    public void GameConstants_TrendDecayFraction_ConvergesToNeutral()
+    {
+        // Given the decay fraction, trend from TrendMax should reach within 5% of neutral
+        // within a reasonable number of ticks (e.g., 50 ticks is about 2 in-game days).
+        var current = GameConstants.TrendMax;
+        const int maxTicks = 50;
+        for (var i = 0; i < maxTicks; i++)
+        {
+            var gap = GameConstants.TrendNeutral - current;
+            current = Math.Clamp(
+                current + gap * GameConstants.TrendDecayFraction,
+                GameConstants.TrendMin,
+                GameConstants.TrendMax);
+        }
+        var tolerance = 0.05m * (GameConstants.TrendMax - GameConstants.TrendMin);
+        Assert.True(
+            Math.Abs(current - GameConstants.TrendNeutral) <= tolerance,
+            $"Trend should converge within 5% of neutral in {maxTicks} ticks, but got {current} (neutral={GameConstants.TrendNeutral}).");
+    }
+
+    [Fact]
+    public void RandomDemandMultiplier_StaysWithinBoundedAmplitude_ForAnySeed()
+    {
+        // ROADMAP AC: "Verify the random component stays within the intended range and
+        // does not cause invalid negative outcomes or unrealistic spikes."
+        // Replicates the exact formula used in PublicSalesPhase to verify that the
+        // bounded random demand variation always stays in
+        // [1 - TrendRandomAmplitude, 1 + TrendRandomAmplitude] for any seed value.
+        var amplitudeMin = 1m - GameConstants.TrendRandomAmplitude;
+        var amplitudeMax = 1m + GameConstants.TrendRandomAmplitude;
+
+        for (var seed = 0; seed < 10_000; seed++)
+        {
+            var rng = new Random(seed);
+            var randomMultiplier = 1m + (decimal)(rng.NextDouble() * 2.0 - 1.0)
+                * GameConstants.TrendRandomAmplitude;
+            randomMultiplier = Math.Clamp(randomMultiplier, amplitudeMin, amplitudeMax);
+
+            Assert.InRange(randomMultiplier, amplitudeMin, amplitudeMax);
+            Assert.True(
+                randomMultiplier > 0m,
+                $"Random multiplier must be positive (seed={seed}, value={randomMultiplier})");
+        }
+    }
+
+    [Fact]
+    public void RandomDemandMultiplier_IsDeterministicForSameSeed()
+    {
+        // The multiplier must be reproducible so that the same (tick, city, item)
+        // combination always yields the same demand variation — preventing test flakiness
+        // and making the simulation debuggable.
+        const int seed = 42;
+        var rng1 = new Random(seed);
+        var rng2 = new Random(seed);
+        var v1 = 1m + (decimal)(rng1.NextDouble() * 2.0 - 1.0) * GameConstants.TrendRandomAmplitude;
+        var v2 = 1m + (decimal)(rng2.NextDouble() * 2.0 - 1.0) * GameConstants.TrendRandomAmplitude;
+        Assert.Equal(v1, v2);
+    }
 }

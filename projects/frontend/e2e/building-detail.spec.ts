@@ -1552,11 +1552,11 @@ test.describe('Building detail upgrades', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
     await expect(page.getByText('Research Product')).toBeVisible()
-    await page
+    const researchProductField = page
       .locator('.config-field')
       .filter({ has: page.getByText('Research Product') })
-      .locator('.picker-item-name', { hasText: 'Wooden Chair' })
-      .click()
+    await researchProductField.locator('.picker-trigger').click()
+    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
 
     await getGridCell(plannedSection, 1, 0).click()
     await expect(page.getByText('Brand Scope')).toBeVisible()
@@ -1567,7 +1567,8 @@ test.describe('Building detail upgrades', () => {
       .selectOption('CATEGORY')
     const anchorProductField = page.locator('.config-field').filter({ has: page.getByText('Anchor Product', { exact: true }) })
     await expect(anchorProductField).toBeVisible()
-    await anchorProductField.locator('.picker-item-name', { hasText: 'Wooden Chair' }).click()
+    await anchorProductField.locator('.picker-trigger').click()
+    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
     await expect(getGridCell(plannedSection, 1, 0)).toContainText('Wooden Chair')
   })
 
@@ -5580,13 +5581,14 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await publicSalesCell.click()
 
-    // PUBLIC_SALES uses ProductPicker for product type
+    // PUBLIC_SALES uses ProductPicker for product type — trigger opens the dropdown
     const productTypeField = page
       .locator('.config-field')
       .filter({ has: page.getByText('Product Type', { exact: true }) })
       .first()
-    await expect(productTypeField.locator('.picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
-    await productTypeField.locator('.picker-item-name', { hasText: 'Wooden Chair' }).click()
+    await productTypeField.locator('.picker-trigger').click()
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
+    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
 
     // Set a negative min price in the number input
     const minPriceField = page
@@ -5637,8 +5639,9 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
       .locator('.config-field')
       .filter({ has: page.getByText('Product Type', { exact: true }) })
       .first()
-    await expect(productTypeField.locator('.picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
-    await productTypeField.locator('.picker-item-name', { hasText: 'Wooden Chair' }).click()
+    await productTypeField.locator('.picker-trigger').click()
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
+    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
 
     // Set price to exactly 0
     const minPriceField = page
@@ -5659,6 +5662,203 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     // Player remains in edit mode
     await expect(planningSection).toBeVisible()
     await expect(page.getByRole('button', { name: /Store Upgrade/i })).toBeVisible()
+  })
+})
+
+// ── Product Picker UX ─────────────────────────────────────────────────────────
+
+test.describe('Product picker UX — collapsible trigger and dropdown', () => {
+  function makeShopForPickerTests() {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-picker',
+          playerId: 'player-1',
+          name: 'Picker Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-picker-shop',
+              companyId: 'company-picker',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP',
+              name: 'Picker Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              units: [],
+            },
+          ],
+        },
+      ],
+    })
+    return player
+  }
+
+  test('product picker is collapsed by default and opens on click', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makeShopForPickerTests()
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-picker-shop')
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    // Click on the PUBLIC_SALES cell
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await publicSalesCell.click()
+
+    // The Product Type field should show the trigger button (collapsed by default)
+    const productTypeField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Product Type', { exact: true }) })
+      .first()
+
+    // Picker dropdown should NOT be visible before clicking
+    await expect(page.locator('.product-picker-panel')).toBeHidden()
+
+    // Trigger button should be visible
+    await expect(productTypeField.locator('.picker-trigger')).toBeVisible()
+
+    // Click trigger to open
+    await productTypeField.locator('.picker-trigger').click()
+
+    // Dropdown should appear with the product list
+    await expect(page.locator('.product-picker-panel')).toBeVisible()
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
+  })
+
+  test('product picker shows help text and closes on selection', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makeShopForPickerTests()
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-picker-shop')
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await publicSalesCell.click()
+
+    const productTypeField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Product Type', { exact: true }) })
+      .first()
+
+    // Help text should be visible
+    await expect(productTypeField.locator('.picker-help-text')).toBeVisible()
+
+    // Open picker and select a product
+    await productTypeField.locator('.picker-trigger').click()
+    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
+
+    // After selection, picker closes and trigger shows selected product name
+    await expect(page.locator('.product-picker-panel')).toBeHidden()
+    await expect(productTypeField.locator('.picker-trigger-selected-name', { hasText: 'Wooden Chair' })).toBeVisible()
+  })
+
+  test('product picker shows empty state when no products available', async ({ page }) => {
+    const player = makeShopForPickerTests()
+    // Use empty productTypes to simulate no available products
+    const state = setupMockApi(page, { players: [player], productTypes: [] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-picker-shop')
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await publicSalesCell.click()
+
+    const productTypeField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Product Type', { exact: true }) })
+      .first()
+
+    // Open picker - click trigger
+    await productTypeField.locator('.picker-trigger').click()
+
+    // The panel opens — wait for empty state (loading is instant in mock)
+    await expect(page.locator('.product-picker-panel')).toBeVisible()
+    await expect(page.locator('.product-picker-panel .picker-empty-no-connected')).toBeVisible({
+      timeout: 10000,
+    })
+  })
+
+  test('product picker dropdown is not obscured — visible in viewport', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makeShopForPickerTests()
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-picker-shop')
+    await page.getByRole('button', { name: /Apply Starter Shop Layout/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    const publicSalesCell = planningSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await publicSalesCell.click()
+
+    const productTypeField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Product Type', { exact: true }) })
+      .first()
+
+    // Open picker
+    await productTypeField.locator('.picker-trigger').click()
+    const panel = page.locator('.product-picker-panel')
+    await expect(panel).toBeVisible()
+
+    // The panel must be within the viewport (not hidden behind navbar or clipped)
+    const panelBox = await panel.boundingBox()
+    // Panel y must be ≥ 0 (not behind the very top/navbar)
+    expect(panelBox!.y).toBeGreaterThanOrEqual(0)
+    // Panel x must be ≥ 0 (not scrolled off the left edge)
+    expect(panelBox!.x).toBeGreaterThanOrEqual(0)
+
+    // Product item should be interactable (visible and clickable)
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
   })
 })
 
@@ -8857,6 +9057,90 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(saturationDriver.first()).toBeVisible()
   })
 
+  test('oversupplied market shows NEGATIVE SATURATION driver and market-saturated description', async ({
+    page,
+  }) => {
+    // ROADMAP AC: "Add coverage for at least one oversupply scenario."
+    // When stock far exceeds city demand (unmetDemandShare ≈ 0) the SATURATION driver
+    // should be NEGATIVE so the player knows to reduce stock, change product, or lower price.
+    const { player } = makeShopPlayer()
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Oversupplied Shop',
+      cityName: 'Bratislava',
+      totalRevenue: 2 * 45,
+      totalQuantitySold: 2,
+      averagePricePerUnit: 45,
+      currentSalesCapacity: 200,
+      dataFromTick: 1,
+      dataToTick: 1,
+      demandSignal: 'WEAK',
+      actionHint: 'Market is oversupplied. Consider reducing stock or switching to a higher-demand product.',
+      recentUtilization: 0.01,
+      revenueHistory: [{ tick: 1, revenue: 2 * 45, quantitySold: 2 }],
+      priceHistory: [{ tick: 1, pricePerUnit: 45 }],
+      marketShare: [
+        { label: 'My Shop', companyId: 'company-shop-mi', share: 0.5, isUnmet: false },
+        { label: 'Rival', companyId: 'rival-id', share: 0.5, isUnmet: false },
+      ],
+      elasticityIndex: -0.5,
+      unmetDemandShare: 0.01, // only 1% unmet → market is saturated
+      populationIndex: 1.0,
+      inventoryQuality: 0.7,
+      brandAwareness: 0.3,
+      totalProfit: 10,
+      profitHistory: [{ tick: 1, profit: 10, grossMarginPct: 11 }],
+      demandDrivers: [
+        {
+          factor: 'SATURATION',
+          impact: 'NEGATIVE',
+          score: 0.01,
+          description:
+            'Market is saturated — nearly all city demand is already being met. Reduce stock or switch products.',
+        },
+        {
+          factor: 'PRICE',
+          impact: 'NEUTRAL',
+          score: 0.75,
+          description: 'Price is at the market baseline.',
+        },
+      ],
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+
+    const panel = page.locator('[aria-label="Market Intelligence"]')
+    await expect(panel).toBeVisible()
+
+    // Demand signal should show WEAK
+    const demandCard = panel.locator('.mi-demand-weak')
+    await expect(demandCard).toBeVisible()
+
+    // SATURATION driver should be NEGATIVE (market is oversupplied)
+    const driversSection = panel.locator('[aria-label="Demand Drivers"]')
+    await expect(driversSection).toBeVisible()
+    const saturationDriver = driversSection.locator('.mi-driver-negative', { hasText: 'Saturation' })
+    await expect(saturationDriver.first()).toBeVisible()
+  })
+
   test('competitive market with small own share shows NEGATIVE COMPETITION driver', async ({
     page,
   }) => {
@@ -9345,6 +9629,212 @@ test.describe('Public Sales Market Intelligence panel', () => {
     // Tick window label should show T1–T100
     await expect(panel.locator('.mi-tick-window')).toContainText('T1')
     await expect(panel.locator('.mi-tick-window')).toContainText('T100')
+  })
+
+  test('shows market momentum metric when trendFactor is provided and > 1 (hot market)', async ({
+    page,
+  }) => {
+    const { player, chairProduct } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      productTypeId: chairProduct.id,
+      productName: chairProduct.name,
+      totalRevenue: 2000,
+      totalQuantitySold: 130,
+      averagePricePerUnit: chairProduct.basePrice * 1.5,
+      currentSalesCapacity: 120,
+      dataFromTick: 1,
+      dataToTick: 10,
+      demandSignal: 'STRONG',
+      actionHint: 'Demand is strong.',
+      recentUtilization: 0.92,
+      trendDirection: 'UP',
+      trendFactor: 1.21,
+      revenueHistory: Array.from({ length: 10 }, (_, i) => ({ tick: i + 1, revenue: 200, quantitySold: 13 })),
+      priceHistory: Array.from({ length: 10 }, (_, i) => ({ tick: i + 1, pricePerUnit: chairProduct.basePrice * 1.5 })),
+      marketShare: [{ label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false }],
+      elasticityIndex: -1.0,
+      unmetDemandShare: 0,
+      populationIndex: 1.2,
+      inventoryQuality: 0.8,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [
+        {
+          factor: 'TREND',
+          impact: 'POSITIVE',
+          score: 0.7,
+          description: 'Market trend is rising (+21%) — consumer demand is growing for this product.',
+        },
+      ],
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+
+    const panel = page.locator('[aria-label="Market Intelligence"]')
+    await expect(panel).toBeVisible()
+
+    // Market Momentum metric should show +21% with up styling.
+    await expect(panel.getByText('Market Momentum')).toBeVisible()
+    await expect(panel.locator('.mi-trend-up').last()).toBeVisible()
+    await expect(panel.locator('.mi-trend-up').last()).toContainText('+21%')
+
+    // TREND driver should appear in the Demand Drivers section.
+    const driversSection = panel.locator('[aria-label="Demand Drivers"]')
+    await expect(driversSection).toBeVisible()
+    await expect(driversSection.getByText('Market Trend', { exact: true })).toBeVisible()
+    await expect(driversSection.getByText('Market trend is rising')).toBeVisible()
+  })
+
+  test('shows market momentum metric when trendFactor < 1 (cold market)', async ({ page }) => {
+    const { player, chairProduct } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      productTypeId: chairProduct.id,
+      productName: chairProduct.name,
+      totalRevenue: 500,
+      totalQuantitySold: 30,
+      averagePricePerUnit: chairProduct.basePrice * 1.5,
+      currentSalesCapacity: 120,
+      dataFromTick: 1,
+      dataToTick: 10,
+      demandSignal: 'WEAK',
+      actionHint: 'Consider lowering price.',
+      recentUtilization: 0.25,
+      trendDirection: 'DOWN',
+      trendFactor: 0.72,
+      revenueHistory: Array.from({ length: 10 }, (_, i) => ({ tick: i + 1, revenue: 50, quantitySold: 3 })),
+      priceHistory: Array.from({ length: 10 }, (_, i) => ({ tick: i + 1, pricePerUnit: chairProduct.basePrice * 1.5 })),
+      marketShare: [{ label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false }],
+      elasticityIndex: -1.0,
+      unmetDemandShare: 0.7,
+      populationIndex: 1.0,
+      inventoryQuality: 0.6,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [
+        {
+          factor: 'TREND',
+          impact: 'NEGATIVE',
+          score: 0.22,
+          description: 'Market trend is falling (-28%) — consumer demand for this product is suppressed.',
+        },
+      ],
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+
+    const panel = page.locator('[aria-label="Market Intelligence"]')
+    await expect(panel).toBeVisible()
+
+    // Market Momentum metric should show -28% with down styling.
+    await expect(panel.getByText('Market Momentum')).toBeVisible()
+    await expect(panel.locator('.mi-trend-down').last()).toBeVisible()
+    await expect(panel.locator('.mi-trend-down').last()).toContainText('-28%')
+
+    // TREND driver should appear in the Demand Drivers section as negative.
+    const driversSection = panel.locator('[aria-label="Demand Drivers"]')
+    await expect(driversSection).toBeVisible()
+    await expect(driversSection.getByText('Market Trend', { exact: true })).toBeVisible()
+    await expect(driversSection.getByText('Market trend is falling')).toBeVisible()
+  })
+
+  test('does not show market momentum metric when trendFactor is null', async ({ page }) => {
+    const { player } = makeShopPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    const analytics: MockPublicSalesAnalytics = {
+      buildingUnitId: 'unit-shop-mi-ps',
+      buildingId: 'building-shop-mi',
+      buildingName: 'Market Intel Shop',
+      cityName: 'Bratislava',
+      productTypeId: null,
+      productName: null,
+      totalRevenue: 0,
+      totalQuantitySold: 0,
+      averagePricePerUnit: 0,
+      currentSalesCapacity: 120,
+      dataFromTick: 0,
+      dataToTick: 0,
+      demandSignal: 'NO_DATA',
+      actionHint: '',
+      recentUtilization: 0,
+      trendDirection: 'NO_DATA',
+      trendFactor: null,
+      revenueHistory: [],
+      priceHistory: [],
+      marketShare: [],
+      elasticityIndex: null,
+      unmetDemandShare: null,
+      populationIndex: null,
+      inventoryQuality: null,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [],
+    }
+    state.publicSalesAnalytics['unit-shop-mi-ps'] = analytics
+
+    await page.goto('/building/building-shop-mi')
+
+    const activeSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
+    const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
+    await psCell.click()
+
+    const panel = page.locator('[aria-label="Market Intelligence"]')
+    await expect(panel).toBeVisible()
+
+    // "Market Momentum" label should NOT be visible when trendFactor is null.
+    await expect(panel.getByText('Market Momentum')).toBeHidden()
   })
 })
 
