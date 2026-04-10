@@ -10,6 +10,10 @@ public sealed class MasterDbInitializer(MasterDbContext db)
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         await db.Database.EnsureCreatedAsync(cancellationToken);
+        if (db.Database.IsNpgsql())
+        {
+            await EnsureLegacyGameNewsSchemaAsync(cancellationToken);
+        }
 
         if (!await db.GameNewsEntries.AnyAsync(entry => entry.Id == GameAdministrationLaunchEntryId, cancellationToken))
         {
@@ -55,5 +59,62 @@ public sealed class MasterDbInitializer(MasterDbContext db)
 
             await db.SaveChangesAsync(cancellationToken);
         }
+    }
+
+    private async Task EnsureLegacyGameNewsSchemaAsync(CancellationToken cancellationToken)
+    {
+        foreach (var commandText in GetLegacyGameNewsSchemaCommands())
+        {
+            await db.Database.ExecuteSqlRawAsync(commandText, cancellationToken);
+        }
+    }
+
+    private string[] GetLegacyGameNewsSchemaCommands()
+    {
+        return
+        [
+            """
+            CREATE TABLE IF NOT EXISTS "GameNewsEntries" (
+                "Id" uuid NOT NULL,
+                "EntryType" character varying(20) NOT NULL,
+                "Status" character varying(20) NOT NULL,
+                "TargetServerKey" character varying(120),
+                "CreatedByEmail" character varying(200) NOT NULL,
+                "UpdatedByEmail" character varying(200) NOT NULL,
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                "UpdatedAtUtc" timestamp with time zone NOT NULL,
+                "PublishedAtUtc" timestamp with time zone,
+                CONSTRAINT "PK_GameNewsEntries" PRIMARY KEY ("Id")
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS "GameNewsEntryLocalizations" (
+                "Id" uuid NOT NULL,
+                "GameNewsEntryId" uuid NOT NULL,
+                "Locale" character varying(10) NOT NULL,
+                "Title" character varying(220) NOT NULL,
+                "Summary" character varying(1000) NOT NULL,
+                "HtmlContent" text NOT NULL,
+                CONSTRAINT "PK_GameNewsEntryLocalizations" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_GameNewsEntryLocalizations_GameNewsEntries_GameNewsEntryId"
+                    FOREIGN KEY ("GameNewsEntryId") REFERENCES "GameNewsEntries" ("Id") ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS "GameNewsReadReceipts" (
+                "Id" uuid NOT NULL,
+                "GameNewsEntryId" uuid NOT NULL,
+                "PlayerEmail" character varying(200) NOT NULL,
+                "ServerKey" character varying(120) NOT NULL,
+                "ReadAtUtc" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_GameNewsReadReceipts" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_GameNewsReadReceipts_GameNewsEntries_GameNewsEntryId"
+                    FOREIGN KEY ("GameNewsEntryId") REFERENCES "GameNewsEntries" ("Id") ON DELETE CASCADE
+            )
+            """,
+            "CREATE INDEX IF NOT EXISTS \"IX_GameNewsEntries_TargetServerKey_PublishedAtUtc\" ON \"GameNewsEntries\" (\"TargetServerKey\", \"PublishedAtUtc\")",
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_GameNewsEntryLocalizations_GameNewsEntryId_Locale\" ON \"GameNewsEntryLocalizations\" (\"GameNewsEntryId\", \"Locale\")",
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_GameNewsReadReceipts_GameNewsEntryId_PlayerEmail_ServerKey\" ON \"GameNewsReadReceipts\" (\"GameNewsEntryId\", \"PlayerEmail\", \"ServerKey\")",
+        ];
     }
 }

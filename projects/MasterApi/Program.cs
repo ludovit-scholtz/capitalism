@@ -61,8 +61,8 @@ public class Program
         {
             if (builder.Environment.IsEnvironment("Testing"))
             {
-                options.UseSqlite(builder.Configuration.GetConnectionString("MasterCatalog")
-                    ?? throw new InvalidOperationException("Connection string 'MasterCatalog' is missing."));
+                options.UseInMemoryDatabase(builder.Configuration.GetConnectionString("MasterCatalog")
+                    ?? $"masterapi-tests-{Guid.NewGuid():N}");
             }
             else
             {
