@@ -30,7 +30,7 @@ It will use real world map. The game will start in single city and later other c
 - Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. 
 - In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
 - Create ingame chat
-- Administrators role management, dashboard, impersonalization
+- Administrators role management, dashboard, impersonalization, newspaper
 
 ## Multiple Game Servers
 
@@ -339,11 +339,23 @@ Game administrators can switch person as invisible - In this mode the person can
 
 Game administrators can do impersonalization to the player's view. In this mode they can do anything on behalf of the player or player's person account or any of the player's company. Make sure the logs handle this issue and show the game administrator who is acting, user on behalf of which the admin is acting and person or company account on behalf of which is the admin acting.
 
+Game administrators can publish newspaper or modify the latest changelog. Allow rich html editor for the news editing and allow multi language support before the news are publish.
+
 There are roles in the game which can be assigned to any user account. The root administrator can assign or remove the global game administrator role and local game administrator role. The user with global game administrator role can access every game admin dashboard, and do game administrator actions. Local game administor can manage only single game instance.
 
 Game administration is managed in the master api, but local game administrator role can be managed at the game server.
 
 List of the root game administrators is managed by the master api configuration.
+
+## Newspaper and changelog
+
+The master api database holds the changelog and newspaper. Admins can publish the news for directing users or report some progress.
+
+With every change the changelog must be updated. The changelog is visible in the news section in every game.
+
+Game administrators can edit any changelog or news record in any localization.
+
+Track if user did read the news, if not show in the navbar number of unread messages.
 
 ## Monetization
 

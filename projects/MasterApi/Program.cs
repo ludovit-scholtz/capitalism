@@ -18,6 +18,9 @@ public class Program
         builder.Services.Configure<MasterServerOptions>(
             builder.Configuration.GetSection(MasterServerOptions.SectionName));
 
+        builder.Services.Configure<GameAdministrationOptions>(
+            builder.Configuration.GetSection(GameAdministrationOptions.SectionName));
+
         builder.Services.Configure<JwtOptions>(
             builder.Configuration.GetSection(JwtOptions.SectionName));
 

@@ -1,24 +1,46 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
 import { usePwa } from '@/composables/usePwa'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
+import { useNewsStore } from '@/stores/news'
+import { useGameAdminStore } from '@/stores/gameAdmin'
 
 const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
+const newsStore = useNewsStore()
+const gameAdminStore = useGameAdminStore()
 gameStateStore.start()
 
 onMounted(() => {
   auth.initFromStorage()
   if (auth.token) {
     void auth.fetchMe()
+    void newsStore.fetchUnreadCount()
+    void gameAdminStore.fetchSession()
   }
 })
+
+watch(
+  () => auth.token,
+  (token, previousToken) => {
+    if (!token) {
+      newsStore.clear()
+      gameAdminStore.clear()
+      return
+    }
+
+    if (token !== previousToken) {
+      void newsStore.fetchUnreadCount()
+      void gameAdminStore.fetchSession()
+    }
+  },
+)
 
 </script>
 

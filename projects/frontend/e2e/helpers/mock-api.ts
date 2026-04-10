@@ -17,6 +17,7 @@ export type MockPlayer = {
   password: string
   displayName: string
   role: 'PLAYER' | 'ADMIN'
+  isInvisibleInChat: boolean
   createdAtUtc: string
   lastLoginAtUtc: string | null
   personalCash: number
@@ -480,7 +481,77 @@ export type MockLoan = {
   closedAtUtc: string | null
 }
 
+export type MockGameNewsLocalization = {
+  locale: string
+  title: string
+  summary: string
+  htmlContent: string
+}
+
+export type MockGameNewsEntry = {
+  id: string
+  entryType: 'NEWS' | 'CHANGELOG'
+  status: 'DRAFT' | 'PUBLISHED'
+  targetServerKey: string | null
+  createdByEmail: string
+  updatedByEmail: string
+  createdAtUtc: string
+  updatedAtUtc: string
+  publishedAtUtc: string | null
+  localizations: MockGameNewsLocalization[]
+  readByPlayerIds: string[]
+}
+
+export type MockGlobalGameAdminGrant = {
+  id: string
+  email: string
+  grantedByEmail: string
+  grantedAtUtc: string
+  updatedAtUtc: string
+}
+
+export type MockGameAdminMoneyInflowSummary = {
+  category: string
+  amount: number
+  description: string
+}
+
+export type MockGameAdminMultiAccountAlert = {
+  reason: string
+  exposureAmount: number
+  confidenceScore: number
+  supportingEntityType: string
+  supportingEntityName: string
+  primaryPlayerId: string
+  relatedPlayerId: string
+}
+
+export type MockGameAdminAuditLog = {
+  id: string
+  adminActorPlayerId: string
+  adminActorEmail: string
+  adminActorDisplayName: string
+  effectivePlayerId: string
+  effectivePlayerEmail: string
+  effectivePlayerDisplayName: string
+  effectiveAccountType: 'PERSON' | 'COMPANY'
+  effectiveCompanyId: string | null
+  effectiveCompanyName: string | null
+  graphQlOperationName: string | null
+  mutationSummary: string
+  responseStatusCode: number
+  recordedAtUtc: string
+}
+
+export type MockImpersonationSession = {
+  adminActorUserId: string
+  effectiveUserId: string
+  effectiveAccountType: 'PERSON' | 'COMPANY'
+  effectiveCompanyId: string | null
+}
+
 export type MockState = {
+  serverKey: string
   players: MockPlayer[]
   shareholdings: MockShareholding[]
   cities: MockCity[]
@@ -516,6 +587,13 @@ export type MockState = {
   upgradeInsufficientFundsUnitId: string | null
   /** Active player SELL exchange orders for products (the globalExchangeProductListings query). */
   productExchangeListings: MockProductExchangeListing[]
+  rootAdminEmails: string[]
+  globalGameAdminGrants: MockGlobalGameAdminGrant[]
+  gameNewsEntries: MockGameNewsEntry[]
+  adminMoneyInflowSummaries: MockGameAdminMoneyInflowSummary[]
+  adminMultiAccountAlerts: MockGameAdminMultiAccountAlert[]
+  adminAuditLogs: MockGameAdminAuditLog[]
+  impersonationSession: MockImpersonationSession | null
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -963,6 +1041,7 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     password: 'TestPass1!',
     displayName: 'Test Player',
     role: 'PLAYER',
+    isInvisibleInChat: false,
     createdAtUtc: '2026-01-01T00:00:00Z',
     lastLoginAtUtc: null,
     personalCash: PERSONAL_STARTING_CASH,
@@ -1253,6 +1332,7 @@ export function makeDefaultProducts(): MockProductType[] {
 
 export function setupMockApi(page: Page, initial?: Partial<MockState>): MockState {
   const state: MockState = {
+    serverKey: 'test-server',
     players: [],
     shareholdings: [],
     cities: makeDefaultCities(),
@@ -1276,6 +1356,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     unitUpgradeInfoOverrides: {},
     upgradeInsufficientFundsUnitId: null,
     productExchangeListings: [],
+    rootAdminEmails: ['root@example.com'],
+    globalGameAdminGrants: [],
+    gameNewsEntries: [],
+    adminMoneyInflowSummaries: [],
+    adminMultiAccountAlerts: [],
+    adminAuditLogs: [],
+    impersonationSession: null,
     ...initial,
   }
 
@@ -1291,18 +1378,172 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     )
   }
 
+  const resolveAdminActor = () => {
+    if (state.impersonationSession) {
+      return state.players.find((player) => player.id === state.impersonationSession?.adminActorUserId)
+    }
+
+    return resolveCurrentPlayer()
+  }
+
+  const resolveEffectivePlayer = () => {
+    if (state.impersonationSession) {
+      return state.players.find((player) => player.id === state.impersonationSession?.effectiveUserId)
+    }
+
+    return resolveCurrentPlayer()
+  }
+
+  const resolveEffectiveAccountContext = () => {
+    if (state.impersonationSession) {
+      return {
+        activeAccountType: state.impersonationSession.effectiveAccountType,
+        activeCompanyId: state.impersonationSession.effectiveCompanyId,
+      }
+    }
+
+    const currentPlayer = resolveCurrentPlayer()
+    return {
+      activeAccountType: currentPlayer?.activeAccountType ?? 'PERSON',
+      activeCompanyId: currentPlayer?.activeCompanyId ?? null,
+    }
+  }
+
+  const buildPlayerPayload = (player: MockPlayer | undefined) => {
+    if (!player) {
+      return null
+    }
+
+    const accountContext = resolveEffectiveAccountContext()
+    return {
+      ...player,
+      password: undefined,
+      activeAccountType: player.id === resolveEffectivePlayer()?.id ? accountContext.activeAccountType : player.activeAccountType,
+      activeCompanyId: player.id === resolveEffectivePlayer()?.id ? accountContext.activeCompanyId : player.activeCompanyId,
+      isInvisibleInChat: player.isInvisibleInChat ?? false,
+    }
+  }
+
+  const buildGameAdminPlayer = (player: MockPlayer) => ({
+    id: player.id,
+    email: player.email,
+    displayName: player.displayName,
+    role: player.role,
+    isInvisibleInChat: player.isInvisibleInChat ?? false,
+    lastLoginAtUtc: player.lastLoginAtUtc,
+    personalCash: player.personalCash,
+    totalCompanyCash: Number(player.companies.reduce((total, company) => total + company.cash, 0).toFixed(2)),
+    companyCount: player.companies.length,
+    companies: player.companies.map((company) => ({
+      id: company.id,
+      name: company.name,
+      cash: company.cash,
+    })),
+  })
+
+  const buildGameNewsEntry = (entry: MockGameNewsEntry) => ({
+    id: entry.id,
+    entryType: entry.entryType,
+    status: entry.status,
+    targetServerKey: entry.targetServerKey,
+    createdByEmail: entry.createdByEmail,
+    updatedByEmail: entry.updatedByEmail,
+    createdAtUtc: entry.createdAtUtc,
+    updatedAtUtc: entry.updatedAtUtc,
+    publishedAtUtc: entry.publishedAtUtc,
+    isRead: !!state.currentUserId && entry.readByPlayerIds.includes(state.currentUserId),
+    localizations: entry.localizations.map((localization) => ({ ...localization })),
+  })
+
+  const buildGameAdminSession = () => {
+    const adminActor = resolveAdminActor()
+    const effectivePlayer = resolveEffectivePlayer()
+
+    if (!adminActor) {
+      return {
+        isLocalAdmin: false,
+        hasGlobalAdminRole: false,
+        isRootAdministrator: false,
+        canAccessAdminDashboard: false,
+        isImpersonating: false,
+        effectiveAccountType: 'PERSON',
+        effectiveCompanyId: null,
+        effectiveCompanyName: null,
+        adminActor: null,
+        effectivePlayer: null,
+      }
+    }
+
+    const isRootAdministrator = state.rootAdminEmails.some((email) => email.toLowerCase() === adminActor.email.toLowerCase())
+    const hasGlobalAdminRole = state.globalGameAdminGrants.some((grant) => grant.email.toLowerCase() === adminActor.email.toLowerCase())
+    const isLocalAdmin = adminActor.role === 'ADMIN'
+    const accountContext = resolveEffectiveAccountContext()
+    const effectiveCompany = effectivePlayer?.companies.find((company) => company.id === accountContext.activeCompanyId) ?? null
+
+    return {
+      isLocalAdmin,
+      hasGlobalAdminRole,
+      isRootAdministrator,
+      canAccessAdminDashboard: isRootAdministrator || hasGlobalAdminRole || isLocalAdmin,
+      isImpersonating: !!state.impersonationSession,
+      effectiveAccountType: accountContext.activeAccountType,
+      effectiveCompanyId: accountContext.activeCompanyId,
+      effectiveCompanyName: effectiveCompany?.name ?? null,
+      adminActor: buildGameAdminPlayer(adminActor),
+      effectivePlayer: effectivePlayer ? buildGameAdminPlayer(effectivePlayer) : null,
+    }
+  }
+
+  const getAdminAccessFailure = (requireRoot = false) => {
+    const session = buildGameAdminSession()
+
+    if ((requireRoot && !session.isRootAdministrator) || (!requireRoot && !session.canAccessAdminDashboard)) {
+      return { message: 'Not authorized for game administration.', code: 'AUTH_NOT_AUTHORIZED' }
+    }
+
+    return null
+  }
+
   mockStateByPage.set(page, state)
 
   page.route('**/graphql', async (route) => {
+    const routeJson = (data: unknown) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data }),
+      })
+
+    const routeJsonError = (message: string, code?: string) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ errors: [{ message, ...(code ? { extensions: { code } } : {}) }] }),
+      })
+
     const body = route.request().postDataJSON()
     const query: string = body?.query ?? ''
     const isRegisterMutation = query.includes('mutation Register') || query.includes('register(input:')
     const isLoginMutation = query.includes('mutation Login') || query.includes('login(input:')
     // Auth token check
     const authHeader = route.request().headers()['authorization'] ?? ''
-    if (authHeader.startsWith('Bearer token-')) {
+    if (authHeader.startsWith('Bearer impersonation-')) {
+      const rawToken = authHeader.replace('Bearer ', '')
+      const [, sessionPayload] = rawToken.split('impersonation-')
+      const [adminActorUserId, effectiveUserId, effectiveAccountType, effectiveCompanyId] = sessionPayload.split(':')
+
+      state.currentToken = rawToken
+      state.currentUserId = effectiveUserId ?? null
+      state.impersonationSession = {
+        adminActorUserId,
+        effectiveUserId,
+        effectiveAccountType: effectiveAccountType === 'COMPANY' ? 'COMPANY' : 'PERSON',
+        effectiveCompanyId: effectiveCompanyId && effectiveCompanyId !== 'null' ? effectiveCompanyId : null,
+      }
+    } else if (authHeader.startsWith('Bearer token-')) {
       state.currentToken = authHeader.replace('Bearer ', '')
       state.currentUserId = authHeader.replace('Bearer token-', '')
+      state.impersonationSession = null
     }
 
     // Mutations
@@ -1321,6 +1562,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         password: input.password,
         displayName: input.displayName,
         role: 'PLAYER',
+        isInvisibleInChat: false,
         createdAtUtc: new Date().toISOString(),
         lastLoginAtUtc: null,
         personalCash: PERSONAL_STARTING_CASH,
@@ -1349,7 +1591,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             register: {
               token: `token-${newPlayer.id}`,
               expiresAtUtc: new Date(Date.now() + 7200000).toISOString(),
-              player: { ...newPlayer, password: undefined },
+              player: buildPlayerPayload(newPlayer),
             },
           },
         }),
@@ -1373,7 +1615,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             login: {
               token: `token-${player.id}`,
               expiresAtUtc: new Date(Date.now() + 7200000).toISOString(),
-              player: { ...player, password: undefined },
+              player: buildPlayerPayload(player),
             },
           },
         }),
@@ -3711,11 +3953,306 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('markGameNewsRead')) {
+      if (!state.currentUserId) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const entryIds: string[] = body.variables?.input?.entryIds ?? []
+      state.gameNewsEntries = state.gameNewsEntries.map((entry) =>
+        entryIds.includes(entry.id) && !entry.readByPlayerIds.includes(state.currentUserId ?? '')
+          ? {
+              ...entry,
+              readByPlayerIds: [...entry.readByPlayerIds, state.currentUserId!],
+            }
+          : entry,
+      )
+
+      return routeJson({ markGameNewsRead: true })
+    }
+
+    if (query.includes('gameNewsFeed')) {
+      const includeDrafts = Boolean(body.variables?.includeDrafts ?? query.includes('includeDrafts: true'))
+      const visibleEntries = state.gameNewsEntries
+        .filter((entry) => entry.targetServerKey === null || entry.targetServerKey === state.serverKey)
+        .filter((entry) => includeDrafts || entry.status === 'PUBLISHED')
+        .sort((left, right) => {
+          const leftTimestamp = left.publishedAtUtc ?? left.updatedAtUtc
+          const rightTimestamp = right.publishedAtUtc ?? right.updatedAtUtc
+          return rightTimestamp.localeCompare(leftTimestamp)
+        })
+
+      const items = visibleEntries.map(buildGameNewsEntry)
+      const unreadCount = items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).length
+
+      return routeJson({
+        gameNewsFeed: {
+          unreadCount,
+          items,
+        },
+      })
+    }
+
+    if (query.includes('gameAdminSession')) {
+      return routeJson({ gameAdminSession: buildGameAdminSession() })
+    }
+
+    if (query.includes('gameAdminDashboard')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const totalPersonalCash = Number(state.players.reduce((total, player) => total + player.personalCash, 0).toFixed(2))
+      const totalCompanyCash = Number(state.players.flatMap((player) => player.companies).reduce((total, company) => total + company.cash, 0).toFixed(2))
+      const inflowSummaries =
+        state.adminMoneyInflowSummaries.length > 0
+          ? state.adminMoneyInflowSummaries.map((summary) => ({ ...summary }))
+          : [
+              {
+                category: 'NO_ANOMALIES',
+                amount: 0,
+                description: 'No exceptional money inflow is currently flagged.',
+              },
+            ]
+
+      const multiAccountAlerts = state.adminMultiAccountAlerts
+        .map((alert) => {
+          const primaryPlayer = state.players.find((player) => player.id === alert.primaryPlayerId)
+          const relatedPlayer = state.players.find((player) => player.id === alert.relatedPlayerId)
+
+          if (!primaryPlayer || !relatedPlayer) {
+            return null
+          }
+
+          return {
+            reason: alert.reason,
+            exposureAmount: alert.exposureAmount,
+            confidenceScore: alert.confidenceScore,
+            supportingEntityType: alert.supportingEntityType,
+            supportingEntityName: alert.supportingEntityName,
+            primaryPlayer: buildGameAdminPlayer(primaryPlayer),
+            relatedPlayer: buildGameAdminPlayer(relatedPlayer),
+          }
+        })
+        .filter((alert): alert is NonNullable<typeof alert> => alert !== null)
+
+      return routeJson({
+        gameAdminDashboard: {
+          serverKey: state.serverKey,
+          totalPersonalCash,
+          totalCompanyCash,
+          moneySupply: Number((totalPersonalCash + totalCompanyCash).toFixed(2)),
+          externalMoneyInflowLast100Ticks: Number(inflowSummaries.reduce((total, summary) => total + summary.amount, 0).toFixed(2)),
+          inflowSummaries,
+          multiAccountAlerts,
+          players: state.players.map(buildGameAdminPlayer).sort((left, right) => left.displayName.localeCompare(right.displayName)),
+          invisiblePlayers: state.players.filter((player) => player.isInvisibleInChat).map(buildGameAdminPlayer),
+          globalGameAdminGrants: state.globalGameAdminGrants
+            .map((grant) => ({ ...grant }))
+            .sort((left, right) => left.email.localeCompare(right.email)),
+          recentAuditLogs: [...state.adminAuditLogs].sort((left, right) => right.recordedAtUtc.localeCompare(left.recordedAtUtc)).slice(0, 12),
+        },
+      })
+    }
+
+    if (query.includes('startAdminImpersonation')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const adminActor = resolveAdminActor()
+      const targetPlayer = state.players.find((player) => player.id === input?.targetPlayerId)
+
+      if (!adminActor || !targetPlayer) {
+        return routeJsonError('Player not found.')
+      }
+
+      const targetCompany = input?.accountType === 'COMPANY' ? targetPlayer.companies.find((company) => company.id === input?.companyId) ?? null : null
+      if (input?.accountType === 'COMPANY' && !targetCompany) {
+        return routeJsonError('Company not found.')
+      }
+
+      state.impersonationSession = {
+        adminActorUserId: adminActor.id,
+        effectiveUserId: targetPlayer.id,
+        effectiveAccountType: input?.accountType === 'COMPANY' ? 'COMPANY' : 'PERSON',
+        effectiveCompanyId: targetCompany?.id ?? null,
+      }
+
+      const token = `impersonation-${adminActor.id}:${targetPlayer.id}:${state.impersonationSession.effectiveAccountType}:${state.impersonationSession.effectiveCompanyId ?? 'null'}`
+      state.currentToken = token
+      state.currentUserId = targetPlayer.id
+
+      return routeJson({
+        startAdminImpersonation: {
+          token,
+          expiresAtUtc: new Date(Date.now() + 7200000).toISOString(),
+          player: buildPlayerPayload(targetPlayer),
+        },
+      })
+    }
+
+    if (query.includes('stopAdminImpersonation')) {
+      const adminActor = resolveAdminActor()
+      if (!adminActor || !state.impersonationSession) {
+        return routeJsonError('No impersonation session is active.')
+      }
+
+      state.impersonationSession = null
+      state.currentUserId = adminActor.id
+      state.currentToken = `token-${adminActor.id}`
+
+      return routeJson({
+        stopAdminImpersonation: {
+          token: state.currentToken,
+          expiresAtUtc: new Date(Date.now() + 7200000).toISOString(),
+          player: buildPlayerPayload(adminActor),
+        },
+      })
+    }
+
+    if (query.includes('setPlayerInvisibleInChat')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const targetPlayer = state.players.find((player) => player.id === input?.playerId)
+      if (!targetPlayer) {
+        return routeJsonError('Player not found.')
+      }
+
+      targetPlayer.isInvisibleInChat = Boolean(input?.isInvisibleInChat)
+      return routeJson({ setPlayerInvisibleInChat: buildGameAdminPlayer(targetPlayer) })
+    }
+
+    if (query.includes('setLocalGameAdminRole')) {
+      const accessFailure = getAdminAccessFailure(true)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const targetPlayer = state.players.find((player) => player.id === input?.playerId)
+      if (!targetPlayer) {
+        return routeJsonError('Player not found.')
+      }
+
+      targetPlayer.role = input?.isAdmin ? 'ADMIN' : 'PLAYER'
+      return routeJson({ setLocalGameAdminRole: buildGameAdminPlayer(targetPlayer) })
+    }
+
+    if (query.includes('assignGlobalGameAdminRole')) {
+      const accessFailure = getAdminAccessFailure(true)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const adminActor = resolveAdminActor()
+      const normalizedEmail = String(input?.email ?? '').trim().toLowerCase()
+
+      if (!normalizedEmail || !adminActor) {
+        return routeJsonError('Email is required.')
+      }
+
+      const existingGrant = state.globalGameAdminGrants.find((grant) => grant.email.toLowerCase() === normalizedEmail)
+      const now = new Date().toISOString()
+      const grant = existingGrant
+        ? {
+            ...existingGrant,
+            grantedByEmail: adminActor.email,
+            updatedAtUtc: now,
+          }
+        : {
+            id: `global-admin-${Date.now()}`,
+            email: normalizedEmail,
+            grantedByEmail: adminActor.email,
+            grantedAtUtc: now,
+            updatedAtUtc: now,
+          }
+
+      state.globalGameAdminGrants = [...state.globalGameAdminGrants.filter((candidate) => candidate.email.toLowerCase() !== normalizedEmail), grant]
+      return routeJson({ assignGlobalGameAdminRole: grant })
+    }
+
+    if (query.includes('removeGlobalGameAdminRole')) {
+      const accessFailure = getAdminAccessFailure(true)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const normalizedEmail = String(input?.email ?? '').trim().toLowerCase()
+      state.globalGameAdminGrants = state.globalGameAdminGrants.filter((grant) => grant.email.toLowerCase() !== normalizedEmail)
+      return routeJson({ removeGlobalGameAdminRole: true })
+    }
+
+    if (query.includes('upsertGameNewsEntry')) {
+      const accessFailure = getAdminAccessFailure(false)
+      if (accessFailure) {
+        return routeJsonError(accessFailure.message, accessFailure.code)
+      }
+
+      const input = body.variables?.input
+      const adminActor = resolveAdminActor()
+      const session = buildGameAdminSession()
+      if (!adminActor) {
+        return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const existingEntry = state.gameNewsEntries.find((entry) => entry.id === input?.entryId)
+      if (existingEntry?.targetServerKey === null && !session.isRootAdministrator && !session.hasGlobalAdminRole) {
+        return routeJsonError('Only global or root administrators can edit global feed entries.', 'AUTH_NOT_AUTHORIZED')
+      }
+
+      const now = new Date().toISOString()
+      const targetServerKey = existingEntry
+        ? existingEntry.targetServerKey
+        : session.isRootAdministrator || session.hasGlobalAdminRole
+          ? null
+          : state.serverKey
+
+      const nextEntry: MockGameNewsEntry = existingEntry
+        ? {
+            ...existingEntry,
+            entryType: input?.entryType ?? existingEntry.entryType,
+            status: input?.status ?? existingEntry.status,
+            updatedByEmail: adminActor.email,
+            updatedAtUtc: now,
+            publishedAtUtc: (input?.status ?? existingEntry.status) === 'PUBLISHED' ? existingEntry.publishedAtUtc ?? now : null,
+            localizations: (input?.localizations ?? []).map((localization: MockGameNewsLocalization) => ({ ...localization })),
+          }
+        : {
+            id: `news-entry-${Date.now()}`,
+            entryType: input?.entryType ?? 'NEWS',
+            status: input?.status ?? 'DRAFT',
+            targetServerKey,
+            createdByEmail: adminActor.email,
+            updatedByEmail: adminActor.email,
+            createdAtUtc: now,
+            updatedAtUtc: now,
+            publishedAtUtc: (input?.status ?? 'DRAFT') === 'PUBLISHED' ? now : null,
+            localizations: (input?.localizations ?? []).map((localization: MockGameNewsLocalization) => ({ ...localization })),
+            readByPlayerIds: [],
+          }
+
+      state.gameNewsEntries = [...state.gameNewsEntries.filter((entry) => entry.id !== nextEntry.id), nextEntry]
+      return routeJson({ upsertGameNewsEntry: buildGameNewsEntry(nextEntry) })
+    }
+
     // Helper: true if the query is a standalone `me` query (not a more-specific query whose field names happen to include "me" as a substring).
     // NOTE: Many field names end in "Name" (e.g. bankBuildingName, lenderCompanyName, cityName) which contain "me" as a substring.
     // Also "payment" contains "me" (pay-me-nt). Always add exclusions here for any new query/mutation with such fields.
     const isStandaloneMeQuery = (q: string) =>
       q.includes('me') &&
+      !q.includes('gameNewsFeed') &&
+      !q.includes('gameAdminSession') &&
+      !q.includes('gameAdminDashboard') &&
       !q.includes('companyLedger') &&
       !q.includes('ledgerDrillDown') &&
       !q.includes('companyBrands') &&
@@ -3741,7 +4278,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         contentType: 'application/json',
         body: JSON.stringify({
           data: {
-            me: { ...player, password: undefined },
+            me: buildPlayerPayload(player),
           },
         }),
       })

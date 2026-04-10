@@ -5,12 +5,18 @@ import { useAuthStore } from '@/stores/auth'
 import { computed, ref } from 'vue'
 import { formatInGameTime } from '@/lib/gameTime'
 import { useGameStateStore } from '@/stores/gameState'
+import { useNewsStore } from '@/stores/news'
+import { useGameAdminStore } from '@/stores/gameAdmin'
 import AccountSwitcher from '@/components/layout/AccountSwitcher.vue'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
+const newsStore = useNewsStore()
+const gameAdminStore = useGameAdminStore()
 const { gameState } = storeToRefs(gameStateStore)
+const { unreadCount } = storeToRefs(newsStore)
+const { session } = storeToRefs(gameAdminStore)
 const isMenuOpen = ref(false)
 
 const formattedGameTime = computed(() => {
@@ -19,6 +25,19 @@ const formattedGameTime = computed(() => {
   }
 
   return formatInGameTime(gameState.value.currentGameTimeUtc, locale.value)
+})
+
+const showUnreadBadge = computed(() => auth.isAuthenticated && unreadCount.value > 0)
+
+const impersonationLabel = computed(() => {
+  if (!session.value?.isImpersonating || !session.value.effectivePlayer) {
+    return null
+  }
+
+  return t('admin.impersonationBanner', {
+    player: session.value.effectivePlayer.displayName,
+    account: session.value.effectiveCompanyName ?? session.value.effectivePlayer.displayName,
+  })
 })
 
 const toggleMenu = () => {
@@ -61,11 +80,22 @@ const closeMenu = () => {
         <RouterLink to="/loans" :title="t('nav.loans')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.loans') }}</span>
         </RouterLink>
+        <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link-with-badge" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.news') }}</span>
+          <span v-if="showUnreadBadge" class="news-badge">{{ unreadCount }}</span>
+        </RouterLink>
+        <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
+        </RouterLink>
       </nav>
       <div class="header-actions">
         <div v-if="gameState && formattedGameTime" class="game-time-chip" :title="t('nav.gameTime')">
           <span class="game-time-label">{{ t('nav.gameTime') }}</span>
           <span class="game-time-value">{{ formattedGameTime }}</span>
+        </div>
+        <div v-if="impersonationLabel" class="impersonation-chip">
+          {{ impersonationLabel }}
         </div>
         <template v-if="auth.isAuthenticated">
           <AccountSwitcher @switched="closeMenu" />
@@ -184,6 +214,28 @@ const closeMenu = () => {
   font-size: 1.25rem;
 }
 
+.nav-link-with-badge {
+  position: relative;
+}
+
+.news-badge {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.55rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ff8a00, #ff3d00);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.3rem;
+  box-shadow: 0 8px 20px rgba(255, 97, 0, 0.35);
+}
+
 .nav-links a::after {
   content: '';
   position: absolute;
@@ -268,6 +320,17 @@ const closeMenu = () => {
   gap: 0.75rem;
 }
 
+.impersonation-chip {
+  max-width: 17rem;
+  padding: 0.45rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 138, 0, 0.5);
+  background: rgba(255, 138, 0, 0.14);
+  color: #ffd7a3;
+  font-size: 0.72rem;
+  line-height: 1.2;
+}
+
 .game-time-chip {
   display: flex;
   flex-direction: column;
@@ -321,6 +384,10 @@ const closeMenu = () => {
   }
 
   .game-time-chip {
+    display: none;
+  }
+
+  .impersonation-chip {
     display: none;
   }
 }

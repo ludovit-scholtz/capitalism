@@ -33,6 +33,9 @@ public sealed class Player
     /// <summary>UTC timestamp of the player's last login.</summary>
     public DateTime? LastLoginAtUtc { get; set; }
 
+    /// <summary>When true, the player's chat messages are only visible to themselves and administrators.</summary>
+    public bool IsInvisibleInChat { get; set; }
+
     /// <summary>Cash held in the player's personal account outside any company.</summary>
     public decimal PersonalCash { get; set; }
 

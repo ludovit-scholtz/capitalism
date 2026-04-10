@@ -84,6 +84,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Active and historical loans between companies.</summary>
     public DbSet<Loan> Loans => Set<Loan>();
 
+    /// <summary>Audit trail for administrator actions performed while impersonating players.</summary>
+    public DbSet<AdminActionAuditLog> AdminActionAuditLogs => Set<AdminActionAuditLog>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -471,6 +474,23 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.HasIndex(l => new { l.BorrowerCompanyId, l.Status });
             e.HasIndex(l => new { l.LenderCompanyId, l.Status });
             e.HasIndex(l => l.NextPaymentTick);
+        });
+
+        // AdminActionAuditLog
+        modelBuilder.Entity<AdminActionAuditLog>(e =>
+        {
+            e.HasKey(log => log.Id);
+            e.Property(log => log.AdminActorEmail).HasMaxLength(256);
+            e.Property(log => log.AdminActorDisplayName).HasMaxLength(100);
+            e.Property(log => log.EffectivePlayerEmail).HasMaxLength(256);
+            e.Property(log => log.EffectivePlayerDisplayName).HasMaxLength(100);
+            e.Property(log => log.EffectiveAccountType).HasMaxLength(20);
+            e.Property(log => log.EffectiveCompanyName).HasMaxLength(200);
+            e.Property(log => log.GraphQlOperationName).HasMaxLength(160);
+            e.Property(log => log.MutationSummary).HasMaxLength(500);
+            e.HasIndex(log => log.RecordedAtUtc);
+            e.HasIndex(log => log.AdminActorPlayerId);
+            e.HasIndex(log => log.EffectivePlayerId);
         });
     }
 }

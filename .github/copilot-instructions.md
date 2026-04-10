@@ -53,6 +53,16 @@
 - The registration key in `projects/Api/appsettings*.json` must match `projects/MasterApi/appsettings*.json` for the game server to appear in the master frontend.
 - Treat `frontendUrl`, `backendUrl`, and `graphqlUrl` as server-owned infrastructure metadata. Do not let the master frontend invent or mutate them client-side.
 
+## Game administration and news feed
+- MasterApi is the source of truth for shared game administration metadata and the cross-server news feed. The core persistence types are `GlobalGameAdminGrant`, `GameNewsEntry`, `GameNewsEntryLocalization`, and `GameNewsReadReceipt` in `projects/MasterApi/Data/Entities/`.
+- The game frontend must continue to use the local game API as its only GraphQL endpoint. Game-admin and news data are proxied through the game API via `projects/Api/Utilities/MasterGameAdministrationService.cs` and exposed to the frontend through `gameAdminSession`, `gameAdminDashboard`, `gameNewsFeed`, and the related mutations.
+- Local game administrators are controlled by the game-server `Player.Role == ADMIN`. Root administrators and global game administrators are controlled by MasterApi (`GameAdministration.RootAdministratorEmails` config plus `GlobalGameAdminGrant` rows keyed by email).
+- `GameNewsEntry.targetServerKey == null` means a global feed item visible across all games. A non-null `targetServerKey` means the item is local to one game server.
+- `CHANGELOG` entries are the canonical place to communicate notable shipped changes. `NEWS` entries are for live-ops announcements, incidents, and server-specific messaging.
+- Whenever you ship an interesting player-visible feature, economy/balance change, admin/security change, or live-ops improvement, also add or update a published changelog/news entry in the MasterApi-backed feed data so players can discover it in-game. Do not leave the feed stale after meaningful changes.
+- Every published news/changelog entry must include `en`, `sk`, and `de` localizations. Use safe rich HTML suitable for DOM sanitization in the game frontend.
+- If a change should be visible across all game servers, publish it as a global `CHANGELOG` entry. If it only affects one game shard or one local incident, publish it as a server-scoped `NEWS` entry.
+
 ## Game domain model
 This is a Capitalism II-style multiplayer economic strategy game. Key entities:
 
@@ -81,8 +91,8 @@ The game is seeded with:
 - Frontend types in `src/types/index.ts` are synced with backend entity models.
 - Player roles: `PLAYER`, `ADMIN`.
 - Key GraphQL operations:
-  - **Queries**: `me`, `cities`, `city(id)`, `resourceTypes`, `productTypes(industry?)`, `rankings`, `myCompanies`, `gameState`, `starterIndustries`
-  - **Mutations**: `register(input)`, `login(input)`, `createCompany(input)`, `placeBuilding(input)`, `completeOnboarding(input)`, `startOnboardingCompany(input)`, `finishOnboarding(input)`, `purchaseLot(input)`
+  - **Queries**: `me`, `cities`, `city(id)`, `resourceTypes`, `productTypes(industry?)`, `rankings`, `myCompanies`, `gameState`, `starterIndustries`, `gameNewsFeed`, `gameAdminSession`, `gameAdminDashboard`
+  - **Mutations**: `register(input)`, `login(input)`, `createCompany(input)`, `placeBuilding(input)`, `completeOnboarding(input)`, `startOnboardingCompany(input)`, `finishOnboarding(input)`, `purchaseLot(input)`, `markGameNewsRead(input)`, `upsertGameNewsEntry(input)`, `startAdminImpersonation(input)`, `stopAdminImpersonation`, `setPlayerInvisibleInChat(input)`, `setLocalGameAdminRole(input)`, `assignGlobalGameAdminRole(input)`, `removeGlobalGameAdminRole(input)`
 - The staged onboarding flow now uses `startOnboardingCompany` to create the first company and purchase the first factory lot, then `finishOnboarding` to select the starter product, purchase the first sales shop lot, configure both buildings, and complete onboarding.
 - Master-server GraphQL operations are `gameServers` and `registerGameServer(input)`.
 
@@ -105,13 +115,15 @@ The game is seeded with:
 - **LoginView** (`/login`): Login/Register toggle form with email, password, optional display name.
 - **OnboardingView** (`/onboarding`): guided staged onboarding flow: (1) choose industry, (2) choose city, (3) name company + purchase the first factory lot on the city map, (4) choose starter product + purchase the first sales shop lot, then completion. If onboarding is interrupted after the factory purchase, the player resumes directly into the shop step using backend-owned onboarding state.
 - **DashboardView** (`/dashboard`): Player info, company cards with buildings list, empty state with link to onboarding.
+- **NewsView** (`/news`): Shared newspaper and changelog feed rendered from MasterApi-backed entries. Opening the feed marks published entries as read for the authenticated player and clears the unread navbar badge.
+- **GameAdminDashboardView** (`/admin`): Admin-only operations dashboard for money-inflow signals, multi-account heuristics, impersonation, invisible-chat mode, local/global admin management, and multilingual news/changelog publishing.
 
 ## Playwright E2E testing
 
 ### Structure
 - Tests live in `projects/frontend/e2e/`.
 - Shared API mock helpers are in `e2e/helpers/mock-api.ts`.
-- Active test files: `home.spec.ts` (home page + header nav), `onboarding.spec.ts` (auth, onboarding wizard, dashboard, full journey), `building-detail.spec.ts` (queued building upgrades and unit-link behavior), `city-map.spec.ts` (city map rendering, lot selection, purchase flow, dashboard→map navigation).
+- Active test files: `home.spec.ts` (home page + header nav), `onboarding.spec.ts` (auth, onboarding wizard, dashboard, full journey), `building-detail.spec.ts` (queued building upgrades and unit-link behavior), `city-map.spec.ts` (city map rendering, lot selection, purchase flow, dashboard→map navigation), `game-admin-news.spec.ts` (unread news badge, admin dashboard, impersonation, newsroom publishing).
 - Old events-specific spec files (`auth.spec.ts`, `category.spec.ts`, etc.) contain `test.skip` placeholders.
 
 ### Always use the shared mock helper

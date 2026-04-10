@@ -63,6 +63,119 @@ public sealed class Query
         return BuildSubscriptionInfo(latestSub, now);
     }
 
+    public async Task<GameAdministrationAccessInfo> GetGameAdministrationAccess(
+        GetGameAdministrationAccessInput input,
+        [Service] MasterDbContext db,
+        [Service] IOptions<MasterServerOptions> masterServerOptions,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        EnsureServiceAccess(input, masterServerOptions);
+        var email = NormalizeEmail(input.Email, "INVALID_EMAIL");
+
+        return await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, email);
+    }
+
+    public async Task<List<GlobalGameAdminGrantInfo>> GetGlobalGameAdminGrants(
+        GetGlobalGameAdminGrantsInput input,
+        [Service] MasterDbContext db,
+        [Service] IOptions<MasterServerOptions> masterServerOptions,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        EnsureServiceAccess(input, masterServerOptions);
+
+        var requesterEmail = NormalizeEmail(input.RequesterEmail, "INVALID_REQUESTER_EMAIL");
+        var requesterAccess = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, requesterEmail);
+        if (!requesterAccess.IsRootAdministrator)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only root administrators can manage global game administrators.")
+                    .SetCode("ROOT_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        return await db.GlobalGameAdminGrants
+            .AsNoTracking()
+            .OrderBy(grant => grant.Email)
+            .Select(grant => new GlobalGameAdminGrantInfo
+            {
+                Id = grant.Id,
+                Email = grant.Email,
+                GrantedByEmail = grant.GrantedByEmail,
+                GrantedAtUtc = grant.GrantedAtUtc,
+                UpdatedAtUtc = grant.UpdatedAtUtc,
+            })
+            .ToListAsync();
+    }
+
+    public async Task<GameNewsFeedResult> GetGameNewsFeed(
+        GetGameNewsFeedInput input,
+        [Service] MasterDbContext db,
+        [Service] IOptions<MasterServerOptions> masterServerOptions)
+    {
+        EnsureServiceAccess(input, masterServerOptions);
+
+        if (input.IncludeDrafts && string.IsNullOrWhiteSpace(input.RequesterEmail))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Requester email is required when draft entries are requested.")
+                    .SetCode("REQUESTER_EMAIL_REQUIRED")
+                    .Build());
+        }
+
+        var playerEmail = string.IsNullOrWhiteSpace(input.PlayerEmail)
+            ? null
+            : NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
+        var limit = Math.Clamp(input.Limit, 1, 100);
+
+        var entries = await db.GameNewsEntries
+            .AsNoTracking()
+            .Include(entry => entry.Localizations)
+            .Include(entry => entry.ReadReceipts)
+            .Where(entry => entry.TargetServerKey == null || entry.TargetServerKey == input.ServerKey)
+            .Where(entry => input.IncludeDrafts || entry.Status == GameNewsEntryStatus.Published)
+            .OrderByDescending(entry => entry.PublishedAtUtc ?? entry.UpdatedAtUtc)
+            .ThenByDescending(entry => entry.CreatedAtUtc)
+            .Take(limit)
+            .AsSplitQuery()
+            .ToListAsync();
+
+        var items = entries
+            .Select(entry => ToGameNewsEntryInfo(entry, playerEmail, input.ServerKey))
+            .ToList();
+
+        var unreadCount = 0;
+        if (playerEmail is not null)
+        {
+            var publishedEntryIds = await db.GameNewsEntries
+                .AsNoTracking()
+                .Where(entry => entry.Status == GameNewsEntryStatus.Published)
+                .Where(entry => entry.TargetServerKey == null || entry.TargetServerKey == input.ServerKey)
+                .Select(entry => entry.Id)
+                .ToListAsync();
+
+            if (publishedEntryIds.Count > 0)
+            {
+                var readEntryIds = await db.GameNewsReadReceipts
+                    .AsNoTracking()
+                    .Where(receipt => receipt.PlayerEmail == playerEmail && receipt.ServerKey == input.ServerKey)
+                    .Where(receipt => publishedEntryIds.Contains(receipt.GameNewsEntryId))
+                    .Select(receipt => receipt.GameNewsEntryId)
+                    .Distinct()
+                    .CountAsync();
+
+                unreadCount = Math.Max(0, publishedEntryIds.Count - readEntryIds);
+            }
+        }
+
+        return new GameNewsFeedResult
+        {
+            Items = items,
+            UnreadCount = unreadCount,
+        };
+    }
+
     internal static GameServerSummary ToSummary(Data.Entities.GameServerNode server, DateTime cutoff)
     {
         return new GameServerSummary
@@ -111,6 +224,93 @@ public sealed class Query
         };
     }
 
+    internal static void EnsureServiceAccess(
+        MasterServerServiceInput input,
+        IOptions<MasterServerOptions> masterServerOptions)
+    {
+        var expectedKey = masterServerOptions.Value.RegistrationKey.Trim();
+        if (string.IsNullOrWhiteSpace(expectedKey)
+            || !string.Equals(expectedKey, input.RegistrationKey?.Trim(), StringComparison.Ordinal))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Invalid game server registration key.")
+                    .SetCode("INVALID_REGISTRATION_KEY")
+                    .Build());
+        }
+
+        if (string.IsNullOrWhiteSpace(input.ServerKey))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Server key is required.")
+                    .SetCode("SERVER_KEY_REQUIRED")
+                    .Build());
+        }
+    }
+
+    internal static async Task<GameAdministrationAccessInfo> BuildGameAdministrationAccessAsync(
+        MasterDbContext db,
+        GameAdministrationOptions options,
+        string normalizedEmail)
+    {
+        var rootAdminEmails = BuildRootAdministratorEmailSet(options);
+        var hasGlobalAdminRole = await db.GlobalGameAdminGrants
+            .AsNoTracking()
+            .AnyAsync(grant => grant.Email == normalizedEmail);
+        var isRootAdministrator = rootAdminEmails.Contains(normalizedEmail);
+
+        return new GameAdministrationAccessInfo
+        {
+            Email = normalizedEmail,
+            IsRootAdministrator = isRootAdministrator,
+            HasGlobalAdminRole = hasGlobalAdminRole,
+            CanAccessEveryGameDashboard = isRootAdministrator || hasGlobalAdminRole,
+        };
+    }
+
+    internal static HashSet<string> BuildRootAdministratorEmailSet(GameAdministrationOptions options)
+    {
+        return options.RootAdministratorEmails
+            .Select(email => email?.Trim().ToLowerInvariant())
+            .Where(email => !string.IsNullOrWhiteSpace(email))
+            .Cast<string>()
+            .ToHashSet(StringComparer.Ordinal);
+    }
+
+    internal static GameNewsEntryInfo ToGameNewsEntryInfo(
+        GameNewsEntry entry,
+        string? normalizedPlayerEmail,
+        string serverKey)
+    {
+        var isRead = normalizedPlayerEmail is not null
+            && entry.ReadReceipts.Any(receipt => receipt.PlayerEmail == normalizedPlayerEmail && receipt.ServerKey == serverKey);
+
+        return new GameNewsEntryInfo
+        {
+            Id = entry.Id,
+            EntryType = entry.EntryType,
+            Status = entry.Status,
+            TargetServerKey = entry.TargetServerKey,
+            CreatedByEmail = entry.CreatedByEmail,
+            UpdatedByEmail = entry.UpdatedByEmail,
+            CreatedAtUtc = entry.CreatedAtUtc,
+            UpdatedAtUtc = entry.UpdatedAtUtc,
+            PublishedAtUtc = entry.PublishedAtUtc,
+            IsRead = isRead,
+            Localizations = entry.Localizations
+                .OrderBy(localization => localization.Locale)
+                .Select(localization => new GameNewsLocalizationInfo
+                {
+                    Locale = localization.Locale,
+                    Title = localization.Title,
+                    Summary = localization.Summary,
+                    HtmlContent = localization.HtmlContent,
+                })
+                .ToList(),
+        };
+    }
+
     internal static SubscriptionInfo BuildSubscriptionInfo(ProSubscription? sub, DateTime now)
     {
         if (sub is null)
@@ -137,5 +337,37 @@ public sealed class Query
             DaysRemaining = isActive ? daysRemaining : null,
             CanProlong = true,
         };
+    }
+
+    internal static string NormalizeEmail(string email, string errorCode)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(normalizedEmail))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A valid email address is required.")
+                    .SetCode(errorCode)
+                    .Build());
+        }
+
+        try
+        {
+            var mailAddress = new System.Net.Mail.MailAddress(normalizedEmail);
+            if (!string.Equals(mailAddress.Address, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new FormatException();
+            }
+        }
+        catch
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A valid email address is required.")
+                    .SetCode(errorCode)
+                    .Build());
+        }
+
+        return normalizedEmail;
     }
 }

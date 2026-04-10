@@ -113,6 +113,216 @@ public sealed class Mutation
         };
     }
 
+    [Authorize]
+    public async Task<AuthPayload> StartAdminImpersonation(
+        StartAdminImpersonationInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IOptions<JwtOptions> jwtOptions,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
+    {
+        var principal = httpContextAccessor.HttpContext!.User;
+        var accessContext = await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, principal, httpContextAccessor.HttpContext.RequestAborted);
+        var targetPlayer = await db.Players
+            .AsNoTracking()
+            .Include(player => player.Companies)
+            .FirstOrDefaultAsync(player => player.Id == input.TargetPlayerId, httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var impersonationContext = ResolveImpersonationAccountContext(targetPlayer, input);
+        targetPlayer.ActiveAccountType = impersonationContext.EffectiveAccountType;
+        targetPlayer.ActiveCompanyId = impersonationContext.EffectiveCompanyId;
+
+        var session = GenerateToken(accessContext.ActorPlayer, jwtOptions.Value, new AdminImpersonationTokenContext(
+            targetPlayer,
+            impersonationContext.EffectiveAccountType,
+            impersonationContext.EffectiveCompanyId,
+            impersonationContext.EffectiveCompanyName));
+
+        return new AuthPayload
+        {
+            Token = session.Token,
+            ExpiresAtUtc = session.ExpiresAtUtc,
+            Player = targetPlayer,
+        };
+    }
+
+    [Authorize]
+    public async Task<AuthPayload> StopAdminImpersonation(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IOptions<JwtOptions> jwtOptions)
+    {
+        var actorUserId = httpContextAccessor.HttpContext!.User.GetAuthenticatedActorUserId();
+        var actorPlayer = await db.Players
+            .AsNoTracking()
+            .Include(player => player.Companies)
+            .FirstOrDefaultAsync(player => player.Id == actorUserId, httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var session = GenerateToken(actorPlayer, jwtOptions.Value);
+        return new AuthPayload
+        {
+            Token = session.Token,
+            ExpiresAtUtc = session.ExpiresAtUtc,
+            Player = actorPlayer,
+        };
+    }
+
+    [Authorize]
+    public async Task<GameAdminPlayerSummary> SetPlayerInvisibleInChat(
+        SetPlayerInvisibleInChatInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
+    {
+        await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        var player = await db.Players
+            .Include(candidate => candidate.Companies)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.PlayerId, httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        player.IsInvisibleInChat = input.IsInvisibleInChat;
+        await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+
+        return new GameAdminPlayerSummary
+        {
+            Id = player.Id,
+            Email = player.Email,
+            DisplayName = player.DisplayName,
+            Role = player.Role,
+            IsInvisibleInChat = player.IsInvisibleInChat,
+            LastLoginAtUtc = player.LastLoginAtUtc,
+            PersonalCash = player.PersonalCash,
+            TotalCompanyCash = player.Companies.Sum(company => company.Cash),
+            CompanyCount = player.Companies.Count,
+            Companies = player.Companies.Select(company => new GameAdminCompanySummary
+            {
+                Id = company.Id,
+                Name = company.Name,
+                Cash = company.Cash,
+            }).ToList(),
+        };
+    }
+
+    [Authorize]
+    public async Task<GameAdminPlayerSummary> SetLocalGameAdminRole(
+        SetLocalGameAdminRoleInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService)
+    {
+        await gameAdminAuthorizationService.RequireRootAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        var player = await db.Players
+            .Include(candidate => candidate.Companies)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.PlayerId, httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        player.Role = input.IsAdmin ? PlayerRole.Admin : PlayerRole.Player;
+        await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+
+        return new GameAdminPlayerSummary
+        {
+            Id = player.Id,
+            Email = player.Email,
+            DisplayName = player.DisplayName,
+            Role = player.Role,
+            IsInvisibleInChat = player.IsInvisibleInChat,
+            LastLoginAtUtc = player.LastLoginAtUtc,
+            PersonalCash = player.PersonalCash,
+            TotalCompanyCash = player.Companies.Sum(company => company.Cash),
+            CompanyCount = player.Companies.Count,
+            Companies = player.Companies.Select(company => new GameAdminCompanySummary
+            {
+                Id = company.Id,
+                Name = company.Name,
+                Cash = company.Cash,
+            }).ToList(),
+        };
+    }
+
+    [Authorize]
+    public async Task<GlobalGameAdminGrantSummary> AssignGlobalGameAdminRole(
+        ManageGlobalGameAdminRoleInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService,
+        [Service] IMasterGameAdministrationService masterGameAdministrationService)
+    {
+        var accessContext = await gameAdminAuthorizationService.RequireRootAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        return await masterGameAdministrationService.AssignGlobalGameAdminAsync(accessContext.ActorPlayer.Email, input.Email, httpContextAccessor.HttpContext.RequestAborted);
+    }
+
+    [Authorize]
+    public async Task<bool> RemoveGlobalGameAdminRole(
+        ManageGlobalGameAdminRoleInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService,
+        [Service] IMasterGameAdministrationService masterGameAdministrationService)
+    {
+        var accessContext = await gameAdminAuthorizationService.RequireRootAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        await masterGameAdministrationService.RemoveGlobalGameAdminAsync(accessContext.ActorPlayer.Email, input.Email, httpContextAccessor.HttpContext.RequestAborted);
+        return true;
+    }
+
+    [Authorize]
+    public async Task<GameNewsEntryResult> UpsertGameNewsEntry(
+        UpsertGameNewsEntryInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] GameAdminAuthorizationService gameAdminAuthorizationService,
+        [Service] IMasterGameAdministrationService masterGameAdministrationService)
+    {
+        var accessContext = await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
+        return await masterGameAdministrationService.UpsertGameNewsEntryAsync(
+            accessContext.ActorPlayer.Email,
+            input.EntryId,
+            input.EntryType,
+            input.Status,
+            input.Localizations,
+            httpContextAccessor.HttpContext.RequestAborted);
+    }
+
+    [Authorize]
+    public async Task<bool> MarkGameNewsRead(
+        MarkGameNewsReadInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IMasterGameAdministrationService masterGameAdministrationService)
+    {
+        var effectiveUserId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var playerEmail = await db.Players
+            .AsNoTracking()
+            .Where(player => player.Id == effectiveUserId)
+            .Select(player => player.Email)
+            .FirstOrDefaultAsync(httpContextAccessor.HttpContext.RequestAborted)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        await masterGameAdministrationService.MarkGameNewsReadAsync(playerEmail, input.EntryIds, httpContextAccessor.HttpContext.RequestAborted);
+        return true;
+    }
+
     /// <summary>Creates a new company for the authenticated player.</summary>
     [Authorize]
     public async Task<Company> CreateCompany(
@@ -886,7 +1096,7 @@ public sealed class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        var account = await ResolveActiveTradingAccountAsync(db, player);
+        var account = await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
         var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
         var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId)
             ?? throw new GraphQLException(
@@ -1010,7 +1220,7 @@ public sealed class Mutation
                     .SetCode("PLAYER_NOT_FOUND")
                     .Build());
 
-        var account = await ResolveActiveTradingAccountAsync(db, player);
+        var account = await ResolveActiveTradingAccountAsync(db, player, httpContextAccessor.HttpContext!.User);
         var (companies, shareholdings, sharePrices) = await LoadSharePricingSnapshotAsync(db);
         var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId)
             ?? throw new GraphQLException(
@@ -1105,22 +1315,57 @@ public sealed class Mutation
         return (companies, shareholdings, sharePrices);
     }
 
-    private static async Task<ActiveTradingAccount> ResolveActiveTradingAccountAsync(AppDbContext db, Player player)
+    private static async Task<ActiveTradingAccount> ResolveActiveTradingAccountAsync(AppDbContext db, Player player, ClaimsPrincipal principal)
     {
-        if (string.Equals(player.ActiveAccountType, AccountContextType.Company, StringComparison.Ordinal)
-            && player.ActiveCompanyId.HasValue)
+        var effectiveAccountType = principal.GetEffectiveAccountType() ?? player.ActiveAccountType;
+        var effectiveCompanyId = principal.GetEffectiveCompanyId() ?? player.ActiveCompanyId;
+
+        if (string.Equals(effectiveAccountType, AccountContextType.Company, StringComparison.Ordinal)
+            && effectiveCompanyId.HasValue)
         {
             var company = await db.Companies.FirstOrDefaultAsync(candidate =>
-                candidate.Id == player.ActiveCompanyId.Value && candidate.PlayerId == player.Id);
+                candidate.Id == effectiveCompanyId.Value && candidate.PlayerId == player.Id);
             if (company is not null)
             {
                 return new ActiveTradingAccount(AccountContextType.Company, company, company.Name);
             }
         }
 
-        player.ActiveAccountType = AccountContextType.Person;
-        player.ActiveCompanyId = null;
+        if (!principal.IsImpersonating())
+        {
+            player.ActiveAccountType = AccountContextType.Person;
+            player.ActiveCompanyId = null;
+        }
+
         return new ActiveTradingAccount(AccountContextType.Person, null, player.DisplayName);
+    }
+
+    private static ImpersonationAccountContext ResolveImpersonationAccountContext(
+        Player targetPlayer,
+        StartAdminImpersonationInput input)
+    {
+        if (string.Equals(input.AccountType, AccountContextType.Person, StringComparison.OrdinalIgnoreCase))
+        {
+            return new ImpersonationAccountContext(AccountContextType.Person, null, null);
+        }
+
+        if (!string.Equals(input.AccountType, AccountContextType.Company, StringComparison.OrdinalIgnoreCase) || input.CompanyId is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A valid person or company account must be selected for impersonation.")
+                    .SetCode("INVALID_IMPERSONATION_ACCOUNT")
+                    .Build());
+        }
+
+        var targetCompany = targetPlayer.Companies.FirstOrDefault(company => company.Id == input.CompanyId.Value)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The selected company does not belong to the target player.")
+                    .SetCode("IMPERSONATION_COMPANY_NOT_FOUND")
+                    .Build());
+
+        return new ImpersonationAccountContext(AccountContextType.Company, targetCompany.Id, targetCompany.Name);
     }
 
     private static Shareholding GetOrCreateShareholding(
@@ -2666,19 +2911,40 @@ public sealed class Mutation
             .FirstAsync(p => p.Id == planId);
     }
 
-    private static AuthenticatedSession GenerateToken(Player player, JwtOptions options)
+    private static AuthenticatedSession GenerateToken(
+        Player player,
+        JwtOptions options,
+        AdminImpersonationTokenContext? impersonation = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(options.SigningKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
         var expires = DateTime.UtcNow.AddMinutes(options.ExpiresMinutes);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, player.Id.ToString()),
             new Claim(ClaimTypes.Email, player.Email),
             new Claim(ClaimTypes.Name, player.DisplayName),
             new Claim(ClaimTypes.Role, player.Role)
         };
+
+        if (impersonation is not null)
+        {
+            claims.Add(new Claim(ClaimsPrincipalExtensions.EffectivePlayerIdClaimType, impersonation.EffectivePlayer.Id.ToString()));
+            claims.Add(new Claim(ClaimsPrincipalExtensions.EffectivePlayerEmailClaimType, impersonation.EffectivePlayer.Email));
+            claims.Add(new Claim(ClaimsPrincipalExtensions.EffectivePlayerNameClaimType, impersonation.EffectivePlayer.DisplayName));
+            claims.Add(new Claim(ClaimsPrincipalExtensions.EffectiveAccountTypeClaimType, impersonation.EffectiveAccountType));
+
+            if (impersonation.EffectiveCompanyId.HasValue)
+            {
+                claims.Add(new Claim(ClaimsPrincipalExtensions.EffectiveCompanyIdClaimType, impersonation.EffectiveCompanyId.Value.ToString()));
+            }
+
+            if (!string.IsNullOrWhiteSpace(impersonation.EffectiveCompanyName))
+            {
+                claims.Add(new Claim(ClaimsPrincipalExtensions.EffectiveCompanyNameClaimType, impersonation.EffectiveCompanyName));
+            }
+        }
 
         var token = new JwtSecurityToken(
             issuer: options.Issuer,
@@ -2691,6 +2957,17 @@ public sealed class Mutation
             new JwtSecurityTokenHandler().WriteToken(token),
             expires);
     }
+
+    private sealed record ImpersonationAccountContext(
+        string EffectiveAccountType,
+        Guid? EffectiveCompanyId,
+        string? EffectiveCompanyName);
+
+    private sealed record AdminImpersonationTokenContext(
+        Player EffectivePlayer,
+        string EffectiveAccountType,
+        Guid? EffectiveCompanyId,
+        string? EffectiveCompanyName);
 }
 
 /// <summary>Auth response payload.</summary>

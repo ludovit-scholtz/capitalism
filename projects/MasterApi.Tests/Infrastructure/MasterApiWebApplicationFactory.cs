@@ -20,6 +20,7 @@ public sealed class MasterApiWebApplicationFactory : WebApplicationFactory<Progr
                 ["ConnectionStrings:MasterCatalog"] = _connectionString,
                 ["MasterServer:RegistrationKey"] = "test-registration-key",
                 ["MasterServer:ActiveThresholdSeconds"] = "90",
+                ["GameAdministration:RootAdministratorEmails:0"] = "root@example.com",
             });
         });
     }

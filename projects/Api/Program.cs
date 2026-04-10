@@ -1,8 +1,10 @@
 ﻿namespace Api;
 
+using System.Security.Claims;
 using System.Text;
 using Api.Configuration;
 using Api.Data;
+using Api.Data.Entities;
 using Api.Engine;
 using Api.Engine.Phases;
 using Api.Security;
@@ -95,11 +97,17 @@ public class Program
                 };
             });
 
+        builder.Services.AddAuthorizationBuilder()
+            .AddPolicy(Policies.Admin, policy => policy.RequireClaim(ClaimTypes.Role, PlayerRole.Admin));
+
         builder.Services
             .AddGraphQLServer()
             .AddAuthorization()
             .AddQueryType<Query>()
             .AddMutationType<Mutation>();
+
+        builder.Services.AddScoped<IMasterGameAdministrationService, MasterGameAdministrationService>();
+        builder.Services.AddScoped<GameAdminAuthorizationService>();
 
         // ── Game tick engine ──
         builder.Services.AddScoped<TickProcessor>();
@@ -127,6 +135,7 @@ public class Program
         app.UseCors("frontend");
         app.UseAuthentication();
         app.UseAuthorization();
+    app.UseMiddleware<AdminAuditLoggingMiddleware>();
 
         app.MapGet("/", () => Results.Ok(new
         {

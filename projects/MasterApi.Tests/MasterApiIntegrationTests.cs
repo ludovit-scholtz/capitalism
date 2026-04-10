@@ -519,6 +519,372 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                 Assert.True(result.TryGetProperty("errors", out _));
         }
 
+
+        #endregion
+
+        #region Game administration service
+
+                [Fact]
+                public async Task GameNewsFeed_IncludesSeededGlobalChangelogEntry()
+                {
+                        var result = await GraphQlAsync("""
+                                query Feed($input: GetGameNewsFeedInput!) {
+                                    gameNewsFeed(input: $input) {
+                                        items {
+                                            entryType
+                                            status
+                                            localizations {
+                                                locale
+                                                title
+                                            }
+                                        }
+                                    }
+                                }
+                                """,
+                                new
+                                {
+                                        input = new
+                                        {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                includeDrafts = false,
+                                                limit = 50,
+                                        }
+                                });
+
+                        Assert.False(result.TryGetProperty("errors", out _));
+                        var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+                        Assert.Contains(
+                                items,
+                                item => item.GetProperty("entryType").GetString() == "CHANGELOG"
+                                        && item.GetProperty("status").GetString() == "PUBLISHED"
+                                        && item.GetProperty("localizations").EnumerateArray().Any(localization =>
+                                                localization.GetProperty("locale").GetString() == "en"
+                                                && localization.GetProperty("title").GetString() == "Game administration and newsroom launched"));
+                }
+
+        [Fact]
+        public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
+        {
+            await GraphQlAsync("""
+                mutation UpsertDraft($input: UpsertGameNewsEntryInput!) {
+                  upsertGameNewsEntry(input: $input) { id }
+                }
+                """,
+                new
+                {
+                    input = new
+                    {
+                        registrationKey = "test-registration-key",
+                        serverKey = "capitalism-local",
+                        requesterEmail = "admin@events.local",
+                        entryType = "NEWS",
+                        status = "DRAFT",
+                        localizations = new[]
+                        {
+                            new
+                            {
+                                locale = "en",
+                                title = "Draft note",
+                                summary = "Private admin note",
+                                htmlContent = "<p>Still preparing the patch.</p>",
+                            }
+                        }
+                    }
+                });
+
+                                    await GraphQlAsync("""
+                                        mutation UpsertPublished($input: UpsertGameNewsEntryInput!) {
+                                          upsertGameNewsEntry(input: $input) { id }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                requesterEmail = "admin@events.local",
+                                                entryType = "CHANGELOG",
+                                                status = "PUBLISHED",
+                                                localizations = new[]
+                                                {
+                                                    new
+                                                    {
+                                                        locale = "en",
+                                                        title = "Patch 0.1",
+                                                        summary = "Admin tools arrived.",
+                                                        htmlContent = "<p>Added the first admin tooling wave.</p>",
+                                                    }
+                                                }
+                                            }
+                                        });
+
+                                    var publicFeed = await GraphQlAsync("""
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            unreadCount
+                                            items { id status entryType }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                                includeDrafts = false,
+                                                limit = 50,
+                                            }
+                                        });
+
+                                    Assert.False(publicFeed.TryGetProperty("errors", out _));
+                                    var publicItems = publicFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+                                    Assert.NotEmpty(publicItems);
+                                    Assert.DoesNotContain(publicItems, item => item.GetProperty("status").GetString() == "DRAFT");
+                                    Assert.Contains(publicItems, item => item.GetProperty("status").GetString() == "PUBLISHED");
+                                    Assert.True(publicFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("unreadCount").GetInt32() >= 1);
+
+                                    var adminFeed = await GraphQlAsync("""
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            items { id status entryType }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                includeDrafts = true,
+                                                limit = 50,
+                                                requesterEmail = "admin@events.local",
+                                            }
+                                        });
+
+                                    Assert.False(adminFeed.TryGetProperty("errors", out _));
+                                    var adminItems = adminFeed.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
+                                    Assert.Contains(adminItems, item => item.GetProperty("status").GetString() == "DRAFT");
+                                    Assert.Contains(adminItems, item => item.GetProperty("status").GetString() == "PUBLISHED");
+                                }
+
+                                [Fact]
+                                public async Task MarkGameNewsRead_ClearsUnreadCountForPlayerAndServer()
+                                {
+                                    var createResult = await GraphQlAsync("""
+                                        mutation Upsert($input: UpsertGameNewsEntryInput!) {
+                                          upsertGameNewsEntry(input: $input) {
+                                            id
+                                            targetServerKey
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                requesterEmail = "admin@events.local",
+                                                entryType = "NEWS",
+                                                status = "PUBLISHED",
+                                                localizations = new[]
+                                                {
+                                                    new
+                                                    {
+                                                        locale = "en",
+                                                        title = "Welcome to the shard",
+                                                        summary = "Read this before expanding.",
+                                                        htmlContent = "<p>Factories are now live.</p>",
+                                                    }
+                                                }
+                                            }
+                                        });
+
+                                    var entryId = createResult.GetProperty("data").GetProperty("upsertGameNewsEntry").GetProperty("id").GetString();
+                                    Assert.NotNull(entryId);
+
+                                    var beforeRead = await GraphQlAsync("""
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            unreadCount
+                                            items { id isRead }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                                includeDrafts = false,
+                                                limit = 50,
+                                            }
+                                        });
+
+                                    var beforeFeed = beforeRead.GetProperty("data").GetProperty("gameNewsFeed");
+                                    var beforeUnreadCount = beforeFeed.GetProperty("unreadCount").GetInt32();
+                                    var beforeItems = beforeFeed.GetProperty("items").EnumerateArray().ToList();
+                                    var createdBefore = beforeItems.Single(item => item.GetProperty("id").GetString() == entryId);
+
+                                    Assert.True(beforeUnreadCount >= 1);
+                                    Assert.False(createdBefore.GetProperty("isRead").GetBoolean());
+
+                                    var markResult = await GraphQlAsync("""
+                                        mutation MarkRead($input: MarkGameNewsReadInput!) {
+                                          markGameNewsRead(input: $input)
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                                entryIds = new[] { entryId },
+                                            }
+                                        });
+
+                                    Assert.False(markResult.TryGetProperty("errors", out _));
+                                    Assert.True(markResult.GetProperty("data").GetProperty("markGameNewsRead").GetBoolean());
+
+                                    var afterRead = await GraphQlAsync("""
+                                        query Feed($input: GetGameNewsFeedInput!) {
+                                          gameNewsFeed(input: $input) {
+                                            unreadCount
+                                            items { id isRead }
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                playerEmail = "reader@example.com",
+                                                includeDrafts = false,
+                                                limit = 50,
+                                            }
+                                        });
+
+                                    var afterFeed = afterRead.GetProperty("data").GetProperty("gameNewsFeed");
+                                    var afterUnreadCount = afterFeed.GetProperty("unreadCount").GetInt32();
+                                    var afterItems = afterFeed.GetProperty("items").EnumerateArray().ToList();
+                                    var createdAfter = afterItems.Single(item => item.GetProperty("id").GetString() == entryId);
+
+                                    Assert.Equal(beforeUnreadCount - 1, afterUnreadCount);
+                                    Assert.True(createdAfter.GetProperty("isRead").GetBoolean());
+                                }
+
+                                [Fact]
+                                public async Task AssignGlobalGameAdmin_RootAdministrator_UpdatesAccess()
+                                {
+                                    var assignResult = await GraphQlAsync("""
+                                        mutation Assign($input: GlobalGameAdminGrantInput!) {
+                                          assignGlobalGameAdmin(input: $input) {
+                                            email
+                                            grantedByEmail
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                requesterEmail = "root@example.com",
+                                                targetEmail = "global-admin@example.com",
+                                            }
+                                        });
+
+                                    Assert.False(assignResult.TryGetProperty("errors", out _));
+                                    var grant = assignResult.GetProperty("data").GetProperty("assignGlobalGameAdmin");
+                                    Assert.Equal("global-admin@example.com", grant.GetProperty("email").GetString());
+                                    Assert.Equal("root@example.com", grant.GetProperty("grantedByEmail").GetString());
+
+                                    var accessResult = await GraphQlAsync("""
+                                        query Access($input: GetGameAdministrationAccessInput!) {
+                                          gameAdministrationAccess(input: $input) {
+                                            email
+                                            isRootAdministrator
+                                            hasGlobalAdminRole
+                                            canAccessEveryGameDashboard
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                email = "global-admin@example.com",
+                                            }
+                                        });
+
+                                    Assert.False(accessResult.TryGetProperty("errors", out _));
+                                    var access = accessResult.GetProperty("data").GetProperty("gameAdministrationAccess");
+                                    Assert.False(access.GetProperty("isRootAdministrator").GetBoolean());
+                                    Assert.True(access.GetProperty("hasGlobalAdminRole").GetBoolean());
+                                    Assert.True(access.GetProperty("canAccessEveryGameDashboard").GetBoolean());
+
+                                    var grantsResult = await GraphQlAsync("""
+                                        query Grants($input: GetGlobalGameAdminGrantsInput!) {
+                                          globalGameAdminGrants(input: $input) {
+                                            email
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                requesterEmail = "root@example.com",
+                                            }
+                                        });
+
+                                    Assert.False(grantsResult.TryGetProperty("errors", out _));
+                                    Assert.Contains(
+                                        grantsResult.GetProperty("data").GetProperty("globalGameAdminGrants").EnumerateArray(),
+                                        item => item.GetProperty("email").GetString() == "global-admin@example.com");
+                                }
+
+                                [Fact]
+                                public async Task AssignGlobalGameAdmin_NonRootAdministrator_ReturnsError()
+                                {
+                                    var result = await GraphQlAsync("""
+                                        mutation Assign($input: GlobalGameAdminGrantInput!) {
+                                          assignGlobalGameAdmin(input: $input) {
+                                            email
+                                          }
+                                        }
+                                        """,
+                                        new
+                                        {
+                                            input = new
+                                            {
+                                                registrationKey = "test-registration-key",
+                                                serverKey = "capitalism-local",
+                                                requesterEmail = "local-admin@example.com",
+                                                targetEmail = "global-admin@example.com",
+                                            }
+                                        });
+
+                                    Assert.True(result.TryGetProperty("errors", out var errors));
+                                    Assert.Contains("ROOT_ADMIN_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+                                }
+
     #endregion
 
     #region Subscription status flow

@@ -220,6 +220,7 @@ export const useAuthStore = defineStore('auth', () => {
     initFromStorage,
     register,
     login,
+    applyAuthPayload: setSession,
     fetchMe,
     switchAccountContext,
     logout,
