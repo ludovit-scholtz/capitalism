@@ -14,10 +14,20 @@ namespace Api.Types;
 /// <summary>
 /// GraphQL query type for the Capitalism V game.
 /// Provides read access to game data including players, cities, resources, products, and buildings.
+/// Split across multiple partial files, one per domain:
+/// <list type="bullet">
+/// <item><see cref="Query"/> (this file) — auth, admin, news, stock exchange, world, resources, products</item>
+/// <item><c>Query.Building.cs</c> — building inventory, operational status, analytics, ledger</item>
+/// <item><c>Query.Chat.cs</c> — in-game chat feed</item>
+/// <item><c>Query.Rankings.cs</c> — player/company rankings and game state</item>
+/// <item><c>Query.Lending.cs</c> — bank loan offers and player loans</item>
+/// </list>
 /// </summary>
-public sealed class Query
+public sealed partial class Query
 {
     private const int MaxRecentStockPriceHistoryPoints = 12;
+    private const int DefaultChatMessageLimit = 50;
+    private const int MaxChatMessageLimit = 100;
 
     /// <summary>Returns the currently authenticated player's profile.</summary>
     [Authorize]
@@ -1291,6 +1301,7 @@ public sealed class Query
             .ThenBy(l => l.PricePerUnit)
             .ToList();
     }
+
 
     /// <summary>
     /// Returns city-level global exchange offers for raw materials, including
@@ -3792,6 +3803,19 @@ public sealed class GlobalExchangeProductListing
 
     /// <summary>When this order was created.</summary>
     public DateTime CreatedAtUtc { get; set; }
+}
+
+/// <summary>
+/// A single line in the shared in-game chat feed.
+/// </summary>
+public sealed class InGameChatMessage
+{
+    public Guid Id { get; set; }
+    public Guid PlayerId { get; set; }
+    public string PlayerDisplayName { get; set; } = string.Empty;
+    public string Message { get; set; } = string.Empty;
+    public DateTime SentAtUtc { get; set; }
+    public bool IsOwnMessage { get; set; }
 }
 
 /// <summary>Inventory fill information for a single building unit.</summary>
