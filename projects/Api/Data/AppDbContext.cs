@@ -21,6 +21,9 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Annual dividend settlement records.</summary>
     public DbSet<DividendPayment> DividendPayments => Set<DividendPayment>();
 
+    /// <summary>Quoted share-price history recorded for the stock exchange.</summary>
+    public DbSet<SharePriceHistoryEntry> SharePriceHistoryEntries => Set<SharePriceHistoryEntry>();
+
     /// <summary>Per-city salary settings selected by company owners.</summary>
     public DbSet<CompanyCitySalarySetting> CompanyCitySalarySettings => Set<CompanyCitySalarySetting>();
 
@@ -90,6 +93,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     /// <summary>Audit trail for administrator actions performed while impersonating players.</summary>
     public DbSet<AdminActionAuditLog> AdminActionAuditLogs => Set<AdminActionAuditLog>();
 
+    /// <summary>Shared in-game chat messages authored by players.</summary>
+    public DbSet<ChatMessage> ChatMessages => Set<ChatMessage>();
+
+    /// <summary>Records stock-exchange buy/sell executions from the player's personal account.</summary>
+    public DbSet<PersonTradeRecord> PersonTradeRecords => Set<PersonTradeRecord>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -108,6 +117,32 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             e.Property(p => p.OnboardingCurrentStep).HasMaxLength(40);
             e.Property(p => p.OnboardingIndustry).HasMaxLength(50);
             e.Property(p => p.ConcurrencyToken).IsConcurrencyToken();
+        });
+
+        // ChatMessage
+        modelBuilder.Entity<ChatMessage>(e =>
+        {
+            e.HasKey(message => message.Id);
+            e.Property(message => message.Message).HasMaxLength(300);
+            e.HasOne(message => message.Player)
+                .WithMany()
+                .HasForeignKey(message => message.PlayerId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(message => message.SentAtUtc);
+        });
+
+        // PersonTradeRecord
+        modelBuilder.Entity<PersonTradeRecord>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Direction).HasMaxLength(4);
+            e.Property(t => t.ShareCount).HasPrecision(18, 4);
+            e.Property(t => t.PricePerShare).HasPrecision(18, 4);
+            e.Property(t => t.TotalValue).HasPrecision(18, 4);
+            e.HasOne(t => t.Player).WithMany().HasForeignKey(t => t.PlayerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(t => t.Company).WithMany().HasForeignKey(t => t.CompanyId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => t.PlayerId);
+            e.HasIndex(t => t.RecordedAtTick);
         });
 
         // Company
@@ -168,6 +203,18 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(payment => new { payment.CompanyId, payment.GameYear });
             e.HasIndex(payment => new { payment.RecipientPlayerId, payment.RecordedAtTick });
+        });
+
+        // SharePriceHistoryEntry
+        modelBuilder.Entity<SharePriceHistoryEntry>(e =>
+        {
+            e.HasKey(entry => entry.Id);
+            e.Property(entry => entry.SharePrice).HasPrecision(18, 4);
+            e.HasOne(entry => entry.Company)
+                .WithMany()
+                .HasForeignKey(entry => entry.CompanyId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(entry => new { entry.CompanyId, entry.RecordedAtTick, entry.RecordedAtUtc });
         });
 
         // CompanyCitySalarySetting

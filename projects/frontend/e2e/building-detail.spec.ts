@@ -10353,7 +10353,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     return player
   }
 
-  test('sales shop unit picker shows exactly PURCHASE, MARKETING, STORAGE, and PUBLIC_SALES options', async ({ page }) => {
+  test('sales shop unit picker shows PURCHASE, MARKETING, STORAGE, and PUBLIC_SALES options', async ({ page }) => {
     const player = makeEmptySalesShopForPicker()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -10387,6 +10387,38 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await expect(page.locator('.picker-option').filter({ hasText: 'Manufacturing' })).toHaveCount(0)
     await expect(page.locator('.picker-option').filter({ hasText: 'Mining' })).toHaveCount(0)
     await expect(page.locator('.picker-option').filter({ hasText: 'B2B Sales' })).toHaveCount(0)
+  })
+
+  test('player adds STORAGE unit to empty sales shop and sees it in the planned grid', async ({ page }) => {
+    const player = makeEmptySalesShopForPicker()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-shop-picker')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(plannedSection).toBeVisible()
+
+    const emptyCell = plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await emptyCell.click()
+    await expect(page.getByText('Select a unit type to place')).toBeVisible()
+
+    const storageOption = page.locator('.picker-option').filter({ hasText: 'Storage' })
+    await expect(storageOption).toBeVisible()
+    await storageOption.click()
+
+    await expect(plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)).toContainText(
+      'Storage',
+    )
   })
 
   test('player adds MARKETING unit to empty sales shop and sees it in the planned grid', async ({ page }) => {

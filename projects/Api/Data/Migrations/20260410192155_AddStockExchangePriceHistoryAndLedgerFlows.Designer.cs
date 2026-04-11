@@ -3,6 +3,7 @@ using System;
 using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260410192155_AddStockExchangePriceHistoryAndLedgerFlows")]
+    partial class AddStockExchangePriceHistoryAndLedgerFlows
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.5");
@@ -642,32 +645,6 @@ namespace Api.Data.Migrations
                     b.ToTable("BuildingUnitResourceHistories");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.ChatMessage", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Message")
-                        .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("PlayerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("SentAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("PlayerId");
-
-                    b.HasIndex("SentAtUtc");
-
-                    b.ToTable("ChatMessages");
-                });
-
             modelBuilder.Entity("Api.Data.Entities.City", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1192,52 +1169,6 @@ namespace Api.Data.Migrations
                     b.ToTable("MarketTrendStates");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.PersonTradeRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("CompanyId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Direction")
-                        .IsRequired()
-                        .HasMaxLength(4)
-                        .HasColumnType("TEXT");
-
-                    b.Property<Guid>("PlayerId")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("PricePerShare")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.Property<long>("RecordedAtTick")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("RecordedAtUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("ShareCount")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("TotalValue")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CompanyId");
-
-                    b.HasIndex("PlayerId");
-
-                    b.HasIndex("RecordedAtTick");
-
-                    b.ToTable("PersonTradeRecords");
-                });
-
             modelBuilder.Entity("Api.Data.Entities.Player", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1750,17 +1681,6 @@ namespace Api.Data.Migrations
                     b.Navigation("ResourceType");
                 });
 
-            modelBuilder.Entity("Api.Data.Entities.ChatMessage", b =>
-                {
-                    b.HasOne("Api.Data.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Player");
-                });
-
             modelBuilder.Entity("Api.Data.Entities.CityResource", b =>
                 {
                     b.HasOne("Api.Data.Entities.City", "City")
@@ -1975,25 +1895,6 @@ namespace Api.Data.Migrations
                     b.Navigation("BankBuilding");
 
                     b.Navigation("LenderCompany");
-                });
-
-            modelBuilder.Entity("Api.Data.Entities.PersonTradeRecord", b =>
-                {
-                    b.HasOne("Api.Data.Entities.Company", "Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Api.Data.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Company");
-
-                    b.Navigation("Player");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.ProductRecipe", b =>

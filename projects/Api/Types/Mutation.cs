@@ -18,8 +18,14 @@ namespace Api.Types;
 /// <summary>
 /// GraphQL mutation type for the Capitalism V game.
 /// Handles authentication, company management, building placement, and onboarding.
+/// Split across multiple partial files, one per domain:
+/// <list type="bullet">
+/// <item><see cref="Mutation"/> (this file) — auth, admin, news, company, onboarding, stock exchange, building</item>
+/// <item><c>Mutation.Chat.cs</c> — in-game chat</item>
+/// <item><c>Mutation.Lending.cs</c> — bank loan publishing, updating, and accepting</item>
+/// </list>
 /// </summary>
-public sealed class Mutation
+public sealed partial class Mutation
 {
     private const decimal StarterFounderContribution = 50_000m;
     private const decimal DefaultDividendPayoutRatio = 0.2m;
@@ -1072,6 +1078,189 @@ public sealed class Mutation
         };
     }
 
+    /// <summary>
+    /// Merges a target company (where the player holds ≥90% combined ownership) into a destination
+    /// company that the player directly controls. All buildings, lots, cash, and owned shareholdings
+    /// are transferred to the destination company. Taxes are settled for the target company at the
+    /// time of merge. The target company is then permanently closed.
+    /// </summary>
+    [Authorize]
+    public async Task<MergeCompanyResult> MergeCompany(
+        MergeCompanyInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var companies = await db.Companies.ToListAsync();
+
+        var targetCompany = companies.FirstOrDefault(c => c.Id == input.TargetCompanyId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Target company not found.")
+                    .SetCode("COMPANY_NOT_FOUND")
+                    .Build());
+
+        var destinationCompany = companies.FirstOrDefault(c => c.Id == input.DestinationCompanyId)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Destination company not found.")
+                    .SetCode("DESTINATION_COMPANY_NOT_FOUND")
+                    .Build());
+
+        if (destinationCompany.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You must directly control the destination company.")
+                    .SetCode("DESTINATION_NOT_CONTROLLED")
+                    .Build());
+        }
+
+        if (targetCompany.Id == destinationCompany.Id)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Target and destination companies must be different.")
+                    .SetCode("SAME_COMPANY")
+                    .Build());
+        }
+
+        var shareholdings = await db.Shareholdings
+            .Where(h => h.CompanyId == targetCompany.Id)
+            .ToListAsync();
+
+        var combinedRatio = ComputeControlledOwnershipRatio(userId, targetCompany, companies, shareholdings);
+        if (combinedRatio < 0.9m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"You need at least 90% combined ownership to merge this company. Current: {combinedRatio:P1}")
+                    .SetCode("INSUFFICIENT_OWNERSHIP_FOR_MERGE")
+                    .Build());
+        }
+
+        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var currentTick = gameState?.CurrentTick ?? 0L;
+
+        // Settle taxes for the target company at merge time
+        var taxableEntries = await db.LedgerEntries
+            .Where(e => e.CompanyId == targetCompany.Id)
+            .ToListAsync();
+        var taxableIncome = LedgerCalculator.ComputeTaxableIncome(taxableEntries);
+        var taxRate = gameState?.TaxRate ?? 0m;
+        if (taxableIncome > 0m && taxRate > 0m)
+        {
+            var taxAmount = decimal.Round(taxableIncome * taxRate, 2, MidpointRounding.AwayFromZero);
+            targetCompany.Cash -= taxAmount;
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = targetCompany.Id,
+                Category = LedgerCategory.Tax,
+                Description = $"Merger settlement tax",
+                Amount = -taxAmount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        }
+
+        // Transfer buildings
+        var buildings = await db.Buildings
+            .Where(b => b.CompanyId == targetCompany.Id)
+            .ToListAsync();
+        foreach (var building in buildings)
+        {
+            building.CompanyId = destinationCompany.Id;
+        }
+
+        // Transfer building lots
+        var lots = await db.BuildingLots
+            .Where(l => l.OwnerCompanyId == targetCompany.Id)
+            .ToListAsync();
+        foreach (var lot in lots)
+        {
+            lot.OwnerCompanyId = destinationCompany.Id;
+        }
+
+        // Transfer shareholdings owned BY the target company
+        var ownedShareholdings = await db.Shareholdings
+            .Where(h => h.OwnerCompanyId == targetCompany.Id)
+            .ToListAsync();
+        foreach (var holding in ownedShareholdings)
+        {
+            // Merge with existing holding in destination if present
+            var existingHolding = await db.Shareholdings.FirstOrDefaultAsync(h =>
+                h.CompanyId == holding.CompanyId && h.OwnerCompanyId == destinationCompany.Id);
+            if (existingHolding is not null)
+            {
+                existingHolding.ShareCount += holding.ShareCount;
+                db.Shareholdings.Remove(holding);
+            }
+            else
+            {
+                holding.OwnerCompanyId = destinationCompany.Id;
+            }
+        }
+
+        // Transfer target company's remaining cash to destination
+        var cashTransferred = Math.Max(targetCompany.Cash, 0m);
+        destinationCompany.Cash += cashTransferred;
+
+        // Record the merger as a ledger entry on destination
+        if (cashTransferred > 0m)
+        {
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = destinationCompany.Id,
+                Category = LedgerCategory.Other,
+                Description = $"Merger: cash received from {targetCompany.Name}",
+                Amount = cashTransferred,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        }
+
+        var buildingsTransferred = buildings.Count;
+        var absorbedName = targetCompany.Name;
+
+        // Remove all shareholdings IN the target company (shares become worthless)
+        var targetShareholdings = await db.Shareholdings
+            .Where(h => h.CompanyId == targetCompany.Id)
+            .ToListAsync();
+        db.Shareholdings.RemoveRange(targetShareholdings);
+
+        // Remove salary settings and any pending player active-company references
+        var salarySettings = await db.CompanyCitySalarySettings
+            .Where(s => s.CompanyId == targetCompany.Id)
+            .ToListAsync();
+        db.CompanyCitySalarySettings.RemoveRange(salarySettings);
+
+        // If any player is currently scoped to the target company, switch them back to person
+        var affectedPlayers = await db.Players
+            .Where(p => p.ActiveCompanyId == targetCompany.Id)
+            .ToListAsync();
+        foreach (var p in affectedPlayers)
+        {
+            p.ActiveAccountType = AccountContextType.Person;
+            p.ActiveCompanyId = null;
+        }
+
+        db.Companies.Remove(targetCompany);
+
+        await db.SaveChangesAsync();
+
+        return new MergeCompanyResult
+        {
+            DestinationCompanyId = destinationCompany.Id,
+            DestinationCompanyName = destinationCompany.Name,
+            AbsorbedCompanyName = absorbedName,
+            CashTransferred = cashTransferred,
+            BuildingsTransferred = buildingsTransferred,
+        };
+    }
+
     /// <summary>Purchases shares from public investors using either the personal account or the selected company account.</summary>
     [Authorize]
     public async Task<ShareTradeResult> BuyShares(
@@ -1121,6 +1310,7 @@ public sealed class Mutation
         var sharePrice = sharePrices.GetValueOrDefault(targetCompany.Id);
         var askPrice = SharePriceCalculator.ComputeAskPrice(sharePrice);
         var totalValue = decimal.Round(askPrice * shareCount, 4, MidpointRounding.AwayFromZero);
+        var currentTick = await GetCurrentTickAsync(db);
 
         if (account.Company is null)
         {
@@ -1134,6 +1324,18 @@ public sealed class Mutation
             }
 
             player.PersonalCash -= totalValue;
+            db.PersonTradeRecords.Add(new PersonTradeRecord
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                CompanyId = targetCompany.Id,
+                Direction = TradeDirection.Buy,
+                ShareCount = shareCount,
+                PricePerShare = askPrice,
+                TotalValue = totalValue,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
         }
         else
         {
@@ -1147,10 +1349,20 @@ public sealed class Mutation
             }
 
             account.Company.Cash -= totalValue;
+            AddCompanyLedgerEntry(
+                db,
+                account.Company,
+                LedgerCategory.StockPurchase,
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Bought {shareCount:0.####} shares in {targetCompany.Name} @ {askPrice:0.00}"),
+                -totalValue,
+                currentTick);
 
             if (account.Company.Id == targetCompany.Id)
             {
                 targetCompany.TotalSharesIssued = Math.Max(0m, decimal.Round(targetCompany.TotalSharesIssued - shareCount, 4, MidpointRounding.AwayFromZero));
+                await RecordSharePriceHistoryAsync(db, targetCompany.Id, askPrice, currentTick);
                 await db.SaveChangesAsync();
 
                 return new ShareTradeResult
@@ -1179,6 +1391,7 @@ public sealed class Mutation
             account.Company?.Id);
         holding.ShareCount = decimal.Round(holding.ShareCount + shareCount, 4, MidpointRounding.AwayFromZero);
 
+        await RecordSharePriceHistoryAsync(db, targetCompany.Id, askPrice, currentTick);
         await db.SaveChangesAsync();
 
         return new ShareTradeResult
@@ -1251,6 +1464,7 @@ public sealed class Mutation
         var sharePrice = sharePrices.GetValueOrDefault(targetCompany.Id);
         var bidPrice = SharePriceCalculator.ComputeBidPrice(sharePrice);
         var totalValue = decimal.Round(bidPrice * shareCount, 4, MidpointRounding.AwayFromZero);
+        var currentTick = await GetCurrentTickAsync(db);
 
         holding.ShareCount = decimal.Round(holding.ShareCount - shareCount, 4, MidpointRounding.AwayFromZero);
         if (holding.ShareCount <= 0m)
@@ -1262,12 +1476,34 @@ public sealed class Mutation
         if (account.Company is null)
         {
             player.PersonalCash += totalValue;
+            db.PersonTradeRecords.Add(new PersonTradeRecord
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                CompanyId = targetCompany.Id,
+                Direction = TradeDirection.Sell,
+                ShareCount = shareCount,
+                PricePerShare = bidPrice,
+                TotalValue = totalValue,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
         }
         else
         {
             account.Company.Cash += totalValue;
+            AddCompanyLedgerEntry(
+                db,
+                account.Company,
+                LedgerCategory.StockSale,
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"Sold {shareCount:0.####} shares in {targetCompany.Name} @ {bidPrice:0.00}"),
+                totalValue,
+                currentTick);
         }
 
+        await RecordSharePriceHistoryAsync(db, targetCompany.Id, bidPrice, currentTick);
         await db.SaveChangesAsync();
 
         return new ShareTradeResult
@@ -1317,6 +1553,57 @@ public sealed class Mutation
         var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, lots, inventories);
         var sharePrices = SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
         return (companies, shareholdings, sharePrices);
+    }
+
+    private static async Task<long> GetCurrentTickAsync(AppDbContext db)
+    {
+        return await db.GameStates
+            .Select(gameState => (long?)gameState.CurrentTick)
+            .FirstOrDefaultAsync() ?? 0L;
+    }
+
+    private static void AddCompanyLedgerEntry(
+        AppDbContext db,
+        Company company,
+        string category,
+        string description,
+        decimal amount,
+        long currentTick)
+    {
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            Category = category,
+            Description = description,
+            Amount = amount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+    }
+
+    private static async Task RecordSharePriceHistoryAsync(AppDbContext db, Guid companyId, decimal sharePrice, long currentTick)
+    {
+        var latestEntryForTick = await db.SharePriceHistoryEntries
+            .Where(entry => entry.CompanyId == companyId && entry.RecordedAtTick == currentTick)
+            .OrderByDescending(entry => entry.RecordedAtUtc)
+            .FirstOrDefaultAsync();
+
+        if (latestEntryForTick is null)
+        {
+            db.SharePriceHistoryEntries.Add(new SharePriceHistoryEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                SharePrice = sharePrice,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+            return;
+        }
+
+        latestEntryForTick.SharePrice = sharePrice;
+        latestEntryForTick.RecordedAtUtc = DateTime.UtcNow;
     }
 
     private static async Task<ActiveTradingAccount> ResolveRequestedTradingAccountAsync(
@@ -1774,6 +2061,11 @@ public sealed class Mutation
             .Select(u => u.ProductTypeId!.Value)
             .ToHashSet();
 
+        var purchaseProductIds = submittedUnits
+            .Where(u => u.UnitType == "PURCHASE" && u.ProductTypeId.HasValue)
+            .Select(u => u.ProductTypeId!.Value)
+            .ToHashSet();
+
         // Gather product IDs configured on STORAGE units in this plan.
         var storageProductIds = submittedUnits
             .Where(u => u.UnitType == "STORAGE" && u.ProductTypeId.HasValue)
@@ -1787,22 +2079,25 @@ public sealed class Mutation
 
         if (storageUnitsWithProduct.Count > 0)
         {
-            // Allowed products for STORAGE = MFG products in plan + current inventory.
+            // Allowed products for STORAGE = MFG products in plan + purchase products
+            // in plan + current inventory. This lets Sales Shops buffer purchased
+            // products before routing them to Public Sales.
             var inventoryProductIds = await db.Inventories
                 .Where(i => i.BuildingId == buildingId && i.ProductTypeId.HasValue && i.Quantity > 0)
                 .Select(i => i.ProductTypeId!.Value)
                 .Distinct()
                 .ToHashSetAsync();
+            var allowedProductIds = mfgProductIds.Union(purchaseProductIds).Union(inventoryProductIds).ToHashSet();
 
             foreach (var unit in storageUnitsWithProduct)
             {
                 var pid = unit.ProductTypeId!.Value;
-                if (!mfgProductIds.Contains(pid) && !inventoryProductIds.Contains(pid))
+                if (!allowedProductIds.Contains(pid))
                 {
                     throw new GraphQLException(
                         ErrorBuilder.New()
                             .SetMessage(
-                                "A STORAGE unit's product must match a MANUFACTURING unit in this configuration or be present in the building's current inventory.")
+                                "A STORAGE unit's product must match a MANUFACTURING or PURCHASE unit in this configuration or be present in the building's current inventory.")
                             .SetCode("STORAGE_PRODUCT_NOT_REACHABLE")
                             .Build());
                 }

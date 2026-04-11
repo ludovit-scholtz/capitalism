@@ -259,6 +259,27 @@ export interface GlobalExchangeProductListing {
   createdAtUtc: string
 }
 
+export interface GlobalExchangeProductQuote {
+  productTypeId: string
+  productName: string
+  productSlug: string
+  productIndustry: string
+  unitSymbol: string
+  basePrice: number
+  bidPricePerUnit: number
+  offerPricePerUnit: number
+  estimatedQuality: number
+}
+
+export interface InGameChatMessage {
+  id: string
+  playerId: string
+  playerDisplayName: string
+  message: string
+  sentAtUtc: string
+  isOwnMessage: boolean
+}
+
 /** Matches backend ApplicationUser entity */
 export interface User {
   id: string
@@ -458,6 +479,18 @@ export interface DividendPayment {
   description: string
 }
 
+export interface PersonTradeRecord {
+  id: string
+  companyId: string
+  companyName: string
+  direction: 'BUY' | 'SELL'
+  shareCount: number
+  pricePerShare: number
+  totalValue: number
+  recordedAtTick: number
+  recordedAtUtc: string
+}
+
 export interface PersonAccount {
   playerId: string
   displayName: string
@@ -466,6 +499,7 @@ export interface PersonAccount {
   activeCompanyId: string | null
   shareholdings: PortfolioHolding[]
   dividendPayments: DividendPayment[]
+  stockTrades: PersonTradeRecord[]
 }
 
 export interface StockExchangeListing {
@@ -482,6 +516,22 @@ export interface StockExchangeListing {
   controlledCompanyOwnedShares: number
   combinedControlledOwnershipRatio: number
   canClaimControl: boolean
+  canMerge: boolean
+}
+
+export interface MergeCompanyResult {
+  destinationCompanyId: string
+  destinationCompanyName: string
+  absorbedCompanyName: string
+  cashTransferred: number
+  buildingsTransferred: number
+}
+
+export interface StockExchangePriceHistoryPoint {
+  companyId: string
+  tick: number
+  price: number
+  recordedAtUtc: string
 }
 
 export interface ShareTradeResult {
@@ -614,6 +664,8 @@ export interface CompanyLedgerSummary {
   inventoryValue: number
   totalAssets: number
   totalPropertyPurchases: number
+  totalStockPurchaseCashOut: number
+  totalStockSaleCashIn: number
   cashFromOperations: number
   cashFromInvestments: number
   firstRecordedTick: number

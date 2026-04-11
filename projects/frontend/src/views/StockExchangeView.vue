@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
@@ -7,7 +7,13 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useGameStateStore } from '@/stores/gameState'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
-import type { PersonAccount, ShareTradeResult, StockExchangeListing } from '@/types'
+import type {
+  MergeCompanyResult,
+  PersonAccount,
+  ShareTradeResult,
+  StockExchangeListing,
+  StockExchangePriceHistoryPoint,
+} from '@/types'
 
 type ControlledCompanyAccount = {
   id: string
@@ -15,7 +21,7 @@ type ControlledCompanyAccount = {
   cash: number | null
 }
 
-type SortField = 'name' | 'price' | 'marketValue' | 'ownership'
+type SortField = 'name' | 'price' | 'marketValue' | 'ownership' | 'dividend'
 type SortDir = 'asc' | 'desc'
 
 const { t, locale } = useI18n()
@@ -35,14 +41,26 @@ const quantityByCompany = ref<Record<string, number>>({})
 const errorByCompany = ref<Record<string, string | null>>({})
 const successByCompany = ref<Record<string, string | null>>({})
 const expandedCompany = ref<string | null>(null)
+const priceHistoryByCompany = ref<Record<string, StockExchangePriceHistoryPoint[]>>({})
+const priceHistoryLoadingByCompany = ref<Record<string, boolean>>({})
+const priceHistoryErrorByCompany = ref<Record<string, string | null>>({})
 
 // Per-listing trade account selection: "PERSON" or "COMPANY:<id>"
 const tradeAccountByCompany = ref<Record<string, string>>({})
+
+// Merge dialog state
+const mergeDialogCompanyId = ref<string | null>(null)
+const mergeDestinationCompanyId = ref<string>('')
+const mergeLoading = ref(false)
+const mergeError = ref<string | null>(null)
+const mergeSuccess = ref<MergeCompanyResult | null>(null)
 
 // Sort and filter state
 const filterText = ref('')
 const sortField = ref<SortField>('marketValue')
 const sortDir = ref<SortDir>('desc')
+const currentPage = ref(1)
+const pageSize = 10
 
 const PERSON_ACCOUNT_QUERY = `
   query PersonAccount {
@@ -72,6 +90,17 @@ const PERSON_ACCOUNT_QUERY = `
         recordedAtUtc
         description
       }
+      stockTrades {
+        id
+        companyId
+        companyName
+        direction
+        shareCount
+        pricePerShare
+        totalValue
+        recordedAtTick
+        recordedAtUtc
+      }
     }
   }
 `
@@ -92,6 +121,7 @@ const LISTINGS_QUERY = `
       controlledCompanyOwnedShares
       combinedControlledOwnershipRatio
       canClaimControl
+      canMerge
     }
   }
 `
@@ -130,6 +160,29 @@ const SELL_MUTATION = `
       publicFloatShares
       personalCash
       companyCash
+    }
+  }
+`
+
+const PRICE_HISTORY_QUERY = `
+  query StockExchangePriceHistory($companyId: UUID!) {
+    stockExchangePriceHistory(companyId: $companyId) {
+      companyId
+      tick
+      price
+      recordedAtUtc
+    }
+  }
+`
+
+const MERGE_MUTATION = `
+  mutation MergeCompany($input: MergeCompanyInput!) {
+    mergeCompany(input: $input) {
+      destinationCompanyId
+      destinationCompanyName
+      absorbedCompanyName
+      cashTransferred
+      buildingsTransferred
     }
   }
 `
@@ -184,9 +237,28 @@ const filteredAndSortedListings = computed(() => {
       cmp = a.marketValue - b.marketValue
     } else if (sortField.value === 'ownership') {
       cmp = a.combinedControlledOwnershipRatio - b.combinedControlledOwnershipRatio
+    } else if (sortField.value === 'dividend') {
+      cmp = a.dividendPayoutRatio - b.dividendPayoutRatio
     }
     return sortDir.value === 'asc' ? cmp : -cmp
   })
+})
+
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredAndSortedListings.value.length / pageSize)))
+
+const paginatedListings = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredAndSortedListings.value.slice(start, start + pageSize)
+})
+
+watch([filterText, sortField, sortDir], () => {
+  currentPage.value = 1
+})
+
+watch(totalPages, (value) => {
+  if (currentPage.value > value) {
+    currentPage.value = value
+  }
 })
 
 function toggleSort(field: SortField) {
@@ -231,6 +303,14 @@ function updateQuantity(companyId: string, value: number) {
   quantityByCompany.value[companyId] = Math.max(Math.floor(Number.isFinite(value) ? value : 0), 1)
 }
 
+function estimatedBuyCost(listing: StockExchangeListing): number {
+  return getQuantity(listing.companyId) * listing.askPrice
+}
+
+function estimatedSellProceeds(listing: StockExchangeListing): number {
+  return getQuantity(listing.companyId) * listing.bidPrice
+}
+
 function resolveTradeAccount(companyId: string): { tradeAccountType: string; tradeAccountCompanyId: string | null } {
   const selected = tradeAccountByCompany.value[companyId] ?? 'PERSON'
   if (selected === 'PERSON') {
@@ -241,10 +321,30 @@ function resolveTradeAccount(companyId: string): { tradeAccountType: string; tra
   return { tradeAccountType: 'COMPANY', tradeAccountCompanyId: id }
 }
 
-function toggleTradePanel(companyId: string) {
+async function loadPriceHistory(companyId: string) {
+  priceHistoryLoadingByCompany.value[companyId] = true
+  priceHistoryErrorByCompany.value[companyId] = null
+
+  try {
+    const data = await gqlRequest<{ stockExchangePriceHistory: StockExchangePriceHistoryPoint[] }>(PRICE_HISTORY_QUERY, {
+      companyId,
+    })
+    priceHistoryByCompany.value[companyId] = data.stockExchangePriceHistory
+  } catch (reason: unknown) {
+    priceHistoryErrorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.historyLoadFailed')
+  } finally {
+    priceHistoryLoadingByCompany.value[companyId] = false
+  }
+}
+
+async function toggleTradePanel(companyId: string) {
   expandedCompany.value = expandedCompany.value === companyId ? null : companyId
   errorByCompany.value[companyId] = null
   successByCompany.value[companyId] = null
+
+  if (expandedCompany.value === companyId && !priceHistoryByCompany.value[companyId]) {
+    await loadPriceHistory(companyId)
+  }
 }
 
 async function loadData(isRefresh = false) {
@@ -352,6 +452,43 @@ async function executeTrade(kind: 'buy' | 'sell', companyId: string) {
     errorByCompany.value[companyId] = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
   } finally {
     actionLoadingKey.value = null
+  }
+}
+
+function openMergeDialog(companyId: string) {
+  mergeDialogCompanyId.value = companyId
+  mergeDestinationCompanyId.value = controlledCompanies.value[0]?.id ?? ''
+  mergeError.value = null
+  mergeSuccess.value = null
+}
+
+function closeMergeDialog() {
+  mergeDialogCompanyId.value = null
+  mergeError.value = null
+  mergeSuccess.value = null
+}
+
+async function executeMerge() {
+  const targetCompanyId = mergeDialogCompanyId.value
+  if (!targetCompanyId || !mergeDestinationCompanyId.value) return
+
+  mergeLoading.value = true
+  mergeError.value = null
+  mergeSuccess.value = null
+
+  try {
+    const data = await gqlRequest<{ mergeCompany: MergeCompanyResult }>(MERGE_MUTATION, {
+      input: {
+        targetCompanyId,
+        destinationCompanyId: mergeDestinationCompanyId.value,
+      },
+    })
+    mergeSuccess.value = data.mergeCompany
+    await Promise.all([loadData(true), auth.fetchMe()])
+  } catch (reason: unknown) {
+    mergeError.value = reason instanceof Error ? reason.message : t('stockExchange.actionFailed')
+  } finally {
+    mergeLoading.value = false
   }
 }
 
@@ -486,11 +623,16 @@ useTickRefresh(async () => {
                       {{ t('stockExchange.controlRatio') }} <span aria-hidden="true">{{ sortIcon('ownership') }}</span>
                     </button>
                   </th>
+                  <th>
+                    <button class="sort-btn" @click="toggleSort('dividend')">
+                      {{ t('stockExchange.dividendPayout') }} <span aria-hidden="true">{{ sortIcon('dividend') }}</span>
+                    </button>
+                  </th>
                   <th v-if="personAccount">{{ t('stockExchange.actions') }}</th>
                 </tr>
               </thead>
               <tbody>
-                <template v-for="listing in filteredAndSortedListings" :key="listing.companyId">
+                <template v-for="listing in paginatedListings" :key="listing.companyId">
                   <tr
                     class="listing-row"
                     :class="{ 'listing-row--expanded': expandedCompany === listing.companyId }"
@@ -501,6 +643,10 @@ useTickRefresh(async () => {
                         v-if="listing.canClaimControl && !isControlledCompany(listing.companyId)"
                         class="listing-chip listing-chip--control"
                       >{{ t('stockExchange.controlReady') }}</span>
+                      <span
+                        v-if="listing.canMerge"
+                        class="listing-chip listing-chip--merge"
+                      >{{ t('stockExchange.mergeReady') }}</span>
                       <span
                         v-else-if="listing.playerOwnedShares + listing.controlledCompanyOwnedShares > 0"
                         class="listing-chip listing-chip--owned"
@@ -519,13 +665,16 @@ useTickRefresh(async () => {
                     <td>
                       <div class="ownership-cell">
                         <span>{{ formatPercent(listing.combinedControlledOwnershipRatio) }}</span>
-                        <span
-                          v-if="listing.playerOwnedShares + listing.controlledCompanyOwnedShares > 0"
-                          class="owned-shares-hint"
-                        >
-                          ({{ formatShares(listing.playerOwnedShares + listing.controlledCompanyOwnedShares) }} {{ t('stockExchange.shares') }})
+                        <span v-if="listing.playerOwnedShares > 0" class="owned-shares-hint">
+                          {{ t('stockExchange.personalShares', { shares: formatShares(listing.playerOwnedShares) }) }}
+                        </span>
+                        <span v-if="listing.controlledCompanyOwnedShares > 0" class="owned-shares-hint">
+                          {{ t('stockExchange.controlledCompanyShares', { shares: formatShares(listing.controlledCompanyOwnedShares) }) }}
                         </span>
                       </div>
+                    </td>
+                    <td class="dividend-cell">
+                      <span class="dividend-badge">{{ formatPercent(listing.dividendPayoutRatio) }}</span>
                     </td>
                     <td v-if="personAccount" class="actions-cell">
                       <button
@@ -543,12 +692,39 @@ useTickRefresh(async () => {
                       >
                         {{ t('stockExchange.claimControl') }}
                       </button>
+                      <button
+                        v-if="listing.canMerge"
+                        class="btn btn-warning btn-sm"
+                        @click="openMergeDialog(listing.companyId)"
+                      >
+                        {{ t('stockExchange.mergeCompany') }}
+                      </button>
                     </td>
                   </tr>
 
                   <tr v-if="expandedCompany === listing.companyId" class="trade-panel-row">
-                    <td :colspan="personAccount ? 6 : 5">
+                    <td :colspan="personAccount ? 7 : 6">
                       <div class="trade-panel">
+                        <div class="company-snapshot">
+                          <dl class="snapshot-grid">
+                            <div class="snapshot-item">
+                              <dt>{{ t('stockExchange.totalSharesLabel') }}</dt>
+                              <dd>{{ formatShares(listing.totalSharesIssued) }}</dd>
+                            </div>
+                            <div class="snapshot-item">
+                              <dt>{{ t('stockExchange.publicFloatLabel') }}</dt>
+                              <dd>
+                                {{ formatShares(listing.publicFloatShares) }}
+                                <span class="snapshot-pct">({{ formatPercent(listing.publicFloatShares / listing.totalSharesIssued) }})</span>
+                              </dd>
+                            </div>
+                            <div class="snapshot-item">
+                              <dt>{{ t('stockExchange.dividendPayoutLabel') }}</dt>
+                              <dd>{{ formatPercent(listing.dividendPayoutRatio) }}</dd>
+                            </div>
+                          </dl>
+                        </div>
+
                         <div class="trade-price-context">
                           <div class="trade-price-item">
                             <span class="trade-price-label">{{ t('stockExchange.askPriceLabel') }}</span>
@@ -583,35 +759,47 @@ useTickRefresh(async () => {
                             </select>
                           </label>
 
-                          <label class="trade-field">
-                            <span>{{ t('stockExchange.quantity') }}</span>
-                            <input
-                              :value="quantityByCompany[listing.companyId] ?? 100"
-                              type="number"
-                              min="1"
-                              step="1"
-                              class="trade-input"
-                              :aria-label="`${t('stockExchange.quantity')} ${listing.companyName}`"
-                              @input="updateQuantity(listing.companyId, Number(($event.target as HTMLInputElement).value))"
-                            />
-                          </label>
-                        </div>
+                          <div class="trade-order-row">
+                            <label class="trade-field trade-field--quantity">
+                              <span>{{ t('stockExchange.quantity') }}</span>
+                              <input
+                                :value="quantityByCompany[listing.companyId] ?? 100"
+                                type="number"
+                                min="1"
+                                step="1"
+                                class="trade-input"
+                                :aria-label="`${t('stockExchange.quantity')} ${listing.companyName}`"
+                                @input="updateQuantity(listing.companyId, Number(($event.target as HTMLInputElement).value))"
+                              />
+                            </label>
 
-                        <div class="trade-actions">
-                          <button
-                            class="btn btn-primary"
-                            :disabled="actionLoadingKey === `buy-${listing.companyId}`"
-                            @click="executeTrade('buy', listing.companyId)"
-                          >
-                            {{ t('stockExchange.buyAt', { price: formatCurrency(listing.askPrice) }) }}
-                          </button>
-                          <button
-                            class="btn btn-secondary"
-                            :disabled="actionLoadingKey === `sell-${listing.companyId}`"
-                            @click="executeTrade('sell', listing.companyId)"
-                          >
-                            {{ t('stockExchange.sellAt', { price: formatCurrency(listing.bidPrice) }) }}
-                          </button>
+                            <div class="trade-actions">
+                              <div class="trade-action-group">
+                                <button
+                                  class="btn btn-primary"
+                                  :disabled="actionLoadingKey === `buy-${listing.companyId}`"
+                                  @click="executeTrade('buy', listing.companyId)"
+                                >
+                                  {{ t('stockExchange.buyAt', { price: formatCurrency(listing.askPrice) }) }}
+                                </button>
+                                <span class="trade-est" aria-live="polite">
+                                  {{ t('stockExchange.estimatedCost', { total: formatCurrency(estimatedBuyCost(listing)) }) }}
+                                </span>
+                              </div>
+                              <div class="trade-action-group">
+                                <button
+                                  class="btn btn-secondary"
+                                  :disabled="actionLoadingKey === `sell-${listing.companyId}`"
+                                  @click="executeTrade('sell', listing.companyId)"
+                                >
+                                  {{ t('stockExchange.sellAt', { price: formatCurrency(listing.bidPrice) }) }}
+                                </button>
+                                <span class="trade-est" aria-live="polite">
+                                  {{ t('stockExchange.estimatedProceeds', { total: formatCurrency(estimatedSellProceeds(listing)) }) }}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         <p
@@ -624,12 +812,66 @@ useTickRefresh(async () => {
                           class="trade-feedback trade-feedback--error"
                           role="alert"
                         >{{ errorByCompany[listing.companyId] }}</p>
+
+                        <div class="history-panel">
+                          <div class="history-panel__header">
+                            <h3>{{ t('stockExchange.priceHistoryTitle') }}</h3>
+                            <span class="history-panel__hint">{{ t('stockExchange.priceHistoryHint') }}</span>
+                          </div>
+
+                          <p v-if="priceHistoryLoadingByCompany[listing.companyId]" class="history-panel__state">
+                            {{ t('common.loading') }}
+                          </p>
+                          <p
+                            v-else-if="priceHistoryErrorByCompany[listing.companyId]"
+                            class="history-panel__state history-panel__state--error"
+                          >
+                            {{ priceHistoryErrorByCompany[listing.companyId] }}
+                          </p>
+                          <p v-else-if="!priceHistoryByCompany[listing.companyId]?.length" class="history-panel__state">
+                            {{ t('stockExchange.priceHistoryEmpty') }}
+                          </p>
+                          <div v-else class="history-table-wrapper">
+                            <table class="history-table" :aria-label="`${listing.companyName} ${t('stockExchange.priceHistoryTitle')}`">
+                              <thead>
+                                <tr>
+                                  <th>{{ t('stockExchange.tick') }}</th>
+                                  <th>{{ t('stockExchange.sharePrice') }}</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr
+                                  v-for="point in priceHistoryByCompany[listing.companyId]"
+                                  :key="`${listing.companyId}-${point.tick}-${point.recordedAtUtc}`"
+                                >
+                                  <td>{{ point.tick }}</td>
+                                  <td>{{ formatCurrency(point.price) }}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                       </div>
                     </td>
                   </tr>
                 </template>
               </tbody>
             </table>
+            <div v-if="totalPages > 1" class="pagination-bar">
+              <button class="btn btn-secondary btn-sm" :disabled="currentPage === 1" @click="currentPage -= 1">
+                {{ t('stockExchange.prevPage') }}
+              </button>
+              <span class="pagination-bar__status">
+                {{ t('stockExchange.pageStatus', { page: currentPage, total: totalPages }) }}
+              </span>
+              <button
+                class="btn btn-secondary btn-sm"
+                :disabled="currentPage === totalPages"
+                @click="currentPage += 1"
+              >
+                {{ t('stockExchange.nextPage') }}
+              </button>
+            </div>
           </div>
         </section>
 
@@ -704,9 +946,104 @@ useTickRefresh(async () => {
             </table>
           </div>
         </section>
+
+        <section v-if="personAccount" class="panel">
+          <div class="section-header">
+            <div>
+              <h2>{{ t('stockExchange.tradeHistoryTitle') }}</h2>
+              <p>{{ t('stockExchange.tradeHistoryDesc') }}</p>
+            </div>
+          </div>
+
+          <p v-if="personAccount.stockTrades.length === 0" class="empty-state">
+            {{ t('stockExchange.tradeHistoryEmpty') }}
+          </p>
+
+          <div v-else class="table-wrapper">
+            <table class="data-table" :aria-label="t('stockExchange.tradeHistoryTitle')">
+              <thead>
+                <tr>
+                  <th>{{ t('stockExchange.company') }}</th>
+                  <th>{{ t('stockExchange.tradeDirection') }}</th>
+                  <th>{{ t('stockExchange.tradeQuantity') }}</th>
+                  <th>{{ t('stockExchange.tradePrice') }}</th>
+                  <th>{{ t('stockExchange.tradeTotal') }}</th>
+                  <th>{{ t('stockExchange.recordedAt') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="trade in personAccount.stockTrades" :key="trade.id" class="trade-history-row">
+                  <td>{{ trade.companyName }}</td>
+                  <td>
+                    <span
+                      :class="trade.direction === 'BUY' ? 'direction-badge direction-badge--buy' : 'direction-badge direction-badge--sell'"
+                    >{{ trade.direction === 'BUY' ? t('stockExchange.tradeBuy') : t('stockExchange.tradeSell') }}</span>
+                  </td>
+                  <td>{{ formatShares(trade.shareCount) }}</td>
+                  <td>{{ formatCurrency(trade.pricePerShare) }}</td>
+                  <td>{{ formatCurrency(trade.totalValue) }}</td>
+                  <td>{{ formatDateTime(trade.recordedAtUtc) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </template>
     </div>
   </div>
+
+  <!-- Merge company dialog -->
+  <Teleport to="body">
+    <div
+      v-if="mergeDialogCompanyId"
+      class="merge-overlay"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('stockExchange.mergeDialogTitle')"
+    >
+      <div class="merge-dialog">
+        <h2 class="merge-dialog__title">{{ t('stockExchange.mergeDialogTitle') }}</h2>
+        <template v-if="mergeSuccess">
+          <p class="merge-dialog__success" role="status">
+            {{ t('stockExchange.mergeSuccessMsg', {
+              absorbed: mergeSuccess.absorbedCompanyName,
+              destination: mergeSuccess.destinationCompanyName,
+              buildings: mergeSuccess.buildingsTransferred,
+              cash: formatCurrency(mergeSuccess.cashTransferred),
+            }) }}
+          </p>
+          <div class="merge-dialog__actions">
+            <button class="btn btn-primary" @click="closeMergeDialog">{{ t('common.close') }}</button>
+          </div>
+        </template>
+        <template v-else>
+          <p class="merge-dialog__desc">{{ t('stockExchange.mergeDialogDesc') }}</p>
+          <p class="merge-dialog__eligibility">{{ t('stockExchange.mergeEligibilityHint') }}</p>
+          <label class="trade-field">
+            <span>{{ t('stockExchange.mergeDestinationLabel') }}</span>
+            <select v-model="mergeDestinationCompanyId" class="trade-select" :aria-label="t('stockExchange.mergeDestinationLabel')">
+              <option v-for="company in controlledCompanies" :key="company.id" :value="company.id">
+                {{ company.name }}
+              </option>
+            </select>
+          </label>
+          <p v-if="mergeError" class="trade-feedback trade-feedback--error" role="alert">{{ mergeError }}</p>
+          <div class="merge-dialog__actions">
+            <button
+              class="btn btn-warning"
+              :disabled="mergeLoading || !mergeDestinationCompanyId"
+              @click="executeMerge"
+            >
+              {{ mergeLoading ? t('common.loading') : t('stockExchange.mergeConfirm') }}
+            </button>
+            <button class="btn btn-ghost" :disabled="mergeLoading" @click="closeMergeDialog">
+              {{ t('common.cancel') }}
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -859,6 +1196,20 @@ useTickRefresh(async () => {
   overflow-x: auto;
 }
 
+.pagination-bar {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.pagination-bar__status {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
 .data-table {
   width: 100%;
   border-collapse: collapse;
@@ -955,6 +1306,7 @@ useTickRefresh(async () => {
 .owned-shares-hint {
   font-size: 0.75rem;
   color: var(--color-text-secondary);
+  white-space: normal;
 }
 
 .listing-chip {
@@ -975,6 +1327,26 @@ useTickRefresh(async () => {
 .listing-chip--owned {
   background: color-mix(in srgb, var(--color-primary) 16%, transparent);
   color: var(--color-primary);
+}
+
+.direction-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.direction-badge--buy {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  color: #16a34a;
+}
+
+.direction-badge--sell {
+  background: color-mix(in srgb, #ef4444 18%, transparent);
+  color: #dc2626;
 }
 
 .actions-cell {
@@ -1052,6 +1424,10 @@ useTickRefresh(async () => {
   gap: 0.35rem;
 }
 
+.trade-field--quantity {
+  min-width: 130px;
+}
+
 .trade-select,
 .trade-input {
   border: 1px solid var(--color-border);
@@ -1070,11 +1446,135 @@ useTickRefresh(async () => {
   width: 130px;
 }
 
+.trade-order-row {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
 .trade-actions {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
+}
+
+.trade-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: flex-start;
+}
+
+.trade-est {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, var(--color-text-secondary));
+  font-variant-numeric: tabular-nums;
+  padding-left: 0.15rem;
+}
+
+.company-snapshot {
+  background: var(--color-surface-secondary, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.snapshot-grid {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.snapshot-item {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.snapshot-item dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, var(--color-text-secondary));
+}
+
+.snapshot-item dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-pct {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, var(--color-text-secondary));
+  margin-left: 0.25rem;
+}
+
+.dividend-cell {
+  white-space: nowrap;
+}
+
+.dividend-badge {
+  display: inline-block;
+  background: color-mix(in srgb, var(--color-success, #22c55e) 14%, transparent);
+  color: var(--color-success, #22c55e);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-panel {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.history-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.history-panel__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.history-panel__hint,
+.history-panel__state {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.history-panel__state--error {
+  color: var(--color-danger, #ef4444);
+}
+
+.history-table-wrapper {
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 0.5rem 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
 }
 
 .trade-feedback {
@@ -1102,8 +1602,69 @@ useTickRefresh(async () => {
   background: color-mix(in srgb, var(--color-danger, #ef4444) 12%, var(--color-surface));
 }
 
-.market-note a {
-  margin-left: 0.35rem;
+.listing-chip--merge {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 18%, var(--color-surface));
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+}
+
+.merge-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.merge-dialog {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 2rem;
+  max-width: 480px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  box-shadow: var(--shadow-lg, 0 20px 40px rgba(0, 0, 0, 0.4));
+}
+
+.merge-dialog__title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.merge-dialog__desc {
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.merge-dialog__eligibility {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 30%, transparent);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.merge-dialog__success {
+  color: var(--color-success, #22c55e);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.merge-dialog__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.25rem;
 }
 
 @media (max-width: 720px) {
@@ -1117,6 +1678,10 @@ useTickRefresh(async () => {
 
   .trade-price-context {
     gap: 1rem;
+  }
+
+  .pagination-bar {
+    justify-content: flex-start;
   }
 }
 </style>

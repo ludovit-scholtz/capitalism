@@ -16,6 +16,7 @@ public sealed class PersonAccountResult
     public Guid? ActiveCompanyId { get; set; }
     public List<PortfolioHoldingResult> Shareholdings { get; set; } = [];
     public List<DividendPaymentResult> DividendPayments { get; set; } = [];
+    public List<PersonTradeRecordResult> StockTrades { get; set; } = [];
 }
 
 public sealed class PortfolioHoldingResult
@@ -57,6 +58,15 @@ public sealed class StockExchangeListingResult
     public decimal ControlledCompanyOwnedShares { get; set; }
     public decimal CombinedControlledOwnershipRatio { get; set; }
     public bool CanClaimControl { get; set; }
+    public bool CanMerge { get; set; }
+}
+
+public sealed class StockExchangePriceHistoryPointResult
+{
+    public Guid CompanyId { get; set; }
+    public long Tick { get; set; }
+    public decimal Price { get; set; }
+    public DateTime RecordedAtUtc { get; set; }
 }
 
 public sealed class ShareTradeResult
@@ -73,4 +83,30 @@ public sealed class ShareTradeResult
     public decimal PublicFloatShares { get; set; }
     public decimal PersonalCash { get; set; }
     public decimal? CompanyCash { get; set; }
+}
+
+public sealed class PersonTradeRecordResult
+{
+    public Guid Id { get; set; }
+    public Guid CompanyId { get; set; }
+    public string CompanyName { get; set; } = string.Empty;
+    public string Direction { get; set; } = string.Empty;
+    public decimal ShareCount { get; set; }
+    public decimal PricePerShare { get; set; }
+    public decimal TotalValue { get; set; }
+    public long RecordedAtTick { get; set; }
+    public DateTime RecordedAtUtc { get; set; }
+}
+
+public sealed class MergeCompanyResult
+{
+    /// <summary>The destination company that received all transferred assets.</summary>
+    public Guid DestinationCompanyId { get; set; }
+    public string DestinationCompanyName { get; set; } = string.Empty;
+    /// <summary>The name of the absorbed company (now closed).</summary>
+    public string AbsorbedCompanyName { get; set; } = string.Empty;
+    /// <summary>Cash transferred from the absorbed company to the destination company.</summary>
+    public decimal CashTransferred { get; set; }
+    /// <summary>Number of buildings transferred.</summary>
+    public int BuildingsTransferred { get; set; }
 }

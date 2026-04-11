@@ -353,6 +353,168 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task SendChatMessage_PersistsAndReturnsDisplayName()
+    {
+        var token = await RegisterAndGetTokenAsync($"chat-{Guid.NewGuid():N}@test.com", "Chatty Trader");
+
+        var sendResult = await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) {
+                id
+                playerDisplayName
+                message
+                isOwnMessage
+              }
+            }
+            """,
+            new { input = new { message = "Hello market" } },
+            token);
+
+        var payload = sendResult.GetProperty("data").GetProperty("sendChatMessage");
+        Assert.Equal("Chatty Trader", payload.GetProperty("playerDisplayName").GetString());
+        Assert.Equal("Hello market", payload.GetProperty("message").GetString());
+        Assert.True(payload.GetProperty("isOwnMessage").GetBoolean());
+
+        var queryResult = await ExecuteGraphQlAsync(
+            """
+            query ChatMessages {
+              chatMessages(limit: 10) {
+                playerDisplayName
+                message
+              }
+            }
+            """,
+            token: token);
+
+        var messages = queryResult.GetProperty("data").GetProperty("chatMessages");
+        Assert.Contains(messages.EnumerateArray(), message =>
+            message.GetProperty("playerDisplayName").GetString() == "Chatty Trader"
+            && message.GetProperty("message").GetString() == "Hello market");
+    }
+
+    [Fact]
+    public async Task SendChatMessage_RequiresAuthentication()
+    {
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) {
+                id
+              }
+            }
+            """,
+            new { input = new { message = "Hello without token" } });
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.NotEqual(0, errors.GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ChatMessages_HideInvisiblePlayersFromOtherRegularPlayers()
+    {
+        var hiddenEmail = $"hidden-{Guid.NewGuid():N}@test.com";
+        var viewerEmail = $"viewer-{Guid.NewGuid():N}@test.com";
+        var hiddenToken = await RegisterAndGetTokenAsync(hiddenEmail, "Hidden Trader");
+        var viewerToken = await RegisterAndGetTokenAsync(viewerEmail, "Viewer");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation SendChatMessage($input: SendChatMessageInput!) {
+              sendChatMessage(input: $input) {
+                id
+              }
+            }
+            """,
+            new { input = new { message = "Invisible support note" } },
+            hiddenToken);
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var hiddenPlayer = await db.Players.SingleAsync(player => player.Email == hiddenEmail);
+            hiddenPlayer.IsInvisibleInChat = true;
+            await db.SaveChangesAsync();
+        }
+
+        var viewerResult = await ExecuteGraphQlAsync(
+            """
+            query ChatMessages {
+              chatMessages(limit: 10) {
+                playerDisplayName
+                message
+              }
+            }
+            """,
+            token: viewerToken);
+        Assert.DoesNotContain(viewerResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(), message =>
+            message.GetProperty("playerDisplayName").GetString() == "Hidden Trader");
+
+        var hiddenResult = await ExecuteGraphQlAsync(
+            """
+            query ChatMessages {
+              chatMessages(limit: 10) {
+                playerDisplayName
+                message
+              }
+            }
+            """,
+            token: hiddenToken);
+        Assert.Contains(hiddenResult.GetProperty("data").GetProperty("chatMessages").EnumerateArray(), message =>
+            message.GetProperty("playerDisplayName").GetString() == "Hidden Trader");
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_SalesShopStoragePlanWithPurchasedProduct_IsAllowed()
+    {
+        var token = await RegisterAndGetTokenAsync($"sales-shop-storage-{Guid.NewGuid():N}@test.com", "Retail Planner");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Retail Planner Co" } },
+            token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
+        var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+
+        var buildingResult = await ExecuteGraphQlAsync(
+            "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
+            new { input = new { companyId, cityId, type = "SALES_SHOP", name = "Retail Buffer Shop" } },
+            token);
+        var buildingId = buildingResult.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString()!;
+
+        var chairProductId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new { unitType = "PURCHASE", gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)null },
+                        new { unitType = "STORAGE", gridX = 1, gridY = 0, linkUp = false, linkDown = false, linkLeft = true, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)null },
+                        new { unitType = "PUBLIC_SALES", gridX = 2, gridY = 0, linkUp = false, linkDown = false, linkLeft = true, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)45m },
+                    }
+                }
+            },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        Assert.True(result.GetProperty("data").TryGetProperty("storeBuildingConfiguration", out var payload));
+        Assert.False(string.IsNullOrWhiteSpace(payload.GetProperty("id").GetString()));
+    }
+
+    [Fact]
     public async Task FinishOnboarding_CompletesStagedFlowWithoutUnexpectedExecutionError()
     {
         var token = await RegisterAndGetTokenAsync(email: $"finish-onboarding-{Guid.NewGuid():N}@test.com");
@@ -5248,6 +5410,153 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
 
         [Fact]
+        public async Task BuyAndSellShares_WithCompanyAccount_RecordLedgerEntriesAndStockPriceHistory()
+        {
+                await ResetGameStateAsync();
+
+                var controllerToken = await RegisterAndGetTokenAsync($"history-controller-{Guid.NewGuid():N}@test.com", "History Controller");
+                var controllerPlayerId = await GetCurrentPlayerIdAsync(controllerToken);
+                var publicCompanyId = await SeedPublicCompanyAsync(controllerPlayerId, name: "History Target", cash: 350_000m);
+
+                var acquirerToken = await RegisterAndGetTokenAsync($"history-acquirer-{Guid.NewGuid():N}@test.com", "History Acquirer");
+                var createCompanyResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation CreateCompany($input: CreateCompanyInput!) {
+                            createCompany(input: $input) { id }
+                        }
+                        """,
+                        new { input = new { name = "History Holdings" } },
+                        acquirerToken);
+
+                var acquirerCompanyId = Guid.Parse(createCompanyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!);
+
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var acquirerCompany = await db.Companies.FirstAsync(candidate => candidate.Id == acquirerCompanyId);
+                        acquirerCompany.Cash = 500_000m;
+                        await db.SaveChangesAsync();
+                }
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) {
+                                shareCount
+                                companyCash
+                            }
+                        }
+                        """,
+                        new
+                        {
+                                input = new
+                                {
+                                        companyId = publicCompanyId,
+                                        shareCount = 120m,
+                                        tradeAccountType = "COMPANY",
+                                        tradeAccountCompanyId = acquirerCompanyId
+                                }
+                        },
+                        acquirerToken);
+
+                await ProcessTicksAsync(1);
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation SellShares($input: SellSharesInput!) {
+                            sellShares(input: $input) {
+                                shareCount
+                                companyCash
+                            }
+                        }
+                        """,
+                        new
+                        {
+                                input = new
+                                {
+                                        companyId = publicCompanyId,
+                                        shareCount = 20m,
+                                        tradeAccountType = "COMPANY",
+                                        tradeAccountCompanyId = acquirerCompanyId
+                                }
+                        },
+                        acquirerToken);
+
+                var ledgerResult = await ExecuteGraphQlAsync(
+                        """
+                        query GetCompanyLedger($companyId: UUID!) {
+                            companyLedger(companyId: $companyId) {
+                                totalStockPurchaseCashOut
+                                totalStockSaleCashIn
+                                cashFromInvestments
+                            }
+                        }
+                        """,
+                        new { companyId = acquirerCompanyId },
+                        acquirerToken);
+
+                var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+                var stockPurchaseCashOut = ledger.GetProperty("totalStockPurchaseCashOut").GetDecimal();
+                var stockSaleCashIn = ledger.GetProperty("totalStockSaleCashIn").GetDecimal();
+                Assert.True(stockPurchaseCashOut > 0m);
+                Assert.True(stockSaleCashIn > 0m);
+                Assert.Equal(stockSaleCashIn - stockPurchaseCashOut, ledger.GetProperty("cashFromInvestments").GetDecimal());
+
+                var purchaseDrillDown = await ExecuteGraphQlAsync(
+                        """
+                        query GetLedgerDrillDown($companyId: UUID!, $category: String!) {
+                            ledgerDrillDown(companyId: $companyId, category: $category) {
+                                category
+                                description
+                                amount
+                            }
+                        }
+                        """,
+                        new { companyId = acquirerCompanyId, category = LedgerCategory.StockPurchase },
+                        acquirerToken);
+
+                var purchaseEntries = purchaseDrillDown.GetProperty("data").GetProperty("ledgerDrillDown");
+                Assert.Single(purchaseEntries.EnumerateArray());
+                Assert.Contains("History Target", purchaseEntries[0].GetProperty("description").GetString());
+                Assert.True(purchaseEntries[0].GetProperty("amount").GetDecimal() < 0m);
+
+                var saleDrillDown = await ExecuteGraphQlAsync(
+                        """
+                        query GetLedgerDrillDown($companyId: UUID!, $category: String!) {
+                            ledgerDrillDown(companyId: $companyId, category: $category) {
+                                category
+                                description
+                                amount
+                            }
+                        }
+                        """,
+                        new { companyId = acquirerCompanyId, category = LedgerCategory.StockSale },
+                        acquirerToken);
+
+                var saleEntries = saleDrillDown.GetProperty("data").GetProperty("ledgerDrillDown");
+                Assert.Single(saleEntries.EnumerateArray());
+                Assert.Contains("History Target", saleEntries[0].GetProperty("description").GetString());
+                Assert.True(saleEntries[0].GetProperty("amount").GetDecimal() > 0m);
+
+                var historyResult = await ExecuteGraphQlAsync(
+                        """
+                        query GetStockExchangePriceHistory($companyId: UUID!) {
+                            stockExchangePriceHistory(companyId: $companyId) {
+                                tick
+                                price
+                            }
+                        }
+                        """,
+                        new { companyId = publicCompanyId });
+
+                var history = historyResult.GetProperty("data").GetProperty("stockExchangePriceHistory").EnumerateArray().ToList();
+                Assert.True(history.Count >= 2);
+                Assert.Contains(history, point => point.GetProperty("tick").GetInt64() == 0);
+                Assert.Contains(history, point => point.GetProperty("tick").GetInt64() == 1);
+                Assert.All(history, point => Assert.True(point.GetProperty("price").GetDecimal() > 0m));
+        }
+
+        [Fact]
         public async Task SwitchAccountContext_UsesControlledCompanyOwnershipToClaimControl()
         {
                 var targetOwnerToken = await RegisterAndGetTokenAsync($"target-owner-{Guid.NewGuid():N}@test.com", "Target Owner");
@@ -5343,6 +5652,706 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         }
 
         [Fact]
+        public async Task StockExchangeListings_ShowsAllPublicCompaniesWithBidAskAndOwnership()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"listing-owner-{Guid.NewGuid():N}@test.com", "Listing Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var company1Id = await SeedPublicCompanyAsync(ownerId, name: "Listing Co Alpha", cash: 200_000m, totalShares: 10_000m, founderShares: 8_000m);
+                var company2Id = await SeedPublicCompanyAsync(ownerId, name: "Listing Co Beta", cash: 300_000m, totalShares: 5_000m, founderShares: 2_500m);
+
+                var investorToken = await RegisterAndGetTokenAsync($"listing-investor-{Guid.NewGuid():N}@test.com", "Listing Investor");
+                var investorId = await GetCurrentPlayerIdAsync(investorToken);
+
+                // Investor buys some shares in Alpha so ownership data is populated
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId = company1Id, shareCount = 100m } },
+                        investorToken);
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            stockExchangeListings {
+                                companyId
+                                companyName
+                                totalSharesIssued
+                                publicFloatShares
+                                sharePrice
+                                marketValue
+                                bidPrice
+                                askPrice
+                                dividendPayoutRatio
+                                playerOwnedShares
+                                controlledCompanyOwnedShares
+                                combinedControlledOwnershipRatio
+                                canClaimControl
+                            }
+                        }
+                        """,
+                        token: investorToken);
+
+                var listings = result.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+                Assert.True(listings.Count >= 2);
+
+                var alphaListing = listings.First(listing => listing.GetProperty("companyId").GetString() == company1Id.ToString());
+                Assert.Equal("Listing Co Alpha", alphaListing.GetProperty("companyName").GetString());
+                Assert.True(alphaListing.GetProperty("sharePrice").GetDecimal() > 0m);
+                Assert.True(alphaListing.GetProperty("marketValue").GetDecimal() > 0m);
+                Assert.True(alphaListing.GetProperty("bidPrice").GetDecimal() < alphaListing.GetProperty("sharePrice").GetDecimal());
+                Assert.True(alphaListing.GetProperty("askPrice").GetDecimal() > alphaListing.GetProperty("sharePrice").GetDecimal());
+                // Investor bought 100 shares
+                Assert.Equal(100m, alphaListing.GetProperty("playerOwnedShares").GetDecimal());
+                // Public float is total minus founder shares (8000) minus investor's 100
+                var expectedFloat = 10_000m - 8_000m - 100m;
+                Assert.True(alphaListing.GetProperty("publicFloatShares").GetDecimal() >= expectedFloat - 1m);
+        }
+
+        [Fact]
+        public async Task StockExchangeListings_UnauthenticatedPlayer_ReturnsListingsWithZeroOwnership()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"unauth-owner-{Guid.NewGuid():N}@test.com", "Unauth Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                await SeedPublicCompanyAsync(ownerId, name: "Unauth Listed Co", cash: 100_000m);
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            stockExchangeListings {
+                                companyId
+                                companyName
+                                sharePrice
+                                playerOwnedShares
+                                combinedControlledOwnershipRatio
+                            }
+                        }
+                        """);
+
+                var listings = result.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+                var unauth = listings.FirstOrDefault(listing => listing.GetProperty("companyName").GetString() == "Unauth Listed Co");
+                Assert.NotEqual(default, unauth);
+                Assert.Equal(0m, unauth.GetProperty("playerOwnedShares").GetDecimal());
+                Assert.Equal(0m, unauth.GetProperty("combinedControlledOwnershipRatio").GetDecimal());
+        }
+
+        [Fact]
+        public async Task BidAskSpread_IsExactlyOnePercent()
+        {
+            // Market bid is 1% below share price; ask is 1% above — per ROADMAP stock-exchange spec.
+            var ownerToken = await RegisterAndGetTokenAsync($"bidask-owner-{Guid.NewGuid():N}@test.com", "BidAsk Owner");
+            var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+            // Use a well-known cash amount so the share price is deterministic
+            var companyId = await SeedPublicCompanyAsync(ownerId, name: "BidAsk Corp", cash: 100_000m, totalShares: 10_000m, founderShares: 10_000m);
+
+            var result = await ExecuteGraphQlAsync(
+                    """
+                    {
+                        stockExchangeListings {
+                            companyId sharePrice bidPrice askPrice
+                        }
+                    }
+                    """,
+                    token: ownerToken);
+
+            var listings = result.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+            var listing = listings.First(l => l.GetProperty("companyId").GetString() == companyId.ToString());
+            var sharePrice = listing.GetProperty("sharePrice").GetDecimal();
+            var bidPrice = listing.GetProperty("bidPrice").GetDecimal();
+            var askPrice = listing.GetProperty("askPrice").GetDecimal();
+
+            Assert.True(sharePrice > 0m, "Share price must be positive");
+            Assert.Equal(Math.Round(sharePrice * 0.99m, 2), Math.Round(bidPrice, 2));
+            Assert.Equal(Math.Round(sharePrice * 1.01m, 2), Math.Round(askPrice, 2));
+        }
+
+        [Fact]
+        public async Task PublicFloat_DecreasesAfterBuyAndIncreasesAfterSell()
+        {
+            var ownerToken = await RegisterAndGetTokenAsync($"float-owner-{Guid.NewGuid():N}@test.com", "Float Owner");
+            var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+            var companyId = await SeedPublicCompanyAsync(ownerId, name: "Float Test Corp", cash: 200_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+            var investorToken = await RegisterAndGetTokenAsync($"float-investor-{Guid.NewGuid():N}@test.com", "Float Investor");
+
+            // Snapshot public float before any trades
+            var beforeResult = await ExecuteGraphQlAsync(
+                    """
+                    {
+                        stockExchangeListings { companyId publicFloatShares }
+                    }
+                    """,
+                    token: investorToken);
+            var beforeFloat = beforeResult.GetProperty("data").GetProperty("stockExchangeListings")
+                .EnumerateArray().First(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+                .GetProperty("publicFloatShares").GetDecimal();
+
+            // Buy 500 shares
+            await ExecuteGraphQlAsync(
+                    """
+                    mutation BuyShares($input: BuySharesInput!) {
+                        buyShares(input: $input) { shareCount publicFloatShares }
+                    }
+                    """,
+                    new { input = new { companyId, shareCount = 500m } },
+                    investorToken);
+
+            var afterBuyResult = await ExecuteGraphQlAsync(
+                    """
+                    {
+                        stockExchangeListings { companyId publicFloatShares }
+                    }
+                    """,
+                    token: investorToken);
+            var afterBuyFloat = afterBuyResult.GetProperty("data").GetProperty("stockExchangeListings")
+                .EnumerateArray().First(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+                .GetProperty("publicFloatShares").GetDecimal();
+
+            Assert.Equal(beforeFloat - 500m, afterBuyFloat);
+
+            // Sell 200 shares back
+            await ExecuteGraphQlAsync(
+                    """
+                    mutation SellShares($input: SellSharesInput!) {
+                        sellShares(input: $input) { shareCount publicFloatShares }
+                    }
+                    """,
+                    new { input = new { companyId, shareCount = 200m } },
+                    investorToken);
+
+            var afterSellResult = await ExecuteGraphQlAsync(
+                    """
+                    {
+                        stockExchangeListings { companyId publicFloatShares }
+                    }
+                    """,
+                    token: investorToken);
+            var afterSellFloat = afterSellResult.GetProperty("data").GetProperty("stockExchangeListings")
+                .EnumerateArray().First(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+                .GetProperty("publicFloatShares").GetDecimal();
+
+            Assert.Equal(afterBuyFloat + 200m, afterSellFloat);
+        }
+
+        [Fact]
+        public async Task PersonAccount_ReturnsPortfolioWithShareholdingData()
+        {
+            var ownerToken = await RegisterAndGetTokenAsync($"portfolio-owner-{Guid.NewGuid():N}@test.com", "Portfolio Owner");
+            var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+            var companyId = await SeedPublicCompanyAsync(ownerId, name: "Portfolio Target Co", cash: 150_000m, totalShares: 8_000m, founderShares: 4_000m);
+
+            var investorToken = await RegisterAndGetTokenAsync($"portfolio-investor2-{Guid.NewGuid():N}@test.com", "Portfolio Investor2");
+
+            // Buy shares so there is something in the portfolio
+            await ExecuteGraphQlAsync(
+                    """
+                    mutation BuyShares($input: BuySharesInput!) {
+                        buyShares(input: $input) { shareCount }
+                    }
+                    """,
+                    new { input = new { companyId, shareCount = 300m } },
+                    investorToken);
+
+            var accountResult = await ExecuteGraphQlAsync(
+                    """
+                    {
+                        personAccount {
+                            playerId
+                            personalCash
+                            shareholdings {
+                                companyId
+                                companyName
+                                shareCount
+                                ownershipRatio
+                                sharePrice
+                                marketValue
+                            }
+                        }
+                    }
+                    """,
+                    token: investorToken);
+
+            var personAccount = accountResult.GetProperty("data").GetProperty("personAccount");
+            Assert.Equal(System.Text.Json.JsonValueKind.Object, personAccount.ValueKind);
+            var holdings = personAccount.GetProperty("shareholdings").EnumerateArray().ToList();
+            Assert.True(holdings.Count >= 1, "personAccount must return at least one shareholding after buying");
+
+            var holding = holdings.First(h => h.GetProperty("companyId").GetString() == companyId.ToString());
+            Assert.Equal("Portfolio Target Co", holding.GetProperty("companyName").GetString());
+            Assert.Equal(300m, holding.GetProperty("shareCount").GetDecimal());
+            Assert.True(holding.GetProperty("ownershipRatio").GetDecimal() > 0m);
+            Assert.True(holding.GetProperty("sharePrice").GetDecimal() > 0m);
+            Assert.True(holding.GetProperty("marketValue").GetDecimal() > 0m);
+        }
+
+        [Fact]
+        public async Task BuyShares_ZeroQuantity_ReturnsInvalidShareCountError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"buy-zero-owner-{Guid.NewGuid():N}@test.com", "Buy Zero Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Buy Zero Co");
+
+                var investorToken = await RegisterAndGetTokenAsync($"buy-zero-investor-{Guid.NewGuid():N}@test.com", "Buy Zero Investor");
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 0m } },
+                        investorToken);
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+                var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+                Assert.Equal("INVALID_SHARE_COUNT", code);
+        }
+
+        [Fact]
+        public async Task BuyShares_InsufficientPersonalFunds_ReturnsError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"buy-funds-owner-{Guid.NewGuid():N}@test.com", "Buy Funds Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Buy Funds Co", cash: 5_000_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+                var investorToken = await RegisterAndGetTokenAsync($"buy-funds-investor-{Guid.NewGuid():N}@test.com", "Buy Funds Investor");
+
+                // Drain the investor's personal cash so they can't afford the trade
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var investorId = await GetCurrentPlayerIdAsync(investorToken);
+                        var investor = await db.Players.FirstAsync(candidate => candidate.Id == investorId);
+                        investor.PersonalCash = 1m; // only 1 unit of currency
+                        await db.SaveChangesAsync();
+                }
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 100m, tradeAccountType = "PERSON" } },
+                        investorToken);
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+                var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+                Assert.Equal("INSUFFICIENT_PERSONAL_FUNDS", code);
+        }
+
+        [Fact]
+        public async Task BuyShares_InsufficientPublicFloat_ReturnsError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"buy-float-owner-{Guid.NewGuid():N}@test.com", "Buy Float Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                // All 10000 shares held by founder — no public float
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "No Float Co", totalShares: 10_000m, founderShares: 10_000m);
+
+                var investorToken = await RegisterAndGetTokenAsync($"buy-float-investor-{Guid.NewGuid():N}@test.com", "Buy Float Investor");
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 1m } },
+                        investorToken);
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+                var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+                Assert.Equal("INSUFFICIENT_PUBLIC_FLOAT", code);
+        }
+
+        [Fact]
+        public async Task BuyShares_UnauthorizedCompanyAccount_FallsBackToPersonAccount()
+        {
+                // When a player specifies a company account they don't own, the backend falls back to the
+                // personal account rather than letting the attacker act on behalf of another company.
+                var ownerToken = await RegisterAndGetTokenAsync($"buy-unauth-owner-{Guid.NewGuid():N}@test.com", "Buy Unauth Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                // Owner's company (attacker should NOT be able to trade with this company's cash)
+                var ownerCompanyId = await SeedPublicCompanyAsync(ownerId, name: "Unauth Owner Co", cash: 5_000_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+                var attackerToken = await RegisterAndGetTokenAsync($"buy-unauth-attacker-{Guid.NewGuid():N}@test.com", "Attacker");
+                var attackerId = await GetCurrentPlayerIdAsync(attackerToken);
+
+                // Record owner's company cash before the attack
+                decimal ownerCashBefore;
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var ownerCompany = await db.Companies.FirstAsync(candidate => candidate.Id == ownerCompanyId);
+                        ownerCashBefore = ownerCompany.Cash;
+                }
+
+                // Attacker tries to trade using the owner's company ID
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) {
+                                shareCount
+                                accountType
+                                accountCompanyId
+                            }
+                        }
+                        """,
+                        new { input = new { companyId = ownerCompanyId, shareCount = 10m, tradeAccountType = "COMPANY", tradeAccountCompanyId = ownerCompanyId } },
+                        attackerToken);
+
+                // Owner's company cash must be UNCHANGED — attacker cannot drain it
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var ownerCompany = await db.Companies.FirstAsync(candidate => candidate.Id == ownerCompanyId);
+                        Assert.Equal(ownerCashBefore, ownerCompany.Cash);
+                }
+
+                // If the trade succeeded, it must have used the attacker's personal account (not the owner's company)
+                if (result.TryGetProperty("data", out var data) && data.ValueKind != System.Text.Json.JsonValueKind.Null)
+                {
+                        var bought = data.GetProperty("buyShares");
+                        var accountType = bought.GetProperty("accountType").GetString();
+                        var accountCompanyId = bought.GetProperty("accountCompanyId");
+                        // Must NOT be the owner's company account
+                        Assert.True(
+                                accountType != "COMPANY" || accountCompanyId.ValueKind == System.Text.Json.JsonValueKind.Null
+                                || accountCompanyId.GetString() != ownerCompanyId.ToString(),
+                                "Attacker must not be able to trade using the owner's company account.");
+                }
+        }
+
+        [Fact]
+        public async Task SellShares_ZeroQuantity_ReturnsInvalidShareCountError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"sell-zero-owner-{Guid.NewGuid():N}@test.com", "Sell Zero Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Sell Zero Co");
+
+                var investorToken = await RegisterAndGetTokenAsync($"sell-zero-investor-{Guid.NewGuid():N}@test.com", "Sell Zero Investor");
+
+                // Buy shares first so we have something to potentially sell
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 10m } },
+                        investorToken);
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation SellShares($input: SellSharesInput!) {
+                            sellShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 0m } },
+                        investorToken);
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+                var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+                Assert.Equal("INVALID_SHARE_COUNT", code);
+        }
+
+        [Fact]
+        public async Task SellShares_InsufficientShares_ReturnsError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"sell-insuf-owner-{Guid.NewGuid():N}@test.com", "Sell Insuf Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Sell Insuf Co");
+
+                var investorToken = await RegisterAndGetTokenAsync($"sell-insuf-investor-{Guid.NewGuid():N}@test.com", "Sell Insuf Investor");
+
+                // Try to sell shares the investor doesn't own
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation SellShares($input: SellSharesInput!) {
+                            sellShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 100m } },
+                        investorToken);
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+                var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+                Assert.Equal("INSUFFICIENT_SHARES", code);
+        }
+
+        [Fact]
+        public async Task BuyShares_Unauthenticated_ReturnsAuthorizationError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"buy-noauth-owner-{Guid.NewGuid():N}@test.com", "Buy Noauth Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Buy Noauth Co");
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 10m } });
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+        }
+
+        [Fact]
+        public async Task SellShares_Unauthenticated_ReturnsAuthorizationError()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"sell-noauth-owner-{Guid.NewGuid():N}@test.com", "Sell Noauth Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Sell Noauth Co");
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation SellShares($input: SellSharesInput!) {
+                            sellShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 10m } });
+
+                var errors = result.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+        }
+
+        [Fact]
+        public async Task BuyShares_WithPersonAccount_RecordsPersonTradeHistory()
+        {
+                var investorToken = await RegisterAndGetTokenAsync($"person-trade-buyer-{Guid.NewGuid():N}@test.com", "Trade Buyer");
+                var investorId = await GetCurrentPlayerIdAsync(investorToken);
+
+                var ownerToken = await RegisterAndGetTokenAsync($"person-trade-owner-{Guid.NewGuid():N}@test.com", "Trade Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Trade History Co", cash: 500_000m, founderShares: 5_000m);
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount pricePerShare totalValue }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 20m, tradeAccountType = "PERSON" } },
+                        token: investorToken);
+
+                // PersonAccount should now reflect the purchase in stockTrades
+                var paResult = await ExecuteGraphQlAsync(
+                        """
+                        query {
+                            personAccount {
+                                personalCash
+                                stockTrades {
+                                    id
+                                    companyName
+                                    direction
+                                    shareCount
+                                    pricePerShare
+                                    totalValue
+                                    recordedAtTick
+                                }
+                            }
+                        }
+                        """,
+                        token: investorToken);
+
+                var stockTrades = paResult.GetProperty("data").GetProperty("personAccount").GetProperty("stockTrades");
+                Assert.Equal(1, stockTrades.GetArrayLength());
+                var trade = stockTrades[0];
+                Assert.Equal("Trade History Co", trade.GetProperty("companyName").GetString());
+                Assert.Equal("BUY", trade.GetProperty("direction").GetString());
+                Assert.Equal(20m, trade.GetProperty("shareCount").GetDecimal());
+                Assert.True(trade.GetProperty("pricePerShare").GetDecimal() > 0m);
+                Assert.True(trade.GetProperty("totalValue").GetDecimal() > 0m);
+        }
+
+        [Fact]
+        public async Task SellShares_WithPersonAccount_RecordsPersonTradeHistory()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"person-trade-sell-owner-{Guid.NewGuid():N}@test.com", "Sell History Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Sell History Co", cash: 500_000m, founderShares: 5_000m);
+
+                var investorToken = await RegisterAndGetTokenAsync($"person-trade-sell-inv-{Guid.NewGuid():N}@test.com", "Sell History Investor");
+                var investorId = await GetCurrentPlayerIdAsync(investorToken);
+
+                // Seed a shareholding so the investor can sell
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        db.Shareholdings.Add(new Shareholding
+                        {
+                                Id = Guid.NewGuid(),
+                                CompanyId = companyId,
+                                OwnerPlayerId = investorId,
+                                ShareCount = 50m,
+                        });
+                        await db.SaveChangesAsync();
+                }
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation SellShares($input: SellSharesInput!) {
+                            sellShares(input: $input) { shareCount pricePerShare totalValue }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 30m, tradeAccountType = "PERSON" } },
+                        token: investorToken);
+
+                var paResult = await ExecuteGraphQlAsync(
+                        """
+                        query {
+                            personAccount {
+                                personalCash
+                                stockTrades {
+                                    companyName
+                                    direction
+                                    shareCount
+                                    totalValue
+                                }
+                            }
+                        }
+                        """,
+                        token: investorToken);
+
+                var stockTrades = paResult.GetProperty("data").GetProperty("personAccount").GetProperty("stockTrades");
+                Assert.Equal(1, stockTrades.GetArrayLength());
+                var trade = stockTrades[0];
+                Assert.Equal("Sell History Co", trade.GetProperty("companyName").GetString());
+                Assert.Equal("SELL", trade.GetProperty("direction").GetString());
+                Assert.Equal(30m, trade.GetProperty("shareCount").GetDecimal());
+                Assert.True(trade.GetProperty("totalValue").GetDecimal() > 0m);
+        }
+
+        [Fact]
+        public async Task CompanyAccountTrades_DoNotAppearInPersonTradeHistory()
+        {
+                // Company-account trades should appear only in the company ledger, NOT in personal stockTrades
+                var ownerToken = await RegisterAndGetTokenAsync($"company-trade-check-owner-{Guid.NewGuid():N}@test.com", "Co Trade Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var targetCompanyId = await SeedPublicCompanyAsync(ownerId, name: "Target For Co Trade", founderShares: 5_000m);
+
+                var buyerToken = await RegisterAndGetTokenAsync($"company-trade-check-buyer-{Guid.NewGuid():N}@test.com", "Co Trade Buyer");
+                var buyerCompanyId = await SeedPublicCompanyAsync(await GetCurrentPlayerIdAsync(buyerToken), name: "Buyer Corp", cash: 1_000_000m);
+
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId = targetCompanyId, shareCount = 10m, tradeAccountType = "COMPANY", tradeAccountCompanyId = buyerCompanyId } },
+                        token: buyerToken);
+
+                var paResult = await ExecuteGraphQlAsync(
+                        """
+                        query {
+                            personAccount {
+                                stockTrades { direction }
+                            }
+                        }
+                        """,
+                        token: buyerToken);
+
+                // stockTrades for person account should be empty — this was a company-account trade
+                var stockTrades = paResult.GetProperty("data").GetProperty("personAccount").GetProperty("stockTrades");
+                Assert.Equal(0, stockTrades.GetArrayLength());
+        }
+
+        [Fact]
+        public async Task StockExchangePriceHistory_ReturnsChronologicalEntries()
+        {
+                var ownerToken = await RegisterAndGetTokenAsync($"price-hist-owner-{Guid.NewGuid():N}@test.com", "Price History Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Price History Co", cash: 500_000m, founderShares: 5_000m);
+
+                var investorToken = await RegisterAndGetTokenAsync($"price-hist-investor-{Guid.NewGuid():N}@test.com", "Price History Investor");
+
+                // Execute a buy so a price history entry is recorded
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { pricePerShare }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 5m, tradeAccountType = "PERSON" } },
+                        token: investorToken);
+
+                var histResult = await ExecuteGraphQlAsync(
+                        """
+                        query History($companyId: UUID!) {
+                            stockExchangePriceHistory(companyId: $companyId) {
+                                companyId tick price recordedAtUtc
+                            }
+                        }
+                        """,
+                        new { companyId = companyId.ToString() });
+
+                var entries = histResult.GetProperty("data").GetProperty("stockExchangePriceHistory").EnumerateArray().ToList();
+                Assert.NotEmpty(entries);
+                // Price should be the ask price (positive value)
+                Assert.True(entries[0].GetProperty("price").GetDecimal() > 0m);
+                // companyId in response should match
+                Assert.Equal(companyId.ToString(), entries[0].GetProperty("companyId").GetString());
+                // If multiple entries returned, they should be in chronological order
+                for (int i = 1; i < entries.Count; i++)
+                {
+                        Assert.True(entries[i].GetProperty("recordedAtUtc").GetDateTime() >= entries[i - 1].GetProperty("recordedAtUtc").GetDateTime());
+                }
+        }
+
+        [Fact]
+        public async Task SwitchAccountContext_BelowFiftyPercentOwnership_ReturnsCompanyControlRequired()
+        {
+                var investorToken = await RegisterAndGetTokenAsync($"switch-below-50-{Guid.NewGuid():N}@test.com", "Low Ownership Investor");
+                var investorId = await GetCurrentPlayerIdAsync(investorToken);
+
+                var founderToken = await RegisterAndGetTokenAsync($"switch-founder-{Guid.NewGuid():N}@test.com", "Switch Founder");
+                var founderId = await GetCurrentPlayerIdAsync(founderToken);
+                var companyId = await SeedPublicCompanyAsync(founderId, name: "Switch Target", founderShares: 8_000m);
+
+                // Investor buys only 1000 shares out of 10000 total — 10%, below the 50% threshold
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        db.Shareholdings.Add(new Shareholding
+                        {
+                                Id = Guid.NewGuid(),
+                                CompanyId = companyId,
+                                OwnerPlayerId = investorId,
+                                ShareCount = 1_000m,
+                        });
+                        await db.SaveChangesAsync();
+                }
+
+                var switchResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation SwitchAccountContext($input: SwitchAccountContextInput!) {
+                            switchAccountContext(input: $input) { activeAccountType }
+                        }
+                        """,
+                        new { input = new { accountType = "COMPANY", companyId } },
+                        token: investorToken);
+
+                var errors = switchResult.GetProperty("errors").EnumerateArray().ToList();
+                Assert.NotEmpty(errors);
+                Assert.Contains(errors, error =>
+                {
+                        var extensions = error.GetProperty("extensions");
+                        return extensions.TryGetProperty("code", out var code) &&
+                               code.GetString() == "COMPANY_CONTROL_REQUIRED";
+                });
+        }
+
+        [Fact]
         public async Task DividendPhase_PaysPersonShareholderAndRecordsPayment()
         {
             await ResetGameStateAsync();
@@ -5352,6 +6361,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 var investorToken = await RegisterAndGetTokenAsync($"div-investor-{Guid.NewGuid():N}@test.com", "Dividend Investor");
                 var investorId = await GetCurrentPlayerIdAsync(investorToken);
                 var companyId = await SeedPublicCompanyAsync(controllerId, name: "Dividend Issuer", cash: 50_000m, founderShares: 0m, dividendPayoutRatio: 0.5m);
+
 
                 await using (var scope = _factory.Services.CreateAsyncScope())
                 {
@@ -5400,6 +6410,381 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 Assert.Equal(1, personAccount.GetProperty("dividendPayments").GetArrayLength());
                     Assert.Equal(expectedDividend, personAccount.GetProperty("dividendPayments")[0].GetProperty("totalAmount").GetDecimal());
         }
+
+        [Fact]
+        public async Task StockExchangeListings_BidAndAskArePlusMinusOnePercentOfSharePrice()
+        {
+                // ROADMAP: "Market bid price is 1% below the share price and offer is 1% above the share price."
+                var ownerToken = await RegisterAndGetTokenAsync($"bidask-owner-{Guid.NewGuid():N}@test.com", "BidAsk Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "BidAsk Co", cash: 200_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            stockExchangeListings {
+                                companyId
+                                sharePrice
+                                bidPrice
+                                askPrice
+                            }
+                        }
+                        """,
+                        token: ownerToken);
+
+                var listings = result.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+                var listing = listings.First(l => l.GetProperty("companyId").GetString() == companyId.ToString());
+
+                var sharePrice = listing.GetProperty("sharePrice").GetDecimal();
+                var bidPrice = listing.GetProperty("bidPrice").GetDecimal();
+                var askPrice = listing.GetProperty("askPrice").GetDecimal();
+
+                Assert.True(sharePrice > 0m, "Share price must be positive");
+                // bid is 1% below share price
+                var expectedBid = Math.Round(sharePrice * 0.99m, 2);
+                Assert.Equal(expectedBid, Math.Round(bidPrice, 2));
+                // ask is 1% above share price
+                var expectedAsk = Math.Round(sharePrice * 1.01m, 2);
+                Assert.Equal(expectedAsk, Math.Round(askPrice, 2));
+        }
+
+        [Fact]
+        public async Task DividendPhase_PaysCompanyShareholderAndRecordsLedgerEntry()
+        {
+                // ROADMAP: Company-owned shares should also receive dividends
+                await ResetGameStateAsync();
+
+                var issuerToken = await RegisterAndGetTokenAsync($"div-issuer-{Guid.NewGuid():N}@test.com", "Dividend Issuer Owner");
+                var issuerId = await GetCurrentPlayerIdAsync(issuerToken);
+                var issuerCompanyId = await SeedPublicCompanyAsync(issuerId, name: "Dividend Source Co", cash: 80_000m, founderShares: 0m, dividendPayoutRatio: 0.5m);
+
+                var holderToken = await RegisterAndGetTokenAsync($"div-holder-{Guid.NewGuid():N}@test.com", "Dividend Holder");
+                var holderPlayerId = await GetCurrentPlayerIdAsync(holderToken);
+                var holderCompanyId = Guid.Parse((await ExecuteGraphQlAsync(
+                        """
+                        mutation CreateCompany($input: CreateCompanyInput!) {
+                            createCompany(input: $input) { id }
+                        }
+                        """,
+                        new { input = new { name = "Dividend Holder Corp" } },
+                        holderToken)).GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!);
+
+                // Seed the holder company's shareholding and revenue for the issuer so dividends get paid
+                decimal holderCashBefore;
+                await using (var scope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        db.Shareholdings.Add(new Shareholding
+                        {
+                                Id = Guid.NewGuid(),
+                                CompanyId = issuerCompanyId,
+                                OwnerCompanyId = holderCompanyId,
+                                ShareCount = 4_000m,
+                        });
+                        db.LedgerEntries.Add(new LedgerEntry
+                        {
+                                Id = Guid.NewGuid(),
+                                CompanyId = issuerCompanyId,
+                                Category = LedgerCategory.Revenue,
+                                Description = "Annual revenue",
+                                Amount = 10_000m,
+                                RecordedAtTick = 1,
+                                RecordedAtUtc = DateTime.UtcNow,
+                        });
+                        var holderCompany = await db.Companies.FirstAsync(c => c.Id == holderCompanyId);
+                        holderCashBefore = holderCompany.Cash;
+                        await db.SaveChangesAsync();
+                }
+
+                await AdvanceGameTicksAsync(GameConstants.TicksPerYear - 1);
+                await ProcessTicksAsync(1);
+
+                // Holder company's cash should have increased (dividend was paid)
+                await using (var verifyScope = _factory.Services.CreateAsyncScope())
+                {
+                        var db = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        var holderCompany = await db.Companies.FirstAsync(c => c.Id == holderCompanyId);
+                        Assert.True(holderCompany.Cash > holderCashBefore, "Company shareholder cash should increase after dividend phase");
+
+                        // There should be a DividendPayment record for the company holding
+                        var divPayment = await db.DividendPayments
+                                .FirstOrDefaultAsync(p => p.RecipientCompanyId == holderCompanyId && p.CompanyId == issuerCompanyId);
+                        Assert.NotNull(divPayment);
+                        Assert.Equal(4_000m, divPayment.ShareCount);
+                        Assert.True(divPayment.TotalAmount > 0m);
+                }
+        }
+
+        [Fact]
+        public async Task StockExchangeListings_PublicFloatDecreasesAfterBuy()
+        {
+                // Buying shares should reduce the publicly available float
+                var ownerToken = await RegisterAndGetTokenAsync($"float-owner-{Guid.NewGuid():N}@test.com", "Float Owner");
+                var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+                var companyId = await SeedPublicCompanyAsync(ownerId, name: "Float Test Co", cash: 150_000m, totalShares: 10_000m, founderShares: 4_000m);
+
+                // Record initial float
+                var before = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            stockExchangeListings {
+                                companyId
+                                publicFloatShares
+                            }
+                        }
+                        """);
+                var beforeFloat = before.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray()
+                        .First(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+                        .GetProperty("publicFloatShares").GetDecimal();
+
+                var investorToken = await RegisterAndGetTokenAsync($"float-investor-{Guid.NewGuid():N}@test.com", "Float Investor");
+                await ExecuteGraphQlAsync(
+                        """
+                        mutation BuyShares($input: BuySharesInput!) {
+                            buyShares(input: $input) { shareCount }
+                        }
+                        """,
+                        new { input = new { companyId, shareCount = 500m } },
+                        investorToken);
+
+                var after = await ExecuteGraphQlAsync(
+                        """
+                        {
+                            stockExchangeListings {
+                                companyId
+                                publicFloatShares
+                            }
+                        }
+                        """);
+                var afterFloat = after.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray()
+                        .First(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+                        .GetProperty("publicFloatShares").GetDecimal();
+
+                Assert.Equal(beforeFloat - 500m, afterFloat);
+        }
+
+    [Fact]
+    public async Task StockExchangeListings_BidAskSpreadIsOnePercentOfSharePrice()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync($"bid-ask-owner-{Guid.NewGuid():N}@test.com", "Bid Ask Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "Spread Co", cash: 100_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+                stockExchangeListings {
+                    companyId
+                    sharePrice
+                    bidPrice
+                    askPrice
+                }
+            }
+            """,
+            token: ownerToken);
+
+        var listings = result.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+        var listing = listings.Single(l => l.GetProperty("companyId").GetString() == companyId.ToString());
+
+        var sharePrice = listing.GetProperty("sharePrice").GetDecimal();
+        var bidPrice = listing.GetProperty("bidPrice").GetDecimal();
+        var askPrice = listing.GetProperty("askPrice").GetDecimal();
+
+        Assert.True(sharePrice > 0m, "sharePrice should be positive");
+        // bid = sharePrice * (1 - 0.01) rounded to 4dp
+        var expectedBid = decimal.Round(sharePrice * 0.99m, 4, MidpointRounding.AwayFromZero);
+        // ask = sharePrice * (1 + 0.01) rounded to 4dp
+        var expectedAsk = decimal.Round(sharePrice * 1.01m, 4, MidpointRounding.AwayFromZero);
+        Assert.Equal(expectedBid, bidPrice);
+        Assert.Equal(expectedAsk, askPrice);
+        // Bid must be strictly below share price; ask must be strictly above
+        Assert.True(bidPrice < sharePrice);
+        Assert.True(askPrice > sharePrice);
+    }
+
+    [Fact]
+    public async Task StockExchangeListings_PublicFloatDecreasesAfterBuyShares()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync($"float-owner-{Guid.NewGuid():N}@test.com", "Float Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "Float Co", cash: 200_000m, totalShares: 10_000m, founderShares: 3_000m);
+
+        // Get the initial public float (10000 total - 3000 founder = 7000 float)
+        var beforeResult = await ExecuteGraphQlAsync(
+            """
+            query {
+                stockExchangeListings {
+                    companyId
+                    publicFloatShares
+                }
+            }
+            """,
+            token: ownerToken);
+
+        var beforeListings = beforeResult.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+        var beforeFloat = beforeListings.Single(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+            .GetProperty("publicFloatShares").GetDecimal();
+        Assert.Equal(7_000m, beforeFloat);
+
+        // Buy 500 shares from the public float
+        var buyerToken = await RegisterAndGetTokenAsync($"float-buyer-{Guid.NewGuid():N}@test.com", "Float Buyer");
+        await ExecuteGraphQlAsync(
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { shareCount publicFloatShares }
+            }
+            """,
+            new { input = new { companyId = companyId.ToString(), shareCount = 500m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            token: buyerToken);
+
+        // Verify public float decreased by the purchased amount
+        var afterResult = await ExecuteGraphQlAsync(
+            """
+            query {
+                stockExchangeListings {
+                    companyId
+                    publicFloatShares
+                }
+            }
+            """,
+            token: ownerToken);
+
+        var afterListings = afterResult.GetProperty("data").GetProperty("stockExchangeListings").EnumerateArray().ToList();
+        var afterFloat = afterListings.Single(l => l.GetProperty("companyId").GetString() == companyId.ToString())
+            .GetProperty("publicFloatShares").GetDecimal();
+        Assert.Equal(6_500m, afterFloat);
+    }
+
+    [Fact]
+    public async Task DividendPhase_PaysCompanyShareholderAndRecordsDividendPayment()
+    {
+        await ResetGameStateAsync();
+
+        var controllerToken = await RegisterAndGetTokenAsync($"comp-div-controller-{Guid.NewGuid():N}@test.com", "Company Dividend Controller");
+        var controllerId = await GetCurrentPlayerIdAsync(controllerToken);
+        var investorToken = await RegisterAndGetTokenAsync($"comp-div-investor-{Guid.NewGuid():N}@test.com", "Company Dividend Investor");
+        var investorId = await GetCurrentPlayerIdAsync(investorToken);
+
+        // Create the dividend-issuing company
+        var issuerId = await SeedPublicCompanyAsync(controllerId, name: "Company Dividend Issuer", cash: 100_000m, founderShares: 0m, dividendPayoutRatio: 0.5m);
+
+        // Create an investor company that holds shares in the issuer
+        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var investorCompany = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = investorId,
+                Name = "Investor Holding Co",
+                Cash = 0m,
+                TotalSharesIssued = 0m,
+                DividendPayoutRatio = 0m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 1,
+            };
+            db.Companies.Add(investorCompany);
+
+            // Investor company holds 5000 shares in the issuer
+            db.Shareholdings.Add(new Shareholding
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = issuerId,
+                OwnerCompanyId = investorCompany.Id,
+                ShareCount = 5_000m,
+            });
+
+            // Issuer has revenue to trigger dividend payout
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = issuerId,
+                Category = LedgerCategory.Revenue,
+                Description = "Profitable quarter",
+                Amount = 20_000m,
+                RecordedAtTick = 1,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+
+            await db.SaveChangesAsync();
+
+            // Verify investor company cash before dividends
+            var cashBefore = investorCompany.Cash;
+
+            await AdvanceGameTicksAsync(GameConstants.TicksPerYear - 1);
+            await ProcessTicksAsync(1);
+
+            // Reload investor company to check cash
+            var investorCompanyAfter = await db.Companies.AsNoTracking().SingleAsync(c => c.Id == investorCompany.Id);
+            // The investor company should have received a dividend in its cash
+            Assert.True(investorCompanyAfter.Cash > cashBefore, "Investor company cash should have increased after receiving dividend");
+
+            // A DividendPayment record should exist targeting the investor company
+            var dividendRecord = await db.DividendPayments.AsNoTracking()
+                .SingleAsync(d => d.RecipientCompanyId == investorCompany.Id);
+            Assert.Equal(issuerId, dividendRecord.CompanyId);
+            Assert.True(dividendRecord.TotalAmount > 0m);
+            Assert.Equal(5_000m, dividendRecord.ShareCount);
+        }
+    }
+
+    [Fact]
+    public async Task PersonAccount_ReturnsPortfolioWithShareholdingMarketValues()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync($"portfolio-owner-{Guid.NewGuid():N}@test.com", "Portfolio Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+        var buyerToken = await RegisterAndGetTokenAsync($"portfolio-buyer-{Guid.NewGuid():N}@test.com", "Portfolio Buyer");
+
+        // Seed a company with 5000 shares in public float
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "Portfolio Target", cash: 200_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+        // Buyer purchases 1000 shares
+        await ExecuteGraphQlAsync(
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { shareCount }
+            }
+            """,
+            new { input = new { companyId = companyId.ToString(), shareCount = 1000m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            token: buyerToken);
+
+        // Verify personAccount returns portfolio with the purchased holding
+        var accountResult = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    personalCash
+                    shareholdings {
+                        companyId
+                        companyName
+                        shareCount
+                        ownershipRatio
+                        sharePrice
+                        marketValue
+                    }
+                }
+            }
+            """,
+            token: buyerToken);
+
+        var personAccount = accountResult.GetProperty("data").GetProperty("personAccount");
+        var shareholdings = personAccount.GetProperty("shareholdings").EnumerateArray().ToList();
+        Assert.Single(shareholdings);
+
+        var holding = shareholdings[0];
+        Assert.Equal(companyId.ToString(), holding.GetProperty("companyId").GetString());
+        Assert.Equal("Portfolio Target", holding.GetProperty("companyName").GetString());
+        Assert.Equal(1_000m, holding.GetProperty("shareCount").GetDecimal());
+        // ownershipRatio = 1000 / 10000 = 0.1 (10%)
+        Assert.Equal(0.1m, holding.GetProperty("ownershipRatio").GetDecimal());
+        var sharePrice = holding.GetProperty("sharePrice").GetDecimal();
+        var marketValue = holding.GetProperty("marketValue").GetDecimal();
+        Assert.True(sharePrice > 0m);
+        // marketValue = shareCount * sharePrice (rounded to 4dp by backend)
+        var expectedMarketValue = decimal.Round(1_000m * sharePrice, 4, MidpointRounding.AwayFromZero);
+        Assert.Equal(expectedMarketValue, marketValue);
+    }
 
     [Fact]
     public async Task FinishOnboarding_UsesAuthoritativeLotValidation_AndCompletesFlow()
@@ -16964,6 +18349,179 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
     private static async Task<Guid> GetProductGuidBySlugAsync(AppDbContext db, string slug)
         => await db.ProductTypes.Where(p => p.Slug == slug).Select(p => p.Id).FirstAsync();
+
+    #region MergeCompany
+
+    [Fact]
+    public async Task MergeCompany_TransfersAssetsAndRemovesTargetCompany()
+    {
+        // Target company owner
+        var targetOwnerToken = await RegisterAndGetTokenAsync($"merge-target-{Guid.NewGuid():N}@test.com", "Merge Target Owner");
+        var targetOwnerId = await GetCurrentPlayerIdAsync(targetOwnerToken);
+        var targetCompanyId = await SeedPublicCompanyAsync(targetOwnerId, name: "Merge Target Co", cash: 20_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+        // Acquirer registers and creates their own destination company
+        var acquirerToken = await RegisterAndGetTokenAsync($"merge-acquirer-{Guid.NewGuid():N}@test.com", "Merge Acquirer");
+        var destResult = await ExecuteGraphQlAsync(
+            """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+                createCompany(input: $input) { id }
+            }
+            """,
+            new { input = new { name = "Destination Corp" } },
+            acquirerToken);
+        var destCompanyId = Guid.Parse(destResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!);
+
+        // Buy 4001 shares out of 5000 public float = 40.01% personal + 0% company = ~40% total — not enough
+        // Need 90% combined. Seed has 5000/10000 as founder shares, so 5000 are on market.
+        // Buying 4501 = 45.01% personal. Not enough since founder keeps 50%.
+        // Need total 90% from both founder (50%) and acquirer (40%) — can't merge since founder's shares don't count for acquirer.
+        // Instead: buy all 5000 public float shares = 50% personal ownership, which still < 90%.
+        // To get 90%: the target company needs fewer founder shares or we set it up with most public.
+        // Use totalShares=10000, founderShares=100 → 9900 public. Buy 8901+ = ≥90%.
+        var targetCompanyId2 = await SeedPublicCompanyAsync(targetOwnerId, name: "Merge High Float Co", cash: 50_000m, totalShares: 10_000m, founderShares: 100m);
+
+        // Buy 9001 shares (90.01% of 10000 total)
+        await ExecuteGraphQlAsync(
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { ownedShareCount }
+            }
+            """,
+            new { input = new { companyId = targetCompanyId2, shareCount = 9_001m } },
+            acquirerToken);
+
+        // Verify canMerge is true on the listing
+        var listingsResult = await ExecuteGraphQlAsync(
+            """
+            { stockExchangeListings { companyId companyName combinedControlledOwnershipRatio canMerge } }
+            """,
+            token: acquirerToken);
+        var targetListing = listingsResult.GetProperty("data").GetProperty("stockExchangeListings")
+            .EnumerateArray()
+            .FirstOrDefault(l => l.GetProperty("companyId").GetString() == targetCompanyId2.ToString());
+        Assert.True(targetListing.GetProperty("canMerge").GetBoolean(), "canMerge should be true at 90%+ ownership");
+
+        // Execute the merge
+        var mergeResult = await ExecuteGraphQlAsync(
+            """
+            mutation MergeCompany($input: MergeCompanyInput!) {
+                mergeCompany(input: $input) {
+                    destinationCompanyId
+                    destinationCompanyName
+                    absorbedCompanyName
+                    cashTransferred
+                    buildingsTransferred
+                }
+            }
+            """,
+            new { input = new { targetCompanyId = targetCompanyId2, destinationCompanyId = destCompanyId } },
+            acquirerToken);
+
+        Assert.False(mergeResult.TryGetProperty("errors", out _), "merge should succeed");
+        var merged = mergeResult.GetProperty("data").GetProperty("mergeCompany");
+        Assert.Equal(destCompanyId.ToString(), merged.GetProperty("destinationCompanyId").GetString());
+        Assert.Equal("Destination Corp", merged.GetProperty("destinationCompanyName").GetString());
+        Assert.Equal("Merge High Float Co", merged.GetProperty("absorbedCompanyName").GetString());
+        Assert.True(merged.GetProperty("cashTransferred").GetDecimal() >= 0m);
+
+        // Verify target company no longer appears in listings
+        var afterListings = await ExecuteGraphQlAsync(
+            """{ stockExchangeListings { companyId companyName } }""",
+            token: acquirerToken);
+        var allIds = afterListings.GetProperty("data").GetProperty("stockExchangeListings")
+            .EnumerateArray()
+            .Select(l => l.GetProperty("companyId").GetString())
+            .ToList();
+        Assert.DoesNotContain(targetCompanyId2.ToString(), allIds);
+    }
+
+    [Fact]
+    public async Task MergeCompany_InsufficientOwnership_ReturnsError()
+    {
+        var targetOwnerToken = await RegisterAndGetTokenAsync($"merge-insuff-target-{Guid.NewGuid():N}@test.com", "Merge Insuff Target");
+        var targetOwnerId = await GetCurrentPlayerIdAsync(targetOwnerToken);
+        var targetCompanyId = await SeedPublicCompanyAsync(targetOwnerId, name: "Merge Insuff Target Co", cash: 10_000m);
+
+        var acquirerToken = await RegisterAndGetTokenAsync($"merge-insuff-acq-{Guid.NewGuid():N}@test.com", "Merge Insuff Acquirer");
+        var destResult = await ExecuteGraphQlAsync(
+            """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+                createCompany(input: $input) { id }
+            }
+            """,
+            new { input = new { name = "Insuff Dest Corp" } },
+            acquirerToken);
+        var destCompanyId = Guid.Parse(destResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!);
+
+        // Only buy 50% of public float — total will be 25% of company (50% owner keeps other 50%)
+        await ExecuteGraphQlAsync(
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { ownedShareCount }
+            }
+            """,
+            new { input = new { companyId = targetCompanyId, shareCount = 2_500m } },
+            acquirerToken);
+
+        var mergeResult = await ExecuteGraphQlAsync(
+            """
+            mutation MergeCompany($input: MergeCompanyInput!) {
+                mergeCompany(input: $input) { destinationCompanyId }
+            }
+            """,
+            new { input = new { targetCompanyId, destinationCompanyId = destCompanyId } },
+            acquirerToken);
+
+        var errors = mergeResult.GetProperty("errors").EnumerateArray().ToList();
+        Assert.NotEmpty(errors);
+        Assert.Equal("INSUFFICIENT_OWNERSHIP_FOR_MERGE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task MergeCompany_SameCompany_ReturnsError()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync($"merge-same-{Guid.NewGuid():N}@test.com", "Merge Same Owner");
+        var destResult = await ExecuteGraphQlAsync(
+            """
+            mutation CreateCompany($input: CreateCompanyInput!) {
+                createCompany(input: $input) { id }
+            }
+            """,
+            new { input = new { name = "Same Corp" } },
+            ownerToken);
+        var companyId = Guid.Parse(destResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!);
+
+        var mergeResult = await ExecuteGraphQlAsync(
+            """
+            mutation MergeCompany($input: MergeCompanyInput!) {
+                mergeCompany(input: $input) { destinationCompanyId }
+            }
+            """,
+            new { input = new { targetCompanyId = companyId, destinationCompanyId = companyId } },
+            ownerToken);
+
+        var errors = mergeResult.GetProperty("errors").EnumerateArray().ToList();
+        Assert.NotEmpty(errors);
+        Assert.Equal("SAME_COMPANY", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task MergeCompany_RequiresAuthentication()
+    {
+        var mergeResult = await ExecuteGraphQlAsync(
+            """
+            mutation MergeCompany($input: MergeCompanyInput!) {
+                mergeCompany(input: $input) { destinationCompanyId }
+            }
+            """,
+            new { input = new { targetCompanyId = Guid.NewGuid(), destinationCompanyId = Guid.NewGuid() } });
+
+        var errors = mergeResult.GetProperty("errors").EnumerateArray().ToList();
+        Assert.NotEmpty(errors);
+    }
+
+    #endregion
 
 }
 
