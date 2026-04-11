@@ -339,6 +339,30 @@ public sealed class Query
         };
     }
 
+    [HotChocolate.Authorization.Authorize]
+    public async Task<List<BuildingLayoutTemplateInfo>> GetMyBuildingLayouts(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var userId = GetCurrentUserId(claimsPrincipal);
+
+        return await db.BuildingLayoutTemplates
+            .AsNoTracking()
+            .Where(l => l.PlayerAccountId == userId)
+            .OrderByDescending(l => l.UpdatedAtUtc)
+            .Select(l => new BuildingLayoutTemplateInfo
+            {
+                Id = l.Id,
+                Name = l.Name,
+                Description = l.Description,
+                BuildingType = l.BuildingType,
+                UnitsJson = l.UnitsJson,
+                CreatedAtUtc = l.CreatedAtUtc,
+                UpdatedAtUtc = l.UpdatedAtUtc,
+            })
+            .ToListAsync();
+    }
+
     internal static string NormalizeEmail(string email, string errorCode)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
