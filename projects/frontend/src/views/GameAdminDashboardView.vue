@@ -393,13 +393,7 @@ onMounted(async () => {
               </div>
 
               <div v-if="player.companies.length > 0" class="admin-company-list">
-                <button
-                  v-for="company in player.companies"
-                  :key="company.id"
-                  type="button"
-                  class="admin-company-pill"
-                  @click="startImpersonation(player.id, 'COMPANY', company.id)"
-                >
+                <button v-for="company in player.companies" :key="company.id" type="button" class="admin-company-pill" @click="startImpersonation(player.id, 'COMPANY', company.id)">
                   {{ company.name }} · {{ formatCurrency(company.cash) }}
                 </button>
               </div>
@@ -450,20 +444,12 @@ onMounted(async () => {
 
               <label class="form-label">
                 {{ t('admin.entryTitle') }}
-                <input
-                  class="form-input"
-                  :value="activeLocalization?.title ?? ''"
-                  @input="updateLocalization('title', ($event.target as HTMLInputElement).value)"
-                />
+                <input class="form-input" :value="activeLocalization?.title ?? ''" @input="updateLocalization('title', ($event.target as HTMLInputElement).value)" />
               </label>
 
               <label class="form-label">
                 {{ t('admin.entrySummary') }}
-                <textarea
-                  class="form-textarea"
-                  :value="activeLocalization?.summary ?? ''"
-                  @input="updateLocalization('summary', ($event.target as HTMLTextAreaElement).value)"
-                ></textarea>
+                <textarea class="form-textarea" :value="activeLocalization?.summary ?? ''" @input="updateLocalization('summary', ($event.target as HTMLTextAreaElement).value)"></textarea>
               </label>
 
               <label class="form-label">

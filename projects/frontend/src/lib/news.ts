@@ -22,10 +22,7 @@ export function createEmptyNewsDraft(entryType: GameNewsEntry['entryType'] = 'NE
   }
 }
 
-export function pickGameNewsLocalization(
-  localizations: readonly GameNewsLocalization[],
-  preferredLocale: string,
-): GameNewsLocalization | null {
+export function pickGameNewsLocalization(localizations: readonly GameNewsLocalization[], preferredLocale: string): GameNewsLocalization | null {
   if (localizations.length === 0) {
     return null
   }
@@ -40,11 +37,7 @@ export function pickGameNewsLocalization(
   )
 }
 
-export function upsertNewsLocalization(
-  localizations: readonly GameNewsLocalization[],
-  locale: string,
-  patch: Partial<GameNewsLocalization>,
-): GameNewsLocalization[] {
+export function upsertNewsLocalization(localizations: readonly GameNewsLocalization[], locale: string, patch: Partial<GameNewsLocalization>): GameNewsLocalization[] {
   const normalizedLocale = locale.toLowerCase()
   const existing = localizations.find((localization) => localization.locale.toLowerCase() === normalizedLocale)
 

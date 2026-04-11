@@ -189,7 +189,7 @@ public sealed class Mutation
         [Service] IOptions<MasterServerOptions> masterServerOptions,
         [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
     {
-        Query.EnsureServiceAccess(input, masterServerOptions);
+        Query.EnsureServiceAccess(input, masterServerOptions, false, false);
 
         var requesterEmail = Query.NormalizeEmail(input.RequesterEmail, "INVALID_REQUESTER_EMAIL");
         var requesterAccess = await Query.BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, requesterEmail);

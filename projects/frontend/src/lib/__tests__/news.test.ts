@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  NEWS_EDITOR_LOCALES,
-  createEmptyNewsDraft,
-  createEmptyNewsLocalizations,
-  pickGameNewsLocalization,
-  upsertNewsLocalization,
-} from '../news'
+import { NEWS_EDITOR_LOCALES, createEmptyNewsDraft, createEmptyNewsLocalizations, pickGameNewsLocalization, upsertNewsLocalization } from '../news'
 
 describe('news helpers', () => {
   it('creates a draft with the expected locale scaffolding', () => {
@@ -15,11 +9,7 @@ describe('news helpers', () => {
     expect(draft.entryType).toBe('CHANGELOG')
     expect(draft.status).toBe('DRAFT')
     expect(draft.localizations).toHaveLength(NEWS_EDITOR_LOCALES.length)
-    expect(draft.localizations.map((localization) => localization.locale)).toEqual([
-      'en',
-      'sk',
-      'de',
-    ])
+    expect(draft.localizations.map((localization) => localization.locale)).toEqual(['en', 'sk', 'de'])
   })
 
   it('falls back to english when the preferred locale is unavailable', () => {

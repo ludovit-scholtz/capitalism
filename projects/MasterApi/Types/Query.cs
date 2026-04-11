@@ -107,13 +107,24 @@ public sealed class Query
             })
             .ToListAsync();
     }
-
+    [HotChocolate.Authorization.Authorize]
     public async Task<GameNewsFeedResult> GetGameNewsFeed(
-        GetGameNewsFeedInput input,
         [Service] MasterDbContext db,
-        [Service] IOptions<MasterServerOptions> masterServerOptions)
+        [Service] IOptions<MasterServerOptions> masterServerOptions,
+        ClaimsPrincipal claimsPrincipal,
+        GetGameNewsFeedInput? input = null
+        )
     {
-        EnsureServiceAccess(input, masterServerOptions);
+        if (input is null)
+        {
+            input = new GetGameNewsFeedInput
+            {
+                ServerKey = string.Empty,
+                IncludeDrafts = false,
+                Limit = 20,
+            };
+        }
+        EnsureServiceAccess(input, masterServerOptions, false, false);
 
         if (input.IncludeDrafts && string.IsNullOrWhiteSpace(input.RequesterEmail))
         {
@@ -126,7 +137,7 @@ public sealed class Query
 
         var playerEmail = string.IsNullOrWhiteSpace(input.PlayerEmail)
             ? null
-            : NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
+            : NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL") ?? claimsPrincipal.Claims.Single(x => x.Type == ClaimTypes.Email).Value;
         var limit = Math.Clamp(input.Limit, 1, 100);
 
         var entries = await db.GameNewsEntries
@@ -168,7 +179,7 @@ public sealed class Query
                 unreadCount = Math.Max(0, publishedEntryIds.Count - readEntryIds);
             }
         }
-
+        
         return new GameNewsFeedResult
         {
             Items = items,
@@ -226,26 +237,34 @@ public sealed class Query
 
     internal static void EnsureServiceAccess(
         MasterServerServiceInput input,
-        IOptions<MasterServerOptions> masterServerOptions)
+        IOptions<MasterServerOptions> masterServerOptions,
+        bool requireRegistrationKey = true,
+        bool requireServerKey = true
+        )
     {
-        var expectedKey = masterServerOptions.Value.RegistrationKey.Trim();
-        if (string.IsNullOrWhiteSpace(expectedKey)
-            || !string.Equals(expectedKey, input.RegistrationKey?.Trim(), StringComparison.Ordinal))
+        if (requireRegistrationKey)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Invalid game server registration key.")
-                    .SetCode("INVALID_REGISTRATION_KEY")
-                    .Build());
+            var expectedKey = masterServerOptions.Value.RegistrationKey.Trim();
+            if (string.IsNullOrWhiteSpace(expectedKey)
+                || !string.Equals(expectedKey, input.RegistrationKey?.Trim(), StringComparison.Ordinal))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Invalid game server registration key.")
+                        .SetCode("INVALID_REGISTRATION_KEY")
+                        .Build());
+            }
         }
-
-        if (string.IsNullOrWhiteSpace(input.ServerKey))
+        if (requireServerKey)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Server key is required.")
-                    .SetCode("SERVER_KEY_REQUIRED")
-                    .Build());
+            if (string.IsNullOrWhiteSpace(input.ServerKey))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Server key is required.")
+                        .SetCode("SERVER_KEY_REQUIRED")
+                        .Build());
+            }
         }
     }
 

@@ -49,9 +49,7 @@ async function loadFeed() {
   try {
     const feed = await newsStore.fetchFeed(false)
     if (auth.isAuthenticated) {
-      const unreadEntryIds = feed.items
-        .filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead)
-        .map((entry) => entry.id)
+      const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
 
       if (unreadEntryIds.length > 0) {
         await newsStore.markRead(unreadEntryIds)
@@ -135,9 +133,7 @@ onMounted(async () => {
 
 .news-hero {
   padding: 3.5rem 0 2rem;
-  background:
-    radial-gradient(circle at top left, rgba(255, 138, 0, 0.18), transparent 40%),
-    radial-gradient(circle at top right, rgba(0, 71, 255, 0.18), transparent 42%);
+  background: radial-gradient(circle at top left, rgba(255, 138, 0, 0.18), transparent 40%), radial-gradient(circle at top right, rgba(0, 71, 255, 0.18), transparent 42%);
   border-bottom: 1px solid var(--color-border);
 }
 

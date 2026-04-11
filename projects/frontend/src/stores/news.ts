@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
-import { gqlRequest } from '@/lib/graphql'
+import { gqlRequest } from '@/lib/masterLayoutApi'
 import type { GameNewsFeed } from '@/types'
 
 const FEED_FIELDS = `
@@ -38,8 +38,8 @@ export const useNewsStore = defineStore('news', () => {
 
     try {
       const data = await gqlRequest<{ gameNewsFeed: GameNewsFeed }>(
-        `query GameNewsFeed($includeDrafts: Boolean!) {
-          gameNewsFeed(includeDrafts: $includeDrafts) {
+        `query GameNewsFeed() {
+          gameNewsFeed() {
             ${FEED_FIELDS}
           }
         }`,
