@@ -5,13 +5,11 @@ Create a fun game on style of the capitalism II game. This game is economic simu
 It will use real world map. The game will start in single city and later other cities will be added.
 
 ## Issues to work on
-- --color-surface-secondary is defined as #f3f4f6, but --color-text-primary is not defined and in some components this combination makes the color of text white and background white so it does not show the text; --color-background is not defined and color text is defined as #e6edf3 - this make the white text on white background making the text not readable. Fix all similar issues.
-- Improve public sales calculation engine - add trending and random component. The 
 - Improve product selection in sales and storage unit - select products only from connected units or current stock items.
 - Product picker does not work at the moment - looks like lines are shrinked and it does not show the products. Perhaps the list should be hidden by the default until the select button is clicked?
 - Show save layout and load layout not in the unit editation but in the building editation. Building layout should be loadable and storeable. Allow user to store this to the master game api, so that he can reuse the layouts between different games.
 - While upgrade of unit is in progress do not move the items from or to the unit or do not produce the items. Allow upgrades UX to be the same as the edit building. Show the upgrade buttons in the edit mode and allow multiple units in the building to be upgraded at the same time.
-- Allow in the sale show build the storage unit
+- Allow in the sale shop show build the storage unit
 - For upgrading the units show true changes what effect it will have. For example the storage capacity of the unit will expand from 100 to 250 and power consumption will increase from 1MW to 1.5MW and salaries will increase from 1 manhour to 2 manhour for example.
 - Global exchange should provide bid and offer for every product. The prices and qualities should be subject of small changes.
 - In stock exchange should be clear list of all companies in the game with public ownership with the stock price, market value, and player aggregated ownership information listed in the table which can be sorted and filtered and paginated
