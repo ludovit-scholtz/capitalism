@@ -17304,7 +17304,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var result = await ExecuteGraphQlAsync(
             $@"{{ companyLedger(companyId: ""{companyId}"") {{
-                totalRevenue totalPurchasingCosts totalLaborCosts totalEnergyCosts
+                totalRevenue totalPurchasingCosts totalShippingCosts totalLaborCosts totalEnergyCosts
                 totalTaxPaid totalOtherCosts netIncome
             }} }}",
             token: token);
@@ -17314,6 +17314,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var totalRevenue = ledger.GetProperty("totalRevenue").GetDecimal();
         var totalPurchasingCosts = ledger.GetProperty("totalPurchasingCosts").GetDecimal();
+        var totalShippingCosts = ledger.GetProperty("totalShippingCosts").GetDecimal();
         var totalLaborCosts = ledger.GetProperty("totalLaborCosts").GetDecimal();
         var totalEnergyCosts = ledger.GetProperty("totalEnergyCosts").GetDecimal();
         var totalTaxPaid = ledger.GetProperty("totalTaxPaid").GetDecimal();
@@ -17321,7 +17322,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var netIncome = ledger.GetProperty("netIncome").GetDecimal();
 
         // netIncome = revenue - all costs including tax (backend formula)
-        var expectedNetIncome = totalRevenue - totalPurchasingCosts - totalLaborCosts
+        var expectedNetIncome = totalRevenue - totalPurchasingCosts - totalShippingCosts - totalLaborCosts
                                 - totalEnergyCosts - totalTaxPaid - totalOtherCosts;
         Assert.Equal(expectedNetIncome, netIncome);
 
@@ -21549,8 +21550,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Must prefer a player exchange order, not the global exchange.
         // Price may be <= $1.00 if other tests have cheaper orders in the shared DB.
         Assert.Equal("PLAYER_EXCHANGE_ORDER", preview.GetProperty("sourceType").GetString());
-        Assert.True(preview.GetProperty("deliveredPricePerUnit").GetDecimal() <= 1.00m,
-            "Preview should pick the cheapest player order (≤ $1.00), not global exchange");
+        Assert.True(preview.GetProperty("deliveredPricePerUnit").GetDecimal() <= 1.01m,
+            "Preview should pick the cheapest player order (≈ $1.00 plus shipping), not global exchange");
     }
 
     [Fact]
@@ -21687,7 +21688,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(preview.GetProperty("canExecute").GetBoolean());
         Assert.Equal("PLAYER_EXCHANGE_ORDER", preview.GetProperty("sourceType").GetString());
         // Must use seller's $2.00 order, NOT other's cheaper $0.50 order.
-        Assert.Equal(2.00m, preview.GetProperty("deliveredPricePerUnit").GetDecimal());
+        Assert.Equal(2.01m, preview.GetProperty("deliveredPricePerUnit").GetDecimal());
         Assert.Equal(sellerCompany.Id.ToString(), preview.GetProperty("sourceVendorCompanyId").GetString());
     }
 
@@ -22974,6 +22975,340 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var first = items[0];
         Assert.Equal("flour", first.GetProperty("productType").GetProperty("slug").GetString());
         Assert.Equal("connected", first.GetProperty("rankingReason").GetString());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_StorageContext_PendingConfigMfgProductRankedFirst()
+    {
+        // Products configured in a pending (draft) MANUFACTURING unit must be promoted for STORAGE context,
+        // even when the live building units do not yet have a product set.
+        var email = $"rpt-stpc-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptStPc");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var bandagesId = await GetProductGuidBySlugAsync(db, "bandages");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptStPcCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "RptStPcFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        // No live MANUFACTURING unit — only a pending plan unit
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            BuildingId = building.Id,
+            SubmittedAtTick = 1,
+            AppliesAtTick = 10,
+            TotalTicksRequired = 9,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            BuildingConfigurationPlanId = plan.Id,
+            UnitType = "MANUFACTURING",
+            GridX = 0, GridY = 0, Level = 1,
+            ProductTypeId = bandagesId,
+            IsChanged = true,
+        });
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = building.Id.ToString(), unitType = "STORAGE" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("bandages", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("connected", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(100, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_PublicSalesContext_PendingConfigConnectedProductRankedFirst()
+    {
+        // Products configured in a pending (draft) MANUFACTURING unit must be promoted for PUBLIC_SALES context.
+        var email = $"rpt-pspc-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptPsPc");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var flourId = await GetProductGuidBySlugAsync(db, "flour");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPsPcCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "RptPsPcShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        // Pending plan with a MANUFACTURING unit configured for Flour
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            BuildingId = building.Id,
+            SubmittedAtTick = 1,
+            AppliesAtTick = 10,
+            TotalTicksRequired = 9,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            BuildingConfigurationPlanId = plan.Id,
+            UnitType = "MANUFACTURING",
+            GridX = 0, GridY = 0, Level = 1,
+            ProductTypeId = flourId,
+            IsChanged = true,
+        });
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = building.Id.ToString(), unitType = "PUBLIC_SALES" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("flour", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("connected", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(100, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_B2BSalesContext_PendingConfigMfgProductRankedFirst()
+    {
+        // Products configured in a pending (draft) MANUFACTURING unit must be promoted for B2B_SALES context.
+        var email = $"rpt-b2bpc-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptB2bPc");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var woodenTableId = await GetProductGuidBySlugAsync(db, "wooden-table");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptB2bPcCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "RptB2bPcFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        // Pending plan with a MANUFACTURING unit configured for Wooden Table
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            BuildingId = building.Id,
+            SubmittedAtTick = 1,
+            AppliesAtTick = 10,
+            TotalTicksRequired = 9,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            BuildingConfigurationPlanId = plan.Id,
+            UnitType = "MANUFACTURING",
+            GridX = 0, GridY = 0, Level = 1,
+            ProductTypeId = woodenTableId,
+            IsChanged = true,
+        });
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = building.Id.ToString(), unitType = "B2B_SALES" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("wooden-table", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("connected", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(100, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task CompanyLedger_ReturnsShippingCostsAndShippingDrillDown()
+    {
+        var email = $"ledger-shipping-{Guid.NewGuid():N}@example.com";
+        var token = await RegisterAndGetTokenAsync(email, "Ledger Shipping");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Ledger Shipping Co",
+            Cash = 50_000m,
+        };
+        db.Companies.Add(company);
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Ledger Shipping Factory",
+            Level = 1,
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            CompanyId = company.Id,
+            BuildingId = building.Id,
+            Category = LedgerCategory.ShippingCost,
+            Description = "Shipping: local product",
+            Amount = -125.50m,
+            RecordedAtTick = 10,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var ledgerResult = await ExecuteGraphQlAsync(
+            """
+            query Ledger($companyId: UUID!) {
+              companyLedger(companyId: $companyId) {
+                totalShippingCosts
+                netIncome
+              }
+            }
+            """,
+            new { companyId = company.Id.ToString() },
+            token);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.Equal(125.50m, ledger.GetProperty("totalShippingCosts").GetDecimal());
+        Assert.True(ledger.GetProperty("netIncome").GetDecimal() < 0m);
+
+        var drillDownResult = await ExecuteGraphQlAsync(
+            """
+            query ShippingDrill($companyId: UUID!) {
+              ledgerDrillDown(companyId: $companyId, category: "SHIPPING_COST") {
+                category
+                description
+                amount
+              }
+            }
+            """,
+            new { companyId = company.Id.ToString() },
+            token);
+
+        var entries = drillDownResult.GetProperty("data").GetProperty("ledgerDrillDown").EnumerateArray().ToList();
+        Assert.Single(entries);
+        Assert.Equal("SHIPPING_COST", entries[0].GetProperty("category").GetString());
+        Assert.Equal("Shipping: local product", entries[0].GetProperty("description").GetString());
+        Assert.Equal(-125.50m, entries[0].GetProperty("amount").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GameAdminDashboard_ReturnsShippingCostTotalsAndPerCompanyBreakdown()
+    {
+        var email = $"admin-shipping-{Guid.NewGuid():N}@example.com";
+        var token = await RegisterAndGetTokenAsync(email, "Admin Shipping");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var admin = await db.Players.FirstAsync(p => p.Email == email);
+        admin.Role = PlayerRole.Admin;
+
+        var companyA = new Company { Id = Guid.NewGuid(), PlayerId = admin.Id, Name = "Atlas Logistics", Cash = 100_000m };
+        var companyB = new Company { Id = Guid.NewGuid(), PlayerId = admin.Id, Name = "Bravo Mills", Cash = 90_000m };
+        db.Companies.AddRange(companyA, companyB);
+        db.LedgerEntries.AddRange(
+            new LedgerEntry
+            {
+                CompanyId = companyA.Id,
+                Category = LedgerCategory.ShippingCost,
+                Description = "Shipping: product route A",
+                Amount = -80m,
+                RecordedAtTick = 5,
+                RecordedAtUtc = DateTime.UtcNow,
+            },
+            new LedgerEntry
+            {
+                CompanyId = companyA.Id,
+                Category = LedgerCategory.ShippingCost,
+                Description = "Shipping: product route B",
+                Amount = -20m,
+                RecordedAtTick = 6,
+                RecordedAtUtc = DateTime.UtcNow,
+            },
+            new LedgerEntry
+            {
+                CompanyId = companyB.Id,
+                Category = LedgerCategory.ShippingCost,
+                Description = "Shipping: product route C",
+                Amount = -50m,
+                RecordedAtTick = 7,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query AdminDashboard {
+              gameAdminDashboard {
+                totalShippingCostsLast100Ticks
+                shippingCostSummaries {
+                  companyId
+                  companyName
+                  amount
+                  entryCount
+                }
+              }
+            }
+            """,
+            token: token);
+
+        var dashboard = result.GetProperty("data").GetProperty("gameAdminDashboard");
+        Assert.Equal(150m, dashboard.GetProperty("totalShippingCostsLast100Ticks").GetDecimal());
+        var summaries = dashboard.GetProperty("shippingCostSummaries").EnumerateArray().ToList();
+        Assert.Equal(2, summaries.Count);
+        Assert.Equal("Atlas Logistics", summaries[0].GetProperty("companyName").GetString());
+        Assert.Equal(100m, summaries[0].GetProperty("amount").GetDecimal());
+        Assert.Equal(2, summaries[0].GetProperty("entryCount").GetInt32());
     }
 
     #endregion

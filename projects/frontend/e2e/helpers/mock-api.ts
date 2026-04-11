@@ -69,6 +69,7 @@ export type MockLedgerSummary = {
   currentCash: number
   totalRevenue: number
   totalPurchasingCosts: number
+  totalShippingCosts?: number
   totalLaborCosts: number
   totalEnergyCosts: number
   totalMarketingCosts: number
@@ -546,6 +547,13 @@ export type MockGameAdminMoneyInflowSummary = {
   description: string
 }
 
+export type MockGameAdminShippingCostSummary = {
+  companyId: string
+  companyName: string
+  amount: number
+  entryCount: number
+}
+
 export type MockGameAdminMultiAccountAlert = {
   reason: string
   exposureAmount: number
@@ -623,6 +631,7 @@ export type MockState = {
   globalGameAdminGrants: MockGlobalGameAdminGrant[]
   gameNewsEntries: MockGameNewsEntry[]
   adminMoneyInflowSummaries: MockGameAdminMoneyInflowSummary[]
+  adminShippingCostSummaries: MockGameAdminShippingCostSummary[]
   adminMultiAccountAlerts: MockGameAdminMultiAccountAlert[]
   adminAuditLogs: MockGameAdminAuditLog[]
   impersonationSession: MockImpersonationSession | null
@@ -863,7 +872,7 @@ function buildMockLedgerHistoryYear(summary: MockLedgerSummary, currentGameYear:
   const gameYear = summary.gameYear ?? currentGameYear
   const taxableIncome =
     summary.taxableIncome ??
-    Math.max(summary.totalRevenue - summary.totalPurchasingCosts - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts, 0)
+    Math.max(summary.totalRevenue - summary.totalPurchasingCosts - (summary.totalShippingCosts ?? 0) - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts, 0)
 
   return {
     gameYear,
@@ -891,9 +900,10 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     isCurrentGameYear: summary.isCurrentGameYear ?? gameYear === currentGameYear,
     totalStockPurchaseCashOut: summary.totalStockPurchaseCashOut ?? 0,
     totalStockSaleCashIn: summary.totalStockSaleCashIn ?? 0,
+    totalShippingCosts: summary.totalShippingCosts ?? 0,
     taxableIncome:
       summary.taxableIncome ??
-      Math.max(summary.totalRevenue - summary.totalPurchasingCosts - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts, 0),
+      Math.max(summary.totalRevenue - summary.totalPurchasingCosts - (summary.totalShippingCosts ?? 0) - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts, 0),
     estimatedIncomeTax: summary.estimatedIncomeTax ?? summary.totalTaxPaid,
     incomeTaxDueAtTick,
     incomeTaxDueGameTimeUtc: summary.incomeTaxDueGameTimeUtc ?? computeMockInGameTimeUtc(incomeTaxDueAtTick),
@@ -982,11 +992,8 @@ function computeMockExchangeQuality(abundance: number) {
 }
 
 function computeMockTransitCost(weightPerUnit: number, distanceKm: number) {
-  if (distanceKm <= 0) {
-    return 0
-  }
-
-  return Number(Math.max(distanceKm * Math.max(weightPerUnit, 0.1) * 0.0025, 0.05).toFixed(2))
+  const rawCost = distanceKm * Math.max(weightPerUnit, 0.1) * 0.0025
+  return Number(Math.max(rawCost, 0.01).toFixed(2))
 }
 
 function getMockUnitCapacity(unit: MockBuildingUnit) {
@@ -1505,6 +1512,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     globalGameAdminGrants: [],
     gameNewsEntries: [],
     adminMoneyInflowSummaries: [],
+    adminShippingCostSummaries: [],
     adminMultiAccountAlerts: [],
     adminAuditLogs: [],
     impersonationSession: null,
@@ -3488,21 +3496,66 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('rankedProductTypes')) {
       const activePlayer = state.players.find((player) => player.id === state.currentUserId)
       const hasActiveProSubscription = !!activePlayer?.proSubscriptionEndsAtUtc && new Date(activePlayer.proSubscriptionEndsAtUtc).getTime() > Date.now()
+      const buildingId = body.variables?.buildingId
+      const unitType = (body.variables?.unitType as string | undefined)?.toUpperCase() ?? ''
+
+      // Find the building to compute context-aware rankings (simulates backend logic)
+      const building = state.players
+        .flatMap((p) => p.companies)
+        .flatMap((c) => c.buildings)
+        .find((b) => b.id === buildingId)
+
+      // Collect unit product IDs from active + pending configuration
+      const allBuildingUnits = [
+        ...(building?.units ?? []),
+        ...(building?.pendingConfiguration?.units ?? []),
+      ]
+
+      const connectedProductIds = new Set<string>()
+      if (unitType === 'PUBLIC_SALES') {
+        // Connected = products from MANUFACTURING or B2B_SALES units
+        allBuildingUnits
+          .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'B2B_SALES') && u.productTypeId)
+          .forEach((u) => connectedProductIds.add(u.productTypeId!))
+      } else if (unitType === 'STORAGE') {
+        // Connected = products from MANUFACTURING units
+        allBuildingUnits
+          .filter((u) => u.unitType === 'MANUFACTURING' && u.productTypeId)
+          .forEach((u) => connectedProductIds.add(u.productTypeId!))
+        // Also products currently in inventory
+        allBuildingUnits
+          .filter((u) => u.inventoryItems && u.inventoryItems.length > 0)
+          .flatMap((u) => u.inventoryItems ?? [])
+          .filter((item) => item.productTypeId)
+          .forEach((item) => connectedProductIds.add(item.productTypeId!))
+      } else if (unitType === 'B2B_SALES') {
+        // Connected = products from MANUFACTURING or STORAGE units
+        allBuildingUnits
+          .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'STORAGE') && u.productTypeId)
+          .forEach((u) => connectedProductIds.add(u.productTypeId!))
+      }
+
+      // Sort: connected first (score 100), then catalog (score 10), both alphabetical
+      const enriched = state.productTypes.map((product) => {
+        const isConnected = connectedProductIds.has(product.id)
+        return {
+          rankingReason: isConnected ? 'connected' : 'catalog',
+          rankingScore: isConnected ? 100 : 10,
+          productType: {
+            ...product,
+            isUnlockedForCurrentPlayer: product.isProOnly ? hasActiveProSubscription : true,
+          },
+        }
+      })
+      enriched.sort((a, b) => {
+        if (b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore
+        return a.productType.name.localeCompare(b.productType.name)
+      })
+
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            rankedProductTypes: state.productTypes.map((product) => ({
-              rankingReason: 'catalog',
-              rankingScore: 10,
-              productType: {
-                ...product,
-                isUnlockedForCurrentPlayer: product.isProOnly ? hasActiveProSubscription : true,
-              },
-            })),
-          },
-        }),
+        body: JSON.stringify({ data: { rankedProductTypes: enriched } }),
       })
     }
 
@@ -4141,8 +4194,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           sourceVendorCompanyId: null,
           sourceVendorName: null,
           exchangePricePerUnit: 8.5,
-          transitCostPerUnit: 0,
-          deliveredPricePerUnit: 8.5,
+          transitCostPerUnit: 0.01,
+          deliveredPricePerUnit: 8.51,
           estimatedQuality: 0.7,
           distanceKm: 0,
           isEligible: true,
@@ -4356,6 +4409,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 description: 'No exceptional money inflow is currently flagged.',
               },
             ]
+      const shippingCostSummaries = state.adminShippingCostSummaries
+        .map((summary) => ({ ...summary }))
+        .sort((left, right) => right.amount - left.amount || left.companyName.localeCompare(right.companyName))
 
       const multiAccountAlerts = state.adminMultiAccountAlerts
         .map((alert) => {
@@ -4385,7 +4441,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           totalCompanyCash,
           moneySupply: Number((totalPersonalCash + totalCompanyCash).toFixed(2)),
           externalMoneyInflowLast100Ticks: Number(inflowSummaries.reduce((total, summary) => total + summary.amount, 0).toFixed(2)),
+          totalShippingCostsLast100Ticks: Number(shippingCostSummaries.reduce((total, summary) => total + summary.amount, 0).toFixed(2)),
           inflowSummaries,
+          shippingCostSummaries,
           multiAccountAlerts,
           players: state.players.map(buildGameAdminPlayer).sort((left, right) => left.displayName.localeCompare(right.displayName)),
           invisiblePlayers: state.players.filter((player) => player.isInvisibleInChat).map(buildGameAdminPlayer),
@@ -4662,6 +4720,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           currentCash: company.cash,
           totalRevenue: 0,
           totalPurchasingCosts: 0,
+          totalShippingCosts: 0,
           totalLaborCosts: 0,
           totalEnergyCosts: 0,
           totalMarketingCosts: 0,
