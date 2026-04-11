@@ -10353,7 +10353,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     return player
   }
 
-  test('sales shop unit picker shows exactly PURCHASE, MARKETING, and PUBLIC_SALES options', async ({ page }) => {
+  test('sales shop unit picker shows exactly PURCHASE, MARKETING, STORAGE, and PUBLIC_SALES options', async ({ page }) => {
     const player = makeEmptySalesShopForPicker()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -10380,6 +10380,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     // Sales-shop-specific unit types must be present
     await expect(page.locator('.picker-option').filter({ hasText: 'Purchase' })).toBeVisible()
     await expect(page.locator('.picker-option').filter({ hasText: 'Marketing' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Storage' })).toBeVisible()
     await expect(page.locator('.picker-option').filter({ hasText: 'Public Sales' })).toBeVisible()
 
     // Factory-only types must NOT appear

@@ -4447,7 +4447,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task StoreBuildingConfiguration_SalesShop_WithMarketingUnit_Succeeds()
     {
-        // The ROADMAP specifies that Sales Shops allow PURCHASE, MARKETING, and PUBLIC_SALES units.
+        // The ROADMAP specifies that Sales Shops allow PURCHASE, MARKETING, STORAGE, and PUBLIC_SALES units.
         // This test verifies MARKETING is accepted when placed in a SALES_SHOP.
         var token = await RegisterAndGetTokenAsync($"shop-mkt-{Guid.NewGuid()}@test.com", "Shop Marketing");
 
@@ -4496,6 +4496,58 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var units = result.GetProperty("data").GetProperty("storeBuildingConfiguration").GetProperty("units").EnumerateArray().ToList();
         Assert.Equal(3, units.Count);
         Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "MARKETING" && u.GetProperty("gridX").GetInt32() == 1);
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_SalesShop_WithStorageUnit_Succeeds()
+    {
+        // Sales shops can now include STORAGE between PURCHASE and PUBLIC_SALES.
+        var token = await RegisterAndGetTokenAsync($"shop-storage-{Guid.NewGuid()}@test.com", "Shop Storage");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Storage Shop Corp" } },
+            token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id } }");
+        var cityId = citiesResult.GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+
+        var buildingResult = await ExecuteGraphQlAsync(
+            "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
+            new { input = new { companyId, cityId, type = "SALES_SHOP", name = "Storage Shop" } },
+            token);
+        var buildingId = buildingResult.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) {
+                id
+                units { unitType gridX }
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new { unitType = "PURCHASE",     gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true,  linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false },
+                        new { unitType = "STORAGE",      gridX = 1, gridY = 0, linkUp = false, linkDown = false, linkLeft = true,  linkRight = true,  linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = (string?)null },
+                        new { unitType = "PUBLIC_SALES", gridX = 2, gridY = 0, linkUp = false, linkDown = false, linkLeft = true,  linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false }
+                    }
+                }
+            },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "STORAGE unit in a SALES_SHOP must be accepted.");
+        var units = result.GetProperty("data").GetProperty("storeBuildingConfiguration").GetProperty("units").EnumerateArray().ToList();
+        Assert.Equal(3, units.Count);
+        Assert.Contains(units, u => u.GetProperty("unitType").GetString() == "STORAGE" && u.GetProperty("gridX").GetInt32() == 1);
     }
 
     [Fact]
