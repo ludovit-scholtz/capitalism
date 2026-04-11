@@ -1139,6 +1139,204 @@ test.describe('Stock exchange', () => {
     // Sign-in prompt should be shown
     await expect(page.locator('.market-note')).toBeVisible()
   })
+
+  test('portfolio section shows owned shares for authenticated player', async ({ page }) => {
+    const rival = makePlayer({
+      id: 'player-portfolio-rival',
+      email: 'portfolio-rival@test.com',
+      displayName: 'Portfolio Rival',
+      companies: [
+        {
+          id: 'company-portfolio-target',
+          playerId: 'player-portfolio-rival',
+          name: 'Portfolio Target Corp',
+          cash: 300000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 5,
+          buildings: [],
+        },
+      ],
+    })
+    const player = makePlayer({
+      personalCash: 250000,
+      companies: [makeControlledCompany()],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-portfolio-target', ownerPlayerId: 'player-portfolio-rival', ownerCompanyId: null, shareCount: 8000 },
+        { companyId: 'company-portfolio-target', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 1500 },
+      ],
+    })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    // Portfolio section must be visible for authenticated player
+    await expect(page.getByRole('heading', { name: 'Personal portfolio' })).toBeVisible()
+
+    // The owned shares must be shown in the portfolio table
+    const portfolioTable = page.locator('.panel').filter({ hasText: 'Personal portfolio' }).locator('.data-table')
+    await expect(portfolioTable).toContainText('Portfolio Target Corp')
+    await expect(portfolioTable).toContainText('1,500')
+  })
+
+  test('portfolio section shows empty state when only company-owned shares exist', async ({ page }) => {
+    const rival = makePlayer({
+      id: 'player-empty-portfolio-rival',
+      email: 'empty-portfolio-rival@test.com',
+      displayName: 'Empty Portfolio Rival',
+      companies: [
+        {
+          id: 'company-empty-portfolio-target',
+          playerId: 'player-empty-portfolio-rival',
+          name: 'No My Shares Corp',
+          cash: 200000,
+          totalSharesIssued: 5000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 2,
+          buildings: [],
+        },
+      ],
+    })
+    const player = makePlayer({
+      personalCash: 100000,
+      companies: [makeControlledCompany()],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        // Company-home founder shares are company-controlled (not in player's personal portfolio)
+        { companyId: 'company-home', ownerPlayerId: null, ownerCompanyId: 'company-home', shareCount: 10000 },
+        { companyId: 'company-empty-portfolio-target', ownerPlayerId: 'player-empty-portfolio-rival', ownerCompanyId: null, shareCount: 5000 },
+      ],
+    })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.getByRole('heading', { name: 'Personal portfolio' })).toBeVisible()
+    const portfolioPanel = page.locator('.panel').filter({ hasText: 'Personal portfolio' }).first()
+    await expect(portfolioPanel.locator('.empty-state')).toBeVisible()
+  })
+
+  test('dividend history section shows payment entry when player received dividends', async ({ page }) => {
+    const rival = makePlayer({
+      id: 'player-div-hist-rival',
+      email: 'div-hist-rival@test.com',
+      displayName: 'Div Hist Rival',
+      companies: [
+        {
+          id: 'company-div-issuer',
+          playerId: 'player-div-hist-rival',
+          name: 'Dividend Issuer Corp',
+          cash: 400000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.3,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 1,
+          buildings: [],
+        },
+      ],
+    })
+    const player = makePlayer({
+      personalCash: 180000,
+      companies: [makeControlledCompany()],
+      dividendPayments: [
+        {
+          id: 'div-payment-1',
+          companyId: 'company-div-issuer',
+          companyName: 'Dividend Issuer Corp',
+          shareCount: 2000,
+          amountPerShare: 1.5,
+          totalAmount: 3000,
+          gameYear: 1,
+          recordedAtTick: 8760,
+          recordedAtUtc: '2026-01-01T00:00:00Z',
+          description: 'Annual dividend payout',
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-div-issuer', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 2000 },
+        { companyId: 'company-div-issuer', ownerPlayerId: 'player-div-hist-rival', ownerCompanyId: null, shareCount: 8000 },
+      ],
+    })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.getByRole('heading', { name: 'Dividend history' })).toBeVisible()
+    const divTable = page.locator('.panel').filter({ hasText: 'Dividend history' }).locator('.data-table')
+    await expect(divTable).toContainText('Dividend Issuer Corp')
+    await expect(divTable).toContainText('3,000')
+  })
+
+  test('dividend history section shows empty state when player has no dividend payments', async ({ page }) => {
+    const rival = makePlayer({
+      id: 'player-no-div-rival',
+      email: 'no-div-rival@test.com',
+      displayName: 'No Div Rival',
+      companies: [
+        {
+          id: 'company-no-div',
+          playerId: 'player-no-div-rival',
+          name: 'No Dividend Corp',
+          cash: 150000,
+          totalSharesIssued: 5000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 3,
+          buildings: [],
+        },
+      ],
+    })
+    const player = makePlayer({
+      personalCash: 90000,
+      companies: [makeControlledCompany()],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-no-div', ownerPlayerId: 'player-no-div-rival', ownerCompanyId: null, shareCount: 5000 },
+      ],
+    })
+    player.activeAccountType = 'PERSON'
+    player.activeCompanyId = null
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await expect(page.getByRole('heading', { name: 'Dividend history' })).toBeVisible()
+    const divPanel = page.locator('.panel').filter({ hasText: 'Dividend history' })
+    await expect(divPanel.locator('.empty-state')).toBeVisible()
+  })
 })
 
 test.describe('Stock exchange live refresh', () => {
@@ -1529,7 +1727,7 @@ test.describe('Stock exchange portfolio and dividend sections', () => {
     await expect(holdingRow.locator('td').last()).toBeVisible()
   })
 
-  test('portfolio section shows empty state when player owns no shares', async ({ page }) => {
+  test('portfolio section shows empty state when player owns no personal shares but has a company', async ({ page }) => {
     const player = makePlayer({
       personalCash: 200000,
       companies: [makeControlledCompany()],
@@ -1707,5 +1905,172 @@ test.describe('Stock exchange — global account switcher hidden in nav', () => 
 
     // The global account switcher IS present on other pages
     await expect(page.locator('.account-switcher')).toBeVisible()
+  })
+})
+
+test.describe('Stock exchange — merge company flow', () => {
+  test('merge button visible and labeled for eligible company', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 500000,
+      companies: [makeControlledCompany()],
+    })
+    // target company with low founder shares so acquirer can hold 90%+
+    const targetOwner = makePlayer({
+      id: 'player-target',
+      email: 'target@test.com',
+      displayName: 'Target Owner',
+      companies: [
+        {
+          id: 'company-target',
+          playerId: 'player-target',
+          name: 'Merge Target Co',
+          cash: 20000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.1,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 10,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, targetOwner],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        // Acquirer holds 9200 out of 10000 = 92% → canMerge=true
+        { companyId: 'company-target', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 9200 },
+        { companyId: 'company-target', ownerPlayerId: 'player-target', ownerCompanyId: null, shareCount: 800 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await restoreMockSession(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    const targetRow = page.locator('tr.listing-row', { hasText: 'Merge Target Co' })
+    await expect(targetRow).toBeVisible()
+
+    // Merge-eligible badge
+    await expect(targetRow.locator('.listing-chip--merge')).toBeVisible()
+
+    // Merge button in actions cell
+    const mergeBtn = targetRow.getByRole('button', { name: 'Merge' })
+    await expect(mergeBtn).toBeVisible()
+  })
+
+  test('merge button NOT visible when ownership below 90%', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 200000,
+      companies: [makeControlledCompany()],
+    })
+    const targetOwner = makePlayer({
+      id: 'player-target2',
+      email: 'target2@test.com',
+      displayName: 'Target Owner 2',
+      companies: [
+        {
+          id: 'company-target2',
+          playerId: 'player-target2',
+          name: 'Low Share Co',
+          cash: 10000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.1,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 10,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, targetOwner],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        // Acquirer holds only 50% → canMerge=false
+        { companyId: 'company-target2', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 5000 },
+        { companyId: 'company-target2', ownerPlayerId: 'player-target2', ownerCompanyId: null, shareCount: 5000 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await restoreMockSession(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    const targetRow = page.locator('tr.listing-row', { hasText: 'Low Share Co' })
+    await expect(targetRow).toBeVisible()
+
+    // No merge button or chip
+    await expect(targetRow.locator('.listing-chip--merge')).not.toBeVisible()
+    await expect(targetRow.getByRole('button', { name: 'Merge' })).not.toBeVisible()
+  })
+
+  test('merge dialog opens, shows eligibility hint, and executes merge', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 500000,
+      companies: [makeControlledCompany()],
+    })
+    const targetOwner = makePlayer({
+      id: 'player-target3',
+      email: 'target3@test.com',
+      displayName: 'Target Owner 3',
+      companies: [
+        {
+          id: 'company-target3',
+          playerId: 'player-target3',
+          name: 'Absorb Me Co',
+          cash: 30000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.05,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 5,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, targetOwner],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-target3', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 9500 },
+        { companyId: 'company-target3', ownerPlayerId: 'player-target3', ownerCompanyId: null, shareCount: 500 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await restoreMockSession(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    const targetRow = page.locator('tr.listing-row', { hasText: 'Absorb Me Co' })
+    await targetRow.getByRole('button', { name: 'Merge' }).click()
+
+    // Dialog opens
+    const dialog = page.locator('[role="dialog"]', { hasText: 'Merge Company' })
+    await expect(dialog).toBeVisible()
+
+    // Eligibility hint is shown
+    await expect(dialog.locator('.merge-dialog__eligibility')).toBeVisible()
+
+    // Destination company select is shown
+    await expect(dialog.locator('select')).toBeVisible()
+
+    // Click Confirm Merge
+    await dialog.getByRole('button', { name: 'Confirm Merge' }).click()
+
+    // Success message appears
+    await expect(dialog.locator('.merge-dialog__success')).toBeVisible()
+    await expect(dialog.locator('.merge-dialog__success')).toContainText('Absorb Me Co')
+
+    // Close button becomes available
+    const closeBtn = dialog.getByRole('button', { name: 'Close' })
+    await expect(closeBtn).toBeVisible()
+    await closeBtn.click()
+
+    // Dialog should close
+    await expect(page.locator('[role="dialog"]', { hasText: 'Merge Company' })).not.toBeVisible()
   })
 })
