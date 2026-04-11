@@ -36,6 +36,10 @@ The master website is product pitching website where users can find in game docu
 
 Master API has its own database and handles the subscription management.
 
+## Authorization
+
+When player creates the account, he creates it at the master server. When user requests the token, he does it against the master server. The token is usable against every game server and master server.
+
 ## Buildings
 
 Every building must be placed on existing land. Land can be purchased on map and it has value which can be increased in time, has gps coordinates, and has attributes like population index which serves for the sale unit sales calculation.
