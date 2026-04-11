@@ -14,8 +14,9 @@ It will use real world map. The game will start in single city and later other c
 - For upgrading the units show true changes what effect it will have. For example the storage capacity of the unit will expand from 100 to 250 and power consumption will increase from 1MW to 1.5MW and salaries will increase from 1 manhour to 2 manhour for example.
 - Make the quality in global exchange vary from 5 to 20 %
 - Do not hide the account selection in the navbar in stock exchange
-- After onboarding the person account should have no cash - He moves his initial cash to the company using the IPO process. At the moment $150000 is present on the person account after the onboarding process.
+- In the stock exchange in company details, show list of all shareholders and the pie chart of their holdings.
 - In the stock exchange, "trade with" should not be visible, but in the navbar should be visible the company selectin as is visible on other pages
+- After onboarding the person account should have no cash - He moves his initial cash to the company using the IPO process. At the moment $150000 is present on the person account after the onboarding process.
 - Dashboard and ledger is loading slow, make sure to use the caching headers so that when user goes fast between the panels it does not have to load all information from the database again. Analyze the issue of the slow requests and if the database is missing an indexes make sure they are created.
 - In manufacturing output product selection show the product images
 - In b2b unit show the sale price, when creating b2b sale unit in factory make sure to set the competetive default price
@@ -280,6 +281,8 @@ Player acting for the company or person account can sell shares it owns.
 When sum of ownerships for person account and all controlled companies in the other company reaches 50%, person can replace the CEO of the company which is considered as the take over and the player will control also this company.
 
 When sum of ownerships for person account and all controlled companies reaches 90%, person can merge this company into another company. This way all assets owned by the company are moved to the new company and the merged company is closed. Taxes for old company are paid on the tick of merge for old company.
+
+In the stock exchange in company details, is list of all shareholders and the pie chart.
 
 ## Account switching
 
