@@ -20,6 +20,9 @@
 - Game frontend router configuration is in `projects/frontend/src/router/index.ts`.
 - Master frontend router configuration is in `projects/master-frontend/src/router/index.ts`.
 
+## Changelog
+Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid id, use current timestamp, and write short one sentence summary in each language (en, sk, de). This is the canonical source of truth for player-visible changes and is used to generate the in-game news feed.
+
 ## Technology and conventions
 - Frontends use Vue 3 + TypeScript + Vite.
 - Game backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, Entity Framework Core (SQLite), and JWT bearer authentication.
