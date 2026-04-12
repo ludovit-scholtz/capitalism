@@ -5,30 +5,57 @@ Create a fun game on style of the capitalism II game. This game is economic simu
 It will use real world map. The game will start in single city and later other cities will be added.
 
 ## Issues to work on
-- Unit linkage on frontend is directional from left to right, right to left, top to bottom and bottom to top, but is not directional from bottom right to top left for example. Make sure all direction combinations are allowed, for example top left to bottom right with bottom left to top right direction. Direction must be always set between the units, and it is not possible to have bidirectional link between units like top to bottom and bottom to top at the same time.
-- When linking Storage unit and sales unit make sure to create correct direction in the first click - all resources must go towards sales units. All directions must go from purchase unit by default.
-- Improve product selection in storage unit - select products only from connected units or current stock items
-- Show save layout and load layout not in the unit editation but in the building editation when no unit is selected. Building layout should be loadable and storeable. Allow user to store this to the master game api, so that he can reuse the layouts between different games.
+
+### Unit links
+- On frontend it is not possible to link the diagonal link between storage at (1,1) and sales unit at (2,0) if the unit (2,1) is empty. Each unit must be connectable to every neighbor including the diagonals with directional links.
+- The cros directional link does not work. The diagonal links can be enabled or disabled from both sides. From top left to bottom right and from top right to bottom left is one of the options. Valid options if all 4 units are available are: TLBR (↘),TRBL (↙),BRTL (↖),BLTR (↗),TLBR+TRBL (⤩),TLBR+BLTR (⤨), BLTR+BRTL (⤧), and TRBL+BRTL (⤪). Valid options if all diagonal TLBR units are available while at least one of the diagonal unit TRBL is not available: TLBR (↘), BRTL (↖). Valid options if all diagonal TRBL units are available while at least one of the diagonal unit TLBR is not available: TRBL (↙), BLTR (↗). 
+- Make frontend arrows bigger, at the moment it is very small and does not show properly direction to the user. Diagonal arrows on frontend does not show direction at all at the moment. Make sure the direction is clearly visible.
+
+### Sale Unit editation
+- Improve product selection in sales unit - select products only from connected units or current stock items
+
+### Manufacturing unit editation
+- In manufacturing output product selection show the product images
+
+### B2B Sales unit editation
+- In b2b unit show the sale price, when creating b2b sale unit in factory make sure to set the competetive default price
+
+### Basic unit definition
 - Make storage unit have 10x storage capacity then the purchase or sales units by default
+
+### Unit modification
 - While upgrade of unit is in progress do not move the items from or to the unit or do not produce the items. Allow upgrades UX to be the same as the edit building. Show the upgrade buttons in the edit mode and allow multiple units in the building to be upgraded at the same time. Test this by the upgrading active sales unit which did sale some product past tick and first tick while unit is upgraded it should not sell any products.
 - For upgrading the units show true changes what effect it will have. For example the storage capacity of the unit will expand from 100 to 250 and power consumption will increase from 1MW to 1.5MW and salaries will increase from 1 manhour to 2 manhour for example.
+
+### Global exchange
 - Make the quality in global exchange vary from 5 to 20 %
+
+### Stock exchange
 - Do not hide the account selection in the navbar in stock exchange
-- In the stock exchange in company details, show list of all shareholders and the pie chart of their holdings.
 - In the stock exchange, "trade with" should not be visible, but in the navbar should be visible the company selectin as is visible on other pages
 - In the stock exchange the buy and sell buttons should be arranged with the share quantity input. Add caption above the buy and sell buttons so that the buttons are moved little bit down.
-- After onboarding the person account should have no cash - He moves his initial cash to the company using the IPO process. ✓ Fixed: founder contribution is now $200k (all personal starting cash), so personal account has $0 after onboarding.
+
+### Database improvements
 - Dashboard and ledger is loading slow, make sure to use the caching headers so that when user goes fast between the panels it does not have to load all information from the database again. Analyze the issue of the slow requests and if the database is missing an indexes make sure they are created.
-- In manufacturing output product selection show the product images
-- In b2b unit show the sale price, when creating b2b sale unit in factory make sure to set the competetive default price
+
+### All buildings
 - Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future.
-- Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging
 - In each building header right below the building name show chart of total costs, total revenue and total profit in the top building overview
+
+### Show time instead of ticks
+- Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging
+
+### Onboarding details
 - Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. 
+
+### Loans menu
 - In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
-- Create ingame chat. Make sure the game administrators has full control of the chat to reduce spam.
-- Administrators role management, dashboard, impersonalization, newspaper
-- Newspaper nor changelog does not show any data
+
+### Ingame chat
+- Make ingame chat more intuitive on the frontend. Add chat to the top navigation bar and if it is open, make sure the chat is visible at the side. In the small devices make sure it is the full page thing.
+
+### Newspaper and changelog
+- Newspaper nor changelog does not show any data. Make sure the data is loaded from the master api and is working properly.
 
 ## Multiple Game Servers
 
