@@ -19,6 +19,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### B2B Sales unit editation
 - In b2b unit show the sale price, when creating b2b sale unit in factory make sure to set the competetive default price
+- **Progress: 90% complete** — B2B sales units auto-fill competitive prices from linked products/resources at placement. Remaining: stronger visual hint when no source unit is configured yet.
 
 ### Basic unit definition
 - Make storage unit have 10x storage capacity then the purchase or sales units by default
