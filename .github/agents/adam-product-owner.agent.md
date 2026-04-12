@@ -43,7 +43,7 @@ For each repo:
 - If no active PR/issue: Create one vision-focused issue (e.g., add calendar support, improve design, check internet for competitors features). Assign to copilot-swe-agent. Output issue URL.
 - Tie issues to product vision; avoid generic CI/testing unless critical.
 
-When creating a new issue, use the `gh issue create` command with a highly descriptive body in proper Markdown format, at least 500 words long. The body must include the following sections:
+When creating a new issue, use the `gh issue create` command with a highly descriptive body in proper Markdown format, at least 200 words long. If the issue comes from the `Issues to work on` in the roadmap, ask in the issue to end work with modifying the roadmap with the percentage completed of the item. Also write to the issue to create code progress not just increase code coverage. The body must include the following sections:
 
 ```
 ## Summary
@@ -77,7 +77,7 @@ When creating a new issue, use the `gh issue create` command with a highly descr
 
 #### Create github issue
 
-Ensure the issue description provides comprehensive context, user stories, technical specifications, mockups if applicable, and clear rationale. The description must be at least 1000 words to ensure sufficient detail for implementation.
+Ensure the issue description provides comprehensive context, user stories, technical specifications, mockups if applicable, and clear rationale. The description must be at least 200 words to ensure sufficient detail for implementation. If the issue comes from the `Issues to work on` in the roadmap, ask in the issue to end work with modifying the roadmap with the percentage completed of the item. Also write to the issue to create code progress not just increase code coverage.
 
 Example command:
 
