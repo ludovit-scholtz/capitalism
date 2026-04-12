@@ -29,7 +29,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, and Entity Framework Core (SQLite locally) to store the live game-server registry.
 - Frontends communicate with their backend exclusively via GraphQL using lightweight fetch-based clients.
 - The game frontend GraphQL endpoint URL is configured via `VITE_GRAPHQL_URL` environment variable (defaults to `https://capitalism.de-4.biatec.io/graphql`).
-- The master frontend GraphQL endpoint URL is configured via `VITE_GRAPHQL_URL` environment variable (defaults to `https://localhost:44364/graphql`).
+- The master frontend GraphQL endpoint URL is configured via `VITE_MASTER_GRAPHQL_URL` environment variable (defaults to `https://localhost:44364/graphql`).
 - State management uses Pinia with the Composition API (`defineStore` with `setup` function syntax).
 - Routing uses Vue Router 5 with lazy-loaded route components (except the home page).
 - Follow existing formatting conventions from `projects/frontend/.prettierrc.json`:
