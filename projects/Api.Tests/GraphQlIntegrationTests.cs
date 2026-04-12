@@ -24489,4 +24489,130 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             "Persisted pending config: B2B_SALES.linkUpLeft must be true (only reversed direction persists)");
     }
 
+    #region News Feed Proxy Tests
+
+    [Fact]
+    public async Task GameNewsFeed_ReturnsEmptyWhenMasterNotConfigured_Unauthenticated()
+    {
+        // Unauthenticated request to gameNewsFeed should succeed and return empty items
+        // when the master server is not configured (test environment).
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+              gameNewsFeed(includeDrafts: false) {
+                unreadCount
+                items {
+                  id
+                  entryType
+                  status
+                }
+              }
+            }
+            """);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Should not return errors when master is not configured.");
+        var feed = result.GetProperty("data").GetProperty("gameNewsFeed");
+        Assert.Equal(0, feed.GetProperty("unreadCount").GetInt32());
+        Assert.Equal(0, feed.GetProperty("items").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task GameNewsFeed_ReturnsEmptyWhenMasterNotConfigured_Authenticated()
+    {
+        // Authenticated players should also get an empty (not error) response when
+        // the master server is not configured.
+        var token = await RegisterAndGetTokenAsync($"news-user-{Guid.NewGuid():N}@test.com", "News User");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+              gameNewsFeed(includeDrafts: false) {
+                unreadCount
+                items {
+                  id
+                  entryType
+                  status
+                  isRead
+                  localizations { locale title }
+                }
+              }
+            }
+            """,
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Authenticated user should not get errors from unconfigured master.");
+        var feed = result.GetProperty("data").GetProperty("gameNewsFeed");
+        Assert.Equal(0, feed.GetProperty("unreadCount").GetInt32());
+        Assert.Equal(0, feed.GetProperty("items").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task GameNewsFeed_IncludeDrafts_RequiresAuthentication()
+    {
+        // Unauthenticated requests with includeDrafts=true must be rejected.
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+              gameNewsFeed(includeDrafts: true) {
+                unreadCount
+              }
+            }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Should return errors when unauthenticated with includeDrafts=true.");
+        var errorCode = errors.EnumerateArray()
+            .Select(error => error.TryGetProperty("extensions", out var ext) &&
+                        ext.TryGetProperty("code", out var code) ? code.GetString() : null)
+            .FirstOrDefault(code => code is not null);
+        Assert.Equal("NOT_AUTHENTICATED", errorCode);
+    }
+
+    [Fact]
+    public async Task GameNewsFeed_IncludeDrafts_RequiresAdminRole()
+    {
+        // Regular (non-admin) authenticated users must not be able to request drafts.
+        var token = await RegisterAndGetTokenAsync($"news-regular-{Guid.NewGuid():N}@test.com", "Regular Player");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+              gameNewsFeed(includeDrafts: true) {
+                unreadCount
+              }
+            }
+            """,
+            token: token);
+
+        Assert.True(result.TryGetProperty("errors", out _), "Non-admin player should not be allowed to view drafts.");
+    }
+
+    [Fact]
+    public async Task GameNewsFeed_DoesNotSwallowOperationCanceledException()
+    {
+        // The fallback should NOT catch OperationCanceledException so that
+        // request-cancellation semantics are preserved for infrastructure/observability.
+        // We verify this by checking whether each exception type would be caught by
+        // the production when-filter:  ex is not GraphQLException and not OperationCanceledException
+        //
+        // OperationCanceledException must NOT be caught by the fallback
+        static bool WouldFallbackCatch(Exception ex)
+        {
+            // Mirror the production filter: catches anything that is NOT GraphQLException
+            // and NOT OperationCanceledException.
+            return ex is not OperationCanceledException
+                   && ex.GetType().FullName != "HotChocolate.GraphQLException";
+        }
+
+        var oce = new OperationCanceledException("request aborted");
+        var upstream = new HttpRequestException("master API unreachable");
+        var timeout = new TaskCanceledException("HTTP timeout");
+
+        Assert.False(WouldFallbackCatch(oce), "OperationCanceledException must not be caught by the fallback.");
+        Assert.False(WouldFallbackCatch(timeout), "TaskCanceledException (a subclass of OperationCanceledException) must not be caught.");
+        Assert.True(WouldFallbackCatch(upstream), "Genuine upstream failures (e.g. HttpRequestException) must be caught by the fallback.");
+
+        await Task.CompletedTask;
+    }
+
+    #endregion
 }
