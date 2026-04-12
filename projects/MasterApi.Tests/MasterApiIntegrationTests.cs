@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
 using MasterApi.Tests.Infrastructure;
@@ -6,11 +8,16 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using MasterApi;
+using Microsoft.IdentityModel.Tokens;
 
 namespace MasterApi.Tests;
 
 public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplicationFactory>
 {
+    private const string SharedJwtIssuer = "Capitalism";
+    private const string SharedJwtAudience = "Capitalism";
+    private const string SharedJwtSigningKey = "ChangeThisSigningKeyBeforeProduction123!";
+
     private readonly HttpClient _client;
 
     public MasterApiIntegrationTests(MasterApiWebApplicationFactory factory)
@@ -55,6 +62,28 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         var token = payload.GetProperty("token").GetString()!;
         var player = payload.GetProperty("player").Clone();
         return (token, player);
+    }
+
+    private static string CreateSharedToken(string userId, string email, string displayName, params Claim[] extraClaims)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SharedJwtSigningKey));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new(ClaimTypes.Email, email),
+            new(ClaimTypes.Name, displayName),
+        };
+        claims.AddRange(extraClaims);
+
+        var token = new JwtSecurityToken(
+            issuer: SharedJwtIssuer,
+            audience: SharedJwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(30),
+            signingCredentials: credentials);
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
     #region Health check
@@ -554,14 +583,39 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
                         Assert.False(result.TryGetProperty("errors", out _));
                         var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
-                        Assert.Contains(
-                                items,
-                                item => item.GetProperty("entryType").GetString() == "CHANGELOG"
-                                        && item.GetProperty("status").GetString() == "PUBLISHED"
-                                        && item.GetProperty("localizations").EnumerateArray().Any(localization =>
-                                                localization.GetProperty("locale").GetString() == "en"
-                                                && localization.GetProperty("title").GetString() == "Game administration and newsroom launched"));
+        Assert.Contains(
+                items,
+                item => item.GetProperty("entryType").GetString() == "CHANGELOG"
+                        && item.GetProperty("status").GetString() == "PUBLISHED"
+                        && item.GetProperty("localizations").EnumerateArray().Any(localization =>
+                                localization.GetProperty("locale").GetString() == "en"
+                                && localization.GetProperty("title").GetString() == "Game administration and newsroom launched"));
                 }
+
+        [Fact]
+        public async Task GameNewsFeed_AllowsAnonymousPublicRequests()
+        {
+            var result = await GraphQlAsync("""
+                query Feed($input: GetGameNewsFeedInput!) {
+                    gameNewsFeed(input: $input) {
+                        items { id entryType status }
+                    }
+                }
+                """,
+                new
+                {
+                    input = new
+                    {
+                        registrationKey = "test-registration-key",
+                        serverKey = "capitalism-local",
+                        includeDrafts = false,
+                        limit = 20,
+                    }
+                });
+
+            Assert.False(result.TryGetProperty("errors", out _));
+            Assert.NotEmpty(result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray());
+        }
 
         [Fact]
         public async Task GameNewsFeed_HidesDraftsFromPublicButIncludesThemForAdminView()
@@ -1209,6 +1263,23 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
         Assert.False(string.IsNullOrEmpty(payload.GetProperty("expiresAtUtc").GetString()));
         var player = payload.GetProperty("player");
         Assert.Equal("login-fields@example.com", player.GetProperty("email").GetString());
+    }
+
+    [Fact]
+    public async Task Me_GameStyleToken_ResolvesPlayerByEmail()
+    {
+        const string email = "cross-api@example.com";
+        await RegisterAndGetTokenAsync(email, "Cross API User");
+        var token = CreateSharedToken(Guid.NewGuid().ToString(), email, "Cross API User", new Claim(ClaimTypes.Role, "PLAYER"));
+
+        var result = await GraphQlAsync("""
+            query { me { email displayName } }
+            """, token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var me = result.GetProperty("data").GetProperty("me");
+        Assert.Equal(email, me.GetProperty("email").GetString());
+        Assert.Equal("Cross API User", me.GetProperty("displayName").GetString());
     }
 
     [Fact]
