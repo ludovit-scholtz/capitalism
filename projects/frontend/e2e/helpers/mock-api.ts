@@ -1010,15 +1010,18 @@ function computeMockTransitCost(weightPerUnit: number, distanceKm: number) {
 }
 
 function getMockUnitCapacity(unit: MockBuildingUnit) {
+  const level = unit.level
   switch (unit.unitType) {
-    case 'MINING':
     case 'STORAGE':
+      // Storage units hold 10× the base capacity (mirrors GameConstants.StorageUnitHoldingCapacity)
+      return level >= 4 ? 10000 : level === 3 ? 5000 : level === 2 ? 2500 : 1000
+    case 'MINING':
     case 'B2B_SALES':
     case 'PURCHASE':
     case 'MANUFACTURING':
     case 'BRANDING':
     case 'PUBLIC_SALES':
-      return unit.level >= 4 ? 1000 : unit.level === 3 ? 500 : unit.level === 2 ? 250 : 100
+      return level >= 4 ? 1000 : level === 3 ? 500 : level === 2 ? 250 : 100
     default:
       return 0
   }
@@ -5197,18 +5200,59 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           body: JSON.stringify({ data: { unitUpgradeInfo: null } }),
         })
       }
+      // Resolve the unit from state to return type-accurate stat label and values
+      const allUnits = state.players
+        .flatMap((p) => p.companies)
+        .flatMap((c) => c.buildings)
+        .flatMap((b) => b.units)
+      const matchedUnit = allUnits.find((u) => u.id === unitId)
+      const resolvedUnitType = matchedUnit?.unitType ?? 'MANUFACTURING'
+      const resolvedLevel = matchedUnit?.level ?? 1
+      // Mirror GameConstants.GetUnitStat and GetUnitStatLabel
+      const isStorage = resolvedUnitType === 'STORAGE'
+      const storageCapacities: Record<number, number> = { 1: 1000, 2: 2500, 3: 5000, 4: 10000 }
+      const baseCapacities: Record<number, number> = { 1: 100, 2: 250, 3: 500, 4: 1000 }
+      const statByType: Record<string, { label: string; current: number; next: number }> = {
+        STORAGE: {
+          label: 'capacity',
+          current: storageCapacities[resolvedLevel] ?? 1000,
+          next: storageCapacities[Math.min(resolvedLevel + 1, 4)] ?? 2500,
+        },
+        MINING: {
+          label: 'units/tick',
+          current: baseCapacities[resolvedLevel] ?? 100,
+          next: baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250,
+        },
+        MANUFACTURING: { label: 'Batches/tick', current: 1.0, next: 2.0 },
+        PURCHASE: {
+          label: 'units/tick',
+          current: baseCapacities[resolvedLevel] ?? 100,
+          next: baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250,
+        },
+        PUBLIC_SALES: {
+          label: 'units/tick',
+          current: baseCapacities[resolvedLevel] ?? 100,
+          next: baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250,
+        },
+        B2B_SALES: {
+          label: 'units/tick',
+          current: baseCapacities[resolvedLevel] ?? 100,
+          next: baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250,
+        },
+      }
+      const stat = statByType[resolvedUnitType] ?? { label: 'Batches/tick', current: 1.0, next: 2.0 }
       const defaultInfo = {
         unitId,
-        unitType: 'MANUFACTURING',
-        currentLevel: 1,
-        nextLevel: 2,
-        isMaxLevel: false,
-        isUpgradable: true,
-        upgradeCost: 8000,
+        unitType: resolvedUnitType,
+        currentLevel: resolvedLevel,
+        nextLevel: Math.min(resolvedLevel + 1, 4),
+        isMaxLevel: resolvedLevel >= 4,
+        isUpgradable: !['BRANDING', 'MARKETING'].includes(resolvedUnitType),
+        upgradeCost: isStorage ? 8000 : 8000,
         upgradeTicks: 10,
-        currentStat: 1.0,
-        nextStat: 2.0,
-        statLabel: 'Batches/tick',
+        currentStat: stat.current,
+        nextStat: stat.next,
+        statLabel: stat.label,
       }
       return route.fulfill({
         status: 200,
