@@ -39,6 +39,12 @@ public sealed class Player
     /// <summary>Cash held in the player's personal account outside any company.</summary>
     public decimal PersonalCash { get; set; }
 
+    /// <summary>
+    /// Amount of personal cash reserved for future tax payment on stock-sale proceeds.
+    /// 15% of each personal-account sale is blocked here and excluded from spendable funds.
+    /// </summary>
+    public decimal PersonalTaxReserve { get; set; }
+
     /// <summary>UTC timestamp when the player completed the onboarding journey. Null if not yet completed.</summary>
     public DateTime? OnboardingCompletedAtUtc { get; set; }
 

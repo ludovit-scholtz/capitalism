@@ -72,6 +72,9 @@ const PERSON_ACCOUNT_QUERY = `
       playerId
       displayName
       personalCash
+      taxReserve
+      availableCash
+      totalNetWealth
       activeAccountType
       activeCompanyId
       shareholdings {
@@ -144,6 +147,7 @@ const BUY_MUTATION = `
       ownedShareCount
       publicFloatShares
       personalCash
+      personalTaxReserve
       companyCash
     }
   }
@@ -160,9 +164,11 @@ const SELL_MUTATION = `
       shareCount
       pricePerShare
       totalValue
+      taxReserved
       ownedShareCount
       publicFloatShares
       personalCash
+      personalTaxReserve
       companyCash
     }
   }
@@ -258,7 +264,9 @@ const activeTradeAccountCash = computed(() => {
     return activeTradeAccount.value.cash
   }
 
-  return auth.player?.personalCash ?? personAccount.value?.personalCash ?? null
+  // For personal account, always use availableCash (gross personalCash minus taxReserve).
+  // If personAccount hasn't loaded yet, show null rather than the incorrect gross amount.
+  return personAccount.value?.availableCash ?? null
 })
 
 const filteredAndSortedListings = computed(() => {
@@ -502,10 +510,18 @@ async function executeTrade(kind: 'buy' | 'sell', companyId: string) {
         input: { companyId, shareCount, tradeAccountType, tradeAccountCompanyId },
       })
       result = data.sellShares
-      successByCompany.value[companyId] = t('stockExchange.sellSuccess', {
-        company: result.companyName,
-        shares: formatShares(result.shareCount),
-      })
+      if (result.taxReserved > 0) {
+        successByCompany.value[companyId] = t('stockExchange.sellSuccessWithTax', {
+          company: result.companyName,
+          shares: formatShares(result.shareCount),
+          tax: formatCurrency(result.taxReserved),
+        })
+      } else {
+        successByCompany.value[companyId] = t('stockExchange.sellSuccess', {
+          company: result.companyName,
+          shares: formatShares(result.shareCount),
+        })
+      }
     }
 
     await Promise.all([loadData(true), auth.fetchMe()])
@@ -736,8 +752,17 @@ useTickRefresh(async () => {
       <template v-else>
         <section v-if="personAccount" class="summary-grid">
           <article class="summary-card">
-            <span class="summary-label">{{ t('stockExchange.personalCash') }}</span>
-            <strong>{{ formatCurrency(personAccount.personalCash) }}</strong>
+            <span class="summary-label">{{ t('stockExchange.totalNetWealth') }}</span>
+            <strong>{{ formatCurrency(personAccount.totalNetWealth) }}</strong>
+          </article>
+          <article class="summary-card">
+            <span class="summary-label">{{ t('stockExchange.availableCash') }}</span>
+            <strong>{{ formatCurrency(personAccount.availableCash) }}</strong>
+          </article>
+          <article class="summary-card summary-card--warning" :class="{ 'summary-card--inactive': personAccount.taxReserve === 0 }">
+            <span class="summary-label">{{ t('stockExchange.taxReserveLabel') }}</span>
+            <strong>{{ formatCurrency(personAccount.taxReserve) }}</strong>
+            <span class="summary-hint">{{ t('stockExchange.taxReserveHint') }}</span>
           </article>
           <article class="summary-card">
             <span class="summary-label">{{ t('stockExchange.portfolioValue') }}</span>
@@ -746,6 +771,9 @@ useTickRefresh(async () => {
           <article class="summary-card">
             <span class="summary-label">{{ t('stockExchange.recentDividends') }}</span>
             <strong>{{ formatCurrency(recentDividendTotal) }}</strong>
+          </article>
+          <article class="summary-card summary-card--link">
+            <RouterLink to="/personal-ledger" class="ledger-link">{{ t('stockExchange.viewPersonalLedger') }}</RouterLink>
           </article>
         </section>
 
@@ -937,7 +965,7 @@ useTickRefresh(async () => {
 
                             <div class="trade-order-controls">
                               <label class="trade-field trade-field--quantity">
-                                <span>{{ t('stockExchange.quantity') }}</span>
+                                <span class="trade-field-label">{{ t('stockExchange.quantity') }}</span>
                                 <input
                                   :value="quantityByCompany[listing.companyId] ?? 100"
                                   type="number"
@@ -949,38 +977,32 @@ useTickRefresh(async () => {
                                 />
                               </label>
 
-                              <div class="trade-actions-card">
-                                <div class="trade-actions-header">
-                                  <span class="trade-actions-caption">{{ t('stockExchange.tradeActionsLabel') }}</span>
-                                  <span class="trade-actions-hint">{{ t('stockExchange.tradeActionsHint') }}</span>
-                                </div>
+                              <div class="trade-action-column">
+                                <span class="trade-field-label">{{ t('stockExchange.buyLabel') }}</span>
+                                <button
+                                  class="btn btn-primary trade-action-btn"
+                                  :disabled="actionLoadingKey === `buy-${listing.companyId}`"
+                                  @click="executeTrade('buy', listing.companyId)"
+                                >
+                                  {{ t('stockExchange.buyAt', { price: formatCurrency(listing.askPrice) }) }}
+                                </button>
+                                <span class="trade-est" aria-live="polite">
+                                  {{ t('stockExchange.estimatedCost', { total: formatCurrency(estimatedBuyCost(listing)) }) }}
+                                </span>
+                              </div>
 
-                                <div class="trade-actions">
-                                  <div class="trade-action-group">
-                                    <button
-                                      class="btn btn-primary"
-                                      :disabled="actionLoadingKey === `buy-${listing.companyId}`"
-                                      @click="executeTrade('buy', listing.companyId)"
-                                    >
-                                      {{ t('stockExchange.buyAt', { price: formatCurrency(listing.askPrice) }) }}
-                                    </button>
-                                    <span class="trade-est" aria-live="polite">
-                                      {{ t('stockExchange.estimatedCost', { total: formatCurrency(estimatedBuyCost(listing)) }) }}
-                                    </span>
-                                  </div>
-                                  <div class="trade-action-group">
-                                    <button
-                                      class="btn btn-secondary"
-                                      :disabled="actionLoadingKey === `sell-${listing.companyId}`"
-                                      @click="executeTrade('sell', listing.companyId)"
-                                    >
-                                      {{ t('stockExchange.sellAt', { price: formatCurrency(listing.bidPrice) }) }}
-                                    </button>
-                                    <span class="trade-est" aria-live="polite">
-                                      {{ t('stockExchange.estimatedProceeds', { total: formatCurrency(estimatedSellProceeds(listing)) }) }}
-                                    </span>
-                                  </div>
-                                </div>
+                              <div class="trade-action-column">
+                                <span class="trade-field-label">{{ t('stockExchange.sellLabel') }}</span>
+                                <button
+                                  class="btn btn-secondary trade-action-btn"
+                                  :disabled="actionLoadingKey === `sell-${listing.companyId}`"
+                                  @click="executeTrade('sell', listing.companyId)"
+                                >
+                                  {{ t('stockExchange.sellAt', { price: formatCurrency(listing.bidPrice) }) }}
+                                </button>
+                                <span class="trade-est" aria-live="polite">
+                                  {{ t('stockExchange.estimatedProceeds', { total: formatCurrency(estimatedSellProceeds(listing)) }) }}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -1465,6 +1487,41 @@ useTickRefresh(async () => {
   gap: 0.3rem;
 }
 
+.summary-card--warning {
+  border-color: color-mix(in srgb, #f59e0b 40%, var(--color-border));
+}
+
+.summary-card--warning strong {
+  color: #b45309;
+}
+
+.summary-card--inactive {
+  opacity: 0.5;
+}
+
+.summary-card--link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.ledger-link {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  text-decoration: none;
+  text-align: center;
+}
+
+.ledger-link:hover {
+  text-decoration: underline;
+}
+
 .summary-label,
 .section-header p,
 .market-note,
@@ -1800,10 +1857,10 @@ useTickRefresh(async () => {
 }
 
 .trade-order-controls {
-  display: grid;
-  grid-template-columns: minmax(140px, 180px) minmax(0, 1fr);
-  gap: 1rem;
-  align-items: end;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
 
 .trade-field {
@@ -1813,6 +1870,30 @@ useTickRefresh(async () => {
 
 .trade-field--quantity {
   min-width: 130px;
+  max-width: 160px;
+  flex: 0 0 auto;
+}
+
+.trade-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.trade-action-column {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 140px;
+}
+
+.trade-action-btn {
+  width: 100%;
+  justify-content: center;
 }
 
 .trade-select,

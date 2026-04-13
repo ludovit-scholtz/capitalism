@@ -21,6 +21,7 @@ export type MockPlayer = {
   createdAtUtc: string
   lastLoginAtUtc: string | null
   personalCash: number
+  personalTaxReserve: number
   activeAccountType: 'PERSON' | 'COMPANY'
   activeCompanyId: string | null
   onboardingCompletedAtUtc: string | null
@@ -1209,6 +1210,10 @@ function applyDueBuildingUpgrades(state: MockState): void {
 
 // ── Factory functions ────────────────────────────────────────────────────────
 
+function computeAvailableCash(player: MockPlayer): number {
+  return player.personalCash - (player.personalTaxReserve ?? 0)
+}
+
 export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
   return {
     id: 'player-1',
@@ -1220,6 +1225,7 @@ export function makePlayer(overrides?: Partial<MockPlayer>): MockPlayer {
     createdAtUtc: '2026-01-01T00:00:00Z',
     lastLoginAtUtc: null,
     personalCash: PERSONAL_STARTING_CASH,
+    personalTaxReserve: 0,
     activeAccountType: 'PERSON',
     activeCompanyId: null,
     onboardingCompletedAtUtc: null,
@@ -2654,7 +2660,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           ownedShareCount = holding.shareCount
         }
       } else {
-        if (player.personalCash < totalValue) {
+        const availableCash = computeAvailableCash(player)
+        if (availableCash < totalValue) {
           return route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -2695,9 +2702,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               shareCount,
               pricePerShare,
               totalValue,
+              taxReserved: 0,
               ownedShareCount,
               publicFloatShares: getPublicFloatShares(state, company),
               personalCash: player.personalCash,
+              personalTaxReserve: player.personalTaxReserve ?? 0,
               companyCash,
             },
           },
@@ -2768,6 +2777,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
         holding.shareCount = Number((holding.shareCount - shareCount).toFixed(4))
         player.personalCash = Number((player.personalCash + totalValue).toFixed(2))
+        const taxAmount = Number((totalValue * 0.15).toFixed(4))
+        player.personalTaxReserve = Number(((player.personalTaxReserve ?? 0) + taxAmount).toFixed(4))
         ownedShareCount = holding.shareCount
         player.stockTrades.unshift({
           id: `trade-sell-${Math.random().toString(36).slice(2)}`,
@@ -2784,6 +2795,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       appendMockStockPriceHistory(state, company.id, pricePerShare)
 
+      const isSellFromPerson = tradeAccountType === 'PERSON'
+      const taxReserved = isSellFromPerson ? Number((totalValue * 0.15).toFixed(4)) : 0
+
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -2798,9 +2812,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               shareCount,
               pricePerShare,
               totalValue,
+              taxReserved,
               ownedShareCount,
               publicFloatShares: getPublicFloatShares(state, company),
               personalCash: player.personalCash,
+              personalTaxReserve: player.personalTaxReserve ?? 0,
               companyCash,
             },
           },
@@ -4073,6 +4089,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               playerId: player.id,
               displayName: player.displayName,
               personalCash: player.personalCash,
+              taxReserve: player.personalTaxReserve ?? 0,
+              availableCash: computeAvailableCash(player),
+              totalNetWealth: computeAvailableCash(player)
+                + shareholdings.reduce((sum: number, h: { marketValue: number }) => sum + h.marketValue, 0),
               activeAccountType: player.activeAccountType,
               activeCompanyId: player.activeCompanyId,
               shareholdings,

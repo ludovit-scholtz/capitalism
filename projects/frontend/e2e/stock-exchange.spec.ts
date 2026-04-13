@@ -397,7 +397,7 @@ test.describe('Stock exchange', () => {
     await expect(tradePanel.getByLabel(/Trade with AccountTarget/)).toHaveCount(0)
     await expect(tradePanel.getByText('Trading as', { exact: true })).toBeVisible()
     await expect(tradePanel.locator('.trade-order-name')).toContainText('Home Holdings')
-    await expect(tradePanel.getByText('Order actions', { exact: true })).toBeVisible()
+    await expect(tradePanel.getByRole('button', { name: /Buy @ / })).toBeVisible()
 
     const qtyInput = tradePanel.getByLabel(/Share quantity AccountTarget/)
     await qtyInput.fill('100')
@@ -1950,7 +1950,6 @@ test.describe('Stock exchange — mobile trading layout (375px)', () => {
     const tradePanel = page.locator('.trade-panel')
     await expect(tradePanel.locator('.trade-order-panel')).toBeVisible()
     await expect(tradePanel.getByText('Trading as', { exact: true })).toBeVisible()
-    await expect(tradePanel.getByText('Order actions', { exact: true })).toBeVisible()
     await expect(tradePanel.getByLabel(/Share quantity Mobile Metals/)).toBeVisible()
     await expect(tradePanel.getByRole('button', { name: /Buy @ / })).toBeVisible()
     await expect(tradePanel.getByRole('button', { name: /Sell @ / })).toBeVisible()
@@ -2302,5 +2301,226 @@ test.describe('Stock exchange — merge company flow', () => {
     await openTradePanel(page, 'Beta Corp')
     await expect(page.locator('.shareholders-panel').first()).toBeVisible()
     await expect(page.locator('.shareholders-panel').first()).toContainText('Other Owner')
+  })
+})
+
+test.describe('Stock exchange — tax holdback', () => {
+  function makeSellCompany(overrides?: Partial<MockCompany>): MockCompany {
+    return {
+      id: 'company-tax-sell',
+      playerId: 'player-tax-owner',
+      name: 'TaxSell Corp',
+      cash: 600_000,
+      totalSharesIssued: 10_000,
+      dividendPayoutRatio: 0.1,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      foundedAtTick: 1,
+      buildings: [],
+      ...overrides,
+    }
+  }
+
+  test('selling shares from personal account shows tax-holdback message', async ({ page }) => {
+    const owner = makePlayer({
+      id: 'player-tax-owner',
+      email: 'taxowner@test.com',
+      displayName: 'Tax Owner',
+      companies: [makeSellCompany()],
+    })
+
+    const buyer = makePlayer({
+      id: 'player-tax-buyer',
+      email: 'taxbuyer@test.com',
+      displayName: 'Tax Buyer',
+      personalCash: 200_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, {
+      players: [owner, buyer],
+      shareholdings: [
+        { companyId: 'company-tax-sell', ownerPlayerId: 'player-tax-owner', ownerCompanyId: null, shareCount: 5_000 },
+        { companyId: 'company-tax-sell', ownerPlayerId: 'player-tax-buyer', ownerCompanyId: null, shareCount: 2_000 },
+      ],
+    })
+    buyer.activeAccountType = 'PERSON'
+    buyer.activeCompanyId = null
+    state.currentUserId = buyer.id
+    state.currentToken = `token-${buyer.id}`
+
+    await authenticateViaLocalStorage(page, `token-${buyer.id}`)
+    await page.goto('/stocks')
+
+    await openTradePanel(page, 'TaxSell Corp')
+
+    const tradePanel = page.locator('.trade-panel')
+    const qtyInput = tradePanel.getByLabel(/Share quantity TaxSell Corp/)
+    await qtyInput.fill('100')
+    await tradePanel.getByRole('button', { name: /Sell @ / }).click()
+
+    // Verify the success message mentions tax reservation
+    await expect(tradePanel.getByRole('status')).toContainText('reserved for taxes')
+  })
+
+  test('summary cards show tax reserve and available cash after sell', async ({ page }) => {
+    const owner = makePlayer({
+      id: 'player-tax-owner2',
+      email: 'taxowner2@test.com',
+      displayName: 'Tax Owner 2',
+      companies: [{ ...makeSellCompany(), id: 'company-tax-sell2', name: 'TaxSell Corp 2' }],
+    })
+
+    const buyer = makePlayer({
+      id: 'player-tax-buyer2',
+      email: 'taxbuyer2@test.com',
+      displayName: 'Tax Buyer 2',
+      personalCash: 200_000,
+      personalTaxReserve: 1_500,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, {
+      players: [owner, buyer],
+      shareholdings: [
+        { companyId: 'company-tax-sell2', ownerPlayerId: 'player-tax-owner2', ownerCompanyId: null, shareCount: 5_000 },
+        { companyId: 'company-tax-sell2', ownerPlayerId: 'player-tax-buyer2', ownerCompanyId: null, shareCount: 1_000 },
+      ],
+    })
+    buyer.activeAccountType = 'PERSON'
+    state.currentUserId = buyer.id
+    state.currentToken = `token-${buyer.id}`
+
+    await authenticateViaLocalStorage(page, `token-${buyer.id}`)
+    await page.goto('/stocks')
+
+    // Summary grid should show tax reserve and available cash cards
+    const summaryGrid = page.locator('.summary-grid')
+    await expect(summaryGrid.locator('.summary-label', { hasText: 'Tax reserve' })).toBeVisible()
+    await expect(summaryGrid.locator('.summary-label', { hasText: 'Available cash' })).toBeVisible()
+    await expect(summaryGrid.locator('.summary-label', { hasText: 'Net wealth' })).toBeVisible()
+    // Tax reserve is positive — warning card should be visible
+    await expect(summaryGrid.locator('.summary-card--warning')).toBeVisible()
+  })
+
+  test('summary cards link to personal ledger page', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 100_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    // The summary section has a link to the personal ledger; use the summary-card container scope
+    await expect(page.locator('.summary-card--link .ledger-link')).toBeVisible()
+  })
+})
+
+test.describe('Personal Ledger view', () => {
+  test('renders wealth breakdown cards', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 100_000,
+      personalTaxReserve: 5_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    await expect(page.getByRole('heading', { name: 'Personal Ledger' })).toBeVisible()
+
+    const wealthGrid = page.locator('.wealth-grid')
+    await expect(wealthGrid.locator('.wealth-label', { hasText: 'Net wealth' })).toBeVisible()
+    await expect(wealthGrid.locator('.wealth-label', { hasText: 'Available cash' })).toBeVisible()
+    await expect(wealthGrid.locator('.wealth-label', { hasText: 'Tax reserve' })).toBeVisible()
+    await expect(wealthGrid.locator('.wealth-label', { hasText: 'Portfolio value' })).toBeVisible()
+
+    // Tax reserve amount should be visible (5000)
+    await expect(wealthGrid.locator('.wealth-amount--blocked')).toBeVisible()
+  })
+
+  test('shows empty trade history when no trades', async ({ page }) => {
+    const player = makePlayer({ companies: [] })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    await expect(page.getByRole('heading', { name: 'Tax history' })).toBeVisible()
+    await expect(page.getByText('No tax entries yet')).toBeVisible()
+  })
+
+  test('shows sell trade in tax history table', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 150_000,
+      personalTaxReserve: 1_500,
+      companies: [],
+      stockTrades: [
+        {
+          id: 'trade-1',
+          companyId: 'company-test',
+          companyName: 'Tax Corp',
+          direction: 'SELL',
+          shareCount: 100,
+          pricePerShare: 100,
+          totalValue: 10_000,
+          recordedAtTick: 42,
+          recordedAtUtc: '2026-01-15T10:00:00Z',
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    const taxTable = page.locator('table[aria-label="Tax history"]')
+    await expect(taxTable).toBeVisible()
+    await expect(taxTable).toContainText('Tax Corp')
+    await expect(taxTable.locator('.tax-cell').first()).toBeVisible()
+  })
+
+  test('back-to-exchange link navigates to /stocks', async ({ page }) => {
+    const player = makePlayer({ companies: [] })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    await page.getByRole('link', { name: /Back to Stock Exchange/ }).click()
+    await expect(page).toHaveURL('/stocks')
+  })
+
+  test('nav link to personal ledger is visible when authenticated', async ({ page }) => {
+    const player = makePlayer({ companies: [] })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    // Verify the nav link to personal ledger exists for authenticated users
+    const link = page.locator('a[href="/personal-ledger"]').first()
+    await expect(link).toHaveAttribute('href', '/personal-ledger')
+    await expect(link).toHaveAttribute('title', 'Personal Ledger')
   })
 })

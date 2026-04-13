@@ -69,7 +69,7 @@ public sealed partial class Mutation
 
         if (account.Company is null)
         {
-            if (player.PersonalCash < totalValue)
+            if (player.PersonalCash - player.PersonalTaxReserve < totalValue)
             {
                 throw new GraphQLException(
                     ErrorBuilder.New()
@@ -133,6 +133,7 @@ public sealed partial class Mutation
                     OwnedShareCount = 0m,
                     PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(holding => holding.CompanyId == targetCompany.Id)),
                     PersonalCash = player.PersonalCash,
+                    PersonalTaxReserve = player.PersonalTaxReserve,
                     CompanyCash = account.Company.Cash,
                 };
             }
@@ -162,6 +163,7 @@ public sealed partial class Mutation
             OwnedShareCount = holding.ShareCount,
             PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
             PersonalCash = player.PersonalCash,
+            PersonalTaxReserve = player.PersonalTaxReserve,
             CompanyCash = account.Company?.Cash,
         };
     }
@@ -228,9 +230,13 @@ public sealed partial class Mutation
             shareholdings.Remove(holding);
         }
 
+        decimal taxReserved = 0m;
+
         if (account.Company is null)
         {
+            taxReserved = decimal.Round(totalValue * GameConstants.PersonalStockSaleTaxRate, 4, MidpointRounding.AwayFromZero);
             player.PersonalCash += totalValue;
+            player.PersonalTaxReserve += taxReserved;
             db.PersonTradeRecords.Add(new PersonTradeRecord
             {
                 Id = Guid.NewGuid(),
@@ -271,9 +277,11 @@ public sealed partial class Mutation
             ShareCount = shareCount,
             PricePerShare = bidPrice,
             TotalValue = totalValue,
+            TaxReserved = taxReserved,
             OwnedShareCount = holding.ShareCount > 0m ? holding.ShareCount : 0m,
             PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
             PersonalCash = player.PersonalCash,
+            PersonalTaxReserve = player.PersonalTaxReserve,
             CompanyCash = account.Company?.Cash,
         };
     }

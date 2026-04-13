@@ -105,6 +105,10 @@ public sealed partial class Query
             PlayerId = player.Id,
             DisplayName = player.DisplayName,
             PersonalCash = player.PersonalCash,
+            TaxReserve = player.PersonalTaxReserve,
+            AvailableCash = player.PersonalCash - player.PersonalTaxReserve,
+            TotalNetWealth = (player.PersonalCash - player.PersonalTaxReserve)
+                + portfolio.Sum(holding => holding.MarketValue),
             ActiveAccountType = player.ActiveAccountType,
             ActiveCompanyId = player.ActiveCompanyId,
             Shareholdings = portfolio,
