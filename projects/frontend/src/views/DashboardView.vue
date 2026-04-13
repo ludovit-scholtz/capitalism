@@ -66,17 +66,14 @@ const formattedGameTime = computed(() =>
   gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : '',
 )
 
-const dashboardTabs = computed(() => [
-  { key: 'overview', label: t('dashboard.tabOverview') },
-  {
-    key: 'buildings',
-    label: t('dashboard.tabBuildings'),
-    badge: visibleCompanies.value[0]?.buildings.length ?? 0,
-  },
-  { key: 'activity', label: t('dashboard.tabActivity') },
-  { key: 'chat', label: t('dashboard.tabChat') },
-])
-
+function tabsForCompany(company: Company) {
+  return [
+    { key: 'overview', label: t('dashboard.tabOverview') },
+    { key: 'buildings', label: t('dashboard.tabBuildings'), badge: company.buildings.length },
+    { key: 'activity', label: t('dashboard.tabActivity') },
+    { key: 'chat', label: t('dashboard.tabChat') },
+  ]
+}
 const buildingTypeIcons: Record<string, string> = {
   MINE: '⛏️',
   FACTORY: '🏭',
@@ -489,7 +486,7 @@ async function createCompany() {
           </div>
 
           <!-- Section tab navigation -->
-          <DashboardTabNav :tabs="dashboardTabs" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat')" />
+          <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat')" />
 
           <!-- ── Overview tab ──────────────────────────────────────────── -->
           <div v-show="activeTab === 'overview'" class="tab-panel" role="tabpanel" aria-label="Overview">
