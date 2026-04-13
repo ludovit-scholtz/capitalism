@@ -2418,6 +2418,75 @@ test.describe('Stock exchange — tax holdback', () => {
     // The summary section has a link to the personal ledger; use the summary-card container scope
     await expect(page.locator('.summary-card--link .ledger-link')).toBeVisible()
   })
+
+  test('selling shares from company account does NOT show tax-holdback message', async ({ page }) => {
+    const company = {
+      id: 'company-notax',
+      playerId: 'player-notax-owner',
+      name: 'NoTax Corp',
+      cash: 600_000,
+      totalSharesIssued: 10_000,
+      dividendPayoutRatio: 0.1,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      foundedAtTick: 1,
+      buildings: [],
+    } as MockCompany
+
+    const buyerCompany = {
+      id: 'company-buyer-notax',
+      playerId: 'player-notax-buyer',
+      name: 'Buyer Corp',
+      cash: 200_000,
+      totalSharesIssued: 1_000,
+      dividendPayoutRatio: 0,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      foundedAtTick: 1,
+      buildings: [],
+    } as MockCompany
+
+    const owner = makePlayer({
+      id: 'player-notax-owner',
+      email: 'notaxowner@test.com',
+      displayName: 'NoTax Owner',
+      companies: [company],
+    })
+
+    const buyer = makePlayer({
+      id: 'player-notax-buyer',
+      email: 'notaxbuyer@test.com',
+      displayName: 'NoTax Buyer',
+      personalCash: 0,
+      companies: [buyerCompany],
+    })
+
+    const state = setupMockApi(page, {
+      players: [owner, buyer],
+      shareholdings: [
+        { companyId: 'company-notax', ownerPlayerId: 'player-notax-owner', ownerCompanyId: null, shareCount: 5_000 },
+        // Company-owned shareholding: ownerPlayerId must be null so mock COMPANY sell path finds it
+        { companyId: 'company-notax', ownerPlayerId: null, ownerCompanyId: 'company-buyer-notax', shareCount: 2_000 },
+      ],
+    })
+    buyer.activeAccountType = 'COMPANY'
+    buyer.activeCompanyId = buyerCompany.id
+    state.currentUserId = buyer.id
+    state.currentToken = `token-${buyer.id}`
+
+    await authenticateViaLocalStorage(page, `token-${buyer.id}`)
+    await page.goto('/stocks')
+
+    await openTradePanel(page, 'NoTax Corp')
+
+    const tradePanel = page.locator('.trade-panel')
+    const qtyInput = tradePanel.getByLabel(/Share quantity NoTax Corp/)
+    await qtyInput.fill('100')
+    await tradePanel.getByRole('button', { name: /Sell @ / }).click()
+
+    // Company-account sell should not show the tax-reservation message
+    const statusMsg = tradePanel.getByRole('status')
+    await expect(statusMsg).toBeVisible()
+    await expect(statusMsg).not.toContainText('reserved for taxes')
+  })
 })
 
 test.describe('Personal Ledger view', () => {
@@ -2522,5 +2591,98 @@ test.describe('Personal Ledger view', () => {
     const link = page.locator('a[href="/personal-ledger"]').first()
     await expect(link).toHaveAttribute('href', '/personal-ledger')
     await expect(link).toHaveAttribute('title', 'Personal Ledger')
+  })
+
+  test('shows dividend history when player has received dividends', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 50_000,
+      personalTaxReserve: 0,
+      companies: [],
+      dividendPayments: [
+        {
+          id: 'div-1',
+          companyId: 'company-div',
+          companyName: 'DivCorp',
+          shareCount: 500,
+          amountPerShare: 3.5,
+          totalAmount: 1750,
+          gameYear: 2026,
+          recordedAtTick: 30,
+          recordedAtUtc: '2026-02-01T00:00:00Z',
+          description: 'Q1 dividend',
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    // aria-label comes from i18n key personalLedger.dividendHistoryTitle = 'Dividend income'
+    const divTable = page.locator('table[aria-label="Dividend income"]')
+    await expect(divTable).toBeVisible()
+    await expect(divTable).toContainText('DivCorp')
+    await expect(divTable).toContainText('500')
+  })
+
+  test('shows empty dividend history when no dividends received', async ({ page }) => {
+    const player = makePlayer({ companies: [], dividendPayments: [] })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    await expect(page.getByText('No dividends received yet')).toBeVisible()
+  })
+
+  test('shows full trade history with BUY and SELL entries', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 80_000,
+      personalTaxReserve: 750,
+      companies: [],
+      stockTrades: [
+        {
+          id: 'trade-buy-1',
+          companyId: 'company-abc',
+          companyName: 'Alpha Corp',
+          direction: 'BUY',
+          shareCount: 50,
+          pricePerShare: 200,
+          totalValue: 10_000,
+          recordedAtTick: 20,
+          recordedAtUtc: '2026-01-05T09:00:00Z',
+        },
+        {
+          id: 'trade-sell-1',
+          companyId: 'company-abc',
+          companyName: 'Alpha Corp',
+          direction: 'SELL',
+          shareCount: 25,
+          pricePerShare: 210,
+          totalValue: 5_250,
+          recordedAtTick: 25,
+          recordedAtUtc: '2026-01-10T10:00:00Z',
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/personal-ledger')
+
+    const tradeTable = page.locator('table[aria-label="Trade history"]')
+    await expect(tradeTable).toBeVisible()
+    await expect(tradeTable).toContainText('Alpha Corp')
+    await expect(tradeTable.locator('.direction-badge--buy')).toBeVisible()
+    await expect(tradeTable.locator('.direction-badge--sell')).toBeVisible()
   })
 })

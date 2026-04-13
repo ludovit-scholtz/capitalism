@@ -7275,6 +7275,81 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task SellShares_PersonAccount_MultipleSellerAccumulatesTaxReserve()
+    {
+        var ownerToken = await RegisterAndGetTokenAsync($"multi-tax-owner-{Guid.NewGuid():N}@test.com", "Multi Tax Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "MultiTax Corp", cash: 500_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+        var investorToken = await RegisterAndGetTokenAsync($"multi-tax-investor-{Guid.NewGuid():N}@test.com", "Multi Tax Investor");
+
+        // Buy 400 shares to have something to sell twice
+        await ExecuteGraphQlAsync(
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { shareCount }
+            }
+            """,
+            new { input = new { companyId, shareCount = 400m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            token: investorToken);
+
+        // First sell — 100 shares
+        var sell1 = await ExecuteGraphQlAsync(
+            """
+            mutation SellShares($input: SellSharesInput!) {
+                sellShares(input: $input) { totalValue taxReserved personalTaxReserve }
+            }
+            """,
+            new { input = new { companyId, shareCount = 100m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            token: investorToken);
+        var s1 = sell1.GetProperty("data").GetProperty("sellShares");
+        var tax1 = s1.GetProperty("taxReserved").GetDecimal();
+        var reserve1 = s1.GetProperty("personalTaxReserve").GetDecimal();
+        Assert.Equal(tax1, reserve1);
+
+        // Second sell — 100 more shares
+        var sell2 = await ExecuteGraphQlAsync(
+            """
+            mutation SellShares($input: SellSharesInput!) {
+                sellShares(input: $input) { totalValue taxReserved personalTaxReserve }
+            }
+            """,
+            new { input = new { companyId, shareCount = 100m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            token: investorToken);
+        var s2 = sell2.GetProperty("data").GetProperty("sellShares");
+        var tax2 = s2.GetProperty("taxReserved").GetDecimal();
+        var reserve2 = s2.GetProperty("personalTaxReserve").GetDecimal();
+
+        // Reserve should have accumulated both taxes
+        Assert.Equal(tax1 + tax2, reserve2);
+    }
+
+    [Fact]
+    public async Task PersonAccount_NewPlayer_HasZeroTaxReserve()
+    {
+        var newPlayerToken = await RegisterAndGetTokenAsync($"zero-tax-{Guid.NewGuid():N}@test.com", "Zero Tax Player");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    personalCash
+                    taxReserve
+                    availableCash
+                    totalNetWealth
+                }
+            }
+            """,
+            token: newPlayerToken);
+
+        var account = result.GetProperty("data").GetProperty("personAccount");
+        Assert.Equal(0m, account.GetProperty("taxReserve").GetDecimal());
+        var personalCash = account.GetProperty("personalCash").GetDecimal();
+        Assert.Equal(personalCash, account.GetProperty("availableCash").GetDecimal());
+        Assert.Equal(personalCash, account.GetProperty("totalNetWealth").GetDecimal());
+    }
+
+    [Fact]
     public async Task CompanyShareholders_SingleOwner_ReturnsSingleShareholderRow()
     {
         var ownerToken = await RegisterAndGetTokenAsync($"shareholders-single-{Guid.NewGuid():N}@test.com", "Single Owner");
