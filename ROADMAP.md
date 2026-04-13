@@ -12,9 +12,6 @@ It will use real world map. The game will start in single city and later other c
 ### Warehouse unit
 - Remove the settings from the warehouse unit. It can accept any product, so product selection is not required to be set.
 
-### Manufacturing unit editation (100%)
-- In manufacturing output product selection show the product images ✅
-
 ### B2B Sales unit editation
 - In B2B sales unit show only connected products or products at the unit stocks.
 
@@ -47,6 +44,12 @@ Show all changes that upgrading of the unit will have, for example the storage c
 ### Ledger for personal account
 Create ledger for personal account, and show there the person's wealth, the income and taxes, taxes blockations and tax history.
 
+### Research & Development
+Show the user's used products first in the the R&D unit prouct quality improvement product selection.
+
+Change the product research quality model from number 0 to 100 to cummulative spending budget model. R&D product research adds the money to the research. For each product define specific base quality model base budget where if user accumulates to the research this amount, and there is not going to be competetive company doing the same research, player will have quality 100%. If two players do research the same product, the player with the highest accumulated research money will be base for all other players. On every tick 0.1% of the research accumulated budget is lost, so if player stops researching the product, in time his research will diminish.
+
+With upgrading the unit to do research, the efficiency to do research improves. At start 50% (1-1/2) of the unit costs are accumulated to the research. Next level improves this to 66% (1-1/3)%, next level to 75% (1-1/4) and so on. While the upgrade is in progress, the player pays half of the costs for the unit.
 
 ### Loans menu
 - In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
