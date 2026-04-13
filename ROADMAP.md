@@ -32,9 +32,18 @@ Show all changes that upgrading of the unit will have, for example the storage c
 
 ### Show time instead of ticks
 - Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging.
+- Wherever is shown the time, make sure in the title is shown also the tick number
 
 ### Onboarding details
 - Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. 
+
+### Stock exchange
+- When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional.
+- When selling stocks as a natural person, block 15% of the income for taxes to be paid. Show personal account under his ledger how much tax he is going to pay and how much money is locked there. In the total wealth substract these blockations for taxes.
+
+### Ledger for personal account
+Create ledger for personal account, and show there the person's wealth, the income and taxes, taxes blockations and tax history.
+
 
 ### Loans menu
 - In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
