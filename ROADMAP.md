@@ -9,38 +9,29 @@ It will use real world map. The game will start in single city and later other c
 ### Unit links
 - Diagonal links does not look good on frontend. There seems to be two lines - one arrow and one line. Also two rounded objects are visible there. There must be only only object which handles all 8 possible states for the link and links should look professional.
 
-### Sale Unit editation (100%)
-- Improve product selection in sales unit - select products only from connected units or current stock items
+### Warehouse unit
+- Remove the settings from the warehouse unit. It can accept any product, so product selection is not required to be set.
 
 ### Manufacturing unit editation (100%)
 - In manufacturing output product selection show the product images ✅
 
 ### B2B Sales unit editation
-- In b2b unit show the sale price, when creating b2b sale unit in factory make sure to set the competetive default price
-- **Progress: 100% complete** ✅ — B2B sales units auto-fill competitive prices from linked products/resources at placement. The edit panel now shows a prominent no-source warning (with explanation and required next action) when no Manufacturing or Mining unit has an item configured. When a price is auto-derived, the hint clearly names the source unit type and item (e.g., "From Manufacturing (Wooden Chair) — base price $45.00") so players understand where the price came from and can accept or override it.
+- In B2B sales unit show only connected products or products at the unit stocks.
 
-### Basic unit definition
-- ✅ 100% — Make storage unit have 10x storage capacity then the purchase or sales units by default. Implemented: STORAGE units hold 1000/2500/5000/10000 units at levels 1–4 vs 100/250/500/1000 for purchase/sales units. The upgrade info panel, inventory fill bar, and capacity stat all reflect the 10× difference so players can immediately see the storage advantage when planning layouts.
+### Unit upgrade
+Show the upgrade unit button in the building editation mode only - extend the building update for the upgrades. Allow to upgrade two units at the same time.
 
-### Unit modification
-- ✅ 95% — While upgrade of unit is in progress do not move the items from or to the unit or do not produce the items. Allow upgrades UX to be the same as the edit building. Show the upgrade buttons in the edit mode and allow multiple units in the building to be upgraded at the same time. Test this by the upgrading active sales unit which did sale some product past tick and first tick while unit is upgraded it should not sell any products. **Delivered**: All tick phases (Purchase, B2B Supply, Manufacturing, Mining, ResourceMovement, PublicSales) skip units under upgrade. A concurrent-upgrades summary panel lists every unit currently under upgrade in the same building, confirming multiple simultaneous upgrades are supported. Regression tests added including `PublicSalesPhase_SoldPreviousTick_DoesNotSellFirstTickAfterUpgradeBegins` and `MultipleUnitsUnderUpgrade_EachUnitSuspendedIndependently`. E2E tests added for concurrent-upgrade panel and stat delta display.
-- ✅ 95% — For upgrading the units show true changes what effect it will have. For example the storage capacity of the unit will expand from 100 to 250 and power consumption will increase from 1MW to 1.5MW and salaries will increase from 1 manhour to 2 manhour for example. **Delivered**: The upgrade panel now shows a full before/after stat table — primary throughput stat, labor cost/tick delta, and energy cost/tick delta — all with explicit +delta badges. Backend `unitUpgradeInfo` returns `currentLaborCostPerTick`, `nextLaborCostPerTick`, `currentEnergyCostPerTick`, `nextEnergyCostPerTick`. Backend test `UnitUpgradeInfo_IncludesLaborAndEnergyCostDeltas` validates the delta values.
+Show all changes that upgrading of the unit will have, for example the storage capacity change.
 
 ### Global exchange
-- ✅ 95% — Quality variability bands are implemented end-to-end. Each exchange offer now exposes a `qualityMin`/`qualityMax` band whose width scales from 20% at zero abundance (scarce, unpredictable) to 5% at full abundance (plentiful, consistent). The exchange UI shows the range (e.g. "59% – 71%") plus a visual band bar with a centre tick for the typical estimate. Actual purchased quality is sampled deterministically from the band each tick, so factory inputs vary realistcally. Sourcing candidate panels in building detail also receive quality band data. Backend: `GlobalExchangeCalculator.ComputeExchangeQualityBand` + `SampleExchangeQuality`; 13 new backend unit tests; 1 tick-engine range test updated. Frontend: 7 new unit tests; 4 new E2E tests. Remaining: sort/filter by quality band in the exchange UI.
-
-### Stock exchange
-- ✅ 100% — The stock exchange now keeps the global navbar account selector visible exactly like the rest of the game, so players always know which company or personal account is acting. The redundant inline "trade with" selector is removed. Trading controls are regrouped into a compact order panel with a read-only "trading as" context, a clear action caption above the buy/sell buttons, and responsive small-screen spacing so the workflow feels deliberate and trustworthy.
-
-### Database improvements
-- ✅ 80% — Dashboard and ledger loading is measurably faster for repeated navigation. Delivered: (1) New compound index `IX_LedgerEntries_CompanyId_Category_RecordedAtTick` for category drill-down queries. (2) `GetCompanyLedger` now filters entries by game year at the database level instead of loading all entries for a company, reducing row transfer for multi-year companies. History summaries use a lightweight `(RecordedAtTick, Category, Amount)` projection instead of full entity hydration. (3) `IMemoryCache` added across the server: `GetCities` cached 5 min, `GetResourceTypes` cached 10 min, `GetGameState` cached 8 s (eliminates redundant writes on rapid panel switching). (4) Non-current game-year ledger summaries cached for 60 s (historical data is immutable). Current-year summaries cached for 10 s. (5) `AsNoTracking()` added to all read-only ledger and city queries. (6) Frontend dashboard caches city names at module level after first load — no redundant API calls on navigation back.
+- The quality of products obrained from the blobal exchange must vary between 5 to 20%
 
 ### All buildings
 - Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future.
 - In each building header right below the building name show chart of total costs, total revenue and total profit in the top building overview
 
 ### Show time instead of ticks
-- ✅ 90% — Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging. **Delivered**: `formatTickDuration(ticks, locale)` helper added to `gameTime.ts`; LeaderboardView game-time chip, BuildingDetailView upgrade banner / unit cells / upgrade pills / concurrent-upgrade list, LedgerView data-range header and income-tax schedule, OnboardingView configure status and first-sale celebration, CityMapView construction countdown, and PendingActionsTimeline all now show player-friendly game dates/durations as primary labels with raw tick numbers preserved in `title` attributes for debugging. Unit tests added for `formatTickDuration` covering hours, days, days+hours, edge cases, and locale variants.
+- Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging.
 
 ### Onboarding details
 - Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. 
@@ -51,8 +42,11 @@ It will use real world map. The game will start in single city and later other c
 ### Ingame chat
 - Make ingame chat more intuitive on the frontend. Add chat to the top navigation bar and if it is open, make sure the chat is visible at the side. In the small devices make sure it is the full page thing.
 
-### Newspaper and changelog
-- ✅ 90% complete — Data flow from MasterApi to game frontend is restored and reliable. All CHANGELOG.csv entries are seeded as global CHANGELOG entries in MasterApi. The game API news proxy now gracefully returns an empty feed when MasterApi is unavailable instead of propagating the error. Frontend shows explicit empty, loading, and error states. Filter tabs work for ALL/Newspaper/Changelog views. Unread badge and mark-read flow is operational. Remaining: server-specific NEWS entries seeding automation; search/pagination UI for large feeds.
+### Changelog
+- Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
+
+### Architecture optimization
+- Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 
 ## Multiple Game Servers
 
