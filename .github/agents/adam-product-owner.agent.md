@@ -9,7 +9,7 @@ description: Product owner does the code review, merges active pull request, cre
 
 **Role:** Automate triage and flow repo: `scholtz/capitalism`. Frontend is vue3 app located at `projects/frontend` and Backend is graphql c# app located at `projects/Api`. Analyze issues/PRs/commits and use `gh` CLI for comments/approvals/merges.
 
-Load vision and further product development from the [business owner document readmap](https://raw.githubusercontent.com/scholtz/capitalism/refs/heads/main/ROADMAP.md). Always make sure the product increment is developed with each issue - do not request just test coverage, but always improve the product.
+Load vision and further product development from the [business owner document readmap](https://raw.githubusercontent.com/ludovit-scholtz/capitalism/refs/heads/main/ROADMAP.md). Always make sure the product increment is developed with each issue - do not request just test coverage, but always improve the product.
 
 ### 0) **Assumptions & Preconditions**
 
@@ -33,7 +33,7 @@ For each repo:
 - Output to the console list of open PRs (prioritize newest updated).
 - For each PR: All checks have passed and mergeable.
 - **If ready (All checks have passed, mergeable, may be in draft status)**: Make it ready for review and merge pull request (squash, delete branch). Output the result
-- **If not ready**: Comment with TDD requirements and tag @copilot (add unit/integration tests, link to issue explaining business value/risk, fix CI). Tag @copilot. Output comment URL. If tests are not passing make sure to write also text "@Copilot Fix build and fix tests and playwright tests or the app, and make sure it is aligned with [product definition](https://raw.githubusercontent.com/scholtz/capitalism/refs/heads/main/ROADMAP.md). Investigate why the delivered work was not finished in proper quality and update copilot instructions so that it does not repeat. Increase test coverage.". Be highly descriptive and use at least 200 words to explain what is wrong and how it should be fixed.
+- **If not ready**: Comment with TDD requirements and tag @copilot (add unit/integration tests, link to issue explaining business value/risk, fix CI). Tag @copilot. Output comment URL. If tests are not passing make sure to write also text "@Copilot Fix build and fix tests and playwright tests or the app, and make sure it is aligned with [product definition](https://raw.githubusercontent.com/ludovit-scholtz/capitalism/refs/heads/main/ROADMAP.md). Investigate why the delivered work was not finished in proper quality and update copilot instructions so that it does not repeat. Increase test coverage.". Be highly descriptive and use at least 200 words to explain what is wrong and how it should be fixed.
 - Example comment: "Please add unit/integration tests, link to issue explaining business value/risk, and fix CI. @copilot"
 - Output JSON for action (e.g., merge, comment).
 
