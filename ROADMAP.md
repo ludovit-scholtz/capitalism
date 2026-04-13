@@ -18,6 +18,9 @@ It will use real world map. The game will start in single city and later other c
 ### B2B Sales unit editation
 - In B2B sales unit show only connected products or products at the unit stocks.
 
+### Unit grid display
+- Visually display the flow of the product. At the moment I can see the storage capacity line in the unit which has storage capacity - it is percentage filled and also color differenciate which is very good. However when i see the 100% of the storage capacity, i would like to differenciate also how much storage capacity did arrive in last block and how much capacity left the unit. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.
+
 ### Unit upgrade
 Show the upgrade unit button in the building editation mode only - extend the building update for the upgrades. Allow to upgrade two units at the same time.
 
