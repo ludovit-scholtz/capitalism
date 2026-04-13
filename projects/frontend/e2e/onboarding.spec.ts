@@ -1284,6 +1284,8 @@ test.describe('Dashboard', () => {
     const companyCard = page.locator('.company-card').first()
     await expect(companyCard.getByRole('heading', { name: 'Test Corp' })).toBeVisible()
     await expect(companyCard.getByText('$500,000')).toBeVisible()
+    // Switch to Buildings tab to see building cards
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     await expect(companyCard.locator('.building-card', { hasText: 'Test Corp Factory' })).toBeVisible()
     await expect(companyCard.locator('.building-type-label', { hasText: 'Factory' })).toBeVisible()
   })

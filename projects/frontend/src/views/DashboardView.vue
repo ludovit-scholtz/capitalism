@@ -17,6 +17,7 @@ import SupplyChainPanel from '@/components/dashboard/SupplyChainPanel.vue'
 import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vue'
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
 import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
+import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
 // Module-level cache for city names — cities are static and never change during a session.
@@ -45,6 +46,16 @@ const createCompanyError = ref<string | null>(null)
 const createCompanyMessage = ref<string | null>(null)
 const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost:5174'
 
+/** Active dashboard tab. Persisted in sessionStorage so navigation preserves state. */
+const _savedTab = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('dashboard_tab') : null
+const activeTab = ref<'overview' | 'buildings' | 'activity' | 'chat'>(
+  (_savedTab as 'overview' | 'buildings' | 'activity' | 'chat') || 'overview',
+)
+function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat') {
+  activeTab.value = tab
+  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('dashboard_tab', tab)
+}
+
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
@@ -55,6 +66,14 @@ const formattedGameTime = computed(() =>
   gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : '',
 )
 
+function tabsForCompany(company: Company) {
+  return [
+    { key: 'overview', label: t('dashboard.tabOverview') },
+    { key: 'buildings', label: t('dashboard.tabBuildings'), badge: company.buildings.length },
+    { key: 'activity', label: t('dashboard.tabActivity') },
+    { key: 'chat', label: t('dashboard.tabChat') },
+  ]
+}
 const buildingTypeIcons: Record<string, string> = {
   MINE: '⛏️',
   FACTORY: '🏭',
@@ -373,38 +392,7 @@ async function createCompany() {
     </div>
 
     <template v-else>
-      <section class="startup-pack-panel" aria-labelledby="dashboard-startup-pack-title">
-        <div class="startup-pack-header">
-          <div>
-            <span class="startup-pack-eyebrow">{{ t('proAccess.eyebrow') }}</span>
-            <h2 id="dashboard-startup-pack-title">{{ t('proAccess.title') }}</h2>
-          </div>
-          <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
-            {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
-          </span>
-        </div>
-
-        <p class="startup-pack-subtitle">
-          <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
-            {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
-          </template>
-          <template v-else>
-            {{ t('proAccess.inactiveBody') }}
-          </template>
-        </p>
-        <p class="startup-pack-free-path">{{ t('proAccess.manageBody') }}</p>
-
-        <div class="startup-pack-actions">
-          <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
-            {{ t('proAccess.openPortal') }}
-          </a>
-        </div>
-      </section>
-
-      <PendingActionsTimeline :actions="pendingActions" :loading="pendingActionsLoading" :current-tick="gameState?.currentTick ?? null" />
-
-      <DashboardChatPanel />
-
+      <!-- Person account mode (no company selected) -->
       <section v-if="isPersonAccount" class="person-account-panel">
         <div class="person-account-header">
           <div>
@@ -462,8 +450,11 @@ async function createCompany() {
         </div>
       </section>
 
+      <!-- Company mode: tabbed dashboard -->
       <div v-if="visibleCompanies.length > 0" class="companies-section">
         <div v-for="company in visibleCompanies" :key="company.id" class="company-card">
+
+          <!-- Always-visible company bar -->
           <div class="company-header">
             <div>
               <h2>{{ company.name }}</h2>
@@ -482,66 +473,120 @@ async function createCompany() {
                 </span>
               </div>
             </div>
-            <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
-              {{ t('dashboard.buyBuilding') }}
-            </RouterLink>
-            <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary"> 🗺️ {{ t('nav.cityMap') }} </RouterLink>
-            <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> 📒 {{ t('dashboard.viewLedger') }} </RouterLink>
-            <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ⚙️ {{ t('dashboard.companySettings') }} </RouterLink>
-          </div>
-
-          <!-- Financial summary and guidance row -->
-          <div class="operations-row">
-            <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
-            <StarterGuidance :company="company" :revenue="companyLedgers[company.id]?.totalRevenue ?? 0" :net-income="companyLedgers[company.id]?.netIncome ?? 0" />
-          </div>
-
-          <div v-if="company.buildings.length === 0" class="no-buildings">
-            <p>{{ t('dashboard.noBuildings') }}</p>
-          </div>
-
-          <div v-else class="buildings-grid">
-            <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper">
-              <RouterLink :to="`/building/${building.id}`" class="building-card">
-                <div class="building-icon">{{ getBuildingIcon(building.type) }}</div>
-                <div class="building-info">
-                  <span class="building-name">{{ building.name }}</span>
-                  <span class="building-type-label">{{ formatBuildingType(building.type) }}</span>
-                </div>
-                <div class="building-stats">
-                  <span class="building-level">Lv.{{ building.level }}</span>
-                  <span class="building-units">{{ building.units.length }} units</span>
-                  <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
-                    {{ building.powerStatus === 'OFFLINE' ? '🔴' : '🟡' }}
-                    {{ getBuildingPowerLabel(building.powerStatus) }}
-                  </span>
-                </div>
+            <div class="company-actions">
+              <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
+                {{ t('dashboard.buyBuilding') }}
               </RouterLink>
-              <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" />
+              <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary">
+                🗺️ {{ t('nav.cityMap') }}
+              </RouterLink>
+              <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> 📒 {{ t('dashboard.viewLedger') }} </RouterLink>
+              <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ⚙️ {{ t('dashboard.companySettings') }} </RouterLink>
             </div>
           </div>
 
-          <!-- City power summary for this company's city -->
-          <div v-if="company.buildings.length > 0 && company.buildings[0]" class="city-power-row">
-            <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
-              <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
-                <span class="power-balance-icon">⚡</span>
-                <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
-                <span v-if="cityPowerBalances[cityId].status === 'BALANCED'" class="power-balance-value">
-                  {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
+          <!-- Section tab navigation -->
+          <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat')" />
+
+          <!-- ── Overview tab ──────────────────────────────────────────── -->
+          <div v-show="activeTab === 'overview'" class="tab-panel" role="tabpanel" aria-label="Overview">
+            <!-- Pro subscription compact status -->
+            <section class="startup-pack-panel" aria-labelledby="dashboard-startup-pack-title">
+              <div class="startup-pack-header">
+                <div>
+                  <span class="startup-pack-eyebrow">{{ t('proAccess.eyebrow') }}</span>
+                  <h2 id="dashboard-startup-pack-title">{{ t('proAccess.title') }}</h2>
+                </div>
+                <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+                  {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
                 </span>
-                <span v-else class="power-balance-warning">
-                  {{ cityPowerBalances[cityId].status === 'CRITICAL' ? t('powerGrid.criticalWarning') : t('powerGrid.shortageWarning') }}
-                </span>
-                <RouterLink :to="`/city/${cityId}`" class="power-balance-link">{{ t('powerGrid.viewDetails') }}</RouterLink>
               </div>
-              <div v-else class="power-balance power-balance--legacy">
-                <span class="power-balance-icon">⚡</span>
-                <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
-                <span class="power-balance-value">{{ t('powerGrid.powerCardNoPower') }}</span>
+              <p class="startup-pack-subtitle">
+                <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
+                  {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
+                </template>
+                <template v-else>
+                  {{ t('proAccess.inactiveBody') }}
+                </template>
+              </p>
+              <p class="startup-pack-free-path">{{ t('proAccess.manageBody') }}</p>
+              <div class="startup-pack-actions">
+                <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
+                  {{ t('proAccess.openPortal') }}
+                </a>
               </div>
-            </template>
+            </section>
+
+            <!-- Financial summary and guidance -->
+            <div class="operations-row">
+              <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
+              <StarterGuidance :company="company" :revenue="companyLedgers[company.id]?.totalRevenue ?? 0" :net-income="companyLedgers[company.id]?.netIncome ?? 0" />
+            </div>
           </div>
+
+          <!-- ── Buildings tab ─────────────────────────────────────────── -->
+          <div v-show="activeTab === 'buildings'" class="tab-panel" role="tabpanel" aria-label="Buildings">
+            <div v-if="company.buildings.length === 0" class="no-buildings">
+              <p>{{ t('dashboard.noBuildings') }}</p>
+              <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
+                {{ t('dashboard.buyBuilding') }}
+              </RouterLink>
+            </div>
+
+            <div v-else class="buildings-grid">
+              <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper">
+                <RouterLink :to="`/building/${building.id}`" class="building-card">
+                  <div class="building-icon">{{ getBuildingIcon(building.type) }}</div>
+                  <div class="building-info">
+                    <span class="building-name">{{ building.name }}</span>
+                    <span class="building-type-label">{{ formatBuildingType(building.type) }}</span>
+                  </div>
+                  <div class="building-stats">
+                    <span class="building-level">Lv.{{ building.level }}</span>
+                    <span class="building-units">{{ building.units.length }} units</span>
+                    <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
+                      {{ building.powerStatus === 'OFFLINE' ? '🔴' : '🟡' }}
+                      {{ getBuildingPowerLabel(building.powerStatus) }}
+                    </span>
+                  </div>
+                </RouterLink>
+                <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" />
+              </div>
+            </div>
+
+            <!-- City power summary -->
+            <div v-if="company.buildings.length > 0 && company.buildings[0]" class="city-power-row">
+              <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
+                <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
+                  <span class="power-balance-icon">⚡</span>
+                  <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
+                  <span v-if="cityPowerBalances[cityId].status === 'BALANCED'" class="power-balance-value">
+                    {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
+                  </span>
+                  <span v-else class="power-balance-warning">
+                    {{ cityPowerBalances[cityId].status === 'CRITICAL' ? t('powerGrid.criticalWarning') : t('powerGrid.shortageWarning') }}
+                  </span>
+                  <RouterLink :to="`/city/${cityId}`" class="power-balance-link">{{ t('powerGrid.viewDetails') }}</RouterLink>
+                </div>
+                <div v-else class="power-balance power-balance--legacy">
+                  <span class="power-balance-icon">⚡</span>
+                  <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
+                  <span class="power-balance-value">{{ t('powerGrid.powerCardNoPower') }}</span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- ── Activity tab ──────────────────────────────────────────── -->
+          <div v-show="activeTab === 'activity'" class="tab-panel" role="tabpanel" aria-label="Activity">
+            <PendingActionsTimeline :actions="pendingActions" :loading="pendingActionsLoading" :current-tick="gameState?.currentTick ?? null" />
+          </div>
+
+          <!-- ── Chat tab ──────────────────────────────────────────────── -->
+          <div v-show="activeTab === 'chat'" class="tab-panel" role="tabpanel" aria-label="Chat">
+            <DashboardChatPanel />
+          </div>
+
         </div>
       </div>
     </template>
@@ -950,7 +995,19 @@ async function createCompany() {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1.25rem;
+  margin-bottom: 0;
+}
+
+.company-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+/* Tab panel container */
+.tab-panel {
+  padding-top: 1.25rem;
 }
 
 .company-header h2 {
@@ -1005,7 +1062,10 @@ async function createCompany() {
   text-align: center;
   padding: 1.5rem;
   color: var(--color-text-secondary);
-  font-style: italic;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
 }
 
 .buildings-grid {

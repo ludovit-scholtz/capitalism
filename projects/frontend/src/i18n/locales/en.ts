@@ -438,6 +438,10 @@ export default {
     viewBuilding: 'View Details',
     viewLedger: 'View Ledger',
     companySettings: 'Settings',
+    tabOverview: 'Overview',
+    tabBuildings: 'Buildings',
+    tabActivity: 'Activity',
+    tabChat: 'Chat',
   },
   leaderboard: {
     eyebrow: 'Competitive Rankings',
