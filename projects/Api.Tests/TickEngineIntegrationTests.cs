@@ -5221,4 +5221,660 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     #endregion
+
+    #region Unit upgrade suspension (units do not act while under upgrade)
+
+    [Fact]
+    public async Task PublicSalesPhase_UnitUnderUpgrade_DoesNotSellDuringUpgrade()
+    {
+        // A PUBLIC_SALES unit that has a pending level upgrade (IsChanged=true, TicksRequired>0,
+        // AppliesAtTick > currentTick) must not execute sales during the upgrade window.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var city = CreatePublicSalesTestCity("UpgradeSuspend", 100_000);
+        db.Cities.Add(city);
+
+        var (_, buildingId, unitId) = AddPublicSalesSeller(db, city, product, "UpgradeSuspend", stockQuantity: 50m);
+
+        // Save entities first so we can query them and so the plan FK is valid.
+        await db.SaveChangesAsync();
+
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        // Attach a pending upgrade plan to the unit's building — upgrade takes 10 ticks.
+        var planId = Guid.NewGuid();
+        var plan = new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = buildingId,
+            SubmittedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        // PUBLIC_SALES unit is placed at (0,0) by AddPublicSalesSeller.
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 2,  // upgrading to next level
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice,
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // The unit is under upgrade; no sales record should be created.
+        var salesRecord = await db.PublicSalesRecords
+            .FirstOrDefaultAsync(r => r.BuildingUnitId == unitId);
+        Assert.Null(salesRecord);
+
+        // Inventory must be unchanged (no sales occurred).
+        var remainingQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == unitId)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(50m, remainingQty);
+    }
+
+    [Fact]
+    public async Task PurchasingPhase_UnitUnderUpgrade_DoesNotPurchaseDuringUpgrade()
+    {
+        // A PURCHASE unit with a pending upgrade must not buy any inventory during the upgrade window.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var city = await db.Cities.Include(c => c.Resources).FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"purchase-upgrade-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Purchase Upgrade Test",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Purchase Upgrade Corp",
+            Cash = 5_000_000m,
+        };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Upgrade Test Factory",
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+
+        var purchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Purchase,
+            GridX = 0, GridY = 0,
+            Level = 1,
+            ResourceTypeId = woodResource.Id,
+            MaxPrice = 999_999m,
+            PurchaseSource = "EXCHANGE",
+        };
+        db.BuildingUnits.Add(purchaseUnit);
+
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        // Attach a pending upgrade plan.
+        var planId = Guid.NewGuid();
+        var plan = new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.Purchase,
+            GridX = 0, GridY = 0,
+            Level = 2,  // upgrading to level 2
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            ResourceTypeId = woodResource.Id,
+            MaxPrice = 999_999m,
+            PurchaseSource = "EXCHANGE",
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // The purchase unit is under upgrade; it must not have acquired any inventory.
+        var inventoryQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == purchaseUnit.Id)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(0m, inventoryQty);
+    }
+
+    [Fact]
+    public async Task ManufacturingPhase_UnitUnderUpgrade_DoesNotManufactureDuringUpgrade()
+    {
+        // A MANUFACTURING unit with inputs available and a pending upgrade must not produce output.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var product = await db.ProductTypes.Include(p => p.Recipes).FirstAsync(p => p.Slug == "wooden-chair");
+        var city = await db.Cities.FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"mfg-upgrade-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Mfg Upgrade Test",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "Mfg Upgrade Corp",
+            Cash = 5_000_000m,
+        };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Mfg Upgrade Factory",
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+
+        var mfgUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Manufacturing,
+            GridX = 0, GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+        };
+        db.BuildingUnits.Add(mfgUnit);
+
+        // Pre-stock raw materials in the manufacturing unit's own inventory.
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuildingUnitId = mfgUnit.Id,
+            ResourceTypeId = woodResource.Id,
+            Quantity = 100m,
+            Quality = 0.7m,
+        });
+
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        // Attach a pending upgrade plan.
+        var planId = Guid.NewGuid();
+        var plan = new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.Manufacturing,
+            GridX = 0, GridY = 0,
+            Level = 2,
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            ProductTypeId = product.Id,
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // No product inventory should have been produced.
+        var productQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == mfgUnit.Id && i.ProductTypeId == product.Id)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(0m, productQty);
+    }
+
+    [Fact]
+    public async Task ResourceMovementPhase_SourceUnderUpgrade_DoesNotPushInventory()
+    {
+        // A source unit that is under upgrade must not push its inventory to linked neighbors.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var city = await db.Cities.FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"resmov-upgrade-{Guid.NewGuid():N}@test.com",
+            DisplayName = "ResMove Upgrade Test",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "ResMove Upgrade Corp",
+            Cash = 1_000_000m,
+        };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "ResMove Upgrade Factory",
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+
+        // Source STORAGE at (0,0) linked right → destination STORAGE at (1,0).
+        var sourceUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Storage,
+            GridX = 0, GridY = 0,
+            Level = 1,
+            LinkRight = true,
+        };
+        var destUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Storage,
+            GridX = 1, GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.AddRange(sourceUnit, destUnit);
+
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuildingUnitId = sourceUnit.Id,
+            ResourceTypeId = woodResource.Id,
+            Quantity = 20m,
+            Quality = 0.7m,
+        });
+
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        // Pending upgrade on the source unit.
+        var planId = Guid.NewGuid();
+        var plan = new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.Storage,
+            GridX = 0, GridY = 0,
+            Level = 2,
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+        });
+        // Snapshot of the destination unit (no change).
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.Storage,
+            GridX = 1, GridY = 0,
+            Level = 1,
+            IsChanged = false,
+            TicksRequired = 0,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick,
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Destination must remain empty — source under upgrade does not push.
+        var destQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == destUnit.Id)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(0m, destQty);
+
+        // Source must still hold its inventory.
+        var sourceQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == sourceUnit.Id)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(20m, sourceQty);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_SoldPreviousTick_DoesNotSellFirstTickAfterUpgradeBegins()
+    {
+        // Key regression: a PUBLIC_SALES unit that successfully sold in tick N must NOT sell
+        // on tick N+1 if a level-upgrade plan is pending from tick N (AppliesAtTick > N+1).
+        // This proves the upgrade suspension starts on the very first tick after scheduling.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var city = CreatePublicSalesTestCity("PrevSaleUpgrade", 100_000);
+        db.Cities.Add(city);
+
+        var (_, buildingId, unitId) = AddPublicSalesSeller(db, city, product, "PrevSaleUpgrade", stockQuantity: 50m);
+        await db.SaveChangesAsync();
+
+        var gameState = await db.GameStates.FirstAsync();
+        var processor = await CreateProcessorAsync(scope);
+
+        // ── TICK 1: no upgrade plan; unit should sell normally ──────────────────────────────────
+        await processor.ProcessTickAsync();
+
+        var salesAfterTick1 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .CountAsync();
+        Assert.True(salesAfterTick1 > 0, "Unit should have sold at least one unit on tick 1 (no upgrade yet).");
+
+        // ── NOW: attach a pending upgrade plan (starts from current tick, applies 10 ticks later) ─
+        var currentTick = gameState.CurrentTick + 1; // one tick has elapsed
+        var planId = Guid.NewGuid();
+        db.BuildingConfigurationPlans.Add(new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = buildingId,
+            SubmittedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            TotalTicksRequired = 10,
+        });
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.PublicSales,
+            GridX = 0, GridY = 0,
+            Level = 2,
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice,
+        });
+        await db.SaveChangesAsync();
+
+        // Record sales count before tick 2.
+        var salesBeforeTick2 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .CountAsync();
+
+        // ── TICK 2: upgrade plan is pending; unit must NOT sell ──────────────────────────────────
+        var processor2 = await CreateProcessorAsync(scope);
+        await processor2.ProcessTickAsync();
+
+        var salesAfterTick2 = await db.PublicSalesRecords
+            .Where(r => r.BuildingUnitId == unitId)
+            .CountAsync();
+
+        // Sales count must not increase on the first tick under upgrade.
+        Assert.Equal(salesBeforeTick2, salesAfterTick2);
+    }
+
+    [Fact]
+    public async Task MultipleUnitsUnderUpgrade_EachUnitSuspendedIndependently()
+    {
+        // Two units in the same building can be under concurrent upgrades.
+        // Each is suspended independently; a third unit (no upgrade) operates normally.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var city = await db.Cities.FirstAsync();
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"multi-upgrade-{Guid.NewGuid():N}@test.com",
+            DisplayName = "MultiUpgrade Test",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "MultiUpgrade Corp",
+            Cash = 5_000_000m,
+        };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "MultiUpgrade Factory",
+            Level = 1,
+        };
+        db.Buildings.Add(building);
+
+        // Unit A: PURCHASE at (0,0) — under upgrade; should not purchase.
+        var purchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = building.Id,
+            UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1,
+            ResourceTypeId = woodResource.Id, MaxPrice = 999_999m, PurchaseSource = "EXCHANGE",
+        };
+        // Unit B: MANUFACTURING at (1,0) — under upgrade; should not produce.
+        var mfgUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = building.Id,
+            UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1,
+            ProductTypeId = product.Id,
+        };
+        // Unit C: STORAGE at (2,0) — no upgrade; not referenced in plan.
+        var storageUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = building.Id,
+            UnitType = UnitType.Storage, GridX = 2, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.AddRange(purchaseUnit, mfgUnit, storageUnit);
+
+        // Pre-stock wood in the manufacturing unit so production would succeed without the upgrade guard.
+        db.Inventories.Add(new Inventory
+        {
+            Id = Guid.NewGuid(), BuildingId = building.Id, BuildingUnitId = mfgUnit.Id,
+            ResourceTypeId = woodResource.Id, Quantity = 100m, Quality = 0.7m,
+        });
+
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        // One plan covers both upgrading units (A and B).
+        var planId = Guid.NewGuid();
+        db.BuildingConfigurationPlans.Add(new BuildingConfigurationPlan
+        {
+            Id = planId, BuildingId = building.Id,
+            SubmittedAtTick = currentTick, AppliesAtTick = currentTick + 10, TotalTicksRequired = 10,
+        });
+        // Plan unit A (Purchase — under upgrade)
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(), BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 2,
+            IsChanged = true, TicksRequired = 10, StartedAtTick = currentTick, AppliesAtTick = currentTick + 10,
+            ResourceTypeId = woodResource.Id, MaxPrice = 999_999m, PurchaseSource = "EXCHANGE",
+        });
+        // Plan unit B (Manufacturing — under upgrade)
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(), BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 2,
+            IsChanged = true, TicksRequired = 10, StartedAtTick = currentTick, AppliesAtTick = currentTick + 10,
+            ProductTypeId = product.Id,
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Purchase unit is under upgrade → no inventory acquired.
+        var purchaseQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == purchaseUnit.Id && i.ResourceTypeId == woodResource.Id)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(0m, purchaseQty);
+
+        // Manufacturing unit is under upgrade → no product produced.
+        var productQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == mfgUnit.Id && i.ProductTypeId == product.Id)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(0m, productQty);
+
+        // Storage unit has no upgrade → its inventory is not blocked (it holds nothing, but
+        // confirming TickContext.UnitsUnderUpgrade does not include it).
+        var storageInSet = await db.BuildingConfigurationPlanUnits
+            .Where(u => u.BuildingConfigurationPlanId == planId && u.GridX == 2)
+            .AnyAsync();
+        Assert.False(storageInSet);
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_UnitUnderUpgrade_StillSuspendedWhenCurrentTickEqualsAppliesAtTick()
+    {
+        // Regression for off-by-one: ProcessTickAsync increments GameState.CurrentTick BEFORE
+        // calling BuildContextAsync. So "currentTick" inside BuildContextAsync is one higher than
+        // the value stored in the DB before the call.
+        //
+        // The boundary case is: planUnit.AppliesAtTick == gameState.CurrentTick (after ++).
+        // In this state BuildingUpgradePhase (order 100) will apply the plan in the same tick.
+        // But per the product promise, the unit must be offline for the FULL upgrade window,
+        // including the application tick — the unit should NOT sell before the upgrade runs.
+        // The correct guard is `< gameState.CurrentTick` (not `<=`) so the unit IS suspended
+        // when AppliesAtTick equals the new current tick.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var city = CreatePublicSalesTestCity("BoundarySuspend", 100_000);
+        db.Cities.Add(city);
+
+        var (_, buildingId, unitId) = AddPublicSalesSeller(db, city, product, "BoundarySuspend", stockQuantity: 50m);
+        await db.SaveChangesAsync();
+
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;  // ProcessTickAsync will increment this by 1
+
+        // The upgrade plan's AppliesAtTick is set to currentTick + 1, which equals
+        // gameState.CurrentTick AFTER the tick increment inside ProcessTickAsync.
+        // This is the exact boundary: AppliesAtTick == gameState.CurrentTick.
+        // With the old `<=` guard this unit would NOT be suspended (plan skipped);
+        // with the correct `<` guard it IS suspended even on the application tick.
+        var planId = Guid.NewGuid();
+        db.BuildingConfigurationPlans.Add(new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = buildingId,
+            SubmittedAtTick = currentTick - 9,
+            AppliesAtTick = currentTick + 1,  // == gameState.CurrentTick after ++ in ProcessTickAsync
+            TotalTicksRequired = 10,
+        });
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 2,
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick - 9,
+            AppliesAtTick = currentTick + 1,  // boundary: equals new currentTick after ++
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice,
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // ProcessTickAsync increments tick to currentTick+1 == AppliesAtTick.
+        // The unit must still be offline — no sales record and unchanged inventory.
+        var salesRecord = await db.PublicSalesRecords
+            .FirstOrDefaultAsync(r => r.BuildingUnitId == unitId);
+        Assert.Null(salesRecord);
+
+        var remainingQty = await db.Inventories
+            .Where(i => i.BuildingUnitId == unitId)
+            .SumAsync(i => i.Quantity);
+        Assert.Equal(50m, remainingQty);
+    }
+
+    #endregion
 }

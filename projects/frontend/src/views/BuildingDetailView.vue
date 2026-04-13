@@ -2353,6 +2353,26 @@ const selectedCellPendingUpgrade = computed<{
   }
 })
 
+/**
+ * Returns true if the cell at (x, y) has an active level upgrade in progress
+ * (a pending plan unit with isChanged=true, ticksRequired>0, and applies in the future).
+ */
+function isCellUnderUpgrade(x: number, y: number): boolean {
+  if (!building.value?.pendingConfiguration) return false
+  const plan = building.value.pendingConfiguration
+  const tick = gameStateStore.gameState?.currentTick ?? currentTick.value
+  const planUnit = plan.units.find(
+    (u) => u.gridX === x && u.gridY === y && u.isChanged && u.ticksRequired > 0,
+  )
+  if (!planUnit) return false
+  const activeUnit = getUnitAtFrom(activeUnits.value, x, y)
+  if (!activeUnit) return false
+  // Upgrade is in progress when the plan applies this tick or later and the level is increasing.
+  // Using >= matches the backend rule: BuildingUpgradePhase runs at order 100 (after operational
+  // phases), so a unit due on the current tick is still offline during purchasing/sales/etc.
+  return planUnit.appliesAtTick >= tick && planUnit.level > activeUnit.level
+}
+
 /** Upgrade info for the currently selected cell unit (cached from last fetch). */
 const selectedCellUpgradeInfo = computed<import('@/types').UnitUpgradeInfo | null>(() => {
   if (!selectedCell.value) return null
@@ -2360,6 +2380,33 @@ const selectedCellUpgradeInfo = computed<import('@/types').UnitUpgradeInfo | nul
   if (!unit || !unit.id) return null
   if (unitUpgradeInfoCache.value?.unitId === unit.id) return unitUpgradeInfoCache.value
   return null
+})
+
+/**
+ * List of all active units in this building that are currently under a level upgrade,
+ * used to show the concurrent-upgrades summary panel.
+ */
+const allUnitsUnderUpgrade = computed<
+  Array<{ unitType: string; gridX: number; gridY: number; toLevel: number; ticksRemaining: number }>
+>(() => {
+  if (!building.value?.pendingConfiguration) return []
+  const plan = building.value.pendingConfiguration
+  const tick = gameStateStore.gameState?.currentTick ?? currentTick.value
+  return plan.units
+    .filter((pu) => pu.isChanged && pu.ticksRequired > 0 && pu.appliesAtTick >= tick)
+    .flatMap((pu) => {
+      const activeUnit = getUnitAtFrom(activeUnits.value, pu.gridX, pu.gridY)
+      if (!activeUnit || pu.level <= activeUnit.level) return []
+      return [
+        {
+          unitType: pu.unitType,
+          gridX: pu.gridX,
+          gridY: pu.gridY,
+          toLevel: pu.level,
+          ticksRemaining: Math.max(0, pu.appliesAtTick - tick),
+        },
+      ]
+    })
 })
 
 function formatCurrency(value: number | null | undefined): string {
@@ -3069,6 +3116,10 @@ async function fetchUpgradeInfo(unitId: string) {
         unitUpgradeInfo(unitId: $unitId) {
           unitId unitType currentLevel nextLevel isMaxLevel isUpgradable
           upgradeCost upgradeTicks currentStat nextStat statLabel
+          currentLaborHoursPerTick nextLaborHoursPerTick
+          currentEnergyMwhPerTick nextEnergyMwhPerTick
+          currentLaborCostPerTick nextLaborCostPerTick
+          currentEnergyCostPerTick nextEnergyCostPerTick
         }
       }`,
       { unitId },
@@ -4084,6 +4135,30 @@ watch(
       </div>
       <div v-if="cancelPlanError" class="error-banner" role="alert">{{ cancelPlanError }}</div>
 
+      <!-- Concurrent unit upgrades summary: lists every unit currently under upgrade in this building -->
+      <div
+        v-if="allUnitsUnderUpgrade.length > 0"
+        class="concurrent-upgrades-panel"
+        aria-label="Units under upgrade"
+      >
+        <h4>⏳ {{ t('buildingDetail.unitUpgrade.concurrentTitle') }}</h4>
+        <p class="concurrent-upgrades-help">{{ t('buildingDetail.unitUpgrade.concurrentHelp') }}</p>
+        <ul class="concurrent-upgrades-list">
+          <li
+            v-for="u in allUnitsUnderUpgrade"
+            :key="`${u.gridX}-${u.gridY}`"
+            class="concurrent-upgrade-item"
+            :aria-label="`${u.unitType} at (${u.gridX}, ${u.gridY}) upgrading to level ${u.toLevel}`"
+          >
+            <span class="concurrent-upgrade-type">{{ u.unitType }}</span>
+            <span class="concurrent-upgrade-pos">({{ u.gridX }}, {{ u.gridY }})</span>
+            <span class="concurrent-upgrade-arrow">→</span>
+            <span class="concurrent-upgrade-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: u.toLevel }) }}</span>
+            <span class="concurrent-upgrade-ticks">{{ t('buildingDetail.unitUpgrade.ticksRemaining', { ticks: u.ticksRemaining }) }}</span>
+          </li>
+        </ul>
+      </div>
+
       <div v-if="lockedConfiguredProducts.length > 0" class="pro-access-banner" role="status">
         <strong>{{ t('catalog.proLockedTitle') }}</strong>
         <p>
@@ -4256,7 +4331,11 @@ watch(
                   <template v-for="x in gridIndexes" :key="`active-unit-${x}-${y}`">
                     <div
                       class="grid-cell readonly clickable"
-                      :class="{ occupied: !!getUnitAtFrom(activeUnits, x, y), selected: selectedCell?.x === x && selectedCell?.y === y }"
+                      :class="{
+                        occupied: !!getUnitAtFrom(activeUnits, x, y),
+                        selected: selectedCell?.x === x && selectedCell?.y === y,
+                        'under-upgrade': isCellUnderUpgrade(x, y),
+                      }"
                       :style="
                         getUnitAtFrom(activeUnits, x, y)
                           ? { borderColor: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType), background: getUnitColor(getUnitAtFrom(activeUnits, x, y)!.unitType) + '18' }
@@ -4273,6 +4352,8 @@ watch(
                           <span class="cell-type">{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, x, y)!.unitType}`) }}</span>
                           <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
                         </div>
+                        <!-- Under-upgrade badge -->
+                        <span v-if="isCellUnderUpgrade(x, y)" class="cell-upgrading-badge" aria-label="Unit is being upgraded">⏳</span>
                         <div v-if="getUnitDisplayLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-item-block" aria-hidden="true">
                           <img v-if="getUnitDisplayImageUrl(getUnitAtFrom(activeUnits, x, y))" class="cell-item-image" :src="getUnitDisplayImageUrl(getUnitAtFrom(activeUnits, x, y))!" alt="" />
                           <span v-else class="cell-item-avatar">{{ getUnitDisplayMonogram(getUnitAtFrom(activeUnits, x, y)) }}</span>
@@ -5287,6 +5368,10 @@ watch(
                         ticks: selectedCellPendingUpgrade.ticksRemaining,
                       }) }}
                     </p>
+                    <!-- Downtime notice: unit is offline during upgrade -->
+                    <p class="unit-upgrade-downtime-notice">
+                      {{ t('buildingDetail.unitUpgrade.pendingDowntimeNotice') }}
+                    </p>
                   </div>
                 </div>
 
@@ -5309,7 +5394,8 @@ watch(
                     <span class="unit-upgrade-arrow">→</span>
                     <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
                   </div>
-                  <div class="unit-upgrade-stats">
+                  <!-- Full before/after stat table -->
+                  <div class="unit-upgrade-stats" aria-label="Upgrade impact">
                     <div class="unit-upgrade-stat-row">
                       <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
                       <span class="unit-upgrade-stat-values">
@@ -5318,7 +5404,29 @@ watch(
                         <span class="stat-next">{{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</span>
                       </span>
                     </div>
+                    <div class="unit-upgrade-stat-row" aria-label="Labor cost delta">
+                      <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
+                      <span class="unit-upgrade-stat-values">
+                        <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
+                        <span class="stat-arrow"> → </span>
+                        <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick) }}</span>
+                        <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick - selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
+                      </span>
+                    </div>
+                    <div class="unit-upgrade-stat-row" aria-label="Energy cost delta">
+                      <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
+                      <span class="unit-upgrade-stat-values">
+                        <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
+                        <span class="stat-arrow"> → </span>
+                        <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick) }}</span>
+                        <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick - selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
+                      </span>
+                    </div>
                   </div>
+                  <!-- Downtime notice shown before confirming the upgrade -->
+                  <p class="unit-upgrade-downtime-notice available">
+                    {{ t('buildingDetail.unitUpgrade.availableDowntimeNotice', { ticks: selectedCellUpgradeInfo.upgradeTicks }) }}
+                  </p>
                   <div class="unit-upgrade-meta">
                     <span class="unit-upgrade-cost">{{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}</span>
                     <span class="unit-upgrade-duration">{{ t('buildingDetail.unitUpgrade.duration', { ticks: selectedCellUpgradeInfo.upgradeTicks }) }}</span>
@@ -9763,6 +9871,120 @@ watch(
 
 .unit-upgrade-confirm-btn {
   width: 100%;
+}
+
+/* Downtime notice shown both when upgrade is pending and when it's about to be scheduled */
+.unit-upgrade-downtime-notice {
+  font-size: 0.78rem;
+  color: #f59e0b;
+  margin: 0.4rem 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  line-height: 1.45;
+}
+
+.unit-upgrade-downtime-notice.available {
+  margin-bottom: 0.6rem;
+}
+
+/* Under-upgrade indicator on grid cells */
+.grid-cell.under-upgrade {
+  position: relative;
+  opacity: 0.75;
+}
+
+.cell-upgrading-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 0.7rem;
+  line-height: 1;
+  background: rgba(245, 158, 11, 0.15);
+  border-radius: 4px;
+  padding: 1px 3px;
+  z-index: 2;
+}
+
+/* Stat delta badge shown in the before/after stat table */
+.stat-delta {
+  font-size: 0.72rem;
+  font-weight: 600;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: var(--radius-sm);
+}
+
+.stat-delta-negative {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+}
+
+/* Concurrent upgrades summary panel */
+.concurrent-upgrades-panel {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-sm);
+}
+
+.concurrent-upgrades-panel h4 {
+  margin: 0 0 0.3rem;
+  font-size: 0.9rem;
+  color: #f59e0b;
+}
+
+.concurrent-upgrades-help {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.5rem;
+}
+
+.concurrent-upgrades-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.concurrent-upgrade-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  padding: 0.25rem 0.5rem;
+  background: rgba(245, 158, 11, 0.04);
+  border-radius: var(--radius-sm);
+}
+
+.concurrent-upgrade-type {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  min-width: 8rem;
+}
+
+.concurrent-upgrade-pos {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.concurrent-upgrade-arrow {
+  color: var(--color-text-secondary);
+}
+
+.concurrent-upgrade-level {
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.concurrent-upgrade-ticks {
+  margin-left: auto;
+  color: #f59e0b;
+  font-size: 0.75rem;
 }
 
 .flush-confirm-dialog {
