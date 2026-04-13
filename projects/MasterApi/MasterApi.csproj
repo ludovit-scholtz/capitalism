@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
 	<PropertyGroup>
 		<TargetFramework>net10.0</TargetFramework>
@@ -36,5 +36,17 @@
 		<Folder Include="Data\Entities\" />
 		<Folder Include="Types\" />
 	</ItemGroup>
+
+	<Target Name="CopyFiles" AfterTargets="Build">
+		<!-- CHANGELOG.csv will be supplied by CICD from the root of the git repository -->
+		<ItemGroup>
+			<ChangelogFiles Include="CHANGELOG.csv"/>
+		</ItemGroup>
+		<Copy
+			SourceFiles="@(ChangelogFiles)"
+			DestinationFolder="$(OutputPath)"
+			ContinueOnError="true"
+        />
+	</Target>
 
 </Project>
