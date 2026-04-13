@@ -24,6 +24,13 @@ import {
 } from '@/lib/linkHelpers'
 import { annotateExchangeOffers, selectOptimalOffer, sortExchangeOffers, detectLogisticsTrap, type AnnotatedExchangeOffer, type ExchangeSortBy } from '@/lib/globalExchange'
 import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedResourceDescription, getLocalizedResourceName, getProductImageUrl, getResourceImageUrl } from '@/lib/catalogPresentation'
+import {
+  PRODUCTION_PANEL_DISMISSED_KEY,
+  SALES_PANEL_DISMISSED_KEY,
+  isBuildingPanelDismissed,
+  dismissBuildingPanel,
+  shouldShowPanel,
+} from '@/lib/panelDismissal'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
@@ -453,13 +460,45 @@ const chainStatus = computed(() => {
   }
 })
 
+// ── Panel dismissal state ──
+
+/** Whether the production-chain panel has been dismissed for the current building. */
+const productionChainPanelDismissed = ref(false)
+/** Whether the sales-chain panel has been dismissed for the current building. */
+const salesChainPanelDismissed = ref(false)
+
+function loadPanelDismissalState(bid: string): void {
+  productionChainPanelDismissed.value = isBuildingPanelDismissed(PRODUCTION_PANEL_DISMISSED_KEY, bid)
+  salesChainPanelDismissed.value = isBuildingPanelDismissed(SALES_PANEL_DISMISSED_KEY, bid)
+}
+
+function dismissProductionChainPanel(): void {
+  const bid = buildingId.value
+  if (!bid) return
+  dismissBuildingPanel(PRODUCTION_PANEL_DISMISSED_KEY, bid)
+  productionChainPanelDismissed.value = true
+}
+
+function dismissSalesChainPanel(): void {
+  const bid = buildingId.value
+  if (!bid) return
+  dismissBuildingPanel(SALES_PANEL_DISMISSED_KEY, bid)
+  salesChainPanelDismissed.value = true
+}
+
 /**
  * Shows the production-chain status panel for a factory that already has units
  * saved (active or pending) but is not currently in edit mode.
+ * Stays hidden after the player dismisses it unless the chain becomes incomplete
+ * (an error condition that requires the player's attention).
  */
-const showProductionChainPanel = computed(
-  () => !isEditing.value && building.value?.type === 'FACTORY' && (activeUnits.value.length > 0 || pendingConfiguration.value !== null) && !showStarterSetupBanner.value,
-)
+const showProductionChainPanel = computed(() => {
+  if (isEditing.value) return false
+  if (building.value?.type !== 'FACTORY') return false
+  if (activeUnits.value.length === 0 && pendingConfiguration.value === null) return false
+  if (showStarterSetupBanner.value) return false
+  return shouldShowPanel(productionChainPanelDismissed.value, chainStatus.value.isChainComplete)
+})
 
 /**
  * Mirrors showStarterSetupBanner but for SALES_SHOP buildings.
@@ -488,10 +527,16 @@ const shopChainStatus = computed(() => {
 /**
  * Shows the sales-chain status panel for a sales shop that already has units
  * saved (active or pending) but is not currently in edit mode.
+ * Stays hidden after the player dismisses it unless the chain becomes incomplete
+ * (an error condition that requires the player's attention).
  */
-const showSalesChainPanel = computed(
-  () => !isEditing.value && building.value?.type === 'SALES_SHOP' && (activeUnits.value.length > 0 || pendingConfiguration.value !== null) && !showSalesShopStarterBanner.value,
-)
+const showSalesChainPanel = computed(() => {
+  if (isEditing.value) return false
+  if (building.value?.type !== 'SALES_SHOP') return false
+  if (activeUnits.value.length === 0 && pendingConfiguration.value === null) return false
+  if (showSalesShopStarterBanner.value) return false
+  return shouldShowPanel(salesChainPanelDismissed.value, shopChainStatus.value.isChainComplete)
+})
 
 type LinkChangeSummaryEntry = {
   description: string
@@ -3615,6 +3660,11 @@ onMounted(async () => {
     return
   }
 
+  // Load panel dismissal state for the initial building ID
+  if (buildingId.value) {
+    loadPanelDismissalState(buildingId.value)
+  }
+
   await loadBuilding()
 })
 
@@ -3688,6 +3738,16 @@ watch(
   () => {
     if (!isEditing.value) {
       restoreReadOnlySelectedCell(activeUnits.value)
+    }
+  },
+)
+
+// Reload panel dismissal state when navigating to a different building
+watch(
+  () => buildingId.value,
+  (bid) => {
+    if (bid) {
+      loadPanelDismissalState(bid)
     }
   },
 )
@@ -4225,6 +4285,11 @@ watch(
           <h3 class="chain-panel-title">⚙️ {{ t('buildingDetail.productionChain.title') }}</h3>
           <span v-if="chainStatus.isChainComplete" class="chain-status-badge chain-status-badge--complete">✅ {{ t('buildingDetail.productionChain.chainComplete') }}</span>
           <span v-else class="chain-status-badge chain-status-badge--incomplete">⚠️ {{ t('buildingDetail.productionChain.chainIncomplete') }}</span>
+          <button
+            class="chain-panel-dismiss"
+            :aria-label="t('buildingDetail.productionChain.dismissAriaLabel')"
+            @click="dismissProductionChainPanel"
+          >{{ t('buildingDetail.productionChain.dismiss') }}</button>
         </div>
 
         <div class="chain-flow" role="list" aria-label="production chain steps">
@@ -4300,6 +4365,11 @@ watch(
           <h3 class="chain-panel-title">🏪 {{ t('buildingDetail.salesChain.title') }}</h3>
           <span v-if="shopChainStatus.isChainComplete" class="chain-status-badge chain-status-badge--complete">✅ {{ t('buildingDetail.salesChain.chainComplete') }}</span>
           <span v-else class="chain-status-badge chain-status-badge--incomplete">⚠️ {{ t('buildingDetail.salesChain.chainIncomplete') }}</span>
+          <button
+            class="chain-panel-dismiss"
+            :aria-label="t('buildingDetail.salesChain.dismissAriaLabel')"
+            @click="dismissSalesChainPanel"
+          >{{ t('buildingDetail.salesChain.dismiss') }}</button>
         </div>
 
         <div class="chain-flow" role="list" aria-label="sales chain steps">
@@ -7012,6 +7082,24 @@ watch(
 .chain-status-badge--incomplete {
   background: rgba(251, 191, 36, 0.15);
   color: #fbbf24;
+}
+
+.chain-panel-dismiss {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.6rem;
+  line-height: 1.4;
+  transition: background 0.15s, color 0.15s;
+}
+
+.chain-panel-dismiss:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text-primary);
 }
 
 .chain-flow {

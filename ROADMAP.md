@@ -38,7 +38,7 @@ Show all changes that upgrading of the unit will have, for example the storage c
 - Wherever is shown the time, make sure in the title is shown also the tick number
 
 ### Onboarding details
-- Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. 
+- Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. **[100% complete — Dismiss button added to both panels; dismissal stored in localStorage per building ID; panel re-appears automatically when chain is incomplete (error condition); state survives navigation and reactive refreshes; E2E tests added for dismiss, persistence, and error-override behavior.]**
 
 ### Stock exchange
 - When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional.
