@@ -440,6 +440,10 @@ export default {
     viewBuilding: 'Details anzeigen',
     viewLedger: 'Hauptbuch anzeigen',
     companySettings: 'Einstellungen',
+    tabOverview: 'Übersicht',
+    tabBuildings: 'Gebäude',
+    tabActivity: 'Aktivität',
+    tabChat: 'Chat',
   },
   leaderboard: {
     eyebrow: 'Wettbewerbliche Rangliste',

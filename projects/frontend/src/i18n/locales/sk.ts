@@ -438,6 +438,10 @@ export default {
     viewBuilding: 'Zobraziť detaily',
     viewLedger: 'Zobraziť účtovnú knihu',
     companySettings: 'Nastavenia',
+    tabOverview: 'Prehľad',
+    tabBuildings: 'Budovy',
+    tabActivity: 'Aktivita',
+    tabChat: 'Chat',
   },
   leaderboard: {
     eyebrow: 'Kompet\u00edt\u00edvne poradie',

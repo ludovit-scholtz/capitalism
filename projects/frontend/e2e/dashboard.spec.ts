@@ -192,6 +192,7 @@ test.describe('Dashboard — pending actions timeline', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Activity' }).click()
     await expect(page.getByRole('heading', { name: 'Scheduled Actions' })).toBeVisible()
     await expect(page.getByRole('status')).toContainText('No scheduled actions')
   })
@@ -237,6 +238,7 @@ test.describe('Dashboard — pending actions timeline', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Activity' }).click()
     await expect(page.getByRole('heading', { name: 'Scheduled Actions' })).toBeVisible()
     // Should show the pending building upgrade entry
     const actionsList = page.locator('.actions-list')
@@ -288,6 +290,7 @@ test.describe('Dashboard — pending actions timeline', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Activity' }).click()
     const viewLink = page.getByRole('link', { name: /view building/i })
     await expect(viewLink).toBeVisible()
     await expect(viewLink).toHaveAttribute('href', `/building/${buildingId}`)
@@ -334,6 +337,9 @@ test.describe('Dashboard — pending actions timeline', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    // Navigate to Activity tab to see pending actions
+    await page.getByRole('tab', { name: 'Activity' }).click()
+
     // Pending action should be visible
     await expect(page.locator('.actions-list')).toBeVisible()
     await expect(page.locator('.actions-list')).toContainText('Iron Mine')
@@ -343,6 +349,7 @@ test.describe('Dashboard — pending actions timeline', () => {
     await page.reload()
 
     // After tick advance, the plan is applied and the action should be gone
+    await page.getByRole('tab', { name: 'Activity' }).click()
     await expect(page.getByRole('status')).toContainText('No scheduled actions')
   })
 })
@@ -380,6 +387,7 @@ test.describe('Dashboard — chat panel', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Chat' }).click()
     await expect(page.getByRole('heading', { name: 'In-Game Chat' })).toBeVisible()
     await expect(page.locator('.chat-log')).toContainText('Welcome to the exchange floor.')
 
@@ -651,6 +659,7 @@ test.describe('Dashboard — power grid summary', () => {
     }, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // The city has no power plants, so the legacy grid label should appear.
     await expect(page.locator('.power-balance--legacy')).toBeVisible()
     await expect(page.locator('.power-balance--legacy')).toContainText('Legacy grid')
@@ -717,6 +726,7 @@ test.describe('Dashboard — power grid summary', () => {
     }, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Supply (50 MW) > Demand (5 MW) → BALANCED
     await expect(page.locator('.power-balance--balanced')).toBeVisible()
     await expect(page.locator('.power-balance--balanced')).toContainText('50')
@@ -784,6 +794,7 @@ test.describe('Dashboard — power grid summary', () => {
     }, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Supply (8 MW) < Demand (15 MW) → CONSTRAINED
     await expect(page.locator('.power-balance--constrained')).toBeVisible()
     // CONSTRAINED buildings show yellow badge
@@ -948,6 +959,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Supply chain panels should be visible for buildings with units
     await expect(page.locator('.supply-chain-panel').first()).toBeVisible()
     // Factory supply chain should show unit labels
@@ -977,6 +989,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Shop supply chain should show public sales
     await expect(page.locator('.supply-chain-panel').nth(1)).toContainText('Public Sales')
   })
@@ -1286,6 +1299,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Food processing factory shows PURCHASE and MANUFACTURING units
     await expect(page.locator('.supply-chain-panel').first()).toContainText('Purchase')
     await expect(page.locator('.supply-chain-panel').first()).toContainText('Manufacturing')
@@ -1314,9 +1328,12 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    // Core elements should be visible on mobile
+    // Core overview elements should be visible on mobile
     await expect(page.locator('.financial-summary-card')).toBeVisible()
     await expect(page.locator('.starter-guidance')).toBeVisible()
+
+    // Switch to buildings tab and verify supply chain
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     await expect(page.locator('.supply-chain-panel').first()).toBeVisible()
   })
 
@@ -1507,6 +1524,7 @@ test.describe('Dashboard — unit operational status in supply chain', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Supply chain panel should be rendered
     await expect(page.locator('.supply-chain-panel').first()).toBeVisible()
     // Unit node for ACTIVE unit should have active styling
@@ -1680,10 +1698,19 @@ test.describe('Dashboard — post-onboarding routing', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    // Core company info
+    // Core company info (always visible in company bar)
     await expect(page.getByRole('heading', { name: 'Wood Empire' })).toBeVisible()
     await expect(page.locator('.cash')).toContainText('350,000')
     await expect(page.locator('.city-name')).toContainText('Bratislava')
+
+    // Financial summary shows revenue (Overview tab - default)
+    await expect(page.locator('.financial-summary-card')).toContainText('1,200')
+
+    // Guidance shows profitable message (revenue > costs)
+    await expect(page.locator('.starter-guidance')).toContainText('Business is profitable')
+
+    // Switch to buildings tab for supply chain
+    await page.getByRole('tab', { name: 'Buildings' }).click()
 
     // Factory supply chain is visible with all 3 units
     const factoryChain = page.locator('.supply-chain-panel').first()
@@ -1695,12 +1722,6 @@ test.describe('Dashboard — post-onboarding routing', () => {
     // Shop supply chain shows purchase and public sales
     const shopChain = page.locator('.supply-chain-panel').nth(1)
     await expect(shopChain).toContainText('Public Sales')
-
-    // Financial summary shows revenue
-    await expect(page.locator('.financial-summary-card')).toContainText('1,200')
-
-    // Guidance shows profitable message (revenue > costs)
-    await expect(page.locator('.starter-guidance')).toContainText('Business is profitable')
   })
 
   test('dashboard shows correct financial data for Food Processing starter company', async ({
@@ -1801,13 +1822,16 @@ test.describe('Dashboard — post-onboarding routing', () => {
     await page.goto('/dashboard')
 
     await expect(page.getByRole('heading', { name: 'Bread Empire' })).toBeVisible()
-    // Food Processing supply chain shows Purchase and Manufacturing
-    await expect(page.locator('.supply-chain-panel').first()).toContainText('Purchase')
-    await expect(page.locator('.supply-chain-panel').first()).toContainText('Manufacturing')
-    // Revenue shows
+    // Revenue shows (Overview tab - default)
     await expect(page.locator('.financial-summary-card')).toContainText('450')
     // Unprofitable guidance (costs 510 > revenue 450)
     await expect(page.locator('.starter-guidance')).toContainText('Review your pricing')
+
+    // Switch to buildings tab for supply chain
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+    // Food Processing supply chain shows Purchase and Manufacturing
+    await expect(page.locator('.supply-chain-panel').first()).toContainText('Purchase')
+    await expect(page.locator('.supply-chain-panel').first()).toContainText('Manufacturing')
   })
 
   test('dashboard shows correct supply chain for Healthcare starter company', async ({ page }) => {
@@ -1898,13 +1922,16 @@ test.describe('Dashboard — post-onboarding routing', () => {
     await page.goto('/dashboard')
 
     await expect(page.getByRole('heading', { name: 'Medicine Empire' })).toBeVisible()
+    // Awaiting revenue for company with no ledger data (Overview tab - default)
+    await expect(page.locator('.starter-guidance')).toContainText('Awaiting first sales')
+
+    // Switch to buildings tab for supply chain
+    await page.getByRole('tab', { name: 'Buildings' }).click()
     // Healthcare supply chain shows all 3 unit types in order
     const chain = page.locator('.supply-chain-panel').first()
     await expect(chain).toContainText('Purchase')
     await expect(chain).toContainText('Manufacturing')
     await expect(chain).toContainText('Storage')
-    // Awaiting revenue for company with no ledger data
-    await expect(page.locator('.starter-guidance')).toContainText('Awaiting first sales')
   })
 })
 
@@ -1982,5 +2009,261 @@ test.describe('Dashboard tick-refresh stability', () => {
     await expect(page.getByRole('heading', { name: 'MultiTick Corp' })).toBeVisible()
     // No loading state between ticks
     await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
+  })
+})
+
+test.describe('Dashboard — section tab navigation', () => {
+  test('renders all four tabs with Overview active by default', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-tabnav',
+          playerId: 'player-1',
+          name: 'Tab Test Corp',
+          cash: 200000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // All four tabs should be present
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Buildings' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Activity' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible()
+
+    // Overview is active by default
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Buildings' })).toHaveAttribute('aria-selected', 'false')
+  })
+
+  test('Buildings tab shows building count badge when company has buildings', async ({ page }) => {
+    const factory: MockBuilding = {
+      id: 'building-badge-factory',
+      companyId: 'comp-badge',
+      cityId: 'city-ba',
+      type: 'FACTORY',
+      name: 'Badge Factory',
+      latitude: 48.14,
+      longitude: 17.12,
+      level: 1,
+      powerConsumption: 5,
+      powerStatus: 'POWERED',
+      isForSale: false,
+      builtAtUtc: '2026-01-01T00:00:00Z',
+      units: [],
+      pendingConfiguration: null,
+    }
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-badge',
+          playerId: 'player-1',
+          name: 'Badge Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [factory],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Buildings tab badge should show "1"
+    const buildingsTab = page.getByRole('tab', { name: 'Buildings' })
+    await expect(buildingsTab).toBeVisible()
+    await expect(buildingsTab.locator('.tab-badge')).toContainText('1')
+  })
+
+  test('switching to Activity tab shows pending actions content', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-switch',
+          playerId: 'player-1',
+          name: 'Switch Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Click Activity tab
+    await page.getByRole('tab', { name: 'Activity' }).click()
+
+    // Activity tab should now be active
+    await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
+
+    // Pending actions section should be visible
+    await expect(page.getByRole('heading', { name: 'Scheduled Actions' })).toBeVisible()
+  })
+
+  test('active tab selection persists during tick refresh', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-persist',
+          playerId: 'player-1',
+          name: 'Persist Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.gameState.currentTick = 30
+    state.gameState.tickIntervalSeconds = 1
+    state.gameState.lastTickAtUtc = new Date(Date.now() - 500).toISOString()
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Switch to Activity tab
+    await page.getByRole('tab', { name: 'Activity' }).click()
+    await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+
+    // Simulate tick advancing
+    state.gameState.currentTick = 31
+    state.gameState.lastTickAtUtc = new Date().toISOString()
+
+    // Tab should remain on Activity after tick update
+    await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('heading', { name: 'Scheduled Actions' })).toBeVisible()
+  })
+
+  test('keyboard navigation: Arrow keys cycle through tabs', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-kbd',
+          playerId: 'player-1',
+          name: 'Keyboard Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Focus the Overview tab
+    await page.getByRole('tab', { name: 'Overview' }).focus()
+
+    // Press ArrowRight should move to Buildings tab
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('tab', { name: 'Buildings' })).toHaveAttribute('aria-selected', 'true')
+
+    // Press ArrowRight again to Activity
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+
+    // Press ArrowLeft to go back to Buildings
+    await page.keyboard.press('ArrowLeft')
+    await expect(page.getByRole('tab', { name: 'Buildings' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('company header is always visible regardless of active tab', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-always',
+          playerId: 'player-1',
+          name: 'Always Visible Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    const companyHeading = page.getByRole('heading', { name: 'Always Visible Corp' })
+
+    // Visible on Overview
+    await expect(companyHeading).toBeVisible()
+
+    // Still visible after switching to Buildings tab
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+    await expect(companyHeading).toBeVisible()
+
+    // Still visible after switching to Activity tab
+    await page.getByRole('tab', { name: 'Activity' }).click()
+    await expect(companyHeading).toBeVisible()
+
+    // Still visible after switching to Chat tab
+    await page.getByRole('tab', { name: 'Chat' }).click()
+    await expect(companyHeading).toBeVisible()
+  })
+
+  test('tab navigation renders correctly on mobile viewport', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-mobile-tab',
+          playerId: 'player-1',
+          name: 'Mobile Tab Corp',
+          cash: 200000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.setViewportSize({ width: 375, height: 812 })
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // All tabs should be accessible on mobile
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Buildings' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Activity' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible()
+
+    // Tabs should function on mobile
+    await page.getByRole('tab', { name: 'Activity' }).click()
+    await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('heading', { name: 'Scheduled Actions' })).toBeVisible()
   })
 })
