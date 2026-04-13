@@ -6,6 +6,12 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
+### Dashboard
+- In dashboard in financial seciton, the costs are at the moment showned as $NaN.
+- Organize the dasboard better, its too much scrolling to get to the buildings - perhaps second level of navigation at the top of the page or pick some professional ux and design solution to make the user feel good on this page
+- Ticks causes the dashboard to flicker - organize the page to components, and make sure each component updates the data only when needed
+- Do not display the inactive or active pro subscription so big, make it much more smaller. We do not want users to feel they must do some action there, but if person wants to help the game and wants to have the more products available with pro subscription show him the benefits after he clicks some show benefits button
+
 ### Unit links
 - Diagonal links does not look good on frontend. There seems to be two lines - one arrow and one line. Also two rounded objects are visible there. There must be only only object which handles all 8 possible states for the link and links should look professional.
 
