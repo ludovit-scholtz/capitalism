@@ -40,6 +40,51 @@ describe('gameTime helpers', () => {
     expect(formatGameTickTime(24, 'en')).toContain('02')
   })
 
+  describe('formatGameTickTime — tick-to-readable-time conversion (player-facing display)', () => {
+    it('formats tick 0 as year-2000 start date', () => {
+      const result = formatGameTickTime(0, 'en')
+      expect(result).toContain('2000')
+      expect(result).toContain('00:00')
+    })
+
+    it('formats tick 24 (1 game day) as Jan 02 2000', () => {
+      const result = formatGameTickTime(24, 'en')
+      expect(result).toContain('2000')
+      expect(result).toContain('02')
+    })
+
+    it('formats tick 8760 (365 game days) into year 2000', () => {
+      // 1 game year = 8760 ticks = 365 days; since 2000 is a leap year (366 days),
+      // tick 8760 falls on Dec 31, 2000 (not Jan 1, 2001).
+      const result = formatGameTickTime(8760, 'en')
+      expect(result).toContain('2000')
+    })
+
+    it('never includes raw tick numbers in formatted output', () => {
+      // Tick 42 → formatted time should not contain "42" as a bare tick label
+      const result = formatGameTickTime(42, 'en')
+      // The formatted date should contain year, month, day — not the bare integer 42
+      // (day "Jan 12" = tick 264, so tick 42 = hour 42 = Jan 02 18:00)
+      expect(result).not.toBe('42')
+      expect(result).toContain('2000')
+    })
+
+    it('works with German locale', () => {
+      const result = formatGameTickTime(24, 'de')
+      expect(result).toContain('2000')
+    })
+
+    it('works with Slovak locale', () => {
+      const result = formatGameTickTime(24, 'sk')
+      expect(result).toContain('2000')
+    })
+
+    it('handles large tick values without error', () => {
+      const result = formatGameTickTime(876000, 'en') // ~100 game years
+      expect(result).toContain('209') // somewhere in the 2090s decade
+    })
+  })
+
   describe('formatTickDuration', () => {
     it('returns "0" for zero ticks', () => {
       expect(formatTickDuration(0, 'en')).toBe('0')

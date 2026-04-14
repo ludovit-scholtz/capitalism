@@ -556,7 +556,9 @@ test.describe('Building detail upgrades', () => {
     const chartCard = overview.locator('.building-financial-chart-card')
     await expect(chartCard.getByRole('img', { name: 'Building financial history' })).toBeVisible()
     await chartCard.locator('.building-financial-hit-area').nth(1).hover()
-    await expect(chartCard.locator('.building-financial-active-tick')).toHaveText('Tick 41')
+    await expect(chartCard.locator('.building-financial-active-tick')).toContainText('2000')
+    // Tick number preserved in debug title attribute
+    await expect(chartCard.locator('.building-financial-active-tick')).toHaveAttribute('title', /41/)
     await expect(chartCard.locator('.building-financial-chart-detail-stat').nth(0)).toContainText('$140')
     await expect(chartCard.locator('.building-financial-chart-detail-stat').nth(1)).toContainText('$120')
     await expect(chartCard.locator('.building-financial-chart-detail-stat').nth(2)).toContainText('$20')
@@ -12896,11 +12898,12 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(productChip).toBeVisible()
     await expect(productChip).toContainText(chairProduct.name)
 
-    // Tick window label should be visible
+    // Tick window label should show readable dates (not raw T1, T10)
     const tickWindow = panel.locator('.mi-tick-window')
     await expect(tickWindow).toBeVisible()
-    await expect(tickWindow).toContainText('T1')
-    await expect(tickWindow).toContainText('T10')
+    await expect(tickWindow).toContainText('2000')
+    // Raw tick numbers preserved in debug title attribute
+    await expect(tickWindow).toHaveAttribute('title', /T1/)
   })
 
   test('shows trend direction indicator when trendDirection is provided', async ({ page }) => {
@@ -13237,9 +13240,10 @@ test.describe('Public Sales Market Intelligence panel', () => {
     // All 100 price bars should be present
     await expect(panel.locator('.mi-bar-price')).toHaveCount(100)
 
-    // Tick window label should show T1–T100
-    await expect(panel.locator('.mi-tick-window')).toContainText('T1')
-    await expect(panel.locator('.mi-tick-window')).toContainText('T100')
+    // Tick window badge should show readable dates (not raw T1/T100)
+    await expect(panel.locator('.mi-tick-window')).toContainText('2000')
+    // Raw tick range preserved in title attribute for debugging
+    await expect(panel.locator('.mi-tick-window')).toHaveAttribute('title', /T1/)
   })
 
   test('shows market momentum metric when trendFactor is provided and > 1 (hot market)', async ({
@@ -13807,8 +13811,10 @@ test.describe('Sales shop edit mode — unit type picker', () => {
 
     // Should list "Purchase" as an addition
     await expect(changesPanel.getByText(/Purchase/)).toBeVisible()
-    // Should show tick cost (3 ticks for a new unit)
-    await expect(changesPanel.getByText(/3 ticks/)).toBeVisible()
+    // Should show duration as human-readable time (not raw ticks) — 3 ticks = 3 hours
+    await expect(changesPanel.getByText(/3 hours/)).toBeVisible()
+    // Raw tick count still available in title attribute for debugging
+    await expect(changesPanel.locator('.unit-change-ticks')).toHaveAttribute('title', /3 ticks/)
   })
 })
 

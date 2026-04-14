@@ -30,6 +30,9 @@ Show all changes that upgrading of the unit will have, for example the storage c
 ### Show time instead of ticks
 - Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging.
 - Wherever is shown the time, make sure in the title is shown also the tick number
+**[100% complete — All player-facing tick labels replaced with readable in-game time (using formatGameTickTime). Affected surfaces: building financial overview time window, financial chart active-tick indicator, market intelligence tick-window badges (public sales and manufacturing analytics panels), resource movement history table and summary (tick range and per-row timestamp), and recent activity feed timestamps. Raw tick numbers are preserved as title/tooltip attributes on every changed element for advanced debugging. i18n labels updated in en/sk/de: "Tick window" → "Time window", "Tick" column → "Time". PendingActionsTimeline (dashboard) was already correct. Unit tests and E2E coverage added.]**
+### Onboarding details
+- Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. **[100% complete — Dismiss button added to both panels; dismissal stored in localStorage per building ID; panel re-appears automatically when chain is incomplete (error condition); state survives navigation and reactive refreshes; E2E tests added for dismiss, persistence, and error-override behavior.]**
 
 ### Stock exchange
 - When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional. 

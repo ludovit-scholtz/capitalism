@@ -4592,7 +4592,7 @@ watch(
                     </template>
                   </span>
                   <span class="unit-change-meta">
-                    <span class="unit-change-ticks">{{ t('buildingDetail.unitChangeTicks', { ticks: change.ticks }) }}</span>
+                    <span class="unit-change-ticks" :title="t('buildingDetail.unitChangeTicks', { ticks: change.ticks })">{{ formatTickDuration(change.ticks, locale) }}</span>
                     <span v-if="change.cost > 0" class="unit-change-cost">{{ formatCurrency(change.cost) }}</span>
                   </span>
                 </li>
@@ -5452,7 +5452,7 @@ watch(
                   </p>
                   <div class="unit-upgrade-meta">
                     <span class="unit-upgrade-cost">{{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}</span>
-                    <span class="unit-upgrade-duration">{{ t('buildingDetail.unitUpgrade.duration', { ticks: selectedCellUpgradeInfo.upgradeTicks }) }}</span>
+                    <span class="unit-upgrade-duration" :title="t('buildingDetail.unitUpgrade.durationTicks', { ticks: selectedCellUpgradeInfo.upgradeTicks })">{{ t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}</span>
                   </div>
                   <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
                   <button
@@ -5781,8 +5781,12 @@ watch(
                   <span v-if="publicSalesAnalytics?.productName" class="mi-product-chip" aria-label="Currently selling product">
                     {{ publicSalesAnalytics.productName }}
                   </span>
-                  <span v-if="publicSalesAnalytics && publicSalesAnalytics.dataFromTick > 0" class="mi-tick-window">
-                    T{{ publicSalesAnalytics.dataFromTick }}–T{{ publicSalesAnalytics.dataToTick }}
+                  <span
+                    v-if="publicSalesAnalytics && publicSalesAnalytics.dataFromTick > 0"
+                    class="mi-tick-window"
+                    :title="`T${publicSalesAnalytics.dataFromTick}–T${publicSalesAnalytics.dataToTick}`"
+                  >
+                    {{ formatGameTickTime(publicSalesAnalytics.dataFromTick, locale) }} – {{ formatGameTickTime(publicSalesAnalytics.dataToTick, locale) }}
                   </span>
                 </div>
 
@@ -6095,8 +6099,12 @@ watch(
                   <span v-else-if="selectedManufacturingUnit.productTypeId" class="mi-product-chip">
                     {{ t('buildingDetail.unitProductAnalytics.productConfigured') }}
                   </span>
-                  <span v-if="unitProductAnalytics && unitProductAnalytics.dataFromTick > 0" class="mi-tick-window">
-                    T{{ unitProductAnalytics.dataFromTick }}–T{{ unitProductAnalytics.dataToTick }}
+                  <span
+                    v-if="unitProductAnalytics && unitProductAnalytics.dataFromTick > 0"
+                    class="mi-tick-window"
+                    :title="`T${unitProductAnalytics.dataFromTick}–T${unitProductAnalytics.dataToTick}`"
+                  >
+                    {{ formatGameTickTime(unitProductAnalytics.dataFromTick, locale) }} – {{ formatGameTickTime(unitProductAnalytics.dataToTick, locale) }}
                   </span>
                 </div>
 
@@ -6204,7 +6212,10 @@ watch(
                       class="activity-item"
                       :class="`activity-${event.eventType.toLowerCase()}`"
                     >
-                      <span class="activity-tick">{{ t('buildingDetail.recentActivity.tickLabel', { tick: event.tick }) }}</span>
+                      <span
+                        class="activity-tick"
+                        :title="t('buildingDetail.recentActivity.tickLabel', { tick: event.tick })"
+                      >{{ formatGameTickTime(event.tick, locale) }}</span>
                       <span class="activity-desc">{{ event.description }}</span>
                     </li>
                   </ul>
@@ -6387,8 +6398,12 @@ watch(
 
               <div class="unit-insight-card building-financial-card">
                 <h5>{{ t('buildingDetail.overview.statsTitle') }}</h5>
-                <p v-if="buildingFinancialTimeline" class="config-help">
-                  {{ t('buildingDetail.overview.tickWindow', { start: buildingFinancialTimeline.dataFromTick, end: buildingFinancialTimeline.dataToTick }) }}
+                <p
+                  v-if="buildingFinancialTimeline"
+                  class="config-help"
+                  :title="t('buildingDetail.overview.tickWindow', { start: buildingFinancialTimeline.dataFromTick, end: buildingFinancialTimeline.dataToTick })"
+                >
+                  {{ formatGameTickTime(buildingFinancialTimeline.dataFromTick, locale) }} – {{ formatGameTickTime(buildingFinancialTimeline.dataToTick, locale) }}
                 </p>
                 <p v-else-if="buildingFinancialTimelineLoading" class="config-help">{{ t('common.loading') }}</p>
 
