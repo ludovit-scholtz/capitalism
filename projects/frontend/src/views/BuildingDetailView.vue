@@ -4592,7 +4592,7 @@ watch(
                     </template>
                   </span>
                   <span class="unit-change-meta">
-                    <span class="unit-change-ticks">{{ t('buildingDetail.unitChangeTicks', { ticks: change.ticks }) }}</span>
+                    <span class="unit-change-ticks" :title="t('buildingDetail.unitChangeTicks', { ticks: change.ticks })">{{ formatTickDuration(change.ticks, locale) }}</span>
                     <span v-if="change.cost > 0" class="unit-change-cost">{{ formatCurrency(change.cost) }}</span>
                   </span>
                 </li>
@@ -5452,7 +5452,7 @@ watch(
                   </p>
                   <div class="unit-upgrade-meta">
                     <span class="unit-upgrade-cost">{{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}</span>
-                    <span class="unit-upgrade-duration">{{ t('buildingDetail.unitUpgrade.duration', { ticks: selectedCellUpgradeInfo.upgradeTicks }) }}</span>
+                    <span class="unit-upgrade-duration" :title="t('buildingDetail.unitUpgrade.durationTicks', { ticks: selectedCellUpgradeInfo.upgradeTicks })">{{ t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}</span>
                   </div>
                   <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
                   <button

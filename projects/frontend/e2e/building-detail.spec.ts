@@ -13811,8 +13811,10 @@ test.describe('Sales shop edit mode — unit type picker', () => {
 
     // Should list "Purchase" as an addition
     await expect(changesPanel.getByText(/Purchase/)).toBeVisible()
-    // Should show tick cost (3 ticks for a new unit)
-    await expect(changesPanel.getByText(/3 ticks/)).toBeVisible()
+    // Should show duration as human-readable time (not raw ticks) — 3 ticks = 3 hours
+    await expect(changesPanel.getByText(/3 hours/)).toBeVisible()
+    // Raw tick count still available in title attribute for debugging
+    await expect(changesPanel.locator('.unit-change-ticks')).toHaveAttribute('title', /3 ticks/)
   })
 })
 
