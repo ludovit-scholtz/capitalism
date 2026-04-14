@@ -222,18 +222,21 @@ public sealed partial class Mutation
 
     /// <summary>
     /// Validates that products assigned to B2B_SALES units are topologically
-    /// reachable within the submitted configuration plan.
+    /// reachable within the submitted configuration plan, or are already present
+    /// in STORAGE inventory of this building.
     ///
     /// STORAGE units are universal — they accept any product and do not require
-    /// a product assignment. No per-unit product validation is applied to STORAGE.
+    /// a product assignment. Since a STORAGE unit can hold any product, a B2B_SALES
+    /// unit may sell a product that is already stocked in a STORAGE unit in this
+    /// building, even if no upstream producer is currently configured for that product.
     ///
     /// Rules:
     /// <list type="bullet">
     ///   <item>B2B_SALES: productTypeId must match a MANUFACTURING or PURCHASE unit in the
-    ///   submitted plan.</item>
+    ///   submitted plan, OR an existing product stocked in a STORAGE unit of this building.</item>
     /// </list>
     /// </summary>
-    private static Task ValidateProductTopologyAsync(
+    private static async Task ValidateProductTopologyAsync(
         AppDbContext db,
         Guid buildingId,
         IReadOnlyCollection<BuildingConfigurationUnitInput> submittedUnits)
@@ -250,6 +253,8 @@ public sealed partial class Mutation
             .ToHashSet();
 
         // STORAGE units are universal — no product topology validation is applied.
+        // However, products already stocked in STORAGE units of this building are
+        // valid sources for downstream B2B_SALES (the warehouse holds real goods).
 
         // Validate B2B_SALES units.
         var b2bUnitsWithProduct = submittedUnits
@@ -258,9 +263,32 @@ public sealed partial class Mutation
 
         if (b2bUnitsWithProduct.Count > 0)
         {
-            // Allowed products for B2B_SALES = MFG products + PURCHASE products in plan.
-            // STORAGE is now universal so it no longer contributes a product constraint here.
-            var allowedForB2B = mfgProductIds.Union(purchaseProductIds).ToHashSet();
+            // Allowed products for B2B_SALES:
+            //   1. Products from MFG or PURCHASE units in this plan (live producers).
+            //   2. Products already stocked in STORAGE units of this building
+            //      (universal warehouse goods — the player owns the inventory).
+            var allowedFromPlan = mfgProductIds.Union(purchaseProductIds).ToHashSet();
+
+            // Query the IDs of STORAGE units currently in this building so we can
+            // fetch their inventory.
+            var storageUnitIds = await db.BuildingUnits
+                .Where(u => u.BuildingId == buildingId && u.UnitType == "STORAGE")
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            // Collect product IDs from inventory of those STORAGE units (quantity > 0).
+            var stockedInStorage = storageUnitIds.Count > 0
+                ? await db.Inventories
+                    .Where(inv => inv.BuildingId == buildingId
+                        && inv.BuildingUnitId.HasValue
+                        && storageUnitIds.Contains(inv.BuildingUnitId!.Value)
+                        && inv.ProductTypeId.HasValue
+                        && inv.Quantity > 0)
+                    .Select(inv => inv.ProductTypeId!.Value)
+                    .ToHashSetAsync()
+                : [];
+
+            var allowedForB2B = allowedFromPlan.Union(stockedInStorage).ToHashSet();
 
             foreach (var unit in b2bUnitsWithProduct)
             {
@@ -270,14 +298,12 @@ public sealed partial class Mutation
                     throw new GraphQLException(
                         ErrorBuilder.New()
                             .SetMessage(
-                                "A B2B_SALES unit's product must match a MANUFACTURING or PURCHASE unit in this configuration.")
+                                "A B2B_SALES unit's product must match a MANUFACTURING or PURCHASE unit in this configuration, or be stocked in a STORAGE unit of this building.")
                             .SetCode("B2B_PRODUCT_NOT_REACHABLE")
                             .Build());
                 }
             }
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>

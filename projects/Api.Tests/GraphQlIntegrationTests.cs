@@ -4322,6 +4322,183 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task StoreBuildingConfiguration_B2BSalesWithStorageStockedProduct_Succeeds()
+    {
+        // Case 1: Existing inventory in STORAGE remains valid for downstream B2B editing
+        // even when the upstream producer is removed.
+        // A B2B_SALES unit may sell a product that is already stocked in a STORAGE unit
+        // of this building, even if no MFG or PURCHASE unit is configured for it.
+        var email = $"b2b-stocked-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "B2bStocked");
+
+        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "StockedCo" } }, token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+        var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "StockedF" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        await using var setupScope = isolatedFactory.Services.CreateAsyncScope();
+        var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chairId = await GetProductGuidBySlugAsync(setupDb, "wooden-chair");
+
+        // Seed a STORAGE unit with Wooden Chair inventory (simulates upstream producer ran, now removed)
+        var storageUnit = new Api.Data.Entities.BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = Guid.Parse(buildingId!),
+            UnitType = "STORAGE",
+            GridX = 0, GridY = 0,
+            Level = 1,
+        };
+        setupDb.BuildingUnits.Add(storageUnit);
+        setupDb.Inventories.Add(new Api.Data.Entities.Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = Guid.Parse(buildingId!),
+            BuildingUnitId = storageUnit.Id,
+            ProductTypeId = chairId,
+            Quantity = 50,
+            Quality = 0.8m,
+        });
+        await setupDb.SaveChangesAsync();
+
+        // Now configure: B2B_SALES for Wooden Chair, no MFG/PURCHASE in plan (upstream removed).
+        // This should succeed because the product is stocked in the STORAGE unit.
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
+            new { i = new { buildingId, units = new object[] {
+                new { unitType="STORAGE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false },
+                new { unitType="B2B_SALES", gridX=1, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+            }}},
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "B2B_SALES with a product stocked in a STORAGE unit should succeed even without an active MFG/PURCHASE unit");
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_PurchaseStorageB2B_SucceedsWithoutStorageProductSelection()
+    {
+        // Case 2: PURCHASE -> STORAGE -> B2B remains valid without STORAGE product selection.
+        // STORAGE is universal — no productTypeId is needed on the STORAGE unit.
+        var email = $"b2b-psb-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "B2bPsb");
+
+        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "PsbCo" } }, token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+        var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "PsbFactory" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
+
+        // PURCHASE (chair) -> STORAGE (universal, no product) -> B2B_SALES (chair)
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
+            new { i = new { buildingId, units = new object[] {
+                new { unitType="PURCHASE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+                new { unitType="STORAGE", gridX=1, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false },
+                new { unitType="B2B_SALES", gridX=2, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+            }}},
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "PURCHASE -> STORAGE (universal, no product) -> B2B_SALES must succeed");
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_UnrelatedUnitEditWithStockedGoods_Succeeds()
+    {
+        // Case 3: Editing unrelated unit properties in a building with stocked goods
+        // does not fail validation.
+        var email = $"b2b-unrelated-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "B2bUnrelated");
+
+        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "UnrelatedCo" } }, token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+        var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "UnrelatedF" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        await using var setupScope = isolatedFactory.Services.CreateAsyncScope();
+        var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chairId = await GetProductGuidBySlugAsync(setupDb, "wooden-chair");
+
+        // Seed a STORAGE unit with stock — simulates an active building with inventory
+        var storageUnit = new Api.Data.Entities.BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = Guid.Parse(buildingId!),
+            UnitType = "STORAGE",
+            GridX = 0, GridY = 0,
+            Level = 1,
+        };
+        setupDb.BuildingUnits.Add(storageUnit);
+        setupDb.Inventories.Add(new Api.Data.Entities.Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = Guid.Parse(buildingId!),
+            BuildingUnitId = storageUnit.Id,
+            ProductTypeId = chairId,
+            Quantity = 100,
+            Quality = 0.9m,
+        });
+        await setupDb.SaveChangesAsync();
+
+        // Edit: add a B2B_SALES for the stocked chair (no MFG/PURCHASE in plan).
+        // This represents editing layout of an active building — should not fail.
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
+            new { i = new { buildingId, units = new object[] {
+                new { unitType="STORAGE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false },
+                new { unitType="B2B_SALES", gridX=1, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+            }}},
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "Editing an active building layout with stocked goods must not fail B2B validation");
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_B2BSalesWithTrueUnreachableProduct_StillFails()
+    {
+        // Case 4: A truly invalid B2B product (no MFG/PURCHASE in plan, no stock in STORAGE)
+        // still fails with B2B_PRODUCT_NOT_REACHABLE.
+        var email = $"b2b-unreachable-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "B2bUnreachable");
+
+        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "UnreachableCo" } }, token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+        var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
+        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "UnreachableF" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var chairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
+        var breadId = await GetProductGuidBySlugAsync(db, "bread");
+
+        // B2B_SALES for Bread, but MFG produces Chair and no STORAGE has Bread stocked.
+        var result = await ExecuteGraphQlAsync(isolatedClient,
+            "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
+            new { i = new { buildingId, units = new[] {
+                new { unitType="MANUFACTURING", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+                new { unitType="B2B_SALES", gridX=1, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=breadId.ToString() },
+            }}},
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            "B2B_SALES with a product not in MFG/PURCHASE plan and not stocked must still be rejected");
+        Assert.Equal("B2B_PRODUCT_NOT_REACHABLE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task StoreBuildingConfiguration_B2BSalesNullProduct_Succeeds()
     {
         // A B2B_SALES unit with null productTypeId is always valid.
