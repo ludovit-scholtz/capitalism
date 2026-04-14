@@ -677,9 +677,24 @@ const selectedDraftPublicSalesUnit = computed(() => {
   return unit?.unitType === 'PUBLIC_SALES' ? unit : undefined
 })
 
+const selectedDraftB2bSalesUnit = computed(() => {
+  if (!selectedCell.value || !isEditing.value) return undefined
+  const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+  return unit?.unitType === 'B2B_SALES' ? unit : undefined
+})
+
 const publicSalesFilteredRankedProducts = computed<RankedProductResult[]>(() =>
   getSalesUnitProductOptions({
     unit: selectedDraftPublicSalesUnit.value,
+    draftUnits: draftUnits.value,
+    rankedProducts: rankedProducts.value,
+    unitInventories: unitInventories.value,
+  }),
+)
+
+const b2bSalesFilteredRankedProducts = computed<RankedProductResult[]>(() =>
+  getSalesUnitProductOptions({
+    unit: selectedDraftB2bSalesUnit.value,
     draftUnits: draftUnits.value,
     rankedProducts: rankedProducts.value,
     unitInventories: unitInventories.value,
@@ -4898,12 +4913,12 @@ watch(
                     <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
                     <ProductPicker
                       :model-value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? null"
-                      :ranked-products="publicSalesFilteredRankedProducts"
+                      :ranked-products="b2bSalesFilteredRankedProducts"
                       :loading="rankedProductsLoading"
                       :allow-none="true"
                       none-label-key="buildingDetail.config.none"
-                      help-text-key="buildingDetail.config.publicSalesProductPickerHelp"
-                      empty-state-key="buildingDetail.config.publicSalesProductPickerEmpty"
+                      help-text-key="buildingDetail.config.b2bProductPickerHelp"
+                      empty-state-key="buildingDetail.config.b2bProductPickerEmpty"
                       @update:model-value="updateSelectedUnitConfig('productTypeId', $event)"
                     />
                   </div>

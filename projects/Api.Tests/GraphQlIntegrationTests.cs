@@ -24591,8 +24591,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task RankedProductTypes_B2BSalesContext_StorageProductRankedFirst()
+    public async Task RankedProductTypes_B2BSalesContext_PurchaseProductRankedFirst()
     {
+        // STORAGE units are now universal buffers — they do not carry a meaningful productTypeId
+        // for ranking purposes. The B2B_SALES context should promote products from MANUFACTURE
+        // or PURCHASE units in the same building. This test verifies PURCHASE units are promoted.
         var email = $"rpt-b2bs-{Guid.NewGuid():N}@test.com";
         await using var isolatedFactory = new ApiWebApplicationFactory();
         using var isolatedClient = isolatedFactory.CreateClient();
@@ -24614,11 +24617,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
         };
         db.Buildings.Add(building);
-        // STORAGE unit with a product set
+        // PURCHASE unit sourcing flour — should be promoted for B2B_SALES context
         db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
         {
-            BuildingId = building.Id, UnitType = "STORAGE",
-            GridX = 1, GridY = 0, Level = 1, ProductTypeId = flourId,
+            BuildingId = building.Id, UnitType = "PURCHASE",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = flourId,
         });
         await db.SaveChangesAsync();
 

@@ -939,6 +939,10 @@ export default {
       b2bNoSourceTitle: 'Keine Upstream-Quelle konfiguriert',
       b2bNoSourceBody:
         'Diese B2B-Verkaufseinheit kann noch keinen Wettbewerbspreis ableiten. Konfigurieren Sie zuerst eine Fertigungseinheit mit einem Ausgabeprodukt oder eine Abbaueinheit mit einem Ressourcentyp in diesem Gebäude.',
+      b2bProductPickerHelp:
+        'Es werden nur Produkte angezeigt, die über verknüpfte vorgelagerte Einheiten mit dieser Einheit verbunden sind oder bereits hier auf Lager sind.',
+      b2bProductPickerEmpty:
+        'Noch keine geeigneten Produkte. Verbinden Sie eine Einkaufs-, Fertigungs- oder Lagerkette mit dieser Einheit oder lagern Sie die Einheit erneut auf, um vorhandenen Bestand weiterhin verkaufen zu können.',
       scopeProduct: 'Produkt',
       scopeCategory: 'Kategorie',
       scopeCompany: 'Unternehmen',

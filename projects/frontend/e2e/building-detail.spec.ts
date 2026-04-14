@@ -8051,6 +8051,190 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await expect(page.getByText('Min Price', { exact: true })).toBeVisible()
     await expect(page.getByText('Sale Visibility', { exact: true })).toBeVisible()
   })
+
+  test('B2B_SALES picker hides unrelated products that are not connected or stocked', async ({ page }) => {
+    // Scenario: factory has MFG producing Wooden Chair, B2B_SALES unit is linked.
+    // Bread (Food Processing) is in the product catalog but NOT connected or stocked.
+    // The B2B_SALES picker must NOT show Bread.
+    const chair = makeChairProduct()
+    const bread = { ...chair, id: 'prod-bread', name: 'Bread', slug: 'bread', industry: 'FOOD_PROCESSING' as const, basePrice: 3 }
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-b2b-filter',
+          playerId: 'player-1',
+          name: 'B2B Filter Co',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-b2b-filter',
+              companyId: 'company-b2b-filter',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'B2B Filter Factory',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 2,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              pendingConfiguration: null,
+              units: [
+                {
+                  id: 'filter-mfg',
+                  buildingId: 'building-b2b-filter',
+                  unitType: 'MANUFACTURING',
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkRight: true,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                  productTypeId: 'prod-chair',
+                },
+                {
+                  id: 'filter-b2b',
+                  buildingId: 'building-b2b-filter',
+                  unitType: 'B2B_SALES',
+                  gridX: 1,
+                  gridY: 0,
+                  level: 1,
+                  linkRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player], products: [chair, bread] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-b2b-filter')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+
+    const productTypeField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Product Type', { exact: true }) })
+      .first()
+
+    await productTypeField.locator('.picker-trigger').click()
+    await expect(page.locator('.product-picker-panel')).toBeVisible()
+
+    // Wooden Chair IS connected — must appear
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' })).toBeVisible()
+
+    // Bread is NOT connected or stocked — must NOT appear
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Bread' })).toHaveCount(0)
+  })
+
+  test('B2B_SALES picker shows empty state when no upstream product is connected', async ({ page }) => {
+    // Scenario: factory has MFG with no product configured, B2B_SALES has no stock.
+    // The picker should show the empty state guidance.
+    const chair = makeChairProduct()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-b2b-empty',
+          playerId: 'player-1',
+          name: 'B2B Empty Co',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-b2b-empty',
+              companyId: 'company-b2b-empty',
+              cityId: 'city-ba',
+              type: 'FACTORY',
+              name: 'B2B Empty Factory',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 2,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              pendingConfiguration: null,
+              units: [
+                {
+                  id: 'empty-b2b',
+                  buildingId: 'building-b2b-empty',
+                  unitType: 'B2B_SALES',
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-b2b-empty')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+
+    const productTypeField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Product Type', { exact: true }) })
+      .first()
+
+    await productTypeField.locator('.picker-trigger').click()
+    await expect(page.locator('.product-picker-panel')).toBeVisible()
+
+    // Empty state should be visible — no products to choose from
+    await expect(page.locator('.product-picker-panel .picker-empty-no-connected')).toBeVisible()
+    // No product items should be listed
+    await expect(page.locator('.product-picker-panel .picker-item')).toHaveCount(0)
+  })
 })
 
 // ── Product picker — contextual "Connected" section and icon display ───────────
