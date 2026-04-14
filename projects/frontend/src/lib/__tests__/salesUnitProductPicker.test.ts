@@ -219,3 +219,129 @@ describe('getSalesUnitProductOptions', () => {
     ).toEqual([])
   })
 })
+
+describe('getSalesUnitProductOptions — B2B_SALES', () => {
+  const rankedProducts = [
+    makeRankedProduct('prod-bread', 'Bread'),
+    makeRankedProduct('prod-chair', 'Wooden Chair'),
+    makeRankedProduct('prod-bandage', 'Bandages'),
+  ]
+
+  it('filters to only connected upstream products for a B2B_SALES unit', () => {
+    const b2bUnit = makeUnit({ id: 'b2b-unit', unitType: 'B2B_SALES', gridX: 1 })
+    const mfgUnit = makeUnit({
+      id: 'mfg-unit',
+      unitType: 'MANUFACTURING',
+      gridX: 0,
+      productTypeId: 'prod-chair',
+      linkRight: true,
+    })
+    const unrelated = makeUnit({
+      id: 'other-mfg',
+      unitType: 'MANUFACTURING',
+      gridX: 0,
+      gridY: 1,
+      productTypeId: 'prod-bread',
+    })
+
+    const options = getSalesUnitProductOptions({
+      unit: b2bUnit,
+      draftUnits: [b2bUnit, mfgUnit, unrelated],
+      rankedProducts,
+      unitInventories: [],
+    })
+
+    expect(options.map((o) => o.productType.id)).toEqual(['prod-chair'])
+    expect(options[0]?.availabilityReason).toBe('connected_upstream')
+  })
+
+  it('returns stocked products even when no upstream connection exists', () => {
+    const b2bUnit = makeUnit({ id: 'b2b-unit', unitType: 'B2B_SALES', gridX: 1 })
+
+    const options = getSalesUnitProductOptions({
+      unit: b2bUnit,
+      draftUnits: [b2bUnit],
+      rankedProducts,
+      unitInventories: [makeInventoryItem({ buildingUnitId: 'b2b-unit', productTypeId: 'prod-bandage', quantity: 5 })],
+    })
+
+    expect(options.map((o) => o.productType.id)).toEqual(['prod-bandage'])
+    expect(options[0]?.availabilityReason).toBe('current_stock')
+  })
+
+  it('returns an empty list when B2B_SALES unit has no connected upstream and no stock', () => {
+    const b2bUnit = makeUnit({ id: 'b2b-unit', unitType: 'B2B_SALES', gridX: 1 })
+
+    const options = getSalesUnitProductOptions({
+      unit: b2bUnit,
+      draftUnits: [b2bUnit],
+      rankedProducts,
+      unitInventories: [],
+    })
+
+    expect(options).toEqual([])
+  })
+
+  it('deduplicates products that are both connected and stocked in a B2B_SALES unit', () => {
+    const b2bUnit = makeUnit({ id: 'b2b-unit', unitType: 'B2B_SALES', gridX: 1 })
+    const mfgUnit = makeUnit({
+      id: 'mfg-unit',
+      unitType: 'MANUFACTURING',
+      gridX: 0,
+      productTypeId: 'prod-chair',
+      linkRight: true,
+    })
+
+    const options = getSalesUnitProductOptions({
+      unit: b2bUnit,
+      draftUnits: [b2bUnit, mfgUnit],
+      rankedProducts,
+      unitInventories: [makeInventoryItem({ buildingUnitId: 'b2b-unit', productTypeId: 'prod-chair', quantity: 2 })],
+    })
+
+    expect(options.map((o) => o.productType.id)).toEqual(['prod-chair'])
+    expect(options[0]?.availabilityReason).toBe('connected_and_stock')
+  })
+
+  it('traverses through STORAGE pass-through to reach upstream PURCHASE product', () => {
+    const b2bUnit = makeUnit({ id: 'b2b-unit', unitType: 'B2B_SALES', gridX: 2 })
+    const storageUnit = makeUnit({
+      id: 'storage-unit',
+      unitType: 'STORAGE',
+      gridX: 1,
+      productTypeId: null,
+      linkRight: true,
+      linkLeft: true,
+    })
+    const purchaseUnit = makeUnit({
+      id: 'purchase-unit',
+      unitType: 'PURCHASE',
+      gridX: 0,
+      productTypeId: 'prod-bread',
+      linkRight: true,
+    })
+
+    const options = getSalesUnitProductOptions({
+      unit: b2bUnit,
+      draftUnits: [b2bUnit, storageUnit, purchaseUnit],
+      rankedProducts,
+      unitInventories: [],
+    })
+
+    expect(options.map((o) => o.productType.id)).toEqual(['prod-bread'])
+    expect(options[0]?.availabilityReason).toBe('connected_upstream')
+  })
+
+  it('passes through all ranked products unchanged for non-sales unit types', () => {
+    const purchaseUnit = makeUnit({ id: 'purchase-unit', unitType: 'PURCHASE', gridX: 0 })
+
+    const options = getSalesUnitProductOptions({
+      unit: purchaseUnit,
+      draftUnits: [purchaseUnit],
+      rankedProducts,
+      unitInventories: [],
+    })
+
+    expect(options).toBe(rankedProducts)
+  })
+})

@@ -935,6 +935,10 @@ export default {
       b2bNoSourceTitle: 'Nie je nakonfigurovaný žiadny zdrojový uzol',
       b2bNoSourceBody:
         'Táto B2B predajná jednotka zatiaľ nemôže odvodiť konkurenčnú cenu. Najprv nakonfigurujte výrobnú jednotku s výstupným produktom alebo ťažobnú jednotku s typom suroviny v tejto budove.',
+      b2bProductPickerHelp:
+        'Zobrazia sa len produkty prepojené s touto jednotkou cez nadradené jednotky alebo už naskladnené v tejto jednotke.',
+      b2bProductPickerEmpty:
+        'Zatiaľ žiadne vhodné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli predávať existujúce zásoby.',
       scopeProduct: 'Produkt',
       scopeCategory: 'Kategória',
       scopeCompany: 'Firma',

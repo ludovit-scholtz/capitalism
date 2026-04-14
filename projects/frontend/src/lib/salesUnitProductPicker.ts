@@ -116,7 +116,7 @@ export function getSalesUnitProductOptions(args: {
   unitInventories: BuildingUnitInventory[]
 }): RankedProductResult[] {
   const { unit, draftUnits, rankedProducts, unitInventories } = args
-  if (!unit || unit.unitType !== 'PUBLIC_SALES') return rankedProducts
+  if (!unit || (unit.unitType !== 'PUBLIC_SALES' && unit.unitType !== 'B2B_SALES')) return rankedProducts
 
   const connectedProductIds = getConnectedProductIds(unit, draftUnits)
   const currentStockProductIds = getCurrentStockProductIds(unit.id, unitInventories)

@@ -3661,10 +3661,16 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           .filter((item) => item.productTypeId)
           .forEach((item) => connectedProductIds.add(item.productTypeId!))
       } else if (unitType === 'B2B_SALES') {
-        // Connected = products from MANUFACTURING or STORAGE units
+        // Connected = products from MANUFACTURING or PURCHASE units
         allBuildingUnits
-          .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'STORAGE') && u.productTypeId)
+          .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'PURCHASE') && u.productTypeId)
           .forEach((u) => connectedProductIds.add(u.productTypeId!))
+        // Also products currently stocked in B2B_SALES units
+        allBuildingUnits
+          .filter((u) => u.unitType === 'B2B_SALES' && u.inventoryItems && u.inventoryItems.length > 0)
+          .flatMap((u) => u.inventoryItems ?? [])
+          .filter((item) => item.productTypeId)
+          .forEach((item) => connectedProductIds.add(item.productTypeId!))
       }
 
       // Sort: connected first (score 100), then catalog (score 10), both alphabetical

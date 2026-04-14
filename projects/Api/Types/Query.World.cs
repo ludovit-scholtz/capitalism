@@ -274,10 +274,11 @@ public sealed partial class Query
         }
         else if (normalizedUnitType is "B2B_SALES")
         {
-            // Promote products from MANUFACTURING or STORAGE units in the same building.
+            // Promote products from MANUFACTURING or PURCHASE units in the same building
+            // (including pending configuration).
             var connectedProductIds = await db.BuildingUnits
                 .Where(u => u.BuildingId == buildingId
-                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "STORAGE")
+                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PURCHASE")
                     && u.ProductTypeId.HasValue)
                 .Select(u => u.ProductTypeId!.Value)
                 .Distinct()
@@ -286,13 +287,30 @@ public sealed partial class Query
             // Also check the pending configuration.
             var pendingConnectedIds = await db.BuildingConfigurationPlanUnits
                 .Where(u => u.BuildingConfigurationPlan.BuildingId == buildingId
-                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "STORAGE")
+                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PURCHASE")
                     && u.ProductTypeId.HasValue)
                 .Select(u => u.ProductTypeId!.Value)
                 .Distinct()
                 .ToListAsync();
 
-            foreach (var id in connectedProductIds.Concat(pendingConnectedIds).Distinct())
+            // Also promote products already stocked in B2B_SALES units of this building.
+            var b2bUnitIds = await db.BuildingUnits
+                .Where(u => u.BuildingId == buildingId && u.UnitType == "B2B_SALES")
+                .Select(u => u.Id)
+                .ToListAsync();
+
+            var stockedInB2B = b2bUnitIds.Count > 0
+                ? await db.Inventories
+                    .Where(inv => inv.BuildingId == buildingId
+                        && inv.BuildingUnitId.HasValue
+                        && b2bUnitIds.Contains(inv.BuildingUnitId!.Value)
+                        && inv.ProductTypeId.HasValue
+                        && inv.Quantity > 0)
+                    .Select(inv => inv.ProductTypeId!.Value)
+                    .ToHashSetAsync()
+                : [];
+
+            foreach (var id in connectedProductIds.Concat(pendingConnectedIds).Concat(stockedInB2B).Distinct())
                 promotedIds.TryAdd(id, ProductRankingReason.Connected);
         }
         else if (normalizedUnitType is "PRODUCT_QUALITY" or "BRAND_QUALITY")

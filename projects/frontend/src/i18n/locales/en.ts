@@ -937,6 +937,10 @@ export default {
       b2bNoSourceTitle: 'No Upstream Source Configured',
       b2bNoSourceBody:
         'This B2B Sales unit cannot derive a competitive price yet. Configure a Manufacturing unit with an output product, or a Mining unit with a resource type, in this building first.',
+      b2bProductPickerHelp:
+        'Only products connected to this unit through linked upstream units or already stocked in this unit are shown.',
+      b2bProductPickerEmpty:
+        'No eligible products yet. Link a purchase, manufacturing, or storage chain into this unit, or restock the unit to keep selling existing inventory.',
       scopeProduct: 'Product',
       scopeCategory: 'Category',
       scopeCompany: 'Company',
