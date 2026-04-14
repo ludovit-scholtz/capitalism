@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  fmtBuildingAmount,
+  fmtBuildingProfit,
+  profitClass,
+  hasFinancialData,
+} from '@/lib/buildingHeaderFormatters'
 
 interface Props {
   revenue: number | null
@@ -12,30 +18,14 @@ interface Props {
 const props = defineProps<Props>()
 const { t, locale } = useI18n()
 
-const hasData = computed(
-  () =>
-    props.revenue !== null &&
-    props.costs !== null &&
-    props.profit !== null &&
-    (props.revenue > 0 || props.costs > 0 || props.profit !== 0),
-)
+const hasData = computed(() => hasFinancialData(props.revenue, props.costs, props.profit))
 
 function fmt(value: number | null): string {
-  if (value === null || !isFinite(value) || isNaN(value)) return '$—'
-  return `$${Math.abs(value).toLocaleString(locale.value, { maximumFractionDigits: 0 })}`
+  return fmtBuildingAmount(value, locale.value)
 }
 
 function fmtProfit(value: number | null): string {
-  if (value === null || !isFinite(value) || isNaN(value)) return '$—'
-  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
-  return `${sign}$${Math.abs(value).toLocaleString(locale.value, { maximumFractionDigits: 0 })}`
-}
-
-function profitClass(value: number | null): string {
-  if (value === null) return ''
-  if (value > 0) return 'bh-positive'
-  if (value < 0) return 'bh-negative'
-  return 'bh-neutral'
+  return fmtBuildingProfit(value, locale.value)
 }
 </script>
 
