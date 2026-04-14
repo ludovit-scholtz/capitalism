@@ -448,6 +448,10 @@ export default {
     tabBuildings: 'Gebäude',
     tabActivity: 'Aktivität',
     tabChat: 'Chat',
+    personTabOverview: 'Übersicht',
+    personTabCreateCompany: 'Unternehmen gründen',
+    personTabLedger: 'Hauptbuch',
+    personLedgerTabBody: 'Verfolgen Sie Ihr persönliches Vermögen, die Steuerrückstellung, Aktiengeschäfte und Dividendeneinnahmen im persönlichen Hauptbuch.',
   },
   leaderboard: {
     eyebrow: 'Wettbewerbliche Rangliste',

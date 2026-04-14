@@ -2543,7 +2543,7 @@ test.describe('Dashboard — building header financials', () => {
 })
 
 test.describe('Dashboard — personal account panel', () => {
-  test('shows personal account panel with ledger link when in person mode', async ({ page }) => {
+  test('shows personal account panel with tab navigation when in person mode', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       personalCash: 75_000,
@@ -2560,16 +2560,46 @@ test.describe('Dashboard — personal account panel', () => {
     }, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    // Personal account panel should be visible
+    // Personal account panel should be visible with heading
     await expect(page.getByRole('heading', { name: 'Founder view' })).toBeVisible()
 
-    // Ledger link must be present in the personal account panel
+    // The three tab buttons should be visible
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Create company' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Ledger' })).toBeVisible()
+
+    // Overview tab is active by default
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  test('shows ledger link in Ledger tab of personal account panel', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      personalCash: 75_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Navigate to the Ledger tab
+    await page.getByRole('tab', { name: 'Ledger' }).click()
+    await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'true')
+
+    // Ledger link must be present in the Ledger tab panel
     const ledgerLink = page.locator('.person-account-ledger-link').getByRole('link', { name: /personal ledger/i })
     await expect(ledgerLink).toBeVisible()
     await expect(ledgerLink).toHaveAttribute('href', '/personal-ledger')
   })
 
-  test('navigates to personal ledger from person account panel', async ({ page }) => {
+  test('navigates to personal ledger from Ledger tab in person account panel', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       personalCash: 50_000,
@@ -2586,8 +2616,71 @@ test.describe('Dashboard — personal account panel', () => {
     }, `token-${player.id}`)
     await page.goto('/dashboard')
 
+    // Switch to Ledger tab first
+    await page.getByRole('tab', { name: 'Ledger' }).click()
     await page.locator('.person-account-ledger-link').getByRole('link', { name: /personal ledger/i }).click()
     await expect(page).toHaveURL('/personal-ledger')
     await expect(page.getByRole('heading', { name: 'Personal Ledger' })).toBeVisible()
+  })
+
+  test('shows create company form in Create company tab', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      personalCash: 200_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Switch to Create company tab
+    await page.getByRole('tab', { name: 'Create company' }).click()
+    await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'true')
+
+    // Company creation form should be visible
+    await expect(page.getByRole('heading', { name: 'Start a new company' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Create company' })).toBeVisible()
+  })
+
+  test('switching tabs changes active state correctly', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      personalCash: 100_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Overview is active by default
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'false')
+
+    // Switch to Create company
+    await page.getByRole('tab', { name: 'Create company' }).click()
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'false')
+
+    // Switch to Ledger
+    await page.getByRole('tab', { name: 'Ledger' }).click()
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'false')
+    await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'true')
   })
 })

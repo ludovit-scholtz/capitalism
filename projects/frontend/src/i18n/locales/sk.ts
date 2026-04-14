@@ -446,6 +446,10 @@ export default {
     tabBuildings: 'Budovy',
     tabActivity: 'Aktivita',
     tabChat: 'Chat',
+    personTabOverview: 'Prehľad',
+    personTabCreateCompany: 'Založiť firmu',
+    personTabLedger: 'Účtovná kniha',
+    personLedgerTabBody: 'Sledujte osobné bohatstvo, daňovú rezervu, obchody s akciami a dividendové príjmy v osobnej účtovnej knihe.',
   },
   leaderboard: {
     eyebrow: 'Kompet\u00edt\u00edvne poradie',

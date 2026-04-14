@@ -761,7 +761,10 @@ test.describe('Encyclopedia contextual entry points', () => {
 
     await page.goto('/dashboard')
 
-    // The encyclopedia link should appear in the dashboard empty state
+    // Switch to Create company tab to reveal the encyclopedia link
+    await page.getByRole('tab', { name: 'Create company' }).click()
+
+    // The encyclopedia link should appear in the Create company tab
     const encyclopediaLink = page.getByRole('link', { name: /Browse Manufacturing Encyclopedia/i })
     await expect(encyclopediaLink).toBeVisible()
 
