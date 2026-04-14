@@ -8231,7 +8231,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await expect(page.locator('.product-picker-panel')).toBeVisible()
 
     // Empty state should be visible — no products to choose from
-    await expect(page.locator('.product-picker-panel .picker-empty-state')).toBeVisible()
+    await expect(page.locator('.product-picker-panel .picker-empty-no-connected')).toBeVisible()
     // No product items should be listed
     await expect(page.locator('.product-picker-panel .picker-item')).toHaveCount(0)
   })
