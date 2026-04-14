@@ -4442,6 +4442,227 @@ test.describe('Building detail upgrades', () => {
     await expect(salesCell).toHaveAttribute('aria-label', /Sell from/)
   })
 
+  test('grid shows inflow indicator (green segment) when unit received goods last tick', async ({ page }) => {
+    const player = makePlayer()
+    const mineUnitId = 'mine-flow-u1'
+    player.companies.push({
+      id: 'company-mine-flow',
+      playerId: player.id,
+      name: 'Flow Mine Co',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-mine-flow',
+          companyId: 'company-mine-flow',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'Flow Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: mineUnitId,
+              buildingId: 'building-mine-flow',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 80, // 80/100 = 80% fill
+              inventoryQuality: 0.9,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // 10 units arrived last tick = 10% inflow segment
+    state.unitLastTickMovement[mineUnitId] = { lastTickInflow: 10, lastTickOutflow: 0 }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-mine-flow')
+    await expect(page.getByRole('heading', { name: 'Flow Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const miningCell = getGridCell(activeSection, 0, 0)
+
+    // Inflow indicator must be visible
+    await expect(miningCell.locator('.cell-capacity-inflow')).toBeVisible()
+    // Outflow indicator must NOT be present (no outflow last tick)
+    await expect(miningCell.locator('.cell-capacity-outflow')).not.toBeVisible()
+
+    // Aria-label must mention inflow
+    await expect(miningCell).toHaveAttribute('aria-label', /↑.*arrived last tick/)
+  })
+
+  test('grid shows outflow indicator (amber segment) when unit shipped goods last tick', async ({ page }) => {
+    const player = makePlayer()
+    const storageUnitId = 'storage-flow-u1'
+    player.companies.push({
+      id: 'company-storage-flow',
+      playerId: player.id,
+      name: 'Flow Storage Co',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-storage-flow',
+          companyId: 'company-storage-flow',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Flow Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: storageUnitId,
+              buildingId: 'building-storage-flow',
+              unitType: 'STORAGE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 60, // 60/1000 = 6% fill
+              inventoryQuality: 0.8,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // 5 units left last tick — no inflow
+    state.unitLastTickMovement[storageUnitId] = { lastTickInflow: 0, lastTickOutflow: 5 }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-storage-flow')
+    await expect(page.getByRole('heading', { name: 'Flow Factory' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const storageCell = getGridCell(activeSection, 0, 0)
+
+    // Outflow indicator must be visible
+    await expect(storageCell.locator('.cell-capacity-outflow')).toBeVisible()
+    // Inflow indicator must NOT be present (no inflow last tick)
+    await expect(storageCell.locator('.cell-capacity-inflow')).not.toBeVisible()
+
+    // Aria-label must mention outflow
+    await expect(storageCell).toHaveAttribute('aria-label', /↓.*left last tick/)
+  })
+
+  test('grid shows no flow indicators when lastTickInflow and lastTickOutflow are both null', async ({ page }) => {
+    const player = makePlayer()
+    const unitId = 'no-flow-u1'
+    player.companies.push({
+      id: 'company-no-flow',
+      playerId: player.id,
+      name: 'No Flow Co',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-no-flow',
+          companyId: 'company-no-flow',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'No Flow Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: unitId,
+              buildingId: 'building-no-flow',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 50,
+              inventoryQuality: 0.9,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // No movement data set → both null by default
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-no-flow')
+    await expect(page.getByRole('heading', { name: 'No Flow Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const miningCell = getGridCell(activeSection, 0, 0)
+
+    // Neither inflow nor outflow indicators should be rendered
+    await expect(miningCell.locator('.cell-capacity-inflow')).not.toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-outflow')).not.toBeVisible()
+
+    // Aria-label should NOT mention movement
+    const ariaLabel = await miningCell.getAttribute('aria-label')
+    expect(ariaLabel).not.toMatch(/↑|↓/)
+  })
+
   test('factory grid shows product label and price metric in planned configuration after edit', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

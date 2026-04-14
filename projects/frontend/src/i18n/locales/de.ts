@@ -704,6 +704,8 @@ export default {
     cellAriaLabelItem: ', {item}',
     cellAriaLabelMetric: ', {metric}',
     cellAriaLabelFill: ', {fill} voll',
+    cellAriaLabelInflow: ', ↑ {value} angekommen letzter Tick',
+    cellAriaLabelOutflow: ', ↓ {value} abgegangen letzter Tick',
     cellAriaLabelEmpty: 'Leerer Slot',
     notFound: 'Geb\u00e4ude nicht gefunden',
     loadFailed: 'Geb\u00e4ude konnte nicht geladen werden',

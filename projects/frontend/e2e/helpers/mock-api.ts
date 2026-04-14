@@ -649,6 +649,12 @@ export type MockState = {
   buildingLayouts: MockBuildingLayoutTemplate[]
   /** When set, the next StoreBuildingConfiguration call returns this string as a CONTRADICTORY_LINK error. */
   forceBuildingConfigError: string | null
+  /**
+   * Per-unit last-tick movement overrides keyed by unit ID.
+   * When set, the buildingUnitInventorySummaries response will include lastTickInflow and lastTickOutflow
+   * from this map instead of the defaults (both null).
+   */
+  unitLastTickMovement: Record<string, { lastTickInflow: number; lastTickOutflow: number }>
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1550,6 +1556,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     impersonationSession: null,
     buildingLayouts: [],
     forceBuildingConfigError: null,
+    unitLastTickMovement: {},
     ...initial,
   }
 
@@ -3728,6 +3735,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           const inventoryItems = getMockUnitInventoryItems(unit)
           const quantity = inventoryItems.reduce((total, item) => total + item.quantity, 0)
           const capacity = getMockUnitCapacity(unit)
+          const movement = state.unitLastTickMovement[unit.id] ?? null
           return {
             buildingUnitId: unit.id,
             quantity,
@@ -3736,6 +3744,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             averageQuality: quantity > 0 ? Number((inventoryItems.reduce((total, item) => total + item.quantity * item.quality, 0) / quantity).toFixed(4)) : null,
             totalSourcingCost: Number(inventoryItems.reduce((total, item) => total + item.sourcingCostTotal, 0).toFixed(2)),
             sourcingCostPerUnit: quantity > 0 ? Number((inventoryItems.reduce((total, item) => total + item.sourcingCostTotal, 0) / quantity).toFixed(2)) : 0,
+            lastTickInflow: movement?.lastTickInflow ?? null,
+            lastTickOutflow: movement?.lastTickOutflow ?? null,
           }
         })
         .filter((summary) => summary.capacity > 0 || summary.quantity > 0)

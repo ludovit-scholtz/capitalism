@@ -40,6 +40,40 @@ public sealed partial class Query
             .Where(entry => entry.BuildingId == buildingId && entry.BuildingUnitId.HasValue)
             .ToListAsync();
 
+        // Two-query approach for last-tick movement: first aggregate the max tick per unit
+        // (no rows transferred), then load only records from those max ticks.
+        var unitIds = building.Units.Select(u => u.Id).ToList();
+        var lastTickByUnit = await db.BuildingUnitResourceHistories
+            .Where(h => unitIds.Contains(h.BuildingUnitId))
+            .GroupBy(h => h.BuildingUnitId)
+            .Select(g => new { UnitId = g.Key, MaxTick = g.Max(h => h.Tick) })
+            .ToDictionaryAsync(x => x.UnitId, x => x.MaxTick);
+
+        // Load only the history rows that fall on each unit's max tick.
+        // Using a set of distinct tick values limits the data transferred significantly
+        // compared to loading the full history.
+        var distinctMaxTicks = lastTickByUnit.Values.Distinct().ToList();
+        var lastTickRecords = distinctMaxTicks.Count > 0
+            ? await db.BuildingUnitResourceHistories
+                .Where(h => unitIds.Contains(h.BuildingUnitId) && distinctMaxTicks.Contains(h.Tick))
+                .ToListAsync()
+            : [];
+
+        // Filter in-process in case two units have different max ticks that share a value.
+        var inflowByUnit = lastTickRecords
+            .Where(h => lastTickByUnit.TryGetValue(h.BuildingUnitId, out var maxTick) && h.Tick == maxTick)
+            .GroupBy(h => h.BuildingUnitId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(h => h.InflowQuantity + h.ProducedQuantity));
+
+        var outflowByUnit = lastTickRecords
+            .Where(h => lastTickByUnit.TryGetValue(h.BuildingUnitId, out var maxTick) && h.Tick == maxTick)
+            .GroupBy(h => h.BuildingUnitId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(h => h.OutflowQuantity + h.ConsumedQuantity));
+
         return building.Units
             .Select(unit =>
             {
@@ -51,6 +85,10 @@ public sealed partial class Query
                 var averageQuality = quantity > 0m
                     ? decimal.Round(unitInventories.Sum(entry => entry.Quantity * entry.Quality) / quantity, 4, MidpointRounding.AwayFromZero)
                     : (decimal?)null;
+
+                var hasHistory = lastTickByUnit.ContainsKey(unit.Id);
+                inflowByUnit.TryGetValue(unit.Id, out var lastTickInflow);
+                outflowByUnit.TryGetValue(unit.Id, out var lastTickOutflow);
 
                 return new BuildingUnitInventorySummary
                 {
@@ -64,7 +102,13 @@ public sealed partial class Query
                     TotalSourcingCost = decimal.Round(unitInventories.Sum(entry => entry.SourcingCostTotal), 4, MidpointRounding.AwayFromZero),
                     SourcingCostPerUnit = quantity > 0m
                         ? decimal.Round(unitInventories.Sum(entry => entry.SourcingCostTotal) / quantity, 4, MidpointRounding.AwayFromZero)
-                        : 0m
+                        : 0m,
+                    LastTickInflow = hasHistory
+                        ? decimal.Round(lastTickInflow, 4, MidpointRounding.AwayFromZero)
+                        : null,
+                    LastTickOutflow = hasHistory
+                        ? decimal.Round(lastTickOutflow, 4, MidpointRounding.AwayFromZero)
+                        : null,
                 };
             })
             .Where(summary => summary.Capacity > 0m || summary.Quantity > 0m)

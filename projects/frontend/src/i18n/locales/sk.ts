@@ -703,6 +703,8 @@ export default {
     cellAriaLabelItem: ', {item}',
     cellAriaLabelMetric: ', {metric}',
     cellAriaLabelFill: ', {fill} plne',
+    cellAriaLabelInflow: ', ↑ {value} prišlo v poslednom kole',
+    cellAriaLabelOutflow: ', ↓ {value} odišlo v poslednom kole',
     cellAriaLabelEmpty: 'Prazdne miesto',
     notFound: 'Budova sa nena\u0161la',
     loadFailed: 'Nepodarilo sa na\u010d\u00edta\u0165 budovu',

@@ -88,8 +88,71 @@ export function getFillBucket(fillPercent: number | null | undefined): FillBucke
 }
 
 // ---------------------------------------------------------------------------
-// Item identity
+// Flow visualization (last-tick inbound / outbound segments)
 // ---------------------------------------------------------------------------
+
+/** Segment widths for the flow visualization bar (values are 0–100, i.e. percentages). */
+export interface FlowSegments {
+  /** Width % of the fill segment (current stored amount minus inflow overlay). */
+  fillWidth: number
+  /** Width % of the inbound segment (what arrived last tick, overlaid at right edge of fill). */
+  inflowWidth: number
+  /** Left offset % of the inbound segment (= fillWidth). */
+  inflowLeft: number
+  /** Width % of the outbound segment (what left last tick, shown in the empty area). */
+  outflowWidth: number
+  /** Left offset % of the outbound segment (= fillPercent * 100). */
+  outflowLeft: number
+  /** Whether any movement data is available to display. */
+  hasMovement: boolean
+}
+
+/**
+ * Compute the flow-visualization bar segment geometry from a unit inventory summary.
+ *
+ * The capacity bar is divided into up to three visual segments:
+ * - **Fill** – current stored amount (existing blue/amber/red colour).
+ * - **Inbound** – last-tick inflow, overlaid at the right edge of the fill bar (green).
+ * - **Outbound** – last-tick outflow, shown just past the fill bar in the empty zone (amber).
+ *
+ * @param fillPercent  Current fill ratio (0–1).
+ * @param capacity     Total unit holding capacity.
+ * @param lastTickInflow  Quantity received last tick (or null if no history).
+ * @param lastTickOutflow Quantity sent/consumed last tick (or null if no history).
+ */
+export function getFlowSegments(
+  fillPercent: number | null | undefined,
+  capacity: number | null | undefined,
+  lastTickInflow: number | null | undefined,
+  lastTickOutflow: number | null | undefined,
+): FlowSegments {
+  const fill = Math.max(0, Math.min(1, fillPercent ?? 0))
+  const cap = capacity ?? 0
+  const fillPct = fill * 100
+
+  const hasMovement = cap > 0 && (lastTickInflow != null || lastTickOutflow != null)
+
+  if (!hasMovement || cap === 0) {
+    return { fillWidth: fillPct, inflowWidth: 0, inflowLeft: 0, outflowWidth: 0, outflowLeft: fillPct, hasMovement: false }
+  }
+
+  // Inbound segment: at the right edge of the fill bar.
+  const inflowRatio = Math.max(0, Math.min(fill, (lastTickInflow ?? 0) / cap))
+  const inflowWidth = inflowRatio * 100
+  // The base fill is everything before the inflow overlay.
+  const fillWidth = Math.max(0, fillPct - inflowWidth)
+  const inflowLeft = fillWidth
+
+  // Outbound segment: in the empty area immediately after the fill bar.
+  const emptyRatio = Math.max(0, 1 - fill)
+  const outflowRatio = Math.max(0, Math.min(emptyRatio, (lastTickOutflow ?? 0) / cap))
+  const outflowWidth = outflowRatio * 100
+  const outflowLeft = fillPct
+
+  return { fillWidth, inflowWidth, inflowLeft, outflowWidth, outflowLeft, hasMovement: true }
+}
+
+
 
 /**
  * Return the configured item id (product or resource) for a grid unit, or `null`

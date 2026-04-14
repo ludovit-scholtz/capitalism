@@ -8,7 +8,7 @@ import DiagonalConnector from '@/components/buildings/DiagonalConnector.vue'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
 import { getInventorySourcingCostPerUnit, getPlannedUnitConstructionCost, getTotalInventorySourcingCost, getUnitConstructionCost, sumPlannedConfigurationCost } from '@/lib/buildingUnitEconomics'
 import { isProductLocked } from '@/lib/productAccess'
-import { formatPercent, formatUnitQuantity, getFillBucket, getUnitConfiguredItemId, getUnitPriceMetric } from '@/lib/gridTileHelpers'
+import { formatPercent, formatUnitQuantity, getFillBucket, getFlowSegments, getUnitConfiguredItemId, getUnitPriceMetric } from '@/lib/gridTileHelpers'
 import {
   applyHorizontalLinkCycle,
   applyPrimaryDiagonalLinkCycle,
@@ -2610,6 +2610,24 @@ function getPurchaseUnitSource(unit: GridUnit | undefined): string | null {
   return unit && 'purchaseSource' in unit ? unit.purchaseSource : null
 }
 
+/** Returns pre-computed flow segments for the given grid unit's inventory summary. */
+function getUnitFlowSegments(unit: GridUnit | undefined) {
+  const inv = getUnitInventorySummary(unit)
+  return getFlowSegments(inv?.fillPercent, inv?.capacity, inv?.lastTickInflow, inv?.lastTickOutflow)
+}
+
+/** Flow segments for the currently selected active-view unit (avoids repeated calls in the detail panel). */
+const selectedActiveUnitFlowSegments = computed(() => {
+  if (!selectedCell.value) return getFlowSegments(null, null, null, null)
+  return getUnitFlowSegments(getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y))
+})
+
+/** Flow segments for the currently selected planned-view unit (avoids repeated calls in the detail panel). */
+const selectedPlannedUnitFlowSegments = computed(() => {
+  if (!selectedCell.value) return getFlowSegments(null, null, null, null)
+  return getUnitFlowSegments(getUnitAtFrom(plannedUnits.value, selectedCell.value.x, selectedCell.value.y))
+})
+
 function getGridCellAriaLabel(unit: GridUnit | undefined): string {
   if (!unit) return t('buildingDetail.cellAriaLabelEmpty')
 
@@ -2621,12 +2639,24 @@ function getGridCellAriaLabel(unit: GridUnit | undefined): string {
   const itemPart = itemLabel ? t('buildingDetail.cellAriaLabelItem', { item: itemLabel }) : ''
   const metricPart = metric ? t('buildingDetail.cellAriaLabelMetric', { metric }) : ''
   let fillPart = ''
+  let inflowPart = ''
+  let outflowPart = ''
   if (inventory?.capacity) {
     fillPart = t('buildingDetail.cellAriaLabelFill', {
       fill: formatPercent(inventory.fillPercent),
     })
+    if (inventory.lastTickInflow != null && inventory.lastTickInflow > 0) {
+      inflowPart = t('buildingDetail.cellAriaLabelInflow', {
+        value: formatUnitQuantity(inventory.lastTickInflow),
+      })
+    }
+    if (inventory.lastTickOutflow != null && inventory.lastTickOutflow > 0) {
+      outflowPart = t('buildingDetail.cellAriaLabelOutflow', {
+        value: formatUnitQuantity(inventory.lastTickOutflow),
+      })
+    }
   }
-  return `${typePart}${itemPart}${metricPart}${fillPart}`
+  return `${typePart}${itemPart}${metricPart}${fillPart}${inflowPart}${outflowPart}`
 }
 
 function updateSelectedUnitConfig(field: string, value: unknown) {
@@ -2662,6 +2692,8 @@ async function loadUnitInventorySummaries(requestId?: number) {
           averageQuality
           totalSourcingCost
           sourcingCostPerUnit
+          lastTickInflow
+          lastTickOutflow
         }
       }`,
       { buildingId: buildingId.value },
@@ -4453,7 +4485,17 @@ watch(
                           <span
                             class="cell-capacity-fill"
                             :data-fill="getFillBucket(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.fillPercent)"
-                            :style="{ width: `${Math.round((getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.fillPercent ?? 0) * 100)}%` }"
+                            :style="{ width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).fillWidth}%` }"
+                          ></span>
+                          <span
+                            v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).inflowWidth > 0"
+                            class="cell-capacity-inflow"
+                            :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).inflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).inflowWidth}%` }"
+                          ></span>
+                          <span
+                            v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowWidth > 0"
+                            class="cell-capacity-outflow"
+                            :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowWidth}%` }"
                           ></span>
                         </div>
                       </template>
@@ -4646,7 +4688,17 @@ watch(
                           <span
                             class="cell-capacity-fill"
                             :data-fill="getFillBucket(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.fillPercent)"
-                            :style="{ width: `${Math.round((getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.fillPercent ?? 0) * 100)}%` }"
+                            :style="{ width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).fillWidth}%` }"
+                          ></span>
+                          <span
+                            v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).inflowWidth > 0"
+                            class="cell-capacity-inflow"
+                            :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).inflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).inflowWidth}%` }"
+                          ></span>
+                          <span
+                            v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth > 0"
+                            class="cell-capacity-outflow"
+                            :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth}%` }"
                           ></span>
                         </div>
                         <span
@@ -5196,7 +5248,17 @@ watch(
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
-                    :style="{ width: `${Math.round(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.fillPercent * 100)}%` }"
+                    :style="{ width: `${selectedPlannedUnitFlowSegments.fillWidth}%` }"
+                  ></span>
+                  <span
+                    v-if="selectedPlannedUnitFlowSegments.inflowWidth > 0"
+                    class="detail-capacity-inflow"
+                    :style="{ left: `${selectedPlannedUnitFlowSegments.inflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.inflowWidth}%` }"
+                  ></span>
+                  <span
+                    v-if="selectedPlannedUnitFlowSegments.outflowWidth > 0"
+                    class="detail-capacity-outflow"
+                    :style="{ left: `${selectedPlannedUnitFlowSegments.outflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.outflowWidth}%` }"
                   ></span>
                 </div>
               </div>
@@ -5527,7 +5589,17 @@ watch(
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
-                    :style="{ width: `${Math.round(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))!.fillPercent * 100)}%` }"
+                    :style="{ width: `${selectedActiveUnitFlowSegments.fillWidth}%` }"
+                  ></span>
+                  <span
+                    v-if="selectedActiveUnitFlowSegments.inflowWidth > 0"
+                    class="detail-capacity-inflow"
+                    :style="{ left: `${selectedActiveUnitFlowSegments.inflowLeft}%`, width: `${selectedActiveUnitFlowSegments.inflowWidth}%` }"
+                  ></span>
+                  <span
+                    v-if="selectedActiveUnitFlowSegments.outflowWidth > 0"
+                    class="detail-capacity-outflow"
+                    :style="{ left: `${selectedActiveUnitFlowSegments.outflowLeft}%`, width: `${selectedActiveUnitFlowSegments.outflowWidth}%` }"
                   ></span>
                 </div>
                 <!-- Flush storage action for STORAGE, MINING, and MANUFACTURING units -->
@@ -7298,6 +7370,7 @@ watch(
 }
 
 .cell-capacity {
+  position: relative;
   width: 100%;
   height: 0.3rem;
   border-radius: 999px;
@@ -7306,7 +7379,9 @@ watch(
 }
 
 .cell-capacity-fill {
-  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--color-primary), #38bdf8);
@@ -7319,6 +7394,33 @@ watch(
 
 .cell-capacity-fill[data-fill='high'] {
   background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+
+.cell-capacity-inflow {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #22c55e;
+  border-radius: inherit;
+  animation: flow-in-pulse 2s ease-in-out infinite;
+}
+
+.cell-capacity-outflow {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(245, 158, 11, 0.75);
+  border-radius: inherit;
+}
+
+@keyframes flow-in-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
 }
 
 .link-toggle {
@@ -8027,6 +8129,7 @@ watch(
 }
 
 .detail-capacity {
+  position: relative;
   width: 100%;
   height: 0.5rem;
   border-radius: 999px;
@@ -8035,10 +8138,29 @@ watch(
 }
 
 .detail-capacity-fill {
-  display: block;
+  position: absolute;
+  left: 0;
+  top: 0;
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, var(--color-primary), #38bdf8);
+}
+
+.detail-capacity-inflow {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: #22c55e;
+  border-radius: inherit;
+  animation: flow-in-pulse 2s ease-in-out infinite;
+}
+
+.detail-capacity-outflow {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: rgba(245, 158, 11, 0.75);
+  border-radius: inherit;
 }
 
 .exchange-offers-list {
