@@ -2354,3 +2354,190 @@ test.describe('Dashboard — section tab navigation', () => {
     await expect(page.getByRole('heading', { name: 'Scheduled Actions' })).toBeVisible()
   })
 })
+
+test.describe('Dashboard — building header financials', () => {
+  const buildingId = 'building-factory-fin'
+
+  const factory: MockBuilding = {
+    id: buildingId,
+    companyId: 'comp-fin',
+    cityId: 'city-ba',
+    type: 'FACTORY',
+    name: 'Finance Factory',
+    latitude: 48.15,
+    longitude: 17.11,
+    level: 2,
+    powerConsumption: 8,
+    powerStatus: 'POWERED',
+    isForSale: false,
+    builtAtUtc: '2026-01-01T00:00:00Z',
+    units: [],
+    pendingConfiguration: null,
+  }
+
+  test('shows revenue, costs, and profit signals when building has financial data', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-fin',
+          playerId: 'player-1',
+          name: 'Finance Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [factory],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingFinancialTimelines[buildingId] = {
+      buildingId,
+      buildingName: 'Finance Factory',
+      dataFromTick: 1,
+      dataToTick: 10,
+      totalSales: 12000,
+      totalCosts: 4500,
+      totalProfit: 7500,
+      timeline: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+
+    const wrapper = page.locator('.building-card-wrapper').first()
+    const financials = wrapper.locator('.building-header-financials')
+    await expect(financials).toBeVisible()
+
+    // Revenue, costs, and profit values should be shown
+    await expect(financials).toContainText('$12,000')
+    await expect(financials).toContainText('$4,500')
+    await expect(financials).toContainText('+$7,500')
+  })
+
+  test('shows no-data message when building has no financial activity', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-nodata',
+          playerId: 'player-1',
+          name: 'Empty Corp',
+          cash: 300000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [{ ...factory, id: 'building-empty', companyId: 'comp-nodata' }],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Default mock returns all-zero totals → no-data state
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+
+    const wrapper = page.locator('.building-card-wrapper').first()
+    const financials = wrapper.locator('.building-header-financials')
+    await expect(financials).toBeVisible()
+    await expect(financials.locator('.bh-no-data')).toBeVisible()
+  })
+
+  test('shows negative profit in red-coded class for loss-making buildings', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-loss',
+          playerId: 'player-1',
+          name: 'Loss Corp',
+          cash: 200000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [{ ...factory, id: 'building-loss', companyId: 'comp-loss' }],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingFinancialTimelines['building-loss'] = {
+      buildingId: 'building-loss',
+      buildingName: 'Finance Factory',
+      dataFromTick: 1,
+      dataToTick: 5,
+      totalSales: 1000,
+      totalCosts: 3000,
+      totalProfit: -2000,
+      timeline: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+
+    const financials = page.locator('.building-card-wrapper').first().locator('.building-header-financials')
+    await expect(financials).toBeVisible()
+    // Negative profit displayed with minus sign
+    await expect(financials).toContainText('-$2,000')
+    // Loss profit value has negative class
+    await expect(financials.locator('.bh-negative')).toBeVisible()
+  })
+
+  test('building card has clear bottom margin separating it from sections below', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-spacing',
+          playerId: 'player-1',
+          name: 'Spacing Corp',
+          cash: 400000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [factory],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+
+    const wrapper = page.locator('.building-card-wrapper').first()
+    await expect(wrapper).toBeVisible()
+
+    // Verify the financials panel is visually present below the card
+    const card = wrapper.locator('.building-card')
+    const financials = wrapper.locator('.building-header-financials')
+    await expect(card).toBeVisible()
+    await expect(financials).toBeVisible()
+
+    // Card should end above the financials panel (card bottom ≤ financials top)
+    const cardBox = await card.boundingBox()
+    const financialsBox = await financials.boundingBox()
+    expect(cardBox).toBeTruthy()
+    expect(financialsBox).toBeTruthy()
+    expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(financialsBox!.y + 1)
+  })
+})
