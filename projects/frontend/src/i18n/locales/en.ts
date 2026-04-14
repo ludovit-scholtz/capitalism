@@ -705,6 +705,8 @@ export default {
     cellAriaLabelItem: ', {item}',
     cellAriaLabelMetric: ', {metric}',
     cellAriaLabelFill: ', {fill} full',
+    cellAriaLabelInflow: ', ↑ {value} arrived last tick',
+    cellAriaLabelOutflow: ', ↓ {value} left last tick',
     cellAriaLabelEmpty: 'Empty slot',
     notFound: 'Building not found',
     loadFailed: 'Failed to load building',

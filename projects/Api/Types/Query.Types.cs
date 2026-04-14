@@ -213,6 +213,18 @@ public sealed class BuildingUnitInventorySummary
     public decimal? AverageQuality { get; set; }
     public decimal TotalSourcingCost { get; set; }
     public decimal SourcingCostPerUnit { get; set; }
+
+    /// <summary>
+    /// Total quantity that entered this unit during the most recent completed tick.
+    /// Null when no history exists yet (unit has never processed a tick).
+    /// </summary>
+    public decimal? LastTickInflow { get; set; }
+
+    /// <summary>
+    /// Total quantity that left this unit during the most recent completed tick.
+    /// Null when no history exists yet (unit has never processed a tick).
+    /// </summary>
+    public decimal? LastTickOutflow { get; set; }
 }
 
 /// <summary>

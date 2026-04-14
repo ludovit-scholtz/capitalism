@@ -17535,6 +17535,111 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task BuildingUnitInventorySummaries_LastTickMovement_ReturnsInflowAndOutflow()
+    {
+        var token = await RegisterAndGetTokenAsync($"last-tick-{Guid.NewGuid():N}@test.com", "LastTickTester");
+        var onboarding = await CompleteOnboardingAsync(token, "LastTick Factory");
+        var factoryId = onboarding.Result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("factory").GetProperty("id").GetString()!;
+
+        Guid unitId;
+        var woodId = Guid.Empty;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var factoryGuid = Guid.Parse(factoryId);
+
+            var unit = await db.BuildingUnits
+                .Where(u => u.BuildingId == factoryGuid && u.UnitType == UnitType.Purchase)
+                .FirstAsync();
+            unitId = unit.Id;
+
+            woodId = await db.ResourceTypes
+                .Where(r => r.Slug == "wood")
+                .Select(r => r.Id)
+                .FirstAsync();
+
+            // Seed older tick history (tick 5) — should NOT appear in lastTick fields.
+            db.BuildingUnitResourceHistories.Add(new Data.Entities.BuildingUnitResourceHistory
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = factoryGuid,
+                BuildingUnitId = unitId,
+                ResourceTypeId = woodId,
+                Tick = 5,
+                InflowQuantity = 20m,
+                OutflowQuantity = 5m,
+            });
+
+            // Seed latest tick history (tick 10) — should appear in lastTick fields.
+            db.BuildingUnitResourceHistories.AddRange(
+                new Data.Entities.BuildingUnitResourceHistory
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingId = factoryGuid,
+                    BuildingUnitId = unitId,
+                    ResourceTypeId = woodId,
+                    Tick = 10,
+                    InflowQuantity = 12m,
+                    OutflowQuantity = 3m,
+                    ProducedQuantity = 0m,
+                    ConsumedQuantity = 1m,
+                });
+
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingInventoryLastTick($buildingId: UUID!) {
+              buildingUnitInventorySummaries(buildingId: $buildingId) {
+                buildingUnitId
+                lastTickInflow
+                lastTickOutflow
+              }
+            }
+            """,
+            new { buildingId = factoryId },
+            token);
+
+        var summaries = result.GetProperty("data").GetProperty("buildingUnitInventorySummaries").EnumerateArray().ToList();
+        var unitSummary = summaries.First(s => s.GetProperty("buildingUnitId").GetString() == unitId.ToString());
+
+        // lastTickInflow = InflowQuantity (12) + ProducedQuantity (0) = 12
+        Assert.Equal(12m, unitSummary.GetProperty("lastTickInflow").GetDecimal());
+        // lastTickOutflow = OutflowQuantity (3) + ConsumedQuantity (1) = 4
+        Assert.Equal(4m, unitSummary.GetProperty("lastTickOutflow").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BuildingUnitInventorySummaries_NoHistory_LastTickMovementIsNull()
+    {
+        var token = await RegisterAndGetTokenAsync($"no-history-{Guid.NewGuid():N}@test.com", "NoHistoryTester");
+        var onboarding = await CompleteOnboardingAsync(token, "NoHistory Factory");
+        var factoryId = onboarding.Result.GetProperty("data").GetProperty("completeOnboarding").GetProperty("factory").GetProperty("id").GetString()!;
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query BuildingInventoryNoHistory($buildingId: UUID!) {
+              buildingUnitInventorySummaries(buildingId: $buildingId) {
+                buildingUnitId
+                lastTickInflow
+                lastTickOutflow
+              }
+            }
+            """,
+            new { buildingId = factoryId },
+            token);
+
+        var summaries = result.GetProperty("data").GetProperty("buildingUnitInventorySummaries").EnumerateArray().ToList();
+        // A freshly onboarded factory has no tick history — both fields should be null.
+        foreach (var summary in summaries)
+        {
+            Assert.Equal(JsonValueKind.Null, summary.GetProperty("lastTickInflow").ValueKind);
+            Assert.Equal(JsonValueKind.Null, summary.GetProperty("lastTickOutflow").ValueKind);
+        }
+    }
+
+    [Fact]
     public async Task LedgerDrillDown_RevenueDrillDown_ReturnsEntries()
     {
         var token = await RegisterAndGetTokenAsync("ledger-rev-drill@test.com", "RevDrillUser");

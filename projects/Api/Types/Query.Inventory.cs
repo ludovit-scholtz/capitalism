@@ -40,6 +40,33 @@ public sealed partial class Query
             .Where(entry => entry.BuildingId == buildingId && entry.BuildingUnitId.HasValue)
             .ToListAsync();
 
+        // Fetch last-tick movement data: load all history for these units in memory,
+        // then pick out the latest tick per unit. Dictionary indexing inside EF Core
+        // queries is not translatable to SQL, so we load first and filter in-process.
+        var unitIds = building.Units.Select(u => u.Id).ToList();
+        var allUnitHistory = await db.BuildingUnitResourceHistories
+            .Where(h => unitIds.Contains(h.BuildingUnitId))
+            .ToListAsync();
+
+        var lastTickByUnit = allUnitHistory
+            .GroupBy(h => h.BuildingUnitId)
+            .ToDictionary(g => g.Key, g => g.Max(h => h.Tick));
+
+        // Aggregate inflow/outflow across all items for the latest tick per unit.
+        var inflowByUnit = allUnitHistory
+            .Where(h => lastTickByUnit.TryGetValue(h.BuildingUnitId, out var maxTick) && h.Tick == maxTick)
+            .GroupBy(h => h.BuildingUnitId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(h => h.InflowQuantity + h.ProducedQuantity));
+
+        var outflowByUnit = allUnitHistory
+            .Where(h => lastTickByUnit.TryGetValue(h.BuildingUnitId, out var maxTick) && h.Tick == maxTick)
+            .GroupBy(h => h.BuildingUnitId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(h => h.OutflowQuantity + h.ConsumedQuantity));
+
         return building.Units
             .Select(unit =>
             {
@@ -51,6 +78,10 @@ public sealed partial class Query
                 var averageQuality = quantity > 0m
                     ? decimal.Round(unitInventories.Sum(entry => entry.Quantity * entry.Quality) / quantity, 4, MidpointRounding.AwayFromZero)
                     : (decimal?)null;
+
+                var hasHistory = lastTickByUnit.ContainsKey(unit.Id);
+                inflowByUnit.TryGetValue(unit.Id, out var lastTickInflow);
+                outflowByUnit.TryGetValue(unit.Id, out var lastTickOutflow);
 
                 return new BuildingUnitInventorySummary
                 {
@@ -64,7 +95,13 @@ public sealed partial class Query
                     TotalSourcingCost = decimal.Round(unitInventories.Sum(entry => entry.SourcingCostTotal), 4, MidpointRounding.AwayFromZero),
                     SourcingCostPerUnit = quantity > 0m
                         ? decimal.Round(unitInventories.Sum(entry => entry.SourcingCostTotal) / quantity, 4, MidpointRounding.AwayFromZero)
-                        : 0m
+                        : 0m,
+                    LastTickInflow = hasHistory
+                        ? decimal.Round(lastTickInflow, 4, MidpointRounding.AwayFromZero)
+                        : null,
+                    LastTickOutflow = hasHistory
+                        ? decimal.Round(lastTickOutflow, 4, MidpointRounding.AwayFromZero)
+                        : null,
                 };
             })
             .Where(summary => summary.Capacity > 0m || summary.Quantity > 0m)

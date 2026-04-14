@@ -248,3 +248,85 @@ describe('getUnitPriceMetric', () => {
     expect(getUnitPriceMetric(unit)).toEqual({ kind: 'scope', value: 'CATEGORY' })
   })
 })
+
+// ---------------------------------------------------------------------------
+// getFlowSegments
+// ---------------------------------------------------------------------------
+
+import { getFlowSegments } from '../gridTileHelpers'
+
+describe('getFlowSegments', () => {
+  it('returns no-movement result when lastTickInflow and lastTickOutflow are both null', () => {
+    const result = getFlowSegments(0.6, 100, null, null)
+    expect(result.hasMovement).toBe(false)
+    expect(result.fillWidth).toBe(60)
+    expect(result.inflowWidth).toBe(0)
+    expect(result.outflowWidth).toBe(0)
+  })
+
+  it('returns no-movement result when capacity is zero', () => {
+    const result = getFlowSegments(0, 0, 10, 5)
+    expect(result.hasMovement).toBe(false)
+  })
+
+  it('shows inflow overlay at the right edge of the fill bar', () => {
+    // fill 70%, inflow 10 out of 100 capacity (10%)
+    const result = getFlowSegments(0.7, 100, 10, 0)
+    expect(result.hasMovement).toBe(true)
+    expect(result.fillWidth).toBeCloseTo(60) // 70% - 10% inflow
+    expect(result.inflowWidth).toBeCloseTo(10) // 10% inflow
+    expect(result.inflowLeft).toBeCloseTo(60) // starts at base fill
+    expect(result.outflowWidth).toBe(0)
+    expect(result.outflowLeft).toBeCloseTo(70)
+  })
+
+  it('shows outflow in the empty area after the fill bar', () => {
+    // fill 65%, outflow 5 out of 100 capacity (5%)
+    const result = getFlowSegments(0.65, 100, 0, 5)
+    expect(result.hasMovement).toBe(true)
+    expect(result.fillWidth).toBeCloseTo(65) // unchanged (no inflow)
+    expect(result.inflowWidth).toBe(0)
+    expect(result.outflowWidth).toBeCloseTo(5)
+    expect(result.outflowLeft).toBeCloseTo(65)
+  })
+
+  it('clamps inflow to current fill so it does not exceed the fill bar', () => {
+    // fill 20%, inflow 50 out of 100 capacity (50% > fill 20%)
+    const result = getFlowSegments(0.2, 100, 50, 0)
+    expect(result.hasMovement).toBe(true)
+    expect(result.inflowWidth).toBeCloseTo(20) // clamped to fill
+    expect(result.fillWidth).toBeCloseTo(0)
+  })
+
+  it('clamps outflow to empty space so it does not exceed the track', () => {
+    // fill 90%, outflow 50 out of 100 capacity (50% > empty space 10%)
+    const result = getFlowSegments(0.9, 100, 0, 50)
+    expect(result.hasMovement).toBe(true)
+    expect(result.outflowWidth).toBeCloseTo(10) // clamped to empty space
+    expect(result.outflowLeft).toBeCloseTo(90)
+  })
+
+  it('handles both inflow and outflow simultaneously', () => {
+    // fill 60%, inflow 10/100 (10%), outflow 15/100 (15%)
+    const result = getFlowSegments(0.6, 100, 10, 15)
+    expect(result.hasMovement).toBe(true)
+    expect(result.fillWidth).toBeCloseTo(50) // 60% - 10%
+    expect(result.inflowWidth).toBeCloseTo(10)
+    expect(result.outflowWidth).toBeCloseTo(15) // empty space = 40%, fits
+    expect(result.outflowLeft).toBeCloseTo(60)
+  })
+
+  it('handles null fillPercent (treats as zero fill)', () => {
+    const result = getFlowSegments(null, 100, 5, 3)
+    expect(result.hasMovement).toBe(true)
+    expect(result.fillWidth).toBe(0) // 0% fill
+    expect(result.inflowWidth).toBe(0) // inflow clamped to 0% fill
+    expect(result.outflowWidth).toBeCloseTo(3) // outflow in the full empty area
+  })
+
+  it('returns zero-movement result when capacity is null', () => {
+    const result = getFlowSegments(0.5, null, 10, 5)
+    expect(result.hasMovement).toBe(false)
+  })
+})
+

@@ -201,6 +201,10 @@ export interface BuildingUnitInventorySummary {
   averageQuality: number | null
   totalSourcingCost: number
   sourcingCostPerUnit: number
+  /** Total inflow (received + produced) during the most recent completed tick. Null if no tick history exists. */
+  lastTickInflow: number | null
+  /** Total outflow (sent + consumed) during the most recent completed tick. Null if no tick history exists. */
+  lastTickOutflow: number | null
 }
 
 export interface BuildingUnitInventory {
