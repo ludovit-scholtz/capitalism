@@ -15,28 +15,30 @@ const totalCosts = computed(() => {
   if (!props.ledger) return 0
   const l = props.ledger
   return (
-    l.totalPurchasingCosts +
-    l.totalLaborCosts +
-    l.totalEnergyCosts +
-    l.totalMarketingCosts +
-    l.totalOtherCosts +
-    l.totalTaxPaid
+    (l.totalPurchasingCosts ?? 0) +
+    (l.totalLaborCosts ?? 0) +
+    (l.totalEnergyCosts ?? 0) +
+    (l.totalMarketingCosts ?? 0) +
+    (l.totalOtherCosts ?? 0) +
+    (l.totalTaxPaid ?? 0)
   )
 })
 
 /** Use the backend-authoritative netIncome (includes taxes) as the single source of truth. */
 const netProfit = computed(() => {
   if (!props.ledger) return 0
-  return props.ledger.netIncome
+  return props.ledger.netIncome ?? 0
 })
 
 function formatAmount(value: number): string {
+  if (!isFinite(value) || isNaN(value)) return '$—'
   const abs = Math.abs(value)
   const sign = value < 0 ? '-' : value > 0 ? '+' : ''
   return `${sign}$${abs.toLocaleString(locale.value, { maximumFractionDigits: 0 })}`
 }
 
 function formatAmountPlain(value: number): string {
+  if (!isFinite(value) || isNaN(value)) return '$—'
   return `$${Math.abs(value).toLocaleString(locale.value, { maximumFractionDigits: 0 })}`
 }
 
@@ -52,7 +54,20 @@ function profitClass(value: number): string {
     <h3 id="financial-summary-title" class="financial-summary-title">
       {{ t('financialSummary.title') }}
     </h3>
-    <div v-if="loading" class="financial-summary-loading">{{ t('common.loading') }}</div>
+    <div v-if="loading" class="financial-summary-metrics" aria-busy="true" aria-label="Loading financial data">
+      <div class="metric">
+        <span class="metric-label">{{ t('financialSummary.revenue') }}</span>
+        <span class="metric-value skeleton-line" aria-hidden="true"></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">{{ t('financialSummary.costs') }}</span>
+        <span class="metric-value skeleton-line" aria-hidden="true"></span>
+      </div>
+      <div class="metric metric--profit">
+        <span class="metric-label">{{ t('financialSummary.netProfit') }}</span>
+        <span class="metric-value skeleton-line" aria-hidden="true"></span>
+      </div>
+    </div>
     <div v-else-if="!ledger" class="financial-summary-empty">
       {{ t('financialSummary.noData') }}
     </div>
@@ -98,6 +113,26 @@ function profitClass(value: number): string {
   font-size: 0.875rem;
   color: var(--color-text-secondary);
   font-style: italic;
+}
+
+.skeleton-line {
+  display: inline-block;
+  width: 4.5rem;
+  height: 1.25rem;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .financial-summary-metrics {

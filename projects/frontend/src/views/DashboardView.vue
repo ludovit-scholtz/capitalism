@@ -267,7 +267,7 @@ async function loadLedgers(companyIds: string[], isRefresh = false) {
             companyLedger(companyId: $companyId) {
               companyId companyName gameYear isCurrentGameYear currentCash
               totalRevenue totalPurchasingCosts totalLaborCosts totalEnergyCosts
-              totalMarketingCosts totalOtherCosts netIncome cashFromOperations
+              totalMarketingCosts totalOtherCosts totalTaxPaid netIncome cashFromOperations
             }
           }`,
           { companyId },
