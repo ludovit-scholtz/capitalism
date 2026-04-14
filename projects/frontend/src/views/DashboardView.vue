@@ -447,6 +447,12 @@ async function createCompany() {
           </article>
         </div>
 
+        <div class="person-account-ledger-link">
+          <RouterLink to="/personal-ledger" class="btn btn-secondary btn-ledger">
+            📒 {{ t('dashboard.viewPersonalLedger') }}
+          </RouterLink>
+        </div>
+
         <div class="person-account-actions">
           <div>
             <h3>{{ t('dashboard.createCompanyTitle') }}</h3>
@@ -914,6 +920,16 @@ async function createCompany() {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 0.75rem;
   margin-bottom: 1.25rem;
+}
+
+.person-account-ledger-link {
+  margin-bottom: 1.25rem;
+}
+
+.btn-ledger {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .person-metric-card {

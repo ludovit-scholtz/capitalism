@@ -433,6 +433,7 @@ export default {
     createCompanyFailed: 'Das neue Unternehmen konnte nicht gegründet werden.',
     switchCompanyHint: 'Nutzen Sie den Kontoknopf im oberen Menü, um in dieses Unternehmen zu wechseln.',
     startupPackRequiresCompany: 'Wechseln Sie in ein Firmenkonto, um den Bargeldbonus des Startup-Pakets zuzuweisen.',
+    viewPersonalLedger: 'Persönliches Hauptbuch anzeigen',
     noBuildings: 'Keine Gebäude.',
     buyBuilding: 'Gebäude kaufen',
     manageBuildings: 'Verwalten',

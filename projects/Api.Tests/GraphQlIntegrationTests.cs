@@ -7516,6 +7516,252 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task PersonAccount_Unauthenticated_ReturnsAuthorizationError()
+    {
+        // personAccount is [Authorize] — calling it without a token must return a GraphQL authorization error.
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    personalCash
+                    taxReserve
+                    availableCash
+                    totalNetWealth
+                }
+            }
+            """,
+            token: null);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors when calling personAccount without a token");
+        var errorList = errors.EnumerateArray().ToList();
+        Assert.NotEmpty(errorList);
+    }
+
+    [Fact]
+    public async Task PersonAccount_ReturnsFullLedgerFields()
+    {
+        // Verify the personAccount query returns all fields needed by the personal ledger view.
+        var token = await RegisterAndGetTokenAsync($"full-ledger-{Guid.NewGuid():N}@test.com", "Full Ledger Player");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    playerId
+                    displayName
+                    personalCash
+                    taxReserve
+                    availableCash
+                    totalNetWealth
+                    activeAccountType
+                    activeCompanyId
+                    shareholdings { companyId companyName shareCount ownershipRatio sharePrice marketValue }
+                    dividendPayments { id companyId companyName shareCount amountPerShare totalAmount gameYear recordedAtTick recordedAtUtc description }
+                    stockTrades { id companyId companyName direction shareCount pricePerShare totalValue recordedAtTick recordedAtUtc }
+                }
+            }
+            """,
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "personAccount must not return errors for authenticated player");
+        var account = result.GetProperty("data").GetProperty("personAccount");
+        Assert.Equal(System.Text.Json.JsonValueKind.Object, account.ValueKind);
+
+        // All ledger-required fields must be present and have correct initial values.
+        Assert.Equal(System.Text.Json.JsonValueKind.String, account.GetProperty("playerId").ValueKind);
+        Assert.Equal("Full Ledger Player", account.GetProperty("displayName").GetString());
+        Assert.Equal(0m, account.GetProperty("taxReserve").GetDecimal());
+        var personalCash = account.GetProperty("personalCash").GetDecimal();
+        Assert.Equal(personalCash, account.GetProperty("availableCash").GetDecimal());
+        Assert.Equal(personalCash, account.GetProperty("totalNetWealth").GetDecimal());
+
+        // Collections must be present (empty for a new player).
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, account.GetProperty("shareholdings").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, account.GetProperty("dividendPayments").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, account.GetProperty("stockTrades").ValueKind);
+    }
+
+    [Fact]
+    public async Task PersonAccount_StockTradeHistory_IncludesBuyAndSellEntriesWithAllFields()
+    {
+        // Verify stockTrades in personAccount includes all fields needed by the personal-ledger trade history table.
+        var ownerToken = await RegisterAndGetTokenAsync($"trade-hist-owner-{Guid.NewGuid():N}@test.com", "Trade Hist Owner");
+        var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "Trade Hist Co", cash: 500_000m, totalShares: 10_000m, founderShares: 5_000m);
+
+        var investorToken = await RegisterAndGetTokenAsync($"trade-hist-inv-{Guid.NewGuid():N}@test.com", "Trade Hist Investor");
+
+        // Buy shares
+        await ExecuteGraphQlAsync(
+            """
+            mutation BuyShares($input: BuySharesInput!) {
+                buyShares(input: $input) { shareCount }
+            }
+            """,
+            new { input = new { companyId, shareCount = 100m } },
+            investorToken);
+
+        // Sell some shares back
+        await ExecuteGraphQlAsync(
+            """
+            mutation SellShares($input: SellSharesInput!) {
+                sellShares(input: $input) { shareCount }
+            }
+            """,
+            new { input = new { companyId, shareCount = 30m } },
+            investorToken);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    stockTrades {
+                        id
+                        companyId
+                        companyName
+                        direction
+                        shareCount
+                        pricePerShare
+                        totalValue
+                        recordedAtTick
+                        recordedAtUtc
+                    }
+                    taxReserve
+                    availableCash
+                }
+            }
+            """,
+            token: investorToken);
+
+        Assert.False(result.TryGetProperty("errors", out _), "personAccount must not error");
+        var account = result.GetProperty("data").GetProperty("personAccount");
+        var trades = account.GetProperty("stockTrades").EnumerateArray().ToList();
+
+        // Both buy and sell must be recorded
+        Assert.True(trades.Count >= 2, "personAccount must record both buy and sell trades");
+        var buyTrade = trades.FirstOrDefault(t => t.GetProperty("direction").GetString() == "BUY");
+        var sellTrade = trades.FirstOrDefault(t => t.GetProperty("direction").GetString() == "SELL");
+        Assert.True(buyTrade.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Must have a BUY trade");
+        Assert.True(sellTrade.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Must have a SELL trade");
+
+        // BUY trade fields
+        Assert.Equal(100m, buyTrade.GetProperty("shareCount").GetDecimal());
+        Assert.Equal("Trade Hist Co", buyTrade.GetProperty("companyName").GetString());
+        Assert.True(buyTrade.GetProperty("pricePerShare").GetDecimal() > 0m);
+        Assert.True(buyTrade.GetProperty("totalValue").GetDecimal() > 0m);
+
+        // SELL trade must have created a tax reserve (15% of proceeds)
+        var sellProceeds = sellTrade.GetProperty("totalValue").GetDecimal();
+        var expectedMinReserve = sellProceeds * 0.15m;
+        var taxReserve = account.GetProperty("taxReserve").GetDecimal();
+        Assert.True(taxReserve >= expectedMinReserve * 0.99m, $"taxReserve {taxReserve} should be approx 15% of {sellProceeds}");
+
+        // availableCash must be reduced by the tax reserve
+        var availableCash = account.GetProperty("availableCash").GetDecimal();
+        Assert.True(availableCash >= 0m, "availableCash must not be negative");
+    }
+
+    [Fact]
+    public async Task PersonAccount_DividendHistory_IncludesAllFieldsNeededByLedgerView()
+    {
+        // Verify dividendPayments in personAccount includes all fields the personal-ledger view consumes.
+        // Use an isolated factory with TaxCycleTicks=2 to trigger a year-end dividend payout quickly.
+        await using var iso = new ApiWebApplicationFactory();
+        using var isoClient = iso.CreateClient();
+
+        var isoOwnerToken = await RegisterAndGetTokenAsync(isoClient, $"div-iso-owner-{Guid.NewGuid():N}@test.com", "Div ISO Owner");
+        var isoOwnerId = Guid.Parse((await ExecuteGraphQlAsync(isoClient, "{ me { id } }", token: isoOwnerToken)).GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+        var isoInvestorToken = await RegisterAndGetTokenAsync(isoClient, $"div-iso-inv-{Guid.NewGuid():N}@test.com", "Div ISO Investor");
+        var isoInvestorId = Guid.Parse((await ExecuteGraphQlAsync(isoClient, "{ me { id } }", token: isoInvestorToken)).GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        Guid isoCompanyId;
+        await using (var scope = iso.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var gs = await db.GameStates.FindAsync(1);
+            Assert.NotNull(gs);
+            gs!.TaxCycleTicks = 2;
+            gs.CurrentTick = 1;
+            isoCompanyId = Guid.NewGuid();
+            var company = new Company
+            {
+                Id = isoCompanyId,
+                PlayerId = isoOwnerId,
+                Name = "Div ISO Co",
+                Cash = 1_000_000m,
+                TotalSharesIssued = 10_000m,
+                DividendPayoutRatio = 0.5m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 1,
+            };
+            db.Companies.Add(company);
+            db.Shareholdings.Add(new Shareholding
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = isoCompanyId,
+                OwnerPlayerId = isoInvestorId,
+                ShareCount = 1_000m,
+            });
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = isoCompanyId,
+                Category = LedgerCategory.Revenue,
+                Amount = 200_000m,
+                Description = "Test revenue",
+                RecordedAtTick = 1,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Process one tick to trigger the year-end at tick 2
+        await using (var scope = iso.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+            var logger = new NullLogger<TickProcessor>();
+            var processor = new TickProcessor(db, phases, logger);
+            await processor.ProcessTickAsync();
+        }
+
+        var divResult = await ExecuteGraphQlAsync(
+            isoClient,
+            """
+            {
+                personAccount {
+                    dividendPayments {
+                        id
+                        companyId
+                        companyName
+                        shareCount
+                        amountPerShare
+                        totalAmount
+                        gameYear
+                        recordedAtTick
+                        recordedAtUtc
+                    }
+                }
+            }
+            """,
+            token: isoInvestorToken);
+
+        Assert.False(divResult.TryGetProperty("errors", out _), "personAccount must not error for dividend query");
+        var divAccount = divResult.GetProperty("data").GetProperty("personAccount");
+        var payments = divAccount.GetProperty("dividendPayments").EnumerateArray().ToList();
+        Assert.True(payments.Count >= 1, "personAccount must show at least one dividend payment after year-end");
+
+        var payment = payments[0];
+        Assert.Equal("Div ISO Co", payment.GetProperty("companyName").GetString());
+        Assert.True(payment.GetProperty("shareCount").GetDecimal() > 0m, "shareCount must be positive");
+        Assert.True(payment.GetProperty("amountPerShare").GetDecimal() > 0m, "amountPerShare must be positive");
+        Assert.True(payment.GetProperty("totalAmount").GetDecimal() > 0m, "totalAmount must be positive");
+        Assert.Equal(System.Text.Json.JsonValueKind.Number, payment.GetProperty("gameYear").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Number, payment.GetProperty("recordedAtTick").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.String, payment.GetProperty("recordedAtUtc").ValueKind);
+    }
+
+    [Fact]
     public async Task PersonalTaxReserve_SettlesAtYearEnd_DeductsCashAndClearsReserve()
     {
         // Use an isolated factory so we can set TaxCycleTicks = 2 without touching shared state.

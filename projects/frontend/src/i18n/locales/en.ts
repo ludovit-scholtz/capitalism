@@ -431,6 +431,7 @@ export default {
     createCompanyFailed: 'Failed to create the new company.',
     switchCompanyHint: 'Use the account button in the top menu to switch into this company.',
     startupPackRequiresCompany: 'Switch to a company account to apply the startup-pack cash grant.',
+    viewPersonalLedger: 'View personal ledger',
     noBuildings: 'No buildings yet.',
     buyBuilding: 'Buy Building',
     manageBuildings: 'Manage',

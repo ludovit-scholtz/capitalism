@@ -38,7 +38,8 @@ Show all changes that upgrading of the unit will have, for example the storage c
 - When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional. 
 
 ### Ledger for personal account
-Create ledger for personal account, and show there the person's wealth, the income and taxes, taxes blockations and tax history. Make sure it is accessible from the peronal account dashboard.
+Create ledger for personal account, and show there the person's wealth, the income and taxes, taxes blockations and tax history. Make sure it is accessible from the personal account dashboard.
+**[100% complete — Personal account ledger delivered at `/personal-ledger`. Features: net wealth, available cash, tax-reserve block (15% of stock-sale proceeds), portfolio value, tax history table (per-sell reserved tax), full BUY/SELL trade history with direction badges, dividend income history. Navigation entry point added to the global header (file-invoice-dollar icon, visible to authenticated players) and a "View personal ledger →" quick-link on the Stock Exchange personal-account panel. Data sourced from the `personAccount` GraphQL query (personalCash, taxReserve, availableCash, totalNetWealth, shareholdings, dividendPayments, stockTrades). Loading, empty, and error states implemented consistently. Backend tests cover tax-reserve accumulation, settlement at year-end, available-cash deduction, multi-seller accumulation, and new-player zero state. E2E tests cover wealth-card rendering, tax history, trade history, dividend history, nav link, and all empty states.]**
 
 ### Research & Development
 Show the user's used products first in the the R&D unit prouct quality improvement product selection.
