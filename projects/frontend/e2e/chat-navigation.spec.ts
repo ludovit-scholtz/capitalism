@@ -85,8 +85,8 @@ test.describe('Chat side panel — desktop', () => {
 
   test('displays existing messages in the panel', async ({ page }) => {
     const player = makePlayer()
-    const otherPlayer = makePlayer()
-    otherPlayer.displayName = 'AliceTrader'
+    // Use explicit overrides so the second player gets a unique id and display name
+    const otherPlayer = makePlayer({ id: 'player-2', email: 'other@test.com', displayName: 'AliceTrader' })
     const state = setupMockApi(page, {
       players: [player, otherPlayer],
       chatMessages: [
@@ -163,7 +163,8 @@ test.describe('Chat side panel — desktop', () => {
     state.currentUserId = player.id
     await loginAndGoHome(page, `token-${player.id}`)
 
-    const chatBtn = page.getByRole('button', { name: 'Chat' })
+    // Scope to .app-header so it never collides with the in-panel close button
+    const chatBtn = page.locator('.app-header').getByRole('button', { name: 'Chat', exact: true })
     await chatBtn.click()
     await expect(page.locator('.chat-side-panel')).toBeVisible()
 
