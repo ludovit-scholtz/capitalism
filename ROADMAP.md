@@ -13,6 +13,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Unit links
 - The diagonal links looks good now, but if there is only one diagonal possible, only half of the link is clickable. Make sure it toggles the state changes everywhere where the link is displayed.
+**[100% complete — Single-diagonal hit-area expanded to full connector square: when only one of the two diagonal axes is available, the transparent hit-area button now covers the entire 36×36 connector cell (`solo-primary` / `solo-secondary` CSS classes) instead of the previous 50% half. Clicking anywhere on the visible diagonal line — including the previously dead left-side zone for a secondary-only connector — now reliably toggles the link. Aria-labels updated to reflect single-axis context. `getHitAreaMode()` pure helper added to `diagonalConnector.ts` with unit-test coverage. New E2E test verifies the dead-zone click triggers the toggle in the single-diagonal case.]**
 
 ### Unit grid display
 - Visually display the flow of the product. At the moment I can see the storage capacity line in the unit which has storage capacity - it is percentage filled and also color differenciate which is very good. However when i see the 100% of the storage capacity, i would like to differenciate also how much storage capacity did arrive in last block and how much capacity left the unit. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.

@@ -49,6 +49,14 @@ const primaryActive = computed(() => props.primaryState !== 'none')
 const secondaryActive = computed(() => props.secondaryState !== 'none')
 const isDisabled = computed(() => isConnectorDisabled(props.canTogglePrimary, props.canToggleSecondary))
 
+/**
+ * When only one diagonal axis is available the hit-area button for that axis
+ * expands to the full connector square so every point on the rendered line is
+ * clickable, not just the half that previously corresponded to that axis.
+ */
+const isSoloPrimary = computed(() => props.canTogglePrimary && !props.canToggleSecondary)
+const isSoloSecondary = computed(() => props.canToggleSecondary && !props.canTogglePrimary)
+
 const primaryArrow = computed(() => getPrimaryArrowPoints(props.primaryState))
 const secondaryArrow = computed(() => getSecondaryArrowPoints(props.secondaryState))
 
@@ -56,7 +64,16 @@ const diagonalRoot = computed(() => `${props.x},${props.y}`)
 </script>
 
 <template>
-  <div class="diagonal-connector-group" :class="{ disabled: isDisabled }">
+  <div
+    class="diagonal-connector-group"
+    :class="{
+      disabled: isDisabled,
+      'has-primary': canTogglePrimary,
+      'has-secondary': canToggleSecondary,
+      'solo-primary': isSoloPrimary,
+      'solo-secondary': isSoloSecondary,
+    }"
+  >
     <!--
       Single SVG: draws BOTH diagonal lines as clean SVG <line> elements.
       This eliminates the duplicate-stroke and multiple-rounded-endpoint artifacts
@@ -119,16 +136,16 @@ const diagonalRoot = computed(() => `${props.x},${props.y}`)
       <button
         v-if="!isReadonly"
         class="link-toggle diagonal diagonal-primary diag-hit-area"
-        :class="[`link-state-${primaryState}`, { active: primaryActive }]"
+        :class="[`link-state-${primaryState}`, { active: primaryActive, solo: isSoloPrimary }]"
         data-diagonal-axis="primary"
         :data-diagonal-root="diagonalRoot"
-        :aria-label="`Diagonal primary link: ${primaryState}`"
+        :aria-label="isSoloPrimary ? `Diagonal link (↘↖): ${primaryState}` : `Diagonal primary link: ${primaryState}`"
         @click="$emit('togglePrimary')"
       />
       <div
         v-else
         class="link-toggle diagonal diagonal-primary diag-hit-area readonly"
-        :class="[`link-state-${primaryState}`, { active: primaryActive }]"
+        :class="[`link-state-${primaryState}`, { active: primaryActive, solo: isSoloPrimary }]"
         data-diagonal-axis="primary"
         :data-diagonal-root="diagonalRoot"
       />
@@ -138,16 +155,16 @@ const diagonalRoot = computed(() => `${props.x},${props.y}`)
       <button
         v-if="!isReadonly"
         class="link-toggle diagonal diagonal-secondary diag-hit-area"
-        :class="[`link-state-${secondaryState}`, { active: secondaryActive }]"
+        :class="[`link-state-${secondaryState}`, { active: secondaryActive, solo: isSoloSecondary }]"
         data-diagonal-axis="secondary"
         :data-diagonal-root="diagonalRoot"
-        :aria-label="`Diagonal secondary link: ${secondaryState}`"
+        :aria-label="isSoloSecondary ? `Diagonal link (↙↗): ${secondaryState}` : `Diagonal secondary link: ${secondaryState}`"
         @click="$emit('toggleSecondary')"
       />
       <div
         v-else
         class="link-toggle diagonal diagonal-secondary diag-hit-area readonly"
-        :class="[`link-state-${secondaryState}`, { active: secondaryActive }]"
+        :class="[`link-state-${secondaryState}`, { active: secondaryActive, solo: isSoloSecondary }]"
         data-diagonal-axis="secondary"
         :data-diagonal-root="diagonalRoot"
       />
@@ -235,6 +252,22 @@ const diagonalRoot = computed(() => `${props.x},${props.y}`)
 .diag-hit-area.diagonal-secondary {
   right: 0;
   width: 50%;
+}
+
+/*
+  Single-diagonal fix: when only one axis is available the entire connector
+  square belongs to that one axis, so expand the hit-area to 100% width so
+  that every visible pixel on the rendered diagonal line is clickable.
+  Without this, a player clicking the "wrong" half got no feedback.
+*/
+.diagonal-connector-group.solo-primary .diag-hit-area.diagonal-primary {
+  width: 100%;
+}
+
+.diagonal-connector-group.solo-secondary .diag-hit-area.diagonal-secondary {
+  width: 100%;
+  left: 0;
+  right: auto;
 }
 
 .diag-hit-area.readonly {
