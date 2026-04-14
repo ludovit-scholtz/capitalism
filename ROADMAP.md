@@ -33,8 +33,8 @@ Show all changes that upgrading of the unit will have, for example the storage c
 - The quality of products obrained from the blobal exchange must vary between 5 to 20%
 
 ### All buildings
-- Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future.
-- In each building header right below the building name show chart of total costs, total revenue and total profit in the top building overview
+- Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future. **[100% complete — Building-card wrapper now has `margin-bottom`; the buildings grid gap is increased to `1.25rem`; the `.building-card` border-radius is flattened on the bottom so it visually merges with the new financials panel below it; the SupplyChainPanel has a top margin class so it breathes apart from the financials strip.]**
+- In each building header right below the building name show chart of total costs, total revenue and total profit in the top building overview **[100% complete — New `BuildingHeaderFinancials.vue` component shows Sales (revenue), Costs, and Profit in a compact color-coded strip attached below each building card on the Dashboard Buildings tab. Data comes from the existing `buildingFinancialTimeline` GraphQL query (aggregate totals only, no full timeline). Profit is green for positive, red for negative. A shimmering skeleton is shown while loading. A "No financial activity recorded yet" message is shown for new buildings with zero activity. Financials refresh silently on every game tick. E2E tests added for positive-profit, negative-profit, no-data, and spacing scenarios.]**
 
 ### Show time instead of ticks
 - Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging.

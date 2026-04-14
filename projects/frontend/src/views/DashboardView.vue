@@ -18,6 +18,7 @@ import FinancialSummaryCard from '@/components/dashboard/FinancialSummaryCard.vu
 import StarterGuidance from '@/components/dashboard/StarterGuidance.vue'
 import DashboardChatPanel from '@/components/dashboard/DashboardChatPanel.vue'
 import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
+import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
 // Module-level cache for city names — cities are static and never change during a session.
@@ -40,6 +41,9 @@ const ledgerLoading = ref(false)
 const cityNames = ref<Record<string, string>>({})
 /** Map from buildingId → per-unit operational statuses for supply-chain live status display. */
 const buildingUnitStatuses = ref<Record<string, BuildingUnitOperationalStatus[]>>({})
+/** Map from buildingId → aggregated financial totals (revenue, costs, profit). */
+const buildingFinancials = ref<Record<string, { totalSales: number; totalCosts: number; totalProfit: number }>>({})
+const buildingFinancialsLoading = ref(false)
 const createCompanyName = ref('')
 const createCompanyLoading = ref(false)
 const createCompanyError = ref<string | null>(null)
@@ -133,7 +137,7 @@ async function refreshCompanyDerivedData() {
   const companyIds = companies.value.map((company) => company.id)
   const buildingIds = companies.value.flatMap((company) => company.buildings.map((building) => building.id))
 
-  await Promise.all([loadCityPowerBalances(cityIds), loadCityNames(), loadLedgers(companyIds), loadBuildingUnitStatuses(buildingIds)])
+  await Promise.all([loadCityPowerBalances(cityIds), loadCityNames(), loadLedgers(companyIds), loadBuildingUnitStatuses(buildingIds), loadBuildingFinancials(buildingIds)])
 }
 
 onMounted(async () => {
@@ -182,10 +186,10 @@ useTickRefresh(async () => {
   const scrollPos = saveScrollPosition()
   await Promise.all([loadDashboardData(), loadPendingActions()])
   startTickCountdown()
-  // Refresh ledger and unit statuses on tick but keep loading state quiet (non-critical).
+  // Refresh ledger, unit statuses, and building financials on tick but keep loading state quiet (non-critical).
   const companyIds = companies.value.map((c) => c.id)
   const buildingIds = companies.value.flatMap((c) => c.buildings.map((b) => b.id))
-  await Promise.all([loadLedgers(companyIds, true), loadBuildingUnitStatuses(buildingIds)])
+  await Promise.all([loadLedgers(companyIds, true), loadBuildingUnitStatuses(buildingIds), loadBuildingFinancials(buildingIds, true)])
   await restoreScrollPosition(scrollPos)
 })
 
@@ -309,6 +313,34 @@ async function loadBuildingUnitStatuses(buildingIds: string[]) {
     }
   } catch {
     // best-effort — unit status is non-critical
+  }
+}
+
+async function loadBuildingFinancials(buildingIds: string[], isRefresh = false) {
+  if (buildingIds.length === 0) return
+  if (!isRefresh) buildingFinancialsLoading.value = true
+  try {
+    const results = await Promise.allSettled(
+      buildingIds.map((buildingId) =>
+        gqlRequest<{ buildingFinancialTimeline: { totalSales: number; totalCosts: number; totalProfit: number } }>(
+          `query BuildingHeaderFinancials($buildingId: UUID!) {
+            buildingFinancialTimeline(buildingId: $buildingId) {
+              totalSales totalCosts totalProfit
+            }
+          }`,
+          { buildingId },
+        ).then((data) => ({ buildingId, totals: data.buildingFinancialTimeline })),
+      ),
+    )
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        buildingFinancials.value[result.value.buildingId] = result.value.totals
+      }
+    }
+  } catch {
+    // best-effort — financial summary is non-critical
+  } finally {
+    if (!isRefresh) buildingFinancialsLoading.value = false
   }
 }
 
@@ -550,7 +582,13 @@ async function createCompany() {
                     </span>
                   </div>
                 </RouterLink>
-                <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" />
+                <BuildingHeaderFinancials
+                  :revenue="buildingFinancials[building.id]?.totalSales ?? null"
+                  :costs="buildingFinancials[building.id]?.totalCosts ?? null"
+                  :profit="buildingFinancials[building.id]?.totalProfit ?? null"
+                  :loading="buildingFinancialsLoading && !buildingFinancials[building.id]"
+                />
+                <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" class="building-supply-chain" />
               </div>
             </div>
 
@@ -1071,12 +1109,13 @@ async function createCompany() {
 .buildings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 0.75rem;
+  gap: 1.25rem;
 }
 
 .building-card-wrapper {
   display: flex;
   flex-direction: column;
+  margin-bottom: 0.25rem;
 }
 
 .building-card {
@@ -1086,7 +1125,8 @@ async function createCompany() {
   padding: 1rem;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom: none;
   text-decoration: none;
   color: var(--color-text);
   transition: all 0.2s ease;
@@ -1097,6 +1137,10 @@ async function createCompany() {
   background: rgba(0, 71, 255, 0.04);
   transform: translateY(-1px);
   text-decoration: none;
+}
+
+.building-supply-chain {
+  margin-top: 0.75rem;
 }
 
 .building-icon {
