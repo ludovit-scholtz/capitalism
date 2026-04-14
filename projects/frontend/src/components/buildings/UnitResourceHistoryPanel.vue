@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatGameTickTime } from '@/lib/gameTime'
 import { formatUnitQuantity } from '@/lib/gridTileHelpers'
 import {
   buildUnitResourceHistoryChartModel,
@@ -20,7 +21,7 @@ const emit = defineEmits<{
   'update:selectedItemKey': [value: string]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const plotWidth = 520
 const plotHeight = 170
@@ -95,8 +96,10 @@ function getMetricLabel(metricKey: UnitResourceHistoryMetricKey): string {
         </div>
         <div class="history-summary-stat">
           <span class="history-summary-label">{{ t('buildingDetail.inventory.history.tickRange') }}</span>
-          <strong>
-            {{ t('buildingDetail.inventory.history.tickWindow', { start: chartModel.tickRange.start ?? 0, end: chartModel.tickRange.end ?? 0 }) }}
+          <strong
+            :title="t('buildingDetail.inventory.history.tickWindow', { start: chartModel.tickRange.start ?? 0, end: chartModel.tickRange.end ?? 0 })"
+          >
+            {{ formatGameTickTime(chartModel.tickRange.start ?? 0, locale) }} – {{ formatGameTickTime(chartModel.tickRange.end ?? 0, locale) }}
           </strong>
         </div>
       </div>
@@ -154,7 +157,7 @@ function getMetricLabel(metricKey: UnitResourceHistoryMetricKey): string {
           <span>{{ t('buildingDetail.inventory.history.produced') }}</span>
         </div>
         <div v-for="row in recentRows" :key="`${row.tick}-${row.resourceTypeId ?? row.productTypeId}`" class="history-table-row">
-          <span>{{ t('buildingDetail.inventory.history.tickShort', { tick: row.tick }) }}</span>
+          <span :title="t('buildingDetail.inventory.history.tickShort', { tick: row.tick })">{{ formatGameTickTime(row.tick, locale) }}</span>
           <span>{{ formatUnitQuantity(row.inflowQuantity) }}</span>
           <span>{{ formatUnitQuantity(row.outflowQuantity) }}</span>
           <span>{{ formatUnitQuantity(row.consumedQuantity) }}</span>

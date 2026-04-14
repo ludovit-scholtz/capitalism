@@ -2,13 +2,14 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { buildBuildingFinancialChartModel, type BuildingFinancialChartTick, type BuildingFinancialSeriesKey } from '@/lib/buildingFinancialChart'
+import { formatGameTickTime } from '@/lib/gameTime'
 import type { BuildingFinancialTickSnapshot } from '@/types'
 
 const props = defineProps<{
   timeline: BuildingFinancialTickSnapshot[]
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const plotWidth = 560
 const plotHeight = 180
@@ -80,7 +81,11 @@ function getTickTitle(tick: BuildingFinancialChartTick): string {
       <div class="building-financial-chart-header">
         <div>
           <span class="building-financial-chart-caption">{{ t('buildingDetail.overview.chartTitle') }}</span>
-          <strong v-if="activeTick" class="building-financial-active-tick">{{ t('buildingDetail.overview.tickLabel', { tick: activeTick.tick }) }}</strong>
+          <strong
+            v-if="activeTick"
+            class="building-financial-active-tick"
+            :title="t('buildingDetail.overview.tickLabel', { tick: activeTick.tick })"
+          >{{ formatGameTickTime(activeTick.tick, locale) }}</strong>
         </div>
         <p class="config-help">{{ t('buildingDetail.overview.hoverHint') }}</p>
       </div>
