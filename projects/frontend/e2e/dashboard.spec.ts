@@ -1448,6 +1448,93 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
 
     await expect(page.locator('.starter-guidance')).toContainText('Business is profitable')
   })
+
+  test('costs never render as $NaN — totalTaxPaid included in dashboard query', async ({ page }) => {
+    // Regression test: the dashboard companyLedger query previously omitted totalTaxPaid,
+    // causing totalCosts to be NaN (undefined + number = NaN). This verifies the fix.
+    const { factory, shop } = makeStarterCompanyWithBuildings()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-nan-test',
+          playerId: 'player-1',
+          name: 'Tax Corp',
+          cash: 200000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [factory, shop],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.ledgerData['comp-nan-test'] = {
+      companyId: 'comp-nan-test',
+      companyName: 'Tax Corp',
+      currentCash: 200000,
+      totalRevenue: 3000,
+      totalPurchasingCosts: 600,
+      totalLaborCosts: 400,
+      totalEnergyCosts: 100,
+      totalMarketingCosts: 50,
+      totalTaxPaid: 250, // non-zero tax — previously caused NaN in costs
+      totalOtherCosts: 0,
+      netIncome: 1600,
+      propertyValue: 0,
+      propertyAppreciation: 0,
+      buildingValue: 200000,
+      inventoryValue: 1000,
+      totalAssets: 401000,
+      totalPropertyPurchases: 200000,
+      cashFromOperations: 1600,
+      cashFromInvestments: -200000,
+      firstRecordedTick: 1,
+      lastRecordedTick: 5,
+      buildingSummaries: [],
+    }
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.financial-summary-card')).toBeVisible()
+    // Costs must be a valid formatted number, never "$NaN"
+    await expect(page.locator('.financial-summary-card')).not.toContainText('NaN')
+    // Costs = 600+400+100+50+250 = 1,400
+    await expect(page.locator('.financial-summary-card')).toContainText('1,400')
+    // Revenue = 3,000
+    await expect(page.locator('.financial-summary-card')).toContainText('3,000')
+  })
+
+  test('financial summary shows skeleton loading state, not NaN, before data arrives', async ({
+    page,
+  }) => {
+    // Verifies the loading state shows skeleton placeholders (not broken text)
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-loading',
+          playerId: 'player-1',
+          name: 'Loading Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // No ledgerData provided — simulates a company with no transaction history
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.locator('.financial-summary-card')).toBeVisible()
+    // Must never show NaN in any state
+    await expect(page.locator('.financial-summary-card')).not.toContainText('NaN')
+  })
 })
 
 test.describe('Dashboard — unit operational status in supply chain', () => {
