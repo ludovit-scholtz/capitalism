@@ -889,3 +889,18 @@ Root-cause of a recurring CI failure pattern (April 2026, PR #360 dashboard/ledg
 3. **If a test passes in isolation but fails in the full suite, the root cause is almost always shared mutable state** — not test flakiness. Diagnose by checking which singleton was modified by a preceding test.
 4. **Tests that need a specific tick value (e.g. year 2001 = tick ≥ 8760) must use an isolated factory,** seed their own game state, and run their assertions against the isolated HTTP client. Never rely on the shared factory's tick advancing to a convenient value.
 5. **Existing tick-advancing tests that use the shared factory are pre-existing technical debt.** Do not add more; when fixing them is in scope, migrate them to isolated factories.
+
+## Personal tax reserve — always implement the full lifecycle, not just accumulation
+
+Root-cause of a product-critical quality failure (April 2026, PR #4):
+- The `PersonalTaxReserve` was implemented as grow-only: `SellShares` accumulated the reserve but no code path ever reduced it.
+- The product copy and ROADMAP both said "will be settled at the tax year-end", but no settlement code existed.
+- Repeated personal share sales could permanently trap a player's liquidity — once `personalCash - personalTaxReserve ≤ 0`, `BuyShares` would always reject with `INSUFFICIENT_PERSONAL_FUNDS` and the player was soft-locked forever.
+- Additionally, the `BuyShares_PersonAccount_CannotUseTaxReservedCash` test had an escape hatch: it accepted both `INSUFFICIENT_PERSONAL_FUNDS` **and** `INSUFFICIENT_PUBLIC_FLOAT` as passing outcomes, meaning the test could pass even if the available-cash check was entirely removed.
+
+**Rules to prevent recurrence:**
+1. **Every financial reserve, block, or holdback must have a complete lifecycle: accumulation AND release/settlement.** Before closing a PR that introduces any `Reserve`, `Block`, or `Hold` field, verify there is code that clears it under the defined business condition.
+2. **For personal stock-sale tax: settlement runs in `TaxPhase` at each tax year-end (`gs.CurrentTick % gs.TaxCycleTicks == 0`).** The settled amount is `Math.Min(personalCash, personalTaxReserve)`, deducted from `PersonalCash` and the reserve is zeroed. This prevents soft-lock even after many sells.
+3. **When testing that a cash reserve blocks a purchase, ensure public float cannot be the failure reason.** Seed the target company with a large enough float (e.g., 99,000 free-float shares) and compute the exact share count that costs between `availableCash` and `grossCash`. Assert exactly `INSUFFICIENT_PERSONAL_FUNDS`, never accept `INSUFFICIENT_PUBLIC_FLOAT` as an allowed outcome in the same test.
+4. **Query `personAccount { availableCash }` directly rather than computing `personalCash - taxReserve` client-side** when verifying the cash constraint in tests — this proves the GraphQL contract returns the correct available cash, not just that arithmetic works.
+5. **For year-end settlement tests, always use an isolated factory with `TaxCycleTicks = 2`** so the test can trigger year-end by processing a single tick without advancing 8,760 ticks.

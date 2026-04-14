@@ -56,6 +56,21 @@ public sealed class TaxPhase : ITickPhase
             });
         }
 
+        // Settle personal stock-sale tax reserves at year-end.
+        // The 15% that was blocked from spending is now permanently paid as tax;
+        // the player's spendable cash decreases and the reserve is cleared so
+        // the player is never permanently soft-locked out of further purchases.
+        var playersWithReserve = context.Db.Players
+            .Where(p => p.PersonalTaxReserve > 0m)
+            .ToList();
+
+        foreach (var player in playersWithReserve)
+        {
+            var taxPaid = Math.Min(player.PersonalCash, player.PersonalTaxReserve);
+            player.PersonalCash -= taxPaid;
+            player.PersonalTaxReserve = 0m;
+        }
+
         return Task.CompletedTask;
     }
 }

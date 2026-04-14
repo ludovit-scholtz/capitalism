@@ -11,7 +11,14 @@ public sealed class PersonAccountResult
 {
     public Guid PlayerId { get; set; }
     public string DisplayName { get; set; } = string.Empty;
+    /// <summary>Gross personal cash (includes tax reserve that is blocked).</summary>
     public decimal PersonalCash { get; set; }
+    /// <summary>Amount of PersonalCash blocked for future tax payment (15% of stock-sale proceeds).</summary>
+    public decimal TaxReserve { get; set; }
+    /// <summary>Spendable cash = PersonalCash - TaxReserve.</summary>
+    public decimal AvailableCash { get; set; }
+    /// <summary>Total net wealth = AvailableCash + portfolio market value.</summary>
+    public decimal TotalNetWealth { get; set; }
     public string ActiveAccountType { get; set; } = string.Empty;
     public Guid? ActiveCompanyId { get; set; }
     public List<PortfolioHoldingResult> Shareholdings { get; set; } = [];
@@ -79,9 +86,13 @@ public sealed class ShareTradeResult
     public decimal ShareCount { get; set; }
     public decimal PricePerShare { get; set; }
     public decimal TotalValue { get; set; }
+    /// <summary>Amount reserved for tax (only set when AccountType is PERSON and trade direction is SELL).</summary>
+    public decimal TaxReserved { get; set; }
     public decimal OwnedShareCount { get; set; }
     public decimal PublicFloatShares { get; set; }
     public decimal PersonalCash { get; set; }
+    /// <summary>Tax reserve on the personal account after this trade.</summary>
+    public decimal PersonalTaxReserve { get; set; }
     public decimal? CompanyCash { get; set; }
 }
 

@@ -377,4 +377,13 @@ public static class GameConstants
         Data.Entities.BuildingType.PowerPlant         => 80_000m,
         _                                             => 10_000m
     };
+
+    // ── Stock exchange tax constants ──────────────────────────────────────────
+
+    /// <summary>
+    /// Fraction of stock-sale proceeds reserved for taxes when selling from a personal account.
+    /// 15% of each natural-person stock sale is held in <see cref="Api.Data.Entities.Player.PersonalTaxReserve"/>
+    /// until the year-end tax settlement.
+    /// </summary>
+    public const decimal PersonalStockSaleTaxRate = 0.15m;
 }

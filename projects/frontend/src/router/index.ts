@@ -22,6 +22,7 @@ const router = createRouter({
     { path: '/company/:companyId/settings', name: 'company-settings', component: () => import('@/views/CompanySettingsView.vue') },
     { path: '/loans', name: 'loan-marketplace', component: () => import('@/views/LoanMarketplaceView.vue') },
     { path: '/bank/:buildingId', name: 'bank-management', component: () => import('@/views/BankManagementView.vue') },
+    { path: '/personal-ledger', name: 'personal-ledger', component: () => import('@/views/PersonalLedgerView.vue') },
   ],
   scrollBehavior() {
     return { top: 0 }

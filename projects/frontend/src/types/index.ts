@@ -508,7 +508,14 @@ export interface PersonTradeRecord {
 export interface PersonAccount {
   playerId: string
   displayName: string
+  /** Gross personal cash (includes the blocked tax reserve). */
   personalCash: number
+  /** Amount blocked for future tax payment (15% of personal stock-sale proceeds). */
+  taxReserve: number
+  /** Spendable cash = personalCash - taxReserve. */
+  availableCash: number
+  /** Total net wealth = availableCash + portfolio market value. */
+  totalNetWealth: number
   activeAccountType: AccountContextType
   activeCompanyId: string | null
   shareholdings: PortfolioHolding[]
@@ -575,9 +582,13 @@ export interface ShareTradeResult {
   shareCount: number
   pricePerShare: number
   totalValue: number
+  /** Amount reserved for taxes (only set on personal-account sells). */
+  taxReserved: number
   ownedShareCount: number
   publicFloatShares: number
   personalCash: number
+  /** Personal tax reserve after this trade. */
+  personalTaxReserve: number
   companyCash: number | null
 }
 
