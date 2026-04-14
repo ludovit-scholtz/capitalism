@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { DirectedPairLinkState } from '@/lib/linkHelpers'
+import {
+  getPrimaryArrowPoints,
+  getSecondaryArrowPoints,
+  isConnectorDisabled,
+} from '@/lib/diagonalConnector'
 
 /**
  * Single-SVG diagonal connector for the building unit grid.
@@ -13,6 +18,9 @@ import type { DirectedPairLinkState } from '@/lib/linkHelpers'
  * diagonal lines cleanly.  Transparent click-hit buttons are layered above the SVG
  * and carry the data-diagonal-axis / data-diagonal-root attributes expected by E2E
  * tests and by accessibility tooling.
+ *
+ * The arrowhead coordinate mapping is in `src/lib/diagonalConnector.ts` so it can
+ * be unit-tested independently of Vue reactivity.
  */
 
 const props = defineProps<{
@@ -39,46 +47,10 @@ defineEmits<{
 
 const primaryActive = computed(() => props.primaryState !== 'none')
 const secondaryActive = computed(() => props.secondaryState !== 'none')
-const isDisabled = computed(() => !props.canTogglePrimary && !props.canToggleSecondary)
+const isDisabled = computed(() => isConnectorDisabled(props.canTogglePrimary, props.canToggleSecondary))
 
-/**
- * Precomputed SVG polygon points for each arrowhead direction.
- * ViewBox is 36×36.  Each triangle has its tip at the destination corner
- * and two base points stepped back along (and perpendicular to) the diagonal.
- *
- * Arrow geometry (length ≈ 9 px, half-width ≈ 4 px):
- *   ↘  tip (33,33), base (24,30) (30,24)
- *   ↖  tip  (3, 3), base (12, 7)  (7,12)
- *   ↙  tip  (3,33), base (12,30)  (7,24)
- *   ↗  tip (33, 3), base (30,12) (24, 7)
- *
- * The `both` state is a legacy value that can appear when a link configuration
- * was saved with both the source-side and destination-side flags set simultaneously
- * (e.g. `linkDownRight=true` on unit A AND `linkUpLeft=true` on unit B for the
- * same pair).  The game engine treats `both` identically to `forward` for routing
- * purposes.  It is not producible via the new UI (the cycle is none→forward→backward→none),
- * but must be handled gracefully for buildings migrated from older data.
- */
-const PRIMARY_ARROWS: Record<Exclude<DirectedPairLinkState, 'none'>, string> = {
-  forward: '33,33 24,30 30,24', // ↘ tl→br
-  backward: '3,3 12,7 7,12', // ↖ br→tl
-  both: '33,33 24,30 30,24', // legacy: render forward arrow
-}
-
-const SECONDARY_ARROWS: Record<Exclude<DirectedPairLinkState, 'none'>, string> = {
-  forward: '3,33 12,30 7,24', // ↙ tr→bl
-  backward: '33,3 30,12 24,7', // ↗ bl→tr
-  both: '3,33 12,30 7,24', // legacy: render forward arrow
-}
-
-const primaryArrow = computed(() =>
-  primaryActive.value ? PRIMARY_ARROWS[props.primaryState as Exclude<DirectedPairLinkState, 'none'>] : null,
-)
-const secondaryArrow = computed(() =>
-  secondaryActive.value
-    ? SECONDARY_ARROWS[props.secondaryState as Exclude<DirectedPairLinkState, 'none'>]
-    : null,
-)
+const primaryArrow = computed(() => getPrimaryArrowPoints(props.primaryState))
+const secondaryArrow = computed(() => getSecondaryArrowPoints(props.secondaryState))
 
 const diagonalRoot = computed(() => `${props.x},${props.y}`)
 </script>

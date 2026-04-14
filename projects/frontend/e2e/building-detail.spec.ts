@@ -4037,9 +4037,174 @@ test.describe('Building detail upgrades', () => {
     await expect(lines).toHaveCount(2) // one for each possible axis (\ and /)
   })
 
-  // ---------------------------------------------------------------------------
-  // Grid tile metadata: resource / product labels, fill bars, price metrics
-  // ---------------------------------------------------------------------------
+  test('diagonal cross-link: both axes active simultaneously render two arrowheads with no duplicate lines — AC7', async ({ page }) => {
+    // A "cross" config: primary (\) and secondary (/) are both active at the same time.
+    // This is the most complex visual state — two SVG lines and two arrowheads must
+    // appear without any overlapping geometry (the old two-div approach rendered
+    // duplicate pill strokes in exactly this state).
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-cross',
+      playerId: player.id,
+      name: 'Cross Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-cross',
+          companyId: 'company-cross',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Cross Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            { id: 'cx-1', buildingId: 'building-cross', unitType: 'PURCHASE',      gridX: 0, gridY: 0, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false,
+              linkDownRight: true }, // primary forward (\): (0,0) → (1,1)
+            { id: 'cx-2', buildingId: 'building-cross', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false,
+              linkDownLeft: true, // secondary forward (/): (1,0) → (0,1)
+              linkDownRight: false },
+            { id: 'cx-3', buildingId: 'building-cross', unitType: 'STORAGE',       gridX: 0, gridY: 1, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+            { id: 'cx-4', buildingId: 'building-cross', unitType: 'B2B_SALES',     gridX: 1, gridY: 1, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-cross')
+    await expect(page.getByRole('heading', { name: 'Cross Factory' })).toBeVisible()
+
+    // Readonly (Current Configuration) view: both axes active
+    const currentSection = getGridSection(page, 'Current Configuration')
+    const primaryBtn = getDiagonalToggle(currentSection, 0, 0, 'primary')
+    const secondaryBtn = getDiagonalToggle(currentSection, 0, 0, 'secondary')
+
+    await expect(primaryBtn).toHaveClass(/link-state-forward/)
+    await expect(secondaryBtn).toHaveClass(/link-state-forward/)
+
+    // Single SVG: exactly 2 lines (one per axis), exactly 2 arrowheads — no duplicates
+    const connectorGroup = primaryBtn.locator('xpath=..')
+    const svgLines = connectorGroup.locator('.diag-conn-line')
+    const arrowheads = connectorGroup.locator('.diag-conn-arrowhead')
+    await expect(svgLines).toHaveCount(2)
+    await expect(arrowheads).toHaveCount(2)
+    await expect(connectorGroup.locator('.diag-conn-active')).toHaveCount(2)
+
+    // Enter edit mode: cross state is preserved in planned section
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    const plannedPrimary = getDiagonalToggle(plannedSection, 0, 0, 'primary')
+    const plannedSecondary = getDiagonalToggle(plannedSection, 0, 0, 'secondary')
+    await expect(plannedPrimary).toHaveClass(/link-state-forward/)
+    await expect(plannedSecondary).toHaveClass(/link-state-forward/)
+
+    // Planned group also has 2 lines and 2 arrowheads — no overlap in edit mode either
+    const plannedGroup = plannedPrimary.locator('xpath=..')
+    await expect(plannedGroup.locator('.diag-conn-line')).toHaveCount(2)
+    await expect(plannedGroup.locator('.diag-conn-arrowhead')).toHaveCount(2)
+
+    // Clear primary — only secondary arrowhead remains
+    await plannedPrimary.click() // forward → backward
+    await plannedPrimary.click() // backward → none
+    await expect(plannedPrimary).toHaveClass(/link-state-none/)
+    await expect(plannedGroup.locator('.diag-conn-arrowhead')).toHaveCount(1)
+    await expect(plannedGroup.locator('.diag-conn-active')).toHaveCount(1)
+  })
+
+  test('diagonal connector SVG no-artifact: readonly view with active diagonals has single SVG element per connector cell — AC8', async ({ page }) => {
+    // Proves that the new component renders exactly one SVG per diagonal connector zone
+    // even when multiple link states are active. The old two-div approach would render
+    // two completely separate DOM elements in the same zone, each with its own SVG-like
+    // rotated pill, creating overlapping visual artifacts.
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-no-artifact',
+      playerId: player.id,
+      name: 'No Artifact Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-no-artifact',
+          companyId: 'company-no-artifact',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'No Artifact Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            { id: 'na-1', buildingId: 'building-no-artifact', unitType: 'PURCHASE',      gridX: 0, gridY: 0, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: true },
+            { id: 'na-2', buildingId: 'building-no-artifact', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: true, linkDownRight: false },
+            { id: 'na-3', buildingId: 'building-no-artifact', unitType: 'STORAGE',       gridX: 0, gridY: 1, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+            { id: 'na-4', buildingId: 'building-no-artifact', unitType: 'B2B_SALES',     gridX: 1, gridY: 1, level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-no-artifact')
+    await expect(page.getByRole('heading', { name: 'No Artifact Factory' })).toBeVisible()
+
+    // Exactly one .diagonal-connector-group in the connector row between rows 0 and 1 at x=0
+    // (The current configuration section uses the same DiagonalConnector component)
+    const currentSection = getGridSection(page, 'Current Configuration')
+    const connectorGroups = currentSection.locator('.diagonal-connector-group')
+    // 3 columns × 3 connector rows = 9 groups in a 4×4 grid with 4 occupied units
+    // For our fixture: only the (0,0) group is in a fully-occupied 2×2 block
+    // but all 9 potential groups should be rendered (disabled ones have opacity 0.28)
+    await expect(connectorGroups).not.toHaveCount(0)
+
+    // The key no-artifact assertion: exactly one .diag-conn-svg per connector group
+    const svgElements = currentSection.locator('.diag-conn-svg')
+    const groupCount = await connectorGroups.count()
+    const svgCount = await svgElements.count()
+    // Each connector group must have exactly one SVG — never more (old code had 2 separate elements)
+    expect(svgCount).toBe(groupCount)
+  })
+
+
 
   test('mine grid shows resource label and fill bar directly in active grid tiles', async ({ page }) => {
     const player = makePlayer()
