@@ -7169,66 +7169,80 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task BuyShares_PersonAccount_CannotUseTaxReservedCash()
     {
+        // Setup: company with cash=$1,000,000, 100,000 total shares, 1,000 founder shares
+        //   → 99,000 public float, sharePrice=$10, askPrice=$10.10, bidPrice=$9.90
+        // The float is large enough that "not enough float" can NEVER be the rejection reason.
         var ownerToken = await RegisterAndGetTokenAsync($"tax-buy-owner-{Guid.NewGuid():N}@test.com", "Tax Buy Owner");
         var ownerId = await GetCurrentPlayerIdAsync(ownerToken);
-        var companyId = await SeedPublicCompanyAsync(ownerId, name: "TaxBuy Corp", cash: 500_000m, totalShares: 10_000m, founderShares: 5_000m);
+        var companyId = await SeedPublicCompanyAsync(ownerId, name: "TaxBuy Corp", cash: 1_000_000m, totalShares: 100_000m, founderShares: 1_000m);
 
         var investorToken = await RegisterAndGetTokenAsync($"tax-buy-investor-{Guid.NewGuid():N}@test.com", "Tax Buy Investor");
 
-        // Buy a small number of shares so we have something to sell
-        var buyResult = await ExecuteGraphQlAsync(
+        // Step 1: buy 1,000 shares so we have something meaningful to sell back.
+        await ExecuteGraphQlAsync(
             """
             mutation BuyShares($input: BuySharesInput!) {
-                buyShares(input: $input) { totalValue personalCash }
+                buyShares(input: $input) { totalValue }
             }
             """,
-            new { input = new { companyId, shareCount = 5m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            new { input = new { companyId, shareCount = 1_000m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
             token: investorToken);
-        var cashAfterBuy = buyResult.GetProperty("data").GetProperty("buyShares").GetProperty("personalCash").GetDecimal();
 
-        // Sell all 5 shares to get proceeds + create tax reserve
-        var sellResult = await ExecuteGraphQlAsync(
+        // Step 2: sell all 1,000 shares → creates a 15% tax reserve.
+        await ExecuteGraphQlAsync(
             """
             mutation SellShares($input: SellSharesInput!) {
-                sellShares(input: $input) { totalValue taxReserved personalCash personalTaxReserve }
+                sellShares(input: $input) { totalValue taxReserved }
             }
             """,
-            new { input = new { companyId, shareCount = 5m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            new { input = new { companyId, shareCount = 1_000m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
             token: investorToken);
-        var sellData = sellResult.GetProperty("data").GetProperty("sellShares");
-        var cashAfterSell = sellData.GetProperty("personalCash").GetDecimal();
-        var taxReserve = sellData.GetProperty("personalTaxReserve").GetDecimal();
 
-        // availableCash = cashAfterSell - taxReserve
-        var availableCash = cashAfterSell - taxReserve;
+        // Step 3: query personAccount to get exact available vs gross cash.
+        var accountResult = await ExecuteGraphQlAsync(
+            """
+            query { personAccount { personalCash taxReserve availableCash } }
+            """,
+            variables: null,
+            token: investorToken);
+        var account = accountResult.GetProperty("data").GetProperty("personAccount");
+        var grossCash = account.GetProperty("personalCash").GetDecimal();
+        var taxReserve = account.GetProperty("taxReserve").GetDecimal();
+        var availableCash = account.GetProperty("availableCash").GetDecimal();
 
-        // Try to buy shares costing more than available cash (but within gross cash)
-        // We need a large purchase that exceeds available but is within gross
-        // Use availableCash + 1 as the target cost, which means requesting ceil(available+1 / askPrice) shares
-        // For simplicity, try to buy back all available float using a large quantity
-        var largeBuyResult = await ExecuteGraphQlAsync(
+        Assert.True(taxReserve > 0m, "Tax reserve must be positive after a personal sell");
+
+        // Step 4: compute a share count whose cost falls strictly between availableCash
+        // and grossCash.  AskPrice = $10 * 1.01 = $10.10 (company has no buildings/lots).
+        // floor(availableCash / 10.10) gives the max shares payable within available cash;
+        // adding 1 makes it exceed available cash while remaining below gross cash.
+        const decimal knownAskPrice = 10.10m;
+        var maxAffordableShares = Math.Floor(availableCash / knownAskPrice);
+        var targetShareCount = maxAffordableShares + 1m;
+        var targetCost = decimal.Round(targetShareCount * knownAskPrice, 4, MidpointRounding.AwayFromZero);
+
+        // Sanity guards: the purchase must be within gross cash and within the 99k float.
+        Assert.True(targetCost > availableCash,
+            $"targetCost {targetCost} must exceed availableCash {availableCash}");
+        Assert.True(targetCost <= grossCash,
+            $"targetCost {targetCost} must be within gross personalCash {grossCash}");
+        Assert.True(targetShareCount < 99_000m,
+            $"Share count {targetShareCount} must be less than the 99,000 public float so float is never the bottleneck");
+
+        // Step 5: attempt the purchase — must be rejected due to tax-reserved cash, NOT float shortage.
+        var failResult = await ExecuteGraphQlAsync(
             """
             mutation BuyShares($input: BuySharesInput!) {
                 buyShares(input: $input) { shareCount }
             }
             """,
-            new { input = new { companyId, shareCount = 10_000m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            new { input = new { companyId, shareCount = targetShareCount, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
             token: investorToken);
 
-        // Either insufficient funds OR insufficient public float — both are acceptable failure codes
-        if (largeBuyResult.TryGetProperty("errors", out var buyErrors))
-        {
-            var errorCode = buyErrors[0].GetProperty("extensions").GetProperty("code").GetString();
-            Assert.True(
-                errorCode == "INSUFFICIENT_PERSONAL_FUNDS" || errorCode == "INSUFFICIENT_PUBLIC_FLOAT",
-                $"Expected INSUFFICIENT_PERSONAL_FUNDS or INSUFFICIENT_PUBLIC_FLOAT but got: {errorCode}");
-        }
-
-        // Verify that a purchase costing exactly (availableCash + 0.01) more is rejected when
-        // tax reserve is the binding constraint: the investor should not be able to purchase
-        // using the blocked 15% tax reserve.
-        _ = availableCash; // Verifies cashAfterSell - taxReserve is tracked; further tests added in integration scope.
-        Assert.True(taxReserve > 0m, "Tax reserve must be positive after a personal sale");
+        Assert.True(failResult.TryGetProperty("errors", out var errors),
+            "Expected an error when buying shares exceeding available cash");
+        var errorCode = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_PERSONAL_FUNDS", errorCode);
     }
 
     [Fact]
@@ -7347,6 +7361,99 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var personalCash = account.GetProperty("personalCash").GetDecimal();
         Assert.Equal(personalCash, account.GetProperty("availableCash").GetDecimal());
         Assert.Equal(personalCash, account.GetProperty("totalNetWealth").GetDecimal());
+    }
+
+    [Fact]
+    public async Task PersonalTaxReserve_SettlesAtYearEnd_DeductsCashAndClearsReserve()
+    {
+        // Use an isolated factory so we can set TaxCycleTicks = 2 without touching shared state.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        // Setup company
+        var ownerEmail = $"tax-settle-owner-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(isolatedClient, ownerEmail, "Tax Settle Owner");
+        var ownerAccountResult = await ExecuteGraphQlAsync(isolatedClient, "{ me { id } }", token: ownerToken);
+        var ownerId = Guid.Parse(ownerAccountResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Seed a company with large public float so we can sell shares
+        Guid companyId;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var currentTick = await db.GameStates.AsNoTracking().Select(s => s.CurrentTick).FirstOrDefaultAsync();
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = ownerId,
+                Name = "Settle Test Corp",
+                Cash = 1_000_000m,
+                TotalSharesIssued = 100_000m,
+                DividendPayoutRatio = 0m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = currentTick,
+            };
+            db.Companies.Add(company);
+            db.Shareholdings.Add(new Shareholding
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                OwnerPlayerId = ownerId,
+                ShareCount = 1_000m,
+            });
+
+            // Set TaxCycleTicks=2 so the next tax year-end occurs at tick 2.
+            var gameState = await db.GameStates.FindAsync(1);
+            Assert.NotNull(gameState);
+            gameState!.CurrentTick = 1;
+            gameState.TaxCycleTicks = 2;
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        // Investor buys 500 shares then sells them to create a tax reserve.
+        var investorEmail = $"tax-settle-investor-{Guid.NewGuid():N}@test.com";
+        var investorToken = await RegisterAndGetTokenAsync(isolatedClient, investorEmail, "Tax Settle Investor");
+
+        await ExecuteGraphQlAsync(isolatedClient,
+            "mutation BuyShares($input: BuySharesInput!) { buyShares(input: $input) { totalValue } }",
+            new { input = new { companyId, shareCount = 500m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            investorToken);
+
+        var sellResult = await ExecuteGraphQlAsync(isolatedClient,
+            "mutation SellShares($input: SellSharesInput!) { sellShares(input: $input) { totalValue taxReserved personalCash personalTaxReserve } }",
+            new { input = new { companyId, shareCount = 500m, tradeAccountType = "PERSON", tradeAccountCompanyId = (string?)null } },
+            investorToken);
+
+        var sellData = sellResult.GetProperty("data").GetProperty("sellShares");
+        var cashBeforeSettlement = sellData.GetProperty("personalCash").GetDecimal();
+        var reserveBeforeSettlement = sellData.GetProperty("personalTaxReserve").GetDecimal();
+        Assert.True(reserveBeforeSettlement > 0m, "Reserve must be positive before settlement");
+
+        // Advance to year-end: CurrentTick is already 1, TaxCycleTicks=2 → processing tick 2 triggers settlement.
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var processor = new TickProcessor(
+                scope.ServiceProvider.GetRequiredService<AppDbContext>(),
+                scope.ServiceProvider.GetServices<ITickPhase>(),
+                new NullLogger<TickProcessor>());
+            await processor.ProcessTickAsync();
+        }
+
+        // After settlement: reserve should be 0, cash reduced by exact reserve amount.
+        var postResult = await ExecuteGraphQlAsync(isolatedClient,
+            "{ personAccount { personalCash taxReserve availableCash } }",
+            variables: null,
+            token: investorToken);
+        var postAccount = postResult.GetProperty("data").GetProperty("personAccount");
+
+        var cashAfterSettlement = postAccount.GetProperty("personalCash").GetDecimal();
+        var reserveAfterSettlement = postAccount.GetProperty("taxReserve").GetDecimal();
+        var availableAfterSettlement = postAccount.GetProperty("availableCash").GetDecimal();
+
+        Assert.Equal(0m, reserveAfterSettlement);
+        Assert.Equal(cashBeforeSettlement - reserveBeforeSettlement, cashAfterSettlement);
+        Assert.Equal(cashAfterSettlement, availableAfterSettlement);
     }
 
     [Fact]
