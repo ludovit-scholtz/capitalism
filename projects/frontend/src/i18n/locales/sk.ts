@@ -431,6 +431,7 @@ export default {
     createCompanyFailed: 'Novú firmu sa nepodarilo založiť.',
     switchCompanyHint: 'Pomocou tlačidla účtu v hornom menu sa prepnete do tejto firmy.',
     startupPackRequiresCompany: 'Prepnite sa do firemného účtu, ak chcete uplatniť hotovostný grant zo štartovacieho balíka.',
+    viewPersonalLedger: 'Zobraziť osobnú účtovnú knihu',
     noBuildings: 'Žiadne budovy.',
     buyBuilding: 'Kúpiť budovu',
     manageBuildings: 'Spravovať',

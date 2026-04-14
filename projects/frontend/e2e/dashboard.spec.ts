@@ -2541,3 +2541,53 @@ test.describe('Dashboard — building header financials', () => {
     expect(cardBox!.y + cardBox!.height).toBeLessThanOrEqual(financialsBox!.y + 1)
   })
 })
+
+test.describe('Dashboard — personal account panel', () => {
+  test('shows personal account panel with ledger link when in person mode', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      personalCash: 75_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Personal account panel should be visible
+    await expect(page.getByRole('heading', { name: 'Founder view' })).toBeVisible()
+
+    // Ledger link must be present in the personal account panel
+    const ledgerLink = page.locator('.person-account-ledger-link').getByRole('link', { name: /personal ledger/i })
+    await expect(ledgerLink).toBeVisible()
+    await expect(ledgerLink).toHaveAttribute('href', '/personal-ledger')
+  })
+
+  test('navigates to personal ledger from person account panel', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      personalCash: 50_000,
+      companies: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await page.locator('.person-account-ledger-link').getByRole('link', { name: /personal ledger/i }).click()
+    await expect(page).toHaveURL('/personal-ledger')
+    await expect(page.getByRole('heading', { name: 'Personal Ledger' })).toBeVisible()
+  })
+})
