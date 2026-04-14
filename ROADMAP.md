@@ -9,6 +9,7 @@ It will use real world map. The game will start in single city and later other c
 ### Dashboard
 - Add pro subscription as new tab in the dashboard.
 - Create navigation menu also for personal account. In personal account show Basic overview, Create company and Ledger page.
+**[100% complete — Personal-account navigation menu delivered inside the Founder view on the Dashboard. Three tabs replace the previous flat layout: Overview (personal cash + controlled-companies list), Create company (company-creation form), and Ledger (quick wealth summary with a CTA link to the full /personal-ledger page). DashboardTabNav reused for consistent active-state styling, keyboard navigation, and responsive overflow scroll. Tab state persisted in sessionStorage. All three locales (en/sk/de) updated. Existing E2E tests updated and five new E2E tests added covering tab rendering, active-state switching, Ledger tab link, Create company form visibility, and navigation to /personal-ledger.]**
 
 ### Unit links
 - The diagonal links looks good now, but if there is only one diagonal possible, only half of the link is clickable. Make sure it toggles the state changes everywhere where the link is displayed.

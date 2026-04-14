@@ -446,6 +446,10 @@ export default {
     tabBuildings: 'Buildings',
     tabActivity: 'Activity',
     tabChat: 'Chat',
+    personTabOverview: 'Overview',
+    personTabCreateCompany: 'Create company',
+    personTabLedger: 'Ledger',
+    personLedgerTabBody: 'Track your personal wealth, tax reserve, stock trades, and dividend income in the personal ledger.',
   },
   leaderboard: {
     eyebrow: 'Competitive Rankings',

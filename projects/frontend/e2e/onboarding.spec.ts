@@ -225,6 +225,7 @@ test.describe('Dashboard account switcher', () => {
     await page.goto('/dashboard')
 
     await expect(page.locator('.person-account-panel')).toBeVisible()
+    await page.getByRole('tab', { name: 'Create company' }).click()
     await page.getByLabel('New company name').fill('Delta Ventures')
     await page.getByRole('button', { name: 'Create company' }).click()
 

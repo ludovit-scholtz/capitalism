@@ -60,6 +60,22 @@ function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat') {
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('dashboard_tab', tab)
 }
 
+/** Active personal-account tab. Persisted in sessionStorage so navigation preserves state. */
+const _savedPersonTab =
+  typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('person_account_tab') : null
+const personAccountTab = ref<'overview' | 'create-company' | 'ledger'>(
+  (_savedPersonTab as 'overview' | 'create-company' | 'ledger') || 'overview',
+)
+function setPersonAccountTab(tab: string) {
+  personAccountTab.value = tab as 'overview' | 'create-company' | 'ledger'
+  if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('person_account_tab', tab)
+}
+const personAccountTabs = computed(() => [
+  { key: 'overview', label: t('dashboard.personTabOverview') },
+  { key: 'create-company', label: t('dashboard.personTabCreateCompany') },
+  { key: 'ledger', label: t('dashboard.personTabLedger') },
+])
+
 const { tickCountdown, startTickCountdown, stopTickCountdown } = useTickCountdown(gameState)
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
@@ -430,60 +446,104 @@ async function createCompany() {
           <div>
             <p class="person-account-eyebrow">{{ t('dashboard.personModeEyebrow') }}</p>
             <h2>{{ t('dashboard.personModeTitle') }}</h2>
-            <p class="person-account-copy">
-              {{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}
-            </p>
           </div>
         </div>
 
-        <div class="person-account-metrics">
-          <article class="person-metric-card">
-            <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
-            <strong class="person-metric-value">${{ formatCurrency(auth.player?.personalCash ?? 0) }}</strong>
-          </article>
-          <article class="person-metric-card">
-            <span class="person-metric-label">{{ t('dashboard.controlledCompanies') }}</span>
-            <strong class="person-metric-value">{{ companies.length }}</strong>
-          </article>
-        </div>
+        <!-- Personal-account tab navigation -->
+        <DashboardTabNav
+          :tabs="personAccountTabs"
+          :model-value="personAccountTab"
+          class="person-account-tab-nav"
+          @update:model-value="setPersonAccountTab"
+        />
 
-        <div class="person-account-ledger-link">
-          <RouterLink to="/personal-ledger" class="btn btn-secondary btn-ledger">
-            📒 {{ t('dashboard.viewPersonalLedger') }}
-          </RouterLink>
-        </div>
+        <!-- ── Overview tab ──────────────────────────────────────────── -->
+        <div
+          v-show="personAccountTab === 'overview'"
+          class="person-account-tab-panel"
+          role="tabpanel"
+          :aria-label="t('dashboard.personTabOverview')"
+        >
+          <p class="person-account-copy">
+            {{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}
+          </p>
 
-        <div class="person-account-actions">
-          <div>
-            <h3>{{ t('dashboard.createCompanyTitle') }}</h3>
-            <p class="person-account-copy">{{ t('dashboard.createCompanyBody') }}</p>
-          </div>
-
-          <form class="new-company-form" @submit.prevent="createCompany">
-            <label class="new-company-field">
-              <span>{{ t('dashboard.companyNameLabel') }}</span>
-              <input v-model="createCompanyName" type="text" maxlength="200" :placeholder="t('dashboard.companyNamePlaceholder')" />
-            </label>
-            <div class="new-company-buttons">
-              <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">
-                {{ createCompanyLoading ? t('common.loading') : t('dashboard.createCompany') }}
-              </button>
-              <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('dashboard.browseEncyclopedia') }}</RouterLink>
-            </div>
-          </form>
-
-          <p v-if="createCompanyMessage" class="person-account-message" role="status">{{ createCompanyMessage }}</p>
-          <p v-if="createCompanyError" class="person-account-error" role="alert">{{ createCompanyError }}</p>
-        </div>
-
-        <div v-if="companies.length > 0" class="controlled-companies-panel">
-          <h3>{{ t('dashboard.controlledCompaniesTitle') }}</h3>
-          <div class="controlled-companies-grid">
-            <article v-for="company in companies" :key="company.id" class="controlled-company-card">
-              <strong>{{ company.name }}</strong>
-              <span>${{ formatCurrency(company.cash) }}</span>
-              <small>{{ t('dashboard.switchCompanyHint') }}</small>
+          <div class="person-account-metrics">
+            <article class="person-metric-card">
+              <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
+              <strong class="person-metric-value">${{ formatCurrency(auth.player?.personalCash ?? 0) }}</strong>
             </article>
+            <article class="person-metric-card">
+              <span class="person-metric-label">{{ t('dashboard.controlledCompanies') }}</span>
+              <strong class="person-metric-value">{{ companies.length }}</strong>
+            </article>
+          </div>
+
+          <div v-if="companies.length > 0" class="controlled-companies-panel">
+            <h3>{{ t('dashboard.controlledCompaniesTitle') }}</h3>
+            <div class="controlled-companies-grid">
+              <article v-for="company in companies" :key="company.id" class="controlled-company-card">
+                <strong>{{ company.name }}</strong>
+                <span>${{ formatCurrency(company.cash) }}</span>
+                <small>{{ t('dashboard.switchCompanyHint') }}</small>
+              </article>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Create company tab ─────────────────────────────────────── -->
+        <div
+          v-show="personAccountTab === 'create-company'"
+          class="person-account-tab-panel"
+          role="tabpanel"
+          :aria-label="t('dashboard.personTabCreateCompany')"
+        >
+          <div class="person-account-actions">
+            <div>
+              <h3>{{ t('dashboard.createCompanyTitle') }}</h3>
+              <p class="person-account-copy">{{ t('dashboard.createCompanyBody') }}</p>
+            </div>
+
+            <form class="new-company-form" @submit.prevent="createCompany">
+              <label class="new-company-field">
+                <span>{{ t('dashboard.companyNameLabel') }}</span>
+                <input v-model="createCompanyName" type="text" maxlength="200" :placeholder="t('dashboard.companyNamePlaceholder')" />
+              </label>
+              <div class="new-company-buttons">
+                <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">
+                  {{ createCompanyLoading ? t('common.loading') : t('dashboard.createCompany') }}
+                </button>
+                <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('dashboard.browseEncyclopedia') }}</RouterLink>
+              </div>
+            </form>
+
+            <p v-if="createCompanyMessage" class="person-account-message" role="status">{{ createCompanyMessage }}</p>
+            <p v-if="createCompanyError" class="person-account-error" role="alert">{{ createCompanyError }}</p>
+          </div>
+        </div>
+
+        <!-- ── Ledger tab ──────────────────────────────────────────────── -->
+        <div
+          v-show="personAccountTab === 'ledger'"
+          class="person-account-tab-panel"
+          role="tabpanel"
+          :aria-label="t('dashboard.personTabLedger')"
+        >
+          <p class="person-account-copy person-account-ledger-intro">
+            {{ t('dashboard.personLedgerTabBody') }}
+          </p>
+
+          <div class="person-account-metrics">
+            <article class="person-metric-card">
+              <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
+              <strong class="person-metric-value">${{ formatCurrency(auth.player?.personalCash ?? 0) }}</strong>
+            </article>
+          </div>
+
+          <div class="person-account-ledger-link">
+            <RouterLink to="/personal-ledger" class="btn btn-primary btn-ledger">
+              📒 {{ t('dashboard.viewPersonalLedger') }}
+            </RouterLink>
           </div>
         </div>
       </section>
@@ -898,7 +958,15 @@ async function createCompany() {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0;
+}
+
+.person-account-tab-nav {
+  margin-top: 0.25rem;
+}
+
+.person-account-tab-panel {
+  padding-top: 1.25rem;
 }
 
 .person-account-eyebrow {
@@ -911,8 +979,12 @@ async function createCompany() {
 }
 
 .person-account-copy {
-  margin: 0;
+  margin: 0 0 1rem;
   color: var(--color-text-secondary);
+}
+
+.person-account-ledger-intro {
+  margin-bottom: 1.25rem;
 }
 
 .person-account-metrics {
