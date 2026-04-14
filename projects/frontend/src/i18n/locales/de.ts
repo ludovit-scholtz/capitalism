@@ -921,6 +921,7 @@ export default {
       none: '— Auswählen —',
       anyResource: '— Beliebiger Rohstoff —',
       anyProduct: '— Beliebiges Produkt —',
+      storageUniversalInfo: 'Diese Lagereinheit ist ein universeller Puffer. Sie akzeptiert automatisch jeden Rohstoff oder jedes Produkt, das über verknüpfte vorgelagerte Einheiten eingeht — keine Produktauswahl erforderlich.',
       publicSalesProductPickerHelp: 'Wählen Sie nur Produkte, die diese Verkaufseinheit über verbundene vorgelagerte Einheiten erreichen können oder hier bereits auf Lager sind.',
       publicSalesProductPickerEmpty: 'Noch keine verkaufsfähigen Produkte verfügbar. Verbinden Sie eine Einkaufs-, Fertigungs- oder Lagerkette mit dieser Einheit oder lagern Sie die Einheit erneut auf, um vorhandenen Bestand weiter bearbeiten zu können.',
       sourceExchange: 'Börse',

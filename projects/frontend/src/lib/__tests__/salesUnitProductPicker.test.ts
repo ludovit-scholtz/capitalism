@@ -110,17 +110,25 @@ describe('getSalesUnitProductOptions', () => {
 
   it('deduplicates products that are both connected upstream and already stocked', () => {
     const salesUnit = makeUnit({ id: 'sales-unit', gridX: 2 })
+    // STORAGE is now universal — no productTypeId needed. It acts as a pass-through node.
     const storageUnit = makeUnit({
       id: 'storage-unit',
       unitType: 'STORAGE',
       gridX: 1,
+      productTypeId: null,
+      linkRight: true,
+    })
+    const purchaseUnit = makeUnit({
+      id: 'purchase-unit',
+      unitType: 'PURCHASE',
+      gridX: 0,
       productTypeId: 'prod-bread',
       linkRight: true,
     })
 
     const options = getSalesUnitProductOptions({
       unit: salesUnit,
-      draftUnits: [salesUnit, storageUnit],
+      draftUnits: [salesUnit, storageUnit, purchaseUnit],
       rankedProducts,
       unitInventories: [makeInventoryItem({ buildingUnitId: 'sales-unit', productTypeId: 'prod-bread', quantity: 3 })],
     })
@@ -158,26 +166,27 @@ describe('getSalesUnitProductOptions', () => {
   })
 
   it('sorts mixed availability reasons from strongest context to weakest', () => {
-    const salesUnit = makeUnit({ id: 'sales-unit', gridX: 3 })
-    const storageUnit = makeUnit({
-      id: 'storage-unit',
-      unitType: 'STORAGE',
-      gridX: 2,
+    const salesUnit = makeUnit({ id: 'sales-unit', gridX: 2 })
+    // MFG unit connected directly to PUBLIC_SALES (linkRight → PUBLIC_SALES at x=2)
+    const mfgUnit = makeUnit({
+      id: 'mfg-unit',
+      unitType: 'MANUFACTURING',
+      gridX: 1,
       productTypeId: 'prod-bandage',
       linkRight: true,
-      linkLeft: true,
     })
+    // PURCHASE connected from the right side of PUBLIC_SALES (linkLeft → PUBLIC_SALES at x=2)
     const purchaseUnit = makeUnit({
       id: 'purchase-unit',
       unitType: 'PURCHASE',
-      gridX: 1,
+      gridX: 3,
       productTypeId: 'prod-bread',
-      linkRight: true,
+      linkLeft: true,
     })
 
     const options = getSalesUnitProductOptions({
       unit: salesUnit,
-      draftUnits: [salesUnit, storageUnit, purchaseUnit],
+      draftUnits: [salesUnit, mfgUnit, purchaseUnit],
       rankedProducts,
       unitInventories: [
         makeInventoryItem({ buildingUnitId: 'sales-unit', productTypeId: 'prod-bandage', quantity: 2 }),
