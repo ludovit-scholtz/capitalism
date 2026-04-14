@@ -271,9 +271,11 @@ function handleChatToggle() {
   padding: 0;
   padding-bottom: 2px;
   position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  min-width: 1.5rem;
+  width: max-content;
   transition: color 0.15s;
 }
 
