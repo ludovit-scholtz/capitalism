@@ -7516,6 +7516,72 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task PersonAccount_Unauthenticated_ReturnsAuthorizationError()
+    {
+        // personAccount is [Authorize] — calling it without a token must return a GraphQL authorization error.
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    personalCash
+                    taxReserve
+                    availableCash
+                    totalNetWealth
+                }
+            }
+            """,
+            token: null);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors when calling personAccount without a token");
+        var errorList = errors.EnumerateArray().ToList();
+        Assert.NotEmpty(errorList);
+    }
+
+    [Fact]
+    public async Task PersonAccount_ReturnsFullLedgerFields()
+    {
+        // Verify the personAccount query returns all fields needed by the personal ledger view.
+        var token = await RegisterAndGetTokenAsync($"full-ledger-{Guid.NewGuid():N}@test.com", "Full Ledger Player");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+                personAccount {
+                    playerId
+                    displayName
+                    personalCash
+                    taxReserve
+                    availableCash
+                    totalNetWealth
+                    activeAccountType
+                    activeCompanyId
+                    shareholdings { companyId companyName shareCount ownershipRatio sharePrice marketValue }
+                    dividendPayments { id companyId companyName shareCount amountPerShare totalAmount gameYear recordedAtTick recordedAtUtc description }
+                    stockTrades { id companyId companyName direction shareCount pricePerShare totalValue recordedAtTick recordedAtUtc }
+                }
+            }
+            """,
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "personAccount must not return errors for authenticated player");
+        var account = result.GetProperty("data").GetProperty("personAccount");
+        Assert.Equal(System.Text.Json.JsonValueKind.Object, account.ValueKind);
+
+        // All ledger-required fields must be present and have correct initial values.
+        Assert.Equal(System.Text.Json.JsonValueKind.String, account.GetProperty("playerId").ValueKind);
+        Assert.Equal("Full Ledger Player", account.GetProperty("displayName").GetString());
+        Assert.Equal(0m, account.GetProperty("taxReserve").GetDecimal());
+        var personalCash = account.GetProperty("personalCash").GetDecimal();
+        Assert.Equal(personalCash, account.GetProperty("availableCash").GetDecimal());
+        Assert.Equal(personalCash, account.GetProperty("totalNetWealth").GetDecimal());
+
+        // Collections must be present (empty for a new player).
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, account.GetProperty("shareholdings").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, account.GetProperty("dividendPayments").ValueKind);
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, account.GetProperty("stockTrades").ValueKind);
+    }
+
+    [Fact]
     public async Task PersonalTaxReserve_SettlesAtYearEnd_DeductsCashAndClearsReserve()
     {
         // Use an isolated factory so we can set TaxCycleTicks = 2 without touching shared state.
