@@ -7,6 +7,7 @@ import { formatInGameTime } from '@/lib/gameTime'
 import { useGameStateStore } from '@/stores/gameState'
 import { useNewsStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
+import { useChatStore } from '@/stores/chat'
 import AccountSwitcher from '@/components/layout/AccountSwitcher.vue'
 
 const { t, locale } = useI18n()
@@ -14,9 +15,11 @@ const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
 const newsStore = useNewsStore()
 const gameAdminStore = useGameAdminStore()
+const chatStore = useChatStore()
 const { gameState } = storeToRefs(gameStateStore)
 const { unreadCount } = storeToRefs(newsStore)
 const { session } = storeToRefs(gameAdminStore)
+const { isChatOpen, unreadCount: chatUnreadCount } = storeToRefs(chatStore)
 const isMenuOpen = ref(false)
 
 const formattedGameTime = computed(() => {
@@ -46,6 +49,11 @@ const toggleMenu = () => {
 
 const closeMenu = () => {
   isMenuOpen.value = false
+}
+
+function handleChatToggle() {
+  closeMenu()
+  chatStore.toggleChat()
 }
 </script>
 
@@ -88,6 +96,19 @@ const closeMenu = () => {
           <span class="inline-block md:hidden">{{ t('nav.news') }}</span>
           <span v-if="showUnreadBadge" class="news-badge">{{ unreadCount }}</span>
         </RouterLink>
+        <button
+          v-if="auth.isAuthenticated"
+          class="nav-chat-btn nav-link-with-badge"
+          :class="{ 'nav-chat-btn-active': isChatOpen }"
+          :title="t('nav.chat')"
+          :aria-label="t('nav.chat')"
+          :aria-pressed="isChatOpen"
+          @click="handleChatToggle"
+        >
+          <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.chat') }}</span>
+          <span v-if="chatUnreadCount > 0" class="chat-badge">{{ chatUnreadCount }}</span>
+        </button>
         <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
         </RouterLink>
@@ -239,6 +260,68 @@ const closeMenu = () => {
   box-shadow: 0 8px 20px rgba(255, 97, 0, 0.35);
 }
 
+/* Chat toggle button — mirrors the nav-link appearance */
+.nav-chat-btn {
+  background: none;
+  border: none;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  padding: 0;
+  padding-bottom: 2px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.nav-chat-btn svg {
+  font-size: 1.25rem;
+}
+
+.nav-chat-btn::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--color-primary);
+  border-radius: 1px;
+  transform: scaleX(0);
+  transition: transform 0.15s;
+}
+
+.nav-chat-btn:hover,
+.nav-chat-btn-active {
+  color: var(--color-text);
+}
+
+.nav-chat-btn:hover::after,
+.nav-chat-btn-active::after {
+  transform: scaleX(1);
+}
+
+.chat-badge {
+  position: absolute;
+  top: -0.45rem;
+  right: -0.55rem;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #2196f3, #1565c0);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0.3rem;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+}
+
 .nav-links a::after {
   content: '';
   position: absolute;
@@ -309,6 +392,23 @@ const closeMenu = () => {
   }
 
   .nav-links a::after {
+    display: none;
+  }
+
+  /* Mobile: chat button looks like a nav link item */
+  .nav-chat-btn {
+    padding: 1rem 2rem;
+    justify-content: flex-start;
+    gap: 0.75rem;
+    font-size: 1rem;
+    width: 100%;
+  }
+
+  .nav-chat-btn svg {
+    font-size: 1.5rem;
+  }
+
+  .nav-chat-btn::after {
     display: none;
   }
 

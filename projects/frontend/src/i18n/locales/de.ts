@@ -31,7 +31,7 @@ export default {
   },
   nav: {
     home: 'Startseite',
-    dashboard: '\u00dcbersicht',
+    dashboard: 'Übersicht',
     leaderboard: 'Rangliste',
     encyclopedia: 'Enzyklopädie',
     exchange: 'Börse',
@@ -42,6 +42,7 @@ export default {
     gameTime: 'Spielzeit',
     loans: 'Kredite',
     news: 'News',
+    chat: 'Chat',
     admin: 'Admin',
   },
   news: {
@@ -160,6 +161,7 @@ export default {
     send: 'Senden',
     loadFailed: 'Der Chat konnte nicht geladen werden.',
     sendFailed: 'Die Chatnachricht konnte nicht gesendet werden.',
+    closeChat: 'Chat schließen',
   },
   home: {
     heroTitle: 'Capitalism V',
