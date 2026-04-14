@@ -892,7 +892,7 @@ Root-cause of a recurring CI failure pattern (April 2026, PR #360 dashboard/ledg
 
 ## Personal tax reserve — always implement the full lifecycle, not just accumulation
 
-Root-cause of a product-critical quality failure (April 2026, PR #stock-sale-tax):
+Root-cause of a product-critical quality failure (April 2026, PR #4):
 - The `PersonalTaxReserve` was implemented as grow-only: `SellShares` accumulated the reserve but no code path ever reduced it.
 - The product copy and ROADMAP both said "will be settled at the tax year-end", but no settlement code existed.
 - Repeated personal share sales could permanently trap a player's liquidity — once `personalCash - personalTaxReserve ≤ 0`, `BuyShares` would always reject with `INSUFFICIENT_PERSONAL_FUNDS` and the player was soft-locked forever.

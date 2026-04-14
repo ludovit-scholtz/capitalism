@@ -7457,6 +7457,59 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task PersonalTaxReserve_PartialPayment_WhenCashLessThanReserve_ClearsReserveAndZerosCash()
+    {
+        // Edge case: if a player somehow ends up with personalCash < personalTaxReserve
+        // (e.g., after paying for buildings/lots through company but receiving more tax reserve),
+        // the settlement must cap the deduction at personalCash and still zero the reserve.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var playerEmail = $"partial-tax-{Guid.NewGuid():N}@test.com";
+        var playerToken = await RegisterAndGetTokenAsync(isolatedClient, playerEmail, "Partial Tax Player");
+        var playerAccountResult = await ExecuteGraphQlAsync(isolatedClient, "{ me { id } }", token: playerToken);
+        var playerId = Guid.Parse(playerAccountResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Directly seed an impossible state: personalCash = 50, personalTaxReserve = 100.
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            Assert.NotNull(player);
+            player!.PersonalCash = 50m;
+            player.PersonalTaxReserve = 100m;
+
+            // Set TaxCycleTicks=2 so tick 2 is year-end.
+            var gameState = await db.GameStates.FindAsync(1);
+            Assert.NotNull(gameState);
+            gameState!.CurrentTick = 1;
+            gameState.TaxCycleTicks = 2;
+            await db.SaveChangesAsync();
+        }
+
+        // Process one tick — triggers year-end settlement.
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var processor = new TickProcessor(
+                scope.ServiceProvider.GetRequiredService<AppDbContext>(),
+                scope.ServiceProvider.GetServices<ITickPhase>(),
+                new NullLogger<TickProcessor>());
+            await processor.ProcessTickAsync();
+        }
+
+        // personalCash should be 0 (all cash used), personalTaxReserve should be 0.
+        var postResult = await ExecuteGraphQlAsync(isolatedClient,
+            "{ personAccount { personalCash taxReserve availableCash } }",
+            variables: null,
+            token: playerToken);
+        var postAccount = postResult.GetProperty("data").GetProperty("personAccount");
+
+        Assert.Equal(0m, postAccount.GetProperty("personalCash").GetDecimal());
+        Assert.Equal(0m, postAccount.GetProperty("taxReserve").GetDecimal());
+        Assert.Equal(0m, postAccount.GetProperty("availableCash").GetDecimal());
+    }
+
+    [Fact]
     public async Task CompanyShareholders_SingleOwner_ReturnsSingleShareholderRow()
     {
         var ownerToken = await RegisterAndGetTokenAsync($"shareholders-single-{Guid.NewGuid():N}@test.com", "Single Owner");
