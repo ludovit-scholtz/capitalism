@@ -221,18 +221,19 @@ public sealed partial class Mutation
     }
 
     /// <summary>
-    /// Validates that products assigned to STORAGE and B2B_SALES units are topologically
+    /// Validates that products assigned to B2B_SALES units are topologically
     /// reachable within the submitted configuration plan.
+    ///
+    /// STORAGE units are universal — they accept any product and do not require
+    /// a product assignment. No per-unit product validation is applied to STORAGE.
     ///
     /// Rules:
     /// <list type="bullet">
-    ///   <item>STORAGE: productTypeId must match a MANUFACTURING unit in the submitted plan,
-    ///   or be currently present in the building's inventory stock.</item>
-    ///   <item>B2B_SALES: productTypeId must match a MANUFACTURING or STORAGE unit in the
+    ///   <item>B2B_SALES: productTypeId must match a MANUFACTURING or PURCHASE unit in the
     ///   submitted plan.</item>
     /// </list>
     /// </summary>
-    private static async Task ValidateProductTopologyAsync(
+    private static Task ValidateProductTopologyAsync(
         AppDbContext db,
         Guid buildingId,
         IReadOnlyCollection<BuildingConfigurationUnitInput> submittedUnits)
@@ -248,43 +249,7 @@ public sealed partial class Mutation
             .Select(u => u.ProductTypeId!.Value)
             .ToHashSet();
 
-        // Gather product IDs configured on STORAGE units in this plan.
-        var storageProductIds = submittedUnits
-            .Where(u => u.UnitType == "STORAGE" && u.ProductTypeId.HasValue)
-            .Select(u => u.ProductTypeId!.Value)
-            .ToHashSet();
-
-        // Validate STORAGE units.
-        var storageUnitsWithProduct = submittedUnits
-            .Where(u => u.UnitType == "STORAGE" && u.ProductTypeId.HasValue)
-            .ToList();
-
-        if (storageUnitsWithProduct.Count > 0)
-        {
-            // Allowed products for STORAGE = MFG products in plan + purchase products
-            // in plan + current inventory. This lets Sales Shops buffer purchased
-            // products before routing them to Public Sales.
-            var inventoryProductIds = await db.Inventories
-                .Where(i => i.BuildingId == buildingId && i.ProductTypeId.HasValue && i.Quantity > 0)
-                .Select(i => i.ProductTypeId!.Value)
-                .Distinct()
-                .ToHashSetAsync();
-            var allowedProductIds = mfgProductIds.Union(purchaseProductIds).Union(inventoryProductIds).ToHashSet();
-
-            foreach (var unit in storageUnitsWithProduct)
-            {
-                var pid = unit.ProductTypeId!.Value;
-                if (!allowedProductIds.Contains(pid))
-                {
-                    throw new GraphQLException(
-                        ErrorBuilder.New()
-                            .SetMessage(
-                                "A STORAGE unit's product must match a MANUFACTURING or PURCHASE unit in this configuration or be present in the building's current inventory.")
-                            .SetCode("STORAGE_PRODUCT_NOT_REACHABLE")
-                            .Build());
-                }
-            }
-        }
+        // STORAGE units are universal — no product topology validation is applied.
 
         // Validate B2B_SALES units.
         var b2bUnitsWithProduct = submittedUnits
@@ -293,8 +258,9 @@ public sealed partial class Mutation
 
         if (b2bUnitsWithProduct.Count > 0)
         {
-            // Allowed products for B2B_SALES = MFG products + STORAGE products in plan.
-            var allowedForB2B = mfgProductIds.Union(storageProductIds).ToHashSet();
+            // Allowed products for B2B_SALES = MFG products + PURCHASE products in plan.
+            // STORAGE is now universal so it no longer contributes a product constraint here.
+            var allowedForB2B = mfgProductIds.Union(purchaseProductIds).ToHashSet();
 
             foreach (var unit in b2bUnitsWithProduct)
             {
@@ -304,12 +270,14 @@ public sealed partial class Mutation
                     throw new GraphQLException(
                         ErrorBuilder.New()
                             .SetMessage(
-                                "A B2B_SALES unit's product must match a MANUFACTURING or STORAGE unit in this configuration.")
+                                "A B2B_SALES unit's product must match a MANUFACTURING or PURCHASE unit in this configuration.")
                             .SetCode("B2B_PRODUCT_NOT_REACHABLE")
                             .Build());
                 }
             }
         }
+
+        return Task.CompletedTask;
     }
 
     /// <summary>

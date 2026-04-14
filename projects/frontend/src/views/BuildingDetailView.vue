@@ -677,61 +677,6 @@ const selectedDraftPublicSalesUnit = computed(() => {
   return unit?.unitType === 'PUBLIC_SALES' ? unit : undefined
 })
 
-/**
- * Returns the set of product type IDs that are valid selections for the currently
- * selected STORAGE unit, based on:
- *   1. Products configured on units directly connected to this storage unit (draft layout).
- *   2. Products currently in inventory of this storage unit (active layout).
- * When this set is non-empty, the picker is filtered to only those products.
- * When empty (no links yet), the full catalog is shown as a fallback.
- */
-const storageConnectedProductIds = computed<Set<string>>(() => {
-  const ids = new Set<string>()
-  if (!selectedCell.value || !isEditing.value) return ids
-
-  const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
-  if (!unit || unit.unitType !== 'STORAGE') return ids
-
-  // Products from directly linked units (in draft configuration)
-  for (const connected of getDirectlyConnectedUnits(unit, draftUnits.value)) {
-    if (connected.productTypeId) ids.add(connected.productTypeId)
-  }
-
-  // Products already in stock in this storage unit (from active unit's inventory)
-  const activeUnit = getUnitAtFrom(activeUnits.value, unit.gridX, unit.gridY)
-  if (activeUnit && 'inventoryItems' in activeUnit) {
-    const items = (activeUnit as { inventoryItems?: Array<{ productTypeId?: string | null }> }).inventoryItems ?? []
-    for (const item of items) {
-      if (item.productTypeId) ids.add(item.productTypeId)
-    }
-  }
-
-  return ids
-})
-
-/**
- * Filtered ranked products for the STORAGE unit picker:
- * - If connected products are found, only show those (ranked as 'connected') plus the current selection.
- * - Otherwise fall back to the full rankedProducts list so the player is never stuck.
- */
-const storageFilteredRankedProducts = computed<import('@/types').RankedProductResult[]>(() => {
-  const unit = selectedCell.value && isEditing.value ? getDraftUnitAt(selectedCell.value.x, selectedCell.value.y) : null
-  if (!unit || unit.unitType !== 'STORAGE') return rankedProducts.value
-
-  const connectedIds = storageConnectedProductIds.value
-  if (connectedIds.size === 0) {
-    // No connections yet – show full list so player can still configure the unit
-    return rankedProducts.value
-  }
-
-  // Always include the currently selected product (avoid stale-selection warning)
-  const filtered = rankedProducts.value.filter(
-    (r) => connectedIds.has(r.productType.id) || r.productType.id === unit.productTypeId,
-  )
-  // If filtering left nothing (e.g. selected product not in connected), fall back to full list
-  return filtered.length > 0 ? filtered : rankedProducts.value
-})
-
 const publicSalesFilteredRankedProducts = computed<RankedProductResult[]>(() =>
   getSalesUnitProductOptions({
     unit: selectedDraftPublicSalesUnit.value,
@@ -5129,38 +5074,9 @@ watch(
                   <p class="config-help">{{ t('buildingDetail.proAccessHint') }}</p>
                 </template>
 
-                <!-- Storage unit config (read-only info) -->
+                <!-- Storage unit config — no configuration needed; storage is universal -->
                 <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'STORAGE'">
-                  <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.resourceType') }}</label>
-                    <select
-                      class="form-input"
-                      :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.resourceTypeId ?? ''"
-                      @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)"
-                    >
-                      <option value="">{{ t('buildingDetail.config.anyResource') }}</option>
-                      <option v-for="rt in resourceTypes" :key="rt.id" :value="rt.id">{{ rt.name }}</option>
-                    </select>
-                  </div>
-                  <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.productType') }}</label>
-                    <ProductPicker
-                      :model-value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? null"
-                      :ranked-products="storageFilteredRankedProducts"
-                      :loading="rankedProductsLoading"
-                      :allow-none="true"
-                      none-label-key="buildingDetail.config.anyProduct"
-                      @update:model-value="updateSelectedUnitConfig('productTypeId', $event)"
-                    />
-                    <p
-                      v-if="storageConnectedProductIds.size > 0"
-                      class="config-help"
-                    >{{ t('productPicker.helpText') }}</p>
-                    <p
-                      v-else
-                      class="config-help config-help-notice"
-                    >{{ t('productPicker.noConnectedProducts') }}</p>
-                  </div>
+                  <p class="config-help">{{ t('buildingDetail.config.storageUniversalInfo') }}</p>
                 </template>
 
                 <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'MINING'">

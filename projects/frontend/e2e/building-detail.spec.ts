@@ -4199,9 +4199,9 @@ test.describe('Building detail upgrades', () => {
     // The key no-artifact assertion: exactly one .diag-conn-svg per connector group
     const svgElements = currentSection.locator('.diag-conn-svg')
     const groupCount = await connectorGroups.count()
-    const svgCount = await svgElements.count()
+    const svgCount = svgElements
     // Each connector group must have exactly one SVG — never more (old code had 2 separate elements)
-    expect(svgCount).toBe(groupCount)
+    await expect(svgCount).toHaveCount(groupCount)
   })
 
 

@@ -919,6 +919,7 @@ export default {
       none: '— Select —',
       anyResource: '— Any Resource —',
       anyProduct: '— Any Product —',
+      storageUniversalInfo: 'This storage unit is a universal buffer. It automatically accepts any raw material or product that flows into it through linked upstream units — no product selection required.',
       publicSalesProductPickerHelp: 'Choose from products that can reach this sales unit through linked upstream units or that are already stocked here.',
       publicSalesProductPickerEmpty: 'No saleable products are available yet. Link a purchase, manufacturing, or storage chain into this unit, or restock the unit to keep editing existing stock.',
       sourceExchange: 'Exchange',

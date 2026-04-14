@@ -530,7 +530,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                     units = new[]
                     {
                         new { unitType = "PURCHASE", gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)null },
-                        new { unitType = "STORAGE", gridX = 1, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)null },
+                        new { unitType = "STORAGE", gridX = 1, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = (string?)null, minPrice = (decimal?)null },
                         new { unitType = "PUBLIC_SALES", gridX = 2, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)45m },
                     }
                 }
@@ -4118,45 +4118,16 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
-    public async Task StoreBuildingConfiguration_StorageWithMfgProduct_Succeeds()
+    public async Task StoreBuildingConfiguration_StorageIsUniversal_AcceptsAnyProduct()
     {
-        // A STORAGE unit whose productTypeId matches a MANUFACTURING unit in the same plan is valid.
-        var email = $"st-mfg-ok-{Guid.NewGuid():N}@test.com";
+        // STORAGE units are now universal: any productTypeId (or none) is accepted.
+        // Products do not need to match any MANUFACTURING or PURCHASE unit in the plan.
+        var email = $"st-universal-{Guid.NewGuid():N}@test.com";
         await using var isolatedFactory = new ApiWebApplicationFactory();
         using var isolatedClient = isolatedFactory.CreateClient();
-        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "StMfgOk");
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "StUniversal");
 
-        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "StMfgCo" } }, token);
-        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
-        var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
-        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "F" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
-
-        await using var scope = isolatedFactory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var chairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
-        var chairIdStr = chairId.ToString();
-
-        var result = await ExecuteGraphQlAsync(isolatedClient,
-            "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
-            new { i = new { buildingId, units = new[] {
-                new { unitType="MANUFACTURING", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairIdStr },
-                new { unitType="STORAGE", gridX=1, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairIdStr },
-            }}},
-            token);
-
-        Assert.False(result.TryGetProperty("errors", out _), "STORAGE with matching MFG product should succeed");
-    }
-
-    [Fact]
-    public async Task StoreBuildingConfiguration_StorageWithUnconnectedProduct_ReturnsError()
-    {
-        // A STORAGE unit whose productTypeId does not match any MANUFACTURING unit AND is not in stock is rejected.
-        var email = $"st-bad-{Guid.NewGuid():N}@test.com";
-        await using var isolatedFactory = new ApiWebApplicationFactory();
-        using var isolatedClient = isolatedFactory.CreateClient();
-        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "StBad");
-
-        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "StBadCo" } }, token);
+        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "StUnivCo" } }, token);
         var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
         var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
         var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "F" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
@@ -4166,7 +4137,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var chairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
         var breadId = await GetProductGuidBySlugAsync(db, "bread");
 
-        // MANUFACTURING produces Wooden Chair, but STORAGE asks for Bread — mismatch
+        // MANUFACTURING produces Wooden Chair, STORAGE has Bread — this was previously rejected
+        // but is now accepted because STORAGE is universal (any product, or no product).
         var result = await ExecuteGraphQlAsync(isolatedClient,
             "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
             new { i = new { buildingId, units = new[] {
@@ -4175,8 +4147,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             }}},
             token);
 
-        Assert.True(result.TryGetProperty("errors", out var errors), "Mismatched STORAGE product should be rejected");
-        Assert.Equal("STORAGE_PRODUCT_NOT_REACHABLE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+        Assert.False(result.TryGetProperty("errors", out _), "STORAGE is universal and should accept any productTypeId regardless of other units in the plan");
     }
 
     [Fact]
@@ -4244,7 +4215,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         });
         await db.SaveChangesAsync();
 
-        // Submit a plan that sets STORAGE to Bread — no MFG unit in plan, but bread IS in stock
+        // Submit a plan — STORAGE is universal so any productTypeId (or none) succeeds.
+        // This also verifies that previously accepted in-stock products still work fine.
         var result = await ExecuteGraphQlAsync(isolatedClient,
             "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
             new { i = new { buildingId = building.Id.ToString(), units = new[] {
@@ -4252,7 +4224,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             }}},
             token);
 
-        Assert.False(result.TryGetProperty("errors", out _), "STORAGE product that is in stock should succeed even without matching MFG");
+        Assert.False(result.TryGetProperty("errors", out _), "STORAGE is universal and accepts any productTypeId regardless of inventory or upstream units");
     }
 
     [Fact]
@@ -4285,39 +4257,42 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
-    public async Task StoreBuildingConfiguration_B2BSalesWithStorageProduct_Succeeds()
+    public async Task StoreBuildingConfiguration_B2BSalesWithPurchaseProduct_Succeeds()
     {
-        // A B2B_SALES unit whose productTypeId matches a STORAGE unit in the same plan is valid.
-        var email = $"b2b-st-ok-{Guid.NewGuid():N}@test.com";
+        // A B2B_SALES unit whose productTypeId matches a PURCHASE unit in the same plan is valid.
+        // (STORAGE is now universal and no longer contributes a product constraint for B2B_SALES validation.)
+        var email = $"b2b-pur-ok-{Guid.NewGuid():N}@test.com";
         await using var isolatedFactory = new ApiWebApplicationFactory();
         using var isolatedClient = isolatedFactory.CreateClient();
-        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "B2bStOk");
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "B2bPurOk");
 
-        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "B2bStCo" } }, token);
+        var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "B2bPurCo" } }, token);
         var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
         var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{cities{id}}", token: token)).GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
-        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "B2bStF" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+        // Use FACTORY building because it supports PURCHASE, STORAGE, and B2B_SALES units.
+        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "FACTORY", name = "B2bPurF" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
 
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var chairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
 
+        // PURCHASE buys chair, STORAGE buffers it (no product needed), B2B_SALES sells chair.
         var result = await ExecuteGraphQlAsync(isolatedClient,
             "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
             new { i = new { buildingId, units = new[] {
-                new { unitType="STORAGE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
-                new { unitType="MANUFACTURING", gridX=1, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+                new { unitType="PURCHASE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+                new { unitType="STORAGE", gridX=1, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=(string?)null },
                 new { unitType="B2B_SALES", gridX=2, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
             }}},
             token);
 
-        Assert.False(result.TryGetProperty("errors", out _), "B2B_SALES with matching STORAGE product should succeed");
+        Assert.False(result.TryGetProperty("errors", out _), "B2B_SALES with matching PURCHASE product (via universal STORAGE) should succeed");
     }
 
     [Fact]
     public async Task StoreBuildingConfiguration_B2BSalesWithUnconnectedProduct_ReturnsError()
     {
-        // A B2B_SALES unit whose productTypeId does not appear in any MFG or STORAGE unit in the plan is rejected.
+        // A B2B_SALES unit whose productTypeId does not appear in any MFG or PURCHASE unit in the plan is rejected.
         var email = $"b2b-bad-{Guid.NewGuid():N}@test.com";
         await using var isolatedFactory = new ApiWebApplicationFactory();
         using var isolatedClient = isolatedFactory.CreateClient();

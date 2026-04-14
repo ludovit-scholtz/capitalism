@@ -917,6 +917,7 @@ export default {
       none: '— Vyberte —',
       anyResource: '— Akákoľvek surovina —',
       anyProduct: '— Akýkoľvek produkt —',
+      storageUniversalInfo: 'Táto skladová jednotka je univerzálna vyrovnávacia pamäť. Automaticky prijíma akúkoľvek surovinu alebo produkt, ktorý do nej prúdi cez prepojené upstream jednotky — nie je potrebný výber produktu.',
       publicSalesProductPickerHelp: 'Vyberajte len z produktov, ktoré sa do tejto predajnej jednotky dostanú cez prepojené vstupné jednotky, alebo sú tu už naskladnené.',
       publicSalesProductPickerEmpty: 'Zatiaľ nie sú dostupné žiadne predajné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli upravovať existujúci tovar.',
       sourceExchange: 'Burza',
