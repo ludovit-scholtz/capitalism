@@ -3,11 +3,13 @@ import { onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppHeader from '@/components/layout/AppHeader.vue'
 import AppFooter from '@/components/layout/AppFooter.vue'
+import ChatSidePanel from '@/components/layout/ChatSidePanel.vue'
 import { usePwa } from '@/composables/usePwa'
 import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
 import { useNewsStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
+import { useChatStore } from '@/stores/chat'
 
 const { t } = useI18n()
 const { isOffline, updateAvailable, acceptUpdate } = usePwa()
@@ -15,6 +17,7 @@ const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
 const newsStore = useNewsStore()
 const gameAdminStore = useGameAdminStore()
+const chatStore = useChatStore()
 gameStateStore.start()
 
 onMounted(() => {
@@ -42,6 +45,15 @@ watch(
   },
 )
 
+// Close chat when user logs out
+watch(
+  () => auth.isAuthenticated,
+  (isAuthenticated) => {
+    if (!isAuthenticated) {
+      chatStore.clear()
+    }
+  },
+)
 </script>
 
 <template>
@@ -64,6 +76,8 @@ watch(
       <RouterView />
     </main>
     <AppFooter />
+    <!-- Global chat side panel — rendered via Teleport to body inside the component -->
+    <ChatSidePanel v-if="auth.isAuthenticated" />
   </div>
 </template>
 

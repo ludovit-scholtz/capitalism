@@ -61,7 +61,7 @@ With upgrading the unit to do research, the efficiency to do research improves. 
 - In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
 
 ### Ingame chat
-- Make ingame chat more intuitive on the frontend. Add chat to the top navigation bar and if it is open, make sure the chat is visible at the side. In the small devices make sure it is the full page thing.
+- Make ingame chat more intuitive on the frontend. Add chat to the top navigation bar and if it is open, make sure the chat is visible at the side. In the small devices make sure it is the full page thing. **[100% complete — Chat icon added to the top navigation bar for authenticated players with a blue unread-message badge. Clicking it opens a slide-in side panel (380 px wide on desktop/tablet, full-screen on mobile). The panel polls for new messages every 10 seconds, pins the composer at the bottom with safe-area handling, and auto-marks messages as read when the panel is open. Unread count is tracked client-side via localStorage. Closing the panel restores the badge until the panel is re-opened. Existing dashboard Chat tab continues to work. Chat panel appears as a global overlay so it stays accessible regardless of the active page.]**
 
 ### Changelog
 - Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.

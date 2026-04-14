@@ -42,6 +42,7 @@ export default {
     gameTime: 'Game Time',
     loans: 'Loans',
     news: 'News',
+    chat: 'Chat',
     admin: 'Admin',
   },
   news: {
@@ -160,6 +161,7 @@ export default {
     send: 'Send',
     loadFailed: 'Failed to load the chat feed.',
     sendFailed: 'Failed to send the chat message.',
+    closeChat: 'Close chat',
   },
   home: {
     heroTitle: 'Capitalism V',
