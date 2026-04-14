@@ -2616,6 +2616,18 @@ function getUnitFlowSegments(unit: GridUnit | undefined) {
   return getFlowSegments(inv?.fillPercent, inv?.capacity, inv?.lastTickInflow, inv?.lastTickOutflow)
 }
 
+/** Flow segments for the currently selected active-view unit (avoids repeated calls in the detail panel). */
+const selectedActiveUnitFlowSegments = computed(() => {
+  if (!selectedCell.value) return getFlowSegments(null, null, null, null)
+  return getUnitFlowSegments(getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y))
+})
+
+/** Flow segments for the currently selected planned-view unit (avoids repeated calls in the detail panel). */
+const selectedPlannedUnitFlowSegments = computed(() => {
+  if (!selectedCell.value) return getFlowSegments(null, null, null, null)
+  return getUnitFlowSegments(getUnitAtFrom(plannedUnits.value, selectedCell.value.x, selectedCell.value.y))
+})
+
 function getGridCellAriaLabel(unit: GridUnit | undefined): string {
   if (!unit) return t('buildingDetail.cellAriaLabelEmpty')
 
@@ -5236,17 +5248,17 @@ watch(
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
-                    :style="{ width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).fillWidth}%` }"
+                    :style="{ width: `${selectedPlannedUnitFlowSegments.fillWidth}%` }"
                   ></span>
                   <span
-                    v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).inflowWidth > 0"
+                    v-if="selectedPlannedUnitFlowSegments.inflowWidth > 0"
                     class="detail-capacity-inflow"
-                    :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).inflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).inflowWidth}%` }"
+                    :style="{ left: `${selectedPlannedUnitFlowSegments.inflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.inflowWidth}%` }"
                   ></span>
                   <span
-                    v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).outflowWidth > 0"
+                    v-if="selectedPlannedUnitFlowSegments.outflowWidth > 0"
                     class="detail-capacity-outflow"
-                    :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).outflowWidth}%` }"
+                    :style="{ left: `${selectedPlannedUnitFlowSegments.outflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.outflowWidth}%` }"
                   ></span>
                 </div>
               </div>
@@ -5577,17 +5589,17 @@ watch(
                 <div class="detail-capacity">
                   <span
                     class="detail-capacity-fill"
-                    :style="{ width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).fillWidth}%` }"
+                    :style="{ width: `${selectedActiveUnitFlowSegments.fillWidth}%` }"
                   ></span>
                   <span
-                    v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).inflowWidth > 0"
+                    v-if="selectedActiveUnitFlowSegments.inflowWidth > 0"
                     class="detail-capacity-inflow"
-                    :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).inflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).inflowWidth}%` }"
+                    :style="{ left: `${selectedActiveUnitFlowSegments.inflowLeft}%`, width: `${selectedActiveUnitFlowSegments.inflowWidth}%` }"
                   ></span>
                   <span
-                    v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).outflowWidth > 0"
+                    v-if="selectedActiveUnitFlowSegments.outflowWidth > 0"
                     class="detail-capacity-outflow"
-                    :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)).outflowWidth}%` }"
+                    :style="{ left: `${selectedActiveUnitFlowSegments.outflowLeft}%`, width: `${selectedActiveUnitFlowSegments.outflowWidth}%` }"
                   ></span>
                 </div>
                 <!-- Flush storage action for STORAGE, MINING, and MANUFACTURING units -->

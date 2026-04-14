@@ -40,27 +40,34 @@ public sealed partial class Query
             .Where(entry => entry.BuildingId == buildingId && entry.BuildingUnitId.HasValue)
             .ToListAsync();
 
-        // Fetch last-tick movement data: load all history for these units in memory,
-        // then pick out the latest tick per unit. Dictionary indexing inside EF Core
-        // queries is not translatable to SQL, so we load first and filter in-process.
+        // Two-query approach for last-tick movement: first aggregate the max tick per unit
+        // (no rows transferred), then load only records from those max ticks.
         var unitIds = building.Units.Select(u => u.Id).ToList();
-        var allUnitHistory = await db.BuildingUnitResourceHistories
+        var lastTickByUnit = await db.BuildingUnitResourceHistories
             .Where(h => unitIds.Contains(h.BuildingUnitId))
-            .ToListAsync();
-
-        var lastTickByUnit = allUnitHistory
             .GroupBy(h => h.BuildingUnitId)
-            .ToDictionary(g => g.Key, g => g.Max(h => h.Tick));
+            .Select(g => new { UnitId = g.Key, MaxTick = g.Max(h => h.Tick) })
+            .ToDictionaryAsync(x => x.UnitId, x => x.MaxTick);
 
-        // Aggregate inflow/outflow across all items for the latest tick per unit.
-        var inflowByUnit = allUnitHistory
+        // Load only the history rows that fall on each unit's max tick.
+        // Using a set of distinct tick values limits the data transferred significantly
+        // compared to loading the full history.
+        var distinctMaxTicks = lastTickByUnit.Values.Distinct().ToList();
+        var lastTickRecords = distinctMaxTicks.Count > 0
+            ? await db.BuildingUnitResourceHistories
+                .Where(h => unitIds.Contains(h.BuildingUnitId) && distinctMaxTicks.Contains(h.Tick))
+                .ToListAsync()
+            : [];
+
+        // Filter in-process in case two units have different max ticks that share a value.
+        var inflowByUnit = lastTickRecords
             .Where(h => lastTickByUnit.TryGetValue(h.BuildingUnitId, out var maxTick) && h.Tick == maxTick)
             .GroupBy(h => h.BuildingUnitId)
             .ToDictionary(
                 g => g.Key,
                 g => g.Sum(h => h.InflowQuantity + h.ProducedQuantity));
 
-        var outflowByUnit = allUnitHistory
+        var outflowByUnit = lastTickRecords
             .Where(h => lastTickByUnit.TryGetValue(h.BuildingUnitId, out var maxTick) && h.Tick == maxTick)
             .GroupBy(h => h.BuildingUnitId)
             .ToDictionary(
