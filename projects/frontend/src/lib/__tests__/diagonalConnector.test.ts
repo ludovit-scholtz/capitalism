@@ -13,6 +13,7 @@ import {
   getPrimaryArrowPoints,
   getSecondaryArrowPoints,
   isConnectorDisabled,
+  getHitAreaMode,
 } from '../diagonalConnector'
 
 // ---------------------------------------------------------------------------
@@ -183,8 +184,52 @@ describe('isConnectorDisabled', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Geometry sanity: arrowhead points fit within the 36×36 viewBox
+// getHitAreaMode — single-diagonal hit-area expansion logic
 // ---------------------------------------------------------------------------
+
+describe('getHitAreaMode', () => {
+  it('returns "none" when neither diagonal can be toggled (fully disabled)', () => {
+    expect(getHitAreaMode(false, false)).toBe('none')
+  })
+
+  it('returns "primary-only" when only the primary (\\) diagonal is available', () => {
+    expect(getHitAreaMode(true, false)).toBe('primary-only')
+  })
+
+  it('returns "secondary-only" when only the secondary (/) diagonal is available', () => {
+    expect(getHitAreaMode(false, true)).toBe('secondary-only')
+  })
+
+  it('returns "both" when both diagonals are available', () => {
+    expect(getHitAreaMode(true, true)).toBe('both')
+  })
+
+  it('primary-only mode matches exactly the scenario where solo hit-area expansion is needed', () => {
+    // This is the case described in ROADMAP: a 2×2 block where only two opposite
+    // corners are occupied (the \ pair), so the / axis cannot be toggled.
+    // The primary hit-area must expand to 100% width to make the full diagonal clickable.
+    const mode = getHitAreaMode(/* canTogglePrimary= */ true, /* canToggleSecondary= */ false)
+    expect(mode).toBe('primary-only')
+  })
+
+  it('secondary-only mode matches the case where the / line runs corner-to-corner but \\ corners are missing', () => {
+    // E.g. topRight=(2,0) and bottomLeft=(1,1) exist, but topLeft=(1,0) or bottomRight=(2,1) is absent.
+    // The secondary hit-area must expand to 100% width.
+    const mode = getHitAreaMode(/* canTogglePrimary= */ false, /* canToggleSecondary= */ true)
+    expect(mode).toBe('secondary-only')
+  })
+
+  it('is consistent with isConnectorDisabled: "none" iff isConnectorDisabled is true', () => {
+    // When getHitAreaMode is "none", isConnectorDisabled should also be true.
+    expect(getHitAreaMode(false, false)).toBe('none')
+    // All other combinations are not "none" and isConnectorDisabled is false.
+    expect(getHitAreaMode(true, false)).not.toBe('none')
+    expect(getHitAreaMode(false, true)).not.toBe('none')
+    expect(getHitAreaMode(true, true)).not.toBe('none')
+  })
+})
+
+
 
 describe('geometry sanity — all arrowhead points within 0–36 viewBox', () => {
   const allTables = [

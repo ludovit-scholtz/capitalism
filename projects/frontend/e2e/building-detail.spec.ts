@@ -3554,6 +3554,113 @@ test.describe('Building detail upgrades', () => {
     await expect(getDiagonalToggle(queuedSection, 1, 0, 'secondary')).toHaveClass(/link-state-backward/)
   })
 
+  test('diagonal link editing: single-diagonal hit area covers full connector square — AC single-diagonal', async ({
+    page,
+  }) => {
+    // When only ONE diagonal axis is possible (e.g. secondary / only because
+    // the \ corners are missing), the hit-area button must expand to the full
+    // 36×36 connector square rather than the previous 50% half.  Clicking the
+    // "left-side dead zone" (the half that previously belonged to the absent
+    // primary axis) must toggle the single available link.
+    //
+    // Layout: only topRight=(2,0) STORAGE and bottomLeft=(1,1) PUBLIC_SALES.
+    // The 2×2 block at (1,0) has only the secondary (/) axis available:
+    //   canTogglePrimary=false  (topLeft=(1,0) and bottomRight=(2,1) absent)
+    //   canToggleSecondary=true  (topRight=(2,0) and bottomLeft=(1,1) present)
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-solo-hit',
+      playerId: player.id,
+      name: 'Solo Hit Area Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-solo-hit',
+          companyId: 'company-solo-hit',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Solo Hit Area Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'solo-top-right',
+              buildingId: 'building-solo-hit',
+              unitType: 'STORAGE',
+              gridX: 2,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'solo-bottom-left',
+              buildingId: 'building-solo-hit',
+              unitType: 'PUBLIC_SALES',
+              gridX: 1,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-solo-hit')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    const sparseSecondary = getDiagonalToggle(plannedSection, 1, 0, 'secondary')
+
+    // Verify the hit area is the only one available in this connector
+    await expect(sparseSecondary).toBeVisible()
+    await expect(getDiagonalToggle(plannedSection, 1, 0, 'primary')).toHaveCount(0)
+    await expect(sparseSecondary).toHaveClass(/link-state-none/)
+
+    // Verify the connector group carries the solo-secondary CSS class, which
+    // triggers the expanded hit-area CSS rule
+    const connectorGroup = sparseSecondary.locator('xpath=..')
+    await expect(connectorGroup).toHaveClass(/solo-secondary/)
+    await expect(connectorGroup).not.toHaveClass(/solo-primary/)
+
+    // Click the "dead zone" — the LEFT side of the connector square.
+    // Before the fix: left side belonged to the absent primary axis (width 0–50%)
+    // and clicking there did nothing.
+    // After the fix: the secondary hit-area expands to 100% width so the left
+    // side also triggers the toggle.
+    await connectorGroup.click({ position: { x: 4, y: 18 } })
+    await expect(sparseSecondary).not.toHaveClass(/link-state-none/)
+  })
+
   test('horizontal link editing: backward (right-to-left) cycle and reversal', async ({ page }) => {
     // Tests the backward direction: clicking the H link button until it reaches "backward" (←)
     // and verifies that the source unit gets linkLeft=true while the other has linkRight=false.

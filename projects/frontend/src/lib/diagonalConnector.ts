@@ -60,3 +60,24 @@ export function getSecondaryArrowPoints(state: DirectedPairLinkState): string | 
 export function isConnectorDisabled(canTogglePrimary: boolean, canToggleSecondary: boolean): boolean {
   return !canTogglePrimary && !canToggleSecondary
 }
+
+/**
+ * Determines which hit-area expansion mode applies for a connector cell.
+ *
+ *  'both'            – both diagonals are available; split 50/50 (left=primary, right=secondary)
+ *  'primary-only'    – only the \ diagonal is available; primary hit-area expands to full width
+ *  'secondary-only'  – only the / diagonal is available; secondary hit-area expands to full width
+ *  'none'            – neither diagonal is available (connector is fully disabled)
+ *
+ * This is the pure-function companion to the `isSoloPrimary` / `isSoloSecondary`
+ * computeds in DiagonalConnector.vue and is exposed here so the logic can be
+ * unit-tested without a Vue instance.
+ */
+export type HitAreaMode = 'both' | 'primary-only' | 'secondary-only' | 'none'
+
+export function getHitAreaMode(canTogglePrimary: boolean, canToggleSecondary: boolean): HitAreaMode {
+  if (canTogglePrimary && canToggleSecondary) return 'both'
+  if (canTogglePrimary) return 'primary-only'
+  if (canToggleSecondary) return 'secondary-only'
+  return 'none'
+}
