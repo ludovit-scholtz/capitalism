@@ -51,6 +51,13 @@ const isDisabled = computed(() => !props.canTogglePrimary && !props.canToggleSec
  *   ↖  tip  (3, 3), base (12, 7)  (7,12)
  *   ↙  tip  (3,33), base (12,30)  (7,24)
  *   ↗  tip (33, 3), base (30,12) (24, 7)
+ *
+ * The `both` state is a legacy value that can appear when a link configuration
+ * was saved with both the source-side and destination-side flags set simultaneously
+ * (e.g. `linkDownRight=true` on unit A AND `linkUpLeft=true` on unit B for the
+ * same pair).  The game engine treats `both` identically to `forward` for routing
+ * purposes.  It is not producible via the new UI (the cycle is none→forward→backward→none),
+ * but must be handled gracefully for buildings migrated from older data.
  */
 const PRIMARY_ARROWS: Record<Exclude<DirectedPairLinkState, 'none'>, string> = {
   forward: '33,33 24,30 30,24', // ↘ tl→br
@@ -225,25 +232,27 @@ const diagonalRoot = computed(() => `${props.x},${props.y}`)
   stroke: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
 }
 
-/* Hit-area buttons/divs — transparent overlays for click delegation */
+/* Hit-area buttons/divs — transparent overlays for click delegation.
+   Parent BuildingDetailView .link-toggle styles are excluded from .diag-hit-area
+   elements via :not(.diag-hit-area) qualifiers on the parent selectors, so no
+   !important overrides are needed here. */
 .diag-hit-area {
   position: absolute;
   top: 0;
   bottom: 0;
   padding: 0;
-  /* Explicitly suppress parent BuildingDetailView .link-toggle border/bg/shadow */
-  border: none !important;
-  background: transparent !important;
+  border: none;
+  background: transparent;
   cursor: pointer;
-  box-shadow: none !important;
+  box-shadow: none;
   outline: none;
   border-radius: 0;
 }
 
 .diag-hit-area:hover {
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
+  border: none;
+  box-shadow: none;
+  background: transparent;
 }
 
 .diag-hit-area.diagonal-primary {

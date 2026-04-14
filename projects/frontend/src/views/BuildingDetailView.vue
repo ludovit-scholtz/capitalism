@@ -7389,12 +7389,14 @@ watch(
     box-shadow 0.15s ease;
 }
 
-.link-toggle:disabled,
-.link-toggle.readonly {
+/* Exclude DiagonalConnector hit-area buttons from cursor and hover rules —
+   the connector's scoped CSS handles its own interaction states. */
+.link-toggle:not(.diag-hit-area):disabled,
+.link-toggle:not(.diag-hit-area).readonly {
   cursor: default;
 }
 
-.link-toggle:not(:disabled):not(.readonly):hover {
+.link-toggle:not(.diag-hit-area):not(:disabled):not(.readonly):hover {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(19, 127, 236, 0.12);
 }
@@ -7413,13 +7415,6 @@ watch(
   width: 14px;
   height: 32px;
   border-radius: 999px;
-}
-
-.diagonal-link-group {
-  /* Legacy fallback — layout is now managed by DiagonalConnector.vue scoped styles */
-  position: relative;
-  width: 36px;
-  height: 36px;
 }
 
 .link-line {
