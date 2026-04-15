@@ -6,68 +6,45 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Dashboard
-- Add pro subscription as new tab in the dashboard.
-- Create navigation menu also for personal account. In personal account show Basic overview, Create company and Ledger page.
-**[100% complete — Personal-account navigation menu delivered inside the Founder view on the Dashboard. Three tabs replace the previous flat layout: Overview (personal cash + controlled-companies list), Create company (company-creation form), and Ledger (quick wealth summary with a CTA link to the full /personal-ledger page). DashboardTabNav reused for consistent active-state styling, keyboard navigation, and responsive overflow scroll. Tab state persisted in sessionStorage. All three locales (en/sk/de) updated. Existing E2E tests updated and five new E2E tests added covering tab rendering, active-state switching, Ledger tab link, Create company form visibility, and navigation to /personal-ledger.]**
+### Banking (0% complete)
 
-### Unit links
-- The diagonal links looks good now, but if there is only one diagonal possible, only half of the link is clickable. Make sure it toggles the state changes everywhere where the link is displayed.
-**[100% complete — Single-diagonal hit-area expanded to full connector square: when only one of the two diagonal axes is available, the transparent hit-area button now covers the entire 36×36 connector cell (`solo-primary` / `solo-secondary` CSS classes) instead of the previous 50% half. Clicking anywhere on the visible diagonal line — including the previously dead left-side zone for a secondary-only connector — now reliably toggles the link. Aria-labels updated to reflect single-axis context. `getHitAreaMode()` pure helper added to `diagonalConnector.ts` with unit-test coverage. New E2E test verifies the dead-zone click triggers the toggle in the single-diagonal case.]**
+Implement banking as is described in the product definition below.
 
-### Unit grid display
-- Visually display the flow of the product. At the moment I can see the storage capacity line in the unit which has storage capacity - it is percentage filled and also color differenciate which is very good. However when i see the 100% of the storage capacity, i would like to differenciate also how much storage capacity did arrive in last block and how much capacity left the unit. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.
-**[100% complete — Last-tick inflow/outflow flow visualization delivered in the building-editor unit grid and detail panels. The capacity bar now shows three layered segments: the existing fill segment (blue gradient for current stock), a green pulsing inbound segment at the right edge of the fill bar (quantity received last tick), and an amber outbound segment in the empty area immediately after the fill (quantity shipped/consumed last tick). Backend `BuildingUnitInventorySummary` now exposes `lastTickInflow` and `lastTickOutflow` computed from `BuildingUnitResourceHistory`. All three capacity surfaces (active grid, planned/edit grid, and unit detail panels) use the same `getFlowSegments()` pure helper. Accessible aria-labels on each cell are extended with ↑/↓ movement values when non-zero. Color-blind players can read the labels and quantities via tooltips and the aria-label without relying on color alone.]**
+### Dashboard (0% complete)
+- Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with. 
 
-### Unit upgrade
-Show the upgrade unit button in the building editation mode only - extend the building update for the upgrades. Allow to upgrade two units at the same time.
+### Unit grid display (0% complete)
+- Visually display the flow of the product. The storage capacity from the unit is not showing any more. I would like to see the storage capacity, current usage of the capacity, inflow and outflow in the unit grid display. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.
 
-Show all changes that upgrading of the unit will have, for example the storage capacity change.
 
-**[100% complete — Edit-mode-only upgrade gating, dual simultaneous upgrades, and full before/after impact preview delivered. Upgrade panel is now hidden in read-only building view and only visible when the player enters "Edit Building" mode. Two units in the same building can be scheduled for upgrade simultaneously (the second call adds a second changed unit to the existing upgrade-only plan rather than blocking). When three or more upgrades are attempted the system returns MAX_CONCURRENT_UPGRADES with a clear, localized message. The upgrade panel shows a full before/after stat table: primary stat (Batches/tick, capacity, etc.), labor cost per tick (current → next + delta), and energy cost per tick (current → next + delta), plus downtime notice and upgrade cost/duration. Error states for INSUFFICIENT_FUNDS, MAX_CONCURRENT_UPGRADES, UNIT_ALREADY_UPGRADING, and structural PENDING_CONFIGURATION_EXISTS are all separately localized in en/sk/de. Backend tests: dual-upgrade success (two units merged into same plan, cash deducted for both), third-upgrade rejection (MAX_CONCURRENT_UPGRADES), same-unit re-upgrade rejection (UNIT_ALREADY_UPGRADING), structural-plan blocking (PENDING_CONFIGURATION_EXISTS with removal). E2E tests: upgrade panel hidden in read-only mode and visible in edit mode; before/after preview renders with level arrows, labor/energy delta rows, downtime notice, and Upgrade Now button; MAX_CONCURRENT_UPGRADES error shown when third upgrade attempted.]**
+### Unit upgrade (0% complete)
+Allow to upgrade more units at the same time. Make sure the upgrade is triggered when "store upgrade" button is clicked.
 
-### Global exchange
-- The quality of products obtained from the global exchange must vary between 5 to 20%
-**[100% complete — Band width ranges from 5% (full abundance) to 20% (zero abundance) via `ComputeExchangeQualityBand`. Per-tick quality is sampled deterministically by `SampleExchangeQuality`. API returns `qualityMin`/`qualityMax`/`estimatedQuality`. Frontend shows quality range with band-bar visual. Localized in en/sk/de. Full test coverage: unit, GraphQL integration, tick-engine, and 69 E2E tests.]**
+Show all changes that upgrading of the unit will have, for example the storage capacity change. At the moment i do not see in the public sales unit the change in the storage capacity change for example.
 
-### All buildings
+
+### All buildings (0% complete)
 - Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future. Sell Building is touching the cancel editing button at the moment.
 
-### Show time instead of ticks
-- Instead of ticks everywhere in the game show the tick time and show the tick only as a title for better debugging.
-- Wherever is shown the time, make sure in the title is shown also the tick number
-**[100% complete — All player-facing tick labels replaced with readable in-game time (using formatGameTickTime). Affected surfaces: building financial overview time window, financial chart active-tick indicator, market intelligence tick-window badges (public sales and manufacturing analytics panels), resource movement history table and summary (tick range and per-row timestamp), and recent activity feed timestamps. Raw tick numbers are preserved as title/tooltip attributes on every changed element for advanced debugging. i18n labels updated in en/sk/de: "Tick window" → "Time window", "Tick" column → "Time". PendingActionsTimeline (dashboard) was already correct. Unit tests and E2E coverage added.]**
-### Onboarding details
-- Hide Sales Loop Status or Production Chain panel after user close it and do not show it any more until there is an error in the building. **[100% complete — Dismiss button added to both panels; dismissal stored in localStorage per building ID; panel re-appears automatically when chain is incomplete (error condition); state survives navigation and reactive refreshes; E2E tests added for dismiss, persistence, and error-override behavior.]**
 
-### Stock exchange
+
+### Stock exchange (0% complete)
 - When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional. 
 
-### Ledger for personal account
-Create ledger for personal account, and show there the person's wealth, the income and taxes, taxes blockations and tax history. Make sure it is accessible from the personal account dashboard.
-**[100% complete — Personal account ledger delivered at `/personal-ledger`. Features: net wealth, available cash, tax-reserve block (15% of stock-sale proceeds), portfolio value, tax history table (per-sell reserved tax), full BUY/SELL trade history with direction badges, dividend income history. Navigation entry point added to the global header (file-invoice-dollar icon, visible to authenticated players) and a "View personal ledger →" quick-link on the Stock Exchange personal-account panel. Data sourced from the `personAccount` GraphQL query (personalCash, taxReserve, availableCash, totalNetWealth, shareholdings, dividendPayments, stockTrades). Loading, empty, and error states implemented consistently. Backend tests cover tax-reserve accumulation, settlement at year-end, available-cash deduction, multi-seller accumulation, and new-player zero state. E2E tests cover wealth-card rendering, tax history, trade history, dividend history, nav link, and all empty states.]**
 
-### Research & Development
-Show the user's used products first in the the R&D unit product quality improvement product selection.
-**[100% complete — R&D product picker now surfaces a player's active products first. The `rankedProductTypes` backend query for `PRODUCT_QUALITY` and `BRAND_QUALITY` contexts detects used products from MANUFACTURING, PUBLIC_SALES, B2B_SALES units AND inventory across all company buildings, promoting them as `used_by_company` (score 50) so they appear under a dedicated "Used by your company" section above the general catalog. The ProductPicker component already rendered this section; contextual help text (`rdProductHelp`) and an empty-state message (`rdProductEmpty`) were added to both the Research Product and Anchor Product pickers in BuildingDetailView. The mock-api E2E helper was updated to simulate cross-company ranking for R&D contexts. Backend tests cover: manufacturing, PUBLIC_SALES, B2B_SALES, and inventory product sources for PRODUCT_QUALITY; PUBLIC_SALES source for BRAND_QUALITY; and no-used-products empty state. An E2E test verifies the "Used by your company" section header appears first with a "Used by company" badge on the promoted product.]**
+### Research & Development (0% complete)
+Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.
+". Make sure to show there the current state of the research or investigate why research is not cummulating.
 
-Change the product research quality model from number 0 to 100 to cummulative spending budget model. R&D product research adds the money to the research. For each product define specific base quality model base budget where if user accumulates to the research this amount, and there is not going to be competetive company doing the same research, player will have quality 100%. If two players do research the same product, the player with the highest accumulated research money will be base for all other players. On every tick 0.1% of the research accumulated budget is lost, so if player stops researching the product, in time his research will diminish.
-**[100% complete — Cumulative research budget model shipped. `ProductResearchBudget` entity persists accumulated R&D spending per (company, product). Each tick a PRODUCT_QUALITY unit converts a level-dependent fraction of its operating costs into accumulated budget (L1 = 50%, L2 = 66.7%, L3 = 75%, L4 = 80%; formula: 1 − 1/(level+1)). All budgets decay 0.1%/tick via `GameConstants.ResearchDecayRate`. Product quality is derived as `myBudget / max(topCompetitorBudget, baseQualityBudget)` capped at 1.0, where `baseQualityBudget = max(5000, product.BasePrice × 1000)`. GraphQL type `ResearchBrandState` now exposes `accumulatedResearchBudget`, `baseResearchBudget`, and `maxCompetitorBudget`. The R&D building panel in BuildingDetailView now shows invested budget, uncontested target, top competitor budget, and a decay hint. Backend integration tests cover: budget accumulation, 0.1% decay, competitive quality computation (top researcher gets 1.0, half-budget competitor gets 0.5), uncontested budget ≥ baseline giving full quality, and level-2 units accumulating more budget per tick than level-1.]**
 
-With upgrading the unit to do research, the efficiency to do research improves. At start 50% (1-1/2) of the unit costs are accumulated to the research. Next level improves this to 66% (1-1/3)%, next level to 75% (1-1/4) and so on. While the upgrade is in progress, the player pays half of the costs for the unit.
-**[100% complete — Level-based conversion efficiency implemented via `GameConstants.ResearchBudgetConversionRate(level)` = 1 − 1/(level+1). Half-cost for in-progress upgrades implemented in `OperatingCostPhase` (charges 50% when `HasPendingUpgrade` and upgrade not yet applied). Integration test `ResearchPhase_ProductQuality_HigherLevelUnitAccumulates_MoreBudget` proves L2 accumulates more budget per tick than L1.]**
 
-### Loans menu
-- In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
-- **100% completed** — Implemented context-aware lender CTA panel in the Loan Marketplace view. Unauthenticated players see a login prompt. Authenticated players without a bank see an "Acquire a Bank" button that navigates to the buy-building flow for their first company. Eligible players who own a bank see a "Manage My Bank" CTA that deep-links directly to that bank's management page (where they can publish loan offers). State detection is driven by fetching building types from the player's companies query. Localized in en/sk/de. E2E tests cover all three states and click-through navigation.
-
-### Ingame chat
+### Ingame chat (0% complete)
 - Ingame chat in navbar does not show any icon.
 
-### Changelog
+### Changelog (0% complete)
 - Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
 
-### Architecture optimization
+### Architecture optimization (0% complete)
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 
 ## Multiple Game Servers
@@ -293,6 +270,8 @@ Frontend integration to tick resolution must be seamless. User should see next t
 
 Tick base system handles units from the end directions and moves single resources only once. Sales buildings are processed before the factories. If there is purchase unit, manufacturing unit, storage unit and b2b sales unit, first it process movement of available resources to fill in the b2b sales unit from storage, next move resources from manufacturing unit to storage and then move resources from purchase to manufacturing. This means that storage and sales will always have not empty resources if the manufacturing and purchasing is working properly.
 
+For users always show the game time while in the title of the element will be the tick number. This way users will receive better look & fell while they still can see the exact tick events.
+
 ## Building modification
 
 Building unit configuration can be modified. User can edit the building and prepare all building modifications on frontend. When building is done being modified by user, user confirms his selection. Each unit can have different suspend time. For example upgrade unit from level 1 to 2 may take 10 ticks. Upgrade from level 2 to 3 may take 100 ticks. Upgrade from level 3 to 4 may take 1000 ticks. Change in the links between the units takes one tick to apply. Each item the unit or link acts separately. User cannot change the building attributes directly. Everything must be scheduled by the tick resolve engine.
@@ -431,6 +410,59 @@ Startup pack will include - 3 months of pro subscription and in game currency.
 In pro subscription the players will have more products to manufacture and sell.
 
 Pro subscription will cost $10/month.
+
+## Research & Development
+Show the user's used products first in the the R&D unit product quality improvement product selection.
+
+Research quality model is cummulative spending budget model. R&D product research adds the money to the research. For each product define specific base quality model base budget where if user accumulates to the research this amount, and there is not going to be competetive company doing the same research, player will have quality 100%. If two players do research the same product, the player with the highest accumulated research money will be base for all other players. On every tick 0.1% of the research accumulated budget is lost, so if player stops researching the product, in time his research will diminish.
+
+With upgrading the unit to do research, the efficiency to do research improves. At start 50% (1-1/2) of the unit costs are accumulated to the research. Next level improves this to 66% (1-1/3)%, next level to 75% (1-1/4) and so on. While the upgrade is in progress, the player pays half of the costs for the unit.
+
+## Banks
+
+In loan menu if person does not own bank, show him link to buy a bank building. If person already owns a bank, show him the link to his bank building. 
+
+In the loan menu show list of all banks with the current deposit interest rate and lending interest rate - sortable, and filterable.
+
+In bank building, allow people to deposit funds to receive interest from the player, and other players to ask for a loan. Player can issue loan only if he has deposits to the bank.
+
+Bank building does not have any configurable unit, whole bank acts as a single unit.
+
+In the bank, there is a configuration to set the interest to pay to cash depositers, and interest rate which lenders pay to the player.
+
+When player creates a bank, he must deposit there the base capital of $10000000. This serves as the initial capital to be lended and is counted towards the bank deposits. 
+
+### Deposits
+
+When player opens a third party bank, he can see the current interest rate, and deposit funds there. The deposit is created in the bank and every tick the interest is paid to the depositer from the bank. 
+
+Player can withdraw money from the bank any time, even if bank does not have enough deposits on the account.
+
+Bank owner company can deposit funds to the bank or withdraw money up to the base capital deposit.
+
+### Loans
+
+When player opens a third party bank, he can see the current lending rate and the sum of money available to be lended. 
+
+Sum of available money to be lended is 90% of the current deposits. Bank must preserve 10% deposit to loan ratio.
+
+User can borrow money only for buildings which are not mortgaged. User can pick a building and he can borrow against it a money up to 70% of the property value.
+
+Creating a loan creates a contract between bank and a player which will hold the interest rate even if the bank player changes the lending interest rate. Each contract has a maturity date. User can see each tick payment amount. The calculation is the same as in the real world mortgage payments with difference that the payment is done on every tick. The borrower pays the interest and principal amount.
+
+Borrower can repay any part of the loan any time.
+
+### Central bank
+
+If the bank deposits are negative because depositers has withdrawn money from the bank. Bank borrows money from the central bank. Interest rate for borrowing money from the central bank is variable depending on how many banks borrow money from it. The interest rate fluctuates between 2 to 5% per game year.
+
+If depositers add new money and the bank has loan from the central bank, bank repays with the deposited money the central bank loan.
+
+### Bank building details
+
+When bank owner company is the current player, show the bank profit chart, interest rates chart, other details and composition of the loans.
+
+When other player displayes the bank detail, make sure he see the professional design for making the deposits or asking for a loan.
 
 # Technical implementation
 
