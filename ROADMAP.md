@@ -32,8 +32,12 @@ Research does not seem to be working at the moment. I have R&D building with res
 ### Architecture optimization (0% complete)
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 
-### Marketing
+### Marketing  (0% complete)
 - Make sure that in every city is one government owned media house from each type of media
+
+### Power plants  (0% complete)
+- Create the powerplant units and implement them on frontend as well
+- Implement everything mentioned in the power plant section below
 
 ## Multiple Game Servers
 
