@@ -99,6 +99,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Records stock-exchange buy/sell executions from the player's personal account.</summary>
     public DbSet<PersonTradeRecord> PersonTradeRecords => Set<PersonTradeRecord>();
 
+    /// <summary>Accumulated R&amp;D research budget per company per product type.</summary>
+    public DbSet<ProductResearchBudget> ProductResearchBudgets => Set<ProductResearchBudget>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

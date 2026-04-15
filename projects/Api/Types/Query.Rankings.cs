@@ -179,13 +179,36 @@ public sealed partial class Query
 
         var productTypes = await db.ProductTypes
             .Where(pt => productTypeIds.Contains(pt.Id))
-            .ToListAsync();
+            .ToDictionaryAsync(pt => pt.Id);
+
+        // Load research budgets for this company (for budget data in UI)
+        var ownResearchBudgets = await db.ProductResearchBudgets
+            .Where(rb => rb.CompanyId == companyId && productTypeIds.Contains(rb.ProductTypeId))
+            .ToDictionaryAsync(rb => rb.ProductTypeId);
+
+        // Load max budget per product across all companies (for competitive context)
+        var maxBudgetPerProduct = await db.ProductResearchBudgets
+            .Where(rb => productTypeIds.Contains(rb.ProductTypeId))
+            .GroupBy(rb => rb.ProductTypeId)
+            .Select(g => new { ProductTypeId = g.Key, MaxBudget = g.Max(rb => rb.AccumulatedBudget) })
+            .ToDictionaryAsync(x => x.ProductTypeId, x => x.MaxBudget);
 
         return brands.Select(b =>
         {
             var pt = b.ProductTypeId.HasValue
-                ? productTypes.FirstOrDefault(p => p.Id == b.ProductTypeId.Value)
+                ? productTypes.GetValueOrDefault(b.ProductTypeId.Value)
                 : null;
+
+            decimal? accBudget = null;
+            decimal? baseBudget = null;
+            decimal? maxBudget = null;
+            if (b.ProductTypeId.HasValue && pt is not null)
+            {
+                accBudget = ownResearchBudgets.TryGetValue(b.ProductTypeId.Value, out var rb) ? rb.AccumulatedBudget : null;
+                baseBudget = Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice);
+                maxBudget = maxBudgetPerProduct.TryGetValue(b.ProductTypeId.Value, out var mb) ? mb : null;
+            }
+
             return new ResearchBrandState
             {
                 Id = b.Id,
@@ -198,6 +221,9 @@ public sealed partial class Query
                 Awareness = b.Awareness,
                 Quality = b.Quality,
                 MarketingEfficiencyMultiplier = b.MarketingEfficiencyMultiplier,
+                AccumulatedResearchBudget = accBudget,
+                BaseResearchBudget = baseBudget,
+                MaxCompetitorBudget = maxBudget,
             };
         }).ToList();
     }

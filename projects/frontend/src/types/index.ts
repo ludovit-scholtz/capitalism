@@ -971,6 +971,23 @@ export interface ResearchBrandState {
   /** 0.0–1.0: Driven by PRODUCT_QUALITY R&D. Higher = better manufactured output quality. */
   quality: number
   /**
+   * Accumulated R&D research budget (game currency) invested into this product.
+   * Grows each tick by fraction of PRODUCT_QUALITY unit operating costs; decays 0.1%/tick.
+   * Null when no research has been performed for this product yet.
+   */
+  accumulatedResearchBudget: number | null
+  /**
+   * Budget required to reach 100% quality when uncontested (product base-price × 1 000, min 5 000).
+   * Null when not a product-scoped brand.
+   */
+  baseResearchBudget: number | null
+  /**
+   * Highest research budget across all companies researching this same product.
+   * Your quality = your budget / max(this, baseResearchBudget).
+   * Null when no research exists globally for this product.
+   */
+  maxCompetitorBudget: number | null
+  /**
    * ≥ 1.0: Driven by BRAND_QUALITY R&D. A value of 1.5 means each unit of marketing budget
    * produces 50% more brand awareness than baseline. Does NOT directly grant awareness.
    */

@@ -64,6 +64,13 @@ public sealed partial class TickContext
     /// </summary>
     public HashSet<Guid> UnitsUnderUpgrade { get; init; } = [];
 
+    /// <summary>
+    /// Accumulated research budgets keyed by (CompanyId, ProductTypeId).
+    /// Pre-loaded by <see cref="TickProcessor"/> from <see cref="Data.AppDbContext.ProductResearchBudgets"/>
+    /// and mutated in-place by <see cref="Phases.ResearchPhase"/>.
+    /// </summary>
+    public Dictionary<(Guid CompanyId, Guid ProductTypeId), ProductResearchBudget> ResearchBudgetsByKey { get; init; } = [];
+
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 

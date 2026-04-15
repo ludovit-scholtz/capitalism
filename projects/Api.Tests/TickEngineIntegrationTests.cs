@@ -3331,64 +3331,80 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     [Fact]
     public async Task ResearchPhase_ProductQuality_IncreasesProductBrandQualityPerTick()
     {
+        // In the new cumulative budget model, PRODUCT_QUALITY research accumulates an investment budget
+        // each tick.  After one tick the budget > 0, which produces a brand quality > 0.
+        // Uses an isolated factory so competitive max-budget from other tests does not interfere.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
         Guid companyId;
         Guid productId;
-        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
             (companyId, _, productId) = await SeedRdBuildingAsync(seedDb, UnitType.ProductQuality);
         }
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var processor = await CreateProcessorAsync(scope);
 
-        // Verify brand starts at 0
-        var brandBefore = await db.Brands
+        // Verify no research budget exists yet
+        var budgetBefore = await db.ProductResearchBudgets
             .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId)
             .FirstOrDefaultAsync();
-        Assert.Null(brandBefore);
+        Assert.Null(budgetBefore);
 
         // Process one tick
         await processor.ProcessTickAsync();
 
-        // Brand quality should have increased
+        // A research budget record should now exist with accumulated budget > 0
+        var budgetAfter = await db.ProductResearchBudgets
+            .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(budgetAfter);
+        Assert.True(budgetAfter.AccumulatedBudget > 0m,
+            "PRODUCT_QUALITY research should accumulate budget > 0 after one tick.");
+
+        // In an isolated DB the only researcher for this product is our company.
+        // Brand quality should be derived from budget and be > 0.
         var brandAfter = await db.Brands
             .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId)
             .FirstOrDefaultAsync();
         Assert.NotNull(brandAfter);
         Assert.True(brandAfter.Quality > 0m,
-            "PRODUCT_QUALITY research should increase brand.Quality after one tick.");
-        // GameConstants.ResearchQualityRate(level: 1) = 0.001m per tick
-        Assert.True(brandAfter.Quality == GameConstants.ResearchQualityRate(1),
-            $"Level-1 PRODUCT_QUALITY unit should add {GameConstants.ResearchQualityRate(1)} quality per tick. Actual: {brandAfter.Quality}");
+            "PRODUCT_QUALITY research should produce brand.Quality > 0 after one tick.");
     }
 
     [Fact]
     public async Task ResearchPhase_ProductQuality_QualityCapAt1()
     {
+        // Pre-seed an enormous research budget (well above baseQualityBudget) so that after
+        // one tick quality is calculated from budget but must not exceed 1.0.
+        // Uses isolated factory to avoid cross-test shared-DB contamination.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
         Guid companyId;
         Guid productId;
-        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
             (companyId, _, productId) = await SeedRdBuildingAsync(seedDb, UnitType.ProductQuality);
 
-            // Pre-seed brand at 0.999 to confirm cap
-            var existingBrand = new Brand
+            // Pre-seed research budget at 10x the base quality budget to force quality = 1.0
+            var product = await seedDb.ProductTypes.FindAsync(productId);
+            Assert.NotNull(product);
+            var hugeBudget = GameConstants.ResearchBaseQualityBudget(product.BasePrice) * 10m;
+            seedDb.ProductResearchBudgets.Add(new ProductResearchBudget
             {
                 Id = Guid.NewGuid(),
                 CompanyId = companyId,
-                Name = "Near-Cap Brand",
-                Scope = BrandScope.Product,
                 ProductTypeId = productId,
-                Quality = 0.999m
-            };
-            seedDb.Brands.Add(existingBrand);
+                AccumulatedBudget = hugeBudget,
+            });
             await seedDb.SaveChangesAsync();
         }
 
-        await using var scope = _factory.Services.CreateAsyncScope();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var processor = await CreateProcessorAsync(scope);
 
@@ -3397,7 +3413,9 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var brand = await db.Brands
             .FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
         Assert.True(brand.Quality <= 1m,
-            "PRODUCT_QUALITY research must not exceed 1.0 (100%).");
+            "PRODUCT_QUALITY research must not produce quality above 1.0 (100%).");
+        Assert.True(brand.Quality == 1m,
+            "A research budget 10x above baseline should yield quality = 1.0 (capped).");
     }
 
     [Fact]
@@ -3739,6 +3757,215 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.True(targetBrand.MarketingEfficiencyMultiplier > 1m,
             "CATEGORY scope R&D must raise efficiency for the anchored industry.");
         Assert.Equal(1m, otherBrand.MarketingEfficiencyMultiplier);
+    }
+
+    [Fact]
+    public async Task ResearchPhase_ProductQuality_BudgetDecaysByPointOnePercentPerTick()
+    {
+        // Seed a large pre-existing budget and NO active R&D unit.
+        // After one tick, accumulated budget should decrease by exactly 0.1% (decay only, no gain).
+        // Uses isolated factory so no cross-test budget contamination affects the assertion.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        Guid productId;
+        const decimal initialBudget = 10_000m;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var city = await seedDb.Cities.FirstAsync();
+            var player = new Player { Id = Guid.NewGuid(), Email = $"decay-test-{Guid.NewGuid():N}@test.com", DisplayName = "Decay Tester", PasswordHash = "hash", Role = PlayerRole.Player };
+            var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Decay Corp", Cash = 100_000m };
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            seedDb.Players.Add(player);
+            seedDb.Companies.Add(company);
+            // No R&D building — only a pre-seeded research budget
+            seedDb.ProductResearchBudgets.Add(new ProductResearchBudget
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                ProductTypeId = product.Id,
+                AccumulatedBudget = initialBudget,
+            });
+            await seedDb.SaveChangesAsync();
+            companyId = company.Id;
+            productId = product.Id;
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        var budgetAfter = await db.ProductResearchBudgets
+            .FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
+
+        var expectedDecay = decimal.Round(initialBudget * GameConstants.ResearchDecayRate, 4, MidpointRounding.AwayFromZero);
+        var expectedBudget = initialBudget - expectedDecay;
+        Assert.True(Math.Abs(budgetAfter.AccumulatedBudget - expectedBudget) < 0.001m,
+            $"Budget after decay should be ~{expectedBudget} but was {budgetAfter.AccumulatedBudget}.");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_ProductQuality_UncontestedBudgetAboveBaselineGivesFullQuality()
+    {
+        // If a company's accumulated budget >= baseQualityBudget and no competitor exists,
+        // their brand quality should be 1.0.
+        // Uses isolated factory — shared DB has accumulated budgets from other tests.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (companyId, _, productId) = await SeedRdBuildingAsync(seedDb, UnitType.ProductQuality);
+
+            var product = await seedDb.ProductTypes.FindAsync(productId);
+            Assert.NotNull(product);
+            // Pre-seed budget at 2× the base quality budget so that after decay in one tick
+            // the budget remains above base, making the company the sole researcher with quality = 1.0.
+            var baseQualityBudget = GameConstants.ResearchBaseQualityBudget(product.BasePrice);
+            seedDb.ProductResearchBudgets.Add(new ProductResearchBudget
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyId,
+                ProductTypeId = productId,
+                AccumulatedBudget = baseQualityBudget * 2m,
+            });
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        var brand = await db.Brands
+            .FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
+        Assert.True(brand.Quality == 1m,
+            $"Uncontested company with budget >= base target should have quality = 1.0. Actual: {brand.Quality}");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_ProductQuality_CompetitorWithHigherBudgetLowersOwnQuality()
+    {
+        // Two companies research the same product. The one with twice the budget should
+        // have quality = 1.0 (top competitor); the other should have quality = 0.5.
+        // Uses isolated factory to ensure only these two budgets exist for this product.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyAId;
+        Guid companyBId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            static (Player, Company) MakeCompany(string suffix)
+            {
+                var p = new Player { Id = Guid.NewGuid(), Email = $"rd-comp-{suffix}-{Guid.NewGuid():N}@test.com", DisplayName = $"RD {suffix}", PasswordHash = "hash", Role = PlayerRole.Player };
+                var c = new Company { Id = Guid.NewGuid(), PlayerId = p.Id, Name = $"Corp {suffix}", Cash = 500_000m };
+                return (p, c);
+            }
+
+            var (playerA, compA) = MakeCompany("A");
+            var (playerB, compB) = MakeCompany("B");
+            companyAId = compA.Id;
+            companyBId = compB.Id;
+
+            seedDb.Players.AddRange(playerA, playerB);
+            seedDb.Companies.AddRange(compA, compB);
+
+            // Company A has twice the budget of Company B (above baseline to ensure denominator is budgetA)
+            const decimal budgetA = 50_000m;
+            const decimal budgetB = 25_000m;
+            seedDb.ProductResearchBudgets.Add(new ProductResearchBudget { Id = Guid.NewGuid(), CompanyId = companyAId, ProductTypeId = productId, AccumulatedBudget = budgetA });
+            seedDb.ProductResearchBudgets.Add(new ProductResearchBudget { Id = Guid.NewGuid(), CompanyId = companyBId, ProductTypeId = productId, AccumulatedBudget = budgetB });
+
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        var brandA = await db.Brands.FirstOrDefaultAsync(b => b.CompanyId == companyAId && b.ProductTypeId == productId);
+        var brandB = await db.Brands.FirstOrDefaultAsync(b => b.CompanyId == companyBId && b.ProductTypeId == productId);
+
+        Assert.NotNull(brandA);
+        Assert.NotNull(brandB);
+        Assert.True(brandA.Quality == 1m,
+            $"Top researcher (budget 50k) should have quality = 1.0. Actual: {brandA.Quality}");
+        Assert.True(Math.Abs(brandB.Quality - 0.5m) < 0.01m,
+            $"Second researcher (budget 25k) should have quality ~0.5. Actual: {brandB.Quality}");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_ProductQuality_HigherLevelUnitAccumulates_MoreBudget()
+    {
+        // Level 2 unit has both higher costs (more labor/energy per hour) and
+        // a better conversion rate (66.7% vs 50%), so it should accumulate more
+        // research budget per tick than a Level 1 unit in the same city.
+        Guid companyL1Id;
+        Guid companyL2Id;
+        Guid productId;
+
+        await using (var seedScope = _factory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var city = await seedDb.Cities.FirstAsync();
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            static (Player, Company, Building, BuildingUnit) MakeRdCompany(AppDbContext db, string suffix, Guid cityId, Guid productId, int level)
+            {
+                var player = new Player { Id = Guid.NewGuid(), Email = $"rd-lvl-{suffix}-{Guid.NewGuid():N}@test.com", DisplayName = $"RD Lvl {suffix}", PasswordHash = "hash", Role = PlayerRole.Player };
+                var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"Corp Lvl {suffix}", Cash = 500_000m };
+                var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = cityId, Type = BuildingType.ResearchDevelopment, Name = $"Lab {suffix}", Level = 1 };
+                var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = level, ProductTypeId = productId };
+                db.Players.Add(player);
+                db.Companies.Add(company);
+                db.Buildings.Add(building);
+                db.BuildingUnits.Add(unit);
+                return (player, company, building, unit);
+            }
+
+            var (_, compL1, _, _) = MakeRdCompany(seedDb, "L1", city.Id, product.Id, 1);
+            var (_, compL2, _, _) = MakeRdCompany(seedDb, "L2", city.Id, product.Id, 2);
+            companyL1Id = compL1.Id;
+            companyL2Id = compL2.Id;
+
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        var budgetL1 = await db.ProductResearchBudgets
+            .FirstOrDefaultAsync(b => b.CompanyId == companyL1Id && b.ProductTypeId == productId);
+        var budgetL2 = await db.ProductResearchBudgets
+            .FirstOrDefaultAsync(b => b.CompanyId == companyL2Id && b.ProductTypeId == productId);
+
+        Assert.NotNull(budgetL1);
+        Assert.NotNull(budgetL2);
+        Assert.True(budgetL2.AccumulatedBudget > budgetL1.AccumulatedBudget,
+            $"Level 2 R&D unit should accumulate more budget per tick ({budgetL2.AccumulatedBudget}) than Level 1 ({budgetL1.AccumulatedBudget}).");
     }
 
     #endregion

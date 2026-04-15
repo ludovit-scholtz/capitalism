@@ -924,7 +924,7 @@ export default {
       minQuality: 'Min Quality',
       brandScope: 'Brand Scope',
       researchProduct: 'Research Product',
-      researchProductHelp: 'Choose the product whose internal manufacturing know-how this lab should improve over time.',
+      researchProductHelp: 'Choose the product whose internal manufacturing know-how this lab should improve over time. Each tick this unit converts a fraction of its operating costs into an accumulated research budget for this product. Budget decays 0.1%/tick; product quality is determined relative to the strongest competitor investing in the same product.',
       researchAnchorProduct: 'Anchor Product',
       researchAnchorProductHelp: 'This product anchors either the exact product line or the wider industry category you want to research.',
       researchBrandHelp: 'Select whether this lab should improve company-wide branding efficiency, a product category, or a single product line.',
@@ -1778,7 +1778,7 @@ export default {
   research: {
     panelTitle: 'Research Progress',
     intro:
-      'Research advances each tick. Product Quality improves manufactured output quality. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
+      'Research advances each tick. Each Product Quality unit converts a fraction of its operating costs into a cumulative research budget for the assigned product — and that budget decays 0.1% per tick. Your product quality is determined relative to the strongest competing research investor globally, so sustained spending and competitive awareness are key. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
     emptyState: 'No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.',
     qualityLabel: 'Product Quality',
     awarenessLabel: 'Brand Awareness',
@@ -1786,6 +1786,12 @@ export default {
     qualityEffect: 'Contributes up to {pct}% quality bonus to manufactured output for this product.',
     awarenessEffect: 'Brand recognition with customers: {pct}%.',
     marketingEfficiencyEffect: 'Each unit of marketing budget produces {multiplier}× more brand awareness than baseline.',
+    budget: {
+      accumulated: 'Research budget invested',
+      target: 'Budget for 100% quality (uncontested)',
+      topCompetitor: 'Top competitor budget',
+      decayHint: 'Your research budget decays 0.1% per tick. Keep investing to maintain or grow your quality lead.',
+    },
   },
   supplyChain: {
     title: 'Supply Chain',

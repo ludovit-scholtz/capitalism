@@ -335,11 +335,23 @@ public sealed partial class Query
 
         var brands = await db.Brands.Where(b => b.CompanyId == companyId).ToListAsync();
         var productTypeIds = brands.Where(b => b.ProductTypeId.HasValue).Select(b => b.ProductTypeId!.Value).Distinct().ToList();
-        var productTypes = await db.ProductTypes.Where(pt => productTypeIds.Contains(pt.Id)).ToListAsync();
+        var productTypes = await db.ProductTypes.Where(pt => productTypeIds.Contains(pt.Id)).ToDictionaryAsync(pt => pt.Id);
+
+        var ownBudgets = await db.ProductResearchBudgets
+            .Where(rb => rb.CompanyId == companyId && productTypeIds.Contains(rb.ProductTypeId))
+            .ToDictionaryAsync(rb => rb.ProductTypeId);
+        var maxBudgets = await db.ProductResearchBudgets
+            .Where(rb => productTypeIds.Contains(rb.ProductTypeId))
+            .GroupBy(rb => rb.ProductTypeId)
+            .Select(g => new { g.Key, Max = g.Max(rb => rb.AccumulatedBudget) })
+            .ToDictionaryAsync(x => x.Key, x => x.Max);
 
         return brands.Select(b =>
         {
-            var pt = b.ProductTypeId.HasValue ? productTypes.FirstOrDefault(p => p.Id == b.ProductTypeId.Value) : null;
+            var pt = b.ProductTypeId.HasValue ? productTypes.GetValueOrDefault(b.ProductTypeId.Value) : null;
+            decimal? accBudget = b.ProductTypeId.HasValue && ownBudgets.TryGetValue(b.ProductTypeId.Value, out var rb) ? rb.AccumulatedBudget : null;
+            decimal? baseBudget = pt is not null ? Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice) : null;
+            decimal? maxBudget = b.ProductTypeId.HasValue && maxBudgets.TryGetValue(b.ProductTypeId.Value, out var mb) ? mb : null;
             return new ResearchBrandState
             {
                 Id = b.Id,
@@ -352,6 +364,9 @@ public sealed partial class Query
                 Awareness = b.Awareness,
                 Quality = b.Quality,
                 MarketingEfficiencyMultiplier = b.MarketingEfficiencyMultiplier,
+                AccumulatedResearchBudget = accBudget,
+                BaseResearchBudget = baseBudget,
+                MaxCompetitorBudget = maxBudget,
             };
         }).ToList();
     }

@@ -121,6 +121,7 @@ public sealed class TickProcessor(
         var brands = await db.Brands.ToListAsync(ct);
         var inventories = await db.Inventories.ToListAsync(ct);
         var exchangeOrders = await db.ExchangeOrders.Where(o => o.IsActive).ToListAsync(ct);
+        var researchBudgets = await db.ProductResearchBudgets.ToListAsync(ct);
 
         // Build a city-keyed map of total absolute salary paid in the past
         // RecentSalaryWindowTicks ticks.  This implements the ROADMAP requirement
@@ -208,6 +209,7 @@ public sealed class TickProcessor(
             RecentSalaryByCity = recentSalaryByCity,
             TrendStatesByKey = trendStatesByKey,
             UnitsUnderUpgrade = unitsUnderUpgrade,
+            ResearchBudgetsByKey = researchBudgets.ToDictionary(rb => (rb.CompanyId, rb.ProductTypeId)),
         };
     }
 }
