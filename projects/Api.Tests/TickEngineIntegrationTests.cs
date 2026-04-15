@@ -3060,6 +3060,194 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.Empty(purchasingEntries);
     }
 
+    [Fact]
+    public async Task PurchasingPhase_GlobalExchange_QualityVariesAcrossTicks_ProducingDifferentInventoryQualities()
+    {
+        // ROADMAP requirement: "The quality of products obtained from the global exchange must
+        // vary between 5 to 20%". SampleExchangeQuality returns a deterministic but tick-varying
+        // value derived from (tick, cityId, resourceId). Clearing inventory between ticks isolates
+        // each tick's quality so we can verify distinct values are produced.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (_, _, _, purchaseUnitId, _) =
+            await SeedExchangePurchaseUnitAsync(db, maxPrice: 9999m, purchaseSource: "EXCHANGE");
+
+        var processor = await CreateProcessorAsync(scope);
+
+        // --- Tick 1 ---
+        await processor.ProcessTickAsync();
+
+        var inv1 = await db.Inventories
+            .Where(i => i.BuildingUnitId == purchaseUnitId && i.Quantity > 0m)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(inv1);
+        var quality1 = inv1.Quality;
+
+        // Clear inventory so the next tick records a fresh quality sample.
+        inv1.Quantity = 0m;
+        await db.SaveChangesAsync();
+
+        // --- Tick 2 (hash inputs are different: tick number advanced) ---
+        await processor.ProcessTickAsync();
+
+        var inv2 = await db.Inventories
+            .Where(i => i.BuildingUnitId == purchaseUnitId && i.Quantity > 0m)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(inv2);
+        var quality2 = inv2.Quality;
+
+        // Both qualities must be within the expanded exchange band [0.20, 0.99].
+        Assert.InRange(quality1, 0.20m, 0.99m);
+        Assert.InRange(quality2, 0.20m, 0.99m);
+
+        // The two ticks must produce different quality values — this proves the per-tick
+        // hash in SampleExchangeQuality actually flows through to inventory.
+        Assert.NotEqual(quality1, quality2);
+    }
+
+    [Fact]
+    public async Task ManufacturingPhase_ExchangeSourcedQuality_AffectsOutputQuality_DownstreamEffect()
+    {
+        // ACCEPTANCE CRITERION: "Quality meaningfully affects the gameplay result of sourced
+        // goods where appropriate." Exchange-sourced input quality (set by SampleExchangeQuality)
+        // flows directly into manufacturing output quality via the weighted-average formula in
+        // ManufacturingPhase. Two identical factories are seeded with different input qualities
+        // (one high-quality batch as if sourced from a high-abundance city, one low-quality batch
+        // as if sourced from a low-abundance/uncertain city) and after one manufacturing tick,
+        // the high-quality-input factory must produce higher-quality finished goods.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities
+            .Include(c => c.Resources).ThenInclude(r => r.ResourceType)
+            .FirstAsync();
+        var product = await db.ProductTypes
+            .Include(p => p.Recipes)
+            .FirstAsync(p => p.Slug == "wooden-chair");
+        var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+
+        Guid highQualityMfgUnitId;
+        Guid lowQualityMfgUnitId;
+        Guid highQualityOutputStorageUnitId;
+        Guid lowQualityOutputStorageUnitId;
+
+        static (Building factory, BuildingUnit purchaseUnit, BuildingUnit mfgUnit, BuildingUnit storageUnit)
+            SeedFactory(AppDbContext db, string suffix, Guid cityId, Guid productId, Guid resourceId, decimal inputQuality)
+        {
+            var player = new Player
+            {
+                Id = Guid.NewGuid(),
+                Email = $"quality-downstream-{suffix}-{Guid.NewGuid():N}@test.com",
+                DisplayName = $"QD {suffix}",
+                PasswordHash = "hash",
+                Role = PlayerRole.Player
+            };
+            db.Players.Add(player);
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"QD Corp {suffix}", Cash = 1_000_000m
+            };
+            db.Companies.Add(company);
+
+            var building = new Building
+            {
+                Id = Guid.NewGuid(), CompanyId = company.Id, CityId = cityId,
+                Type = BuildingType.Factory, Name = $"Factory {suffix}", Level = 1
+            };
+            db.Buildings.Add(building);
+
+            // PURCHASE unit pre-filled with a specific quality
+            var purchaseUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.Purchase,
+                GridX = 0, GridY = 0, Level = 1,
+                ResourceTypeId = resourceId,
+                PurchaseSource = "LOCAL", // no exchange buying during the tick
+                MaxPrice = 0.001m         // prevent any purchasing during the tick
+            };
+            // MANUFACTURING unit
+            var mfgUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.Manufacturing,
+                GridX = 1, GridY = 0, Level = 1, ProductTypeId = productId
+            };
+            // STORAGE output unit
+            var storageUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.Storage,
+                GridX = 2, GridY = 0, Level = 1, ProductTypeId = productId
+            };
+            db.BuildingUnits.AddRange(purchaseUnit, mfgUnit, storageUnit);
+
+            // Pre-fill purchase unit with resource at the specified quality.
+            db.Inventories.Add(new Inventory
+            {
+                Id = Guid.NewGuid(), BuildingId = building.Id, BuildingUnitId = purchaseUnit.Id,
+                ResourceTypeId = resourceId,
+                Quantity = 1000m,
+                Quality = inputQuality,
+                SourcingCostTotal = 0m
+            });
+
+            return (building, purchaseUnit, mfgUnit, storageUnit);
+        }
+
+        // Factory A: high-quality inputs (simulating exchange sourcing from a high-abundance city)
+        // SampleExchangeQuality at abundance=0.9 would produce ~0.87 ± 0.025.
+        var (_, _, highMfg, highStorage) = SeedFactory(db, "highQ", city.Id, product.Id, resource.Id, inputQuality: 0.90m);
+        highQualityMfgUnitId = highMfg.Id;
+        highQualityOutputStorageUnitId = highStorage.Id;
+
+        // Factory B: low-quality inputs (simulating exchange sourcing from a low-abundance city)
+        // SampleExchangeQuality at abundance=0.1 would produce ~0.43 ± 0.075.
+        var (_, _, lowMfg, lowStorage) = SeedFactory(db, "lowQ", city.Id, product.Id, resource.Id, inputQuality: 0.40m);
+        lowQualityMfgUnitId = lowMfg.Id;
+        lowQualityOutputStorageUnitId = lowStorage.Id;
+
+        await db.SaveChangesAsync();
+
+        // Link purchase → manufacturing (right) for both factories so resources flow.
+        var highPurchase = await db.BuildingUnits.FirstAsync(u => u.BuildingId == highMfg.BuildingId && u.UnitType == UnitType.Purchase);
+        var lowPurchase = await db.BuildingUnits.FirstAsync(u => u.BuildingId == lowMfg.BuildingId && u.UnitType == UnitType.Purchase);
+        highPurchase.LinkRight = true;
+        lowPurchase.LinkRight = true;
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Check output in the storage unit (manufacturing output should land there via ResourceMovement)
+        var highOutput = await db.Inventories
+            .Where(i => i.BuildingUnitId == highQualityMfgUnitId || i.BuildingId == highMfg.BuildingId)
+            .Where(i => i.ProductTypeId == product.Id && i.Quantity > 0m)
+            .ToListAsync();
+
+        var lowOutput = await db.Inventories
+            .Where(i => i.BuildingUnitId == lowQualityMfgUnitId || i.BuildingId == lowMfg.BuildingId)
+            .Where(i => i.ProductTypeId == product.Id && i.Quantity > 0m)
+            .ToListAsync();
+
+        // Both factories must have produced output
+        Assert.NotEmpty(highOutput);
+        Assert.NotEmpty(lowOutput);
+
+        var highQuality = highOutput.Average(i => (double)i.Quality);
+        var lowQuality = lowOutput.Average(i => (double)i.Quality);
+
+        // High-quality input (0.90) must produce higher-quality output than low-quality input (0.40).
+        // The manufacturing formula weights input quality at 70%:
+        //   output_quality = input_quality * 0.70 + rd_bonus * 0.30 (rd_bonus ≈ 0 here)
+        // High: 0.90 * 0.70 ≈ 0.63 | Low: 0.40 * 0.70 ≈ 0.28
+        Assert.True(highQuality > lowQuality,
+            $"High-quality-input factory (output: {highQuality:P2}) must out-qualify " +
+            $"low-quality-input factory (output: {lowQuality:P2}). " +
+            "Exchange quality variance must flow through to manufactured goods.");
+    }
+
     #endregion
 
     #region Full supply-chain integration (onboarding AC#4)

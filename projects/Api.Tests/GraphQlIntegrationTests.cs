@@ -11946,6 +11946,102 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             "Different cities must produce different exchange prices for the same resource (city rent multiplier).");
     }
 
+    [Fact]
+    public async Task GlobalExchangeOffers_QualityBandFieldsReturned_WithValidRangeAndConsistency()
+    {
+        // ROADMAP requirement: quality must vary between 5% and 20% (the band width).
+        // This test verifies that qualityMin, qualityMax, and estimatedQuality are all
+        // returned, that min ≤ estimatedQuality ≤ max, and that the band width is in [5%, 20%].
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var woodId = (await ExecuteGraphQlAsync("{ resourceTypes { id slug } }"))
+            .GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().First(r => r.GetProperty("slug").GetString() == "wood")
+            .GetProperty("id").GetString()!;
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GlobalExchangeOffers($destinationCityId: UUID!, $resourceTypeId: UUID) {
+              globalExchangeOffers(destinationCityId: $destinationCityId, resourceTypeId: $resourceTypeId) {
+                cityName
+                estimatedQuality
+                qualityMin
+                qualityMax
+                localAbundance
+              }
+            }
+            """,
+            new { destinationCityId = bratislavaId, resourceTypeId = woodId });
+
+        var offers = result.GetProperty("data").GetProperty("globalExchangeOffers").EnumerateArray().ToList();
+        Assert.NotEmpty(offers);
+
+        foreach (var offer in offers)
+        {
+            var estimatedQuality = offer.GetProperty("estimatedQuality").GetDecimal();
+            var qualityMin = offer.GetProperty("qualityMin").GetDecimal();
+            var qualityMax = offer.GetProperty("qualityMax").GetDecimal();
+            var bandWidth = qualityMax - qualityMin;
+            var city = offer.GetProperty("cityName").GetString();
+
+            // Band width must be within the ROADMAP-specified [5%, 20%] range.
+            Assert.True(bandWidth >= 0.05m,
+                $"{city}: band width ({bandWidth:P2}) must be ≥ 5%");
+            Assert.True(bandWidth <= 0.20m,
+                $"{city}: band width ({bandWidth:P2}) must be ≤ 20%");
+
+            // Estimated quality must fall within the band.
+            Assert.True(estimatedQuality >= qualityMin,
+                $"{city}: estimatedQuality ({estimatedQuality}) must be ≥ qualityMin ({qualityMin})");
+            Assert.True(estimatedQuality <= qualityMax,
+                $"{city}: estimatedQuality ({estimatedQuality}) must be ≤ qualityMax ({qualityMax})");
+
+            // All quality values must be within the valid range.
+            Assert.InRange(qualityMin, 0.05m, 0.99m);
+            Assert.InRange(qualityMax, 0.05m, 0.99m);
+            Assert.InRange(estimatedQuality, 0.05m, 0.99m);
+        }
+    }
+
+    [Fact]
+    public async Task GlobalExchangeOffers_QualityBandWidth_NarrowsForHighAbundanceResources()
+    {
+        // High-abundance resources (e.g. Wood 0.7 in Bratislava) must have a narrower
+        // quality band than low-abundance resources (e.g. ChemMinerals 0.3). This proves
+        // the "more abundant → more predictable quality" game mechanic is API-visible.
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var resourceIds = (await ExecuteGraphQlAsync("{ resourceTypes { id slug } }"))
+            .GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray()
+            .ToDictionary(r => r.GetProperty("slug").GetString()!, r => r.GetProperty("id").GetString()!);
+
+        async Task<(decimal min, decimal max)> GetBandAsync(string slug)
+        {
+            var r = await ExecuteGraphQlAsync(
+                """
+                query GlobalExchangeOffers($destinationCityId: UUID!, $resourceTypeId: UUID) {
+                  globalExchangeOffers(destinationCityId: $destinationCityId, resourceTypeId: $resourceTypeId) {
+                    cityName qualityMin qualityMax
+                  }
+                }
+                """,
+                new { destinationCityId = bratislavaId, resourceTypeId = resourceIds[slug] });
+            var bra = r.GetProperty("data").GetProperty("globalExchangeOffers")
+                .EnumerateArray()
+                .First(o => o.GetProperty("cityName").GetString() == "Bratislava");
+            return (bra.GetProperty("qualityMin").GetDecimal(), bra.GetProperty("qualityMax").GetDecimal());
+        }
+
+        var (woodMin, woodMax) = await GetBandAsync("wood");             // abundance 0.7 → narrow band
+        var (chemMin, chemMax) = await GetBandAsync("chemical-minerals"); // abundance 0.3 → wider band
+
+        var woodBandWidth = woodMax - woodMin;
+        var chemBandWidth = chemMax - chemMin;
+
+        Assert.True(chemBandWidth > woodBandWidth,
+            $"ChemMinerals band ({chemBandWidth:P2}) must be wider than Wood band ({woodBandWidth:P2}) " +
+            "because lower abundance gives less predictable quality.");
+    }
+
     // ── GlobalExchangeProductListings tests ──────────────────────────────────
 
     [Fact]

@@ -800,3 +800,57 @@ describe('detectLogisticsTrap', () => {
     expect(detectLogisticsTrap([])).toBeNull()
   })
 })
+
+describe('computeExchangeQualityBand — ROADMAP 5%–20% requirement', () => {
+  // ROADMAP: "The quality of products obtained from the global exchange must vary
+  // between 5 to 20%". The band width must fall within [5%, 20%] at every abundance.
+
+  it('band width is within [5%, 20%] for all abundance levels', () => {
+    const abundanceLevels = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    for (const abundance of abundanceLevels) {
+      const { min, max } = computeExchangeQualityBand(abundance)
+      const bandWidth = max - min
+      // Use a small tolerance (0.001) to handle floating-point arithmetic at boundary values.
+      expect(bandWidth).toBeGreaterThanOrEqual(0.05 - 0.001)
+      expect(bandWidth).toBeLessThanOrEqual(0.20 + 0.001)
+    }
+  })
+
+  it('zero abundance produces widest band (≈ 20%) matching scarce-resource uncertainty', () => {
+    const { min, max } = computeExchangeQualityBand(0)
+    const bandWidth = max - min
+    expect(bandWidth).toBeCloseTo(0.20, 2)
+  })
+
+  it('full abundance produces narrowest band (≈ 5%) matching predictable sourcing', () => {
+    const { min, max } = computeExchangeQualityBand(1)
+    const bandWidth = max - min
+    expect(bandWidth).toBeCloseTo(0.05, 2)
+  })
+
+  it('all three starter industry inputs have correct quality ranges', () => {
+    // Bratislava seed abundances: Wood=0.7, Grain=0.6, Chemical Minerals=0.3
+    const woodBand = computeExchangeQualityBand(0.7) // FURNITURE
+    const grainBand = computeExchangeQualityBand(0.6) // FOOD_PROCESSING
+    const chemBand = computeExchangeQualityBand(0.3) // HEALTHCARE
+
+    const woodWidth = woodBand.max - woodBand.min
+    const grainWidth = grainBand.max - grainBand.min
+    const chemWidth = chemBand.max - chemBand.min
+
+    // High abundance → narrower band (more predictable quality)
+    expect(woodWidth).toBeLessThan(chemWidth)
+    expect(grainWidth).toBeLessThan(chemWidth)
+
+    // All within ROADMAP range (with floating-point tolerance)
+    for (const w of [woodWidth, grainWidth, chemWidth]) {
+      expect(w).toBeGreaterThanOrEqual(0.05 - 0.001)
+      expect(w).toBeLessThanOrEqual(0.20 + 0.001)
+    }
+
+    // Central quality: higher abundance → higher quality
+    const woodCenter = (woodBand.min + woodBand.max) / 2
+    const chemCenter = (chemBand.min + chemBand.max) / 2
+    expect(woodCenter).toBeGreaterThan(chemCenter)
+  })
+})
