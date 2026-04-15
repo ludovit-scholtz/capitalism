@@ -73,7 +73,21 @@ public class Program
         builder.Services.AddScoped<AuthenticatedPlayerClaimsSyncService>();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddHttpClient("push");
-        builder.Services.AddHttpClient("master-server");
+
+        if (builder.Configuration["MasterServer:ApiUrl"]?.Contains("masterapi") == true)
+        {
+            // ignore ssl issues in local dev
+            builder.Services.AddHttpClient("master-server").ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (m, c, ch, e) => true
+            });
+
+        }
+        else
+        {
+            builder.Services.AddHttpClient("master-server");
+        }
+
         builder.Services.AddScoped<WebPush.IWebPushClient>(serviceProvider =>
             new WebPush.WebPushClient(
                 serviceProvider.GetRequiredService<IHttpClientFactory>().CreateClient("push")));

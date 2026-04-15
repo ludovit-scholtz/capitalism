@@ -36,6 +36,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=https://+:44356
       - ConnectionStrings__GameCatalog=Host=postgresmaster;Port=5432;Database=game1;Username=postgres;Password=password
+      - MasterServer__ApiUrl=https://masterapi:44364/graphql
 
 volumes:
   postgres_data:
