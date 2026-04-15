@@ -13,7 +13,9 @@ public sealed partial class Mutation
     /// <summary>
     /// Schedules a level upgrade for a building unit.
     /// Deducts the upgrade cost from the owning company's cash immediately
-    /// and creates a queued building configuration plan that applies after the required ticks.
+    /// and creates (or extends) a queued building configuration plan that applies after the required ticks.
+    /// Up to <see cref="Engine.GameConstants.MaxConcurrentUnitUpgrades"/> units may be upgrading
+    /// simultaneously within the same building.
     /// </summary>
     [Authorize]
     public async Task<BuildingConfigurationPlan> ScheduleUnitUpgrade(
@@ -73,15 +75,6 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (unit.Building.PendingConfiguration is not null)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("This building already has a pending configuration change. Wait for it to complete or cancel it before scheduling an upgrade.")
-                    .SetCode("PENDING_CONFIGURATION_EXISTS")
-                    .Build());
-        }
-
         var upgradeCost = Engine.GameConstants.UnitUpgradeCost(unit.UnitType, unit.Level);
         var company = unit.Building.Company;
 
@@ -94,65 +87,185 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        company.Cash -= upgradeCost;
-
         var upgradeTicks = Engine.GameConstants.UnitUpgradeTicks(unit.Level);
-        var planId = Guid.NewGuid();
         var now = DateTime.UtcNow;
+        Guid planId;
 
-        var plan = new BuildingConfigurationPlan
-        {
-            Id = planId,
-            BuildingId = unit.BuildingId,
-            SubmittedAtUtc = now,
-            SubmittedAtTick = gameState.CurrentTick,
-            AppliesAtTick = gameState.CurrentTick + upgradeTicks,
-            TotalTicksRequired = upgradeTicks,
-        };
+        var existingPlan = unit.Building.PendingConfiguration;
 
-        // Snapshot all active units; only the target unit gets a level bump and a timer.
-        // DistinctBy is defensive deduplication per coding guidelines; AsSplitQuery() above prevents
-        // Cartesian explosion, but we deduplicate by position as a safety net.
-        var allActiveUnits = unit.Building.Units.DistinctBy(u => (u.GridX, u.GridY)).ToList();
-        foreach (var activeUnit in allActiveUnits)
+        if (existingPlan is not null)
         {
-            bool isTarget = activeUnit.Id == unit.Id;
-            plan.Units.Add(new BuildingConfigurationPlanUnit
+            // Check whether the existing plan is upgrade-only (no structural changes, no removals).
+            // An upgrade-only plan has no removals and all IsChanged plan units represent level bumps
+            // of existing active units (same type, level increased).
+            var activeUnitsByPos = unit.Building.Units
+                .DistinctBy(u => (u.GridX, u.GridY))
+                .ToDictionary(u => (u.GridX, u.GridY));
+
+            var isUpgradeOnlyPlan = existingPlan.Removals.Count == 0
+                && existingPlan.Units
+                    .Where(pu => pu.IsChanged)
+                    .All(pu =>
+                    {
+                        var active = activeUnitsByPos.GetValueOrDefault((pu.GridX, pu.GridY));
+                        return active is not null && pu.UnitType == active.UnitType && pu.Level > active.Level;
+                    });
+
+            if (!isUpgradeOnlyPlan)
             {
-                Id = Guid.NewGuid(),
-                BuildingConfigurationPlanId = planId,
-                UnitType = activeUnit.UnitType,
-                GridX = activeUnit.GridX,
-                GridY = activeUnit.GridY,
-                Level = isTarget ? activeUnit.Level + 1 : activeUnit.Level,
-                LinkUp = activeUnit.LinkUp,
-                LinkDown = activeUnit.LinkDown,
-                LinkLeft = activeUnit.LinkLeft,
-                LinkRight = activeUnit.LinkRight,
-                LinkUpLeft = activeUnit.LinkUpLeft,
-                LinkUpRight = activeUnit.LinkUpRight,
-                LinkDownLeft = activeUnit.LinkDownLeft,
-                LinkDownRight = activeUnit.LinkDownRight,
-                StartedAtTick = gameState.CurrentTick,
-                AppliesAtTick = isTarget ? gameState.CurrentTick + upgradeTicks : gameState.CurrentTick,
-                TicksRequired = isTarget ? upgradeTicks : 0,
-                IsChanged = isTarget,
-                ResourceTypeId = activeUnit.ResourceTypeId,
-                ProductTypeId = activeUnit.ProductTypeId,
-                MinPrice = activeUnit.MinPrice,
-                MaxPrice = activeUnit.MaxPrice,
-                PurchaseSource = activeUnit.PurchaseSource,
-                SaleVisibility = activeUnit.SaleVisibility,
-                Budget = activeUnit.Budget,
-                MediaHouseBuildingId = activeUnit.MediaHouseBuildingId,
-                MinQuality = activeUnit.MinQuality,
-                BrandScope = activeUnit.BrandScope,
-                VendorLockCompanyId = activeUnit.VendorLockCompanyId,
-                LockedCityId = activeUnit.LockedCityId,
-            });
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("This building already has a pending configuration change. Wait for it to complete or cancel it before scheduling an upgrade.")
+                        .SetCode("PENDING_CONFIGURATION_EXISTS")
+                        .Build());
+            }
+
+            // Count current in-progress upgrades.
+            var upgradesInProgress = existingPlan.Units.Count(pu => pu.IsChanged);
+
+            if (upgradesInProgress >= Engine.GameConstants.MaxConcurrentUnitUpgrades)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"This building already has {Engine.GameConstants.MaxConcurrentUnitUpgrades} unit upgrades in progress. Wait for one to complete before scheduling another.")
+                        .SetCode("MAX_CONCURRENT_UPGRADES")
+                        .Build());
+            }
+
+            // Check if the target unit is already being upgraded in the existing plan.
+            var targetPlanUnit = existingPlan.Units
+                .FirstOrDefault(pu => pu.GridX == unit.GridX && pu.GridY == unit.GridY && pu.IsChanged);
+
+            if (targetPlanUnit is not null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("This unit is already scheduled for an upgrade.")
+                        .SetCode("UNIT_ALREADY_UPGRADING")
+                        .Build());
+            }
+
+            // Add the second unit upgrade to the existing plan.
+            var secondPlanUnit = existingPlan.Units
+                .FirstOrDefault(pu => pu.GridX == unit.GridX && pu.GridY == unit.GridY);
+
+            if (secondPlanUnit is not null)
+            {
+                // Update the existing snapshot unit to become an upgrade.
+                secondPlanUnit.Level = unit.Level + 1;
+                secondPlanUnit.StartedAtTick = gameState.CurrentTick;
+                secondPlanUnit.AppliesAtTick = gameState.CurrentTick + upgradeTicks;
+                secondPlanUnit.TicksRequired = upgradeTicks;
+                secondPlanUnit.IsChanged = true;
+            }
+            else
+            {
+                // The target unit was not in the snapshot (edge case: plan was created before unit was added).
+                existingPlan.Units.Add(new BuildingConfigurationPlanUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingConfigurationPlanId = existingPlan.Id,
+                    UnitType = unit.UnitType,
+                    GridX = unit.GridX,
+                    GridY = unit.GridY,
+                    Level = unit.Level + 1,
+                    LinkUp = unit.LinkUp,
+                    LinkDown = unit.LinkDown,
+                    LinkLeft = unit.LinkLeft,
+                    LinkRight = unit.LinkRight,
+                    LinkUpLeft = unit.LinkUpLeft,
+                    LinkUpRight = unit.LinkUpRight,
+                    LinkDownLeft = unit.LinkDownLeft,
+                    LinkDownRight = unit.LinkDownRight,
+                    StartedAtTick = gameState.CurrentTick,
+                    AppliesAtTick = gameState.CurrentTick + upgradeTicks,
+                    TicksRequired = upgradeTicks,
+                    IsChanged = true,
+                    ResourceTypeId = unit.ResourceTypeId,
+                    ProductTypeId = unit.ProductTypeId,
+                    MinPrice = unit.MinPrice,
+                    MaxPrice = unit.MaxPrice,
+                    PurchaseSource = unit.PurchaseSource,
+                    SaleVisibility = unit.SaleVisibility,
+                    Budget = unit.Budget,
+                    MediaHouseBuildingId = unit.MediaHouseBuildingId,
+                    MinQuality = unit.MinQuality,
+                    BrandScope = unit.BrandScope,
+                    VendorLockCompanyId = unit.VendorLockCompanyId,
+                    LockedCityId = unit.LockedCityId,
+                });
+            }
+
+            // Refresh the plan's overall AppliesAtTick to be the max across all changed units.
+            var maxAppliesAtTick = existingPlan.Units
+                .Where(pu => pu.IsChanged)
+                .Max(pu => pu.AppliesAtTick);
+            existingPlan.AppliesAtTick = maxAppliesAtTick;
+            existingPlan.TotalTicksRequired = (int)(maxAppliesAtTick - existingPlan.SubmittedAtTick);
+
+            planId = existingPlan.Id;
+        }
+        else
+        {
+            // No existing plan: create a fresh upgrade plan.
+            planId = Guid.NewGuid();
+
+            var plan = new BuildingConfigurationPlan
+            {
+                Id = planId,
+                BuildingId = unit.BuildingId,
+                SubmittedAtUtc = now,
+                SubmittedAtTick = gameState.CurrentTick,
+                AppliesAtTick = gameState.CurrentTick + upgradeTicks,
+                TotalTicksRequired = upgradeTicks,
+            };
+
+            // Snapshot all active units; only the target unit gets a level bump and a timer.
+            // DistinctBy is defensive deduplication per coding guidelines; AsSplitQuery() above prevents
+            // Cartesian explosion, but we deduplicate by position as a safety net.
+            var allActiveUnits = unit.Building.Units.DistinctBy(u => (u.GridX, u.GridY)).ToList();
+            foreach (var activeUnit in allActiveUnits)
+            {
+                bool isTarget = activeUnit.Id == unit.Id;
+                plan.Units.Add(new BuildingConfigurationPlanUnit
+                {
+                    Id = Guid.NewGuid(),
+                    BuildingConfigurationPlanId = planId,
+                    UnitType = activeUnit.UnitType,
+                    GridX = activeUnit.GridX,
+                    GridY = activeUnit.GridY,
+                    Level = isTarget ? activeUnit.Level + 1 : activeUnit.Level,
+                    LinkUp = activeUnit.LinkUp,
+                    LinkDown = activeUnit.LinkDown,
+                    LinkLeft = activeUnit.LinkLeft,
+                    LinkRight = activeUnit.LinkRight,
+                    LinkUpLeft = activeUnit.LinkUpLeft,
+                    LinkUpRight = activeUnit.LinkUpRight,
+                    LinkDownLeft = activeUnit.LinkDownLeft,
+                    LinkDownRight = activeUnit.LinkDownRight,
+                    StartedAtTick = gameState.CurrentTick,
+                    AppliesAtTick = isTarget ? gameState.CurrentTick + upgradeTicks : gameState.CurrentTick,
+                    TicksRequired = isTarget ? upgradeTicks : 0,
+                    IsChanged = isTarget,
+                    ResourceTypeId = activeUnit.ResourceTypeId,
+                    ProductTypeId = activeUnit.ProductTypeId,
+                    MinPrice = activeUnit.MinPrice,
+                    MaxPrice = activeUnit.MaxPrice,
+                    PurchaseSource = activeUnit.PurchaseSource,
+                    SaleVisibility = activeUnit.SaleVisibility,
+                    Budget = activeUnit.Budget,
+                    MediaHouseBuildingId = activeUnit.MediaHouseBuildingId,
+                    MinQuality = activeUnit.MinQuality,
+                    BrandScope = activeUnit.BrandScope,
+                    VendorLockCompanyId = activeUnit.VendorLockCompanyId,
+                    LockedCityId = activeUnit.LockedCityId,
+                });
+            }
+
+            db.BuildingConfigurationPlans.Add(plan);
         }
 
-        db.BuildingConfigurationPlans.Add(plan);
+        company.Cash -= upgradeCost;
 
         db.LedgerEntries.Add(new LedgerEntry
         {

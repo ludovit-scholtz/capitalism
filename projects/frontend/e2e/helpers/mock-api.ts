@@ -641,6 +641,10 @@ export type MockState = {
   unitUpgradeInfoOverrides: Record<string, object | null>
   /** If set to a unit ID, scheduleUnitUpgrade will return INSUFFICIENT_FUNDS for that unit. */
   upgradeInsufficientFundsUnitId: string | null
+  /** If set to a unit ID, scheduleUnitUpgrade will return MAX_CONCURRENT_UPGRADES for that unit. */
+  upgradeMaxConcurrentUnitId: string | null
+  /** If set to a unit ID, scheduleUnitUpgrade will return UNIT_ALREADY_UPGRADING for that unit. */
+  upgradeAlreadyUpgradingUnitId: string | null
   /** Active player SELL exchange orders for products (the globalExchangeProductListings query). */
   productExchangeListings: MockProductExchangeListing[]
   chatMessages: MockChatMessage[]
@@ -1550,6 +1554,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     sourcingCandidates: {},
     unitUpgradeInfoOverrides: {},
     upgradeInsufficientFundsUnitId: null,
+    upgradeMaxConcurrentUnitId: null,
+    upgradeAlreadyUpgradingUnitId: null,
     productExchangeListings: [],
     chatMessages: [],
     rootAdminEmails: ['root@example.com'],
@@ -5366,6 +5372,20 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({ errors: [{ message: 'Insufficient funds.', extensions: { code: 'INSUFFICIENT_FUNDS' } }] }),
+        })
+      }
+      if (state.upgradeMaxConcurrentUnitId === unitId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Max concurrent upgrades reached.', extensions: { code: 'MAX_CONCURRENT_UPGRADES' } }] }),
+        })
+      }
+      if (state.upgradeAlreadyUpgradingUnitId === unitId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Unit already upgrading.', extensions: { code: 'UNIT_ALREADY_UPGRADING' } }] }),
         })
       }
       const gameState = state.gameState

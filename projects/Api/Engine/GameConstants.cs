@@ -286,6 +286,12 @@ public static class GameConstants
     public const int MaxUnitLevel = 4;
 
     /// <summary>
+    /// Maximum number of units that can be upgrading simultaneously within one building.
+    /// A second upgrade can be queued while the first is still in progress.
+    /// </summary>
+    public const int MaxConcurrentUnitUpgrades = 2;
+
+    /// <summary>
     /// Ticks required to upgrade a unit from <paramref name="currentLevel"/> to the next level.
     /// Level 1→2 = 10 ticks, 2→3 = 100 ticks, 3→4 = 1000 ticks (roadmap spec).
     /// </summary>
