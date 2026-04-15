@@ -22,10 +22,6 @@ Allow to upgrade more units at the same time. Make sure the upgrade is triggered
 
 Show all changes that upgrading of the unit will have, for example the storage capacity change. At the moment i do not see in the public sales unit the change in the storage capacity change for example.
 
-
-### All buildings (0% complete)
-- Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future. Sell Building is touching the cancel editing button at the moment.
-
 ### Research & Development (0% complete)
 Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.
 ". Make sure to show there the current state of the research or investigate why research is not cummulating.
