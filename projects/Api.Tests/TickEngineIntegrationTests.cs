@@ -4085,6 +4085,125 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             $"(${storageEffectiveRatePerHour:F4}) because overhead applies only to manufacturing.");
     }
 
+    [Fact]
+    public async Task OperatingCostPhase_UnitUnderUpgrade_ChargesHalfOperatingCosts()
+    {
+        // Two identical PRODUCT_QUALITY units in the same city/salary environment.
+        // One unit has a pending upgrade in progress; the other does not.
+        // The upgrading unit must incur exactly 50% of the normal labor and energy costs.
+        await using var factory = new ApiWebApplicationFactory();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync();
+        var gameState = await db.GameStates.FirstAsync();
+        var currentTick = gameState.CurrentTick;
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"halfcost-{Guid.NewGuid():N}@test.com",
+            DisplayName = "HalfCost",
+            PasswordHash = "h",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var companyNormal = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Normal Corp", Cash = 1_000_000m, FoundedAtTick = 0 };
+        var companyUpgrading = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Upgrading Corp", Cash = 1_000_000m, FoundedAtTick = 0 };
+        db.Companies.AddRange(companyNormal, companyUpgrading);
+
+        // Normal building — no pending upgrade
+        var buildingNormal = new Building { Id = Guid.NewGuid(), CompanyId = companyNormal.Id, CityId = city.Id, Type = BuildingType.ResearchDevelopment, Name = "Normal Lab", Level = 1 };
+        var unitNormal = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingNormal.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = 1 };
+        db.Buildings.Add(buildingNormal);
+        db.BuildingUnits.Add(unitNormal);
+
+        // Upgrading building — has a pending configuration plan for its unit
+        var buildingUpgrading = new Building { Id = Guid.NewGuid(), CompanyId = companyUpgrading.Id, CityId = city.Id, Type = BuildingType.ResearchDevelopment, Name = "Upgrading Lab", Level = 1 };
+        var unitUpgrading = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingUpgrading.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = 1 };
+        db.Buildings.Add(buildingUpgrading);
+        db.BuildingUnits.Add(unitUpgrading);
+
+        await db.SaveChangesAsync();
+
+        // Attach a pending upgrade plan (upgrade in progress, applies 10 ticks from now)
+        var planId = Guid.NewGuid();
+        var plan = new BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = buildingUpgrading.Id,
+            SubmittedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = UnitType.ProductQuality,
+            GridX = 0,
+            GridY = 0,
+            Level = 2, // upgrading to level 2
+            IsChanged = true,
+            TicksRequired = 10,
+            StartedAtTick = currentTick,
+            AppliesAtTick = currentTick + 10,
+            ProductTypeId = product.Id,
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Verify normal unit costs
+        var normalLaborCost = await db.LedgerEntries
+            .Where(e => e.CompanyId == companyNormal.Id && e.Category == LedgerCategory.LaborCost && e.BuildingUnitId == unitNormal.Id)
+            .SumAsync(e => -e.Amount);
+        var normalEnergyCost = await db.LedgerEntries
+            .Where(e => e.CompanyId == companyNormal.Id && e.Category == LedgerCategory.EnergyCost && e.BuildingUnitId == unitNormal.Id)
+            .SumAsync(e => -e.Amount);
+
+        // Verify upgrading unit costs
+        var upgradingLaborCost = await db.LedgerEntries
+            .Where(e => e.CompanyId == companyUpgrading.Id && e.Category == LedgerCategory.LaborCost && e.BuildingUnitId == unitUpgrading.Id)
+            .SumAsync(e => -e.Amount);
+        var upgradingEnergyCost = await db.LedgerEntries
+            .Where(e => e.CompanyId == companyUpgrading.Id && e.Category == LedgerCategory.EnergyCost && e.BuildingUnitId == unitUpgrading.Id)
+            .SumAsync(e => -e.Amount);
+
+        Assert.True(normalLaborCost > 0m, "Normal unit should incur positive labor cost.");
+
+        // Upgrading unit must pay exactly half the normal cost (same level, city, and unit type).
+        // Allow 1 cent rounding tolerance per entry.
+        Assert.True(upgradingLaborCost <= normalLaborCost / 2m + 0.01m,
+            $"Upgrading unit labor (${upgradingLaborCost}) should be ≤ half normal labor (${normalLaborCost / 2m:F2}) plus rounding.");
+        Assert.True(upgradingLaborCost >= normalLaborCost / 2m - 0.01m,
+            $"Upgrading unit labor (${upgradingLaborCost}) should be ≥ half normal labor (${normalLaborCost / 2m:F2}) minus rounding.");
+
+        if (normalEnergyCost > 0m)
+        {
+            Assert.True(upgradingEnergyCost <= normalEnergyCost / 2m + 0.01m,
+                $"Upgrading unit energy (${upgradingEnergyCost}) should be ≤ half normal energy (${normalEnergyCost / 2m:F2}) plus rounding.");
+            Assert.True(upgradingEnergyCost >= normalEnergyCost / 2m - 0.01m,
+                $"Upgrading unit energy (${upgradingEnergyCost}) should be ≥ half normal energy (${normalEnergyCost / 2m:F2}) minus rounding.");
+        }
+
+        // Company cash must reflect the halved deduction
+        var upgradingCompanyAfter = await db.Companies.FindAsync(companyUpgrading.Id);
+        var normalCompanyAfter = await db.Companies.FindAsync(companyNormal.Id);
+
+        var normalTotalCost = normalLaborCost + normalEnergyCost;
+        var upgradingTotalCost = upgradingLaborCost + upgradingEnergyCost;
+
+        Assert.True(1_000_000m - normalCompanyAfter!.Cash >= normalTotalCost,
+            "Normal company cash should reflect at least the unit operating costs.");
+        Assert.True(upgradingTotalCost < normalTotalCost,
+            $"Upgrading company total cost (${upgradingTotalCost}) must be strictly less than normal total cost (${normalTotalCost}).");
+    }
+
     #endregion
 
     #region Market Trend State
