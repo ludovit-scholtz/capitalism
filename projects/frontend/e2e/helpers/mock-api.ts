@@ -3651,6 +3651,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       ]
 
       const connectedProductIds = new Set<string>()
+      // For PRODUCT_QUALITY/BRAND_QUALITY, collect used products across ALL company buildings
+      const usedByCompanyIds = new Set<string>()
       if (unitType === 'PUBLIC_SALES') {
         // Connected = products from MANUFACTURING or B2B_SALES units
         allBuildingUnits
@@ -3678,14 +3680,37 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           .flatMap((u) => u.inventoryItems ?? [])
           .filter((item) => item.productTypeId)
           .forEach((item) => connectedProductIds.add(item.productTypeId!))
+      } else if (unitType === 'PRODUCT_QUALITY' || unitType === 'BRAND_QUALITY') {
+        // Promote products used across all company buildings: manufactured, sold, or stocked
+        const activePlayer = state.players.find((p) => p.id === state.currentUserId)
+        const allCompanyBuildings = (activePlayer?.companies ?? []).flatMap((c) => c.buildings)
+        allCompanyBuildings.forEach((b) => {
+          const allUnits = [...(b.units ?? []), ...(b.pendingConfiguration?.units ?? [])]
+          allUnits
+            .filter(
+              (u) =>
+                (u.unitType === 'MANUFACTURING' ||
+                  u.unitType === 'PUBLIC_SALES' ||
+                  u.unitType === 'B2B_SALES') &&
+                u.productTypeId,
+            )
+            .forEach((u) => usedByCompanyIds.add(u.productTypeId!))
+          // Also inventory products
+          allUnits
+            .filter((u) => u.inventoryItems && u.inventoryItems.length > 0)
+            .flatMap((u) => u.inventoryItems ?? [])
+            .filter((item) => item.productTypeId)
+            .forEach((item) => usedByCompanyIds.add(item.productTypeId!))
+        })
       }
 
-      // Sort: connected first (score 100), then catalog (score 10), both alphabetical
+      // Sort: connected first (score 100), used_by_company second (score 50), catalog (score 10)
       const enriched = state.productTypes.map((product) => {
         const isConnected = connectedProductIds.has(product.id)
+        const isUsedByCompany = !isConnected && usedByCompanyIds.has(product.id)
         return {
-          rankingReason: isConnected ? 'connected' : 'catalog',
-          rankingScore: isConnected ? 100 : 10,
+          rankingReason: isConnected ? 'connected' : isUsedByCompany ? 'used_by_company' : 'catalog',
+          rankingScore: isConnected ? 100 : isUsedByCompany ? 50 : 10,
           productType: {
             ...product,
             isUnlockedForCurrentPlayer: product.isProOnly ? hasActiveProSubscription : true,

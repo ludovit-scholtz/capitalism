@@ -614,6 +614,8 @@ export default {
     triggerPlaceholder: 'Select a product…',
     helpText: 'Only products from connected units or current stock are shown first.',
     noConnectedProducts: 'No products available. Link upstream units or stock this unit first to unlock context-aware choices.',
+    rdProductHelp: 'Products your company already manufactures, sells, or stocks are shown first so you can focus research on your active production lines.',
+    rdProductEmpty: 'No active products found. Start manufacturing or selling products and they will appear here first next time.',
     invalidSelectionWarning: 'Previously selected product is no longer available. Please choose a replacement.',
     sectionConnected: 'Connected to this building',
     sectionUsedByCompany: 'Used by your company',

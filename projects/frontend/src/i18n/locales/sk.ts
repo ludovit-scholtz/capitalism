@@ -612,6 +612,8 @@ export default {
     triggerPlaceholder: 'Vyberte produkt…',
     helpText: 'Najprv sa zobrazujú len produkty z prepojených jednotiek alebo aktuálnych zásob.',
     noConnectedProducts: 'Žiadne produkty nie sú dostupné. Najprv prepojte nadväzujúce jednotky alebo naplňte túto jednotku zásobami, aby sa odomkli kontextové možnosti.',
+    rdProductHelp: 'Produkty, ktoré vaša spoločnosť vyrába, predáva alebo má na sklade, sa zobrazujú ako prvé, aby ste mohli sústrediť výskum na aktívne výrobné linky.',
+    rdProductEmpty: 'Žiadne aktívne produkty nenájdené. Začnite vyrábať alebo predávať produkty a nabudúce sa zobrazia ako prvé.',
     invalidSelectionWarning: 'Predtým zvolený produkt už nie je dostupný. Prosím vyberte náhradu.',
     sectionConnected: 'Prepojené s touto budovou',
     sectionUsedByCompany: 'Používané vašou spoločnosťou',

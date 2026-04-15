@@ -5102,6 +5102,8 @@ watch(
                       :loading="rankedProductsLoading"
                       :allow-none="true"
                       none-label-key="buildingDetail.config.none"
+                      help-text-key="productPicker.rdProductHelp"
+                      empty-state-key="productPicker.rdProductEmpty"
                       @update:model-value="updateSelectedUnitConfig('productTypeId', $event)"
                     />
                   </div>
@@ -5131,6 +5133,8 @@ watch(
                       :loading="rankedProductsLoading"
                       :allow-none="true"
                       none-label-key="buildingDetail.config.none"
+                      help-text-key="productPicker.rdProductHelp"
+                      empty-state-key="productPicker.rdProductEmpty"
                       @update:model-value="updateSelectedUnitConfig('productTypeId', $event)"
                     />
                   </div>

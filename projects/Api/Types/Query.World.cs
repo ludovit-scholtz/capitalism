@@ -315,7 +315,8 @@ public sealed partial class Query
         }
         else if (normalizedUnitType is "PRODUCT_QUALITY" or "BRAND_QUALITY")
         {
-            // Promote products that this player's company manufactures in any building.
+            // Promote products actively used by this player's companies across all buildings:
+            // manufactured, sold (public or B2B), or currently stocked in inventory.
             var companyIds = await db.Companies
                 .Where(c => c.PlayerId == userId)
                 .Select(c => c.Id)
@@ -326,15 +327,25 @@ public sealed partial class Query
                 .Select(b => b.Id)
                 .ToListAsync();
 
-            var usedProductIds = await db.BuildingUnits
+            // Products in MANUFACTURING, PUBLIC_SALES, or B2B_SALES units.
+            var unitProductIds = await db.BuildingUnits
                 .Where(u => companyBuildingIds.Contains(u.BuildingId)
-                    && u.UnitType == "MANUFACTURING"
+                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
                     && u.ProductTypeId.HasValue)
                 .Select(u => u.ProductTypeId!.Value)
                 .Distinct()
                 .ToListAsync();
 
-            foreach (var id in usedProductIds)
+            // Products currently stocked in any company building inventory.
+            var inventoryProductIds = await db.Inventories
+                .Where(i => companyBuildingIds.Contains(i.BuildingId)
+                    && i.ProductTypeId.HasValue
+                    && i.Quantity > 0)
+                .Select(i => i.ProductTypeId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var id in unitProductIds.Concat(inventoryProductIds).Distinct())
                 promotedIds.TryAdd(id, ProductRankingReason.UsedByCompany);
         }
 
