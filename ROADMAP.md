@@ -11,35 +11,43 @@ It will use real world map. The game will start in single city and later other c
 Implement banking as is described in the product definition below.
 
 ### Dashboard (0% complete)
+
 - Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with. 
 
 ### Unit grid display (0% complete)
+
 - Visually display the flow of the product. The storage capacity from the unit is not showing any more. I would like to see the storage capacity, current usage of the capacity, inflow and outflow in the unit grid display. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.
 
-
 ### Unit upgrade (0% complete)
+
 Allow to upgrade more units at the same time. Make sure the upgrade is triggered when "store upgrade" button is clicked.
 
 Show all changes that upgrading of the unit will have, for example the storage capacity change. At the moment i do not see in the public sales unit the change in the storage capacity change for example.
 
 ### Research & Development (0% complete)
+
 - Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.". Make sure to show there the current state of the research or investigate why research is not cummulating.
 - In brand quality unit when category is selected as brand scope, the product selection shows up but not the product category selection. Make sure the brand category can be improved as well and the category of products is selected.
 
 ### Changelog (0% complete)
+
 - Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
 
 ### Architecture optimization (0% complete)
+
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 
 ### Marketing  (0% complete)
+
 - Make sure that in every city is one government owned media house from each type of media
 
 ### Power plants  (0% complete)
+
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below
 
 ### City map (0% complete)
+
 - Add picker to change the city
 - Implement and show weather predictions as is defined in the powerplants seciton
 - When going to the list view, and back to the map view, the map does not show up
