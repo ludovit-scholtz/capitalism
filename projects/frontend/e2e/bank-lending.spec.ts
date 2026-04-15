@@ -282,7 +282,12 @@ test.describe('Loan Marketplace (/loans)', () => {
     const lenderPanel = page.locator('[aria-label="Lender action"]')
     await expect(lenderPanel).toBeVisible()
     await expect(lenderPanel.getByRole('heading', { name: 'Become a Lender', level: 2 })).toBeVisible()
+    await expect(lenderPanel.getByRole('heading', { name: 'Log In to Start Lending', level: 3 })).toBeVisible()
+    // Login-specific description (not the no-bank explanation)
+    await expect(lenderPanel.getByText('Log in or create a free account to start offering loans')).toBeVisible()
     await expect(lenderPanel.getByRole('link', { name: 'Log in to offer loans' })).toBeVisible()
+    // Must NOT show the no-bank description which is for authenticated users without a bank
+    await expect(lenderPanel.getByText('you need to acquire a Bank building')).toBeHidden()
   })
 
   test('authenticated player without bank sees Acquire a Bank CTA', async ({ page }) => {

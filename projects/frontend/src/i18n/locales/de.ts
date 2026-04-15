@@ -1919,5 +1919,6 @@ export default {
     manageBank: 'Meine Bank verwalten',
     loginToLend: 'Anmelden, um Kredite anzubieten',
     loginToLendTitle: 'Anmelden und mit Verleihen beginnen',
+    loginToLendDescription: 'Melden Sie sich an oder erstellen Sie ein kostenloses Konto, um Kredite anzubieten und Zinseinkünfte von anderen Spielern zu erzielen.',
   },
 }

@@ -92,6 +92,7 @@ const MY_COMPANIES_QUERY = `
         buildings {
           id
           type
+          name
         }
       }
     }
@@ -266,7 +267,7 @@ async function confirmAcceptLoan() {
           <div class="lender-cta-icon" aria-hidden="true">🏦</div>
           <div class="lender-cta-body">
             <h3 class="lender-cta-title">{{ t('bank.loginToLendTitle') }}</h3>
-            <p class="lender-cta-description">{{ t('bank.noBankCTADescription') }}</p>
+            <p class="lender-cta-description">{{ t('bank.loginToLendDescription') }}</p>
           </div>
           <router-link to="/login" class="btn btn-secondary lender-cta-btn" aria-label="Log in to offer loans">
             {{ t('bank.loginToLend') }}

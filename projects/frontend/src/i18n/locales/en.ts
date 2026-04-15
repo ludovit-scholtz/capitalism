@@ -1919,5 +1919,6 @@ export default {
     manageBank: 'Manage My Bank',
     loginToLend: 'Log in to offer loans',
     loginToLendTitle: 'Log In to Start Lending',
+    loginToLendDescription: 'Log in or create a free account to start offering loans and earn interest income from other players.',
   },
 }

@@ -1911,5 +1911,6 @@ export default {
     manageBank: 'Spravovať moju banku',
     loginToLend: 'Prihlásiť sa na ponúkanie pôžičiek',
     loginToLendTitle: 'Prihláste sa a začnite požičiavať',
+    loginToLendDescription: 'Prihláste sa alebo si vytvorte bezplatný účet a začnite ponúkať pôžičky a zarábať na úrokoch od iných hráčov.',
   },
 }
