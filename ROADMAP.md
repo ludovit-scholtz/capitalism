@@ -36,6 +36,9 @@ Research does not seem to be working at the moment. I have R&D building with res
 ### Architecture optimization (0% complete)
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 
+### Marketing
+- Make sure that in every city is one government owned media house from each type of media
+
 ## Multiple Game Servers
 
 The master website is product pitching website where users can find in game documentation and list of active game servers. Existing users who authenticated can see their pro subscription on they can purchase prolonging their pro subscription.
@@ -368,8 +371,6 @@ List of the root game administrators is managed by the master api configuration.
 
 ## Newspaper and changelog
 
-**Status: 90% complete** (April 2026)
-
 The master api database holds the changelog and newspaper. Admins can publish the news for directing users or report some progress.
 
 With every change the changelog must be updated. The changelog is visible in the news section in every game.
@@ -378,17 +379,19 @@ Game administrators can edit any changelog or news record in any localization.
 
 Track if user did read the news, if not show in the navbar number of unread messages.
 
-### What was delivered
-- All CHANGELOG.csv entries are seeded as published global CHANGELOG records in MasterApi on startup (idempotent).
-- The game API news proxy (`gameNewsFeed` query) now returns an empty feed gracefully when MasterApi is unreachable, preventing blank screens.
-- Full empty state, loading state, and error state UIs are implemented in the NewsView.
-- Filter tabs (All / Newspaper / Changelog) work correctly and hide entries that do not belong to this server.
-- Unread badge in navbar shows count of unread entries; opening the News page marks visible entries as read and clears the badge.
-- 4 new backend game API tests verify proxy behaviour; 4 new MasterApi tests verify seed entries have all three locales; 8 new E2E tests cover unauthenticated access, empty state, error state, filter tabs, and pill labels.
+## Media house
 
-### What remains
-- Automated seeding of server-specific NEWS entries per deployed game server.
-- Pagination or search UI for feeds with more than 50 entries.
+Media building has single unit layout and does not show the grid.
+
+The configuration for this single unit is spending level on content per tick.
+
+The quality of the content is determined by accumulated costs spent by the media building. With the upgrade of the building, the content is more efficient. At start 50% of the costs goes to the aggregated content (1-1/2). Next level of building has 66% (1-1/3) efficiency, and so on.
+
+Per tick every media house looses 0.5% of the aggregated content value.
+
+The quality of the content is determined by the comparision of the other media houses. If this media house has highest content, it is ranked at 100% content. If competitive media house has aggregated content value half of the top media house, their content is ranked at 50%. This applies for the same media house in the same category and city. Different categories do not affect each other, so one company may have 100% of the content in city 1 for TV category, other company 100% of the content for Radio category in the same city with different aggregated content, and third company may have 100% content ranking for TV but in the different city.
+
+The content quality ranking determines the speed with which the branding quality is increasing.
 
 ## Monetization
 
