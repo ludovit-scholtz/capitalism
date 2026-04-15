@@ -391,6 +391,12 @@ export type MockResearchBrandState = {
   quality: number
   /** ≥ 1.0: driven by BRAND_QUALITY R&D. >1.0 = marketing budget is more effective. */
   marketingEfficiencyMultiplier: number
+  /** Accumulated R&D research budget for this product (game currency). Null if none. */
+  accumulatedResearchBudget?: number | null
+  /** Budget for 100% quality when uncontested. Null if not a product brand. */
+  baseResearchBudget?: number | null
+  /** Highest competitor budget for this product globally. Null if no research exists. */
+  maxCompetitorBudget?: number | null
 }
 
 export type MockPublicSalesRecord = {

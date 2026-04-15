@@ -4172,16 +4172,16 @@ watch(
             </div>
 
             <!-- Cumulative research budget panel (PRODUCT_QUALITY R&D model) -->
-            <div v-if="brand.scope === 'PRODUCT' && (brand.accumulatedResearchBudget !== null || brand.baseResearchBudget !== null)" class="research-budget-panel">
+            <div v-if="brand.scope === 'PRODUCT' && (brand.accumulatedResearchBudget != null || brand.baseResearchBudget != null)" class="research-budget-panel">
               <div class="research-budget-row">
                 <span class="research-budget-label">{{ t('research.budget.accumulated') }}</span>
-                <span class="research-budget-value">{{ brand.accumulatedResearchBudget !== null ? `$${brand.accumulatedResearchBudget.toFixed(0)}` : '—' }}</span>
+                <span class="research-budget-value">{{ brand.accumulatedResearchBudget != null ? `$${brand.accumulatedResearchBudget.toFixed(0)}` : '—' }}</span>
               </div>
               <div class="research-budget-row">
                 <span class="research-budget-label">{{ t('research.budget.target') }}</span>
-                <span class="research-budget-value">{{ brand.baseResearchBudget !== null ? `$${brand.baseResearchBudget.toFixed(0)}` : '—' }}</span>
+                <span class="research-budget-value">{{ brand.baseResearchBudget != null ? `$${brand.baseResearchBudget.toFixed(0)}` : '—' }}</span>
               </div>
-              <div v-if="brand.maxCompetitorBudget !== null && brand.accumulatedResearchBudget !== null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)" class="research-budget-row research-budget-row--competitor">
+              <div v-if="brand.maxCompetitorBudget != null && brand.accumulatedResearchBudget != null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)" class="research-budget-row research-budget-row--competitor">
                 <span class="research-budget-label">{{ t('research.budget.topCompetitor') }}</span>
                 <span class="research-budget-value research-budget-value--warn">${{ brand.maxCompetitorBudget.toFixed(0) }}</span>
               </div>
