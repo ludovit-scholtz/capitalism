@@ -10771,6 +10771,84 @@ test.describe('R&D Research Progress Panel', () => {
     // Help text explaining the three scope options is visible (from i18n key researchBrandHelp)
     await expect(page.getByText(/company-wide branding efficiency.*product category.*single product line/i)).toBeVisible()
   })
+
+  test('shows cumulative research budget panel for PRODUCT-scope brand with budget data', async ({
+    page,
+  }) => {
+    // Proves the new cumulative budget model UI: invested budget, uncontested target,
+    // top competitor warning, and decay hint are all visible.
+    const player = makePlayer()
+    const companyId = 'company-rd-budget'
+    player.companies.push({
+      id: companyId,
+      playerId: player.id,
+      name: 'Budget Research Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        makeRdBuilding(companyId, [
+          {
+            id: 'rd-unit-budget',
+            buildingId: 'building-rd-progress',
+            unitType: 'PRODUCT_QUALITY',
+            gridX: 0,
+            gridY: 0,
+            level: 1,
+            linkUp: false,
+            linkDown: false,
+            linkLeft: false,
+            linkRight: false,
+            linkUpLeft: false,
+            linkUpRight: false,
+            linkDownLeft: false,
+            linkDownRight: false,
+            productTypeId: 'prod-chair',
+          },
+        ]),
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.researchBrands[companyId] = [
+      {
+        id: 'brand-chair-budget',
+        companyId,
+        name: 'Wooden Chair',
+        scope: 'PRODUCT',
+        productTypeId: 'prod-chair',
+        productName: 'Wooden Chair',
+        industryCategory: null,
+        awareness: 0,
+        quality: 0.22,
+        marketingEfficiencyMultiplier: 1,
+        accumulatedResearchBudget: 9900,
+        baseResearchBudget: 45000,
+        maxCompetitorBudget: 18500,
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-rd-progress')
+
+    const panel = page.getByRole('region', { name: 'research progress' })
+    await expect(panel).toBeVisible()
+
+    // Budget panel rows are shown for PRODUCT-scope brands with budget data
+    await expect(panel.locator('.research-budget-label', { hasText: 'Research budget invested' })).toBeVisible()
+    await expect(panel.locator('.research-budget-value', { hasText: '$9900' })).toBeVisible()
+    await expect(panel.locator('.research-budget-label', { hasText: 'Budget for 100% quality' })).toBeVisible()
+    await expect(panel.locator('.research-budget-value', { hasText: '$45000' })).toBeVisible()
+    // Competitor row shown when competitor has more budget
+    await expect(panel.locator('.research-budget-label', { hasText: 'Top competitor budget' })).toBeVisible()
+    await expect(panel.locator('.research-budget-value--warn', { hasText: '$18500' })).toBeVisible()
+    // Decay hint always shown in budget panel
+    await expect(panel.locator('.research-budget-hint')).toBeVisible()
+  })
 })
 
 // ── Exchange sourcing — per-industry coverage ─────────────────────────────────

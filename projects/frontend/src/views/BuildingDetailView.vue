@@ -2974,6 +2974,9 @@ async function loadResearchBrands() {
           awareness
           quality
           marketingEfficiencyMultiplier
+          accumulatedResearchBudget
+          baseResearchBudget
+          maxCompetitorBudget
         }
       }`,
       { companyId },
@@ -4167,6 +4170,24 @@ watch(
                 <span class="research-metric-value">{{ (brand.awareness * 100).toFixed(1) }}%</span>
               </div>
             </div>
+
+            <!-- Cumulative research budget panel (PRODUCT_QUALITY R&D model) -->
+            <div v-if="brand.scope === 'PRODUCT' && (brand.accumulatedResearchBudget != null || brand.baseResearchBudget != null)" class="research-budget-panel">
+              <div class="research-budget-row">
+                <span class="research-budget-label">{{ t('research.budget.accumulated') }}</span>
+                <span class="research-budget-value">{{ brand.accumulatedResearchBudget != null ? `$${brand.accumulatedResearchBudget.toFixed(0)}` : '—' }}</span>
+              </div>
+              <div class="research-budget-row">
+                <span class="research-budget-label">{{ t('research.budget.target') }}</span>
+                <span class="research-budget-value">{{ brand.baseResearchBudget != null ? `$${brand.baseResearchBudget.toFixed(0)}` : '—' }}</span>
+              </div>
+              <div v-if="brand.maxCompetitorBudget != null && brand.accumulatedResearchBudget != null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)" class="research-budget-row research-budget-row--competitor">
+                <span class="research-budget-label">{{ t('research.budget.topCompetitor') }}</span>
+                <span class="research-budget-value research-budget-value--warn">${{ brand.maxCompetitorBudget.toFixed(0) }}</span>
+              </div>
+              <p class="research-budget-hint">{{ t('research.budget.decayHint') }}</p>
+            </div>
+
             <p class="research-brand-effect">
               <span v-if="brand.quality > 0">
                 {{
@@ -8844,6 +8865,51 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 0.125rem;
+}
+
+/* Research budget panel (cumulative budget model) */
+.research-budget-panel {
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.04));
+  border-radius: var(--radius-sm, 6px);
+  padding: 0.625rem 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.research-budget-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.125rem 0;
+}
+
+.research-budget-row--competitor {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.25rem;
+  padding-top: 0.375rem;
+}
+
+.research-budget-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.research-budget-value {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.research-budget-value--warn {
+  color: var(--color-warning, #d97706);
+}
+
+.research-budget-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+  margin: 0.375rem 0 0;
 }
 
 /* ── Market Intelligence panel ── */

@@ -66,6 +66,11 @@ public sealed class OperatingCostPhase : ITickPhase
                     2,
                     MidpointRounding.AwayFromZero);
 
+                // While an upgrade is in progress the unit operates at 50% cost (ROADMAP).
+                var upgradeMultiplier = context.UnitsUnderUpgrade.Contains(unit.Id) ? 0.5m : 1m;
+                laborCost = decimal.Round(laborCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
+                energyCost = decimal.Round(energyCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
+
                 if (laborCost > 0m)
                 {
                     company.Cash -= laborCost;

@@ -207,4 +207,23 @@ public sealed partial class TickContext
         Db.Brands.Add(brand);
         return brand;
     }
+
+    /// <summary>Finds or creates a research budget record for a company and product.</summary>
+    public ProductResearchBudget GetOrCreateResearchBudget(Guid companyId, Guid productTypeId)
+    {
+        var key = (companyId, productTypeId);
+        if (ResearchBudgetsByKey.TryGetValue(key, out var existing))
+            return existing;
+
+        var budget = new ProductResearchBudget
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyId,
+            ProductTypeId = productTypeId,
+            AccumulatedBudget = 0m,
+        };
+        ResearchBudgetsByKey[key] = budget;
+        Db.ProductResearchBudgets.Add(budget);
+        return budget;
+    }
 }

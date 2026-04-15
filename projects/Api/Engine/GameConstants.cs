@@ -149,6 +149,31 @@ public static class GameConstants
         _ => 0.001m * (decimal)Math.Pow(2, Math.Max(level - 1, 0))
     };
 
+    /// <summary>
+    /// Fraction of a PRODUCT_QUALITY unit's operating costs accumulated as research budget per tick.
+    /// Formula: 1 - 1/(level+1) — Level 1: 50%, Level 2: 66.7%, Level 3: 75%, Level 4: 80%.
+    /// Upgrades improve conversion efficiency as described in the ROADMAP.
+    /// </summary>
+    public static decimal ResearchBudgetConversionRate(int level)
+    {
+        var l = Math.Max(1, level);
+        return 1m - 1m / (l + 1m);
+    }
+
+    /// <summary>
+    /// Fraction of accumulated research budget lost per tick (decay rate).
+    /// 0.001 = 0.1% — a company that stops investing in R&amp;D will slowly lose quality over time.
+    /// </summary>
+    public const decimal ResearchDecayRate = 0.001m;
+
+    /// <summary>
+    /// Minimum accumulated research budget required to reach 100% product quality when uncontested
+    /// (i.e., the company is the sole researcher for that product).
+    /// Computed as max(5 000, basePrice × 1 000) to give cheaper products a sensible floor.
+    /// </summary>
+    public static decimal ResearchBaseQualityBudget(decimal basePrice) =>
+        Math.Max(5_000m, basePrice * 1_000m);
+
     /// <summary>Rate at which occupancy adjusts per tick toward equilibrium.</summary>
     public const decimal OccupancyAdjustmentRate = 0.5m;
 

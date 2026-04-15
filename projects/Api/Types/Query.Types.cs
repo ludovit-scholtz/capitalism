@@ -325,6 +325,26 @@ public sealed class ResearchBrandState
     public decimal Quality { get; set; }
 
     /// <summary>
+    /// Accumulated R&amp;D research budget (game currency) for this product.
+    /// Grows each tick by a fraction of the PRODUCT_QUALITY unit's operating cost,
+    /// and decays by 0.1% per tick.  Null when no research has been done for this product.
+    /// </summary>
+    public decimal? AccumulatedResearchBudget { get; set; }
+
+    /// <summary>
+    /// Base research budget required for 100% quality when no competitor exists
+    /// (computed from the product base price).
+    /// </summary>
+    public decimal? BaseResearchBudget { get; set; }
+
+    /// <summary>
+    /// Highest research budget across all companies researching this same product.
+    /// Used as the denominator when computing relative quality.
+    /// Null when no research has been done globally for this product.
+    /// </summary>
+    public decimal? MaxCompetitorBudget { get; set; }
+
+    /// <summary>
     /// Marketing efficiency multiplier (≥ 1.0). Driven by BRAND_QUALITY R&amp;D.
     /// A value of 1.5 means each unit of marketing budget generates 50% more brand awareness than baseline.
     /// This is NOT a direct brand gain — it only amplifies the effect of marketing spend.

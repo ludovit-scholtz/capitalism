@@ -1770,7 +1770,7 @@ export default {
   },
   research: {
     panelTitle: 'Výskumný pokrok',
-    intro: 'Výskum postupuje každý tik. Kvalita produktu zlepšuje výstupnú kvalitu výroby. Výskum kvality značky zlepšuje efektívnosť marketingového rozpočtu — priamo nezvyšuje povedomie o značke.',
+    intro: 'Výskum postupuje každý tik. Každá jednotka Kvality produktu konvertuje časť prevádzkových nákladov na kumulatívny výskumný rozpočet pre priradený produkt — a tento rozpočet klesá o 0,1 % za tik. Vaša kvalita produktu sa určuje relatívne k najsilnejšiemu konkurentovi investujúcemu do výskumu. Výskum kvality značky zlepšuje efektívnosť marketingového rozpočtu — priamo nezvyšuje povedomie o značke.',
     emptyState: 'Zatiaľ žiadny výskum nezaznamenaný. Nakonfigurujte jednotky Kvality produktu alebo Kvality značky a nechajte simuláciu bežať, aby ste tu videli pokrok.',
     qualityLabel: 'Kvalita produktu',
     awarenessLabel: 'Povedomie o značke',
@@ -1778,6 +1778,12 @@ export default {
     qualityEffect: 'Prispieva až {pct}% bonusom kvality do vyrobeného výstupu pre tento produkt.',
     awarenessEffect: 'Rozpoznanie značky zákazníkmi: {pct}%.',
     marketingEfficiencyEffect: 'Každá jednotka marketingového rozpočtu produkuje {multiplier}× viac povedomia o značke ako základná hodnota.',
+    budget: {
+      accumulated: 'Investovaný výskumný rozpočet',
+      target: 'Rozpočet pre 100 % kvalitu (bez konkurencie)',
+      topCompetitor: 'Najvyšší rozpočet konkurenta',
+      decayHint: 'Váš výskumný rozpočet klesá o 0,1 % za tik. Pokračujte v investíciách, aby ste si udržali alebo zvýšili vedúce postavenie v kvalite.',
+    },
   },
   supplyChain: {
     title: 'Dodávateľský reťazec',
