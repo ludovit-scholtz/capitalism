@@ -25181,6 +25181,425 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_PublicSalesProductRankedFirst()
+    {
+        // Products configured in a PUBLIC_SALES unit should be promoted with used_by_company
+        // for the PRODUCT_QUALITY context so the player can quickly research what they're selling.
+        var email = $"rpt-pqps-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptPqPs");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var flourId = await GetProductGuidBySlugAsync(db, "flour");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqPsCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var shopBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "RptPqPsShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(shopBuilding);
+        db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = shopBuilding.Id, UnitType = "PUBLIC_SALES",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = flourId,
+        });
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptPqPsRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("flour", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_B2BSalesProductRankedFirst()
+    {
+        // Products configured in a B2B_SALES unit should be promoted with used_by_company
+        // for the PRODUCT_QUALITY context.
+        var email = $"rpt-pqb2b-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptPqB2b");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var breadId = await GetProductGuidBySlugAsync(db, "bread");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqB2bCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var factoryBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "RptPqB2bFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(factoryBuilding);
+        db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = factoryBuilding.Id, UnitType = "B2B_SALES",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = breadId,
+        });
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptPqB2bRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("bread", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_InventoryProductRankedFirst()
+    {
+        // Products stocked in company inventory (without any active manufacturing unit)
+        // should be promoted with used_by_company for the PRODUCT_QUALITY context.
+        var email = $"rpt-pqinv-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptPqInv");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var basicMedicineId = await GetProductGuidBySlugAsync(db, "basic-medicine");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqInvCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var factoryBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "RptPqInvFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(factoryBuilding);
+        // No active units — but product is stocked in inventory.
+        db.Inventories.Add(new Api.Data.Entities.Inventory
+        {
+            BuildingId = factoryBuilding.Id,
+            ProductTypeId = basicMedicineId,
+            Quantity = 25m,
+            Quality = 1.0m,
+        });
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptPqInvRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("basic-medicine", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_NoUsedProducts_AllReturnAsCatalog()
+    {
+        // When the player has no active manufacturing, sales, or inventory for any product,
+        // all products should be returned as catalog (score 10).
+        var email = $"rpt-pqnone-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptPqNone");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqNoneCo", Cash = 50_000m };
+        db.Companies.Add(company);
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptPqNoneRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0, "Should return all products as catalog");
+        foreach (var item in items.EnumerateArray())
+        {
+            Assert.Equal("catalog", item.GetProperty("rankingReason").GetString());
+            Assert.Equal(10, item.GetProperty("rankingScore").GetInt32());
+        }
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_BrandQualityContext_PublicSalesProductRankedFirst()
+    {
+        // Products sold via PUBLIC_SALES should be promoted with used_by_company for BRAND_QUALITY.
+        var email = $"rpt-bqps-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptBqPs");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var woodenBedId = await GetProductGuidBySlugAsync(db, "wooden-bed");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptBqPsCo", Cash = 100_000m };
+        db.Companies.Add(company);
+        var shopBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "RptBqPsShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(shopBuilding);
+        db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = shopBuilding.Id, UnitType = "PUBLIC_SALES",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = woodenBedId,
+        });
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptBqPsRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "BRAND_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("wooden-bed", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_PendingManufacturingUnitProductRankedFirst()
+    {
+        // A product configured in a pending (not yet applied) MANUFACTURING plan unit should be
+        // promoted with used_by_company for PRODUCT_QUALITY, matching mock API behaviour.
+        var email = $"rpt-pqpend-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptPqPend");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var woodenTableId = await GetProductGuidBySlugAsync(db, "wooden-table");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqPendCo", Cash = 100_000m };
+        db.Companies.Add(company);
+
+        // Factory with no active units but a pending plan that includes a MANUFACTURING unit.
+        var factory = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "RptPqPendFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(factory);
+
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            BuildingId = factory.Id, SubmittedAtTick = 1, AppliesAtTick = 9999,
+            TotalTicksRequired = 1,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            BuildingConfigurationPlanId = plan.Id, UnitType = "MANUFACTURING",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = woodenTableId,
+            IsChanged = true, StartedAtTick = 1, AppliesAtTick = 9999, TicksRequired = 1,
+        });
+
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptPqPendRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("wooden-table", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_BrandQualityContext_PendingPublicSalesUnitProductRankedFirst()
+    {
+        // A product configured in a pending PUBLIC_SALES plan unit should be promoted with
+        // used_by_company for BRAND_QUALITY, matching mock API behaviour.
+        var email = $"rpt-bqpend-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptBqPend");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var breadId = await GetProductGuidBySlugAsync(db, "bread");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptBqPendCo", Cash = 100_000m };
+        db.Companies.Add(company);
+
+        // Shop with no active units but a pending plan that includes a PUBLIC_SALES unit.
+        var shopBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "RptBqPendShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(shopBuilding);
+
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            BuildingId = shopBuilding.Id, SubmittedAtTick = 1, AppliesAtTick = 9999,
+            TotalTicksRequired = 1,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        db.BuildingConfigurationPlanUnits.Add(new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            BuildingConfigurationPlanId = plan.Id, UnitType = "PUBLIC_SALES",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = breadId,
+            IsChanged = true, StartedAtTick = 1, AppliesAtTick = 9999, TicksRequired = 1,
+        });
+
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptBqPendRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "BRAND_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes");
+        Assert.True(items.GetArrayLength() > 0);
+        var first = items[0];
+        Assert.Equal("bread", first.GetProperty("productType").GetProperty("slug").GetString());
+        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    #endregion
+
+    [Fact]
     public async Task CompanyLedger_ReturnsShippingCostsAndShippingDrillDown()
     {
         var email = $"ledger-shipping-{Guid.NewGuid():N}@example.com";
@@ -25326,8 +25745,6 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(100m, summaries[0].GetProperty("amount").GetDecimal());
         Assert.Equal(2, summaries[0].GetProperty("entryCount").GetInt32());
     }
-
-    #endregion
 
     // ── Contradictory bidirectional link rejection ─────────────────────────────────────────────
     // The ROADMAP rule: "it is not possible to have bidirectional link between units like

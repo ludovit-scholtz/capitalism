@@ -177,9 +177,10 @@ public sealed partial class Query
     ///     the same building (including pending configuration) are ranked as <c>connected</c> (score 100).
     ///   </item>
     ///   <item>
-    ///     <b>PRODUCT_QUALITY</b> or <b>BRAND_QUALITY</b> context: products used in MANUFACTURING
-    ///     units across all buildings owned by the caller's companies are ranked as
-    ///     <c>used_by_company</c> (score 50).
+    ///     <b>PRODUCT_QUALITY</b> or <b>BRAND_QUALITY</b> context: products used in MANUFACTURING,
+    ///     PUBLIC_SALES, or B2B_SALES units (active or in a pending configuration plan) across all
+    ///     buildings owned by the caller's companies, plus any products currently stocked in
+    ///     inventory with quantity &gt; 0, are ranked as <c>used_by_company</c> (score 50).
     ///   </item>
     ///   <item>All remaining unlocked products fall into the <c>catalog</c> tier (score 10).</item>
     /// </list>
@@ -315,7 +316,8 @@ public sealed partial class Query
         }
         else if (normalizedUnitType is "PRODUCT_QUALITY" or "BRAND_QUALITY")
         {
-            // Promote products that this player's company manufactures in any building.
+            // Promote products actively used by this player's companies across all buildings:
+            // manufactured, sold (public or B2B), or currently stocked in inventory.
             var companyIds = await db.Companies
                 .Where(c => c.PlayerId == userId)
                 .Select(c => c.Id)
@@ -326,15 +328,37 @@ public sealed partial class Query
                 .Select(b => b.Id)
                 .ToListAsync();
 
-            var usedProductIds = await db.BuildingUnits
+            // Products in active MANUFACTURING, PUBLIC_SALES, or B2B_SALES units.
+            var unitProductIds = await db.BuildingUnits
                 .Where(u => companyBuildingIds.Contains(u.BuildingId)
-                    && u.UnitType == "MANUFACTURING"
+                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
                     && u.ProductTypeId.HasValue)
                 .Select(u => u.ProductTypeId!.Value)
                 .Distinct()
                 .ToListAsync();
 
-            foreach (var id in usedProductIds)
+            // Products in pending configuration plan units (planned but not yet applied).
+            var pendingUnitProductIds = await db.BuildingConfigurationPlanUnits
+                .Where(u => db.BuildingConfigurationPlans
+                    .Where(p => companyBuildingIds.Contains(p.BuildingId))
+                    .Select(p => p.Id)
+                    .Contains(u.BuildingConfigurationPlanId)
+                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
+                    && u.ProductTypeId.HasValue)
+                .Select(u => u.ProductTypeId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            // Products currently stocked in any company building inventory.
+            var inventoryProductIds = await db.Inventories
+                .Where(i => companyBuildingIds.Contains(i.BuildingId)
+                    && i.ProductTypeId.HasValue
+                    && i.Quantity > 0)
+                .Select(i => i.ProductTypeId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            foreach (var id in unitProductIds.Concat(pendingUnitProductIds).Concat(inventoryProductIds).Distinct())
                 promotedIds.TryAdd(id, ProductRankingReason.UsedByCompany);
         }
 

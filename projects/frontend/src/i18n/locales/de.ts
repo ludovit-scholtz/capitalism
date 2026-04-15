@@ -613,6 +613,8 @@ export default {
     triggerPlaceholder: 'Produkt auswählen…',
     helpText: 'Zuerst werden nur Produkte aus verbundenen Einheiten oder aktuellem Bestand angezeigt.',
     noConnectedProducts: 'Keine Produkte verfügbar. Verbinden Sie zuerst vorgelagerte Einheiten oder füllen Sie diese Einheit mit Bestand, um kontextbezogene Optionen freizuschalten.',
+    rdProductHelp: 'Produkte, die Ihr Unternehmen herstellt, verkauft oder lagert, werden zuerst angezeigt, damit Sie die Forschung auf Ihre aktiven Produktionslinien konzentrieren können.',
+    rdProductEmpty: 'Keine aktiven Produkte gefunden. Beginnen Sie mit der Herstellung oder dem Verkauf von Produkten, damit sie beim nächsten Mal zuerst erscheinen.',
     invalidSelectionWarning: 'Das zuvor gewählte Produkt ist nicht mehr verfügbar. Bitte wählen Sie eine Alternative.',
     sectionConnected: 'Mit diesem Gebäude verbunden',
     sectionUsedByCompany: 'Von Ihrem Unternehmen genutzt',

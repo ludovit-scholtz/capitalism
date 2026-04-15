@@ -2036,6 +2036,131 @@ test.describe('Building detail upgrades', () => {
     await expect(getGridCell(plannedSection, 1, 0)).toContainText('Wooden Chair')
   })
 
+  test('R&D product picker shows used products first with "Used by your company" section', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-rd-prio',
+      playerId: player.id,
+      name: 'Research Priority Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-factory-prio',
+          companyId: 'company-rd-prio',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Priority Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'prio-mfg',
+              buildingId: 'building-factory-prio',
+              unitType: 'MANUFACTURING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              productTypeId: 'prod-chair',
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+        {
+          id: 'building-rd-prio',
+          companyId: 'company-rd-prio',
+          cityId: 'city-ba',
+          type: 'RESEARCH_DEVELOPMENT',
+          name: 'Priority Lab',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'prio-rd-unit',
+              buildingId: 'building-rd-prio',
+              unitType: 'PRODUCT_QUALITY',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-rd-prio')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+    await expect(page.getByText('Research Product')).toBeVisible()
+
+    // Open the product picker
+    const researchProductField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Research Product') })
+    await researchProductField.locator('.picker-trigger').click()
+
+    // The "Used by your company" section header should be visible
+    await expect(
+      page.locator('.product-picker-panel .picker-section-header', {
+        hasText: 'Used by your company',
+      }),
+    ).toBeVisible()
+
+    // Wooden Chair (manufactured in the factory) should have a "Used by company" badge
+    const woodenChairItem = page
+      .locator('.product-picker-panel .picker-item')
+      .filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
+    await expect(woodenChairItem).toBeVisible()
+    await expect(woodenChairItem.locator('.picker-item-badge')).toContainText('Used by company')
+
+    // The "All products" (catalog) section should also be present with remaining products
+    await expect(
+      page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' }),
+    ).toBeVisible()
+
+    // The first item in the list should be the "Used by your company" section header
+    // (confirming used products appear before the catalog section)
+    const firstHeader = page.locator('.product-picker-panel .picker-section-header').first()
+    await expect(firstHeader).toContainText('Used by your company')
+  })
+
   test('factory purchase selector shows raw materials and only intermediate products', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
@@ -4510,7 +4635,7 @@ test.describe('Building detail upgrades', () => {
     // Inflow indicator must be visible
     await expect(miningCell.locator('.cell-capacity-inflow')).toBeVisible()
     // Outflow indicator must NOT be present (no outflow last tick)
-    await expect(miningCell.locator('.cell-capacity-outflow')).not.toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-outflow')).toBeHidden()
 
     // Aria-label must mention inflow
     await expect(miningCell).toHaveAttribute('aria-label', /↑.*arrived last tick/)
@@ -4584,7 +4709,7 @@ test.describe('Building detail upgrades', () => {
     // Outflow indicator must be visible
     await expect(storageCell.locator('.cell-capacity-outflow')).toBeVisible()
     // Inflow indicator must NOT be present (no inflow last tick)
-    await expect(storageCell.locator('.cell-capacity-inflow')).not.toBeVisible()
+    await expect(storageCell.locator('.cell-capacity-inflow')).toBeHidden()
 
     // Aria-label must mention outflow
     await expect(storageCell).toHaveAttribute('aria-label', /↓.*left last tick/)
@@ -4655,8 +4780,8 @@ test.describe('Building detail upgrades', () => {
     const miningCell = getGridCell(activeSection, 0, 0)
 
     // Neither inflow nor outflow indicators should be rendered
-    await expect(miningCell.locator('.cell-capacity-inflow')).not.toBeVisible()
-    await expect(miningCell.locator('.cell-capacity-outflow')).not.toBeVisible()
+    await expect(miningCell.locator('.cell-capacity-inflow')).toBeHidden()
+    await expect(miningCell.locator('.cell-capacity-outflow')).toBeHidden()
 
     // Aria-label should NOT mention movement
     const ariaLabel = await miningCell.getAttribute('aria-label')
