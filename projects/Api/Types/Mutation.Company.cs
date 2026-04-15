@@ -222,6 +222,45 @@ public sealed partial class Mutation
         if (input.Type == BuildingType.MediaHouse && !string.IsNullOrWhiteSpace(input.MediaType))
             building.MediaType = input.MediaType;
 
+        // Bank buildings require a $10,000,000 base-capital deposit.
+        if (input.Type == BuildingType.Bank)
+        {
+            if (company.Cash < BankBaseCapitalRequirement)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"Opening a bank requires a base capital deposit of ${BankBaseCapitalRequirement:N0}. Your company has {company.Cash:C0}.")
+                        .SetCode("INSUFFICIENT_FUNDS")
+                        .Build());
+            }
+
+            // Set default interest rates
+            building.DepositInterestRatePercent = 3m;   // 3% deposit rate
+            building.LendingInterestRatePercent = 8m;   // 8% lending rate
+
+            // Create the base-capital deposit record
+            var baseDeposit = new Data.Entities.BankDeposit
+            {
+                Id = Guid.NewGuid(),
+                BankBuildingId = building.Id,
+                DepositorCompanyId = company.Id,
+                Amount = Mutation.BankBaseCapitalRequirement,
+                DepositInterestRatePercent = 0m, // No interest on own base capital
+                IsBaseCapital = true,
+                IsActive = true,
+                DepositedAtTick = currentTick,
+                DepositedAtUtc = DateTime.UtcNow,
+                TotalInterestPaid = 0m,
+            };
+
+            db.BankDeposits.Add(baseDeposit);
+
+            // The base capital is already in the company's cash; it just gets "locked" into the bank
+            // (the company IS the bank, so no cash transfer needed — TotalDeposits increases)
+            building.TotalDeposits = Mutation.BankBaseCapitalRequirement;
+            building.BaseCapitalDeposited = true;
+        }
+
         await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
         await db.SaveChangesAsync();
 

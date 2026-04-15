@@ -90,6 +90,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Active and historical loans between companies.</summary>
     public DbSet<Loan> Loans => Set<Loan>();
 
+    /// <summary>Cash deposits placed by companies into bank buildings.</summary>
+    public DbSet<BankDeposit> BankDeposits => Set<BankDeposit>();
+
     /// <summary>Audit trail for administrator actions performed while impersonating players.</summary>
     public DbSet<AdminActionAuditLog> AdminActionAuditLogs => Set<AdminActionAuditLog>();
 

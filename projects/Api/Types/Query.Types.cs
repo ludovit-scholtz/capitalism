@@ -530,3 +530,47 @@ public sealed class UnitUpgradeInfo
     public decimal CurrentEnergyCostPerTick { get; set; }
     public decimal NextEnergyCostPerTick { get; set; }
 }
+
+/// <summary>Read model for a bank deposit (depositor or owner view).</summary>
+public sealed class BankDepositSummary
+{
+    public Guid Id { get; set; }
+    public Guid BankBuildingId { get; set; }
+    public string BankBuildingName { get; set; } = string.Empty;
+    public Guid DepositorCompanyId { get; set; }
+    public string DepositorCompanyName { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public decimal DepositInterestRatePercent { get; set; }
+    public bool IsBaseCapital { get; set; }
+    public bool IsActive { get; set; }
+    public long DepositedAtTick { get; set; }
+    public DateTime DepositedAtUtc { get; set; }
+    public long? WithdrawnAtTick { get; set; }
+    public DateTime? WithdrawnAtUtc { get; set; }
+    public decimal TotalInterestPaid { get; set; }
+}
+
+/// <summary>Public summary for a bank building: rates, capacity, and reserve status.</summary>
+public sealed class BankInfoSummary
+{
+    public Guid BankBuildingId { get; set; }
+    public string BankBuildingName { get; set; } = string.Empty;
+    public Guid CityId { get; set; }
+    public string CityName { get; set; } = string.Empty;
+    public Guid LenderCompanyId { get; set; }
+    public string LenderCompanyName { get; set; } = string.Empty;
+    /// <summary>Annual rate (%) the bank pays to depositors.</summary>
+    public decimal DepositInterestRatePercent { get; set; }
+    /// <summary>Annual rate (%) the bank charges on loans.</summary>
+    public decimal LendingInterestRatePercent { get; set; }
+    /// <summary>Total active deposits in the bank.</summary>
+    public decimal TotalDeposits { get; set; }
+    /// <summary>90% of total deposits — the maximum lendable amount.</summary>
+    public decimal LendableCapacity { get; set; }
+    /// <summary>Currently outstanding loan principal from this bank.</summary>
+    public decimal OutstandingLoanPrincipal { get; set; }
+    /// <summary>Available capacity to issue new loans (LendableCapacity - OutstandingLoanPrincipal).</summary>
+    public decimal AvailableLendingCapacity { get; set; }
+    /// <summary>Whether the bank has met the base-capital deposit requirement.</summary>
+    public bool BaseCapitalDeposited { get; set; }
+}

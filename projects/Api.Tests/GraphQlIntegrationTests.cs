@@ -22601,7 +22601,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var city = await db.Cities.FirstAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BankCo", Cash = 500_000m };
         db.Companies.Add(company);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "My Bank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "My Bank", Level = 1, TotalDeposits = 300_000m, BaseCapitalDeposited = true };
         db.Buildings.Add(bank);
         await db.SaveChangesAsync();
 
@@ -23214,6 +23214,350 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal("ACTIVE", loans[0].GetProperty("status").GetString());
         Assert.Equal("BLBorrowerCo", loans[0].GetProperty("borrowerCompanyName").GetString());
         Assert.Equal(15_000m, loans[0].GetProperty("originalPrincipal").GetDecimal());
+    }
+
+    #endregion
+
+    #region Bank Deposits
+
+    private static Api.Data.Entities.Building CreateTestBank(
+        Api.Data.AppDbContext db,
+        Api.Data.Entities.Company company,
+        Guid cityId,
+        decimal totalDeposits = 20_000_000m)
+    {
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = cityId,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "Test Bank",
+            Level = 1,
+            DepositInterestRatePercent = 5m,
+            LendingInterestRatePercent = 10m,
+            TotalDeposits = totalDeposits,
+            BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+        return bank;
+    }
+
+    [Fact]
+    public async Task CreateDeposit_Succeeds_TransfersCashAndCreatesRecord()
+    {
+        var bankOwnerEmail = $"bank-owner-dep-{Guid.NewGuid():N}@test.com";
+        var depositorEmail = $"depositor-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(bankOwnerEmail, "BankOwner");
+        var depositorToken = await RegisterAndGetTokenAsync(depositorEmail, "Depositor");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCo", Cash = 15_000_000m };
+        db.Companies.Add(bankCompany);
+        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "DepositorCo", Cash = 500_000m };
+        db.Companies.Add(depositorCompany);
+
+        var bank = CreateTestBank(db, bankCompany, city.Id);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Dep($input: CreateDepositInput!) {
+              createDeposit(input: $input) {
+                id
+                amount
+                depositInterestRatePercent
+                isActive
+                depositorCompanyId
+                bankBuildingId
+              }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 100_000m } },
+            depositorToken);
+
+        var data = result.GetProperty("data").GetProperty("createDeposit");
+        Assert.Equal(100_000m, data.GetProperty("amount").GetDecimal());
+        Assert.Equal(5m, data.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.True(data.GetProperty("isActive").GetBoolean());
+
+        // Verify cash was transferred
+        await db.Entry(depositorCompany).ReloadAsync();
+        await db.Entry(bankCompany).ReloadAsync();
+        await db.Entry(bank).ReloadAsync();
+
+        Assert.Equal(400_000m, depositorCompany.Cash);   // 500k - 100k
+        Assert.Equal(15_100_000m, bankCompany.Cash);     // 15M + 100k
+        Assert.Equal(20_100_000m, bank.TotalDeposits);   // 20M base + 100k
+    }
+
+    [Fact]
+    public async Task CreateDeposit_IntoUninitializedBank_ReturnsError()
+    {
+        var depositorEmail = $"dep-uninit-{Guid.NewGuid():N}@test.com";
+        var bankOwnerEmail = $"bo-uninit-{Guid.NewGuid():N}@test.com";
+        var depositorToken = await RegisterAndGetTokenAsync(depositorEmail, "DepUninit");
+        await RegisterAndGetTokenAsync(bankOwnerEmail, "BoUninit");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "UninitBankCo", Cash = 500_000m };
+        db.Companies.Add(bankCompany);
+        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "UninitDepCo", Cash = 500_000m };
+        db.Companies.Add(depositorCompany);
+
+        // Bank without BaseCapitalDeposited
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Uninit Bank", Level = 1,
+            BaseCapitalDeposited = false,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Dep($input: CreateDepositInput!) {
+              createDeposit(input: $input) { id }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 10_000m } },
+            depositorToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("BANK_NOT_INITIALIZED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task WithdrawDeposit_Succeeds_ReturnsCashAndClosesDeposit()
+    {
+        var bankOwnerEmail = $"bank-owner-wd-{Guid.NewGuid():N}@test.com";
+        var depositorEmail = $"depositor-wd-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(bankOwnerEmail, "WdBankOwner");
+        var depositorToken = await RegisterAndGetTokenAsync(depositorEmail, "WdDepositor");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "WdBankCo", Cash = 20_000_000m };
+        db.Companies.Add(bankCompany);
+        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "WdDepCo", Cash = 0m };
+        db.Companies.Add(depositorCompany);
+
+        var bank = CreateTestBank(db, bankCompany, city.Id, 20_050_000m);
+
+        var deposit = new Api.Data.Entities.BankDeposit
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            DepositorCompanyId = depositorCompany.Id,
+            Amount = 50_000m,
+            DepositInterestRatePercent = 5m,
+            IsBaseCapital = false,
+            IsActive = true,
+            DepositedAtTick = 1L,
+            DepositedAtUtc = DateTime.UtcNow,
+            TotalInterestPaid = 0m,
+        };
+        db.BankDeposits.Add(deposit);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Wd($input: WithdrawDepositInput!) {
+              withdrawDeposit(input: $input) {
+                id
+                amount
+                isActive
+              }
+            }
+            """,
+            new { input = new { depositId = deposit.Id.ToString(), amount = 50_000m } },
+            depositorToken);
+
+        var data = result.GetProperty("data").GetProperty("withdrawDeposit");
+        Assert.Equal(0m, data.GetProperty("amount").GetDecimal());
+        Assert.False(data.GetProperty("isActive").GetBoolean());
+
+        await db.Entry(depositorCompany).ReloadAsync();
+        Assert.Equal(50_000m, depositorCompany.Cash); // got money back
+    }
+
+    [Fact]
+    public async Task SetBankRates_ByOwner_UpdatesDepositAndLendingRates()
+    {
+        var ownerEmail = $"bank-rates-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "RatesOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "RatesCo", Cash = 15_000_000m };
+        db.Companies.Add(company);
+        var bank = CreateTestBank(db, company, city.Id);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Rates($input: SetBankRatesInput!) {
+              setBankRates(input: $input) {
+                bankBuildingId
+                depositInterestRatePercent
+                lendingInterestRatePercent
+              }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositInterestRatePercent = 4.5m, lendingInterestRatePercent = 12m } },
+            ownerToken);
+
+        var data = result.GetProperty("data").GetProperty("setBankRates");
+        Assert.Equal(4.5m, data.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(12m, data.GetProperty("lendingInterestRatePercent").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BankInfo_ReturnsRatesAndCapacity()
+    {
+        var ownerEmail = $"bank-info-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "InfoOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "InfoCo", Cash = 15_000_000m };
+        db.Companies.Add(company);
+        var bank = CreateTestBank(db, company, city.Id, totalDeposits: 10_000_000m);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Info($id: UUID!) {
+              bankInfo(bankBuildingId: $id) {
+                bankBuildingId
+                depositInterestRatePercent
+                lendingInterestRatePercent
+                totalDeposits
+                lendableCapacity
+                availableLendingCapacity
+                baseCapitalDeposited
+              }
+            }
+            """,
+            new { id = bank.Id.ToString() });
+
+        var data = result.GetProperty("data").GetProperty("bankInfo");
+        Assert.Equal(5m, data.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(10m, data.GetProperty("lendingInterestRatePercent").GetDecimal());
+        Assert.Equal(10_000_000m, data.GetProperty("totalDeposits").GetDecimal());
+        Assert.Equal(9_000_000m, data.GetProperty("lendableCapacity").GetDecimal()); // 90% of 10M
+        Assert.Equal(9_000_000m, data.GetProperty("availableLendingCapacity").GetDecimal());
+        Assert.True(data.GetProperty("baseCapitalDeposited").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PublishLoanOffer_ExceedsReserveRatio_ReturnsError()
+    {
+        var ownerEmail = $"bank-reserve-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "ReserveOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "ReserveCo", Cash = 1_000_000m };
+        db.Companies.Add(company);
+        // Bank with only $1M in deposits → lendable = $900k
+        var bank = CreateTestBank(db, company, city.Id, totalDeposits: 1_000_000m);
+        await db.SaveChangesAsync();
+
+        // Try to offer $950k — exceeds the 90% ($900k) limit
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Pub($input: PublishLoanOfferInput!) {
+              publishLoanOffer(input: $input) { id }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), annualInterestRatePercent = 8m, maxPrincipalPerLoan = 50_000m, totalCapacity = 950_000m, durationTicks = 1440L } },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("EXCEEDS_RESERVE_RATIO", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task BankInterestPhase_PaysInterestToDepositor()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+
+        var bankPlayer = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"bank-int-{Guid.NewGuid():N}@test.com", DisplayName = "BankInt", Role = "PLAYER", PasswordHash = "x" };
+        var depositorPlayer = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"dep-int-{Guid.NewGuid():N}@test.com", DisplayName = "DepInt", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.Add(bankPlayer);
+        db.Players.Add(depositorPlayer);
+
+        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankPlayer.Id, Name = "IntBankCo", Cash = 1_000_000m };
+        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositorPlayer.Id, Name = "IntDepCo", Cash = 0m };
+        db.Companies.Add(bankCompany);
+        db.Companies.Add(depositorCompany);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "IntBank", Level = 1,
+            DepositInterestRatePercent = 3650m, // 3650% p.a. = 10 per tick (for easy math at 1 tick/year ratio)
+            TotalDeposits = 100_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+
+        var deposit = new Api.Data.Entities.BankDeposit
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            DepositorCompanyId = depositorCompany.Id,
+            Amount = 100_000m,
+            DepositInterestRatePercent = 3650m, // 3650% / TicksPerYear (8760) = ~0.4167 per tick per unit, times 100k = ~41.67 per tick
+            IsBaseCapital = false,
+            IsActive = true,
+            DepositedAtTick = 1L,
+            DepositedAtUtc = DateTime.UtcNow,
+        };
+        db.BankDeposits.Add(deposit);
+        await db.SaveChangesAsync();
+
+        // Process one tick via TickProcessor
+        var tickProcessor = scope.ServiceProvider.GetRequiredService<Api.Engine.TickProcessor>();
+        await tickProcessor.ProcessTickAsync();
+
+        await db.Entry(depositorCompany).ReloadAsync();
+        await db.Entry(bankCompany).ReloadAsync();
+        await db.Entry(deposit).ReloadAsync();
+
+        // depositor should have received some interest
+        Assert.True(depositorCompany.Cash > 0m, "Depositor should have received interest.");
+        Assert.True(deposit.TotalInterestPaid > 0m, "Deposit should track interest paid.");
     }
 
     #endregion

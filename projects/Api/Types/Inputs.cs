@@ -495,3 +495,39 @@ public sealed class MergeCompanyInput
     /// <summary>The company that receives all transferred assets (must be directly controlled by the player).</summary>
     public Guid DestinationCompanyId { get; set; }
 }
+
+/// <summary>Input for creating a cash deposit in a bank building.</summary>
+public sealed class CreateDepositInput
+{
+    /// <summary>The bank building to deposit into.</summary>
+    public Guid BankBuildingId { get; set; }
+
+    /// <summary>The company making the deposit (must be owned by the authenticated player).</summary>
+    public Guid DepositorCompanyId { get; set; }
+
+    /// <summary>Amount to deposit (must be >= 1,000).</summary>
+    public decimal Amount { get; set; }
+}
+
+/// <summary>Input for withdrawing funds from a bank deposit.</summary>
+public sealed class WithdrawDepositInput
+{
+    /// <summary>The deposit to withdraw from.</summary>
+    public Guid DepositId { get; set; }
+
+    /// <summary>Amount to withdraw. Pass the full deposit amount for a complete withdrawal.</summary>
+    public decimal Amount { get; set; }
+}
+
+/// <summary>Input for configuring a bank's deposit and lending interest rates.</summary>
+public sealed class SetBankRatesInput
+{
+    /// <summary>The bank building to configure (must be owned by the authenticated player's company).</summary>
+    public Guid BankBuildingId { get; set; }
+
+    /// <summary>Annual interest rate (%) to pay depositors. Must be between 0 and 100.</summary>
+    public decimal DepositInterestRatePercent { get; set; }
+
+    /// <summary>Annual interest rate (%) to charge borrowers. Must be between 0.1 and 200.</summary>
+    public decimal LendingInterestRatePercent { get; set; }
+}

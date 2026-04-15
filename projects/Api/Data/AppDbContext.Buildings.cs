@@ -20,6 +20,9 @@ public sealed partial class AppDbContext
             e.Property(b => b.PowerOutput).HasPrecision(18, 2);
             e.Property(b => b.PowerStatus).HasMaxLength(20);
             e.Property(b => b.InterestRate).HasPrecision(5, 2);
+            e.Property(b => b.DepositInterestRatePercent).HasPrecision(8, 4);
+            e.Property(b => b.LendingInterestRatePercent).HasPrecision(8, 4);
+            e.Property(b => b.TotalDeposits).HasPrecision(18, 2);
             e.Property(b => b.ConstructionCost).HasPrecision(18, 2);
             e.HasOne(b => b.Company).WithMany(c => c.Buildings).HasForeignKey(b => b.CompanyId);
             e.HasOne(b => b.City).WithMany(c => c.Buildings).HasForeignKey(b => b.CityId);

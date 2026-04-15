@@ -189,6 +189,18 @@ public sealed partial class AppDbContext
             e.HasIndex(l => l.NextPaymentTick);
         });
 
+        modelBuilder.Entity<BankDeposit>(e =>
+        {
+            e.HasKey(d => d.Id);
+            e.Property(d => d.Amount).HasPrecision(18, 2);
+            e.Property(d => d.DepositInterestRatePercent).HasPrecision(8, 4);
+            e.Property(d => d.TotalInterestPaid).HasPrecision(18, 4);
+            e.HasOne(d => d.BankBuilding).WithMany().HasForeignKey(d => d.BankBuildingId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(d => d.DepositorCompany).WithMany().HasForeignKey(d => d.DepositorCompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasIndex(d => new { d.BankBuildingId, d.IsActive });
+            e.HasIndex(d => new { d.DepositorCompanyId, d.IsActive });
+        });
+
         modelBuilder.Entity<AdminActionAuditLog>(e =>
         {
             e.HasKey(log => log.Id);

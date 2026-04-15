@@ -138,6 +138,7 @@ public class Program
         builder.Services.AddScoped<ITickPhase, ResearchPhase>();
         builder.Services.AddScoped<ITickPhase, RentPhase>();
         builder.Services.AddScoped<ITickPhase, LoanRepaymentPhase>();
+        builder.Services.AddScoped<ITickPhase, BankInterestPhase>();
         builder.Services.AddScoped<ITickPhase, TaxPhase>();
         builder.Services.AddScoped<ITickPhase, DividendPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
