@@ -26,18 +26,9 @@ Show all changes that upgrading of the unit will have, for example the storage c
 ### All buildings (0% complete)
 - Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future. Sell Building is touching the cancel editing button at the moment.
 
-
-
-### Stock exchange (0% complete)
-- When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional. 
-**[100% complete — Trading controls redesigned with a 3-row CSS grid layout: label row (Quantity / Buy / Sell), controls row (number input and both action buttons in the same grid row for pixel-perfect vertical alignment), and estimates row (Est. cost / Est. proceeds). Replaced the old `display:flex; align-items:flex-end` approach that misaligned buttons with a `display:grid` sub-grid that guarantees input and buttons share identical baselines. Responsive: on ≤720 px the label row is hidden, the input spans full width, and Buy/Sell buttons sit side-by-side. Keyboard navigation order preserved. E2E coverage added for aligned-controls rendering, disabled loading state, and validation error placement.]**
-
-
 ### Research & Development (0% complete)
 Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.
 ". Make sure to show there the current state of the research or investigate why research is not cummulating.
-
-
 
 ### Ingame chat (0% complete)
 - Ingame chat in navbar does not show any icon.
