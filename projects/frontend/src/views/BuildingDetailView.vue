@@ -3215,6 +3215,10 @@ async function submitUnitUpgrade(unitId: string) {
       unitUpgradeError.value = t('buildingDetail.unitUpgrade.errorInsufficientFunds')
     } else if (code === 'MAX_LEVEL_REACHED' || raw.includes('MAX_LEVEL_REACHED')) {
       unitUpgradeError.value = t('buildingDetail.unitUpgrade.errorMaxLevel')
+    } else if (code === 'MAX_CONCURRENT_UPGRADES' || raw.includes('MAX_CONCURRENT_UPGRADES')) {
+      unitUpgradeError.value = t('buildingDetail.unitUpgrade.errorMaxConcurrentUpgrades')
+    } else if (code === 'UNIT_ALREADY_UPGRADING' || raw.includes('UNIT_ALREADY_UPGRADING')) {
+      unitUpgradeError.value = t('buildingDetail.unitUpgrade.errorUnitAlreadyUpgrading')
     } else if (code === 'PENDING_CONFIGURATION_EXISTS' || raw.includes('PENDING_CONFIGURATION_EXISTS')) {
       unitUpgradeError.value = t('buildingDetail.unitUpgrade.errorPendingPlan')
     } else {
@@ -3856,10 +3860,11 @@ watch(
   { immediate: true },
 )
 
-// Fetch upgrade info when a live (non-editing) unit is selected
+// Fetch upgrade info when an active unit is selected while in edit mode.
+// Upgrade actions are only available in edit mode (per product requirements).
 watch(
   () => {
-    if (isEditing.value || !selectedCell.value) return null
+    if (!isEditing.value || !selectedCell.value) return null
     const unit = getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y)
     return unit?.id ?? null
   },
@@ -5379,86 +5384,10 @@ watch(
                   {{ t('buildingDetail.removeUnit') }}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
 
-        <!-- Read-only unit detail sidebar (click on active grid) -->
-        <div class="sidebar" v-else-if="selectedCell && !isEditing && getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)">
-          <div class="unit-config">
-            <div class="unit-config-header">
-              <h3>{{ t('buildingDetail.unitDetails') }}</h3>
-              <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
-            </div>
-            <div class="unit-detail">
-              <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
-              <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
-              <div class="unit-stats">
-                <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.level }}</span>
-                <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
-              </div>
-              <div class="unit-config-readonly-details">
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).resourceTypeId">
-                  {{ t('buildingDetail.config.resourceType') }}: {{ getResourceName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).resourceTypeId) }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId">
-                  {{ t('buildingDetail.config.productType') }}: {{ getProductName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId) }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice != null">
-                  {{ t('buildingDetail.config.minPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice != null">
-                  {{ t('buildingDetail.config.maxPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource">
-                  {{ t('buildingDetail.config.procurementMode') }}:
-                  {{ t(`buildingDetail.config.procurementMode_${(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource}`) }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility">
-                  {{ t('buildingDetail.config.saleVisibility') }}: {{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget != null">
-                  {{ t('buildingDetail.config.budget') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget }}
-                </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope">
-                  {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope) }}
-                </span>
-              </div>
-
-              <!-- Operational status badge for active units -->
+              <!-- Unit Upgrade Panel (edit-mode only) -->
               <div
-                v-if="selectedActiveUnitOperationalStatus"
-                class="unit-insight-card operational-status-card"
-                :data-status="selectedActiveUnitOperationalStatus.status"
-                aria-label="Unit operational status"
-              >
-                <h5>{{ t('buildingDetail.operationalStatus.title') }}</h5>
-                <div class="operational-status-row">
-                  <span class="status-badge" :class="`status-${selectedActiveUnitOperationalStatus.status.toLowerCase()}`">
-                    {{ t(`buildingDetail.operationalStatus.${selectedActiveUnitOperationalStatus.status}`) }}
-                  </span>
-                  <span v-if="selectedActiveUnitOperationalStatus.idleTicks > 0" class="idle-ticks-label">
-                    {{ t('buildingDetail.operationalStatus.idleTicks', { count: selectedActiveUnitOperationalStatus.idleTicks }) }}
-                  </span>
-                </div>
-                <p v-if="selectedActiveUnitOperationalStatus.blockedReason" class="blocked-reason-text">
-                  {{ selectedActiveUnitOperationalStatus.blockedReason }}
-                </p>
-                <!-- Next-tick operating costs breakdown -->
-                <div v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-costs-row">
-                  <span class="operating-cost-label">{{ t('buildingDetail.operatingCost.title') }}</span>
-                  <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="operating-cost-item">
-                    {{ t('buildingDetail.operatingCost.labor', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickLaborCost) }) }}
-                  </span>
-                  <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-cost-item">
-                    {{ t('buildingDetail.operatingCost.energy', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickEnergyCost) }) }}
-                  </span>
-                </div>
-              </div>
-
-              <!-- Unit Upgrade Panel -->
-              <div
-                v-if="selectedCellUpgradeInfo !== null"
+                v-if="isEditing && selectedCellUpgradeInfo !== null"
                 class="unit-insight-card unit-upgrade-panel"
                 aria-label="Unit Upgrade"
               >
@@ -5475,7 +5404,6 @@ watch(
                         time: formatTickDuration(selectedCellPendingUpgrade.ticksRemaining, locale),
                       }) }}
                     </p>
-                    <!-- Downtime notice: unit is offline during upgrade -->
                     <p class="unit-upgrade-downtime-notice">
                       {{ t('buildingDetail.unitUpgrade.pendingDowntimeNotice') }}
                     </p>
@@ -5553,6 +5481,84 @@ watch(
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Read-only unit detail sidebar (click on active grid) -->
+        <div class="sidebar" v-else-if="selectedCell && !isEditing && getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)">
+          <div class="unit-config">
+            <div class="unit-config-header">
+              <h3>{{ t('buildingDetail.unitDetails') }}</h3>
+              <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
+            </div>
+            <div class="unit-detail">
+              <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
+              <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
+              <div class="unit-stats">
+                <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.level }}</span>
+                <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+              </div>
+              <div class="unit-config-readonly-details">
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).resourceTypeId">
+                  {{ t('buildingDetail.config.resourceType') }}: {{ getResourceName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).resourceTypeId) }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId">
+                  {{ t('buildingDetail.config.productType') }}: {{ getProductName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId) }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice != null">
+                  {{ t('buildingDetail.config.minPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice != null">
+                  {{ t('buildingDetail.config.maxPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource">
+                  {{ t('buildingDetail.config.procurementMode') }}:
+                  {{ t(`buildingDetail.config.procurementMode_${(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource}`) }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility">
+                  {{ t('buildingDetail.config.saleVisibility') }}: {{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget != null">
+                  {{ t('buildingDetail.config.budget') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope">
+                  {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope) }}
+                </span>
+              </div>
+
+              <!-- Operational status badge for active units -->
+              <div
+                v-if="selectedActiveUnitOperationalStatus"
+                class="unit-insight-card operational-status-card"
+                :data-status="selectedActiveUnitOperationalStatus.status"
+                aria-label="Unit operational status"
+              >
+                <h5>{{ t('buildingDetail.operationalStatus.title') }}</h5>
+                <div class="operational-status-row">
+                  <span class="status-badge" :class="`status-${selectedActiveUnitOperationalStatus.status.toLowerCase()}`">
+                    {{ t(`buildingDetail.operationalStatus.${selectedActiveUnitOperationalStatus.status}`) }}
+                  </span>
+                  <span v-if="selectedActiveUnitOperationalStatus.idleTicks > 0" class="idle-ticks-label">
+                    {{ t('buildingDetail.operationalStatus.idleTicks', { count: selectedActiveUnitOperationalStatus.idleTicks }) }}
+                  </span>
+                </div>
+                <p v-if="selectedActiveUnitOperationalStatus.blockedReason" class="blocked-reason-text">
+                  {{ selectedActiveUnitOperationalStatus.blockedReason }}
+                </p>
+                <!-- Next-tick operating costs breakdown -->
+                <div v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-costs-row">
+                  <span class="operating-cost-label">{{ t('buildingDetail.operatingCost.title') }}</span>
+                  <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="operating-cost-item">
+                    {{ t('buildingDetail.operatingCost.labor', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickLaborCost) }) }}
+                  </span>
+                  <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-cost-item">
+                    {{ t('buildingDetail.operatingCost.energy', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickEnergyCost) }) }}
+                  </span>
+                </div>
+              </div>
+
+              <!-- Unit Upgrade Panel removed from read-only view; it now lives in edit mode only. -->
 
               <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
                 <h5>{{ t('buildingDetail.inventory.title') }}</h5>

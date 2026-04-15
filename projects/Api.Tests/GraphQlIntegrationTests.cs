@@ -24160,7 +24160,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             GridX = 0, GridY = 0, Level = 1,
         };
         db.BuildingUnits.Add(unit);
-        // Add a blocking pending plan
+        // Add a blocking structural pending plan (has a removal, so it is not upgrade-only)
         var existingPlan = new Api.Data.Entities.BuildingConfigurationPlan
         {
             BuildingId = building.Id,
@@ -24169,6 +24169,15 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             TotalTicksRequired = 50,
         };
         db.BuildingConfigurationPlans.Add(existingPlan);
+        await db.SaveChangesAsync();
+        // Add a removal entry to mark this as a structural change (not upgrade-only)
+        db.BuildingConfigurationPlanRemovals.Add(new Api.Data.Entities.BuildingConfigurationPlanRemoval
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = existingPlan.Id,
+            GridX = 1, GridY = 0,
+            AppliesAtTick = gameState.CurrentTick + 3,
+        });
         await db.SaveChangesAsync();
 
         var mutation = """
@@ -24517,6 +24526,240 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { input = new { unitId = unit.Id.ToString() } }, null);
 
         Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task ScheduleUnitUpgrade_DualUpgrade_AddsSecondUpgradeToExistingPlan()
+    {
+        // Two different units in the same building can be upgraded simultaneously.
+        // The second call should modify the existing upgrade-only plan rather than blocking.
+        var email = $"uu-dual-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUDual");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUDualCo", Cash = 500_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUDualFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit1 = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        var unit2 = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Storage,
+            GridX = 1, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.AddRange(unit1, unit2);
+        await db.SaveChangesAsync();
+
+        var mutation = """
+            mutation SUU($input: ScheduleUnitUpgradeInput!) {
+              scheduleUnitUpgrade(input: $input) {
+                id units { gridX gridY level isChanged ticksRequired unitType }
+              }
+            }
+            """;
+
+        // Schedule first upgrade (Manufacturing at 0,0)
+        var result1 = await ExecuteGraphQlAsync(isolatedClient, mutation,
+            new { input = new { unitId = unit1.Id.ToString() } }, token);
+        Assert.False(result1.TryGetProperty("errors", out _), "First upgrade should succeed");
+        var plan1 = result1.GetProperty("data").GetProperty("scheduleUnitUpgrade");
+        var plan1Id = plan1.GetProperty("id").GetString();
+
+        // Schedule second upgrade (Storage at 1,0) — should merge into the same plan
+        var result2 = await ExecuteGraphQlAsync(isolatedClient, mutation,
+            new { input = new { unitId = unit2.Id.ToString() } }, token);
+        Assert.False(result2.TryGetProperty("errors", out _), "Second upgrade on different unit should succeed");
+        var plan2 = result2.GetProperty("data").GetProperty("scheduleUnitUpgrade");
+
+        // Both upgrades should be on the same plan
+        Assert.Equal(plan1Id, plan2.GetProperty("id").GetString());
+
+        // Both changed units should appear in the plan
+        var changedUnits = plan2.GetProperty("units").EnumerateArray()
+            .Where(u => u.GetProperty("isChanged").GetBoolean())
+            .ToList();
+        Assert.Equal(2, changedUnits.Count);
+        Assert.Contains(changedUnits, u => u.GetProperty("unitType").GetString() == "MANUFACTURING");
+        Assert.Contains(changedUnits, u => u.GetProperty("unitType").GetString() == "STORAGE");
+
+        // Both units should be bumped to level 2
+        Assert.All(changedUnits, u => Assert.Equal(2, u.GetProperty("level").GetInt32()));
+
+        // Cash deducted for both upgrades
+        await db.Entry(company).ReloadAsync();
+        var cost1 = Api.Engine.GameConstants.UnitUpgradeCost(Api.Data.Entities.UnitType.Manufacturing, 1);
+        var cost2 = Api.Engine.GameConstants.UnitUpgradeCost(Api.Data.Entities.UnitType.Storage, 1);
+        Assert.Equal(500_000m - cost1 - cost2, company.Cash);
+    }
+
+    [Fact]
+    public async Task ScheduleUnitUpgrade_ThirdUpgrade_ReturnsMaxConcurrentUpgradesError()
+    {
+        // Once two units are already upgrading (max concurrent = 2), a third upgrade attempt is rejected.
+        var email = $"uu-third-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUThird");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var gameState = await db.GameStates.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUThirdCo", Cash = 1_000_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUThirdFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit1 = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        var unit2 = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Storage,
+            GridX = 1, GridY = 0, Level = 1,
+        };
+        var unit3 = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Mining,
+            GridX = 2, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.AddRange(unit1, unit2, unit3);
+
+        // Seed a plan with 2 upgrades already in progress
+        var planId = Guid.NewGuid();
+        var existingPlan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtTick = gameState.CurrentTick,
+            AppliesAtTick = gameState.CurrentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(existingPlan);
+        await db.SaveChangesAsync();
+
+        // Add 2 changed units (both upgrades in progress)
+        db.BuildingConfigurationPlanUnits.AddRange(
+            new Api.Data.Entities.BuildingConfigurationPlanUnit
+            {
+                Id = Guid.NewGuid(), BuildingConfigurationPlanId = planId,
+                UnitType = Api.Data.Entities.UnitType.Manufacturing, GridX = 0, GridY = 0,
+                Level = 2, IsChanged = true, TicksRequired = 10,
+                StartedAtTick = gameState.CurrentTick, AppliesAtTick = gameState.CurrentTick + 10,
+            },
+            new Api.Data.Entities.BuildingConfigurationPlanUnit
+            {
+                Id = Guid.NewGuid(), BuildingConfigurationPlanId = planId,
+                UnitType = Api.Data.Entities.UnitType.Storage, GridX = 1, GridY = 0,
+                Level = 2, IsChanged = true, TicksRequired = 10,
+                StartedAtTick = gameState.CurrentTick, AppliesAtTick = gameState.CurrentTick + 10,
+            }
+        );
+        await db.SaveChangesAsync();
+
+        var mutation = """
+            mutation SUU($input: ScheduleUnitUpgradeInput!) {
+              scheduleUnitUpgrade(input: $input) { id }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, mutation,
+            new { input = new { unitId = unit3.Id.ToString() } }, token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Contains("MAX_CONCURRENT_UPGRADES", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task ScheduleUnitUpgrade_UnitAlreadyUpgrading_ReturnsError()
+    {
+        // Trying to upgrade a unit that is already being upgraded in the plan returns an error.
+        var email = $"uu-dup-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUDup");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+        var gameState = await db.GameStates.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUDupCo", Cash = 500_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUDupFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+
+        // Seed a plan with the same unit already being upgraded
+        var planId = Guid.NewGuid();
+        var existingPlan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtTick = gameState.CurrentTick,
+            AppliesAtTick = gameState.CurrentTick + 10,
+            TotalTicksRequired = 10,
+        };
+        db.BuildingConfigurationPlans.Add(existingPlan);
+        await db.SaveChangesAsync();
+
+        db.BuildingConfigurationPlanUnits.Add(new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(), BuildingConfigurationPlanId = planId,
+            UnitType = Api.Data.Entities.UnitType.Manufacturing, GridX = 0, GridY = 0,
+            Level = 2, IsChanged = true, TicksRequired = 10,
+            StartedAtTick = gameState.CurrentTick, AppliesAtTick = gameState.CurrentTick + 10,
+        });
+        await db.SaveChangesAsync();
+
+        var mutation = """
+            mutation SUU($input: ScheduleUnitUpgradeInput!) {
+              scheduleUnitUpgrade(input: $input) { id }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, mutation,
+            new { input = new { unitId = unit.Id.ToString() } }, token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Contains("UNIT_ALREADY_UPGRADING", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     #endregion

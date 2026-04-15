@@ -5030,6 +5030,223 @@ test.describe('Building detail upgrades', () => {
     await expect(getGridCell(plannedSection, 0, 0)).toHaveClass(/selected/)
     await expect(page.locator('.sidebar .purchase-selection-summary')).toContainText('Wood')
   })
+
+  // ── Unit upgrade edit-mode gating ──────────────────────────────────────────
+
+  test('upgrade panel is hidden in read-only view and visible in edit mode', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-upgrate-gate',
+      playerId: player.id,
+      name: 'Gate Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-gate',
+          companyId: 'company-upgrate-gate',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Gate Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-gate-mfg',
+              buildingId: 'building-gate',
+              unitType: 'MANUFACTURING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-gate')
+    await expect(page.getByRole('heading', { name: 'Gate Factory' })).toBeVisible()
+
+    // In read-only mode: click on the active grid cell — upgrade panel must NOT be visible
+    const currentSection = getGridSection(page, 'Current Configuration')
+    await getGridCell(currentSection, 0, 0).click()
+    await expect(page.locator('.unit-upgrade-panel')).toHaveCount(0)
+
+    // Enter edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+
+    // Click the same cell in the planned grid — upgrade panel IS visible
+    await getGridCell(plannedSection, 0, 0).click()
+    await expect(page.locator('.unit-upgrade-panel')).toBeVisible()
+    await expect(page.locator('.unit-upgrade-panel')).toContainText('Unit Upgrade')
+
+    // Exit edit mode (cancel)
+    await page.getByRole('button', { name: 'Cancel Editing' }).click()
+    await expect(page.locator('.unit-upgrade-panel')).toHaveCount(0)
+  })
+
+  test('upgrade panel shows before/after stat preview and allows confirming', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-upgrade-preview',
+      playerId: player.id,
+      name: 'Preview Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-upgrade-preview',
+          companyId: 'company-upgrade-preview',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Preview Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-preview-mfg',
+              buildingId: 'building-upgrade-preview',
+              unitType: 'MANUFACTURING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-upgrade-preview')
+    await expect(page.getByRole('heading', { name: 'Preview Factory' })).toBeVisible()
+
+    // Enter edit mode and select the manufacturing cell
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    // Upgrade panel shows before/after stat preview
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+
+    // The level arrows: "Level 1 → Level 2"
+    await expect(upgradePanel.locator('.current-level')).toContainText('Level 1')
+    await expect(upgradePanel.locator('.next-level')).toContainText('Level 2')
+
+    // Labor and energy cost rows
+    await expect(upgradePanel.locator('[aria-label="Labor cost delta"]')).toBeVisible()
+    await expect(upgradePanel.locator('[aria-label="Energy cost delta"]')).toBeVisible()
+
+    // Downtime notice
+    await expect(upgradePanel).toContainText('offline during the upgrade')
+
+    // Confirm button visible
+    await expect(upgradePanel.getByRole('button', { name: 'Upgrade Now' })).toBeVisible()
+
+    // Click confirm — mock returns success, page should refresh data
+    await upgradePanel.getByRole('button', { name: 'Upgrade Now' }).click()
+    // After success the panel either hides or shows confirming state; no error shown
+    await expect(upgradePanel.locator('.form-error')).toHaveCount(0)
+  })
+
+  test('max concurrent upgrades error is shown when third upgrade is attempted', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-max-concurrent',
+      playerId: player.id,
+      name: 'Busy Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-max-concurrent',
+          companyId: 'company-max-concurrent',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Busy Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-busy-mfg',
+              buildingId: 'building-max-concurrent',
+              unitType: 'MANUFACTURING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Mock: this unit will get MAX_CONCURRENT_UPGRADES error
+    state.upgradeMaxConcurrentUnitId = 'unit-busy-mfg'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-max-concurrent')
+    await expect(page.getByRole('heading', { name: 'Busy Factory' })).toBeVisible()
+
+    // Enter edit mode and select the unit
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+
+    // Attempt to upgrade — mock returns MAX_CONCURRENT_UPGRADES
+    await upgradePanel.getByRole('button', { name: 'Upgrade Now' }).click()
+
+    // Error message is shown
+    await expect(upgradePanel.locator('.form-error')).toContainText('already has 2 unit upgrades in progress')
+  })
 })
 
 test.describe('Global exchange market', () => {
@@ -15966,8 +16183,10 @@ test.describe('Unit upgrade panel', () => {
     await page.goto('/building/building-uu-1')
     await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
 
-    const currentSection = getGridSection(page, 'Current Configuration')
-    await getGridCell(currentSection, 0, 0).click()
+    // Enter edit mode — upgrade panel only shows in edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
 
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
@@ -16008,8 +16227,10 @@ test.describe('Unit upgrade panel', () => {
     await page.goto('/building/building-uu-1')
     await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
 
-    const currentSection = getGridSection(page, 'Current Configuration')
-    await getGridCell(currentSection, 0, 0).click()
+    // Enter edit mode — upgrade panel only shows in edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection2 = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection2, 0, 0).click()
 
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
@@ -16045,8 +16266,10 @@ test.describe('Unit upgrade panel', () => {
     await page.goto('/building/building-uu-1')
     await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
 
-    const currentSection = getGridSection(page, 'Current Configuration')
-    await getGridCell(currentSection, 0, 0).click()
+    // Enter edit mode — upgrade panel only shows in edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection3 = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection3, 0, 0).click()
 
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
@@ -16095,8 +16318,10 @@ test.describe('Unit upgrade panel', () => {
     await page.goto('/building/building-uu-1')
     await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
 
-    const currentSection = getGridSection(page, 'Current Configuration')
-    await getGridCell(currentSection, 0, 0).click()
+    // Enter edit mode — upgrade panel only shows in edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection4 = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection4, 0, 0).click()
 
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
@@ -16162,8 +16387,10 @@ test.describe('Unit upgrade panel', () => {
     await page.goto('/building/building-uu-1')
     await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
 
-    const currentSection = getGridSection(page, 'Current Configuration')
-    await getGridCell(currentSection, 0, 0).click()
+    // Enter edit mode — the section is called 'Queued Upgrade' when a pending plan already exists
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const queuedSection = getGridSection(page, 'Queued Upgrade')
+    await getGridCell(queuedSection, 0, 0).click()
 
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
@@ -16194,8 +16421,10 @@ test.describe('Unit upgrade panel', () => {
     await page.goto('/building/building-uu-1')
     await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
 
-    const currentSection = getGridSection(page, 'Current Configuration')
-    await getGridCell(currentSection, 0, 0).click()
+    // Enter edit mode — upgrade panel only shows in edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection6 = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection6, 0, 0).click()
 
     const upgradePanel = page.locator('.unit-upgrade-panel')
     await expect(upgradePanel).toBeVisible()
