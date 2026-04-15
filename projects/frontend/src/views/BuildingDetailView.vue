@@ -23,13 +23,7 @@ import {
 } from '@/lib/linkHelpers'
 import { annotateExchangeOffers, selectOptimalOffer, sortExchangeOffers, detectLogisticsTrap, type AnnotatedExchangeOffer, type ExchangeSortBy } from '@/lib/globalExchange'
 import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedResourceDescription, getLocalizedResourceName, getProductImageUrl, getResourceImageUrl } from '@/lib/catalogPresentation'
-import {
-  PRODUCTION_PANEL_DISMISSED_KEY,
-  SALES_PANEL_DISMISSED_KEY,
-  isBuildingPanelDismissed,
-  dismissBuildingPanel,
-  shouldShowPanel,
-} from '@/lib/panelDismissal'
+import { PRODUCTION_PANEL_DISMISSED_KEY, SALES_PANEL_DISMISSED_KEY, isBuildingPanelDismissed, dismissBuildingPanel, shouldShowPanel } from '@/lib/panelDismissal'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
@@ -743,11 +737,7 @@ const b2bHasUpstreamSource = computed<boolean>(() => {
   if (!selectedCell.value || !isEditing.value) return true
   const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
   if (!unit || unit.unitType !== 'B2B_SALES') return true
-  return draftUnits.value.some(
-    (u) =>
-      (u.unitType === 'MANUFACTURING' && !!u.productTypeId) ||
-      (u.unitType === 'MINING' && !!u.resourceTypeId),
-  )
+  return draftUnits.value.some((u) => (u.unitType === 'MANUFACTURING' && !!u.productTypeId) || (u.unitType === 'MINING' && !!u.resourceTypeId))
 })
 
 /** Max revenue across all history ticks – used to normalise the revenue bar chart heights. */
@@ -815,40 +805,23 @@ const purchaseSelectorItems = computed<SelectorItem[]>(() => {
     )
 
   if (building.value?.type === 'FACTORY') {
-    return sortPurchaseSelectorItems(
-      annotatePreferred(getFactoryPurchaseSelectableItems()),
-      building.value?.type ?? null,
-      sameCityVendorItemKeys.value,
-    )
+    return sortPurchaseSelectorItems(annotatePreferred(getFactoryPurchaseSelectableItems()), building.value?.type ?? null, sameCityVendorItemKeys.value)
   }
 
   if (building.value?.type === 'SALES_SHOP') {
     return sortPurchaseSelectorItems(
-      annotatePreferred([
-        ...allSelectableItems.value.filter((item) => item.kind === 'product'),
-        ...allSelectableItems.value.filter((item) => item.kind === 'resource'),
-      ]),
+      annotatePreferred([...allSelectableItems.value.filter((item) => item.kind === 'product'), ...allSelectableItems.value.filter((item) => item.kind === 'resource')]),
       building.value?.type ?? null,
       sameCityVendorItemKeys.value,
     )
   }
 
-  return sortPurchaseSelectorItems(
-    annotatePreferred(allSelectableItems.value),
-    building.value?.type ?? null,
-    sameCityVendorItemKeys.value,
-  )
+  return sortPurchaseSelectorItems(annotatePreferred(allSelectableItems.value), building.value?.type ?? null, sameCityVendorItemKeys.value)
 })
 
 const selectedPurchaseSelection = computed<ItemSelection>(() => getItemSelection(selectedDraftPurchaseUnit.value))
 
-const sameCityVendorItemKeys = computed(() =>
-  collectSameCityVendorItemKeys(
-    purchaseVendorCompanies.value,
-    building.value?.cityId ?? null,
-    building.value?.id ?? null,
-  ),
-)
+const sameCityVendorItemKeys = computed(() => collectSameCityVendorItemKeys(purchaseVendorCompanies.value, building.value?.cityId ?? null, building.value?.id ?? null))
 
 const resourceTypesById = computed(() => new Map(resourceTypes.value.map((resource) => [resource.id, resource])))
 const productTypesById = computed(() => new Map(productTypes.value.map((product) => [product.id, product])))
@@ -870,9 +843,7 @@ const selectedPurchaseVendorSummary = computed<string | null>(() => {
   if (!companyId) return null
   const match = purchaseVendorOptions.value.find((option) => option.companyId === companyId)
   if (match) {
-    return match.pricePerUnit != null
-      ? `${match.companyName} · ${match.buildingName} · ${formatCurrency(match.pricePerUnit)}`
-      : `${match.companyName} · ${match.buildingName}`
+    return match.pricePerUnit != null ? `${match.companyName} · ${match.buildingName} · ${formatCurrency(match.pricePerUnit)}` : `${match.companyName} · ${match.buildingName}`
   }
   if (companyId === building.value?.companyId) return t('buildingDetail.purchaseSelector.vendorOwnCompany')
   return purchaseVendorCompanies.value.find((company) => company.id === companyId)?.name ?? null
@@ -905,14 +876,11 @@ function layoutStructureSummary(layout: BuildingLayoutTemplate): string {
   let hasLinks = false
   for (const u of layout.units) {
     counts[u.unitType] = (counts[u.unitType] ?? 0) + 1
-    if (u.linkUp || u.linkDown || u.linkLeft || u.linkRight ||
-      u.linkUpLeft || u.linkUpRight || u.linkDownLeft || u.linkDownRight) {
+    if (u.linkUp || u.linkDown || u.linkLeft || u.linkRight || u.linkUpLeft || u.linkUpRight || u.linkDownLeft || u.linkDownRight) {
       hasLinks = true
     }
   }
-  const parts = Object.entries(counts).map(([type, count]) =>
-    `${count}× ${t(`buildingDetail.unitTypes.${type}`)}`
-  )
+  const parts = Object.entries(counts).map(([type, count]) => `${count}× ${t(`buildingDetail.unitTypes.${type}`)}`)
   if (hasLinks) parts.push(t('buildingDetail.layouts.hasLinks'))
   return parts.join(' · ')
 }
@@ -1925,9 +1893,7 @@ async function refreshMasterLayouts(): Promise<void> {
   masterLayoutsError.value = null
   try {
     const all = await fetchMasterLayouts()
-    masterLayouts.value = building.value
-      ? all.filter((l) => l.buildingType === building.value!.type)
-      : all
+    masterLayouts.value = building.value ? all.filter((l) => l.buildingType === building.value!.type) : all
   } catch (err: unknown) {
     masterLayoutsError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -2365,12 +2331,7 @@ const selectedCellPendingUpgrade = computed<{
   // Prefer the authoritative tick from the game-state store; fall back to the
   // local `currentTick` ref which is set from the same source during loadBuilding().
   const tick = gameStateStore.gameState?.currentTick ?? currentTick.value
-  const planUnit = plan.units.find(
-    (u) =>
-      u.gridX === selectedCell.value!.x &&
-      u.gridY === selectedCell.value!.y &&
-      u.isChanged,
-  )
+  const planUnit = plan.units.find((u) => u.gridX === selectedCell.value!.x && u.gridY === selectedCell.value!.y && u.isChanged)
   if (!planUnit) return null
   const activeUnit = getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y)
   if (!activeUnit || planUnit.level <= activeUnit.level) return null
@@ -2388,9 +2349,7 @@ function isCellUnderUpgrade(x: number, y: number): boolean {
   if (!building.value?.pendingConfiguration) return false
   const plan = building.value.pendingConfiguration
   const tick = gameStateStore.gameState?.currentTick ?? currentTick.value
-  const planUnit = plan.units.find(
-    (u) => u.gridX === x && u.gridY === y && u.isChanged && u.ticksRequired > 0,
-  )
+  const planUnit = plan.units.find((u) => u.gridX === x && u.gridY === y && u.isChanged && u.ticksRequired > 0)
   if (!planUnit) return false
   const activeUnit = getUnitAtFrom(activeUnits.value, x, y)
   if (!activeUnit) return false
@@ -2413,9 +2372,7 @@ const selectedCellUpgradeInfo = computed<import('@/types').UnitUpgradeInfo | nul
  * List of all active units in this building that are currently under a level upgrade,
  * used to show the concurrent-upgrades summary panel.
  */
-const allUnitsUnderUpgrade = computed<
-  Array<{ unitType: string; gridX: number; gridY: number; toLevel: number; ticksRemaining: number }>
->(() => {
+const allUnitsUnderUpgrade = computed<Array<{ unitType: string; gridX: number; gridY: number; toLevel: number; ticksRemaining: number }>>(() => {
   if (!building.value?.pendingConfiguration) return []
   const plan = building.value.pendingConfiguration
   const tick = gameStateStore.gameState?.currentTick ?? currentTick.value
@@ -3766,14 +3723,7 @@ watch(
     const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
     if (!unit) return null
     const type = unit.unitType
-    if (
-      type === 'PUBLIC_SALES' ||
-      type === 'PRODUCT_QUALITY' ||
-      type === 'BRAND_QUALITY' ||
-      type === 'STORAGE' ||
-      type === 'B2B_SALES'
-    )
-      return type
+    if (type === 'PUBLIC_SALES' || type === 'PRODUCT_QUALITY' || type === 'BRAND_QUALITY' || type === 'STORAGE' || type === 'B2B_SALES') return type
     return null
   },
   (unitType) => {
@@ -4071,9 +4021,7 @@ watch(
             {{
               t('property.pendingRentNotice', {
                 rent: '€' + building.pendingPricePerSqm.toFixed(2),
-                time: building.pendingPriceActivationTick != null
-                  ? formatTickDuration(Math.max(0, building.pendingPriceActivationTick - currentTick), locale)
-                  : '—',
+                time: building.pendingPriceActivationTick != null ? formatTickDuration(Math.max(0, building.pendingPriceActivationTick - currentTick), locale) : '—',
               })
             }}
           </span>
@@ -4186,7 +4134,10 @@ watch(
                 <span class="research-budget-label">{{ t('research.budget.target') }}</span>
                 <span class="research-budget-value">{{ brand.baseResearchBudget != null ? `$${brand.baseResearchBudget.toFixed(0)}` : '—' }}</span>
               </div>
-              <div v-if="brand.maxCompetitorBudget != null && brand.accumulatedResearchBudget != null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)" class="research-budget-row research-budget-row--competitor">
+              <div
+                v-if="brand.maxCompetitorBudget != null && brand.accumulatedResearchBudget != null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)"
+                class="research-budget-row research-budget-row--competitor"
+              >
                 <span class="research-budget-label">{{ t('research.budget.topCompetitor') }}</span>
                 <span class="research-budget-value research-budget-value--warn">${{ brand.maxCompetitorBudget.toFixed(0) }}</span>
               </div>
@@ -4244,10 +4195,7 @@ watch(
           <p>{{ t('buildingDetail.upgradeQueuedBody', { time: formatTickDuration(remainingUpgradeTicks, locale) }) }}</p>
         </div>
         <div class="upgrade-banner-actions">
-          <div
-            class="upgrade-pill"
-            :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration!.appliesAtTick })"
-          >
+          <div class="upgrade-pill" :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration!.appliesAtTick })">
             {{ t('buildingDetail.upgradeAppliesAt', { time: formatGameTickTime(pendingConfiguration!.appliesAtTick, locale) }) }}
           </div>
           <button v-if="!isEditing" class="btn btn-danger btn-sm" :disabled="cancellingPlan" @click="cancelPlan">
@@ -4258,11 +4206,7 @@ watch(
       <div v-if="cancelPlanError" class="error-banner" role="alert">{{ cancelPlanError }}</div>
 
       <!-- Concurrent unit upgrades summary: lists every unit currently under upgrade in this building -->
-      <div
-        v-if="allUnitsUnderUpgrade.length > 0"
-        class="concurrent-upgrades-panel"
-        aria-label="Units under upgrade"
-      >
+      <div v-if="allUnitsUnderUpgrade.length > 0" class="concurrent-upgrades-panel" aria-label="Units under upgrade">
         <h4>⏳ {{ t('buildingDetail.unitUpgrade.concurrentTitle') }}</h4>
         <p class="concurrent-upgrades-help">{{ t('buildingDetail.unitUpgrade.concurrentHelp') }}</p>
         <ul class="concurrent-upgrades-list">
@@ -4276,7 +4220,9 @@ watch(
             <span class="concurrent-upgrade-pos">({{ u.gridX }}, {{ u.gridY }})</span>
             <span class="concurrent-upgrade-arrow">→</span>
             <span class="concurrent-upgrade-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: u.toLevel }) }}</span>
-            <span class="concurrent-upgrade-ticks" :title="u.ticksRemaining + ' ticks'">{{ t('buildingDetail.unitUpgrade.ticksRemaining', { time: formatTickDuration(u.ticksRemaining, locale) }) }}</span>
+            <span class="concurrent-upgrade-ticks" :title="u.ticksRemaining + ' ticks'">{{
+              t('buildingDetail.unitUpgrade.ticksRemaining', { time: formatTickDuration(u.ticksRemaining, locale) })
+            }}</span>
           </li>
         </ul>
       </div>
@@ -4298,11 +4244,9 @@ watch(
           <h3 class="chain-panel-title">⚙️ {{ t('buildingDetail.productionChain.title') }}</h3>
           <span v-if="chainStatus.isChainComplete" class="chain-status-badge chain-status-badge--complete">✅ {{ t('buildingDetail.productionChain.chainComplete') }}</span>
           <span v-else class="chain-status-badge chain-status-badge--incomplete">⚠️ {{ t('buildingDetail.productionChain.chainIncomplete') }}</span>
-          <button
-            class="chain-panel-dismiss"
-            :aria-label="t('buildingDetail.productionChain.dismissAriaLabel')"
-            @click="dismissProductionChainPanel"
-          >{{ t('buildingDetail.productionChain.dismiss') }}</button>
+          <button class="chain-panel-dismiss" :aria-label="t('buildingDetail.productionChain.dismissAriaLabel')" @click="dismissProductionChainPanel">
+            {{ t('buildingDetail.productionChain.dismiss') }}
+          </button>
         </div>
 
         <div class="chain-flow" role="list" aria-label="production chain steps">
@@ -4378,11 +4322,7 @@ watch(
           <h3 class="chain-panel-title">🏪 {{ t('buildingDetail.salesChain.title') }}</h3>
           <span v-if="shopChainStatus.isChainComplete" class="chain-status-badge chain-status-badge--complete">✅ {{ t('buildingDetail.salesChain.chainComplete') }}</span>
           <span v-else class="chain-status-badge chain-status-badge--incomplete">⚠️ {{ t('buildingDetail.salesChain.chainIncomplete') }}</span>
-          <button
-            class="chain-panel-dismiss"
-            :aria-label="t('buildingDetail.salesChain.dismissAriaLabel')"
-            @click="dismissSalesChainPanel"
-          >{{ t('buildingDetail.salesChain.dismiss') }}</button>
+          <button class="chain-panel-dismiss" :aria-label="t('buildingDetail.salesChain.dismissAriaLabel')" @click="dismissSalesChainPanel">{{ t('buildingDetail.salesChain.dismiss') }}</button>
         </div>
 
         <div class="chain-flow" role="list" aria-label="sales chain steps">
@@ -4601,14 +4541,10 @@ watch(
             </div>
 
             <div class="upgrade-summary">
-              <span
-                class="upgrade-summary-pill"
-                :title="'Tick #' + currentTick"
-              >{{ t('buildingDetail.currentTickLabel', { time: gameStateStore.gameState ? formatGameTickTime(currentTick, locale) : String(currentTick) }) }}</span>
-              <span
-                class="upgrade-summary-pill"
-                :title="draftTotalTicks + ' ticks'"
-              >{{ t('buildingDetail.totalUpgradeTicks', { time: formatTickDuration(draftTotalTicks, locale) }) }}</span>
+              <span class="upgrade-summary-pill" :title="'Tick #' + currentTick">{{
+                t('buildingDetail.currentTickLabel', { time: gameStateStore.gameState ? formatGameTickTime(currentTick, locale) : String(currentTick) })
+              }}</span>
+              <span class="upgrade-summary-pill" :title="draftTotalTicks + ' ticks'">{{ t('buildingDetail.totalUpgradeTicks', { time: formatTickDuration(draftTotalTicks, locale) }) }}</span>
               <span class="upgrade-summary-pill">{{ t('buildingDetail.totalBuildCost', { cost: formatCurrency(draftConstructionCost) }) }}</span>
               <span v-if="projectedCompanyCashAfterApply != null" class="upgrade-summary-pill">
                 {{ t('buildingDetail.cashAfterApply', { cash: formatCurrency(projectedCompanyCashAfterApply) }) }}
@@ -4724,7 +4660,10 @@ watch(
                           <span
                             v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth > 0"
                             class="cell-capacity-outflow"
-                            :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth}%` }"
+                            :style="{
+                              left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowLeft}%`,
+                              width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth}%`,
+                            }"
                           ></span>
                         </div>
                         <span
@@ -5012,12 +4951,10 @@ watch(
                     />
                     <p v-if="b2bPriceSource !== null" class="config-help config-price-hint">
                       {{
-                        t(
-                          b2bPriceSource!.sourceType === 'manufacturing'
-                            ? 'buildingDetail.config.b2bPriceFromMfg'
-                            : 'buildingDetail.config.b2bPriceFromMining',
-                          { item: b2bPriceSource!.itemName ?? '?', price: b2bPriceSource!.price.toFixed(2) },
-                        )
+                        t(b2bPriceSource!.sourceType === 'manufacturing' ? 'buildingDetail.config.b2bPriceFromMfg' : 'buildingDetail.config.b2bPriceFromMining', {
+                          item: b2bPriceSource!.itemName ?? '?',
+                          price: b2bPriceSource!.price.toFixed(2),
+                        })
                       }}
                       <button type="button" class="btn-link" @click="updateSelectedUnitConfig('minPrice', b2bSuggestedPrice)">{{ t('buildingDetail.config.b2bUseSuggested') }}</button>
                     </p>
@@ -5276,10 +5213,7 @@ watch(
                 </div>
                 <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
                 <div class="detail-capacity">
-                  <span
-                    class="detail-capacity-fill"
-                    :style="{ width: `${selectedPlannedUnitFlowSegments.fillWidth}%` }"
-                  ></span>
+                  <span class="detail-capacity-fill" :style="{ width: `${selectedPlannedUnitFlowSegments.fillWidth}%` }"></span>
                   <span
                     v-if="selectedPlannedUnitFlowSegments.inflowWidth > 0"
                     class="detail-capacity-inflow"
@@ -5386,11 +5320,7 @@ watch(
               </div>
 
               <!-- Unit Upgrade Panel (edit-mode only) -->
-              <div
-                v-if="isEditing && selectedCellUpgradeInfo !== null"
-                class="unit-insight-card unit-upgrade-panel"
-                aria-label="Unit Upgrade"
-              >
+              <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" aria-label="Unit Upgrade">
                 <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
                 <!-- Upgrade in progress (from pending configuration) -->
@@ -5399,10 +5329,12 @@ watch(
                   <div class="unit-upgrade-progress-body">
                     <strong>{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</strong>
                     <p class="unit-upgrade-progress-desc" :title="selectedCellPendingUpgrade.ticksRemaining + ' ticks remaining'">
-                      {{ t('buildingDetail.unitUpgrade.pendingBody', {
-                        level: selectedCellPendingUpgrade.level,
-                        time: formatTickDuration(selectedCellPendingUpgrade.ticksRemaining, locale),
-                      }) }}
+                      {{
+                        t('buildingDetail.unitUpgrade.pendingBody', {
+                          level: selectedCellPendingUpgrade.level,
+                          time: formatTickDuration(selectedCellPendingUpgrade.ticksRemaining, locale),
+                        })
+                      }}
                     </p>
                     <p class="unit-upgrade-downtime-notice">
                       {{ t('buildingDetail.unitUpgrade.pendingDowntimeNotice') }}
@@ -5459,25 +5391,18 @@ watch(
                     </div>
                   </div>
                   <!-- Downtime notice shown before confirming the upgrade -->
-                  <p
-                    class="unit-upgrade-downtime-notice available"
-                    :title="selectedCellUpgradeInfo.upgradeTicks + ' ticks'"
-                  >
+                  <p class="unit-upgrade-downtime-notice available" :title="selectedCellUpgradeInfo.upgradeTicks + ' ticks'">
                     {{ t('buildingDetail.unitUpgrade.availableDowntimeNotice', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}
                   </p>
                   <div class="unit-upgrade-meta">
                     <span class="unit-upgrade-cost">{{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}</span>
-                    <span class="unit-upgrade-duration" :title="t('buildingDetail.unitUpgrade.durationTicks', { ticks: selectedCellUpgradeInfo.upgradeTicks })">{{ t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}</span>
+                    <span class="unit-upgrade-duration" :title="t('buildingDetail.unitUpgrade.durationTicks', { ticks: selectedCellUpgradeInfo.upgradeTicks })">{{
+                      t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) })
+                    }}</span>
                   </div>
                   <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
-                  <button
-                    class="btn btn-primary btn-sm unit-upgrade-confirm-btn"
-                    :disabled="schedulingUpgrade"
-                    @click="submitUnitUpgrade(selectedCellUpgradeInfo!.unitId)"
-                  >
-                    {{ schedulingUpgrade
-                      ? t('buildingDetail.unitUpgrade.confirmingButton')
-                      : t('buildingDetail.unitUpgrade.confirmButton') }}
+                  <button class="btn btn-primary btn-sm unit-upgrade-confirm-btn" :disabled="schedulingUpgrade" @click="submitUnitUpgrade(selectedCellUpgradeInfo!.unitId)">
+                    {{ schedulingUpgrade ? t('buildingDetail.unitUpgrade.confirmingButton') : t('buildingDetail.unitUpgrade.confirmButton') }}
                   </button>
                 </div>
               </div>
@@ -5618,10 +5543,7 @@ watch(
                 </div>
                 <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
                 <div class="detail-capacity">
-                  <span
-                    class="detail-capacity-fill"
-                    :style="{ width: `${selectedActiveUnitFlowSegments.fillWidth}%` }"
-                  ></span>
+                  <span class="detail-capacity-fill" :style="{ width: `${selectedActiveUnitFlowSegments.fillWidth}%` }"></span>
                   <span
                     v-if="selectedActiveUnitFlowSegments.inflowWidth > 0"
                     class="detail-capacity-inflow"
@@ -5910,7 +5832,8 @@ watch(
                           'building-profit-positive-text': publicSalesAnalytics.totalProfit >= 0,
                           'building-profit-negative-text': publicSalesAnalytics.totalProfit < 0,
                         }"
-                      >{{ formatCurrency(publicSalesAnalytics.totalProfit) }}</strong>
+                        >{{ formatCurrency(publicSalesAnalytics.totalProfit) }}</strong
+                      >
                     </div>
                     <div class="mi-metric">
                       <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.totalSold') }}</span>
@@ -5929,10 +5852,7 @@ watch(
                       <strong class="mi-metric-value">{{ Math.round(publicSalesAnalytics.recentUtilization * 100) }}%</strong>
                     </div>
                     <!-- Trend direction (only shown when there are at least 2 ticks of history) -->
-                    <div
-                      v-if="publicSalesAnalytics.trendDirection && publicSalesAnalytics.trendDirection !== 'NO_DATA'"
-                      class="mi-metric"
-                    >
+                    <div v-if="publicSalesAnalytics.trendDirection && publicSalesAnalytics.trendDirection !== 'NO_DATA'" class="mi-metric">
                       <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.trend') }}</span>
                       <strong
                         class="mi-metric-value mi-trend"
@@ -6065,12 +5985,7 @@ watch(
                   <div v-if="publicSalesAnalytics.demandDrivers.length > 0" class="mi-demand-drivers" aria-label="Demand Drivers">
                     <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.demandDrivers.title') }}</span>
                     <div class="mi-driver-list">
-                      <div
-                        v-for="driver in publicSalesAnalytics.demandDrivers"
-                        :key="driver.factor"
-                        class="mi-driver-entry"
-                        :class="`mi-driver-${driver.impact.toLowerCase()}`"
-                      >
+                      <div v-for="driver in publicSalesAnalytics.demandDrivers" :key="driver.factor" class="mi-driver-entry" :class="`mi-driver-${driver.impact.toLowerCase()}`">
                         <span class="mi-driver-icon">
                           {{ driver.impact === 'POSITIVE' ? '↑' : driver.impact === 'NEGATIVE' ? '↓' : '→' }}
                         </span>
@@ -6236,7 +6151,8 @@ watch(
                           'building-profit-positive-text': unitProductAnalytics.estimatedProfit >= 0,
                           'building-profit-negative-text': unitProductAnalytics.estimatedProfit < 0,
                         }"
-                      >{{ formatCurrency(unitProductAnalytics.estimatedProfit) }}</strong>
+                        >{{ formatCurrency(unitProductAnalytics.estimatedProfit) }}</strong
+                      >
                     </div>
                   </div>
 
@@ -6315,10 +6231,7 @@ watch(
                       class="activity-item"
                       :class="`activity-${event.eventType.toLowerCase()}`"
                     >
-                      <span
-                        class="activity-tick"
-                        :title="t('buildingDetail.recentActivity.tickLabel', { tick: event.tick })"
-                      >{{ formatGameTickTime(event.tick, locale) }}</span>
+                      <span class="activity-tick" :title="t('buildingDetail.recentActivity.tickLabel', { tick: event.tick })">{{ formatGameTickTime(event.tick, locale) }}</span>
                       <span class="activity-desc">{{ event.description }}</span>
                     </li>
                   </ul>
@@ -6368,13 +6281,7 @@ watch(
 
                 <!-- Save form -->
                 <div class="layout-save" v-if="!overwriteConfirmPending">
-                  <input
-                    type="text"
-                    class="form-input"
-                    v-model="layoutName"
-                    :placeholder="t('buildingDetail.layouts.namePlaceholder')"
-                    :aria-label="t('buildingDetail.layouts.namePlaceholder')"
-                  />
+                  <input type="text" class="form-input" v-model="layoutName" :placeholder="t('buildingDetail.layouts.namePlaceholder')" :aria-label="t('buildingDetail.layouts.namePlaceholder')" />
                   <input
                     type="text"
                     class="form-input layout-desc-input"
@@ -6382,11 +6289,7 @@ watch(
                     :placeholder="t('buildingDetail.layouts.descriptionPlaceholder')"
                     :aria-label="t('buildingDetail.layouts.descriptionPlaceholder')"
                   />
-                  <button
-                    class="btn btn-secondary btn-sm"
-                    :disabled="!layoutName.trim() || layoutSaving"
-                    @click="saveLayout"
-                  >
+                  <button class="btn btn-secondary btn-sm" :disabled="!layoutName.trim() || layoutSaving" @click="saveLayout">
                     {{ layoutSaving ? t('buildingDetail.layouts.masterSaving') : t('buildingDetail.layouts.save') }}
                   </button>
                   <p v-if="layoutSaveSuccess" class="layout-save-success">✓ {{ t('buildingDetail.layouts.saveSuccess') }}</p>
@@ -7083,7 +6986,9 @@ watch(
   font-size: 0.75rem;
   padding: 0.2rem 0.6rem;
   line-height: 1.4;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .chain-panel-dismiss:hover {

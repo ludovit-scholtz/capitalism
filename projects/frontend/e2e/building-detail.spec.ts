@@ -16,12 +16,7 @@ function getGridCell(section: ReturnType<typeof getGridSection>, x: number, y: n
  * Finds one of the two independent diagonal controls rendered inside a connector square.
  * `primary` = \ axis (top-left ↔ bottom-right), `secondary` = / axis (top-right ↔ bottom-left).
  */
-function getDiagonalToggle(
-  section: ReturnType<typeof getGridSection>,
-  x: number,
-  y: number,
-  axis: 'primary' | 'secondary',
-) {
+function getDiagonalToggle(section: ReturnType<typeof getGridSection>, x: number, y: number, axis: 'primary' | 'secondary') {
   return section.locator(`.link-toggle.diagonal[data-diagonal-root="${x},${y}"][data-diagonal-axis="${axis}"]`)
 }
 
@@ -40,12 +35,7 @@ async function selectPurchaseItem(page: Page, searchTerm: string, optionName: Re
   await expect(dialog).toBeHidden()
 }
 
-async function configureStarterShopPurchaseItem(
-  page: Page,
-  planningSection: ReturnType<typeof getGridSection>,
-  searchTerm: string,
-  optionName: RegExp,
-) {
+async function configureStarterShopPurchaseItem(page: Page, planningSection: ReturnType<typeof getGridSection>, searchTerm: string, optionName: RegExp) {
   await getGridCell(planningSection, 0, 0).click()
   await selectPurchaseItem(page, searchTerm, optionName)
 }
@@ -1532,9 +1522,7 @@ test.describe('Building detail upgrades', () => {
     await expect(getGridCell(currentSection, 3, 0).locator('.cell-metric')).toContainText('$45')
   })
 
-  test('B2B_SALES unit shows no-source warning when no manufacturing or mining unit is configured', async ({
-    page,
-  }) => {
+  test('B2B_SALES unit shows no-source warning when no manufacturing or mining unit is configured', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-b2b-nosource',
@@ -2016,9 +2004,7 @@ test.describe('Building detail upgrades', () => {
     const plannedSection = getGridSection(page, 'Planned Upgrade')
     await getGridCell(plannedSection, 0, 0).click()
     await expect(page.getByText('Research Product')).toBeVisible()
-    const researchProductField = page
-      .locator('.config-field')
-      .filter({ has: page.getByText('Research Product') })
+    const researchProductField = page.locator('.config-field').filter({ has: page.getByText('Research Product') })
     await researchProductField.locator('.picker-trigger').click()
     await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
 
@@ -2036,9 +2022,7 @@ test.describe('Building detail upgrades', () => {
     await expect(getGridCell(plannedSection, 1, 0)).toContainText('Wooden Chair')
   })
 
-  test('R&D product picker shows used products first with "Used by your company" section', async ({
-    page,
-  }) => {
+  test('R&D product picker shows used products first with "Used by your company" section', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-rd-prio',
@@ -2131,9 +2115,7 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('Research Product')).toBeVisible()
 
     // Open the product picker
-    const researchProductField = page
-      .locator('.config-field')
-      .filter({ has: page.getByText('Research Product') })
+    const researchProductField = page.locator('.config-field').filter({ has: page.getByText('Research Product') })
     await researchProductField.locator('.picker-trigger').click()
 
     // The "Used by your company" section header should be visible
@@ -2144,16 +2126,12 @@ test.describe('Building detail upgrades', () => {
     ).toBeVisible()
 
     // Wooden Chair (manufactured in the factory) should have a "Used by company" badge
-    const woodenChairItem = page
-      .locator('.product-picker-panel .picker-item')
-      .filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
+    const woodenChairItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
     await expect(woodenChairItem).toBeVisible()
     await expect(woodenChairItem.locator('.picker-item-badge')).toContainText('Used by company')
 
     // The "All products" (catalog) section should also be present with remaining products
-    await expect(
-      page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' }),
-    ).toBeVisible()
+    await expect(page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' })).toBeVisible()
 
     // The first item in the list should be the "Used by your company" section header
     // (confirming used products appear before the catalog section)
@@ -3137,12 +3115,87 @@ test.describe('Building detail upgrades', () => {
           pendingConfiguration: null,
           units: [
             // Row 0: PURCHASE(0,0) — MANUFACTURING(1,0) — PUBLIC_SALES(2,0)
-            { id: 'sm-1', buildingId: 'building-smart', unitType: 'PURCHASE', gridX: 0, gridY: 0, level: 1, linkUp: false, linkDown: false, linkLeft: false, linkRight: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-            { id: 'sm-2', buildingId: 'building-smart', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1, linkUp: false, linkDown: false, linkLeft: false, linkRight: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-            { id: 'sm-3', buildingId: 'building-smart', unitType: 'PUBLIC_SALES', gridX: 2, gridY: 0, level: 1, linkUp: false, linkDown: false, linkLeft: false, linkRight: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+            {
+              id: 'sm-1',
+              buildingId: 'building-smart',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'sm-2',
+              buildingId: 'building-smart',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'sm-3',
+              buildingId: 'building-smart',
+              unitType: 'PUBLIC_SALES',
+              gridX: 2,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
             // Row 1: STORAGE(0,1) — PURCHASE(1,1) (purchase on right side → smart default is backward)
-            { id: 'sm-4', buildingId: 'building-smart', unitType: 'STORAGE', gridX: 0, gridY: 1, level: 1, linkUp: false, linkDown: false, linkLeft: false, linkRight: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-            { id: 'sm-5', buildingId: 'building-smart', unitType: 'PURCHASE', gridX: 1, gridY: 1, level: 1, linkUp: false, linkDown: false, linkLeft: false, linkRight: false, linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+            {
+              id: 'sm-4',
+              buildingId: 'building-smart',
+              unitType: 'STORAGE',
+              gridX: 0,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'sm-5',
+              buildingId: 'building-smart',
+              unitType: 'PURCHASE',
+              gridX: 1,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
           ],
         },
       ],
@@ -3679,9 +3732,7 @@ test.describe('Building detail upgrades', () => {
     await expect(getDiagonalToggle(queuedSection, 1, 0, 'secondary')).toHaveClass(/link-state-backward/)
   })
 
-  test('diagonal link editing: single-diagonal hit area covers full connector square — AC single-diagonal', async ({
-    page,
-  }) => {
+  test('diagonal link editing: single-diagonal hit area covers full connector square — AC single-diagonal', async ({ page }) => {
     // When only ONE diagonal axis is possible (e.g. secondary / only because
     // the \ corners are missing), the hit-area button must expand to the full
     // 36×36 connector square rather than the previous 50% half.  Clicking the
@@ -4119,28 +4170,94 @@ test.describe('Building detail upgrades', () => {
     // This completes the reversal coverage for both diagonal axes.
     const player = makePlayer()
     const buildingUnits: MockBuildingUnit[] = [
-      { id: 'ar2-1', buildingId: 'building-ar2', unitType: 'PURCHASE',      gridX: 0, gridY: 0, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-      { id: 'ar2-2', buildingId: 'building-ar2', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-      { id: 'ar2-3', buildingId: 'building-ar2', unitType: 'STORAGE',       gridX: 0, gridY: 1, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-      { id: 'ar2-4', buildingId: 'building-ar2', unitType: 'B2B_SALES',     gridX: 1, gridY: 1, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+      {
+        id: 'ar2-1',
+        buildingId: 'building-ar2',
+        unitType: 'PURCHASE',
+        gridX: 0,
+        gridY: 0,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
+      {
+        id: 'ar2-2',
+        buildingId: 'building-ar2',
+        unitType: 'MANUFACTURING',
+        gridX: 1,
+        gridY: 0,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
+      {
+        id: 'ar2-3',
+        buildingId: 'building-ar2',
+        unitType: 'STORAGE',
+        gridX: 0,
+        gridY: 1,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
+      {
+        id: 'ar2-4',
+        buildingId: 'building-ar2',
+        unitType: 'B2B_SALES',
+        gridX: 1,
+        gridY: 1,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
     ]
     player.companies.push({
-      id: 'company-ar2', playerId: player.id, name: 'Axis2 Corp', cash: 500000,
+      id: 'company-ar2',
+      playerId: player.id,
+      name: 'Axis2 Corp',
+      cash: 500000,
       foundedAtUtc: '2026-01-01T00:00:00Z',
-      buildings: [{
-        id: 'building-ar2', companyId: 'company-ar2', cityId: 'city-ba', type: 'FACTORY',
-        name: 'Axis2 Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2,
-        isForSale: false, builtAtUtc: '2026-01-01T00:00:00Z', pendingConfiguration: null,
-        units: buildingUnits,
-      }],
+      buildings: [
+        {
+          id: 'building-ar2',
+          companyId: 'company-ar2',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Axis2 Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: buildingUnits,
+        },
+      ],
     })
 
     const state = setupMockApi(page, { players: [player] })
@@ -4194,28 +4311,94 @@ test.describe('Building detail upgrades', () => {
     // state is verified via the link-state-* CSS classes on the hit-area buttons.
     const player = makePlayer()
     const buildingUnits: MockBuildingUnit[] = [
-      { id: 'glyph-1', buildingId: 'building-glyph', unitType: 'PURCHASE',      gridX: 0, gridY: 0, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-      { id: 'glyph-2', buildingId: 'building-glyph', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-      { id: 'glyph-3', buildingId: 'building-glyph', unitType: 'STORAGE',       gridX: 0, gridY: 1, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-      { id: 'glyph-4', buildingId: 'building-glyph', unitType: 'B2B_SALES',     gridX: 1, gridY: 1, level: 1,
-        linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-        linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+      {
+        id: 'glyph-1',
+        buildingId: 'building-glyph',
+        unitType: 'PURCHASE',
+        gridX: 0,
+        gridY: 0,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
+      {
+        id: 'glyph-2',
+        buildingId: 'building-glyph',
+        unitType: 'MANUFACTURING',
+        gridX: 1,
+        gridY: 0,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
+      {
+        id: 'glyph-3',
+        buildingId: 'building-glyph',
+        unitType: 'STORAGE',
+        gridX: 0,
+        gridY: 1,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
+      {
+        id: 'glyph-4',
+        buildingId: 'building-glyph',
+        unitType: 'B2B_SALES',
+        gridX: 1,
+        gridY: 1,
+        level: 1,
+        linkUp: false,
+        linkDown: false,
+        linkLeft: false,
+        linkRight: false,
+        linkUpLeft: false,
+        linkUpRight: false,
+        linkDownLeft: false,
+        linkDownRight: false,
+      },
     ]
     player.companies.push({
-      id: 'company-glyph', playerId: player.id, name: 'Glyph Corp', cash: 500000,
+      id: 'company-glyph',
+      playerId: player.id,
+      name: 'Glyph Corp',
+      cash: 500000,
       foundedAtUtc: '2026-01-01T00:00:00Z',
-      buildings: [{
-        id: 'building-glyph', companyId: 'company-glyph', cityId: 'city-ba', type: 'FACTORY',
-        name: 'Glyph Factory', latitude: 48.15, longitude: 17.11, level: 1, powerConsumption: 2,
-        isForSale: false, builtAtUtc: '2026-01-01T00:00:00Z', pendingConfiguration: null,
-        units: buildingUnits,
-      }],
+      buildings: [
+        {
+          id: 'building-glyph',
+          companyId: 'company-glyph',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Glyph Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: buildingUnits,
+        },
+      ],
     })
 
     const state = setupMockApi(page, { players: [player] })
@@ -4298,21 +4481,70 @@ test.describe('Building detail upgrades', () => {
           builtAtUtc: '2026-01-01T00:00:00Z',
           pendingConfiguration: null,
           units: [
-            { id: 'cx-1', buildingId: 'building-cross', unitType: 'PURCHASE',      gridX: 0, gridY: 0, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false,
-              linkDownRight: true }, // primary forward (\): (0,0) → (1,1)
-            { id: 'cx-2', buildingId: 'building-cross', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false,
+            {
+              id: 'cx-1',
+              buildingId: 'building-cross',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: true,
+            }, // primary forward (\): (0,0) → (1,1)
+            {
+              id: 'cx-2',
+              buildingId: 'building-cross',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
               linkDownLeft: true, // secondary forward (/): (1,0) → (0,1)
-              linkDownRight: false },
-            { id: 'cx-3', buildingId: 'building-cross', unitType: 'STORAGE',       gridX: 0, gridY: 1, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-            { id: 'cx-4', buildingId: 'building-cross', unitType: 'B2B_SALES',     gridX: 1, gridY: 1, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+              linkDownRight: false,
+            },
+            {
+              id: 'cx-3',
+              buildingId: 'building-cross',
+              unitType: 'STORAGE',
+              gridX: 0,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'cx-4',
+              buildingId: 'building-cross',
+              unitType: 'B2B_SALES',
+              gridX: 1,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
           ],
         },
       ],
@@ -4393,18 +4625,70 @@ test.describe('Building detail upgrades', () => {
           builtAtUtc: '2026-01-01T00:00:00Z',
           pendingConfiguration: null,
           units: [
-            { id: 'na-1', buildingId: 'building-no-artifact', unitType: 'PURCHASE',      gridX: 0, gridY: 0, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: true },
-            { id: 'na-2', buildingId: 'building-no-artifact', unitType: 'MANUFACTURING', gridX: 1, gridY: 0, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: true, linkDownRight: false },
-            { id: 'na-3', buildingId: 'building-no-artifact', unitType: 'STORAGE',       gridX: 0, gridY: 1, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
-            { id: 'na-4', buildingId: 'building-no-artifact', unitType: 'B2B_SALES',     gridX: 1, gridY: 1, level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false },
+            {
+              id: 'na-1',
+              buildingId: 'building-no-artifact',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: true,
+            },
+            {
+              id: 'na-2',
+              buildingId: 'building-no-artifact',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: true,
+              linkDownRight: false,
+            },
+            {
+              id: 'na-3',
+              buildingId: 'building-no-artifact',
+              unitType: 'STORAGE',
+              gridX: 0,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+            {
+              id: 'na-4',
+              buildingId: 'building-no-artifact',
+              unitType: 'B2B_SALES',
+              gridX: 1,
+              gridY: 1,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
           ],
         },
       ],
@@ -4437,8 +4721,6 @@ test.describe('Building detail upgrades', () => {
     // Each connector group must have exactly one SVG — never more (old code had 2 separate elements)
     await expect(svgCount).toHaveCount(groupCount)
   })
-
-
 
   test('mine grid shows resource label and fill bar directly in active grid tiles', async ({ page }) => {
     const player = makePlayer()
@@ -5063,8 +5345,14 @@ test.describe('Building detail upgrades', () => {
               gridX: 0,
               gridY: 0,
               level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
             },
           ],
         },
@@ -5132,8 +5420,14 @@ test.describe('Building detail upgrades', () => {
               gridX: 0,
               gridY: 0,
               level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
             },
           ],
         },
@@ -5211,8 +5505,14 @@ test.describe('Building detail upgrades', () => {
               gridX: 0,
               gridY: 0,
               level: 1,
-              linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-              linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
             },
           ],
         },
@@ -8189,13 +8489,15 @@ test.describe('Product picker UX — collapsible trigger and dropdown', () => {
 })
 
 test.describe('Link-aware product picker — PUBLIC_SALES unit', () => {
-  function makeSalesShopForContextAwarePicker(options: {
-    upstreamProductId?: string | null
-    unrelatedProductId?: string | null
-    salesUnitProductId?: string | null
-    salesInventoryProductIds?: string[]
-    purchaseLinked?: boolean
-  } = {}) {
+  function makeSalesShopForContextAwarePicker(
+    options: {
+      upstreamProductId?: string | null
+      unrelatedProductId?: string | null
+      salesUnitProductId?: string | null
+      salesInventoryProductIds?: string[]
+      purchaseLinked?: boolean
+    } = {},
+  ) {
     const salesInventoryItems = (options.salesInventoryProductIds ?? []).map((productTypeId, index) => ({
       id: `sales-stock-${index}`,
       productTypeId,
@@ -8313,9 +8615,7 @@ test.describe('Link-aware product picker — PUBLIC_SALES unit', () => {
       .filter({ has: page.getByText('Product Type', { exact: true }) })
       .first()
 
-    await expect(productTypeField.locator('.picker-help-text')).toContainText(
-      'Choose from products that can reach this sales unit through linked upstream units',
-    )
+    await expect(productTypeField.locator('.picker-help-text')).toContainText('Choose from products that can reach this sales unit through linked upstream units')
     await productTypeField.locator('.picker-trigger').click()
 
     const breadItem = page.locator('.product-picker-panel .picker-item').filter({
@@ -8376,9 +8676,7 @@ test.describe('Link-aware product picker — PUBLIC_SALES unit', () => {
 
     await productTypeField.locator('.picker-trigger').click()
 
-    await expect(page.locator('.product-picker-panel .picker-empty-no-connected')).toContainText(
-      'Link a purchase, manufacturing, or storage chain into this unit, or restock the unit',
-    )
+    await expect(page.locator('.product-picker-panel .picker-empty-no-connected')).toContainText('Link a purchase, manufacturing, or storage chain into this unit, or restock the unit')
   })
 
   test('PUBLIC_SALES picker shows mixed connected and stocked reasons in one workflow', async ({ page }) => {
@@ -8411,19 +8709,19 @@ test.describe('Link-aware product picker — PUBLIC_SALES unit', () => {
     await expect(breadItem.locator('.picker-item-badge')).toContainText('Connected chain')
     await expect(chairItem).toBeVisible()
     await expect(chairItem.locator('.picker-item-badge')).toContainText('Current stock')
-    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Basic Medicine' })).toHaveCount(
-      0,
-    )
+    await expect(page.locator('.product-picker-panel .picker-item-name', { hasText: 'Basic Medicine' })).toHaveCount(0)
   })
 })
 
 // ── Link-aware product picker — STORAGE and B2B_SALES ─────────────────────────
 
 test.describe('Link-aware product picker — STORAGE unit', () => {
-  function makeFactoryWithMfgAndStorage(options: {
-    mfgProductId?: string | null
-    storageProductId?: string | null
-  } = {}) {
+  function makeFactoryWithMfgAndStorage(
+    options: {
+      mfgProductId?: string | null
+      storageProductId?: string | null
+    } = {},
+  ) {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [
@@ -8516,17 +8814,13 @@ test.describe('Link-aware product picker — STORAGE unit', () => {
     await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
 
     // The universal info message must be visible
-    await expect(
-      page.locator('.config-help', { hasText: /universal buffer/i }),
-    ).toBeVisible()
+    await expect(page.locator('.config-help', { hasText: /universal buffer/i })).toBeVisible()
 
     // No product picker trigger should exist for STORAGE
     await expect(page.locator('.config-field .picker-trigger')).toHaveCount(0)
 
     // No "Product Type" label (from old config) should appear
-    await expect(
-      page.locator('.config-field').filter({ has: page.getByText('Product Type', { exact: true }) }),
-    ).toHaveCount(0)
+    await expect(page.locator('.config-field').filter({ has: page.getByText('Product Type', { exact: true }) })).toHaveCount(0)
   })
 
   test('STORAGE unit with no product shows universal info and no picker', async ({ page }) => {
@@ -8559,7 +8853,6 @@ test.describe('Link-aware product picker — STORAGE unit', () => {
     // No picker trigger should exist for STORAGE
     await expect(page.locator('.config-field .picker-trigger')).toHaveCount(0)
   })
-
 })
 
 test.describe('Link-aware product picker — B2B_SALES unit', () => {
@@ -8912,9 +9205,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
 // ── Product picker — contextual "Connected" section and icon display ───────────
 
 test.describe('Product picker — contextual ranking section headers', () => {
-  test('STORAGE unit shows universal info — no contextual picker even when connected to MFG', async ({
-    page,
-  }) => {
+  test('STORAGE unit shows universal info — no contextual picker even when connected to MFG', async ({ page }) => {
     // STORAGE is universal: even when MFG is connected, clicking STORAGE shows
     // the "universal buffer" info message rather than a filtered product picker.
     const chair = makeChairProduct()
@@ -9002,16 +9293,12 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
 
     // Universal storage info message visible — no product picker
-    await expect(
-      page.locator('.config-help', { hasText: /universal buffer/i }),
-    ).toBeVisible()
+    await expect(page.locator('.config-help', { hasText: /universal buffer/i })).toBeVisible()
 
     await expect(page.locator('.config-field .picker-trigger')).toHaveCount(0)
   })
 
-  test('B2B_SALES picker shows "Connected" section when MFG unit has product set', async ({
-    page,
-  }) => {
+  test('B2B_SALES picker shows "Connected" section when MFG unit has product set', async ({ page }) => {
     const chair = makeChairProduct()
     const bread = { ...chair, id: 'prod-bread', name: 'Bread', slug: 'bread', industry: 'FOOD_PROCESSING' }
     const player = makePlayer({
@@ -9109,15 +9396,11 @@ test.describe('Product picker — contextual ranking section headers', () => {
       }),
     ).toBeVisible()
 
-    const chairItem = page
-      .locator('.product-picker-panel .picker-item')
-      .filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
+    const chairItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
     await expect(chairItem.locator('.badge-connected')).toBeVisible()
   })
 
-  test('PUBLIC_SALES picker shows "Connected" section when MFG unit has product set', async ({
-    page,
-  }) => {
+  test('PUBLIC_SALES picker shows "Connected" section when MFG unit has product set', async ({ page }) => {
     const chair = makeChairProduct()
     const bread = { ...chair, id: 'prod-bread', name: 'Bread', slug: 'bread', industry: 'FOOD_PROCESSING' }
     const player = makePlayer({
@@ -9215,9 +9498,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
       }),
     ).toBeVisible()
 
-    const chairItem = page
-      .locator('.product-picker-panel .picker-item')
-      .filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
+    const chairItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
     await expect(chairItem.locator('.badge-connected')).toBeVisible()
   })
 
@@ -9286,9 +9567,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await expect(pickerItem.locator('.picker-item-img')).toHaveCount(1)
   })
 
-  test('product picker shows stale selection warning when saved product is not in list', async ({
-    page,
-  }) => {
+  test('product picker shows stale selection warning when saved product is not in list', async ({ page }) => {
     const chair = makeChairProduct()
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
@@ -9384,9 +9663,7 @@ test.describe('Product picker — contextual ranking section headers', () => {
     ).toBeVisible({ timeout: 10000 })
   })
 
-  test('STORAGE to B2B_SALES direct chain: B2B_SALES picker shows STORAGE product as connected', async ({
-    page,
-  }) => {
+  test('STORAGE to B2B_SALES direct chain: B2B_SALES picker shows STORAGE product as connected', async ({ page }) => {
     // Scenario 2 from the issue: STORAGE is directly linked to B2B_SALES with no MFG.
     // The B2B_SALES picker must surface the STORAGE unit's configured product.
     const chair = makeChairProduct()
@@ -9489,15 +9766,11 @@ test.describe('Product picker — contextual ranking section headers', () => {
       }),
     ).toBeVisible()
 
-    const chairItem = page
-      .locator('.product-picker-panel .picker-item')
-      .filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
+    const chairItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
     await expect(chairItem.locator('.badge-connected')).toBeVisible()
   })
 
-  test('full PURCHASE to MFG to STORAGE to PUBLIC_SALES chain: STORAGE is universal, PUBLIC_SALES picker shows connected products', async ({
-    page,
-  }) => {
+  test('full PURCHASE to MFG to STORAGE to PUBLIC_SALES chain: STORAGE is universal, PUBLIC_SALES picker shows connected products', async ({ page }) => {
     // Scenario: four-unit chain with directional links.
     // STORAGE is universal (no product required). PUBLIC_SALES still sees the
     // upstream product from MFG via the STORAGE pass-through.
@@ -9535,8 +9808,13 @@ test.describe('Product picker — contextual ranking section headers', () => {
                   gridY: 0,
                   level: 1,
                   linkRight: true,
-                  linkUp: false, linkDown: false, linkLeft: false,
-                  linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
                 },
                 {
                   id: 'fc-mfg',
@@ -9546,8 +9824,13 @@ test.describe('Product picker — contextual ranking section headers', () => {
                   gridY: 0,
                   level: 1,
                   linkRight: true,
-                  linkUp: false, linkDown: false, linkLeft: false,
-                  linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
                   productTypeId: 'prod-chair',
                 },
                 {
@@ -9558,8 +9841,13 @@ test.describe('Product picker — contextual ranking section headers', () => {
                   gridY: 0,
                   level: 1,
                   linkRight: true,
-                  linkUp: false, linkDown: false, linkLeft: false,
-                  linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
                   productTypeId: null, // universal — no product needed
                 },
                 {
@@ -9570,8 +9858,13 @@ test.describe('Product picker — contextual ranking section headers', () => {
                   gridY: 0,
                   level: 1,
                   linkRight: false,
-                  linkUp: false, linkDown: false, linkLeft: false,
-                  linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
                 },
               ],
             },
@@ -9612,15 +9905,11 @@ test.describe('Product picker — contextual ranking section headers', () => {
     await expect(page.locator('.product-picker-panel')).toBeVisible()
 
     // Wooden Chair should appear via MFG→STORAGE→PUBLIC_SALES chain
-    const chairItem = page
-      .locator('.product-picker-panel .picker-item')
-      .filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
+    const chairItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
     await expect(chairItem.locator('.badge-connected')).toBeVisible()
 
     // Bread should NOT appear (no Bread in the chain)
-    const breadItem = page
-      .locator('.product-picker-panel .picker-item')
-      .filter({ has: page.locator('.picker-item-name', { hasText: 'Bread' }) })
+    const breadItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Bread' }) })
     await expect(breadItem).toHaveCount(0)
   })
 })
@@ -9716,9 +10005,7 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
     await expect(dialog).toContainText('Choose product and vendor')
   })
 
-  test('purchase selector dialog renders vendor section with Auto and Own Company options', async ({
-    page,
-  }) => {
+  test('purchase selector dialog renders vendor section with Auto and Own Company options', async ({ page }) => {
     const player = makePurchaseFactory()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -9758,9 +10045,7 @@ test.describe('Purchase selector dialog — navbar visibility and z-index', () =
 })
 
 test.describe('Purchase selector list visuals and same-city vendor context', () => {
-  test('sales shop purchase selector shows product icons and keeps same-city own supply products at the top', async ({
-    page,
-  }) => {
+  test('sales shop purchase selector shows product icons and keeps same-city own supply products at the top', async ({ page }) => {
     const chair = makeChairProduct()
     const bread = {
       ...chair,
@@ -9884,9 +10169,7 @@ test.describe('Purchase selector list visuals and same-city vendor context', () 
     await expect(firstOption).toContainText('Available from your own factory in this city.')
   })
 
-  test('same-city vendor cards show price and transit details for a selected resource and sort cheapest first', async ({
-    page,
-  }) => {
+  test('same-city vendor cards show price and transit details for a selected resource and sort cheapest first', async ({ page }) => {
     const player = makePlayer()
     player.onboardingCompletedAtUtc = '2026-01-01T00:00:00Z'
     player.companies.push(
@@ -10049,9 +10332,7 @@ test.describe('Purchase selector list visuals and same-city vendor context', () 
 // ── Complete building configuration end-to-end journey ───────────────────────
 
 test.describe('Complete building configuration end-to-end journey', () => {
-  test('player enters edit mode, sees STORAGE universal info, and cancels without error', async ({
-    page,
-  }) => {
+  test('player enters edit mode, sees STORAGE universal info, and cancels without error', async ({ page }) => {
     // Verifies the full E2E edit flow: a player can enter edit mode, see that
     // the STORAGE unit has no picker (universal), and cancel cleanly.
     const chair = makeChairProduct()
@@ -10088,8 +10369,13 @@ test.describe('Complete building configuration end-to-end journey', () => {
                   gridY: 0,
                   level: 1,
                   linkRight: true,
-                  linkUp: false, linkDown: false, linkLeft: false,
-                  linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
                   productTypeId: 'prod-chair',
                 },
                 {
@@ -10100,8 +10386,13 @@ test.describe('Complete building configuration end-to-end journey', () => {
                   gridY: 0,
                   level: 1,
                   linkRight: false,
-                  linkUp: false, linkDown: false, linkLeft: false,
-                  linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
                   productTypeId: null, // universal — no product needed
                 },
               ],
@@ -10989,9 +11280,7 @@ test.describe('R&D Research Progress Panel', () => {
     await expect(page.getByText(/company-wide branding efficiency.*product category.*single product line/i)).toBeVisible()
   })
 
-  test('shows cumulative research budget panel for PRODUCT-scope brand with budget data', async ({
-    page,
-  }) => {
+  test('shows cumulative research budget panel for PRODUCT-scope brand with budget data', async ({ page }) => {
     // Proves the new cumulative budget model UI: invested budget, uncontested target,
     // top competitor warning, and decay hint are all visible.
     const player = makePlayer()
@@ -12287,9 +12576,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(pricePanel.locator('.mi-price-impact-lower')).toContainText('0.9')
   })
 
-  test('quick price update shows error message when backend returns unit-not-found error', async ({
-    page,
-  }) => {
+  test('quick price update shows error message when backend returns unit-not-found error', async ({ page }) => {
     const { player, chairProduct } = makeShopPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -12322,9 +12609,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
         tick: i + 1,
         pricePerUnit: chairProduct.basePrice * 1.5,
       })),
-      marketShare: [
-        { label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false },
-      ],
+      marketShare: [{ label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false }],
       elasticityIndex: -1.0,
       unmetDemandShare: 0,
       populationIndex: 1.0,
@@ -12353,9 +12638,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
 
     // Simulate unit deletion from server state to trigger UNIT_NOT_FOUND.
     // The building is guaranteed to exist because makeShopPlayer() creates it.
-    const shopBuilding = state.players
-      .flatMap((p) => p.companies.flatMap((c) => c.buildings))
-      .find((b) => b.id === 'building-shop-mi')!
+    const shopBuilding = state.players.flatMap((p) => p.companies.flatMap((c) => c.buildings)).find((b) => b.id === 'building-shop-mi')!
     shopBuilding.units = shopBuilding.units?.filter((u) => u.id !== 'unit-shop-mi-ps') ?? []
 
     // Enter a valid price and submit — backend will return UNIT_NOT_FOUND
@@ -12373,9 +12656,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(pricePanel.locator('.mi-price-success')).toBeHidden()
   })
 
-  test('quick price update preserves route, unit selection, and analytics panel after applying price', async ({
-    page,
-  }) => {
+  test('quick price update preserves route, unit selection, and analytics panel after applying price', async ({ page }) => {
     const { player, chairProduct } = makeShopPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -12408,9 +12689,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
         tick: i + 1,
         pricePerUnit: chairProduct.basePrice * 1.5,
       })),
-      marketShare: [
-        { label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false },
-      ],
+      marketShare: [{ label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false }],
       elasticityIndex: -1.3,
       unmetDemandShare: 0,
       populationIndex: 1.1,
@@ -12460,9 +12739,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-demand-badge')).toContainText('Strong')
   })
 
-  test('quick price update apply button is disabled when price is zero or negative', async ({
-    page,
-  }) => {
+  test('quick price update apply button is disabled when price is zero or negative', async ({ page }) => {
     const { player, chairProduct } = makeShopPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -12495,9 +12772,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
         tick: i + 1,
         pricePerUnit: chairProduct.basePrice * 1.5,
       })),
-      marketShare: [
-        { label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false },
-      ],
+      marketShare: [{ label: 'Market Intel Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false }],
       elasticityIndex: -0.8,
       unmetDemandShare: 0,
       populationIndex: 1.0,
@@ -13132,9 +13407,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-action-hint', { hasText: 'lower' })).toBeVisible()
   })
 
-  test('lower price correlates with higher utilization and positive price driver in analytics', async ({
-    page,
-  }) => {
+  test('lower price correlates with higher utilization and positive price driver in analytics', async ({ page }) => {
     // ROADMAP AC: "Cover at least one scenario showing a lower price increasing sold quantity."
     // We model this by presenting analytics where the unit is priced below the market baseline
     // and verify that:
@@ -13177,9 +13450,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
         tick: i + 1,
         pricePerUnit: discountedPrice,
       })),
-      marketShare: [
-        { label: 'Discount Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false },
-      ],
+      marketShare: [{ label: 'Discount Corp', companyId: 'company-shop-mi', share: 1.0, isUnmet: false }],
       elasticityIndex: -1.2,
       unmetDemandShare: 0.1,
       populationIndex: 1.0,
@@ -13236,9 +13507,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(positivePriceDriver.first()).toBeVisible()
   })
 
-  test('quality-advantaged seller holds larger market share than quality-disadvantaged competitor', async ({
-    page,
-  }) => {
+  test('quality-advantaged seller holds larger market share than quality-disadvantaged competitor', async ({ page }) => {
     // ROADMAP AC: "Cover at least one scenario showing a stronger product outperforming
     // a weaker competitor."
     // Analytics for a seller with 90% quality holding 70% market share, while a
@@ -13338,9 +13607,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(positiveQualityDriver.first()).toBeVisible()
   })
 
-  test('supply-constrained market shows POSITIVE SATURATION driver and scarcity description', async ({
-    page,
-  }) => {
+  test('supply-constrained market shows POSITIVE SATURATION driver and scarcity description', async ({ page }) => {
     // When unmet demand is high (demand >> supply), the SATURATION driver should be POSITIVE
     // so players know they could capture more sales by stocking more inventory.
     const { player } = makeShopPlayer()
@@ -13418,9 +13685,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(saturationDriver.first()).toBeVisible()
   })
 
-  test('oversupplied market shows NEGATIVE SATURATION driver and market-saturated description', async ({
-    page,
-  }) => {
+  test('oversupplied market shows NEGATIVE SATURATION driver and market-saturated description', async ({ page }) => {
     // ROADMAP AC: "Add coverage for at least one oversupply scenario."
     // When stock far exceeds city demand (unmetDemandShare ≈ 0) the SATURATION driver
     // should be NEGATIVE so the player knows to reduce stock, change product, or lower price.
@@ -13466,8 +13731,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
           factor: 'SATURATION',
           impact: 'NEGATIVE',
           score: 0.01,
-          description:
-            'Market is saturated — nearly all city demand is already being met. Reduce stock or switch products.',
+          description: 'Market is saturated — nearly all city demand is already being met. Reduce stock or switch products.',
         },
         {
           factor: 'PRICE',
@@ -13502,9 +13766,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(saturationDriver.first()).toBeVisible()
   })
 
-  test('competitive market with small own share shows NEGATIVE COMPETITION driver', async ({
-    page,
-  }) => {
+  test('competitive market with small own share shows NEGATIVE COMPETITION driver', async ({ page }) => {
     // When the player holds a small market share against several rivals, the COMPETITION
     // driver should be NEGATIVE so the player knows to improve price or quality.
     const { player } = makeShopPlayer()
@@ -13550,8 +13812,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
           factor: 'COMPETITION',
           impact: 'NEGATIVE',
           score: 0.1,
-          description:
-            'Strong competition: 2 rivals hold most of this market and your 10% share is low. Improve price competitiveness, quality, or brand to win more demand.',
+          description: 'Strong competition: 2 rivals hold most of this market and your 10% share is low. Improve price competitiveness, quality, or brand to win more demand.',
         },
         {
           factor: 'PRICE',
@@ -13994,9 +14255,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel.locator('.mi-tick-window')).toHaveAttribute('title', /T1/)
   })
 
-  test('shows market momentum metric when trendFactor is provided and > 1 (hot market)', async ({
-    page,
-  }) => {
+  test('shows market momentum metric when trendFactor is provided and > 1 (hot market)', async ({ page }) => {
     const { player, chairProduct } = makeShopPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -14438,9 +14697,7 @@ test.describe('Sales shop edit mode — unit type picker', () => {
     await expect(storageOption).toBeVisible()
     await storageOption.click()
 
-    await expect(plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)).toContainText(
-      'Storage',
-    )
+    await expect(plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)).toContainText('Storage')
   })
 
   test('player adds MARKETING unit to empty sales shop and sees it in the planned grid', async ({ page }) => {
@@ -16451,9 +16708,7 @@ test.describe('Unit upgrade panel', () => {
     await expect(upgradePanel.locator('.unit-upgrade-downtime-notice.available')).toBeVisible()
   })
 
-  test('shows concurrent upgrades summary when multiple units are under upgrade', async ({
-    page,
-  }) => {
+  test('shows concurrent upgrades summary when multiple units are under upgrade', async ({ page }) => {
     const player = makePlayer()
     const building = makeUpgradeBuilding(player.id)
     // Add a second unit that will also be under upgrade
@@ -16567,9 +16822,7 @@ test.describe('Unit upgrade panel', () => {
 })
 
 test.describe('Building detail tick-refresh stability', () => {
-  test('background tick refresh does not show a loading spinner or reset the building view', async ({
-    page,
-  }) => {
+  test('background tick refresh does not show a loading spinner or reset the building view', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-tick-stable',
@@ -16717,9 +16970,7 @@ test.describe('Building detail tick-refresh stability', () => {
     await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
   })
 
-  test('in-progress draft layout edit is preserved after a background tick refresh', async ({
-    page,
-  }) => {
+  test('in-progress draft layout edit is preserved after a background tick refresh', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-draft-stable',
@@ -16798,9 +17049,7 @@ test.describe('Building detail tick-refresh stability', () => {
     await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
   })
 
-  test('unit selection is restored from ?unit= query param on direct navigation', async ({
-    page,
-  }) => {
+  test('unit selection is restored from ?unit= query param on direct navigation', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-deeplink',
@@ -16935,9 +17184,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
     return { player, products }
   }
 
-  test('shows analytics panel with summary and charts when manufacturing unit has production history', async ({
-    page,
-  }) => {
+  test('shows analytics panel with summary and charts when manufacturing unit has production history', async ({ page }) => {
     const { player, products } = makeFactoryWithMfgUnit()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -16973,7 +17220,10 @@ test.describe('Manufacturing unit product analytics panel', () => {
     await page.goto('/building/building-upa')
 
     // Click the manufacturing unit cell (grid position 1,0)
-    const gridSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    const gridSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
 
@@ -17029,7 +17279,10 @@ test.describe('Manufacturing unit product analytics panel', () => {
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
-    const gridSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    const gridSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
 
@@ -17071,7 +17324,10 @@ test.describe('Manufacturing unit product analytics panel', () => {
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
-    const gridSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    const gridSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
 
@@ -17086,9 +17342,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
     await expect(profitMetric.locator('.building-profit-negative-text')).toBeVisible()
   })
 
-  test('analytics panel remains stable across tick refresh without context loss', async ({
-    page,
-  }) => {
+  test('analytics panel remains stable across tick refresh without context loss', async ({ page }) => {
     const { player, products } = makeFactoryWithMfgUnit()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -17125,7 +17379,10 @@ test.describe('Manufacturing unit product analytics panel', () => {
     }, `token-${player.id}`)
     await page.goto('/building/building-upa')
 
-    const gridSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) }).first()
+    const gridSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+      .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
 
@@ -17301,7 +17558,6 @@ test.describe('Sales shop building financial overview', () => {
     await expect(finCard.locator('.building-financial-chart')).toHaveCount(0)
   })
 })
-
 
 // ── Building Layouts panel ─────────────────────────────────────────────────────
 
@@ -17819,9 +18075,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await expect(panel.getByRole('button', { name: 'Save Layout' })).toBeVisible()
   })
 
-  test('loading a template with directional links shows link arrows in planned grid (AC5)', async ({
-    page,
-  }) => {
+  test('loading a template with directional links shows link arrows in planned grid (AC5)', async ({ page }) => {
     const player = makeLayoutTestPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -17915,9 +18169,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await expect(planSection.locator('.link-arrow').first()).toBeVisible()
   })
 
-  test('loading a template with diagonal link flags preserves diagonal state in planned grid (AC6)', async ({
-    page,
-  }) => {
+  test('loading a template with diagonal link flags preserves diagonal state in planned grid (AC6)', async ({ page }) => {
     // Verifies that a template saved with a diagonal linkDownRight flag (tl-br direction)
     // round-trips through save/load and shows the correct state-tl-br class in the planned grid.
     // This proves the ROADMAP requirement: "Saved layouts and loaded layouts preserve all
@@ -18046,16 +18298,10 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
 
     const panel = page.locator('[aria-label="Building Layouts"]')
     await expect(panel).toBeVisible()
-    await expect(
-      panel.locator('.layout-item').filter({ hasText: 'Diagonal Chain Template' }),
-    ).toBeVisible()
+    await expect(panel.locator('.layout-item').filter({ hasText: 'Diagonal Chain Template' })).toBeVisible()
 
     // Load the diagonal template — draft is empty, no overwrite confirm needed
-    await panel
-      .locator('.layout-item')
-      .filter({ hasText: 'Diagonal Chain Template' })
-      .getByRole('button', { name: 'Load' })
-      .click()
+    await panel.locator('.layout-item').filter({ hasText: 'Diagonal Chain Template' }).getByRole('button', { name: 'Load' }).click()
     await expect(page.locator('.layout-overwrite-confirm')).toHaveCount(0)
 
     // Planned grid should show four occupied cells
@@ -18200,11 +18446,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await expect(panel.locator('.layout-item').filter({ hasText: 'Single Unit Template' })).toBeVisible()
 
     // Draft is non-empty → click Load should trigger overwrite confirm
-    await panel
-      .locator('.layout-item')
-      .filter({ hasText: 'Single Unit Template' })
-      .getByRole('button', { name: 'Load' })
-      .click()
+    await panel.locator('.layout-item').filter({ hasText: 'Single Unit Template' }).getByRole('button', { name: 'Load' }).click()
     await expect(page.locator('.layout-overwrite-confirm')).toBeVisible()
     // Confirm dialog should show the template name
     await expect(page.locator('.layout-confirm-title')).toContainText('Single Unit Template')
@@ -18226,9 +18468,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await expect(planSection.locator('.grid-cell.occupied').locator('.cell-type').first()).toContainText('Manufacturing')
   })
 
-  test('AC4: full tick-based workflow — load template, Store Upgrade, pending config is created', async ({
-    page,
-  }) => {
+  test('AC4: full tick-based workflow — load template, Store Upgrade, pending config is created', async ({ page }) => {
     // Proves AC4: applying a template flows through the normal tick-based building modification
     // workflow and does NOT bypass game rules. The result is a pending configuration, not an
     // instant state change.
@@ -18312,11 +18552,7 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     await expect(panel.locator('.layout-item').filter({ hasText: 'AC4 Blueprint' })).toBeVisible()
 
     // Draft is empty → Load directly (no overwrite confirm)
-    await panel
-      .locator('.layout-item')
-      .filter({ hasText: 'AC4 Blueprint' })
-      .getByRole('button', { name: 'Load' })
-      .click()
+    await panel.locator('.layout-item').filter({ hasText: 'AC4 Blueprint' }).getByRole('button', { name: 'Load' }).click()
     await expect(page.locator('.layout-overwrite-confirm')).toHaveCount(0)
 
     // ── Step 2: Planning grid should show the template units ──
@@ -18337,7 +18573,6 @@ test.describe('Building Layouts panel — edit mode, no unit selected', () => {
     // not applied instantly — AC4 compliance.
     await expect(page.locator('.upgrade-banner')).toBeVisible()
   })
-
 })
 
 // ---------------------------------------------------------------------------
@@ -18440,8 +18675,7 @@ test.describe('Building link validation errors — backend error display', () =>
 
     // Force the mock to return CONTRADICTORY_LINK on the next StoreBuildingConfiguration call.
     // This simulates the backend rejecting a plan with bidirectional flow on the same pair.
-    state.forceBuildingConfigError =
-      'Contradictory bidirectional horizontal link between units at (0, 0) and (1, 0). A link can only flow in one direction between the same pair of units.'
+    state.forceBuildingConfigError = 'Contradictory bidirectional horizontal link between units at (0, 0) and (1, 0). A link can only flow in one direction between the same pair of units.'
 
     await page.getByRole('button', { name: 'Store Upgrade' }).click()
 
