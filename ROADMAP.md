@@ -40,6 +40,8 @@ Show all changes that upgrading of the unit will have, for example the storage c
 ### Marketing  (0% complete)
 
 - Make sure that in every city is one government owned media house from each type of media
+- Modify the marketing unit media house selection. Make sure to sort the media house by the media content ranking, and show the player's media house companies at the top of the list.
+- Implement all features in the Media house section in this document
 
 ### Power plants  (0% complete)
 
