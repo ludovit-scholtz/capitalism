@@ -30,9 +30,6 @@ Show all changes that upgrading of the unit will have, for example the storage c
 Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.
 ". Make sure to show there the current state of the research or investigate why research is not cummulating.
 
-### Ingame chat (0% complete)
-- Ingame chat in navbar does not show any icon.
-
 ### Changelog (0% complete)
 - Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
 
