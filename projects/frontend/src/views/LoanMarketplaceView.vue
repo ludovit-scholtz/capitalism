@@ -8,7 +8,7 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, Company } from '@/types'
+import type { LoanOfferSummary, LoanSummary, Company, BankDepositSummary, BankInfoSummary } from '@/types'
 import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, computeTotalPayments, loanStatusClass, formatCurrency, formatPercent } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
@@ -20,6 +20,22 @@ const error = ref<string | null>(null)
 const offers = ref<LoanOfferSummary[]>([])
 const myLoans = ref<LoanSummary[]>([])
 const myCompanies = ref<Company[]>([])
+
+// Active tab: 'borrow' | 'deposit'
+const activeTab = ref<'borrow' | 'deposit'>('borrow')
+
+// Banks list (for deposit tab)
+const allBanks = ref<BankInfoSummary[]>([])
+const myDeposits = ref<BankDepositSummary[]>([])
+
+// Deposit modal state
+const showDepositModal = ref(false)
+const selectedBank = ref<BankInfoSummary | null>(null)
+const depositCompanyId = ref('')
+const depositAmount = ref(10000)
+const depositLoading = ref(false)
+const depositError = ref<string | null>(null)
+const depositSuccess = ref(false)
 
 // Accept modal state
 const showAcceptModal = ref(false)
@@ -112,6 +128,66 @@ const ACCEPT_LOAN_MUTATION = `
   }
 `
 
+const ALL_BANKS_QUERY = `
+  {
+    allBanks {
+      bankBuildingId
+      bankBuildingName
+      cityId
+      cityName
+      lenderCompanyId
+      lenderCompanyName
+      depositInterestRatePercent
+      lendingInterestRatePercent
+      totalDeposits
+      lendableCapacity
+      outstandingLoanPrincipal
+      availableLendingCapacity
+      baseCapitalDeposited
+    }
+  }
+`
+
+const MY_DEPOSITS_QUERY = `
+  {
+    myDeposits {
+      id
+      bankBuildingId
+      bankBuildingName
+      depositorCompanyId
+      depositorCompanyName
+      amount
+      depositInterestRatePercent
+      isBaseCapital
+      isActive
+      depositedAtTick
+      depositedAtUtc
+      totalInterestPaid
+    }
+  }
+`
+
+const CREATE_DEPOSIT_MUTATION = `
+  mutation CreateDeposit($input: CreateDepositInput!) {
+    createDeposit(input: $input) {
+      id
+      amount
+      depositInterestRatePercent
+      isActive
+    }
+  }
+`
+
+const WITHDRAW_DEPOSIT_MUTATION = `
+  mutation WithdrawDeposit($input: WithdrawDepositInput!) {
+    withdrawDeposit(input: $input) {
+      id
+      amount
+      isActive
+    }
+  }
+`
+
 async function loadData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
@@ -122,19 +198,34 @@ async function loadData(isRefresh = false) {
       await auth.fetchMe()
     }
 
-    const offersResult = await gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY)
+    const [offersResult, banksResult] = await Promise.all([
+      gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY),
+      gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY),
+    ])
     const newOffers = offersResult.loanOffers ?? []
     if (!deepEqual(offers.value, newOffers)) {
       offers.value = newOffers
     }
+    const newBanks = banksResult.allBanks ?? []
+    if (!deepEqual(allBanks.value, newBanks)) {
+      allBanks.value = newBanks
+    }
 
     if (auth.isAuthenticated) {
-      const [loansResult, companiesResult] = await Promise.all([gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY), gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY)])
+      const [loansResult, companiesResult, depositsResult] = await Promise.all([
+        gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY),
+        gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY),
+        gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY),
+      ])
       const newLoans = loansResult.myLoans ?? []
       if (!deepEqual(myLoans.value, newLoans)) {
         myLoans.value = newLoans
       }
       myCompanies.value = companiesResult.me?.companies ?? []
+      const newDeposits = depositsResult.myDeposits ?? []
+      if (!deepEqual(myDeposits.value, newDeposits)) {
+        myDeposits.value = newDeposits
+      }
     }
   } catch (err) {
     error.value = err instanceof Error ? err.message : String(err)
@@ -236,15 +327,87 @@ async function confirmAcceptLoan() {
     acceptLoading.value = false
   }
 }
+
+// ── Deposit functions ─────────────────────────────────────────────────────────
+
+function openDepositModal(bank: BankInfoSummary) {
+  selectedBank.value = bank
+  depositCompanyId.value = activeCompany.value?.id ?? ''
+  depositAmount.value = 10_000
+  depositError.value = null
+  depositSuccess.value = false
+  showDepositModal.value = true
+}
+
+function closeDepositModal() {
+  showDepositModal.value = false
+  selectedBank.value = null
+  depositError.value = null
+  depositSuccess.value = false
+}
+
+async function submitDeposit() {
+  if (!selectedBank.value || !depositCompanyId.value) return
+  depositLoading.value = true
+  depositError.value = null
+  depositSuccess.value = false
+  try {
+    await gqlRequest(CREATE_DEPOSIT_MUTATION, {
+      input: {
+        bankBuildingId: selectedBank.value.bankBuildingId,
+        depositorCompanyId: depositCompanyId.value,
+        amount: depositAmount.value,
+      },
+    })
+    depositSuccess.value = true
+    await loadData()
+    setTimeout(closeDepositModal, 1500)
+  } catch (err) {
+    depositError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    depositLoading.value = false
+  }
+}
+
+async function withdrawDeposit(deposit: BankDepositSummary) {
+  if (!confirm(t('bank.confirmWithdraw'))) return
+  try {
+    await gqlRequest(WITHDRAW_DEPOSIT_MUTATION, {
+      input: { depositId: deposit.id, amount: deposit.amount },
+    })
+    await loadData()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  }
+}
 </script>
 
 <template>
   <div class="loan-marketplace-view">
     <div class="page-header">
-      <h1 class="page-title">{{ t('bank.loanOffers') }}</h1>
-      <p class="page-subtitle">
-        {{ t('bank.browseMarketplace') }}
-      </p>
+      <h1 class="page-title">{{ t('bank.title') }}</h1>
+      <p class="page-subtitle">{{ t('bank.browseMarketplace') }}</p>
+    </div>
+
+    <!-- Tab switcher -->
+    <div class="marketplace-tabs" role="tablist">
+      <button
+        role="tab"
+        :aria-selected="activeTab === 'borrow'"
+        :class="['tab-btn', { 'tab-active': activeTab === 'borrow' }]"
+        @click="activeTab = 'borrow'"
+      >
+        {{ t('bank.borrowTab') }}
+      </button>
+      <button
+        role="tab"
+        :aria-selected="activeTab === 'deposit'"
+        :class="['tab-btn', { 'tab-active': activeTab === 'deposit' }]"
+        @click="activeTab = 'deposit'"
+      >
+        {{ t('bank.depositTab') }}
+        <span v-if="myDeposits.length > 0" class="tab-badge">{{ myDeposits.length }}</span>
+      </button>
     </div>
 
     <div v-if="loading" class="loading-state">
@@ -258,6 +421,8 @@ async function confirmAcceptLoan() {
     </div>
 
     <template v-else>
+      <!-- ── BORROW TAB ────────────────────────────────────────────────────── -->
+      <div v-if="activeTab === 'borrow'">
       <!-- Lender action panel: context-aware CTA for offering loans -->
       <section class="lender-cta-section" aria-label="Lender action">
         <h2 class="section-title">{{ t('bank.becomeALender') }}</h2>
@@ -384,6 +549,99 @@ async function confirmAcceptLoan() {
           </div>
         </div>
       </section>
+      </div><!-- end borrow tab -->
+
+      <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
+      <div v-if="activeTab === 'deposit'" class="deposit-tab">
+
+        <!-- My Deposits -->
+        <section v-if="auth.isAuthenticated && myDeposits.length > 0" class="my-deposits-section">
+          <h2 class="section-title">{{ t('bank.myDeposits') }}</h2>
+          <div class="deposits-list">
+            <div v-for="dep in myDeposits" :key="dep.id" class="deposit-card">
+              <div class="deposit-card-header">
+                <span class="deposit-bank-name">{{ dep.bankBuildingName }}</span>
+                <span class="deposit-rate-badge">{{ formatPercent(dep.depositInterestRatePercent) }} p.a.</span>
+              </div>
+              <div class="deposit-stats">
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('bank.depositAmount') }}</span>
+                  <span class="deposit-stat-value">{{ formatCurrency(dep.amount) }}</span>
+                </div>
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('bank.depositInterestEarned') }}</span>
+                  <span class="deposit-stat-value positive">+{{ formatCurrency(dep.totalInterestPaid) }}</span>
+                </div>
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('common.company') }}</span>
+                  <span class="deposit-stat-value">{{ dep.depositorCompanyName }}</span>
+                </div>
+              </div>
+              <button
+                v-if="!dep.isBaseCapital"
+                class="btn btn-secondary btn-sm"
+                @click="withdrawDeposit(dep)"
+              >
+                {{ t('bank.withdrawDeposit') }}
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Banks List -->
+        <section class="banks-list-section">
+          <h2 class="section-title">{{ t('bank.allBanks') }}</h2>
+
+          <div v-if="allBanks.length === 0" class="empty-state">
+            <p>{{ t('bank.noBanksAvailable') }}</p>
+          </div>
+
+          <div v-else class="banks-grid">
+            <div v-for="bank in allBanks" :key="bank.bankBuildingId" class="bank-card">
+              <div class="bank-card-header">
+                <div>
+                  <h3 class="bank-card-name">{{ bank.bankBuildingName }}</h3>
+                  <span class="bank-card-city">{{ bank.cityName }} · {{ bank.lenderCompanyName }}</span>
+                </div>
+              </div>
+              <div class="bank-card-rates">
+                <div class="bank-rate deposit-rate">
+                  <span class="rate-label">{{ t('bank.depositInterestRate') }}</span>
+                  <span class="rate-value green">{{ formatPercent(bank.depositInterestRatePercent) }}</span>
+                </div>
+                <div class="bank-rate lending-rate">
+                  <span class="rate-label">{{ t('bank.lendingInterestRate') }}</span>
+                  <span class="rate-value orange">{{ formatPercent(bank.lendingInterestRatePercent) }}</span>
+                </div>
+              </div>
+              <div class="bank-card-capacity">
+                <span class="capacity-label">{{ t('bank.availableLendingCapacity') }}</span>
+                <span class="capacity-value" :class="bank.availableLendingCapacity > 0 ? 'positive' : 'zero'">
+                  {{ formatCurrency(bank.availableLendingCapacity) }}
+                </span>
+              </div>
+              <button
+                v-if="auth.isAuthenticated && isCompanyAccountActive"
+                class="btn btn-primary btn-sm bank-deposit-btn"
+                :disabled="bank.availableLendingCapacity <= 0 && allBanks.length > 0"
+                @click="openDepositModal(bank)"
+              >
+                {{ t('bank.makeDeposit') }}
+              </button>
+              <router-link
+                v-else-if="!auth.isAuthenticated"
+                to="/login"
+                class="btn btn-secondary btn-sm"
+              >
+                {{ t('auth.login') }}
+              </router-link>
+              <p v-else class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- end deposit tab -->
+
     </template>
 
     <!-- Accept Loan Modal -->
@@ -456,6 +714,53 @@ async function confirmAcceptLoan() {
           <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0" @click="confirmAcceptLoan">
             <span v-if="acceptLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.acceptLoan') }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Deposit Modal -->
+    <div v-if="showDepositModal && selectedBank" class="modal-overlay" @click.self="closeDepositModal">
+      <div class="modal" role="dialog" :aria-label="t('bank.makeDeposit')">
+        <div class="modal-header">
+          <h2>{{ t('bank.makeDeposit') }}</h2>
+          <button class="modal-close" :aria-label="t('common.close')" @click="closeDepositModal">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="loan-summary">
+            <div class="summary-row">
+              <span>Bank</span>
+              <strong>{{ selectedBank.bankBuildingName }}</strong>
+            </div>
+            <div class="summary-row">
+              <span>{{ t('bank.depositInterestRate') }}</span>
+              <strong>{{ formatPercent(selectedBank.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="deposit-amount">{{ t('bank.depositAmount') }}</label>
+            <input
+              id="deposit-amount"
+              v-model.number="depositAmount"
+              type="number"
+              min="1000"
+              step="1000"
+              class="form-input"
+            />
+            <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
+          </div>
+          <div v-if="depositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
+          <div v-if="depositError" class="error-message">{{ depositError }}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeDepositModal">{{ t('common.cancel') }}</button>
+          <button
+            class="btn btn-primary"
+            :disabled="depositLoading || depositAmount < 1000"
+            @click="submitDeposit"
+          >
+            <span v-if="depositLoading">{{ t('common.loading') }}</span>
+            <span v-else>{{ t('bank.confirmDeposit') }}</span>
           </button>
         </div>
       </div>
@@ -905,5 +1210,219 @@ async function confirmAcceptLoan() {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* Tabs */
+.marketplace-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.tab-btn {
+  padding: 0.6rem 1.25rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.tab-btn.tab-active {
+  color: var(--color-primary, #3b82f6);
+  border-bottom-color: var(--color-primary, #3b82f6);
+}
+
+.tab-badge {
+  background: var(--color-primary, #3b82f6);
+  color: white;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.1rem 0.45rem;
+  min-width: 1.2rem;
+  text-align: center;
+}
+
+/* Deposit tab content */
+.deposit-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.my-deposits-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.deposits-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.deposit-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.deposit-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.deposit-bank-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.deposit-rate-badge {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.15rem 0.55rem;
+}
+
+.deposit-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.deposit-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.deposit-stat-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.deposit-stat-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.deposit-stat-value.positive { color: #22c55e; }
+
+/* Banks grid */
+.banks-list-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.banks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.bank-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bank-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.bank-card-name {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.bank-card-city {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.bank-card-rates {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.bank-rate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.rate-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.rate-value {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.rate-value.green { color: #22c55e; }
+.rate-value.orange { color: #f59e0b; }
+
+.bank-card-capacity {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.875rem;
+}
+
+.capacity-label {
+  color: var(--color-text-muted);
+}
+
+.capacity-value {
+  font-weight: 600;
+}
+
+.capacity-value.positive { color: #22c55e; }
+.capacity-value.zero { color: var(--color-text-muted); }
+
+.bank-deposit-btn {
+  width: 100%;
+}
+
+.success-message {
+  color: #22c55e;
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
 }
 </style>

@@ -6,7 +6,7 @@ import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
-import type { LoanOfferSummary, LoanSummary } from '@/types'
+import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary } from '@/types'
 import {
   formatLoanDuration,
   formatCurrency,
@@ -25,6 +25,15 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const myOffers = ref<LoanOfferSummary[]>([])
 const issuedLoans = ref<LoanSummary[]>([])
+const bankDeposits = ref<BankDepositSummary[]>([])
+const bankInfo = ref<BankInfoSummary | null>(null)
+
+// Rate configuration form
+const showRatesForm = ref(false)
+const ratesForm = ref({ depositInterestRatePercent: 3, lendingInterestRatePercent: 8 })
+const ratesLoading = ref(false)
+const ratesError = ref<string | null>(null)
+const ratesSuccess = ref(false)
 
 // Publish offer form
 const showPublishForm = ref(false)
@@ -119,6 +128,59 @@ const DEACTIVATE_OFFER_MUTATION = `
   }
 `
 
+const BANK_INFO_QUERY = `
+  query BankInfo($id: UUID!) {
+    bankInfo(bankBuildingId: $id) {
+      bankBuildingId
+      bankBuildingName
+      cityId
+      cityName
+      lenderCompanyId
+      lenderCompanyName
+      depositInterestRatePercent
+      lendingInterestRatePercent
+      totalDeposits
+      lendableCapacity
+      outstandingLoanPrincipal
+      availableLendingCapacity
+      baseCapitalDeposited
+    }
+  }
+`
+
+const BANK_DEPOSITS_QUERY = `
+  query BankDeposits($id: UUID!) {
+    bankDeposits(bankBuildingId: $id) {
+      id
+      bankBuildingId
+      bankBuildingName
+      depositorCompanyId
+      depositorCompanyName
+      amount
+      depositInterestRatePercent
+      isBaseCapital
+      isActive
+      depositedAtTick
+      depositedAtUtc
+      totalInterestPaid
+    }
+  }
+`
+
+const SET_BANK_RATES_MUTATION = `
+  mutation SetBankRates($input: SetBankRatesInput!) {
+    setBankRates(input: $input) {
+      bankBuildingId
+      depositInterestRatePercent
+      lendingInterestRatePercent
+      totalDeposits
+      lendableCapacity
+      availableLendingCapacity
+      baseCapitalDeposited
+    }
+  }
+`
+
 async function loadData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
@@ -134,12 +196,30 @@ async function loadData(isRefresh = false) {
     }
 
     if (bankBuildingId.value) {
-      const loansResult = await gqlRequest<{ bankLoans: LoanSummary[] }>(BANK_LOANS_QUERY, {
-        bankBuildingId: bankBuildingId.value,
-      })
+      const [loansResult, infoResult, depositsResult] = await Promise.all([
+        gqlRequest<{ bankLoans: LoanSummary[] }>(BANK_LOANS_QUERY, {
+          bankBuildingId: bankBuildingId.value,
+        }),
+        gqlRequest<{ bankInfo: BankInfoSummary }>(BANK_INFO_QUERY, {
+          id: bankBuildingId.value,
+        }),
+        gqlRequest<{ bankDeposits: BankDepositSummary[] }>(BANK_DEPOSITS_QUERY, {
+          id: bankBuildingId.value,
+        }),
+      ])
       const loans = loansResult.bankLoans ?? []
       if (!deepEqual(issuedLoans.value, loans)) {
         issuedLoans.value = loans
+      }
+      bankInfo.value = infoResult.bankInfo ?? null
+      const deposits = depositsResult.bankDeposits ?? []
+      if (!deepEqual(bankDeposits.value, deposits)) {
+        bankDeposits.value = deposits
+      }
+      // Pre-fill the rates form
+      if (bankInfo.value && !showRatesForm.value) {
+        ratesForm.value.depositInterestRatePercent = bankInfo.value.depositInterestRatePercent
+        ratesForm.value.lendingInterestRatePercent = bankInfo.value.lendingInterestRatePercent
       }
     }
   } catch (err) {
@@ -206,6 +286,29 @@ async function toggleOfferActive(offer: LoanOfferSummary) {
     error.value = err instanceof Error ? err.message : String(err)
   }
 }
+
+async function saveRates() {
+  if (!bankBuildingId.value) return
+  ratesLoading.value = true
+  ratesError.value = null
+  ratesSuccess.value = false
+  try {
+    const result = await gqlRequest<{ setBankRates: BankInfoSummary }>(SET_BANK_RATES_MUTATION, {
+      input: {
+        bankBuildingId: bankBuildingId.value,
+        depositInterestRatePercent: ratesForm.value.depositInterestRatePercent,
+        lendingInterestRatePercent: ratesForm.value.lendingInterestRatePercent,
+      },
+    })
+    bankInfo.value = result.setBankRates
+    ratesSuccess.value = true
+    showRatesForm.value = false
+  } catch (err) {
+    ratesError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    ratesLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -226,6 +329,111 @@ async function toggleOfferActive(offer: LoanOfferSummary) {
     </div>
 
     <template v-else>
+      <!-- Bank Info & Rate Configuration -->
+      <div v-if="bankInfo" class="bank-info-section">
+        <div class="bank-info-header">
+          <h2>{{ t('bank.bankRates') }}</h2>
+          <button class="btn btn-secondary btn-sm" @click="showRatesForm = !showRatesForm">
+            {{ showRatesForm ? t('common.cancel') : t('bank.setBankRates') }}
+          </button>
+        </div>
+
+        <!-- Rates form -->
+        <div v-if="showRatesForm" class="rates-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="deposit-rate">{{ t('bank.depositInterestRate') }} (%)</label>
+              <input
+                id="deposit-rate"
+                v-model.number="ratesForm.depositInterestRatePercent"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                class="form-input"
+              />
+            </div>
+            <div class="form-group">
+              <label for="lending-rate">{{ t('bank.lendingInterestRate') }} (%)</label>
+              <input
+                id="lending-rate"
+                v-model.number="ratesForm.lendingInterestRatePercent"
+                type="number"
+                min="0.1"
+                max="200"
+                step="0.1"
+                class="form-input"
+              />
+            </div>
+          </div>
+          <div v-if="ratesError" class="error-message">{{ ratesError }}</div>
+          <div v-if="ratesSuccess" class="success-message">{{ t('bank.ratesUpdated') }}</div>
+          <button class="btn btn-primary" :disabled="ratesLoading" @click="saveRates">
+            {{ ratesLoading ? t('common.loading') : t('bank.setBankRates') }}
+          </button>
+        </div>
+
+        <!-- Bank stats panel -->
+        <div class="bank-stats-grid">
+          <div class="bank-stat">
+            <span class="bank-stat-label">{{ t('bank.depositInterestRate') }}</span>
+            <span class="bank-stat-value deposit-rate">{{ formatPercent(bankInfo.depositInterestRatePercent) }}</span>
+          </div>
+          <div class="bank-stat">
+            <span class="bank-stat-label">{{ t('bank.lendingInterestRate') }}</span>
+            <span class="bank-stat-value lending-rate">{{ formatPercent(bankInfo.lendingInterestRatePercent) }}</span>
+          </div>
+          <div class="bank-stat">
+            <span class="bank-stat-label">{{ t('bank.totalDeposits') }}</span>
+            <span class="bank-stat-value">{{ formatCurrency(bankInfo.totalDeposits) }}</span>
+          </div>
+          <div class="bank-stat">
+            <span class="bank-stat-label">{{ t('bank.lendableCapacity') }}</span>
+            <span class="bank-stat-value">{{ formatCurrency(bankInfo.lendableCapacity) }}</span>
+            <span class="bank-stat-hint">{{ t('bank.reserveInfo') }}</span>
+          </div>
+          <div class="bank-stat">
+            <span class="bank-stat-label">{{ t('bank.availableLendingCapacity') }}</span>
+            <span class="bank-stat-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'negative'">
+              {{ formatCurrency(bankInfo.availableLendingCapacity) }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Depositors section -->
+      <section class="depositors-section">
+        <h2 class="section-title">{{ t('bank.bankDepositors') }}</h2>
+        <div v-if="bankDeposits.length === 0" class="empty-state">
+          <p>{{ t('bank.noBankDepositors') }}</p>
+        </div>
+        <div v-else class="depositors-table">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ t('common.company') }}</th>
+                <th>{{ t('bank.depositAmount') }}</th>
+                <th>{{ t('bank.depositInterestRate') }}</th>
+                <th>{{ t('bank.depositInterestEarned') }}</th>
+                <th>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="dep in bankDeposits" :key="dep.id">
+                <td>{{ dep.depositorCompanyName }}</td>
+                <td>{{ formatCurrency(dep.amount) }}</td>
+                <td>{{ formatPercent(dep.depositInterestRatePercent) }}</td>
+                <td>{{ formatCurrency(dep.totalInterestPaid) }}</td>
+                <td>
+                  <span v-if="dep.isBaseCapital" class="badge badge-info">{{ t('bank.baseCapital') }}</span>
+                  <span v-else class="badge badge-success">Depositor</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- Overview stats -->
       <div class="stats-row">
         <div class="stat-card">
@@ -639,5 +847,124 @@ th {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Bank info and rate configuration */
+.bank-info-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.bank-info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.bank-info-header h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.bank-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.bank-stat {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bank-stat-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bank-stat-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.bank-stat-value.deposit-rate { color: var(--color-success, #22c55e); }
+.bank-stat-value.lending-rate { color: var(--color-warning, #f59e0b); }
+.bank-stat-value.positive { color: var(--color-success, #22c55e); }
+.bank-stat-value.negative { color: var(--color-error, #ef4444); }
+
+.bank-stat-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.rates-form {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+/* Depositors section */
+.depositors-section {
+  margin-bottom: 1.5rem;
+}
+
+.depositors-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.depositors-table th,
+.depositors-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.depositors-table th {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.badge-info {
+  background: var(--color-primary-bg, rgba(99, 102, 241, 0.15));
+  color: var(--color-primary, #6366f1);
+}
+
+.badge-success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.success-message {
+  color: var(--color-success, #22c55e);
+  font-size: 0.875rem;
+  padding: 0.5rem 0;
 }
 </style>

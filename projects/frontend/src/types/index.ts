@@ -1145,6 +1145,41 @@ export interface LoanSummary {
   closedAtUtc: string | null
 }
 
+/** A bank deposit made by a company into a bank building. */
+export interface BankDepositSummary {
+  id: string
+  bankBuildingId: string
+  bankBuildingName: string
+  depositorCompanyId: string
+  depositorCompanyName: string
+  amount: number
+  depositInterestRatePercent: number
+  isBaseCapital: boolean
+  isActive: boolean
+  depositedAtTick: number
+  depositedAtUtc: string
+  withdrawnAtTick: number | null
+  withdrawnAtUtc: string | null
+  totalInterestPaid: number
+}
+
+/** Public information about a bank building. */
+export interface BankInfoSummary {
+  bankBuildingId: string
+  bankBuildingName: string
+  cityId: string
+  cityName: string
+  lenderCompanyId: string
+  lenderCompanyName: string
+  depositInterestRatePercent: number
+  lendingInterestRatePercent: number
+  totalDeposits: number
+  lendableCapacity: number
+  outstandingLoanPrincipal: number
+  availableLendingCapacity: number
+  baseCapitalDeposited: boolean
+}
+
 /** Procurement preview result from the backend. */
 export interface ProcurementPreview {
   sourceType: 'GLOBAL_EXCHANGE' | 'LOCAL_B2B' | 'LOCKED_VENDOR' | 'NO_SOURCE'
