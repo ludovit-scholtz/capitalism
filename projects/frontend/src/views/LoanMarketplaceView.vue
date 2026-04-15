@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
@@ -12,6 +13,7 @@ import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, comput
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const router = useRouter()
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -87,6 +89,10 @@ const MY_COMPANIES_QUERY = `
         id
         name
         cash
+        buildings {
+          id
+          type
+        }
       }
     }
   }
@@ -147,6 +153,28 @@ useTickRefresh(async () => {
 const activeLoans = computed(() => myLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE'))
 const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
+
+// Lender eligibility: detect BANK buildings across all companies
+const myBankBuildings = computed(() =>
+  myCompanies.value.flatMap((c) => (c.buildings ?? []).filter((b) => b.type === 'BANK').map((b) => ({ ...b, companyId: c.id }))),
+)
+const hasBankBuilding = computed(() => myBankBuildings.value.length > 0)
+const firstBankBuilding = computed(() => myBankBuildings.value[0] ?? null)
+const firstCompanyId = computed(() => myCompanies.value[0]?.id ?? null)
+
+function navigateToAcquireBank() {
+  if (firstCompanyId.value) {
+    router.push(`/buy-building/${firstCompanyId.value}`)
+  } else {
+    router.push('/dashboard')
+  }
+}
+
+function navigateToManageBank() {
+  if (firstBankBuilding.value) {
+    router.push(`/bank/${firstBankBuilding.value.id}`)
+  }
+}
 
 function openAcceptModal(offer: LoanOfferSummary) {
   if (!isCompanyAccountActive.value || !activeCompany.value) {
@@ -229,6 +257,48 @@ async function confirmAcceptLoan() {
     </div>
 
     <template v-else>
+      <!-- Lender action panel: context-aware CTA for offering loans -->
+      <section class="lender-cta-section" aria-label="Lender action">
+        <h2 class="section-title">{{ t('bank.becomeALender') }}</h2>
+
+        <!-- Unauthenticated: prompt login -->
+        <div v-if="!auth.isAuthenticated" class="lender-cta-card lender-cta-login">
+          <div class="lender-cta-icon" aria-hidden="true">🏦</div>
+          <div class="lender-cta-body">
+            <h3 class="lender-cta-title">{{ t('bank.loginToLendTitle') }}</h3>
+            <p class="lender-cta-description">{{ t('bank.noBankCTADescription') }}</p>
+          </div>
+          <router-link to="/login" class="btn btn-secondary lender-cta-btn" aria-label="Log in to offer loans">
+            {{ t('bank.loginToLend') }}
+          </router-link>
+        </div>
+
+        <!-- Authenticated, no bank building: acquire CTA -->
+        <div v-else-if="!hasBankBuilding" class="lender-cta-card lender-cta-acquire">
+          <div class="lender-cta-icon" aria-hidden="true">🏦</div>
+          <div class="lender-cta-body">
+            <h3 class="lender-cta-title">{{ t('bank.noBankCTATitle') }}</h3>
+            <p class="lender-cta-description">{{ t('bank.noBankCTADescription') }}</p>
+          </div>
+          <button class="btn btn-primary lender-cta-btn" @click="navigateToAcquireBank" aria-label="Acquire a Bank building">
+            {{ t('bank.acquireBank') }}
+          </button>
+        </div>
+
+        <!-- Authenticated, has bank: manage bank CTA -->
+        <div v-else class="lender-cta-card lender-cta-manage">
+          <div class="lender-cta-icon" aria-hidden="true">🏦</div>
+          <div class="lender-cta-body">
+            <h3 class="lender-cta-title">{{ t('bank.hasBankCTATitle') }}</h3>
+            <p class="lender-cta-description">{{ t('bank.hasBankCTADescription') }}</p>
+            <span class="lender-bank-name">{{ firstBankBuilding?.name }}</span>
+          </div>
+          <button class="btn btn-primary lender-cta-btn" @click="navigateToManageBank">
+            {{ t('bank.manageBank') }}
+          </button>
+        </div>
+      </section>
+
       <!-- Active loans section (authenticated borrowers) -->
       <section v-if="auth.isAuthenticated && activeLoans.length > 0" class="my-loans-section">
         <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
@@ -760,6 +830,79 @@ async function confirmAcceptLoan() {
   .loans-grid,
   .offers-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Lender CTA panel */
+.lender-cta-section {
+  margin-bottom: var(--spacing-xl);
+}
+
+.lender-cta-card {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md) var(--spacing-lg);
+  transition: box-shadow 0.2s;
+}
+
+.lender-cta-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.lender-cta-manage {
+  border-color: var(--color-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.lender-cta-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.lender-cta-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lender-cta-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.lender-cta-description {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-xs);
+  line-height: 1.4;
+}
+
+.lender-bank-name {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-primary, #3b82f6);
+}
+
+.lender-cta-btn {
+  flex-shrink: 0;
+  width: auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .lender-cta-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .lender-cta-btn {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

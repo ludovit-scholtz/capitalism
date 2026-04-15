@@ -59,6 +59,7 @@ With upgrading the unit to do research, the efficiency to do research improves. 
 
 ### Loans menu
 - In loans offers make sure is the action button to do some action. If user needs to buy a bank to allow public loan service make sure there is button to buy the building. If user can offer a loan make sure to navigate him to the form where he can offer a loan.
+- **100% completed** — Implemented context-aware lender CTA panel in the Loan Marketplace view. Unauthenticated players see a login prompt. Authenticated players without a bank see an "Acquire a Bank" button that navigates to the buy-building flow for their first company. Eligible players who own a bank see a "Manage My Bank" CTA that deep-links directly to that bank's management page (where they can publish loan offers). State detection is driven by fetching building types from the player's companies query. Localized in en/sk/de. E2E tests cover all three states and click-through navigation.
 
 ### Ingame chat
 - Ingame chat in navbar does not show any icon.

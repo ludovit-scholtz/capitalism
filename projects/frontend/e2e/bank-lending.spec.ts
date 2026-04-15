@@ -274,6 +274,143 @@ test.describe('Loan Marketplace (/loans)', () => {
     await expect(page.getByText('8.0%')).toBeVisible()
     await expect(page.getByText('15.0%')).toBeVisible()
   })
+
+  test('unauthenticated user sees login CTA in lender action panel', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/loans')
+
+    const lenderPanel = page.locator('[aria-label="Lender action"]')
+    await expect(lenderPanel).toBeVisible()
+    await expect(lenderPanel.getByRole('heading', { name: 'Become a Lender', level: 2 })).toBeVisible()
+    await expect(lenderPanel.getByRole('link', { name: 'Log in to offer loans' })).toBeVisible()
+  })
+
+  test('authenticated player without bank sees Acquire a Bank CTA', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'company-1',
+      playerId: player.id,
+      name: 'My Company',
+      cash: 50000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [], // no bank
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    const lenderPanel = page.locator('[aria-label="Lender action"]')
+    await expect(lenderPanel.getByText("You Don't Own a Bank Yet")).toBeVisible()
+    await expect(lenderPanel.getByRole('button', { name: 'Acquire a Bank' })).toBeVisible()
+  })
+
+  test('clicking Acquire a Bank navigates to buy-building page', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'company-1',
+      playerId: player.id,
+      name: 'My Company',
+      cash: 50000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.locator('[aria-label="Lender action"]').getByRole('button', { name: 'Acquire a Bank' }).click()
+    await expect(page).toHaveURL(/\/buy-building\/company-1/)
+  })
+
+  test('authenticated player with bank sees Manage My Bank CTA', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'lender-company-1',
+      playerId: player.id,
+      name: 'Lending Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'bank-building-1',
+          companyId: 'lender-company-1',
+          cityId: 'city-ba',
+          name: 'City Bank',
+          type: 'BANK',
+          level: 1,
+          units: [],
+          isUnderConstruction: false,
+          constructionCompletesAtTick: null,
+          pendingConfigurationTick: null,
+          hasPendingConfiguration: false,
+          powerStatus: 'POWERED',
+          mediaType: null,
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    const lenderPanel = page.locator('[aria-label="Lender action"]')
+    await expect(lenderPanel.getByText('You Own a Bank')).toBeVisible()
+    await expect(lenderPanel.getByText('City Bank')).toBeVisible()
+    await expect(lenderPanel.locator('button').filter({ hasText: 'Manage My Bank' })).toBeVisible()
+  })
+
+  test('clicking Manage My Bank navigates to bank management page', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'lender-company-1',
+      playerId: player.id,
+      name: 'Lending Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'bank-building-1',
+          companyId: 'lender-company-1',
+          cityId: 'city-ba',
+          name: 'City Bank',
+          type: 'BANK',
+          level: 1,
+          units: [],
+          isUnderConstruction: false,
+          constructionCompletesAtTick: null,
+          pendingConfigurationTick: null,
+          hasPendingConfiguration: false,
+          powerStatus: 'POWERED',
+          mediaType: null,
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.locator('[aria-label="Lender action"]').locator('button').filter({ hasText: 'Manage My Bank' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1/)
+  })
 })
 
 test.describe('Bank Management (/bank/:buildingId)', () => {
