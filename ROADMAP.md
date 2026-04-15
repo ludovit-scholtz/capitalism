@@ -23,8 +23,8 @@ Allow to upgrade more units at the same time. Make sure the upgrade is triggered
 Show all changes that upgrading of the unit will have, for example the storage capacity change. At the moment i do not see in the public sales unit the change in the storage capacity change for example.
 
 ### Research & Development (0% complete)
-Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.
-". Make sure to show there the current state of the research or investigate why research is not cummulating.
+- Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.". Make sure to show there the current state of the research or investigate why research is not cummulating.
+- In brand quality unit when category is selected as brand scope, the product selection shows up but not the product category selection. Make sure the brand category can be improved as well and the category of products is selected.
 
 ### Changelog (0% complete)
 - Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
@@ -38,6 +38,11 @@ Research does not seem to be working at the moment. I have R&D building with res
 ### Power plants  (0% complete)
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below
+
+### City map (0% complete)
+- Add picker to change the city
+- Implement and show weather predictions as is defined in the powerplants seciton
+- When going to the list view, and back to the map view, the map does not show up
 
 ## Multiple Game Servers
 
