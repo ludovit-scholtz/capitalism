@@ -300,6 +300,23 @@ When sum of ownerships for person account and all controlled companies reaches 9
 
 In the stock exchange in company details, is list of all shareholders and the pie chart.
 
+**Status: 75% complete** (April 2026)
+
+### What was delivered
+- Global stock exchange UI with company listings, share prices, bid/ask spread, shareholder tables, and pie charts.
+- Buy and sell share trading with person account and company account switching.
+- Personal account ledger showing portfolio holdings, available cash, tax reserve, and dividend history.
+- Trading controls redesigned using CSS grid for precise vertical alignment across all viewport sizes; input and Buy/Sell buttons share the same grid row guaranteeing identical baseline.
+- Responsive layout: labels hidden on mobile (aria-label covers accessibility), input spans full width, buttons collapse to side-by-side pair.
+- Loading, disabled, validation-error, and success/error feedback states all implemented.
+- Personal tax reserve lifecycle: accumulation on share sell, settlement at year-end TaxPhase.
+- 58 E2E tests covering buy/sell flows, portfolio, dividends, personal ledger, alignment, and authentication states.
+
+### What remains
+- Takeover trigger when combined ownership reaches 50%.
+- Company merge when combined ownership reaches 90%.
+- Share buyback reducing issued share count.
+
 ## Account switching
 
 Player can switch between his person account and any company he controls.

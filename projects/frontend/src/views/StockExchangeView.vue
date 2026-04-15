@@ -773,7 +773,7 @@ useTickRefresh(async () => {
             <strong>{{ formatCurrency(recentDividendTotal) }}</strong>
           </article>
           <article class="summary-card summary-card--link">
-            <RouterLink to="/personal-ledger" class="ledger-link">{{ t('stockExchange.viewPersonalLedger') }}</RouterLink>
+            <RouterLink to="/personal-ledger" class="ledger-link" :title="t('nav.personalLedger')">{{ t('stockExchange.viewPersonalLedger') }}</RouterLink>
           </article>
         </section>
 
