@@ -26,26 +26,18 @@ Show all changes that upgrading of the unit will have, for example the storage c
 ### All buildings (0% complete)
 - Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future. Sell Building is touching the cancel editing button at the moment.
 
-
-
-### Stock exchange (0% complete)
-- When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional. 
-
-
 ### Research & Development (0% complete)
 Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.
 ". Make sure to show there the current state of the research or investigate why research is not cummulating.
-
-
-
-### Ingame chat (0% complete)
-- Ingame chat in navbar does not show any icon.
 
 ### Changelog (0% complete)
 - Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
 
 ### Architecture optimization (0% complete)
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
+
+### Marketing
+- Make sure that in every city is one government owned media house from each type of media
 
 ## Multiple Game Servers
 
@@ -308,6 +300,23 @@ When sum of ownerships for person account and all controlled companies reaches 9
 
 In the stock exchange in company details, is list of all shareholders and the pie chart.
 
+**Status: 75% complete** (April 2026)
+
+### What was delivered
+- Global stock exchange UI with company listings, share prices, bid/ask spread, shareholder tables, and pie charts.
+- Buy and sell share trading with person account and company account switching.
+- Personal account ledger showing portfolio holdings, available cash, tax reserve, and dividend history.
+- Trading controls redesigned using CSS grid for precise vertical alignment across all viewport sizes; input and Buy/Sell buttons share the same grid row guaranteeing identical baseline.
+- Responsive layout: labels hidden on mobile (aria-label covers accessibility), input spans full width, buttons collapse to side-by-side pair.
+- Loading, disabled, validation-error, and success/error feedback states all implemented.
+- Personal tax reserve lifecycle: accumulation on share sell, settlement at year-end TaxPhase.
+- 58 E2E tests covering buy/sell flows, portfolio, dividends, personal ledger, alignment, and authentication states.
+
+### What remains
+- Takeover trigger when combined ownership reaches 50%.
+- Company merge when combined ownership reaches 90%.
+- Share buyback reducing issued share count.
+
 ## Account switching
 
 Player can switch between his person account and any company he controls.
@@ -379,8 +388,6 @@ List of the root game administrators is managed by the master api configuration.
 
 ## Newspaper and changelog
 
-**Status: 90% complete** (April 2026)
-
 The master api database holds the changelog and newspaper. Admins can publish the news for directing users or report some progress.
 
 With every change the changelog must be updated. The changelog is visible in the news section in every game.
@@ -389,17 +396,19 @@ Game administrators can edit any changelog or news record in any localization.
 
 Track if user did read the news, if not show in the navbar number of unread messages.
 
-### What was delivered
-- All CHANGELOG.csv entries are seeded as published global CHANGELOG records in MasterApi on startup (idempotent).
-- The game API news proxy (`gameNewsFeed` query) now returns an empty feed gracefully when MasterApi is unreachable, preventing blank screens.
-- Full empty state, loading state, and error state UIs are implemented in the NewsView.
-- Filter tabs (All / Newspaper / Changelog) work correctly and hide entries that do not belong to this server.
-- Unread badge in navbar shows count of unread entries; opening the News page marks visible entries as read and clears the badge.
-- 4 new backend game API tests verify proxy behaviour; 4 new MasterApi tests verify seed entries have all three locales; 8 new E2E tests cover unauthenticated access, empty state, error state, filter tabs, and pill labels.
+## Media house
 
-### What remains
-- Automated seeding of server-specific NEWS entries per deployed game server.
-- Pagination or search UI for feeds with more than 50 entries.
+Media building has single unit layout and does not show the grid.
+
+The configuration for this single unit is spending level on content per tick.
+
+The quality of the content is determined by accumulated costs spent by the media building. With the upgrade of the building, the content is more efficient. At start 50% of the costs goes to the aggregated content (1-1/2). Next level of building has 66% (1-1/3) efficiency, and so on.
+
+Per tick every media house looses 0.5% of the aggregated content value.
+
+The quality of the content is determined by the comparision of the other media houses. If this media house has highest content, it is ranked at 100% content. If competitive media house has aggregated content value half of the top media house, their content is ranked at 50%. This applies for the same media house in the same category and city. Different categories do not affect each other, so one company may have 100% of the content in city 1 for TV category, other company 100% of the content for Radio category in the same city with different aggregated content, and third company may have 100% content ranking for TV but in the different city.
+
+The content quality ranking determines the speed with which the branding quality is increasing.
 
 ## Monetization
 
@@ -463,6 +472,25 @@ If depositers add new money and the bank has loan from the central bank, bank re
 When bank owner company is the current player, show the bank profit chart, interest rates chart, other details and composition of the loans.
 
 When other player displayes the bank detail, make sure he see the professional design for making the deposits or asking for a loan.
+
+## Power plants
+
+In powerplant grid allow to build following units:
+- Purchasing unit - allows to buy the coal or gas
+- Wind turbine unit - produces wind force - Each city has the weather channel with prediciton for next 50 ticks on how much wind is blown - ranges from 0% to 100% but incrementing and decrementing in random manner 2-5% up or down.
+- Watter turbine unit - produces watter force - extremly expensive, but produces steady force units
+- Storage unit - to users to store the wind force and optimize for steady energy output
+- Energy producing unit - consumes the coal or gas, wind force, and produces energy
+- Battery unit - Can store the extra energe in peaks and outputs when produciton is not good enough.
+
+Flow of the resources is following:
+- Purchasing unit | Wind turbine unit | Watter turbine unit -> Storage unit | Energy producing unit
+- Storage unit -> Energy producing unit
+- Energy producing unit -> Battery unit
+
+The power plant as a building as a whole has configuration for planned output. If the output is oversupplied, the powerplant do not receive money for the oversupply. If the powerplant is undersupply, it receives the government fines for not generating enough of energy.
+
+Make sure to show the powerplant P&L chart in the building overview.
 
 # Technical implementation
 

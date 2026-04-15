@@ -773,7 +773,7 @@ useTickRefresh(async () => {
             <strong>{{ formatCurrency(recentDividendTotal) }}</strong>
           </article>
           <article class="summary-card summary-card--link">
-            <RouterLink to="/personal-ledger" class="ledger-link">{{ t('stockExchange.viewPersonalLedger') }}</RouterLink>
+            <RouterLink to="/personal-ledger" class="ledger-link" :title="t('nav.personalLedger')">{{ t('stockExchange.viewPersonalLedger') }}</RouterLink>
           </article>
         </section>
 
@@ -964,8 +964,15 @@ useTickRefresh(async () => {
                             </div>
 
                             <div class="trade-order-controls">
-                              <label class="trade-field trade-field--quantity">
+                              <!-- Label row: Quantity / Buy / Sell — hidden on mobile via CSS -->
+                              <div class="trade-controls-labels" aria-hidden="true">
                                 <span class="trade-field-label">{{ t('stockExchange.quantity') }}</span>
+                                <span class="trade-field-label">{{ t('stockExchange.buyLabel') }}</span>
+                                <span class="trade-field-label">{{ t('stockExchange.sellLabel') }}</span>
+                              </div>
+
+                              <!-- Controls row: input and both buttons share the same grid row for precise alignment -->
+                              <div class="trade-controls-inputs">
                                 <input
                                   :value="quantityByCompany[listing.companyId] ?? 100"
                                   type="number"
@@ -975,10 +982,6 @@ useTickRefresh(async () => {
                                   :aria-label="`${t('stockExchange.quantity')} ${listing.companyName}`"
                                   @input="updateQuantity(listing.companyId, Number(($event.target as HTMLInputElement).value))"
                                 />
-                              </label>
-
-                              <div class="trade-action-column">
-                                <span class="trade-field-label">{{ t('stockExchange.buyLabel') }}</span>
                                 <button
                                   class="btn btn-primary trade-action-btn"
                                   :disabled="actionLoadingKey === `buy-${listing.companyId}`"
@@ -986,13 +989,6 @@ useTickRefresh(async () => {
                                 >
                                   {{ t('stockExchange.buyAt', { price: formatCurrency(listing.askPrice) }) }}
                                 </button>
-                                <span class="trade-est" aria-live="polite">
-                                  {{ t('stockExchange.estimatedCost', { total: formatCurrency(estimatedBuyCost(listing)) }) }}
-                                </span>
-                              </div>
-
-                              <div class="trade-action-column">
-                                <span class="trade-field-label">{{ t('stockExchange.sellLabel') }}</span>
                                 <button
                                   class="btn btn-secondary trade-action-btn"
                                   :disabled="actionLoadingKey === `sell-${listing.companyId}`"
@@ -1000,6 +996,14 @@ useTickRefresh(async () => {
                                 >
                                   {{ t('stockExchange.sellAt', { price: formatCurrency(listing.bidPrice) }) }}
                                 </button>
+                              </div>
+
+                              <!-- Estimates row: empty placeholder / est. cost / est. proceeds -->
+                              <div class="trade-controls-estimates">
+                                <span aria-hidden="true"></span>
+                                <span class="trade-est" aria-live="polite">
+                                  {{ t('stockExchange.estimatedCost', { total: formatCurrency(estimatedBuyCost(listing)) }) }}
+                                </span>
                                 <span class="trade-est" aria-live="polite">
                                   {{ t('stockExchange.estimatedProceeds', { total: formatCurrency(estimatedSellProceeds(listing)) }) }}
                                 </span>
@@ -1857,21 +1861,33 @@ useTickRefresh(async () => {
 }
 
 .trade-order-controls {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-end;
-  flex-wrap: wrap;
+  display: grid;
+  gap: 0.35rem 0;
+}
+
+.trade-controls-labels,
+.trade-controls-inputs,
+.trade-controls-estimates {
+  display: grid;
+  grid-template-columns: minmax(130px, 160px) 1fr 1fr;
+  gap: 0 0.75rem;
+}
+
+.trade-controls-labels {
+  align-items: end;
+}
+
+.trade-controls-inputs {
+  align-items: stretch;
+}
+
+.trade-controls-estimates {
+  align-items: start;
 }
 
 .trade-field {
   display: grid;
   gap: 0.35rem;
-}
-
-.trade-field--quantity {
-  min-width: 130px;
-  max-width: 160px;
-  flex: 0 0 auto;
 }
 
 .trade-field-label {
@@ -1881,14 +1897,6 @@ useTickRefresh(async () => {
   letter-spacing: 0.06em;
   color: var(--color-text-secondary);
   white-space: nowrap;
-}
-
-.trade-action-column {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  flex: 1;
-  min-width: 140px;
 }
 
 .trade-action-btn {
@@ -2151,7 +2159,26 @@ useTickRefresh(async () => {
   }
 
   .trade-order-controls {
-    grid-template-columns: 1fr;
+    gap: 0.5rem 0;
+  }
+
+  .trade-controls-labels {
+    display: none;
+  }
+
+  .trade-controls-inputs,
+  .trade-controls-estimates {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* Quantity input spans both buy/sell columns on narrow screens */
+  .trade-controls-inputs .trade-input {
+    grid-column: 1 / -1;
+  }
+
+  /* Hide the empty quantity placeholder in the estimates row */
+  .trade-controls-estimates > :first-child {
+    display: none;
   }
 
   .trade-actions {
