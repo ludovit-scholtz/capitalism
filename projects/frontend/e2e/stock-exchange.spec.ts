@@ -241,6 +241,145 @@ test.describe('Stock exchange', () => {
     await expect(sellBtn).toBeVisible()
   })
 
+  test('trade controls — quantity input and buy/sell buttons are vertically aligned in the same row', async ({
+    page,
+  }) => {
+    const player = makePlayer({
+      personalCash: 150000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-aligned',
+      email: 'aligned@test.com',
+      displayName: 'Aligned Rival',
+      companies: [
+        {
+          id: 'company-aligned',
+          playerId: 'player-aligned',
+          name: 'Alignment Corp',
+          cash: 600000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 5,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-aligned', ownerPlayerId: 'player-aligned', ownerCompanyId: null, shareCount: 5000 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await openTradePanel(page, 'Alignment Corp')
+
+    const tradePanel = page.locator('.trade-panel')
+    await expect(tradePanel).toBeVisible()
+
+    // All three controls must be inside the same grid row container
+    const controlsRow = tradePanel.locator('.trade-controls-inputs')
+    await expect(controlsRow).toBeVisible()
+
+    const qtyInput = controlsRow.locator('.trade-input')
+    const buyBtn = controlsRow.getByRole('button', { name: /Buy @ / })
+    const sellBtn = controlsRow.getByRole('button', { name: /Sell @ / })
+
+    await expect(qtyInput).toBeVisible()
+    await expect(buyBtn).toBeVisible()
+    await expect(sellBtn).toBeVisible()
+
+    // Verify pixel-level alignment: all three controls must share the same top edge and height
+    const inputBox = await qtyInput.boundingBox()
+    const buyBox = await buyBtn.boundingBox()
+    const sellBox = await sellBtn.boundingBox()
+
+    expect(inputBox).not.toBeNull()
+    expect(buyBox).not.toBeNull()
+    expect(sellBox).not.toBeNull()
+
+    // Allow 2 px tolerance for sub-pixel rendering differences
+    const tolerance = 2
+    expect(Math.abs(inputBox!.y - buyBox!.y)).toBeLessThanOrEqual(tolerance)
+    expect(Math.abs(inputBox!.y - sellBox!.y)).toBeLessThanOrEqual(tolerance)
+    expect(Math.abs(inputBox!.height - buyBox!.height)).toBeLessThanOrEqual(tolerance)
+    expect(Math.abs(inputBox!.height - sellBox!.height)).toBeLessThanOrEqual(tolerance)
+
+    // Labels row must be visible on desktop viewport
+    const labelsRow = tradePanel.locator('.trade-controls-labels')
+    await expect(labelsRow).toBeVisible()
+
+    // Estimates must be visible below the controls
+    const estimatesRow = tradePanel.locator('.trade-controls-estimates')
+    await expect(estimatesRow.locator('.trade-est').first()).toBeVisible()
+    await expect(estimatesRow.locator('.trade-est').last()).toBeVisible()
+  })
+
+  test('trade controls — disabled state keeps input and buttons aligned during loading', async ({ page }) => {
+    const player = makePlayer({
+      personalCash: 150000,
+      companies: [makeControlledCompany()],
+    })
+    const rival = makePlayer({
+      id: 'player-loading',
+      email: 'loading@test.com',
+      displayName: 'Loading Rival',
+      companies: [
+        {
+          id: 'company-loading',
+          playerId: 'player-loading',
+          name: 'Loading Corp',
+          cash: 600000,
+          totalSharesIssued: 10000,
+          dividendPayoutRatio: 0.2,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          foundedAtTick: 5,
+          buildings: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, {
+      players: [player, rival],
+      shareholdings: [
+        { companyId: 'company-home', ownerPlayerId: 'player-1', ownerCompanyId: null, shareCount: 10000 },
+        { companyId: 'company-loading', ownerPlayerId: 'player-loading', ownerCompanyId: null, shareCount: 5000 },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/stocks')
+
+    await openTradePanel(page, 'Loading Corp')
+
+    const tradePanel = page.locator('.trade-panel')
+    const controlsRow = tradePanel.locator('.trade-controls-inputs')
+    await expect(controlsRow).toBeVisible()
+
+    // Initially buttons are not disabled
+    const buyBtn = controlsRow.getByRole('button', { name: /Buy @ / })
+    const sellBtn = controlsRow.getByRole('button', { name: /Sell @ / })
+    await expect(buyBtn).toBeEnabled()
+    await expect(sellBtn).toBeEnabled()
+
+    // Verify controls-inputs container is still aligned after checking state
+    const inputBox = await controlsRow.locator('.trade-input').boundingBox()
+    const buyBox = await buyBtn.boundingBox()
+    expect(inputBox).not.toBeNull()
+    expect(buyBox).not.toBeNull()
+    expect(Math.abs(inputBox!.y - buyBox!.y)).toBeLessThanOrEqual(2)
+  })
+
   test('person account can buy shares via inline trade panel', async ({ page }) => {
     const player = makePlayer({
       personalCash: 150000,

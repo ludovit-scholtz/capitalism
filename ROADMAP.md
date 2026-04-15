@@ -42,6 +42,7 @@ Show all changes that upgrading of the unit will have, for example the storage c
 
 ### Stock exchange
 - When trading stocks, the input for number of shares, and buttons buy and sell are not in the same height. Make sure the design is professional. 
+**[100% complete — Trading controls redesigned with a 3-row CSS grid layout: label row (Quantity / Buy / Sell), controls row (number input and both action buttons in the same grid row for pixel-perfect vertical alignment), and estimates row (Est. cost / Est. proceeds). Replaced the old `display:flex; align-items:flex-end` approach that misaligned buttons with a `display:grid` sub-grid that guarantees input and buttons share identical baselines. Responsive: on ≤720 px the label row is hidden, the input spans full width, and Buy/Sell buttons sit side-by-side. Keyboard navigation order preserved. E2E coverage added for aligned-controls rendering, disabled loading state, and validation error placement.]**
 
 ### Ledger for personal account
 Create ledger for personal account, and show there the person's wealth, the income and taxes, taxes blockations and tax history. Make sure it is accessible from the personal account dashboard.
