@@ -473,6 +473,25 @@ When bank owner company is the current player, show the bank profit chart, inter
 
 When other player displayes the bank detail, make sure he see the professional design for making the deposits or asking for a loan.
 
+## Power plants
+
+In powerplant grid allow to build following units:
+- Purchasing unit - allows to buy the coal or gas
+- Wind turbine unit - produces wind force - Each city has the weather channel with prediciton for next 50 ticks on how much wind is blown - ranges from 0% to 100% but incrementing and decrementing in random manner 2-5% up or down.
+- Watter turbine unit - produces watter force - extremly expensive, but produces steady force units
+- Storage unit - to users to store the wind force and optimize for steady energy output
+- Energy producing unit - consumes the coal or gas, wind force, and produces energy
+- Battery unit - Can store the extra energe in peaks and outputs when produciton is not good enough.
+
+Flow of the resources is following:
+- Purchasing unit | Wind turbine unit | Watter turbine unit -> Storage unit | Energy producing unit
+- Storage unit -> Energy producing unit
+- Energy producing unit -> Battery unit
+
+The power plant as a building as a whole has configuration for planned output. If the output is oversupplied, the powerplant do not receive money for the oversupply. If the powerplant is undersupply, it receives the government fines for not generating enough of energy.
+
+Make sure to show the powerplant P&L chart in the building overview.
+
 # Technical implementation
 
 Game server frontend is vue.js with source code located at projects/frontend with tailwind styling.
