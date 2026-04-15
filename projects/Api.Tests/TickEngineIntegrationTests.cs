@@ -3060,6 +3060,53 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.Empty(purchasingEntries);
     }
 
+    [Fact]
+    public async Task PurchasingPhase_GlobalExchange_QualityVariesAcrossTicks_ProducingDifferentInventoryQualities()
+    {
+        // ROADMAP requirement: "The quality of products obtained from the global exchange must
+        // vary between 5 to 20%". SampleExchangeQuality returns a deterministic but tick-varying
+        // value derived from (tick, cityId, resourceId). Clearing inventory between ticks isolates
+        // each tick's quality so we can verify distinct values are produced.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (_, _, _, purchaseUnitId, _) =
+            await SeedExchangePurchaseUnitAsync(db, maxPrice: 9999m, purchaseSource: "EXCHANGE");
+
+        var processor = await CreateProcessorAsync(scope);
+
+        // --- Tick 1 ---
+        await processor.ProcessTickAsync();
+
+        var inv1 = await db.Inventories
+            .Where(i => i.BuildingUnitId == purchaseUnitId && i.Quantity > 0m)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(inv1);
+        var quality1 = inv1.Quality;
+
+        // Clear inventory so the next tick records a fresh quality sample.
+        inv1.Quantity = 0m;
+        await db.SaveChangesAsync();
+
+        // --- Tick 2 (hash inputs are different: tick number advanced) ---
+        await processor.ProcessTickAsync();
+
+        var inv2 = await db.Inventories
+            .Where(i => i.BuildingUnitId == purchaseUnitId && i.Quantity > 0m)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(inv2);
+        var quality2 = inv2.Quality;
+
+        // Both qualities must be within the expanded exchange band [0.20, 0.99].
+        Assert.InRange(quality1, 0.20m, 0.99m);
+        Assert.InRange(quality2, 0.20m, 0.99m);
+
+        // The two ticks must produce different quality values — this proves the per-tick
+        // hash in SampleExchangeQuality actually flows through to inventory.
+        Assert.NotEqual(quality1, quality2);
+    }
+
     #endregion
 
     #region Full supply-chain integration (onboarding AC#4)

@@ -462,6 +462,23 @@ public sealed class GlobalExchangeCalculatorUnitTests
         Assert.True(max <= 0.99m, "max must be ≤ 0.99");
     }
 
+    [Fact]
+    public void ComputeExchangeQualityBand_BandWidthAlwaysBetween5And20Percent()
+    {
+        // ROADMAP requirement: "The quality of products obtained from the global exchange
+        // must vary between 5 to 20%". This means the quality variability band width must
+        // be at least 5% (at full abundance) and at most 20% (at zero abundance).
+        foreach (var abundance in new[] { 0m, 0.1m, 0.2m, 0.3m, 0.4m, 0.5m, 0.6m, 0.7m, 0.8m, 0.9m, 1.0m })
+        {
+            var (min, max) = GlobalExchangeCalculator.ComputeExchangeQualityBand(abundance);
+            var bandWidth = max - min;
+            Assert.True(bandWidth >= 0.05m,
+                $"Band width ({bandWidth:P2}) must be ≥ 5% at abundance {abundance}");
+            Assert.True(bandWidth <= 0.20m,
+                $"Band width ({bandWidth:P2}) must be ≤ 20% at abundance {abundance}");
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // SampleExchangeQuality
     // ---------------------------------------------------------------------------

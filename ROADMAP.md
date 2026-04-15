@@ -28,6 +28,7 @@ Show all changes that upgrading of the unit will have, for example the storage c
 
 ### Global exchange
 - The quality of products obrained from the blobal exchange must vary between 5 to 20%
+**[100% complete — Quality variability fully implemented end-to-end. Backend: `GlobalExchangeCalculator.ComputeExchangeQualityBand(abundance)` returns a (min, max) quality band whose width narrows from 20% at zero abundance to 5% at full abundance. `SampleExchangeQuality(abundance, tick, cityId, resourceId)` deterministically samples within this band per tick, producing genuine tick-by-tick variability. `PurchasingPhase` uses the sampled quality when filling inventory from global exchange. GraphQL API returns `estimatedQuality`, `qualityMin`, and `qualityMax` on every exchange offer. Frontend: `GlobalExchangeView` shows each city's quality as a range ("72%–82%"), renders a quality-band bar with a centre-tick marker at the estimated quality, and includes a tooltip explaining the variability. Localized in en/sk/de. Backend tests cover band-width validation (5%–20%), API field consistency (min ≤ estimated ≤ max), quality-varies-across-ticks tick-engine proof, and all three starter industries (Wood/Grain/Chemical Minerals). 69 E2E tests in exchange.spec.ts and 24 in building-detail.spec.ts all pass.]**
 
 ### All buildings
 - Add bottom margin to building-header as the components touch the components below. Make sure not to make the design errors in the future. Sell Building is touching the cancel editing button at the moment.
