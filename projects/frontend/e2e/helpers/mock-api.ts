@@ -5251,6 +5251,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         body: JSON.stringify({ data: { setBankRates: { id: input.bankBuildingId } } }),
       })
     }
+
+    if (query.includes('bankLoans')) {
       const bankBuildingId = body.variables?.bankBuildingId
       const loans = bankBuildingId ? state.myLoans.filter((l) => l.bankBuildingId === bankBuildingId) : state.myLoans
       return route.fulfill({
