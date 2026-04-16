@@ -23560,6 +23560,159 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(deposit.TotalInterestPaid > 0m, "Deposit should track interest paid.");
     }
 
+    [Fact]
+    public async Task GetAllBanks_ReturnsBankListWithLendableCapacity()
+    {
+        // Seed two banks in two different cities so we can verify the list is populated correctly.
+        await RegisterAndGetTokenAsync($"allbanks-owner-{Guid.NewGuid():N}@test.com", "AllBanksOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cities = await db.Cities.Take(2).ToListAsync();
+        var city1 = cities[0];
+        var city2 = cities.Count > 1 ? cities[1] : cities[0];
+
+        var owner1 = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"ab-o1-{Guid.NewGuid():N}@t.com", DisplayName = "O1", Role = "PLAYER", PasswordHash = "x" };
+        var owner2 = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"ab-o2-{Guid.NewGuid():N}@t.com", DisplayName = "O2", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.AddRange(owner1, owner2);
+
+        var co1 = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner1.Id, Name = "BankCo1", Cash = 5_000_000m };
+        var co2 = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner2.Id, Name = "BankCo2", Cash = 5_000_000m };
+        db.Companies.AddRange(co1, co2);
+
+        // Bank 1: 2M deposits → lendable 1.8M; no outstanding loans → available = 1.8M
+        var bank1 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co1.Id, CityId = city1.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Alpha Bank", Level = 1,
+            DepositInterestRatePercent = 4m, LendingInterestRatePercent = 9m,
+            TotalDeposits = 2_000_000m, BaseCapitalDeposited = true,
+        };
+
+        // Bank 2: 5M deposits → lendable 4.5M; 1M outstanding loan → available = 3.5M
+        var bank2 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co2.Id, CityId = city2.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Beta Bank", Level = 1,
+            DepositInterestRatePercent = 6m, LendingInterestRatePercent = 12m,
+            TotalDeposits = 5_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.AddRange(bank1, bank2);
+
+        // Seed an outstanding loan against bank2
+        var borrower = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner1.Id, Name = "Borrow2", Cash = 0m };
+        db.Companies.Add(borrower);
+
+        var offer2 = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank2.Id,
+            LenderCompanyId = co2.Id,
+            AnnualInterestRatePercent = 12m,
+            MaxPrincipalPerLoan = 2_000_000m,
+            TotalCapacity = 5_000_000m,
+            UsedCapacity = 1_000_000m,
+            DurationTicks = 1440,
+            IsActive = true,
+        };
+        db.LoanOffers.Add(offer2);
+
+        var loan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer2.Id,
+            BankBuildingId = bank2.Id,
+            BorrowerCompanyId = borrower.Id,
+            LenderCompanyId = co2.Id,
+            OriginalPrincipal = 1_000_000m,
+            RemainingPrincipal = 1_000_000m,
+            AnnualInterestRatePercent = 12m,
+            DurationTicks = 1440,
+            StartTick = 1,
+            DueTick = 1441,
+            NextPaymentTick = 721,
+            PaymentAmount = 500_000m,
+            TotalPayments = 2,
+            PaymentsMade = 0,
+            Status = Api.Data.Entities.LoanStatus.Active,
+        };
+        db.Loans.Add(loan);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+              allBanks {
+                bankBuildingId
+                bankBuildingName
+                cityName
+                depositInterestRatePercent
+                lendingInterestRatePercent
+                totalDeposits
+                lendableCapacity
+                outstandingLoanPrincipal
+                availableLendingCapacity
+              }
+            }
+            """);
+
+        var banks = result.GetProperty("data").GetProperty("allBanks");
+        var bankArray = banks.EnumerateArray().ToList();
+
+        // The list must contain at least our two seeded banks
+        Assert.True(bankArray.Count >= 2, "Expected at least 2 banks in the list.");
+
+        var alpha = bankArray.FirstOrDefault(b => b.GetProperty("bankBuildingName").GetString() == "Alpha Bank");
+        var beta  = bankArray.FirstOrDefault(b => b.GetProperty("bankBuildingName").GetString() == "Beta Bank");
+
+        Assert.True(alpha.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Alpha Bank should appear in list.");
+        Assert.True(beta.ValueKind  != System.Text.Json.JsonValueKind.Undefined, "Beta Bank should appear in list.");
+
+        // Verify lendable capacity = 90% of deposits
+        Assert.Equal(1_800_000m, alpha.GetProperty("lendableCapacity").GetDecimal());
+        Assert.Equal(1_800_000m, alpha.GetProperty("availableLendingCapacity").GetDecimal()); // no outstanding loans
+
+        Assert.Equal(4_500_000m, beta.GetProperty("lendableCapacity").GetDecimal());
+        Assert.Equal(3_500_000m, beta.GetProperty("availableLendingCapacity").GetDecimal()); // 1M outstanding → 4.5M - 1M
+
+        // Verify rates are exposed correctly
+        Assert.Equal(4m, alpha.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(9m, alpha.GetProperty("lendingInterestRatePercent").GetDecimal());
+        Assert.Equal(6m, beta.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(12m, beta.GetProperty("lendingInterestRatePercent").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GetAllBanks_ExcludesUninitializedBanks()
+    {
+        // Banks that haven't received their base capital (BaseCapitalDeposited = false) must not appear in the list.
+        await RegisterAndGetTokenAsync($"allbanks-excl-{Guid.NewGuid():N}@test.com", "ExclOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+
+        var owner = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"excl-o-{Guid.NewGuid():N}@t.com", DisplayName = "ExclO", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.Add(owner);
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "ExclCo", Cash = 1_000_000m };
+        db.Companies.Add(co);
+
+        var uninitBank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Uninit Bank", Level = 1,
+            BaseCapitalDeposited = false, // not yet initialized
+        };
+        db.Buildings.Add(uninitBank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync("query { allBanks { bankBuildingName } }");
+        var banks = result.GetProperty("data").GetProperty("allBanks");
+        var names = banks.EnumerateArray().Select(b => b.GetProperty("bankBuildingName").GetString()).ToList();
+        Assert.DoesNotContain("Uninit Bank", names);
+    }
+
     #endregion
 
     #region Procurement Preview

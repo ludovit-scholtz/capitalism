@@ -763,3 +763,247 @@ test.describe('Bank Management — tick-refresh stability', () => {
     await expect(page.locator('.loading-state')).toBeHidden()
   })
 })
+
+test.describe('Loan Marketplace — sort and filter banks', () => {
+  function makeBankInfo(
+    id: string,
+    name: string,
+    city: string,
+    depositRate: number,
+    lendingRate: number,
+    available: number,
+  ) {
+    return {
+      bankBuildingId: id,
+      bankBuildingName: name,
+      cityId: city === 'Bratislava' ? 'city-ba' : city === 'Prague' ? 'city-pr' : 'city-vi',
+      cityName: city,
+      lenderCompanyId: `co-${id}`,
+      lenderCompanyName: `Company ${id}`,
+      depositInterestRatePercent: depositRate,
+      lendingInterestRatePercent: lendingRate,
+      totalDeposits: available / 0.9 + 1_000_000,
+      lendableCapacity: available + 500_000,
+      outstandingLoanPrincipal: 500_000,
+      availableLendingCapacity: available,
+      baseCapitalDeposited: true,
+    }
+  }
+
+  test('displays bank list with rates and capacity', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Alpha Bank', 'Bratislava', 5, 10, 1_000_000),
+      makeBankInfo('b2', 'Beta Bank', 'Prague', 3, 8, 2_000_000),
+    ]
+    await page.goto('/loans')
+
+    await expect(page.getByText('Alpha Bank')).toBeVisible()
+    await expect(page.getByText('Beta Bank')).toBeVisible()
+    // Rate and capacity info should be visible on each card (formatPercent gives 1 decimal)
+    await expect(page.locator('.bank-card').first().getByText('5.0%')).toBeVisible()
+    await expect(page.locator('.bank-card').first().getByText('Bratislava')).toBeVisible()
+  })
+
+  test('sort by deposit rate changes ordering', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'LowRate Bank', 'Bratislava', 3, 10, 1_000_000),
+      makeBankInfo('b2', 'HighRate Bank', 'Prague', 8, 15, 2_000_000),
+    ]
+    await page.goto('/loans')
+
+    // Default sort is by deposit rate desc — high rate first
+    const firstCard = page.locator('.bank-card').first()
+    await expect(firstCard.getByText('HighRate Bank')).toBeVisible()
+
+    // Click deposit rate sort again to toggle ascending
+    await page.getByRole('group', { name: 'Sort by' }).getByText('Deposit Rate').click()
+
+    // Now ascending — low rate first
+    await expect(page.locator('.bank-card').first().getByText('LowRate Bank')).toBeVisible()
+  })
+
+  test('sort by lending rate changes ordering', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Cheap Loans', 'Bratislava', 5, 7, 1_000_000),
+      makeBankInfo('b2', 'Expensive Loans', 'Prague', 4, 14, 2_000_000),
+    ]
+    await page.goto('/loans')
+
+    // Click Lending Rate sort button
+    await page.getByRole('group', { name: 'Sort by' }).getByText('Lending Rate').click()
+
+    // Default sort dir is desc on first click — expensive loans first
+    await expect(page.locator('.bank-card').first().getByText('Expensive Loans')).toBeVisible()
+  })
+
+  test('city filter shows only banks in selected city', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Bratislava Bank', 'Bratislava', 5, 10, 1_000_000),
+      makeBankInfo('b2', 'Prague Bank', 'Prague', 5, 10, 2_000_000),
+    ]
+    await page.goto('/loans')
+
+    await expect(page.getByText('Bratislava Bank')).toBeVisible()
+    await expect(page.getByText('Prague Bank')).toBeVisible()
+
+    // Filter to Prague only
+    await page.locator('#city-filter').selectOption('Prague')
+
+    await expect(page.getByText('Prague Bank')).toBeVisible()
+    await expect(page.getByText('Bratislava Bank')).toBeHidden()
+  })
+
+  test('available capacity filter hides banks with no capacity', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Has Capacity', 'Bratislava', 5, 10, 1_000_000),
+      makeBankInfo('b2', 'No Capacity', 'Prague', 5, 10, 0),
+    ]
+    await page.goto('/loans')
+
+    await expect(page.getByText('No Capacity')).toBeVisible()
+
+    await page.locator('label.filter-check input[type="checkbox"]').check()
+
+    await expect(page.getByText('Has Capacity')).toBeVisible()
+    await expect(page.getByText('No Capacity')).toBeHidden()
+  })
+})
+
+test.describe('Bank Management — customer view', () => {
+  test('customer sees rate/capacity profile panel for a bank they do not own', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'customer-co-1',
+      playerId: player.id,
+      name: 'Customer Corp',
+      cash: 200_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [], // no bank building
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.allBanks = [
+      {
+        bankBuildingId: 'ext-bank-1',
+        bankBuildingName: 'External Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'other-co-1',
+        lenderCompanyName: 'Other Corp',
+        depositInterestRatePercent: 4,
+        lendingInterestRatePercent: 9,
+        totalDeposits: 10_000_000,
+        lendableCapacity: 9_000_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 9_000_000,
+        baseCapitalDeposited: true,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/bank/ext-bank-1')
+
+    // Customer view heading
+    await expect(page.getByRole('heading', { name: 'Banking Services' })).toBeVisible()
+
+    // Rate cards must be shown
+    await expect(page.locator('.customer-rate-card.deposit').getByText('4%')).toBeVisible()
+    await expect(page.locator('.customer-rate-card.lending').getByText('9%')).toBeVisible()
+    await expect(page.locator('.customer-rate-card.capacity')).toBeVisible()
+  })
+
+  test('authenticated customer can make a deposit and see it listed', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'depositor-co-1',
+      playerId: player.id,
+      name: 'Depositor Corp',
+      cash: 500_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.allBanks = [
+      {
+        bankBuildingId: 'dep-bank-1',
+        bankBuildingName: 'Deposit Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'other-co-2',
+        lenderCompanyName: 'Bank Owner Corp',
+        depositInterestRatePercent: 5,
+        lendingInterestRatePercent: 10,
+        totalDeposits: 5_000_000,
+        lendableCapacity: 4_500_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 4_500_000,
+        baseCapitalDeposited: true,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/bank/dep-bank-1')
+
+    // The deposit form section must be visible
+    await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
+
+    // Fill in the amount and submit
+    await page.locator('#customer-deposit-amount').fill('25000')
+
+    // Rate preview is shown
+    await expect(page.getByText('5%')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Confirm Deposit' }).click()
+
+    // Success message
+    await expect(page.getByText('Deposit created successfully.')).toBeVisible()
+  })
+
+  test('unauthenticated visitor sees login prompt in deposit form', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      {
+        bankBuildingId: 'guest-bank-1',
+        bankBuildingName: 'Guest Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'other-co-3',
+        lenderCompanyName: 'Guest Owner Corp',
+        depositInterestRatePercent: 6,
+        lendingInterestRatePercent: 11,
+        totalDeposits: 3_000_000,
+        lendableCapacity: 2_700_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 2_700_000,
+        baseCapitalDeposited: true,
+      },
+    ]
+
+    await page.goto('/bank/guest-bank-1')
+
+    // Rate cards should be visible (public info)
+    await expect(page.locator('.customer-rate-card.deposit')).toBeVisible()
+
+    // Deposit form should show login prompt, not the form
+    await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Log In' })).toBeVisible()
+  })
+})
