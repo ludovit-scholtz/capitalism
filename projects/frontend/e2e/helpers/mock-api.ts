@@ -242,6 +242,7 @@ export type MockBuildingUnit = {
   brandScope?: string | null
   vendorLockCompanyId?: string | null
   lockedCityId?: string | null
+  industryCategory?: string | null
   inventoryQuantity?: number | null
   inventoryQuality?: number | null
   inventorySourcingCostTotal?: number | null
@@ -1149,7 +1150,8 @@ function areUnitsEquivalent(currentUnit: MockBuildingUnit | undefined, nextUnit:
     (currentUnit.minQuality ?? null) === (nextUnit.minQuality ?? null) &&
     (currentUnit.brandScope ?? null) === (nextUnit.brandScope ?? null) &&
     (currentUnit.vendorLockCompanyId ?? null) === (nextUnit.vendorLockCompanyId ?? null) &&
-    (currentUnit.lockedCityId ?? null) === (nextUnit.lockedCityId ?? null)
+    (currentUnit.lockedCityId ?? null) === (nextUnit.lockedCityId ?? null) &&
+    (currentUnit.industryCategory ?? null) === (nextUnit.industryCategory ?? null)
   )
 }
 
@@ -1213,7 +1215,8 @@ function calculateUnitTicks(currentUnit: MockBuildingUnit | undefined, nextUnit:
     (currentUnit.minQuality ?? null) !== (nextUnit.minQuality ?? null) ||
     (currentUnit.brandScope ?? null) !== (nextUnit.brandScope ?? null) ||
     (currentUnit.vendorLockCompanyId ?? null) !== (nextUnit.vendorLockCompanyId ?? null) ||
-    (currentUnit.lockedCityId ?? null) !== (nextUnit.lockedCityId ?? null)
+    (currentUnit.lockedCityId ?? null) !== (nextUnit.lockedCityId ?? null) ||
+    (currentUnit.industryCategory ?? null) !== (nextUnit.industryCategory ?? null)
   ) {
     return 1
   }
