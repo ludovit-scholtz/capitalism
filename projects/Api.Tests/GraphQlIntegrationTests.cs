@@ -23216,6 +23216,134 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(15_000m, loans[0].GetProperty("originalPrincipal").GetDecimal());
     }
 
+    [Fact]
+    public async Task AcceptLoan_InsufficientBankCapacity_ReturnsError()
+    {
+        // Offer has TotalCapacity=5000, UsedCapacity=4900 — requesting 200 would exceed capacity
+        var lenderEmail = $"cap-full-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"cap-full-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "CapFullLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "CapFullBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "CapFullLenderCo", Cash = 500_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "CapFullBorrowerCo", Cash = 1_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "CapFullBank", Level = 1 };
+        db.Buildings.Add(bank);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 10m,
+            MaxPrincipalPerLoan = 10_000m,
+            TotalCapacity = 5_000m,
+            UsedCapacity = 4_900m, // nearly exhausted — only 100 available
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        // Request 200 which exceeds remaining capacity of 100
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 200m } },
+            borrowerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should return error when bank capacity is insufficient.");
+    }
+
+    [Fact]
+    public async Task LoanRepayment_FullRepayment_ClosesLoan()
+    {
+        // A loan with TotalPayments=1 should become PAID_OFF after one tick
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        var lenderEmail = $"full-repay-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"full-repay-borrower-{Guid.NewGuid():N}@test.com";
+
+        using var lenderClient = isolatedFactory.CreateClient();
+        lenderClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",
+                await RegisterAndGetTokenWithClientAsync(lenderClient, lenderEmail, "FullRepayLender"));
+
+        using var borrowerClient = isolatedFactory.CreateClient();
+        borrowerClient.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",
+                await RegisterAndGetTokenWithClientAsync(borrowerClient, borrowerEmail, "FullRepayBorrower"));
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "FullRepayLenderCo", Cash = 500_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "FullRepayBorrowerCo", Cash = 10_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "FullRepayBank", Level = 1, TotalDeposits = 100_000m, BaseCapitalDeposited = true };
+        db.Buildings.Add(bank);
+
+        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 10m, MaxPrincipalPerLoan = 5_000m, TotalCapacity = 50_000m, UsedCapacity = 0m, DurationTicks = 1440L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
+        db.LoanOffers.Add(offer);
+
+        var gameState = await db.GameStates.FirstAsync();
+        var loan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer.Id,
+            BorrowerCompanyId = borrowerCompany.Id,
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 1_000m,
+            RemainingPrincipal = 600m,
+            AnnualInterestRatePercent = 10m,
+            DurationTicks = 1440L,
+            StartTick = gameState.CurrentTick,
+            DueTick = gameState.CurrentTick + 1440L,
+            NextPaymentTick = gameState.CurrentTick + 1L,
+            PaymentAmount = 600m, // exactly the remaining principal
+            PaymentsMade = 1,
+            TotalPayments = 2,
+            Status = Api.Data.Entities.LoanStatus.Active,
+            MissedPayments = 0,
+            AccumulatedPenalty = 0m,
+            AcceptedAtUtc = DateTime.UtcNow
+        };
+        db.Loans.Add(loan);
+        gameState.CurrentTick = loan.NextPaymentTick;
+        await db.SaveChangesAsync();
+
+        // Process the final payment tick
+        await ProcessTicksWithClientAsync(isolatedFactory, 1);
+
+        await using var verifyScope = isolatedFactory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var reloadedLoan = await verifyDb.Loans.FindAsync(loan.Id);
+        Assert.NotNull(reloadedLoan);
+        Assert.True(
+            reloadedLoan.Status == Api.Data.Entities.LoanStatus.PaidOff || reloadedLoan.RemainingPrincipal == 0m,
+            $"Loan should be PAID_OFF after final payment. Actual status: {reloadedLoan.Status}, remaining: {reloadedLoan.RemainingPrincipal}");
+    }
+
     #endregion
 
     #region Bank Deposits
