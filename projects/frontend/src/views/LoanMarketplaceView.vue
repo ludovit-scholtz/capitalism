@@ -385,7 +385,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 <template>
   <div class="loan-marketplace-view">
     <div class="page-header">
-      <h1 class="page-title">{{ t('bank.title') }}</h1>
+      <h1 class="page-title">{{ t('bank.loanOffers') }}</h1>
       <p class="page-subtitle">{{ t('bank.browseMarketplace') }}</p>
     </div>
 
