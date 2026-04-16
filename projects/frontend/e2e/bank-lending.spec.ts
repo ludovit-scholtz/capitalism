@@ -6,6 +6,38 @@ import {
   type MockLoan,
 } from './helpers/mock-api'
 
+/** Creates a player who owns a BANK building with id 'bank-building-1'. */
+function makeBankOwnerPlayer() {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  player.companies.push({
+    id: 'lender-company-1',
+    playerId: player.id,
+    name: 'Lending Corp',
+    cash: 500_000,
+    foundedAtUtc: '2026-01-01T00:00:00Z',
+    buildings: [
+      {
+        id: 'bank-building-1',
+        companyId: 'lender-company-1',
+        cityId: 'city-ba',
+        name: 'City Bank',
+        type: 'BANK',
+        level: 1,
+        units: [],
+        isUnderConstruction: false,
+        constructionCompletesAtTick: null,
+        pendingConfigurationTick: null,
+        hasPendingConfiguration: false,
+        powerStatus: 'POWERED',
+        mediaType: null,
+      },
+    ],
+  })
+  player.activeAccountType = 'COMPANY'
+  player.activeCompanyId = 'lender-company-1'
+  return player
+}
+
 function makeLoanOffer(overrides: Partial<MockLoanOffer> = {}): MockLoanOffer {
   return {
     id: 'offer-1',
@@ -460,7 +492,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('shows bank stats overview', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], loanOffers: [], myLoans: [] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -476,7 +508,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('shows publish offer form when button clicked', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -495,7 +527,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('cancels publish form when Cancel clicked', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -513,7 +545,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('publishes offer and shows it in the offer list', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], loanOffers: [] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -538,7 +570,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
       bankBuildingId: 'bank-building-1',
       borrowerCompanyName: 'Borrower Inc',
     })
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], myLoans: [issuedLoan] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -558,7 +590,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
       status: 'OVERDUE',
       missedPayments: 2,
     })
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], myLoans: [overdueIssuedLoan] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -667,7 +699,7 @@ test.describe('Bank Management — tick-refresh stability', () => {
   test('background tick refresh does not show a loading spinner or blank the bank management view', async ({
     page,
   }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const offer = makeLoanOffer({
       id: 'offer-bank-refresh',
       lenderCompanyName: 'Refresh Lender Corp',
@@ -699,7 +731,7 @@ test.describe('Bank Management — tick-refresh stability', () => {
   })
 
   test('issued loans remain visible after a background tick refresh', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const issuedLoan = makeActiveLoan({
       id: 'loan-bank-refresh',
       borrowerCompanyName: 'Borrower Co',

@@ -1964,5 +1964,12 @@ export default {
     cityFilter: 'Filter by city',
     capacityAvailable: 'Capacity Available',
     viewBankDetail: 'View Bank',
+    sortBy: 'Sort by',
+    showAvailableOnly: 'Available capacity only',
+    // Customer view (third-party bank detail)
+    customerView: 'Banking Services',
+    backToMarketplace: 'Back to Marketplace',
+    yourDepositsHere: 'Your deposits at this bank',
+    noOffersFromBank: 'This bank has no active loan offers at this time.',
   },
 }

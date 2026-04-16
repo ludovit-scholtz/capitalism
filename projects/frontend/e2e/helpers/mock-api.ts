@@ -5184,6 +5184,57 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    // bankInfo: look up from allBanks, then synthesize from player company buildings
+    if (query.includes('bankInfo')) {
+      const bankId = body.variables?.id
+      const bank = state.allBanks.find((b) => b.bankBuildingId === bankId)
+      if (bank) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { bankInfo: bank } }),
+        })
+      }
+      // Synthesize from player companies when the bank isn't in allBanks
+      for (const player of state.players) {
+        for (const company of player.companies) {
+          const building = (company.buildings ?? []).find(
+            (b) => b.id === bankId && b.type === 'BANK',
+          )
+          if (building) {
+            return route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                data: {
+                  bankInfo: {
+                    bankBuildingId: bankId,
+                    bankBuildingName: building.name,
+                    cityId: building.cityId,
+                    cityName: 'Bratislava',
+                    lenderCompanyId: company.id,
+                    lenderCompanyName: company.name,
+                    depositInterestRatePercent: 5,
+                    lendingInterestRatePercent: 12,
+                    totalDeposits: 10_000_000,
+                    lendableCapacity: 9_000_000,
+                    outstandingLoanPrincipal: 0,
+                    availableLendingCapacity: 9_000_000,
+                    baseCapitalDeposited: true,
+                  },
+                },
+              }),
+            })
+          }
+        }
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { bankInfo: null } }),
+      })
+    }
+
     if (query.includes('myDeposits')) {
       return route.fulfill({
         status: 200,

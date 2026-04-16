@@ -28,6 +28,13 @@ const activeTab = ref<'borrow' | 'deposit'>('borrow')
 const allBanks = ref<BankInfoSummary[]>([])
 const myDeposits = ref<BankDepositSummary[]>([])
 
+// Sort/filter state for bank list
+type BankSortField = 'depositRate' | 'lendingRate' | 'capacity' | 'city'
+const bankSortBy = ref<BankSortField>('depositRate')
+const bankSortDir = ref<'asc' | 'desc'>('desc')
+const bankCityFilter = ref('')
+const bankShowAvailableOnly = ref(false)
+
 // Deposit modal state
 const showDepositModal = ref(false)
 const selectedBank = ref<BankInfoSummary | null>(null)
@@ -254,6 +261,50 @@ const hasBankBuilding = computed(() => myBankBuildings.value.length > 0)
 const firstBankBuilding = computed(() => myBankBuildings.value[0] ?? null)
 const firstCompanyId = computed(() => myCompanies.value[0]?.id ?? null)
 
+// Bank list sort/filter computeds
+const availableBankCities = computed(() => {
+  const cities = new Set(allBanks.value.map((b) => b.cityName))
+  return [...cities].sort()
+})
+
+const filteredAndSortedBanks = computed(() => {
+  let banks = allBanks.value
+  if (bankCityFilter.value) {
+    banks = banks.filter((b) => b.cityName === bankCityFilter.value)
+  }
+  if (bankShowAvailableOnly.value) {
+    banks = banks.filter((b) => b.availableLendingCapacity > 0)
+  }
+  return [...banks].sort((a, b) => {
+    let aVal: number | string
+    let bVal: number | string
+    if (bankSortBy.value === 'depositRate') {
+      aVal = a.depositInterestRatePercent
+      bVal = b.depositInterestRatePercent
+    } else if (bankSortBy.value === 'lendingRate') {
+      aVal = a.lendingInterestRatePercent
+      bVal = b.lendingInterestRatePercent
+    } else if (bankSortBy.value === 'capacity') {
+      aVal = a.availableLendingCapacity
+      bVal = b.availableLendingCapacity
+    } else {
+      aVal = a.cityName
+      bVal = b.cityName
+    }
+    const dir = bankSortDir.value === 'asc' ? 1 : -1
+    return aVal < bVal ? -dir : aVal > bVal ? dir : 0
+  })
+})
+
+function toggleBankSort(field: BankSortField) {
+  if (bankSortBy.value === field) {
+    bankSortDir.value = bankSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    bankSortBy.value = field
+    bankSortDir.value = 'desc'
+  }
+}
+
 function navigateToAcquireBank() {
   if (firstCompanyId.value) {
     router.push(`/buy-building/${firstCompanyId.value}`)
@@ -266,6 +317,10 @@ function navigateToManageBank() {
   if (firstBankBuilding.value) {
     router.push(`/bank/${firstBankBuilding.value.id}`)
   }
+}
+
+function navigateToBank(bankBuildingId: string) {
+  router.push(`/bank/${bankBuildingId}`)
 }
 
 function openAcceptModal(offer: LoanOfferSummary) {
@@ -596,48 +651,94 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
             <p>{{ t('bank.noBanksAvailable') }}</p>
           </div>
 
-          <div v-else class="banks-grid">
-            <div v-for="bank in allBanks" :key="bank.bankBuildingId" class="bank-card">
-              <div class="bank-card-header">
-                <div>
-                  <h3 class="bank-card-name">{{ bank.bankBuildingName }}</h3>
-                  <span class="bank-card-city">{{ bank.cityName }} · {{ bank.lenderCompanyName }}</span>
-                </div>
+          <template v-else>
+            <!-- Sort/filter controls -->
+            <div class="banks-controls">
+              <div class="banks-filter">
+                <label class="filter-label" for="city-filter">{{ t('bank.cityFilter') }}</label>
+                <select id="city-filter" v-model="bankCityFilter" class="filter-select">
+                  <option value="">{{ t('common.city') }}: All</option>
+                  <option v-for="city in availableBankCities" :key="city" :value="city">{{ city }}</option>
+                </select>
+                <label class="filter-check">
+                  <input v-model="bankShowAvailableOnly" type="checkbox" />
+                  {{ t('bank.showAvailableOnly') }}
+                </label>
               </div>
-              <div class="bank-card-rates">
-                <div class="bank-rate deposit-rate">
-                  <span class="rate-label">{{ t('bank.depositInterestRate') }}</span>
-                  <span class="rate-value green">{{ formatPercent(bank.depositInterestRatePercent) }}</span>
-                </div>
-                <div class="bank-rate lending-rate">
-                  <span class="rate-label">{{ t('bank.lendingInterestRate') }}</span>
-                  <span class="rate-value orange">{{ formatPercent(bank.lendingInterestRatePercent) }}</span>
-                </div>
+              <div class="banks-sort" role="group" :aria-label="t('bank.sortBy')">
+                <span class="sort-label">{{ t('bank.sortBy') }}</span>
+                <button
+                  v-for="field in (['depositRate', 'lendingRate', 'capacity', 'city'] as BankSortField[])"
+                  :key="field"
+                  class="sort-btn"
+                  :class="{ 'sort-active': bankSortBy === field }"
+                  @click="toggleBankSort(field)"
+                >
+                  <span v-if="field === 'depositRate'">{{ t('bank.depositInterestRate') }}</span>
+                  <span v-else-if="field === 'lendingRate'">{{ t('bank.lendingInterestRate') }}</span>
+                  <span v-else-if="field === 'capacity'">{{ t('bank.availableLendingCapacity') }}</span>
+                  <span v-else>{{ t('common.city') }}</span>
+                  <span v-if="bankSortBy === field" class="sort-dir-icon" aria-hidden="true">
+                    {{ bankSortDir === 'asc' ? '↑' : '↓' }}
+                  </span>
+                </button>
               </div>
-              <div class="bank-card-capacity">
-                <span class="capacity-label">{{ t('bank.availableLendingCapacity') }}</span>
-                <span class="capacity-value" :class="bank.availableLendingCapacity > 0 ? 'positive' : 'zero'">
-                  {{ formatCurrency(bank.availableLendingCapacity) }}
-                </span>
-              </div>
-              <button
-                v-if="auth.isAuthenticated && isCompanyAccountActive"
-                class="btn btn-primary btn-sm bank-deposit-btn"
-                :disabled="bank.availableLendingCapacity <= 0 && allBanks.length > 0"
-                @click="openDepositModal(bank)"
-              >
-                {{ t('bank.makeDeposit') }}
-              </button>
-              <router-link
-                v-else-if="!auth.isAuthenticated"
-                to="/login"
-                class="btn btn-secondary btn-sm"
-              >
-                {{ t('auth.login') }}
-              </router-link>
-              <p v-else class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
             </div>
-          </div>
+
+            <div v-if="filteredAndSortedBanks.length === 0" class="empty-state">
+              <p>{{ t('bank.noBanksAvailable') }}</p>
+            </div>
+
+            <div v-else class="banks-grid">
+              <div v-for="bank in filteredAndSortedBanks" :key="bank.bankBuildingId" class="bank-card">
+                <div class="bank-card-header">
+                  <div>
+                    <h3 class="bank-card-name">{{ bank.bankBuildingName }}</h3>
+                    <span class="bank-card-city">{{ bank.cityName }} · {{ bank.lenderCompanyName }}</span>
+                  </div>
+                </div>
+                <div class="bank-card-rates">
+                  <div class="bank-rate deposit-rate">
+                    <span class="rate-label">{{ t('bank.depositInterestRate') }}</span>
+                    <span class="rate-value green">{{ formatPercent(bank.depositInterestRatePercent) }}</span>
+                  </div>
+                  <div class="bank-rate lending-rate">
+                    <span class="rate-label">{{ t('bank.lendingInterestRate') }}</span>
+                    <span class="rate-value orange">{{ formatPercent(bank.lendingInterestRatePercent) }}</span>
+                  </div>
+                </div>
+                <div class="bank-card-capacity">
+                  <span class="capacity-label">{{ t('bank.availableLendingCapacity') }}</span>
+                  <span class="capacity-value" :class="bank.availableLendingCapacity > 0 ? 'positive' : 'zero'">
+                    {{ formatCurrency(bank.availableLendingCapacity) }}
+                  </span>
+                </div>
+                <div class="bank-card-actions">
+                  <button
+                    class="btn btn-secondary btn-sm"
+                    @click="navigateToBank(bank.bankBuildingId)"
+                  >
+                    {{ t('bank.viewBankDetail') }}
+                  </button>
+                  <button
+                    v-if="auth.isAuthenticated && isCompanyAccountActive"
+                    class="btn btn-primary btn-sm bank-deposit-btn"
+                    @click="openDepositModal(bank)"
+                  >
+                    {{ t('bank.makeDeposit') }}
+                  </button>
+                  <router-link
+                    v-else-if="!auth.isAuthenticated"
+                    to="/login"
+                    class="btn btn-primary btn-sm"
+                  >
+                    {{ t('auth.login') }}
+                  </router-link>
+                  <p v-else class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
+                </div>
+              </div>
+            </div>
+          </template>
         </section>
 
       </div><!-- end deposit tab -->
@@ -1418,6 +1519,101 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 
 .bank-deposit-btn {
   width: 100%;
+}
+
+.bank-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Sort/filter controls */
+.banks-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--color-surface-hover, rgba(255,255,255,0.04));
+  border-radius: 6px;
+}
+
+.banks-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.filter-label {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.filter-select {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.filter-check {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.banks-sort {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.sort-label {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  margin-right: 0.25rem;
+}
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sort-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.sort-btn.sort-active {
+  background: var(--color-primary, #3b82f6);
+  color: #fff;
+  border-color: var(--color-primary, #3b82f6);
+}
+
+.sort-dir-icon {
+  font-size: 0.9rem;
 }
 
 .success-message {

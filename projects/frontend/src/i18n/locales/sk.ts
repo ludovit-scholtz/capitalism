@@ -1954,5 +1954,11 @@ export default {
     cityFilter: 'Filtrovať podľa mesta',
     capacityAvailable: 'Dostupná kapacita',
     viewBankDetail: 'Zobraziť banku',
+    sortBy: 'Zoradiť podľa',
+    showAvailableOnly: 'Len s dostupnou kapacitou',
+    customerView: 'Bankové služby',
+    backToMarketplace: 'Späť na trh',
+    yourDepositsHere: 'Vaše vklady v tejto banke',
+    noOffersFromBank: 'Táto banka momentálne nemá žiadne aktívne ponuky pôžičiek.',
   },
 }

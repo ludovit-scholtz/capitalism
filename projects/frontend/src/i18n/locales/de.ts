@@ -1962,5 +1962,11 @@ export default {
     cityFilter: 'Nach Stadt filtern',
     capacityAvailable: 'Verfügbare Kapazität',
     viewBankDetail: 'Bank anzeigen',
+    sortBy: 'Sortieren nach',
+    showAvailableOnly: 'Nur mit verfügbarer Kapazität',
+    customerView: 'Bankdienstleistungen',
+    backToMarketplace: 'Zurück zum Marktplatz',
+    yourDepositsHere: 'Ihre Einlagen bei dieser Bank',
+    noOffersFromBank: 'Diese Bank hat derzeit keine aktiven Kreditangebote.',
   },
 }
