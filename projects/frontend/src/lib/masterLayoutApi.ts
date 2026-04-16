@@ -42,6 +42,7 @@ export interface LayoutUnit {
   brandScope: string | null
   vendorLockCompanyId: string | null
   lockedCityId?: string | null
+  industryCategory?: string | null
 }
 
 export interface BuildingLayoutTemplate {

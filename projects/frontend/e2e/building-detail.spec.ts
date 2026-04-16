@@ -2010,16 +2010,31 @@ test.describe('Building detail upgrades', () => {
 
     await getGridCell(plannedSection, 1, 0).click()
     await expect(page.getByText('Brand Scope')).toBeVisible()
+    // PRODUCT scope: should show "Anchor Product" picker
+    await page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Brand Scope') })
+      .locator('select')
+      .selectOption('PRODUCT')
+    const anchorProductField = page.locator('.config-field').filter({ has: page.getByText('Anchor Product', { exact: true }) })
+    await expect(anchorProductField).toBeVisible()
+    await anchorProductField.locator('.picker-trigger').click()
+    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
+    await expect(getGridCell(plannedSection, 1, 0)).toContainText('Scope: Product')
+
+    // CATEGORY scope: should show "Industry Category" dropdown, NOT the product picker
     await page
       .locator('.config-field')
       .filter({ has: page.getByText('Brand Scope') })
       .locator('select')
       .selectOption('CATEGORY')
-    const anchorProductField = page.locator('.config-field').filter({ has: page.getByText('Anchor Product', { exact: true }) })
-    await expect(anchorProductField).toBeVisible()
-    await anchorProductField.locator('.picker-trigger').click()
-    await page.locator('.product-picker-panel .picker-item-name', { hasText: 'Wooden Chair' }).click()
-    await expect(getGridCell(plannedSection, 1, 0)).toContainText('Wooden Chair')
+    await expect(anchorProductField).not.toBeVisible()
+    const industryCategoryField = page
+      .locator('.config-field')
+      .filter({ has: page.getByText('Industry Category', { exact: true }) })
+    await expect(industryCategoryField).toBeVisible()
+    await industryCategoryField.locator('select').selectOption('FURNITURE')
+    await expect(getGridCell(plannedSection, 1, 0)).toContainText('Scope: Category')
   })
 
   test('R&D product picker shows used products first with "Used by your company" section', async ({ page }) => {

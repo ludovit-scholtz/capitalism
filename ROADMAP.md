@@ -24,10 +24,11 @@ Allow to upgrade more units at the same time. Make sure the upgrade is triggered
 
 Show all changes that upgrading of the unit will have, for example the storage capacity change. At the moment i do not see in the public sales unit the change in the storage capacity change for example.
 
-### Research & Development (0% complete)
+### Research & Development (60% complete)
 
-- Research does not seem to be working at the moment. I have R&D building with research set to the product, but in the header i see "No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.". Make sure to show there the current state of the research or investigate why research is not cummulating.
-- In brand quality unit when category is selected as brand scope, the product selection shows up but not the product category selection. Make sure the brand category can be improved as well and the category of products is selected.
+- ~~In brand quality unit when category is selected as brand scope, the product selection shows up but not the product category selection. Make sure the brand category can be improved as well and the category of products is selected.~~ Fixed: BRAND_QUALITY units with CATEGORY scope now show an industry-category dropdown (Furniture, Food Processing, Healthcare, Electronics, Construction) instead of a product picker. The selected industry is stored directly on the unit and used by the simulation engine.
+- The research progress panel now shows a context-aware "pending" message when R&D units are configured but no research brands exist yet (e.g. plan not yet applied), instead of the generic "no research recorded" empty state.
+- TODO: Investigate why "No research recorded yet" persists if units are live and ticks have run — may require admin tooling to confirm tick processing is running.
 
 ### Changelog (0% complete)
 

@@ -107,6 +107,14 @@ public sealed class BuildingUnit
 
     /// <summary>Lock exchange purchases to a specific source city ID. Applies when PurchaseSource is EXCHANGE.</summary>
     public Guid? LockedCityId { get; set; }
+
+    /// <summary>
+    /// Industry category for BRAND_QUALITY units with CATEGORY scope (e.g. "FURNITURE", "FOOD_PROCESSING").
+    /// When set, brand research improves the category brand for this industry directly.
+    /// If null and scope is CATEGORY, the system falls back to the industry of the selected ProductType.
+    /// </summary>
+    [MaxLength(50)]
+    public string? IndustryCategory { get; set; }
 }
 
 /// <summary>Defines valid unit types for each building type.</summary>

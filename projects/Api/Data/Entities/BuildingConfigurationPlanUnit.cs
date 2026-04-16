@@ -108,4 +108,11 @@ public sealed class BuildingConfigurationPlanUnit
 
     /// <summary>Lock exchange purchases to a specific source city ID. Applies when PurchaseSource is EXCHANGE.</summary>
     public Guid? LockedCityId { get; set; }
+
+    /// <summary>
+    /// Industry category for BRAND_QUALITY units with CATEGORY scope (e.g. "FURNITURE", "FOOD_PROCESSING").
+    /// When set, brand research improves the category brand for this industry directly.
+    /// </summary>
+    [MaxLength(50)]
+    public string? IndustryCategory { get; set; }
 }

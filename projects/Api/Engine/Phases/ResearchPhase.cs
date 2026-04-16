@@ -157,25 +157,43 @@ public sealed class ResearchPhase : ITickPhase
             ? productType
             : null;
 
-        if (scope is BrandScope.Product or BrandScope.Category && selectedProductType is null)
+        // For PRODUCT scope: a product must be selected.
+        if (scope is BrandScope.Product && selectedProductType is null)
         {
+            return;
+        }
+
+        // For CATEGORY scope: use IndustryCategory field directly if set,
+        // otherwise fall back to the selected product's industry.
+        // At least one must be provided.
+        if (scope is BrandScope.Category)
+        {
+            var category = !string.IsNullOrEmpty(unit.IndustryCategory)
+                ? unit.IndustryCategory
+                : selectedProductType?.Industry;
+
+            if (string.IsNullOrEmpty(category))
+                return;
+
+            var brand = context.GetOrCreateCategoryBrand(building.CompanyId, category);
+            brand.MarketingEfficiencyMultiplier = Math.Min(
+                GameConstants.MaxMarketingEfficiencyMultiplier,
+                brand.MarketingEfficiencyMultiplier + rate);
             return;
         }
 
         // BRAND_QUALITY research raises the marketing efficiency multiplier on scope-matching brands.
         // This means marketing budget becomes more effective — it does NOT directly grant awareness.
-        var brand = scope switch
+        var resolvedBrand = scope switch
         {
             BrandScope.Product when selectedProductType is not null =>
                 context.GetOrCreateBrand(building.CompanyId, selectedProductType.Id, selectedProductType.Name),
-            BrandScope.Category when selectedProductType is not null =>
-                context.GetOrCreateCategoryBrand(building.CompanyId, selectedProductType.Industry),
             _ =>
                 context.GetOrCreateCompanyBrand(building.CompanyId)
         };
 
-        brand.MarketingEfficiencyMultiplier = Math.Min(
+        resolvedBrand.MarketingEfficiencyMultiplier = Math.Min(
             GameConstants.MaxMarketingEfficiencyMultiplier,
-            brand.MarketingEfficiencyMultiplier + rate);
+            resolvedBrand.MarketingEfficiencyMultiplier + rate);
     }
 }

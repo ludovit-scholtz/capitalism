@@ -22,7 +22,7 @@ import {
   getVerticalLinkState,
 } from '@/lib/linkHelpers'
 import { annotateExchangeOffers, selectOptimalOffer, sortExchangeOffers, detectLogisticsTrap, type AnnotatedExchangeOffer, type ExchangeSortBy } from '@/lib/globalExchange'
-import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedResourceDescription, getLocalizedResourceName, getProductImageUrl, getResourceImageUrl } from '@/lib/catalogPresentation'
+import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedResourceDescription, getLocalizedResourceName, getProductImageUrl, getResourceImageUrl, getLocalizedIndustry } from '@/lib/catalogPresentation'
 import { PRODUCTION_PANEL_DISMISSED_KEY, SALES_PANEL_DISMISSED_KEY, isBuildingPanelDismissed, dismissBuildingPanel, shouldShowPanel } from '@/lib/panelDismissal'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
@@ -143,12 +143,14 @@ type EditableGridUnit = {
   brandScope: string | null
   vendorLockCompanyId: string | null
   lockedCityId: string | null
+  industryCategory: string | null
   isReverting?: boolean
 }
 
 const LINK_CHANGE_TICKS = 1
 const UNIT_PLAN_CHANGE_TICKS = 3
 const gridIndexes = [0, 1, 2, 3] as const
+const SUPPORTED_INDUSTRIES = ['FURNITURE', 'FOOD_PROCESSING', 'HEALTHCARE', 'ELECTRONICS', 'CONSTRUCTION'] as const
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -400,6 +402,15 @@ const lockedConfiguredProducts = computed(() => {
 const lockedConfiguredProductNames = computed(() => lockedConfiguredProducts.value.map((product) => getLocalizedProductName(product, locale.value)).join(', '))
 const isUpgradeInProgress = computed(() => pendingConfiguration.value !== null)
 const showPlanningSection = computed(() => isEditing.value)
+
+// True when at least one R&D unit (active or pending) is configured but no research brands exist yet
+const hasConfiguredRdUnits = computed(() => {
+  if (building.value?.type !== 'RESEARCH_DEVELOPMENT') return false
+  const rdUnitTypes = ['PRODUCT_QUALITY', 'BRAND_QUALITY']
+  const activeLive = activeUnits.value.some((u) => rdUnitTypes.includes(u.unitType))
+  const pendingLive = pendingUnits.value.some((u) => rdUnitTypes.includes(u.unitType))
+  return activeLive || pendingLive
+})
 const remainingUpgradeTicks = computed(() => {
   if (!pendingConfiguration.value) return 0
   return Math.max(pendingConfiguration.value.appliesAtTick - currentTick.value, 0)
@@ -924,6 +935,7 @@ function cloneUnit(unit: GridUnit): EditableGridUnit {
     brandScope: ('brandScope' in unit ? unit.brandScope : null) ?? null,
     vendorLockCompanyId: ('vendorLockCompanyId' in unit ? unit.vendorLockCompanyId : null) ?? null,
     lockedCityId: ('lockedCityId' in unit ? unit.lockedCityId : null) ?? null,
+    industryCategory: ('industryCategory' in unit ? unit.industryCategory : null) ?? null,
     isReverting: ('isReverting' in unit ? unit.isReverting : undefined) ?? undefined,
   }
 }
@@ -990,6 +1002,7 @@ function applyStarterLayout() {
       brandScope: null,
       vendorLockCompanyId: null,
       lockedCityId: null,
+      industryCategory: null,
     },
     {
       id: 'draft-starter-1-0',
@@ -1017,6 +1030,7 @@ function applyStarterLayout() {
       brandScope: null,
       vendorLockCompanyId: null,
       lockedCityId: null,
+      industryCategory: null,
     },
     {
       id: 'draft-starter-2-0',
@@ -1044,6 +1058,7 @@ function applyStarterLayout() {
       brandScope: null,
       vendorLockCompanyId: null,
       lockedCityId: null,
+      industryCategory: null,
     },
     {
       id: 'draft-starter-3-0',
@@ -1071,6 +1086,7 @@ function applyStarterLayout() {
       brandScope: null,
       vendorLockCompanyId: null,
       lockedCityId: null,
+      industryCategory: null,
     },
   ]
   setDraftUnitsFrom(starterUnits)
@@ -1110,6 +1126,7 @@ function applyShopStarterLayout() {
       brandScope: null,
       vendorLockCompanyId: null,
       lockedCityId: null,
+      industryCategory: null,
     },
     {
       id: 'draft-shop-starter-1-0',
@@ -1137,6 +1154,7 @@ function applyShopStarterLayout() {
       brandScope: null,
       vendorLockCompanyId: null,
       lockedCityId: null,
+      industryCategory: null,
     },
   ]
   setDraftUnitsFrom(shopStarterUnits)
@@ -1187,6 +1205,7 @@ function placeUnit(unitType: string) {
     brandScope: null,
     vendorLockCompanyId: null,
     lockedCityId: null,
+    industryCategory: null,
   }
 
   // Auto-fill competitive default price for B2B_SALES based on adjacent/building units
@@ -1368,7 +1387,8 @@ function getDraftTicksForUnit(unit: EditableGridUnit): number {
     (activeUnit.minQuality ?? null) !== (unit.minQuality ?? null) ||
     (activeUnit.brandScope ?? null) !== (unit.brandScope ?? null) ||
     (activeUnit.vendorLockCompanyId ?? null) !== (unit.vendorLockCompanyId ?? null) ||
-    (activeUnit.lockedCityId ?? null) !== (unit.lockedCityId ?? null)
+    (activeUnit.lockedCityId ?? null) !== (unit.lockedCityId ?? null) ||
+    (activeUnit.industryCategory ?? null) !== (unit.industryCategory ?? null)
   ) {
     return LINK_CHANGE_TICKS
   }
@@ -1533,6 +1553,7 @@ function storeConfiguration() {
           brandScope: unit.brandScope,
           vendorLockCompanyId: unit.vendorLockCompanyId,
           lockedCityId: unit.lockedCityId,
+          industryCategory: unit.industryCategory,
         })),
       },
     },
@@ -1679,7 +1700,7 @@ const configWarnings = computed<ValidationWarning[]>(() => {
       continue
     }
 
-    if (['PRODUCT', 'CATEGORY'].includes(unit.brandScope) && !unit.productTypeId) {
+    if (['PRODUCT', 'CATEGORY'].includes(unit.brandScope) && !unit.productTypeId && !unit.industryCategory) {
       warnings.push({ key: 'buildingDetail.warnings.brandQualityNoProduct', params: { x: unit.gridX, y: unit.gridY } })
     }
   }
@@ -1998,6 +2019,7 @@ function applyLayout(layout: BuildingLayoutTemplate): void {
     id: `layout-${i}-${Date.now()}`,
     ...u,
     lockedCityId: u.lockedCityId ?? null,
+    industryCategory: u.industryCategory ?? null,
     level: 1,
   }))
 }
@@ -2627,6 +2649,16 @@ function updateSelectedUnitConfig(field: string, value: unknown) {
   // LockedCityId only applies to EXCHANGE mode – keeping it silently restricts OPTIMAL sourcing.
   if (field === 'purchaseSource' && value !== 'EXCHANGE') {
     ;(unit as Record<string, unknown>)['lockedCityId'] = null
+  }
+
+  // When brand scope changes on a BRAND_QUALITY unit, clear the no-longer-relevant selection field.
+  if (field === 'brandScope') {
+    if (value !== 'PRODUCT') {
+      ;(unit as Record<string, unknown>)['productTypeId'] = null
+    }
+    if (value !== 'CATEGORY') {
+      ;(unit as Record<string, unknown>)['industryCategory'] = null
+    }
   }
 }
 
@@ -3422,6 +3454,7 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
               brandScope
               vendorLockCompanyId
               lockedCityId
+              industryCategory
             }
             pendingConfiguration {
               id
@@ -3470,6 +3503,7 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
                 brandScope
                 vendorLockCompanyId
                 lockedCityId
+                industryCategory
               }
             }
           }
@@ -4081,7 +4115,8 @@ watch(
         <div v-if="researchBrandsLoading" class="research-loading">{{ t('common.loading') }}</div>
 
         <div v-else-if="researchBrands.length === 0" class="research-empty-state">
-          {{ t('research.emptyState') }}
+          <span v-if="hasConfiguredRdUnits">⏳ {{ t('research.emptyStatePending') }}</span>
+          <span v-else>{{ t('research.emptyState') }}</span>
         </div>
 
         <div v-else class="research-brand-list">
@@ -5088,7 +5123,8 @@ watch(
                       <option value="COMPANY">{{ t('buildingDetail.config.scopeCompany') }}</option>
                     </select>
                   </div>
-                  <div v-if="['PRODUCT', 'CATEGORY'].includes(getDraftUnitAt(selectedCell.x, selectedCell.y)!.brandScope ?? '')" class="config-field">
+                  <!-- PRODUCT scope: pick a specific product -->
+                  <div v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.brandScope === 'PRODUCT'" class="config-field">
                     <label class="config-label">{{ t('buildingDetail.config.researchAnchorProduct') }}</label>
                     <ProductPicker
                       :model-value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.productTypeId ?? null"
@@ -5100,11 +5136,24 @@ watch(
                       empty-state-key="productPicker.rdProductEmpty"
                       @update:model-value="updateSelectedUnitConfig('productTypeId', $event)"
                     />
+                    <p class="config-help">{{ t('buildingDetail.config.researchAnchorProductHelp') }}</p>
+                  </div>
+                  <!-- CATEGORY scope: pick an industry category directly -->
+                  <div v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.brandScope === 'CATEGORY'" class="config-field">
+                    <label class="config-label">{{ t('buildingDetail.config.researchIndustryCategory') }}</label>
+                    <select
+                      class="form-input"
+                      :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.industryCategory ?? ''"
+                      @change="updateSelectedUnitConfig('industryCategory', ($event.target as HTMLSelectElement).value || null)"
+                    >
+                      <option value="">{{ t('buildingDetail.config.none') }}</option>
+                      <option v-for="ind in SUPPORTED_INDUSTRIES" :key="ind" :value="ind">
+                        {{ getLocalizedIndustry(ind, locale) }}
+                      </option>
+                    </select>
+                    <p class="config-help">{{ t('buildingDetail.config.researchIndustryCategoryHelp') }}</p>
                   </div>
                   <p class="config-help">{{ t('buildingDetail.config.researchBrandHelp') }}</p>
-                  <p class="config-help" v-if="['PRODUCT', 'CATEGORY'].includes(getDraftUnitAt(selectedCell.x, selectedCell.y)!.brandScope ?? '')">
-                    {{ t('buildingDetail.config.researchAnchorProductHelp') }}
-                  </p>
                   <p class="config-help">{{ t('buildingDetail.proAccessHint') }}</p>
                 </template>
 
@@ -5149,8 +5198,11 @@ watch(
                   <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope">
                     {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope) }}
                   </span>
-                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId">
+                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId && (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope === 'PRODUCT'">
                     {{ t('buildingDetail.config.researchAnchorProduct') }}: {{ getProductName((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId) }}
+                  </span>
+                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory && (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope === 'CATEGORY'">
+                    {{ t('buildingDetail.config.researchIndustryCategory') }}: {{ getLocalizedIndustry((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory!, locale) }}
                   </span>
                 </template>
               </div>
@@ -5449,6 +5501,9 @@ watch(
                 </span>
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope">
                   {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope) }}
+                </span>
+                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).industryCategory && (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope === 'CATEGORY'">
+                  {{ t('buildingDetail.config.researchIndustryCategory') }}: {{ getLocalizedIndustry((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).industryCategory!, locale) }}
                 </span>
               </div>
 

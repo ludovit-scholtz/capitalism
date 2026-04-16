@@ -230,6 +230,7 @@ public static partial class BuildingConfigurationService
                 liveUnit.VendorLockCompanyId = pendingUnit.VendorLockCompanyId;
                 // LockedCityId only applies to EXCHANGE mode; clear it for any other mode.
                 liveUnit.LockedCityId = (pendingUnit.PurchaseSource == "EXCHANGE") ? pendingUnit.LockedCityId : null;
+                liveUnit.IndustryCategory = pendingUnit.IndustryCategory;
 
                 pendingUnit.StartedAtTick = currentTick;
                 pendingUnit.AppliesAtTick = currentTick;

@@ -3948,6 +3948,161 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     }
 
     [Fact]
+    public async Task ResearchPhase_BrandQuality_CategoryScope_WithDirectIndustryCategory_IncreasesEfficiency()
+    {
+        // When IndustryCategory is set directly on the unit (without ProductTypeId),
+        // BRAND_QUALITY CATEGORY scope should still work correctly.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        const string industry = "FURNITURE";
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await seedDb.Cities.FirstAsync();
+
+            var player = new Player
+            {
+                Id = Guid.NewGuid(),
+                Email = $"rd-cat-direct-{Guid.NewGuid():N}@test.com",
+                DisplayName = "Category Direct Tester",
+                PasswordHash = "hash",
+                Role = PlayerRole.Player
+            };
+            seedDb.Players.Add(player);
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Category Direct Corp",
+                Cash = 1_000_000m
+            };
+            seedDb.Companies.Add(company);
+            companyId = company.Id;
+
+            var rdBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.ResearchDevelopment,
+                Name = "Direct Category Lab",
+                Level = 1
+            };
+            seedDb.Buildings.Add(rdBuilding);
+
+            // Unit has IndustryCategory set directly, no ProductTypeId
+            var researchUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = rdBuilding.Id,
+                UnitType = UnitType.BrandQuality,
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+                BrandScope = BrandScope.Category,
+                IndustryCategory = industry,
+                ProductTypeId = null
+            };
+            seedDb.BuildingUnits.Add(researchUnit);
+
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        // A CATEGORY-scope brand should exist with the correct industry
+        var brandAfter = await db.Brands
+            .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Category)
+            .FirstOrDefaultAsync();
+        Assert.NotNull(brandAfter);
+        Assert.Equal(industry, brandAfter.IndustryCategory);
+        Assert.True(brandAfter.MarketingEfficiencyMultiplier > 1m,
+            "BRAND_QUALITY with direct IndustryCategory must increase MarketingEfficiencyMultiplier.");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_BrandQuality_CategoryScope_WithNoProductOrCategory_IsSkipped()
+    {
+        // When scope is CATEGORY but neither ProductTypeId nor IndustryCategory is set,
+        // the unit should be skipped (no crash, no brand created).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await seedDb.Cities.FirstAsync();
+
+            var player = new Player
+            {
+                Id = Guid.NewGuid(),
+                Email = $"rd-cat-none-{Guid.NewGuid():N}@test.com",
+                DisplayName = "Category None Tester",
+                PasswordHash = "hash",
+                Role = PlayerRole.Player
+            };
+            seedDb.Players.Add(player);
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Category None Corp",
+                Cash = 1_000_000m
+            };
+            seedDb.Companies.Add(company);
+            companyId = company.Id;
+
+            var rdBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.ResearchDevelopment,
+                Name = "Unconfigured Lab",
+                Level = 1
+            };
+            seedDb.Buildings.Add(rdBuilding);
+
+            // Unit has CATEGORY scope but no IndustryCategory and no ProductTypeId
+            var researchUnit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = rdBuilding.Id,
+                UnitType = UnitType.BrandQuality,
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+                BrandScope = BrandScope.Category,
+                IndustryCategory = null,
+                ProductTypeId = null
+            };
+            seedDb.BuildingUnits.Add(researchUnit);
+
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        // Should not throw
+        await processor.ProcessTickAsync();
+
+        // No CATEGORY-scope brand should be created
+        var brandAfter = await db.Brands
+            .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Category)
+            .FirstOrDefaultAsync();
+        Assert.Null(brandAfter);
+    }
+
+    [Fact]
     public async Task ResearchPhase_ProductQuality_BudgetDecaysByPointOnePercentPerTick()
     {
         // Seed a large pre-existing budget and NO active R&D unit.
