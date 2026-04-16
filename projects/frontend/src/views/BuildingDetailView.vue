@@ -2595,6 +2595,33 @@ function getUnitFlowSegments(unit: GridUnit | undefined) {
   return getFlowSegments(inv?.fillPercent, inv?.capacity, inv?.lastTickInflow, inv?.lastTickOutflow)
 }
 
+/**
+ * Returns the CSS class for the outflow segment of a capacity bar.
+ * PUBLIC_SALES units use a 'sold' animated class to distinguish retail sales from generic outflow.
+ */
+function getCellOutflowClass(unit: GridUnit | undefined): string {
+  return unit?.unitType === 'PUBLIC_SALES' ? 'cell-capacity-sold' : 'cell-capacity-outflow'
+}
+
+/**
+ * Returns a tooltip string for the capacity bar showing exact quantity, capacity,
+ * and last-tick inflow/outflow values.
+ */
+function getCellCapacityTooltip(unit: GridUnit | undefined): string {
+  const inv = getUnitInventorySummary(unit)
+  if (!inv?.capacity) return ''
+  const fill = `${formatUnitQuantity(inv.quantity)}/${formatUnitQuantity(inv.capacity)}`
+  const pct = formatPercent(inv.fillPercent)
+  let tooltip = `${fill} (${pct})`
+  if (inv.lastTickInflow != null && inv.lastTickInflow > 0) {
+    tooltip += ` ↑${formatUnitQuantity(inv.lastTickInflow)}`
+  }
+  if (inv.lastTickOutflow != null && inv.lastTickOutflow > 0) {
+    tooltip += ` ↓${formatUnitQuantity(inv.lastTickOutflow)}`
+  }
+  return tooltip
+}
+
 /** Flow segments for the currently selected active-view unit (avoids repeated calls in the detail panel). */
 const selectedActiveUnitFlowSegments = computed(() => {
   if (!selectedCell.value) return getFlowSegments(null, null, null, null)
@@ -4482,7 +4509,12 @@ watch(
                         <span v-if="getUnitNextTickOperatingCostLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-operating-cost" aria-hidden="true">
                           {{ t('buildingDetail.operatingCost.tileLabel', { cost: getUnitNextTickOperatingCostLabel(getUnitAtFrom(activeUnits, x, y)) }) }}
                         </span>
-                        <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.capacity" class="cell-capacity" aria-hidden="true">
+                        <div
+                          v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.capacity"
+                          class="cell-capacity"
+                          aria-hidden="true"
+                          :title="getCellCapacityTooltip(getUnitAtFrom(activeUnits, x, y))"
+                        >
                           <span
                             class="cell-capacity-fill"
                             :data-fill="getFillBucket(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.fillPercent)"
@@ -4495,9 +4527,23 @@ watch(
                           ></span>
                           <span
                             v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowWidth > 0"
-                            class="cell-capacity-outflow"
+                            :class="getCellOutflowClass(getUnitAtFrom(activeUnits, x, y))"
                             :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowWidth}%` }"
                           ></span>
+                        </div>
+                        <div
+                          v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).hasMovement"
+                          class="cell-flow-labels"
+                          aria-hidden="true"
+                        >
+                          <span
+                            v-if="(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.lastTickInflow ?? 0) > 0"
+                            class="cell-flow-in"
+                          >↑{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.lastTickInflow!) }}</span>
+                          <span
+                            v-if="(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.lastTickOutflow ?? 0) > 0"
+                            :class="getUnitAtFrom(activeUnits, x, y)?.unitType === 'PUBLIC_SALES' ? 'cell-flow-sold' : 'cell-flow-out'"
+                          >↓{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.lastTickOutflow!) }}</span>
                         </div>
                       </template>
                       <template v-else>
@@ -4681,7 +4727,12 @@ watch(
                         <span v-if="getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, x, y))" class="cell-value" aria-hidden="true">
                           {{ t('buildingDetail.inventory.sourcingCostsShort', { value: getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, x, y)) }) }}
                         </span>
-                        <div v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.capacity" class="cell-capacity" aria-hidden="true">
+                        <div
+                          v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.capacity"
+                          class="cell-capacity"
+                          aria-hidden="true"
+                          :title="getCellCapacityTooltip(getUnitAtFrom(plannedUnits, x, y))"
+                        >
                           <span
                             class="cell-capacity-fill"
                             :data-fill="getFillBucket(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.fillPercent)"
@@ -4694,12 +4745,26 @@ watch(
                           ></span>
                           <span
                             v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth > 0"
-                            class="cell-capacity-outflow"
+                            :class="getCellOutflowClass(getUnitAtFrom(plannedUnits, x, y))"
                             :style="{
                               left: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowLeft}%`,
                               width: `${getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).outflowWidth}%`,
                             }"
                           ></span>
+                        </div>
+                        <div
+                          v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).hasMovement"
+                          class="cell-flow-labels"
+                          aria-hidden="true"
+                        >
+                          <span
+                            v-if="(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.lastTickInflow ?? 0) > 0"
+                            class="cell-flow-in"
+                          >↑{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.lastTickInflow!) }}</span>
+                          <span
+                            v-if="(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.lastTickOutflow ?? 0) > 0"
+                            :class="getUnitAtFrom(plannedUnits, x, y)?.unitType === 'PUBLIC_SALES' ? 'cell-flow-sold' : 'cell-flow-out'"
+                          >↓{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.lastTickOutflow!) }}</span>
                         </div>
                         <span
                           v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0"
@@ -7364,7 +7429,7 @@ watch(
 .cell-capacity {
   position: relative;
   width: 100%;
-  height: 0.3rem;
+  height: 0.5rem;
   border-radius: 999px;
   overflow: hidden;
   background: color-mix(in srgb, var(--color-border) 75%, transparent);
@@ -7405,14 +7470,57 @@ watch(
   border-radius: inherit;
 }
 
-@keyframes flow-in-pulse {
+.cell-capacity-sold {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #10b981, #34d399);
+  border-radius: inherit;
+  animation: sold-sweep 1.8s ease-in-out infinite;
+}
+
+@keyframes sold-sweep {
   0%,
   100% {
-    opacity: 1;
+    opacity: 0.9;
   }
   50% {
-    opacity: 0.55;
+    opacity: 0.45;
   }
+}
+
+.cell-flow-labels {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+  overflow: hidden;
+  margin-top: auto;
+}
+
+.cell-flow-in,
+.cell-flow-out,
+.cell-flow-sold {
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.1rem 0.25rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.cell-flow-in {
+  background: color-mix(in srgb, #22c55e 15%, transparent);
+  color: #16a34a;
+}
+
+.cell-flow-out {
+  background: color-mix(in srgb, #f59e0b 15%, transparent);
+  color: #d97706;
+}
+
+.cell-flow-sold {
+  background: color-mix(in srgb, #10b981 15%, transparent);
+  color: #059669;
 }
 
 .link-toggle {
