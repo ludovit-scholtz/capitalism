@@ -1018,3 +1018,65 @@ test.describe('Bank Management — customer view', () => {
     await expect(page.locator('.auth-prompt').getByRole('link', { name: 'Login' })).toBeVisible()
   })
 })
+
+test.describe('Bank Management — owner rate configuration', () => {
+  test('owner can open rate configuration form and see current rates', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    // Owner sees the rates section heading
+    await expect(page.getByRole('heading', { name: 'Bank Rates Configuration' })).toBeVisible()
+
+    // Opening the rate form shows deposit and lending inputs
+    await page.getByRole('button', { name: 'Update Rates' }).click()
+    await expect(page.locator('#deposit-rate')).toBeVisible()
+    await expect(page.locator('#lending-rate')).toBeVisible()
+  })
+
+  test('owner can cancel rate form without saving', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    await page.getByRole('button', { name: 'Update Rates' }).click()
+    await expect(page.locator('#deposit-rate')).toBeVisible()
+
+    // Clicking Cancel hides the form again
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.locator('#deposit-rate')).toBeHidden()
+  })
+
+  test('owner can submit updated rates', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    await page.getByRole('button', { name: 'Update Rates' }).click()
+    await page.locator('#deposit-rate').fill('6')
+    await page.locator('#lending-rate').fill('14')
+
+    await page.getByRole('button', { name: 'Update Rates' }).last().click()
+
+    // Success message appears and form hides
+    await expect(page.getByText('Rates updated')).toBeVisible()
+  })
+})
