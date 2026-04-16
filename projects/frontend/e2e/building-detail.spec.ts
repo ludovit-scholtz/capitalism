@@ -5085,6 +5085,263 @@ test.describe('Building detail upgrades', () => {
     expect(ariaLabel).not.toMatch(/↑|↓/)
   })
 
+  test('PUBLIC_SALES unit shows sold segment (green sweep) instead of generic amber outflow', async ({ page }) => {
+    const player = makePlayer()
+    const psUnitId = 'ps-sold-u1'
+    player.companies.push({
+      id: 'company-ps-sold',
+      playerId: player.id,
+      name: 'Sold Shop Corp',
+      cash: 400000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-ps-sold',
+          companyId: 'company-ps-sold',
+          cityId: 'city-ba',
+          type: 'SALES_SHOP',
+          name: 'Sold Shop',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: psUnitId,
+              buildingId: 'building-ps-sold',
+              unitType: 'PUBLIC_SALES',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              productTypeId: 'product-chair',
+              minPrice: 45,
+              saleVisibility: 'PUBLIC',
+              inventoryQuantity: 80,
+              inventoryQuality: 0.85,
+              inventorySourcingCostTotal: 2800,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // 30 goods arrived, 15 sold last tick
+    state.unitLastTickMovement = {
+      [psUnitId]: { lastTickInflow: 30, lastTickOutflow: 15 },
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ps-sold')
+    await expect(page.getByRole('heading', { name: 'Sold Shop' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const psCell = getGridCell(activeSection, 0, 0)
+
+    // PUBLIC_SALES uses green 'sold' segment, NOT amber outflow
+    await expect(psCell.locator('.cell-capacity-sold')).toBeVisible()
+    await expect(psCell.locator('.cell-capacity-outflow')).toBeHidden()
+
+    // Inflow segment is also present
+    await expect(psCell.locator('.cell-capacity-inflow')).toBeVisible()
+  })
+
+  test('flow micro-labels (↑N ↓N) are visible directly on tiles when movement data exists', async ({ page }) => {
+    const player = makePlayer()
+    const purchaseUnitId = 'flow-labels-u1'
+    const mfgUnitId = 'flow-labels-u2'
+    player.companies.push({
+      id: 'company-flow-labels',
+      playerId: player.id,
+      name: 'Flow Label Factory',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-flow-labels',
+          companyId: 'company-flow-labels',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Flow Label Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: purchaseUnitId,
+              buildingId: 'building-flow-labels',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: true,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              maxPrice: 25,
+              purchaseSource: 'EXCHANGE',
+              inventoryQuantity: 50,
+              inventoryQuality: 0.8,
+              inventorySourcingCostTotal: 500,
+            },
+            {
+              id: mfgUnitId,
+              buildingId: 'building-flow-labels',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              productTypeId: 'product-chair',
+              inventoryQuantity: 20,
+              inventoryQuality: 0.75,
+              inventorySourcingCostTotal: 700,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.unitLastTickMovement = {
+      [purchaseUnitId]: { lastTickInflow: 20, lastTickOutflow: 0 },
+      [mfgUnitId]: { lastTickInflow: 10, lastTickOutflow: 8 },
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-flow-labels')
+    await expect(page.getByRole('heading', { name: 'Flow Label Factory' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const purchaseCell = getGridCell(activeSection, 0, 0)
+    const mfgCell = getGridCell(activeSection, 1, 0)
+
+    // Purchase unit: inflow label visible, no outflow label (outflow = 0)
+    await expect(purchaseCell.locator('.cell-flow-labels')).toBeVisible()
+    await expect(purchaseCell.locator('.cell-flow-in')).toBeVisible()
+    await expect(purchaseCell.locator('.cell-flow-out')).toBeHidden()
+
+    // Manufacturing unit: both inflow and outflow labels visible
+    await expect(mfgCell.locator('.cell-flow-labels')).toBeVisible()
+    await expect(mfgCell.locator('.cell-flow-in')).toBeVisible()
+    await expect(mfgCell.locator('.cell-flow-out')).toBeVisible()
+  })
+
+  test('PUBLIC_SALES sold flow micro-label uses green sold style instead of amber out style', async ({ page }) => {
+    const player = makePlayer()
+    const psUnitId = 'ps-flow-label-u1'
+    player.companies.push({
+      id: 'company-ps-flow-label',
+      playerId: player.id,
+      name: 'Flow Label Shop',
+      cash: 400000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-ps-flow-label',
+          companyId: 'company-ps-flow-label',
+          cityId: 'city-ba',
+          type: 'SALES_SHOP',
+          name: 'Flow Label Shop',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: psUnitId,
+              buildingId: 'building-ps-flow-label',
+              unitType: 'PUBLIC_SALES',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              productTypeId: 'product-chair',
+              minPrice: 45,
+              saleVisibility: 'PUBLIC',
+              inventoryQuantity: 60,
+              inventoryQuality: 0.8,
+              inventorySourcingCostTotal: 2100,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.unitLastTickMovement = {
+      [psUnitId]: { lastTickInflow: 25, lastTickOutflow: 12 },
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ps-flow-label')
+    await expect(page.getByRole('heading', { name: 'Flow Label Shop' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const psCell = getGridCell(activeSection, 0, 0)
+
+    // Sold flow label uses green 'cell-flow-sold' class, not amber 'cell-flow-out'
+    await expect(psCell.locator('.cell-flow-sold')).toBeVisible()
+    await expect(psCell.locator('.cell-flow-out')).toBeHidden()
+    // Inflow label is also present
+    await expect(psCell.locator('.cell-flow-in')).toBeVisible()
+  })
+
   test('factory grid shows product label and price metric in planned configuration after edit', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

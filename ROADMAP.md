@@ -14,9 +14,10 @@ Implement banking as is described in the product definition below.
 
 - Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with. 
 
-### Unit grid display (0% complete)
+### Unit grid display (90% complete)
 
-- Visually display the flow of the product. The storage capacity from the unit is not showing any more. I would like to see the storage capacity, current usage of the capacity, inflow and outflow in the unit grid display. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.
+- ~~Visually display the flow of the product. The storage capacity from the unit is not showing any more. I would like to see the storage capacity, current usage of the capacity, inflow and outflow in the unit grid display. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.~~ Implemented: Each grid tile now shows a capacity bar (fill level color-coded low/medium/high), a green animated inflow segment (↑ goods received last tick), an amber outflow segment for generic units, and a distinct green sweeping animation for PUBLIC_SALES sold goods. Flow micro-labels (↑N ↓N) are displayed directly in the tile for quick readability. The capacity bar also carries a tooltip with exact quantity/capacity/inflow/outflow values on hover.
+- TODO: Consider adding per-tick sparkline to tiles for even richer throughput data.
 
 ### Unit upgrade (0% complete)
 
