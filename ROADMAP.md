@@ -8,7 +8,9 @@ It will use real world map. The game will start in single city and later other c
 
 ### Banking (0% complete)
 
-Implement banking as is described in the product definition below.
+Implement banking as is described in the product definition below
+- Make sure the frontend is updated so that the banks does not show units grid, but shows custom bank flows for deposits and borrows
+- Make sure the backend is fully implemented according to the product definition
 
 ### Dashboard (0% complete)
 
