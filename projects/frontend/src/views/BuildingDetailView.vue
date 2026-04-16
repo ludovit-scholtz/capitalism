@@ -326,6 +326,8 @@ const flushStorageSuccess = ref(false)
 const schedulingUpgrade = ref(false)
 const unitUpgradeError = ref<string | null>(null)
 const unitUpgradeInfoCache = ref<import('@/types').UnitUpgradeInfo | null>(null)
+/** Unit IDs staged for upgrade via the "Stage Upgrade" button; applied when "Store Upgrade" is clicked. */
+const draftUpgradeUnitIds = ref<Set<string>>(new Set())
 
 let activeBuildingLoadRequest = 0
 let activeExchangeOffersRequest = 0
@@ -428,7 +430,7 @@ const draftTotalTicks = computed(() => {
     return Math.max(maxTicks, getDraftTicksAt(gridX, gridY))
   }, 0)
 })
-const hasDraftChanges = computed(() => !areUnitCollectionsEqual(draftUnits.value, editBaselineUnits.value))
+const hasDraftChanges = computed(() => !areUnitCollectionsEqual(draftUnits.value, editBaselineUnits.value) || draftUpgradeUnitIds.value.size > 0)
 const draftConstructionCost = computed(() => sumPlannedConfigurationCost(activeUnits.value, draftUnits.value))
 const projectedCompanyCashAfterApply = computed(() => {
   if (companyCash.value == null) return null
@@ -971,6 +973,7 @@ function cancelEditing() {
   setReadOnlySelectedCell(null)
   showUnitPicker.value = false
   saveError.value = null
+  draftUpgradeUnitIds.value = new Set()
 }
 
 function applyStarterLayout() {
@@ -1506,68 +1509,93 @@ function compareUnits(left: EditableGridUnit, right: EditableGridUnit): number {
   return left.unitType.localeCompare(right.unitType)
 }
 
-function storeConfiguration() {
+async function storeConfiguration() {
   if (!building.value || saving.value || !hasDraftChanges.value) return
 
   saving.value = true
   saveError.value = null
 
-  gqlRequest<{
-    storeBuildingConfiguration: {
-      id: string
-      appliesAtTick: number
-      totalTicksRequired: number
+  try {
+    // 1. Apply any staged unit upgrades first
+    const stagedIds = Array.from(draftUpgradeUnitIds.value)
+    for (const unitId of stagedIds) {
+      await gqlRequest<{ scheduleUnitUpgrade: { id: string; appliesAtTick: number; totalTicksRequired: number } }>(
+        `mutation SUU($input: ScheduleUnitUpgradeInput!) {
+          scheduleUnitUpgrade(input: $input) { id appliesAtTick totalTicksRequired }
+        }`,
+        { input: { unitId } },
+      )
     }
-  }>(
-    `mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
-      storeBuildingConfiguration(input: $input) {
-        id
-        appliesAtTick
-        totalTicksRequired
-      }
-    }`,
-    {
-      input: {
-        buildingId: building.value.id,
-        units: draftUnits.value.map((unit) => ({
-          unitType: unit.unitType,
-          gridX: unit.gridX,
-          gridY: unit.gridY,
-          linkUp: unit.linkUp,
-          linkDown: unit.linkDown,
-          linkLeft: unit.linkLeft,
-          linkRight: unit.linkRight,
-          linkUpLeft: unit.linkUpLeft,
-          linkUpRight: unit.linkUpRight,
-          linkDownLeft: unit.linkDownLeft,
-          linkDownRight: unit.linkDownRight,
-          resourceTypeId: unit.resourceTypeId,
-          productTypeId: unit.productTypeId,
-          minPrice: unit.minPrice,
-          maxPrice: unit.maxPrice,
-          purchaseSource: unit.purchaseSource,
-          saleVisibility: unit.saleVisibility,
-          budget: unit.budget,
-          mediaHouseBuildingId: unit.mediaHouseBuildingId,
-          minQuality: unit.minQuality,
-          brandScope: unit.brandScope,
-          vendorLockCompanyId: unit.vendorLockCompanyId,
-          lockedCityId: unit.lockedCityId,
-          industryCategory: unit.industryCategory,
-        })),
-      },
-    },
-  )
-    .then(() => {
-      isEditing.value = false
-      return loadBuilding()
-    })
-    .catch((reason: unknown) => {
-      saveError.value = reason instanceof Error ? reason.message : t('buildingDetail.storeUpgradeFailed')
-    })
-    .finally(() => {
-      saving.value = false
-    })
+    draftUpgradeUnitIds.value = new Set()
+
+    // 2. Store structural configuration changes (if any)
+    const hasStructuralChanges = !areUnitCollectionsEqual(draftUnits.value, editBaselineUnits.value)
+    if (hasStructuralChanges) {
+      await gqlRequest<{
+        storeBuildingConfiguration: {
+          id: string
+          appliesAtTick: number
+          totalTicksRequired: number
+        }
+      }>(
+        `mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+          storeBuildingConfiguration(input: $input) {
+            id
+            appliesAtTick
+            totalTicksRequired
+          }
+        }`,
+        {
+          input: {
+            buildingId: building.value.id,
+            units: draftUnits.value.map((unit) => ({
+              unitType: unit.unitType,
+              gridX: unit.gridX,
+              gridY: unit.gridY,
+              linkUp: unit.linkUp,
+              linkDown: unit.linkDown,
+              linkLeft: unit.linkLeft,
+              linkRight: unit.linkRight,
+              linkUpLeft: unit.linkUpLeft,
+              linkUpRight: unit.linkUpRight,
+              linkDownLeft: unit.linkDownLeft,
+              linkDownRight: unit.linkDownRight,
+              resourceTypeId: unit.resourceTypeId,
+              productTypeId: unit.productTypeId,
+              minPrice: unit.minPrice,
+              maxPrice: unit.maxPrice,
+              purchaseSource: unit.purchaseSource,
+              saleVisibility: unit.saleVisibility,
+              budget: unit.budget,
+              mediaHouseBuildingId: unit.mediaHouseBuildingId,
+              minQuality: unit.minQuality,
+              brandScope: unit.brandScope,
+              vendorLockCompanyId: unit.vendorLockCompanyId,
+              lockedCityId: unit.lockedCityId,
+              industryCategory: unit.industryCategory,
+            })),
+          },
+        },
+      )
+    }
+
+    isEditing.value = false
+    await loadBuilding()
+  } catch (reason: unknown) {
+    const code = reason instanceof GraphQLError ? reason.code : undefined
+    const raw = reason instanceof Error ? reason.message : String(reason)
+    if (code === 'INSUFFICIENT_FUNDS' || raw.includes('INSUFFICIENT_FUNDS')) {
+      saveError.value = t('buildingDetail.unitUpgrade.errorInsufficientFunds')
+    } else if (code === 'MAX_CONCURRENT_UPGRADES' || raw.includes('MAX_CONCURRENT_UPGRADES')) {
+      saveError.value = t('buildingDetail.unitUpgrade.errorMaxConcurrentUpgrades')
+    } else if (code === 'UNIT_ALREADY_UPGRADING' || raw.includes('UNIT_ALREADY_UPGRADING')) {
+      saveError.value = t('buildingDetail.unitUpgrade.errorUnitAlreadyUpgrading')
+    } else {
+      saveError.value = raw || t('buildingDetail.storeUpgradeFailed')
+    }
+  } finally {
+    saving.value = false
+  }
 }
 
 function cancelPlan() {
@@ -2390,6 +2418,22 @@ const selectedCellUpgradeInfo = computed<import('@/types').UnitUpgradeInfo | nul
   return null
 })
 
+/** Whether the currently selected cell's unit has been staged for upgrade via "Stage Upgrade". */
+const isSelectedCellStaged = computed(() =>
+  selectedCellUpgradeInfo.value ? draftUpgradeUnitIds.value.has(selectedCellUpgradeInfo.value.unitId) : false,
+)
+
+function toggleStagedUpgrade(unitId: string) {
+  const next = new Set(draftUpgradeUnitIds.value)
+  if (next.has(unitId)) {
+    next.delete(unitId)
+  } else {
+    next.add(unitId)
+  }
+  draftUpgradeUnitIds.value = next
+  unitUpgradeError.value = null
+}
+
 /**
  * List of all active units in this building that are currently under a level upgrade,
  * used to show the concurrent-upgrades summary panel.
@@ -3198,6 +3242,7 @@ async function fetchUpgradeInfo(unitId: string) {
           currentEnergyMwhPerTick nextEnergyMwhPerTick
           currentLaborCostPerTick nextLaborCostPerTick
           currentEnergyCostPerTick nextEnergyCostPerTick
+          currentStorageCapacity nextStorageCapacity
         }
       }`,
       { unitId },
@@ -4610,7 +4655,7 @@ watch(
                   {{ t('buildingDetail.cancelEditing') }}
                 </button>
                 <button class="btn btn-primary" :disabled="saving || !hasDraftChanges" @click="storeConfiguration">
-                  {{ saving ? t('common.loading') : t('buildingDetail.storeConfiguration') }}
+                  {{ saving ? t('common.loading') : draftUpgradeUnitIds.size > 0 ? t('buildingDetail.unitUpgrade.storeWithUpgradesButton', { count: draftUpgradeUnitIds.size }) : t('buildingDetail.storeConfiguration') }}
                 </button>
               </div>
             </div>
@@ -5488,6 +5533,16 @@ watch(
                         <span class="stat-next">{{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</span>
                       </span>
                     </div>
+                    <!-- Storage capacity row — shown for all unit types that buffer inventory -->
+                    <div class="unit-upgrade-stat-row" aria-label="Storage capacity delta">
+                      <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
+                      <span class="unit-upgrade-stat-values">
+                        <span class="stat-current">{{ selectedCellUpgradeInfo.currentStorageCapacity.toFixed(0) }}</span>
+                        <span class="stat-arrow"> → </span>
+                        <span class="stat-next">{{ selectedCellUpgradeInfo.nextStorageCapacity.toFixed(0) }}</span>
+                        <span class="stat-delta stat-delta-positive">+{{ (selectedCellUpgradeInfo.nextStorageCapacity - selectedCellUpgradeInfo.currentStorageCapacity).toFixed(0) }}</span>
+                      </span>
+                    </div>
                     <div class="unit-upgrade-stat-row" aria-label="Labor cost delta">
                       <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
                       <span class="unit-upgrade-stat-values">
@@ -5518,9 +5573,23 @@ watch(
                     }}</span>
                   </div>
                   <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
-                  <button class="btn btn-primary btn-sm unit-upgrade-confirm-btn" :disabled="schedulingUpgrade" @click="submitUnitUpgrade(selectedCellUpgradeInfo!.unitId)">
-                    {{ schedulingUpgrade ? t('buildingDetail.unitUpgrade.confirmingButton') : t('buildingDetail.unitUpgrade.confirmButton') }}
-                  </button>
+                  <!-- Staged state: unit has been queued for upgrade via Store Upgrade -->
+                  <div v-if="isSelectedCellStaged" class="unit-upgrade-staged">
+                    <span class="unit-upgrade-staged-badge">✓ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
+                    <p class="unit-upgrade-stage-info">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
+                    <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
+                      {{ t('buildingDetail.unitUpgrade.removeStagedUpgrade') }}
+                    </button>
+                  </div>
+                  <!-- Not yet staged: show Stage and Upgrade Now buttons -->
+                  <div v-else class="unit-upgrade-actions">
+                    <button class="btn btn-primary btn-sm unit-upgrade-stage-btn" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
+                      {{ t('buildingDetail.unitUpgrade.stageButton') }}
+                    </button>
+                    <button class="btn btn-ghost btn-sm unit-upgrade-confirm-btn" :disabled="schedulingUpgrade" @click="submitUnitUpgrade(selectedCellUpgradeInfo!.unitId)">
+                      {{ schedulingUpgrade ? t('buildingDetail.unitUpgrade.confirmingButton') : t('buildingDetail.unitUpgrade.confirmButton') }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -10138,6 +10207,41 @@ watch(
   width: 100%;
 }
 
+/* Staged upgrade state */
+.unit-upgrade-staged {
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(74, 222, 128, 0.08);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  border-radius: var(--radius-sm);
+}
+
+.unit-upgrade-staged-badge {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #4ade80;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.unit-upgrade-stage-info {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  margin: 0 0 0.4rem;
+  line-height: 1.4;
+}
+
+.unit-upgrade-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+
+.unit-upgrade-stage-btn {
+  width: 100%;
+}
+
 /* Downtime notice shown both when upgrade is pending and when it's about to be scheduled */
 .unit-upgrade-downtime-notice {
   font-size: 0.78rem;
@@ -10184,6 +10288,11 @@ watch(
 .stat-delta-negative {
   color: #f87171;
   background: rgba(248, 113, 113, 0.12);
+}
+
+.stat-delta-positive {
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
 }
 
 /* Concurrent upgrades summary panel */

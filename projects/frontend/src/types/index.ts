@@ -1244,6 +1244,9 @@ export interface UnitUpgradeInfo {
   nextLaborCostPerTick: number
   currentEnergyCostPerTick: number
   nextEnergyCostPerTick: number
+  // Inventory holding capacity (units stored in the unit's buffer) before and after upgrade
+  currentStorageCapacity: number
+  nextStorageCapacity: number
 }
 
 export interface GameNewsFeed {

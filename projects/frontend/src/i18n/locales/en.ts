@@ -754,6 +754,12 @@ export default {
       ticksRemaining: '{time} left',
       concurrentTitle: 'Units Under Upgrade',
       concurrentHelp: 'These units are temporarily offline and will not operate until their upgrade completes. Multiple units can be upgraded simultaneously.',
+      storageCapacity: 'Storage capacity',
+      stageButton: 'Stage Upgrade',
+      stagedBadge: 'Staged for Upgrade',
+      removeStagedUpgrade: 'Remove from queue',
+      stageInfo: 'Upgrade will be applied when you click "Store Upgrade". You can stage upgrades for multiple units.',
+      storeWithUpgradesButton: 'Store Upgrade ({count} queued)',
     },
     starterSetup: {
       title: 'New Factory — Ready to Set Up',

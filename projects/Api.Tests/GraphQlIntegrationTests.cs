@@ -24927,6 +24927,122 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task UnitUpgradeInfo_IncludesStorageCapacityDelta_ForPublicSalesUnit()
+    {
+        // Proves that currentStorageCapacity and nextStorageCapacity are populated correctly
+        // for PUBLIC_SALES units so the frontend can show the inventory buffer change.
+        var email = $"uui-storage-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUIStorage");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIStorageCo", Cash = 50_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "UUIStorageShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.PublicSales,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query UUI($unitId: UUID!) {
+              unitUpgradeInfo(unitId: $unitId) {
+                currentLevel nextLevel isUpgradable
+                currentStorageCapacity nextStorageCapacity
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { unitId = unit.Id.ToString() }, token);
+
+        var info = result.GetProperty("data").GetProperty("unitUpgradeInfo");
+        Assert.True(info.GetProperty("isUpgradable").GetBoolean());
+        Assert.Equal(1, info.GetProperty("currentLevel").GetInt32());
+        Assert.Equal(2, info.GetProperty("nextLevel").GetInt32());
+
+        var currentCap = info.GetProperty("currentStorageCapacity").GetDecimal();
+        var nextCap    = info.GetProperty("nextStorageCapacity").GetDecimal();
+
+        // Storage capacity at level 1 must be a positive value and must grow at level 2.
+        Assert.True(currentCap > 0,          $"currentStorageCapacity should be positive; got {currentCap}");
+        Assert.True(nextCap > currentCap,    $"nextStorageCapacity ({nextCap}) must exceed current ({currentCap})");
+
+        // Verify against the canonical GameConstants values.
+        Assert.Equal(Api.Engine.GameConstants.GetUnitHoldingCapacity(Api.Data.Entities.UnitType.PublicSales, 1), currentCap);
+        Assert.Equal(Api.Engine.GameConstants.GetUnitHoldingCapacity(Api.Data.Entities.UnitType.PublicSales, 2), nextCap);
+    }
+
+    [Fact]
+    public async Task UnitUpgradeInfo_StorageCapacity_IncreasesAtEachLevel_ForStorageUnit()
+    {
+        // Confirms that dedicated STORAGE units also report growing holding capacity as level increases.
+        var email = $"uui-stounit-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUIStorUnit");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIStorUnitCo", Cash = 50_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUIStorUnitFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Storage,
+            GridX = 0, GridY = 0, Level = 2,
+        };
+        db.BuildingUnits.Add(unit);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query UUI($unitId: UUID!) {
+              unitUpgradeInfo(unitId: $unitId) {
+                currentLevel nextLevel
+                currentStorageCapacity nextStorageCapacity
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { unitId = unit.Id.ToString() }, token);
+
+        var info = result.GetProperty("data").GetProperty("unitUpgradeInfo");
+        Assert.Equal(2, info.GetProperty("currentLevel").GetInt32());
+        Assert.Equal(3, info.GetProperty("nextLevel").GetInt32());
+
+        var currentCap = info.GetProperty("currentStorageCapacity").GetDecimal();
+        var nextCap    = info.GetProperty("nextStorageCapacity").GetDecimal();
+
+        Assert.True(nextCap > currentCap, $"Storage STORAGE unit nextStorageCapacity ({nextCap}) must exceed current ({currentCap})");
+        Assert.Equal(Api.Engine.GameConstants.GetUnitHoldingCapacity(Api.Data.Entities.UnitType.Storage, 2), currentCap);
+        Assert.Equal(Api.Engine.GameConstants.GetUnitHoldingCapacity(Api.Data.Entities.UnitType.Storage, 3), nextCap);
+    }
+
+    [Fact]
     public async Task ScheduleUnitUpgrade_Unauthenticated_ReturnsError()
     {
         var email = $"uu-anon-{Guid.NewGuid():N}@test.com";
