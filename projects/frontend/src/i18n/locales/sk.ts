@@ -751,6 +751,12 @@ export default {
       ticksRemaining: 'zostáva {time}',
       concurrentTitle: 'Jednotky vo vylepšovaní',
       concurrentHelp: 'Tieto jednotky sú dočasne offline a nebudú fungovať, kým sa vylepšenie nedokončí. Viacero jednotiek možno vylepšovať súčasne.',
+      storageCapacity: 'Kapacita úložiska',
+      stageButton: 'Zaradiť do fronty',
+      stagedBadge: 'Naplánované na vylepšenie',
+      removeStagedUpgrade: 'Odstrániť z fronty',
+      stageInfo: 'Vylepšenie sa použije po kliknutí na "Uložiť zmeny". Môžete zaradiť viac jednotiek.',
+      storeWithUpgradesButton: 'Uložiť zmeny ({count} vo fronte)',
     },
     starterSetup: {
       title: 'Nová továreň — pripravená na nastavenie',

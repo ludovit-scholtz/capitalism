@@ -529,6 +529,15 @@ public sealed class UnitUpgradeInfo
     public decimal NextLaborCostPerTick { get; set; }
     public decimal CurrentEnergyCostPerTick { get; set; }
     public decimal NextEnergyCostPerTick { get; set; }
+
+    /// <summary>
+    /// Inventory holding capacity (max units storable in the unit's local buffer) at the
+    /// current and next levels. Relevant for all unit types that hold inventory in transit
+    /// (PUBLIC_SALES, PURCHASE, MANUFACTURING, MINING, B2B_SALES) as well as dedicated STORAGE units.
+    /// Use this to show the player the concrete inventory buffer change an upgrade unlocks.
+    /// </summary>
+    public decimal CurrentStorageCapacity { get; set; }
+    public decimal NextStorageCapacity { get; set; }
 }
 
 /// <summary>Read model for a bank deposit (depositor or owner view).</summary>

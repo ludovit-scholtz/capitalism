@@ -2028,7 +2028,7 @@ test.describe('Building detail upgrades', () => {
       .filter({ has: page.getByText('Brand Scope') })
       .locator('select')
       .selectOption('CATEGORY')
-    await expect(anchorProductField).not.toBeVisible()
+    await expect(anchorProductField).toBeHidden()
     const industryCategoryField = page
       .locator('.config-field')
       .filter({ has: page.getByText('Industry Category', { exact: true }) })
@@ -16837,6 +16837,16 @@ test.describe('Unit upgrade panel', () => {
       currentStat: 4.0,
       nextStat: 4.0,
       statLabel: 'Batches/tick',
+      currentLaborHoursPerTick: 2.8,
+      nextLaborHoursPerTick: 2.8,
+      currentEnergyMwhPerTick: 0.48,
+      nextEnergyMwhPerTick: 0.48,
+      currentLaborCostPerTick: 56,
+      nextLaborCostPerTick: 56,
+      currentEnergyCostPerTick: 26.4,
+      nextEnergyCostPerTick: 26.4,
+      currentStorageCapacity: 1000,
+      nextStorageCapacity: 1000,
     }
 
     await page.addInitScript((token) => {
@@ -17090,6 +17100,202 @@ test.describe('Unit upgrade panel', () => {
     // Each item should show unit type, new level, and ticks remaining
     await expect(items.first().locator('.concurrent-upgrade-type')).toBeVisible()
     await expect(items.first().locator('.concurrent-upgrade-ticks')).toBeVisible()
+  })
+
+  test('storage capacity delta is visible in upgrade panel for PUBLIC_SALES unit', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-uu',
+      playerId: player.id,
+      name: 'Sales Corp',
+      cash: 50000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [makeUpgradeBuilding(player.id, 'PUBLIC_SALES')],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    // Explicit override with a clear before/after delta to prove the positive delta badge renders
+    state.unitUpgradeInfoOverrides['unit-uu-1'] = {
+      unitId: 'unit-uu-1',
+      unitType: 'PUBLIC_SALES',
+      currentLevel: 1,
+      nextLevel: 2,
+      isMaxLevel: false,
+      isUpgradable: true,
+      upgradeCost: 8000,
+      upgradeTicks: 10,
+      currentStat: 20.0,
+      nextStat: 50.0,
+      statLabel: 'units/tick',
+      currentLaborHoursPerTick: 0.7,
+      nextLaborHoursPerTick: 1.4,
+      currentEnergyMwhPerTick: 0.12,
+      nextEnergyMwhPerTick: 0.24,
+      currentLaborCostPerTick: 14,
+      nextLaborCostPerTick: 28,
+      currentEnergyCostPerTick: 6.6,
+      nextEnergyCostPerTick: 13.2,
+      // Explicit storage capacity: 100 → 250 (+150) to prove the green delta badge is shown
+      currentStorageCapacity: 100,
+      nextStorageCapacity: 250,
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-uu-1')
+    await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
+
+    // Enter edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+
+    // Storage capacity row must be present with before/after values and positive delta badge
+    const storageRow = upgradePanel.locator('[aria-label="Storage capacity delta"]')
+    await expect(storageRow).toBeVisible()
+    await expect(storageRow.locator('.stat-current')).toContainText('100')
+    await expect(storageRow.locator('.stat-next')).toContainText('250')
+    // Green +150 delta badge proves the capacity increase is clearly communicated
+    await expect(storageRow.locator('.stat-delta-positive')).toContainText('+150')
+  })
+
+  test('stage upgrade button queues upgrade and updates Store Upgrade button text', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-uu',
+      playerId: player.id,
+      name: 'Stage Corp',
+      cash: 50000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [makeUpgradeBuilding(player.id)],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-uu-1')
+    await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
+
+    // Enter edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+
+    // "Stage Upgrade" button should be visible initially
+    await expect(upgradePanel.getByRole('button', { name: 'Stage Upgrade' })).toBeVisible()
+
+    // Click "Stage Upgrade" — unit gets queued
+    await upgradePanel.getByRole('button', { name: 'Stage Upgrade' }).click()
+
+    // Badge shows "Staged for Upgrade"
+    await expect(upgradePanel.locator('.unit-upgrade-staged-badge')).toBeVisible()
+    await expect(upgradePanel.locator('.unit-upgrade-staged-badge')).toContainText('Staged for Upgrade')
+
+    // "Store Upgrade" button text updates to show queued count
+    const storeBtn = page.locator('.grid-actions .btn-primary')
+    await expect(storeBtn).toContainText('1 queued')
+
+    // "Remove from queue" link is available
+    await expect(upgradePanel.getByRole('button', { name: 'Remove from queue' })).toBeVisible()
+  })
+
+  test('removing staged upgrade reverts Store Upgrade button and panel state', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-uu',
+      playerId: player.id,
+      name: 'Unstage Corp',
+      cash: 50000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [makeUpgradeBuilding(player.id)],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-uu-1')
+    await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+
+    // Stage and then remove
+    await upgradePanel.getByRole('button', { name: 'Stage Upgrade' }).click()
+    await expect(upgradePanel.locator('.unit-upgrade-staged-badge')).toBeVisible()
+    await upgradePanel.getByRole('button', { name: 'Remove from queue' }).click()
+
+    // Panel should revert to showing Stage Upgrade button
+    await expect(upgradePanel.getByRole('button', { name: 'Stage Upgrade' })).toBeVisible()
+    await expect(upgradePanel.locator('.unit-upgrade-staged-badge')).toHaveCount(0)
+
+    // Store Upgrade button should revert to default text (no queued)
+    const storeBtn = page.locator('.grid-actions .btn-primary')
+    await expect(storeBtn).not.toContainText('queued')
+  })
+
+  test('cancelling edit mode clears all staged upgrades', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-uu',
+      playerId: player.id,
+      name: 'Cancel Stage Corp',
+      cash: 50000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [makeUpgradeBuilding(player.id)],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-uu-1')
+    await expect(page.getByRole('heading', { name: 'Upgrade Factory' })).toBeVisible()
+
+    // Stage an upgrade then cancel editing
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+    await upgradePanel.getByRole('button', { name: 'Stage Upgrade' }).click()
+    await expect(upgradePanel.locator('.unit-upgrade-staged-badge')).toBeVisible()
+
+    // Cancel editing
+    await page.getByRole('button', { name: 'Cancel Editing' }).click()
+
+    // Re-enter edit mode — staged queue must be empty
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const storeBtn = page.locator('.grid-actions .btn-primary')
+    await expect(storeBtn).not.toContainText('queued')
   })
 })
 

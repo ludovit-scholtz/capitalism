@@ -752,6 +752,12 @@ export default {
       ticksRemaining: 'noch {time}',
       concurrentTitle: 'Einheiten im Upgrade',
       concurrentHelp: 'Diese Einheiten sind vorübergehend offline und werden erst nach Abschluss des Upgrades wieder arbeiten. Mehrere Einheiten können gleichzeitig aufgerüstet werden.',
+      storageCapacity: 'Lagerkapazität',
+      stageButton: 'Upgrade vormerken',
+      stagedBadge: 'Für Upgrade vorgemerkt',
+      removeStagedUpgrade: 'Aus Warteschlange entfernen',
+      stageInfo: 'Das Upgrade wird angewendet, wenn Sie auf "Upgrade speichern" klicken. Sie können mehrere Einheiten vormerken.',
+      storeWithUpgradesButton: 'Upgrade speichern ({count} vorgemerkt)',
     },
     starterSetup: {
       title: 'Neue Fabrik — Bereit zur Einrichtung',

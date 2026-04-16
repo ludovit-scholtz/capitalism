@@ -5478,6 +5478,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         nextLaborCostPerTick: Math.round(0.7 * Math.min(resolvedLevel + 1, 4) * 20 * 100) / 100,
         currentEnergyCostPerTick: Math.round(0.12 * resolvedLevel * 55 * 100) / 100,
         nextEnergyCostPerTick: Math.round(0.12 * Math.min(resolvedLevel + 1, 4) * 55 * 100) / 100,
+        // Inventory holding capacity (mirrors GameConstants.GetUnitHoldingCapacity)
+        currentStorageCapacity: isStorage
+          ? storageCapacities[resolvedLevel] ?? 1000
+          : baseCapacities[resolvedLevel] ?? 100,
+        nextStorageCapacity: isStorage
+          ? storageCapacities[Math.min(resolvedLevel + 1, 4)] ?? 2500
+          : baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250,
       }
       return route.fulfill({
         status: 200,

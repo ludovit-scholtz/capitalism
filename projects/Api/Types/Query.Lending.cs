@@ -323,6 +323,8 @@ public sealed partial class Query
             NextLaborCostPerTick     = decimal.Round(nextLaborHours    * Engine.GameConstants.ReferenceSalaryPerManhour, 2, MidpointRounding.AwayFromZero),
             CurrentEnergyCostPerTick = decimal.Round(currentEnergyMwh  * Engine.GameConstants.EnergyPricePerMwh, 2, MidpointRounding.AwayFromZero),
             NextEnergyCostPerTick    = decimal.Round(nextEnergyMwh     * Engine.GameConstants.EnergyPricePerMwh, 2, MidpointRounding.AwayFromZero),
+            CurrentStorageCapacity   = Engine.GameConstants.GetUnitHoldingCapacity(unit.UnitType, unit.Level),
+            NextStorageCapacity      = Engine.GameConstants.GetUnitHoldingCapacity(unit.UnitType, nextLevel),
         };
     }
 }

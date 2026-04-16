@@ -19,11 +19,14 @@ Implement banking as is described in the product definition below.
 - ~~Visually display the flow of the product. The storage capacity from the unit is not showing any more. I would like to see the storage capacity, current usage of the capacity, inflow and outflow in the unit grid display. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.~~ Implemented: Each grid tile now shows a capacity bar (fill level color-coded low/medium/high), a green animated inflow segment (↑ goods received last tick), an amber outflow segment for generic units, and a distinct green sweeping animation for PUBLIC_SALES sold goods. Flow micro-labels (↑N ↓N) are displayed directly in the tile for quick readability. The capacity bar also carries a tooltip with exact quantity/capacity/inflow/outflow values on hover.
 - TODO: Consider adding per-tick sparkline to tiles for even richer throughput data.
 
-### Unit upgrade (0% complete)
+### Unit upgrade (70% complete)
 
 Allow to upgrade more units at the same time. Make sure the upgrade is triggered when "store upgrade" button is clicked.
 
-Show all changes that upgrading of the unit will have, for example the storage capacity change. At the moment i do not see in the public sales unit the change in the storage capacity change for example.
+- ✅ **Multi-unit upgrade queue**: Players can now "Stage Upgrade" for multiple units in a single editing session. The staged upgrades are submitted when the "Store Upgrade" button is clicked, which now also schedules all queued unit level upgrades. The button text updates to show how many upgrades are queued (e.g. "Store Upgrade (2 queued)").
+- ✅ **Storage capacity before/after**: The upgrade impact panel now shows a dedicated "Storage capacity" row with current → next values and a positive delta badge, making it clear how much inventory buffer grows after the upgrade. This applies to PUBLIC_SALES, PURCHASE, MANUFACTURING, MINING, B2B_SALES, and dedicated STORAGE units.
+- ✅ **Stage Upgrade / Remove from queue**: Players can stage and unstage upgrades freely before committing. Cancelling edit mode clears the upgrade queue.
+- TODO: Show the total cost of all staged upgrades in the "Store Upgrade" button tooltip or summary area.
 
 ### Research & Development (60% complete)
 
