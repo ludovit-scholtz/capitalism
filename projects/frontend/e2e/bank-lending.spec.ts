@@ -797,6 +797,8 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
       makeBankInfo('b2', 'Beta Bank', 'Prague', 3, 8, 2_000_000),
     ]
     await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
 
     await expect(page.getByText('Alpha Bank')).toBeVisible()
     await expect(page.getByText('Beta Bank')).toBeVisible()
@@ -812,6 +814,8 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
       makeBankInfo('b2', 'HighRate Bank', 'Prague', 8, 15, 2_000_000),
     ]
     await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
 
     // Default sort is by deposit rate desc — high rate first
     const firstCard = page.locator('.bank-card').first()
@@ -831,6 +835,8 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
       makeBankInfo('b2', 'Expensive Loans', 'Prague', 4, 14, 2_000_000),
     ]
     await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
 
     // Click Lending Rate sort button
     await page.getByRole('group', { name: 'Sort by' }).getByText('Lending Rate').click()
@@ -846,6 +852,8 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
       makeBankInfo('b2', 'Prague Bank', 'Prague', 5, 10, 2_000_000),
     ]
     await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
 
     await expect(page.getByText('Bratislava Bank')).toBeVisible()
     await expect(page.getByText('Prague Bank')).toBeVisible()
@@ -864,6 +872,8 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
       makeBankInfo('b2', 'No Capacity', 'Prague', 5, 10, 0),
     ]
     await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
 
     await expect(page.getByText('No Capacity')).toBeVisible()
 
@@ -914,12 +924,12 @@ test.describe('Bank Management — customer view', () => {
 
     await page.goto('/bank/ext-bank-1')
 
-    // Customer view heading
-    await expect(page.getByRole('heading', { name: 'Banking Services' })).toBeVisible()
+    // Customer view heading shows the bank building name (not generic 'Banking Services')
+    await expect(page.getByRole('heading', { name: 'External Bank' })).toBeVisible()
 
-    // Rate cards must be shown
-    await expect(page.locator('.customer-rate-card.deposit').getByText('4%')).toBeVisible()
-    await expect(page.locator('.customer-rate-card.lending').getByText('9%')).toBeVisible()
+    // Rate cards must be shown (formatPercent gives 1 decimal place)
+    await expect(page.locator('.customer-rate-card.deposit').getByText('4.0%')).toBeVisible()
+    await expect(page.locator('.customer-rate-card.lending').getByText('9.0%')).toBeVisible()
     await expect(page.locator('.customer-rate-card.capacity')).toBeVisible()
   })
 
@@ -968,8 +978,8 @@ test.describe('Bank Management — customer view', () => {
     // Fill in the amount and submit
     await page.locator('#customer-deposit-amount').fill('25000')
 
-    // Rate preview is shown
-    await expect(page.getByText('5%')).toBeVisible()
+    // Rate preview is shown (formatPercent gives 1 decimal place) — scope to preview section
+    await expect(page.locator('.repayment-preview').getByText('5.0%')).toBeVisible()
 
     await page.getByRole('button', { name: 'Confirm Deposit' }).click()
 
@@ -1004,6 +1014,7 @@ test.describe('Bank Management — customer view', () => {
 
     // Deposit form should show login prompt, not the form
     await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
-    await expect(page.getByRole('link', { name: 'Log In' })).toBeVisible()
+    // auth.login key maps to 'Login' — scope to the auth-prompt div to avoid matching the navbar link
+    await expect(page.locator('.auth-prompt').getByRole('link', { name: 'Login' })).toBeVisible()
   })
 })
