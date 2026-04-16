@@ -22,7 +22,15 @@ import {
   getVerticalLinkState,
 } from '@/lib/linkHelpers'
 import { annotateExchangeOffers, selectOptimalOffer, sortExchangeOffers, detectLogisticsTrap, type AnnotatedExchangeOffer, type ExchangeSortBy } from '@/lib/globalExchange'
-import { getLocalizedProductDescription, getLocalizedProductName, getLocalizedResourceDescription, getLocalizedResourceName, getProductImageUrl, getResourceImageUrl, getLocalizedIndustry } from '@/lib/catalogPresentation'
+import {
+  getLocalizedProductDescription,
+  getLocalizedProductName,
+  getLocalizedResourceDescription,
+  getLocalizedResourceName,
+  getProductImageUrl,
+  getResourceImageUrl,
+  getLocalizedIndustry,
+} from '@/lib/catalogPresentation'
 import { PRODUCTION_PANEL_DISMISSED_KEY, SALES_PANEL_DISMISSED_KEY, isBuildingPanelDismissed, dismissBuildingPanel, shouldShowPanel } from '@/lib/panelDismissal'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
@@ -2419,9 +2427,7 @@ const selectedCellUpgradeInfo = computed<import('@/types').UnitUpgradeInfo | nul
 })
 
 /** Whether the currently selected cell's unit has been staged for upgrade via "Stage Upgrade". */
-const isSelectedCellStaged = computed(() =>
-  selectedCellUpgradeInfo.value ? draftUpgradeUnitIds.value.has(selectedCellUpgradeInfo.value.unitId) : false,
-)
+const isSelectedCellStaged = computed(() => (selectedCellUpgradeInfo.value ? draftUpgradeUnitIds.value.has(selectedCellUpgradeInfo.value.unitId) : false))
 
 function toggleStagedUpgrade(unitId: string) {
   const next = new Set(draftUpgradeUnitIds.value)
@@ -4576,19 +4582,15 @@ watch(
                             :style="{ left: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowLeft}%`, width: `${getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).outflowWidth}%` }"
                           ></span>
                         </div>
-                        <div
-                          v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).hasMovement"
-                          class="cell-flow-labels"
-                          aria-hidden="true"
-                        >
-                          <span
-                            v-if="(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.lastTickInflow ?? 0) > 0"
-                            class="cell-flow-in"
-                          >↑{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.lastTickInflow!) }}</span>
+                        <div v-if="getUnitFlowSegments(getUnitAtFrom(activeUnits, x, y)).hasMovement" class="cell-flow-labels" aria-hidden="true">
+                          <span v-if="(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.lastTickInflow ?? 0) > 0" class="cell-flow-in"
+                            >↑{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.lastTickInflow!) }}</span
+                          >
                           <span
                             v-if="(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))?.lastTickOutflow ?? 0) > 0"
                             :class="getUnitAtFrom(activeUnits, x, y)?.unitType === 'PUBLIC_SALES' ? 'cell-flow-sold' : 'cell-flow-out'"
-                          >↓{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.lastTickOutflow!) }}</span>
+                            >↓{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, x, y))!.lastTickOutflow!) }}</span
+                          >
                         </div>
                       </template>
                       <template v-else>
@@ -4655,7 +4657,13 @@ watch(
                   {{ t('buildingDetail.cancelEditing') }}
                 </button>
                 <button class="btn btn-primary" :disabled="saving || !hasDraftChanges" @click="storeConfiguration">
-                  {{ saving ? t('common.loading') : draftUpgradeUnitIds.size > 0 ? t('buildingDetail.unitUpgrade.storeWithUpgradesButton', { count: draftUpgradeUnitIds.size }) : t('buildingDetail.storeConfiguration') }}
+                  {{
+                    saving
+                      ? t('common.loading')
+                      : draftUpgradeUnitIds.size > 0
+                        ? t('buildingDetail.unitUpgrade.storeWithUpgradesButton', { count: draftUpgradeUnitIds.size })
+                        : t('buildingDetail.storeConfiguration')
+                  }}
                 </button>
               </div>
             </div>
@@ -4797,19 +4805,15 @@ watch(
                             }"
                           ></span>
                         </div>
-                        <div
-                          v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).hasMovement"
-                          class="cell-flow-labels"
-                          aria-hidden="true"
-                        >
-                          <span
-                            v-if="(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.lastTickInflow ?? 0) > 0"
-                            class="cell-flow-in"
-                          >↑{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.lastTickInflow!) }}</span>
+                        <div v-if="getUnitFlowSegments(getUnitAtFrom(plannedUnits, x, y)).hasMovement" class="cell-flow-labels" aria-hidden="true">
+                          <span v-if="(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.lastTickInflow ?? 0) > 0" class="cell-flow-in"
+                            >↑{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.lastTickInflow!) }}</span
+                          >
                           <span
                             v-if="(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))?.lastTickOutflow ?? 0) > 0"
                             :class="getUnitAtFrom(plannedUnits, x, y)?.unitType === 'PUBLIC_SALES' ? 'cell-flow-sold' : 'cell-flow-out'"
-                          >↓{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.lastTickOutflow!) }}</span>
+                            >↓{{ formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, x, y))!.lastTickOutflow!) }}</span
+                          >
                         </div>
                         <span
                           v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, x, y)!) > 0"
@@ -5308,11 +5312,24 @@ watch(
                   <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope">
                     {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope) }}
                   </span>
-                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId && (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope === 'PRODUCT'">
+                  <span
+                    class="stat"
+                    v-if="
+                      (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId &&
+                      (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope === 'PRODUCT'
+                    "
+                  >
                     {{ t('buildingDetail.config.researchAnchorProduct') }}: {{ getProductName((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).productTypeId) }}
                   </span>
-                  <span class="stat" v-if="(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory && (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope === 'CATEGORY'">
-                    {{ t('buildingDetail.config.researchIndustryCategory') }}: {{ getLocalizedIndustry((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory!, locale) }}
+                  <span
+                    class="stat"
+                    v-if="
+                      (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory &&
+                      (getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).brandScope === 'CATEGORY'
+                    "
+                  >
+                    {{ t('buildingDetail.config.researchIndustryCategory') }}:
+                    {{ getLocalizedIndustry((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory!, locale) }}
                   </span>
                 </template>
               </div>
@@ -5636,8 +5653,15 @@ watch(
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope">
                   {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope) }}
                 </span>
-                <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).industryCategory && (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope === 'CATEGORY'">
-                  {{ t('buildingDetail.config.researchIndustryCategory') }}: {{ getLocalizedIndustry((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).industryCategory!, locale) }}
+                <span
+                  class="stat"
+                  v-if="
+                    (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).industryCategory &&
+                    (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope === 'CATEGORY'
+                  "
+                >
+                  {{ t('buildingDetail.config.researchIndustryCategory') }}:
+                  {{ getLocalizedIndustry((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).industryCategory!, locale) }}
                 </span>
               </div>
 
@@ -6574,23 +6598,6 @@ watch(
               <p class="building-overview-name">{{ building.name }}</p>
               <p class="unit-desc">{{ t('buildingDetail.overview.subtitle', { type: formatBuildingType(building.type) }) }}</p>
 
-              <div class="unit-insight-card building-location-card">
-                <h5>{{ t('buildingDetail.overview.locationTitle') }}</h5>
-                <div class="building-overview-location-grid">
-                  <div class="building-overview-location-row">
-                    <span class="building-overview-label">{{ t('buildingDetail.overview.city') }}</span>
-                    <strong>{{ buildingOverviewCityName }}</strong>
-                  </div>
-                  <div class="building-overview-location-row">
-                    <span class="building-overview-label">{{ t('buildingDetail.overview.gps') }}</span>
-                    <strong>{{ formatGpsLocation(building.latitude, building.longitude) }}</strong>
-                  </div>
-                </div>
-                <RouterLink v-if="buildingOverviewMapRoute" :to="buildingOverviewMapRoute" class="btn btn-secondary btn-sm building-overview-map-link">
-                  {{ t('buildingDetail.overview.showOnMap') }}
-                </RouterLink>
-              </div>
-
               <div class="unit-insight-card building-financial-card">
                 <h5>{{ t('buildingDetail.overview.statsTitle') }}</h5>
                 <p
@@ -6636,6 +6643,23 @@ watch(
                 <p v-else-if="!buildingFinancialTimelineLoading" class="mi-empty-state">
                   {{ t('buildingDetail.overview.loadFailed') }}
                 </p>
+              </div>
+
+              <div class="unit-insight-card building-location-card">
+                <h5>{{ t('buildingDetail.overview.locationTitle') }}</h5>
+                <div class="building-overview-location-grid">
+                  <div class="building-overview-location-row">
+                    <span class="building-overview-label">{{ t('buildingDetail.overview.city') }}</span>
+                    <strong>{{ buildingOverviewCityName }}</strong>
+                  </div>
+                  <div class="building-overview-location-row">
+                    <span class="building-overview-label">{{ t('buildingDetail.overview.gps') }}</span>
+                    <strong>{{ formatGpsLocation(building.latitude, building.longitude) }}</strong>
+                  </div>
+                </div>
+                <RouterLink v-if="buildingOverviewMapRoute" :to="buildingOverviewMapRoute" class="btn btn-secondary btn-sm building-overview-map-link">
+                  {{ t('buildingDetail.overview.showOnMap') }}
+                </RouterLink>
               </div>
             </div>
           </div>
