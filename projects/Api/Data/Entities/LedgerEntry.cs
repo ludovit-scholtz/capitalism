@@ -55,4 +55,10 @@ public static class LedgerCategory
     public const string DiscardedResources = "DISCARDED_RESOURCES";
     public const string StockPurchase = "STOCK_PURCHASE";
     public const string StockSale = "STOCK_SALE";
+    public const string DepositMade = "DEPOSIT_MADE";
+    public const string DepositWithdrawn = "DEPOSIT_WITHDRAWN";
+    public const string DepositInterestPaid = "DEPOSIT_INTEREST_PAID";
+    public const string DepositInterestReceived = "DEPOSIT_INTEREST_RECEIVED";
+    public const string CentralBankBorrow = "CENTRAL_BANK_BORROW";
+    public const string CentralBankRepay = "CENTRAL_BANK_REPAY";
 }

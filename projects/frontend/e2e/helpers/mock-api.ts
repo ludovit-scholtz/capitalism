@@ -519,6 +519,37 @@ export type MockLoan = {
   closedAtUtc: string | null
 }
 
+export type MockBankDeposit = {
+  id: string
+  bankBuildingId: string
+  bankBuildingName: string
+  depositorCompanyId: string
+  depositorCompanyName: string
+  amount: number
+  depositInterestRatePercent: number
+  isBaseCapital: boolean
+  isActive: boolean
+  depositedAtTick: number
+  depositedAtUtc: string
+  totalInterestPaid: number
+}
+
+export type MockBankInfo = {
+  bankBuildingId: string
+  bankBuildingName: string
+  cityId: string
+  cityName: string
+  lenderCompanyId: string
+  lenderCompanyName: string
+  depositInterestRatePercent: number
+  lendingInterestRatePercent: number
+  totalDeposits: number
+  lendableCapacity: number
+  outstandingLoanPrincipal: number
+  availableLendingCapacity: number
+  baseCapitalDeposited: boolean
+}
+
 export type MockGameNewsLocalization = {
   locale: string
   title: string
@@ -633,6 +664,10 @@ export type MockState = {
   loanOffers: MockLoanOffer[]
   /** Active loans for the current player's companies */
   myLoans: MockLoan[]
+  /** Bank deposits (by depositor companies of the current player) */
+  myDeposits: MockBankDeposit[]
+  /** All banks visible in the marketplace */
+  allBanks: MockBankInfo[]
   /** Mock procurement preview response keyed by unit ID. If null/missing, returns a default GLOBAL_EXCHANGE preview. */
   procurementPreviews: Record<string, object | null>
   /** Mock sourcing candidates response keyed by unit ID. If null/missing, returns default candidates. */
@@ -1550,6 +1585,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     buildingFinancialTimelines: {},
     loanOffers: [],
     myLoans: [],
+    myDeposits: [],
+    allBanks: [],
     procurementPreviews: {},
     sourcingCandidates: {},
     unitUpgradeInfoOverrides: {},
@@ -4905,6 +4942,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('myLoans') &&
       !q.includes('myLoanOffers') &&
       !q.includes('bankLoans') &&
+      !q.includes('allBanks') &&
+      !q.includes('myDeposits') &&
+      !q.includes('bankDeposits') &&
+      !q.includes('bankInfo') &&
+      !q.includes('createDeposit') &&
+      !q.includes('withdrawDeposit') &&
+      !q.includes('setBankRates') &&
       // acceptLoan mutation response includes paymentAmount which contains 'me'
       !q.includes('acceptLoan') &&
       // procurementPreview contains 'me' as substring
@@ -5124,6 +5168,87 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { myLoans: state.myLoans } }),
+      })
+    }
+
+    // allBanks must be checked before 'bankLoans' to avoid substring collision
+    if (query.includes('allBanks')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { allBanks: state.allBanks } }),
+      })
+    }
+
+    if (query.includes('myDeposits')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myDeposits: state.myDeposits } }),
+      })
+    }
+
+    if (query.includes('bankDeposits')) {
+      const bankBuildingId = body.variables?.bankBuildingId
+      const deposits = bankBuildingId
+        ? state.myDeposits.filter((d) => d.bankBuildingId === bankBuildingId)
+        : state.myDeposits
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { bankDeposits: deposits } }),
+      })
+    }
+
+    if (query.includes('createDeposit')) {
+      const input = body.variables?.input ?? {}
+      const bank = state.allBanks.find((b) => b.bankBuildingId === input.bankBuildingId)
+      const newDeposit: MockBankDeposit = {
+        id: `deposit-${Date.now()}`,
+        bankBuildingId: input.bankBuildingId ?? '',
+        bankBuildingName: bank?.bankBuildingName ?? 'Bank',
+        depositorCompanyId: input.depositorCompanyId ?? '',
+        depositorCompanyName: 'My Company',
+        amount: input.amount ?? 0,
+        depositInterestRatePercent: bank?.depositInterestRatePercent ?? 5,
+        isBaseCapital: false,
+        isActive: true,
+        depositedAtTick: state.gameState.currentTick,
+        depositedAtUtc: new Date().toISOString(),
+        totalInterestPaid: 0,
+      }
+      state.myDeposits.push(newDeposit)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { createDeposit: newDeposit } }),
+      })
+    }
+
+    if (query.includes('withdrawDeposit')) {
+      const depositId = body.variables?.input?.depositId
+      const deposit = state.myDeposits.find((d) => d.id === depositId)
+      if (deposit) deposit.isActive = false
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { withdrawDeposit: deposit ?? null } }),
+      })
+    }
+
+    if (query.includes('setBankRates')) {
+      const input = body.variables?.input ?? {}
+      const bank = state.allBanks.find((b) => b.bankBuildingId === input.bankBuildingId)
+      if (bank) {
+        if (input.depositInterestRatePercent !== undefined)
+          bank.depositInterestRatePercent = input.depositInterestRatePercent
+        if (input.lendingInterestRatePercent !== undefined)
+          bank.lendingInterestRatePercent = input.lendingInterestRatePercent
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setBankRates: { id: input.bankBuildingId } } }),
       })
     }
 

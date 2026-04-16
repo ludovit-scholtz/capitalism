@@ -87,13 +87,25 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Ensure the lender company has enough cash to cover the full capacity.
-        if (bankBuilding.Company.Cash < input.TotalCapacity)
+        // Enforce 90% reserve rule: total committed loan capacity across active offers
+        // cannot exceed 90% of the bank's total deposits.
+        var lendableCapacity = bankBuilding.TotalDeposits * 0.9m;
+        var existingCommittedCapacity = await db.LoanOffers
+            .Where(o => o.BankBuildingId == bankBuilding.Id && o.IsActive)
+            .SumAsync(o => (decimal?)(o.TotalCapacity - o.UsedCapacity)) ?? 0m;
+        var outstandingPrincipal = await db.Loans
+            .Where(l => l.BankBuildingId == bankBuilding.Id && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
+
+        var totalAlreadyCommitted = existingCommittedCapacity + outstandingPrincipal;
+        var availableToOffer = Math.Max(0m, lendableCapacity - totalAlreadyCommitted);
+
+        if (input.TotalCapacity > availableToOffer)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage($"Insufficient funds. Your company needs at least {input.TotalCapacity:C0} to publish this offer.")
-                    .SetCode("INSUFFICIENT_FUNDS")
+                    .SetMessage($"The bank can only commit {availableToOffer:C0} to new loan offers (90% of deposits minus existing commitments). Reduce the total capacity or grow your deposit base.")
+                    .SetCode("EXCEEDS_RESERVE_RATIO")
                     .Build());
         }
 

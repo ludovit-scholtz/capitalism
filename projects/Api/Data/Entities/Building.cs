@@ -89,8 +89,26 @@ public sealed class Building
     [MaxLength(20)]
     public string? MediaType { get; set; }
 
-    /// <summary>Interest rate percentage for banks.</summary>
+    /// <summary>Interest rate percentage for banks (legacy; use DepositInterestRatePercent/LendingInterestRatePercent).</summary>
     public decimal? InterestRate { get; set; }
+
+    /// <summary>Annual interest rate (%) the bank pays to depositors. Null for non-bank buildings.</summary>
+    public decimal? DepositInterestRatePercent { get; set; }
+
+    /// <summary>Annual interest rate (%) the bank charges on loans. Null for non-bank buildings.</summary>
+    public decimal? LendingInterestRatePercent { get; set; }
+
+    /// <summary>
+    /// Cached total of active deposits in this bank (sum of BankDeposit.Amount where IsActive = true).
+    /// Updated on each deposit/withdrawal mutation. Only meaningful for BANK buildings.
+    /// </summary>
+    public decimal TotalDeposits { get; set; }
+
+    /// <summary>
+    /// True when the bank's $10,000,000 base-capital deposit has been created.
+    /// Prevents double-charging on any re-initialisation path.
+    /// </summary>
+    public bool BaseCapitalDeposited { get; set; }
 
     /// <summary>UTC timestamp when the building was constructed.</summary>
     public DateTime BuiltAtUtc { get; set; } = DateTime.UtcNow;
