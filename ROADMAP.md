@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (75% complete)
+### Banking (0% complete)
 
 Implement banking as is described in the product definition below.
 
