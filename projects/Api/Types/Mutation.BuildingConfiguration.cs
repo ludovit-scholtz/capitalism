@@ -148,6 +148,7 @@ public sealed partial class Mutation
                 BrandScope = unit.BrandScope,
                 VendorLockCompanyId = unit.VendorLockCompanyId,
                 LockedCityId = unit.LockedCityId,
+                IndustryCategory = unit.IndustryCategory,
             })
             .ToList();
 

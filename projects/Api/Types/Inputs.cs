@@ -341,6 +341,13 @@ public sealed class BuildingConfigurationUnitInput
 
     /// <summary>Lock exchange purchases to a specific source city ID (for Purchase units with EXCHANGE source).</summary>
     public Guid? LockedCityId { get; set; }
+
+    /// <summary>
+    /// Industry category for BRAND_QUALITY units with CATEGORY scope (e.g. "FURNITURE", "FOOD_PROCESSING").
+    /// When provided, brand research targets this industry category directly.
+    /// </summary>
+    [MaxLength(50)]
+    public string? IndustryCategory { get; set; }
 }
 
 /// <summary>Input for publishing a new loan offer from a bank building.</summary>

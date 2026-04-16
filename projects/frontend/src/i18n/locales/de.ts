@@ -930,7 +930,9 @@ export default {
       researchProduct: 'Forschungsprodukt',
       researchProductHelp: 'Wählen Sie das Produkt, dessen internes Produktions-Know-how dieses Labor schrittweise verbessern soll.',
       researchAnchorProduct: 'Ankerprodukt',
-      researchAnchorProductHelp: 'Dieses Produkt verankert entweder die exakte Produktlinie oder die breitere Kategorie, die Sie erforschen möchten.',
+      researchAnchorProductHelp: 'Dieses Produkt verankert die exakte Produktlinie, die Sie erforschen möchten.',
+      researchIndustryCategory: 'Branchenkategorie',
+      researchIndustryCategoryHelp: 'Wählen Sie die Branche, deren Kategorienmarke dieses Labor verbessern soll. Der Marketing-Effizienz-Multiplikator steigt für alle Produkte dieser Branche.',
       researchBrandHelp: 'Wählen Sie, ob dieses Labor die Branding-Effizienz für das ganze Unternehmen, eine Kategorie oder eine einzelne Produktlinie verbessern soll.',
       none: '— Auswählen —',
       anyResource: '— Beliebiger Rohstoff —',
@@ -1782,6 +1784,7 @@ export default {
     intro:
       'Die Forschung schreitet jeden Takt voran. Jede Produktqualitätseinheit wandelt einen Teil ihrer Betriebskosten in ein kumulatives Forschungsbudget für das zugewiesene Produkt um — dieses Budget verfällt jedoch um 0,1 % pro Takt. Ihre Produktqualität wird relativ zum stärksten globalen Forschungsinvestor bestimmt, daher sind nachhaltige Ausgaben und Wettbewerbsbewusstsein entscheidend. Markenqualitätsforschung verbessert die Effizienz Ihres Marketingbudgets — sie erhöht die Markenbekanntheit nicht direkt.',
     emptyState: 'Noch keine Forschung aufgezeichnet. Konfigurieren Sie Produktqualitäts- oder Markenqualitätseinheiten und lassen Sie die Simulation laufen, um hier Fortschritte zu sehen.',
+    emptyStatePending: 'Forschungseinheiten sind konfiguriert und warten auf Aktivierung. Fortschritte erscheinen hier, sobald der Simulations-Tick läuft und Ihre Konfiguration in Kraft tritt.',
     qualityLabel: 'Produktqualität',
     awarenessLabel: 'Markenbekanntheit',
     marketingEfficiencyLabel: 'Marketing-Effizienz',

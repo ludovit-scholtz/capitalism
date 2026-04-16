@@ -928,7 +928,9 @@ export default {
       researchProduct: 'Research Product',
       researchProductHelp: 'Choose the product whose internal manufacturing know-how this lab should improve over time. Each tick this unit converts a fraction of its operating costs into an accumulated research budget for this product. Budget decays 0.1%/tick; product quality is determined relative to the strongest competitor investing in the same product.',
       researchAnchorProduct: 'Anchor Product',
-      researchAnchorProductHelp: 'This product anchors either the exact product line or the wider industry category you want to research.',
+      researchAnchorProductHelp: 'This product anchors the exact product line you want to research.',
+      researchIndustryCategory: 'Industry Category',
+      researchIndustryCategoryHelp: 'Select the industry whose category brand quality this lab should improve. The brand efficiency multiplier will rise for all products in this industry.',
       researchBrandHelp: 'Select whether this lab should improve company-wide branding efficiency, a product category, or a single product line.',
       none: '— Select —',
       anyResource: '— Any Resource —',
@@ -1782,6 +1784,7 @@ export default {
     intro:
       'Research advances each tick. Each Product Quality unit converts a fraction of its operating costs into a cumulative research budget for the assigned product — and that budget decays 0.1% per tick. Your product quality is determined relative to the strongest competing research investor globally, so sustained spending and competitive awareness are key. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
     emptyState: 'No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.',
+    emptyStatePending: 'Research units are configured and pending activation. Progress will appear here once the simulation tick runs and your configuration takes effect.',
     qualityLabel: 'Product Quality',
     awarenessLabel: 'Brand Awareness',
     marketingEfficiencyLabel: 'Marketing Efficiency',

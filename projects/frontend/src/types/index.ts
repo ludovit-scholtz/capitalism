@@ -151,6 +151,7 @@ export interface BuildingConfigurationPlanUnit {
   brandScope: string | null
   vendorLockCompanyId: string | null
   lockedCityId: string | null
+  industryCategory: string | null
 }
 
 export interface BuildingConfigurationPlanRemoval {
@@ -191,6 +192,7 @@ export interface BuildingUnit {
   brandScope: string | null
   vendorLockCompanyId: string | null
   lockedCityId: string | null
+  industryCategory: string | null
 }
 
 export interface BuildingUnitInventorySummary {

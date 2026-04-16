@@ -132,6 +132,7 @@ public static partial class BuildingConfigurationService
             BrandScope = input.BrandScope,
             VendorLockCompanyId = input.VendorLockCompanyId,
             LockedCityId = (input.PurchaseSource == "EXCHANGE") ? input.LockedCityId : null,
+            IndustryCategory = input.IndustryCategory,
         };
     }
 
@@ -170,6 +171,7 @@ public static partial class BuildingConfigurationService
             BrandScope = unit.BrandScope,
             VendorLockCompanyId = unit.VendorLockCompanyId,
             LockedCityId = unit.LockedCityId,
+            IndustryCategory = unit.IndustryCategory,
         };
     }
 
@@ -244,7 +246,8 @@ public static partial class BuildingConfigurationService
             || currentUnit.MinQuality != input.MinQuality
             || !string.Equals(NormalizeString(currentUnit.BrandScope), NormalizeString(input.BrandScope), StringComparison.Ordinal)
             || currentUnit.VendorLockCompanyId != input.VendorLockCompanyId
-            || currentUnit.LockedCityId != input.LockedCityId)
+            || currentUnit.LockedCityId != input.LockedCityId
+            || !string.Equals(NormalizeString(currentUnit.IndustryCategory), NormalizeString(input.IndustryCategory), StringComparison.OrdinalIgnoreCase))
         {
             return LinkChangeTicks;
         }
@@ -286,7 +289,8 @@ public static partial class BuildingConfigurationService
             && currentUnit.MinQuality == desiredUnit.MinQuality
             && string.Equals(NormalizeString(currentUnit.BrandScope), NormalizeString(desiredUnit.BrandScope), StringComparison.Ordinal)
             && currentUnit.VendorLockCompanyId == desiredUnit.VendorLockCompanyId
-            && currentUnit.LockedCityId == desiredUnit.LockedCityId;
+            && currentUnit.LockedCityId == desiredUnit.LockedCityId
+            && string.Equals(NormalizeString(currentUnit.IndustryCategory), NormalizeString(desiredUnit.IndustryCategory), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool AreEquivalent(BuildingConfigurationPlanUnit pendingUnit, BuildingConfigurationUnitInput desiredUnit)
@@ -313,7 +317,8 @@ public static partial class BuildingConfigurationService
             && pendingUnit.MinQuality == desiredUnit.MinQuality
             && string.Equals(NormalizeString(pendingUnit.BrandScope), NormalizeString(desiredUnit.BrandScope), StringComparison.Ordinal)
             && pendingUnit.VendorLockCompanyId == desiredUnit.VendorLockCompanyId
-            && pendingUnit.LockedCityId == desiredUnit.LockedCityId;
+            && pendingUnit.LockedCityId == desiredUnit.LockedCityId
+            && string.Equals(NormalizeString(pendingUnit.IndustryCategory), NormalizeString(desiredUnit.IndustryCategory), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsPending(BuildingConfigurationPlanUnit unit, long currentTick)

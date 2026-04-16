@@ -182,21 +182,47 @@ public sealed partial class Query
             .ToDictionaryAsync(pt => pt.Id);
 
         // Load research budgets for this company (for budget data in UI)
-        var ownResearchBudgets = await db.ProductResearchBudgets
-            .Where(rb => rb.CompanyId == companyId && productTypeIds.Contains(rb.ProductTypeId))
-            .ToDictionaryAsync(rb => rb.ProductTypeId);
+        // Also loads budgets whose brands don't yet exist (covers first-tick edge case).
+        var allOwnBudgets = await db.ProductResearchBudgets
+            .Where(rb => rb.CompanyId == companyId && rb.AccumulatedBudget > 0m)
+            .ToListAsync();
+
+        var ownResearchBudgets = allOwnBudgets.ToDictionary(rb => rb.ProductTypeId);
+
+        // Add product types from budgets that don't have a brand yet (defensive)
+        var extraProductTypeIds = allOwnBudgets
+            .Select(rb => rb.ProductTypeId)
+            .Where(id => !productTypeIds.Contains(id))
+            .Distinct()
+            .ToList();
+
+        Dictionary<Guid, ProductType> allProductTypes;
+        if (extraProductTypeIds.Count > 0)
+        {
+            var extraProductTypes = await db.ProductTypes
+                .Where(pt => extraProductTypeIds.Contains(pt.Id))
+                .ToDictionaryAsync(pt => pt.Id);
+            allProductTypes = productTypes.Concat(extraProductTypes).ToDictionary(kv => kv.Key, kv => kv.Value);
+        }
+        else
+        {
+            allProductTypes = productTypes;
+        }
 
         // Load max budget per product across all companies (for competitive context)
-        var maxBudgetPerProduct = await db.ProductResearchBudgets
-            .Where(rb => productTypeIds.Contains(rb.ProductTypeId))
-            .GroupBy(rb => rb.ProductTypeId)
-            .Select(g => new { ProductTypeId = g.Key, MaxBudget = g.Max(rb => rb.AccumulatedBudget) })
-            .ToDictionaryAsync(x => x.ProductTypeId, x => x.MaxBudget);
+        var allBudgetProductIds = productTypeIds.Concat(extraProductTypeIds).Distinct().ToList();
+        var maxBudgetPerProduct = allBudgetProductIds.Count > 0
+            ? await db.ProductResearchBudgets
+                .Where(rb => allBudgetProductIds.Contains(rb.ProductTypeId))
+                .GroupBy(rb => rb.ProductTypeId)
+                .Select(g => new { ProductTypeId = g.Key, MaxBudget = g.Max(rb => rb.AccumulatedBudget) })
+                .ToDictionaryAsync(x => x.ProductTypeId, x => x.MaxBudget)
+            : new Dictionary<Guid, decimal>();
 
-        return brands.Select(b =>
+        var results = brands.Select(b =>
         {
             var pt = b.ProductTypeId.HasValue
-                ? productTypes.GetValueOrDefault(b.ProductTypeId.Value)
+                ? allProductTypes.GetValueOrDefault(b.ProductTypeId.Value)
                 : null;
 
             decimal? accBudget = null;
@@ -226,6 +252,37 @@ public sealed partial class Query
                 MaxCompetitorBudget = maxBudget,
             };
         }).ToList();
+
+        // Add synthetic entries for research budgets that accumulated but no brand exists yet.
+        // This covers the edge case where research ticked but brand creation was delayed.
+        var brandedProductIds = brands.Where(b => b.ProductTypeId.HasValue).Select(b => b.ProductTypeId!.Value).ToHashSet();
+        foreach (var budget in allOwnBudgets.Where(rb => !brandedProductIds.Contains(rb.ProductTypeId)))
+        {
+            if (!allProductTypes.TryGetValue(budget.ProductTypeId, out var pt))
+                continue;
+
+            var baseBudget = Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice);
+            var maxBudget = maxBudgetPerProduct.TryGetValue(budget.ProductTypeId, out var mb) ? mb : budget.AccumulatedBudget;
+
+            results.Add(new ResearchBrandState
+            {
+                Id = budget.Id,
+                CompanyId = budget.CompanyId,
+                Name = pt.Name,
+                Scope = BrandScope.Product,
+                ProductTypeId = budget.ProductTypeId,
+                ProductName = pt.Name,
+                IndustryCategory = null,
+                Awareness = 0m,
+                Quality = 0m,
+                MarketingEfficiencyMultiplier = 1m,
+                AccumulatedResearchBudget = budget.AccumulatedBudget,
+                BaseResearchBudget = baseBudget,
+                MaxCompetitorBudget = maxBudget,
+            });
+        }
+
+        return results;
     }
 
     /// <summary>Returns owner-editable company settings including salary levels per city.</summary>
