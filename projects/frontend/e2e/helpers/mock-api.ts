@@ -3100,6 +3100,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               brandScope: unit.brandScope ?? null,
               vendorLockCompanyId: unit.vendorLockCompanyId ?? null,
               lockedCityId: unit.lockedCityId ?? null,
+              industryCategory: unit.industryCategory ?? null,
             } satisfies MockBuildingUnit,
           ]
         }),
