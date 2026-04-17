@@ -1,22 +1,29 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
-import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary } from '@/types'
+import { getActiveCompany } from '@/lib/accountContext'
+import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company } from '@/types'
 import {
   formatLoanDuration,
   formatCurrency,
   formatPercent,
   loanStatusClass,
   computeCapacityUsedPercent,
+  computeTotalRepayment,
+  computePaymentAmount,
+  computeTotalPayments,
 } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
+const auth = useAuthStore()
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 const bankBuildingId = computed(() => route.params.buildingId as string)
@@ -27,6 +34,29 @@ const myOffers = ref<LoanOfferSummary[]>([])
 const issuedLoans = ref<LoanSummary[]>([])
 const bankDeposits = ref<BankDepositSummary[]>([])
 const bankInfo = ref<BankInfoSummary | null>(null)
+const userCompanies = ref<Company[]>([])
+
+// Ownership detection — check if any user company owns this bank building
+// (uses company buildings from me query, not bankInfo.lenderCompanyId)
+const isOwner = computed(() => {
+  if (!auth.isAuthenticated) return false
+  return userCompanies.value.some((c) =>
+    (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'),
+  )
+})
+
+// Customer-specific state
+const bankLoanOffers = ref<LoanOfferSummary[]>([])
+const myDepositsHere = ref<BankDepositSummary[]>([])
+const customerDepositAmount = ref(10_000)
+const customerDepositLoading = ref(false)
+const customerDepositError = ref<string | null>(null)
+const customerDepositSuccess = ref(false)
+const customerLoanOffer = ref<LoanOfferSummary | null>(null)
+const customerLoanPrincipal = ref(0)
+const customerLoanLoading = ref(false)
+const customerLoanError = ref<string | null>(null)
+const customerLoanSuccess = ref(false)
 
 // Rate configuration form
 const showRatesForm = ref(false)
@@ -181,45 +211,149 @@ const SET_BANK_RATES_MUTATION = `
   }
 `
 
+const MY_COMPANIES_QUERY = `
+  {
+    me {
+      companies {
+        id
+        name
+        cash
+        playerId
+        buildings { id type }
+      }
+    }
+  }
+`
+
+const PUBLIC_LOAN_OFFERS_QUERY = `
+  {
+    loanOffers {
+      id
+      bankBuildingId
+      bankBuildingName
+      lenderCompanyId
+      lenderCompanyName
+      annualInterestRatePercent
+      maxPrincipalPerLoan
+      totalCapacity
+      usedCapacity
+      remainingCapacity
+      durationTicks
+      isActive
+    }
+  }
+`
+
+const MY_DEPOSITS_QUERY = `
+  {
+    myDeposits {
+      id
+      bankBuildingId
+      bankBuildingName
+      depositorCompanyId
+      depositorCompanyName
+      amount
+      depositInterestRatePercent
+      isBaseCapital
+      isActive
+      depositedAtTick
+      depositedAtUtc
+      totalInterestPaid
+    }
+  }
+`
+
+const CREATE_DEPOSIT_MUTATION = `
+  mutation CreateDeposit($input: CreateDepositInput!) {
+    createDeposit(input: $input) {
+      id
+      amount
+      depositInterestRatePercent
+      isActive
+    }
+  }
+`
+
+const ACCEPT_LOAN_MUTATION = `
+  mutation AcceptLoan($input: AcceptLoanInput!) {
+    acceptLoan(input: $input) {
+      id
+      status
+      originalPrincipal
+    }
+  }
+`
+
 async function loadData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
   }
   error.value = null
   try {
-    const offersResult = await gqlRequest<{ myLoanOffers: LoanOfferSummary[] }>(MY_LOAN_OFFERS_QUERY)
-    const filtered = (offersResult.myLoanOffers ?? []).filter(
-      (o) => !bankBuildingId.value || o.bankBuildingId === bankBuildingId.value,
-    )
-    if (!deepEqual(myOffers.value, filtered)) {
-      myOffers.value = filtered
-    }
+    // Always load bank info (public) and user companies (for ownership check)
+    const [infoResult, companiesResult] = await Promise.all([
+      gqlRequest<{ bankInfo: BankInfoSummary }>(BANK_INFO_QUERY, {
+        id: bankBuildingId.value,
+      }),
+      auth.isAuthenticated
+        ? gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY)
+        : Promise.resolve({ me: { companies: [] } }),
+    ])
+    bankInfo.value = infoResult.bankInfo ?? null
+    userCompanies.value = companiesResult.me?.companies ?? []
 
-    if (bankBuildingId.value) {
-      const [loansResult, infoResult, depositsResult] = await Promise.all([
+    const ownerDetected = userCompanies.value.some((c) =>
+      (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'),
+    )
+
+    if (ownerDetected) {
+      // Owner view: load full management data
+      const [offersResult, loansResult, depositsResult] = await Promise.all([
+        gqlRequest<{ myLoanOffers: LoanOfferSummary[] }>(MY_LOAN_OFFERS_QUERY),
         gqlRequest<{ bankLoans: LoanSummary[] }>(BANK_LOANS_QUERY, {
           bankBuildingId: bankBuildingId.value,
-        }),
-        gqlRequest<{ bankInfo: BankInfoSummary }>(BANK_INFO_QUERY, {
-          id: bankBuildingId.value,
         }),
         gqlRequest<{ bankDeposits: BankDepositSummary[] }>(BANK_DEPOSITS_QUERY, {
           id: bankBuildingId.value,
         }),
       ])
+      const filtered = (offersResult.myLoanOffers ?? []).filter(
+        (o) => o.bankBuildingId === bankBuildingId.value,
+      )
+      if (!deepEqual(myOffers.value, filtered)) {
+        myOffers.value = filtered
+      }
       const loans = loansResult.bankLoans ?? []
       if (!deepEqual(issuedLoans.value, loans)) {
         issuedLoans.value = loans
       }
-      bankInfo.value = infoResult.bankInfo ?? null
       const deposits = depositsResult.bankDeposits ?? []
       if (!deepEqual(bankDeposits.value, deposits)) {
         bankDeposits.value = deposits
       }
-      // Pre-fill the rates form
       if (bankInfo.value && !showRatesForm.value) {
         ratesForm.value.depositInterestRatePercent = bankInfo.value.depositInterestRatePercent
         ratesForm.value.lendingInterestRatePercent = bankInfo.value.lendingInterestRatePercent
+      }
+    } else {
+      // Customer view: load public loan offers for this bank, and my deposits here
+      const [offersResult, depositsResult] = await Promise.all([
+        gqlRequest<{ loanOffers: LoanOfferSummary[] }>(PUBLIC_LOAN_OFFERS_QUERY),
+        auth.isAuthenticated
+          ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY)
+          : Promise.resolve({ myDeposits: [] }),
+      ])
+      const bankOffers = (offersResult.loanOffers ?? []).filter(
+        (o) => o.bankBuildingId === bankBuildingId.value && o.isActive,
+      )
+      if (!deepEqual(bankLoanOffers.value, bankOffers)) {
+        bankLoanOffers.value = bankOffers
+      }
+      const myDeposits = (depositsResult.myDeposits ?? []).filter(
+        (d) => d.bankBuildingId === bankBuildingId.value,
+      )
+      if (!deepEqual(myDepositsHere.value, myDeposits)) {
+        myDepositsHere.value = myDeposits
       }
     }
   } catch (err) {
@@ -309,13 +443,109 @@ async function saveRates() {
     ratesLoading.value = false
   }
 }
+
+// ── Customer view helpers ─────────────────────────────────────────────────────
+
+const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
+const isCompanyAccountActive = computed(
+  () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
+)
+
+async function submitCustomerDeposit() {
+  if (!activeCompany.value || !bankBuildingId.value) return
+  customerDepositLoading.value = true
+  customerDepositError.value = null
+  customerDepositSuccess.value = false
+  try {
+    await gqlRequest(CREATE_DEPOSIT_MUTATION, {
+      input: {
+        bankBuildingId: bankBuildingId.value,
+        depositorCompanyId: activeCompany.value.id,
+        amount: customerDepositAmount.value,
+      },
+    })
+    customerDepositSuccess.value = true
+    await loadData()
+    setTimeout(() => { customerDepositSuccess.value = false }, 3000)
+  } catch (err) {
+    customerDepositError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    customerDepositLoading.value = false
+  }
+}
+
+async function submitCustomerLoan() {
+  if (!customerLoanOffer.value || !activeCompany.value) return
+  customerLoanLoading.value = true
+  customerLoanError.value = null
+  customerLoanSuccess.value = false
+  try {
+    await gqlRequest(ACCEPT_LOAN_MUTATION, {
+      input: {
+        loanOfferId: customerLoanOffer.value.id,
+        borrowerCompanyId: activeCompany.value.id,
+        principalAmount: customerLoanPrincipal.value,
+      },
+    })
+    customerLoanSuccess.value = true
+    customerLoanOffer.value = null
+    await loadData()
+    setTimeout(() => { customerLoanSuccess.value = false }, 3000)
+  } catch (err) {
+    customerLoanError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    customerLoanLoading.value = false
+  }
+}
+
+function selectLoanOffer(offer: LoanOfferSummary) {
+  customerLoanOffer.value = offer
+  customerLoanPrincipal.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
+  customerLoanError.value = null
+}
+
+const estimatedCustomerTotalRepayment = computed(() => {
+  if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
+  return computeTotalRepayment(
+    customerLoanPrincipal.value,
+    customerLoanOffer.value.annualInterestRatePercent,
+    customerLoanOffer.value.durationTicks,
+  )
+})
+
+const estimatedCustomerPaymentAmount = computed(() => {
+  if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
+  return computePaymentAmount(
+    customerLoanPrincipal.value,
+    customerLoanOffer.value.annualInterestRatePercent,
+    customerLoanOffer.value.durationTicks,
+  )
+})
+
+const estimatedCustomerTotalPayments = computed(() => {
+  if (!customerLoanOffer.value) return 0
+  return computeTotalPayments(customerLoanOffer.value.durationTicks)
+})
 </script>
 
 <template>
   <div class="bank-management-view">
     <div class="page-header">
-      <h1 class="page-title">{{ t('bank.configureBank') }}</h1>
-      <p class="page-subtitle">{{ t('bank.lending') }}</p>
+      <!-- Show different titles based on ownership -->
+      <template v-if="!loading && isOwner">
+        <h1 class="page-title">{{ t('bank.configureBank') }}</h1>
+        <p class="page-subtitle">{{ t('bank.lending') }}</p>
+      </template>
+      <template v-else-if="!loading">
+        <div class="customer-nav">
+          <button class="btn-back" @click="router.push('/loans')">← {{ t('bank.backToMarketplace') }}</button>
+        </div>
+        <h1 class="page-title">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
+        <p class="page-subtitle">{{ bankInfo?.lenderCompanyName }} · {{ bankInfo?.cityName }}</p>
+      </template>
+      <template v-else>
+        <h1 class="page-title">{{ t('bank.customerView') }}</h1>
+      </template>
     </div>
 
     <div v-if="loading" class="loading-state">
@@ -329,6 +559,9 @@ async function saveRates() {
     </div>
 
     <template v-else>
+      <!-- ── OWNER VIEW ─────────────────────────────────────────────── -->
+      <template v-if="isOwner">
+
       <!-- Bank Info & Rate Configuration -->
       <div v-if="bankInfo" class="bank-info-section">
         <div class="bank-info-header">
@@ -367,10 +600,13 @@ async function saveRates() {
             </div>
           </div>
           <div v-if="ratesError" class="error-message">{{ ratesError }}</div>
-          <div v-if="ratesSuccess" class="success-message">{{ t('bank.ratesUpdated') }}</div>
           <button class="btn btn-primary" :disabled="ratesLoading" @click="saveRates">
             {{ ratesLoading ? t('common.loading') : t('bank.setBankRates') }}
           </button>
+        </div>
+        <!-- Success message shown outside the form so it persists after the form closes -->
+        <div v-if="ratesSuccess && !showRatesForm" class="success-message rates-success">
+          {{ t('bank.ratesUpdated') }}
         </div>
 
         <!-- Bank stats panel -->
@@ -572,6 +808,190 @@ async function saveRates() {
           </table>
         </div>
       </section>
+
+      </template><!-- end owner view -->
+
+      <!-- ── CUSTOMER VIEW ──────────────────────────────────────────── -->
+      <template v-else>
+
+        <!-- Bank profile card (rates + capacity) -->
+        <div v-if="bankInfo" class="customer-bank-profile">
+          <div class="customer-rates-grid">
+            <div class="customer-rate-card deposit">
+              <span class="customer-rate-label">{{ t('bank.depositInterestRate') }}</span>
+              <span class="customer-rate-value">{{ formatPercent(bankInfo.depositInterestRatePercent) }}</span>
+              <span class="customer-rate-hint">{{ t('bank.perYear') }}</span>
+            </div>
+            <div class="customer-rate-card lending">
+              <span class="customer-rate-label">{{ t('bank.lendingInterestRate') }}</span>
+              <span class="customer-rate-value">{{ formatPercent(bankInfo.lendingInterestRatePercent) }}</span>
+              <span class="customer-rate-hint">{{ t('bank.perYear') }}</span>
+            </div>
+            <div class="customer-rate-card capacity">
+              <span class="customer-rate-label">{{ t('bank.availableLendingCapacity') }}</span>
+              <span class="customer-rate-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'muted'">
+                {{ formatCurrency(bankInfo.availableLendingCapacity) }}
+              </span>
+              <span class="customer-rate-hint">{{ t('bank.reserveInfo') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- My deposits at this bank -->
+        <section v-if="auth.isAuthenticated && myDepositsHere.length > 0" class="customer-deposits-section">
+          <h2 class="section-title">{{ t('bank.yourDepositsHere') }}</h2>
+          <div class="deposits-list">
+            <div v-for="dep in myDepositsHere" :key="dep.id" class="deposit-card">
+              <div class="deposit-card-header">
+                <span class="deposit-company">{{ dep.depositorCompanyName }}</span>
+                <span class="deposit-rate-badge">{{ formatPercent(dep.depositInterestRatePercent) }} p.a.</span>
+              </div>
+              <div class="deposit-stats">
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('bank.depositAmount') }}</span>
+                  <span class="deposit-stat-value">{{ formatCurrency(dep.amount) }}</span>
+                </div>
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('bank.depositInterestEarned') }}</span>
+                  <span class="deposit-stat-value positive">+{{ formatCurrency(dep.totalInterestPaid) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Deposit form -->
+        <section class="customer-deposit-form-section">
+          <h2 class="section-title">{{ t('bank.makeDeposit') }}</h2>
+          <div v-if="!auth.isAuthenticated" class="auth-prompt">
+            <p>{{ t('bank.loginToLendDescription') }}</p>
+            <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
+          </div>
+          <div v-else-if="!isCompanyAccountActive" class="auth-prompt">
+            <p>{{ t('bank.companyAccountRequired') }}</p>
+          </div>
+          <div v-else class="customer-deposit-form">
+            <div class="form-group">
+              <label>{{ t('common.company') }}</label>
+              <div class="active-company-display">
+                <strong>{{ activeCompany?.name }}</strong>
+                <span>{{ formatCurrency(activeCompany?.cash ?? 0) }}</span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="customer-deposit-amount">{{ t('bank.depositAmount') }}</label>
+              <input
+                id="customer-deposit-amount"
+                v-model.number="customerDepositAmount"
+                type="number"
+                min="1000"
+                step="1000"
+                class="form-input"
+              />
+              <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
+            </div>
+            <div v-if="bankInfo" class="repayment-preview">
+              <div class="preview-row">
+                <span>{{ t('bank.depositInterestRate') }}</span>
+                <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+              </div>
+            </div>
+            <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
+            <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
+            <button
+              class="btn btn-primary"
+              :disabled="customerDepositLoading || customerDepositAmount < 1000"
+              @click="submitCustomerDeposit"
+            >
+              {{ customerDepositLoading ? t('common.loading') : t('bank.confirmDeposit') }}
+            </button>
+          </div>
+        </section>
+
+        <!-- Available loan offers -->
+        <section class="customer-loans-section">
+          <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
+          <div v-if="bankLoanOffers.length === 0" class="empty-state">
+            <p>{{ t('bank.noOffersFromBank') }}</p>
+          </div>
+          <div v-else class="customer-offers-grid">
+            <div v-for="offer in bankLoanOffers" :key="offer.id" class="customer-offer-card">
+              <div class="customer-offer-header">
+                <span class="offer-rate-big">{{ formatPercent(offer.annualInterestRatePercent) }}</span>
+                <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
+              </div>
+              <div class="customer-offer-stats">
+                <div class="offer-stat-row">
+                  <span>{{ t('bank.maxPrincipal') }}</span>
+                  <strong>{{ formatCurrency(offer.maxPrincipalPerLoan) }}</strong>
+                </div>
+                <div class="offer-stat-row">
+                  <span>{{ t('bank.remainingCapacity') }}</span>
+                  <strong :class="offer.remainingCapacity > 0 ? 'positive' : 'muted'">
+                    {{ formatCurrency(offer.remainingCapacity) }}
+                  </strong>
+                </div>
+                <div class="offer-stat-row">
+                  <span>{{ t('bank.duration') }}</span>
+                  <strong>{{ formatLoanDuration(offer.durationTicks) }}</strong>
+                </div>
+              </div>
+
+              <!-- Loan request form for selected offer -->
+              <div v-if="customerLoanOffer?.id === offer.id" class="customer-loan-request">
+                <div class="form-group">
+                  <label for="customer-loan-amount">{{ t('bank.principalAmount') }}</label>
+                  <input
+                    id="customer-loan-amount"
+                    v-model.number="customerLoanPrincipal"
+                    type="number"
+                    :min="1000"
+                    :max="Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)"
+                    step="1000"
+                    class="form-input"
+                  />
+                </div>
+                <div class="repayment-preview">
+                  <div class="preview-row">
+                    <span>{{ t('bank.paymentAmount') }}</span>
+                    <strong>{{ formatCurrency(estimatedCustomerPaymentAmount) }} × {{ estimatedCustomerTotalPayments }}</strong>
+                  </div>
+                  <div class="preview-row total-row">
+                    <span>{{ t('bank.totalRepayment') }}</span>
+                    <strong>{{ formatCurrency(estimatedCustomerTotalRepayment) }}</strong>
+                  </div>
+                </div>
+                <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
+                <div v-if="customerLoanSuccess" class="success-message">Loan accepted successfully.</div>
+                <div v-if="customerLoanError" class="error-message">{{ customerLoanError }}</div>
+                <div class="loan-request-actions">
+                  <button class="btn btn-secondary btn-sm" @click="customerLoanOffer = null">{{ t('common.cancel') }}</button>
+                  <button
+                    class="btn btn-primary"
+                    :disabled="customerLoanLoading || customerLoanPrincipal <= 0"
+                    @click="submitCustomerLoan"
+                  >
+                    {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
+                  </button>
+                </div>
+              </div>
+
+              <div v-else-if="auth.isAuthenticated && isCompanyAccountActive && offer.remainingCapacity > 0">
+                <button class="btn btn-primary btn-sm" @click="selectLoanOffer(offer)">
+                  {{ t('bank.acceptLoan') }}
+                </button>
+              </div>
+              <div v-else-if="!auth.isAuthenticated">
+                <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
+              </div>
+              <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
+              <p v-else class="offer-context-hint muted">No capacity available</p>
+            </div>
+          </div>
+        </section>
+
+      </template><!-- end customer view -->
+
     </template>
   </div>
 </template>
@@ -966,5 +1386,265 @@ th {
   color: var(--color-success, #22c55e);
   font-size: 0.875rem;
   padding: 0.5rem 0;
+}
+
+/* Customer view styles */
+.customer-nav {
+  margin-bottom: 0.5rem;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.btn-back:hover {
+  color: var(--color-text-primary);
+}
+
+.customer-bank-profile {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.customer-rates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.customer-rate-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.customer-rate-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.customer-rate-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.customer-rate-card.deposit .customer-rate-value { color: #22c55e; }
+.customer-rate-card.lending .customer-rate-value { color: #f59e0b; }
+.customer-rate-card.capacity .customer-rate-value.positive { color: #22c55e; }
+.customer-rate-card.capacity .customer-rate-value.muted { color: var(--color-text-muted); }
+
+.customer-rate-hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.customer-deposits-section {
+  margin-bottom: 1.5rem;
+}
+
+.deposits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.deposit-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.875rem 1rem;
+}
+
+.deposit-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.deposit-company {
+  font-weight: 600;
+}
+
+.deposit-rate-badge {
+  font-size: 0.82rem;
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.deposit-stats {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.deposit-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.deposit-stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.deposit-stat-value {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.deposit-stat-value.positive { color: #22c55e; }
+
+.customer-deposit-form-section,
+.customer-loans-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.auth-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0.75rem 0;
+}
+
+.customer-deposit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 420px;
+}
+
+.active-company-display {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.repayment-preview {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+}
+
+.preview-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  padding: 0.2rem 0;
+}
+
+.preview-row.total-row {
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  font-weight: 600;
+}
+
+.customer-offers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.customer-offer-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.customer-offer-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.offer-rate-big {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #f59e0b;
+}
+
+.offer-rate-hint {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.customer-offer-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.offer-stat-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.offer-stat-row strong.positive { color: #22c55e; }
+.offer-stat-row strong.muted { color: var(--color-text-muted); }
+
+.customer-loan-request {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.risk-warning {
+  font-size: 0.78rem;
+  color: #f59e0b;
+}
+
+.loan-request-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.offer-context-hint {
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.offer-context-hint.muted {
+  font-style: italic;
 }
 </style>

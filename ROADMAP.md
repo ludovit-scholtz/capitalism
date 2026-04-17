@@ -6,9 +6,20 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (55% complete)
+### Banking (70% complete)
 
 Implement banking as is described in the product definition below.
+
+- ✅ **Loan marketplace** (`/loans`): Lists all active banks with deposit and lending rates, lendable capacity, and city. Sortable by deposit rate and lending rate; filterable by city and available capacity.
+- ✅ **Contextual CTA**: Unauthenticated visitors see a login prompt. Authenticated players without a bank see an "Acquire a Bank" link. Players who own a bank see a "Manage My Bank" link going directly to their bank.
+- ✅ **Bank deposit tab**: Shows the sortable list of banks with their deposit/lending rates and available lending capacity so customers can compare terms before committing funds.
+- ✅ **Customer bank view** (`/bank/:id`): Third-party players see professional rate/capacity profile panel, deposit form with interest preview, and deposit history.
+- ✅ **Owner bank view** (`/bank/:id`): Bank owners see operating summary (active loans, capital outstanding, overdue count), rate configuration form, loan-offer publishing, and issued-loans table with delinquency badges.
+- ✅ **Backend APIs**: `allBanks`, `bankInfo`, `createDeposit`, `withdrawDeposit`, `setBankRates`, `publishLoanOffer`, `acceptLoan`, `repayLoan`, `bankLoans`, `myLoans`.
+- ✅ **Tick engine**: Interest paid to depositors each tick; loan repayment deducted from borrower each tick; overdue/defaulted status and penalty accumulation.
+- TODO: Central bank mechanic (bank borrows from central bank when deposits are negative; variable rate 2–5% per game year).
+- TODO: Loan collateral — borrow against a specific building up to 70% of its appraised value.
+- TODO: Make sure to request and pay minimum base deposit ($10,000,000) when creating the bank building.
 
 ### Dashboard (0% complete)
 

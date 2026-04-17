@@ -6,6 +6,38 @@ import {
   type MockLoan,
 } from './helpers/mock-api'
 
+/** Creates a player who owns a BANK building with id 'bank-building-1'. */
+function makeBankOwnerPlayer() {
+  const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+  player.companies.push({
+    id: 'lender-company-1',
+    playerId: player.id,
+    name: 'Lending Corp',
+    cash: 500_000,
+    foundedAtUtc: '2026-01-01T00:00:00Z',
+    buildings: [
+      {
+        id: 'bank-building-1',
+        companyId: 'lender-company-1',
+        cityId: 'city-ba',
+        name: 'City Bank',
+        type: 'BANK',
+        level: 1,
+        units: [],
+        isUnderConstruction: false,
+        constructionCompletesAtTick: null,
+        pendingConfigurationTick: null,
+        hasPendingConfiguration: false,
+        powerStatus: 'POWERED',
+        mediaType: null,
+      },
+    ],
+  })
+  player.activeAccountType = 'COMPANY'
+  player.activeCompanyId = 'lender-company-1'
+  return player
+}
+
 function makeLoanOffer(overrides: Partial<MockLoanOffer> = {}): MockLoanOffer {
   return {
     id: 'offer-1',
@@ -460,7 +492,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('shows bank stats overview', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], loanOffers: [], myLoans: [] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -476,7 +508,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('shows publish offer form when button clicked', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -495,7 +527,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('cancels publish form when Cancel clicked', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -513,7 +545,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
   })
 
   test('publishes offer and shows it in the offer list', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], loanOffers: [] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -538,7 +570,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
       bankBuildingId: 'bank-building-1',
       borrowerCompanyName: 'Borrower Inc',
     })
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], myLoans: [issuedLoan] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -558,7 +590,7 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
       status: 'OVERDUE',
       missedPayments: 2,
     })
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player], myLoans: [overdueIssuedLoan] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -667,7 +699,7 @@ test.describe('Bank Management — tick-refresh stability', () => {
   test('background tick refresh does not show a loading spinner or blank the bank management view', async ({
     page,
   }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const offer = makeLoanOffer({
       id: 'offer-bank-refresh',
       lenderCompanyName: 'Refresh Lender Corp',
@@ -699,7 +731,7 @@ test.describe('Bank Management — tick-refresh stability', () => {
   })
 
   test('issued loans remain visible after a background tick refresh', async ({ page }) => {
-    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const player = makeBankOwnerPlayer()
     const issuedLoan = makeActiveLoan({
       id: 'loan-bank-refresh',
       borrowerCompanyName: 'Borrower Co',
@@ -729,5 +761,322 @@ test.describe('Bank Management — tick-refresh stability', () => {
     // Issued loan must remain visible after background refresh
     await expect(page.getByText('Borrower Co')).toBeVisible()
     await expect(page.locator('.loading-state')).toBeHidden()
+  })
+})
+
+test.describe('Loan Marketplace — sort and filter banks', () => {
+  function makeBankInfo(
+    id: string,
+    name: string,
+    city: string,
+    depositRate: number,
+    lendingRate: number,
+    available: number,
+  ) {
+    return {
+      bankBuildingId: id,
+      bankBuildingName: name,
+      cityId: city === 'Bratislava' ? 'city-ba' : city === 'Prague' ? 'city-pr' : 'city-vi',
+      cityName: city,
+      lenderCompanyId: `co-${id}`,
+      lenderCompanyName: `Company ${id}`,
+      depositInterestRatePercent: depositRate,
+      lendingInterestRatePercent: lendingRate,
+      totalDeposits: available / 0.9 + 1_000_000,
+      lendableCapacity: available + 500_000,
+      outstandingLoanPrincipal: 500_000,
+      availableLendingCapacity: available,
+      baseCapitalDeposited: true,
+    }
+  }
+
+  test('displays bank list with rates and capacity', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Alpha Bank', 'Bratislava', 5, 10, 1_000_000),
+      makeBankInfo('b2', 'Beta Bank', 'Prague', 3, 8, 2_000_000),
+    ]
+    await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
+
+    await expect(page.getByText('Alpha Bank')).toBeVisible()
+    await expect(page.getByText('Beta Bank')).toBeVisible()
+    // Rate and capacity info should be visible on each card (formatPercent gives 1 decimal)
+    await expect(page.locator('.bank-card').first().getByText('5.0%')).toBeVisible()
+    await expect(page.locator('.bank-card').first().getByText('Bratislava')).toBeVisible()
+  })
+
+  test('sort by deposit rate changes ordering', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'LowRate Bank', 'Bratislava', 3, 10, 1_000_000),
+      makeBankInfo('b2', 'HighRate Bank', 'Prague', 8, 15, 2_000_000),
+    ]
+    await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
+
+    // Default sort is by deposit rate desc — high rate first
+    const firstCard = page.locator('.bank-card').first()
+    await expect(firstCard.getByText('HighRate Bank')).toBeVisible()
+
+    // Click deposit rate sort again to toggle ascending
+    await page.getByRole('group', { name: 'Sort by' }).getByText('Deposit Rate').click()
+
+    // Now ascending — low rate first
+    await expect(page.locator('.bank-card').first().getByText('LowRate Bank')).toBeVisible()
+  })
+
+  test('sort by lending rate changes ordering', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Cheap Loans', 'Bratislava', 5, 7, 1_000_000),
+      makeBankInfo('b2', 'Expensive Loans', 'Prague', 4, 14, 2_000_000),
+    ]
+    await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
+
+    // Click Lending Rate sort button
+    await page.getByRole('group', { name: 'Sort by' }).getByText('Lending Rate').click()
+
+    // Default sort dir is desc on first click — expensive loans first
+    await expect(page.locator('.bank-card').first().getByText('Expensive Loans')).toBeVisible()
+  })
+
+  test('city filter shows only banks in selected city', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Bratislava Bank', 'Bratislava', 5, 10, 1_000_000),
+      makeBankInfo('b2', 'Prague Bank', 'Prague', 5, 10, 2_000_000),
+    ]
+    await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
+
+    await expect(page.getByText('Bratislava Bank')).toBeVisible()
+    await expect(page.getByText('Prague Bank')).toBeVisible()
+
+    // Filter to Prague only
+    await page.locator('#city-filter').selectOption('Prague')
+
+    await expect(page.getByText('Prague Bank')).toBeVisible()
+    await expect(page.getByText('Bratislava Bank')).toBeHidden()
+  })
+
+  test('available capacity filter hides banks with no capacity', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      makeBankInfo('b1', 'Has Capacity', 'Bratislava', 5, 10, 1_000_000),
+      makeBankInfo('b2', 'No Capacity', 'Prague', 5, 10, 0),
+    ]
+    await page.goto('/loans')
+    // Banks list lives in the Deposit tab
+    await page.getByRole('tab', { name: 'Deposit' }).click()
+
+    await expect(page.getByText('No Capacity')).toBeVisible()
+
+    await page.locator('label.filter-check input[type="checkbox"]').check()
+
+    await expect(page.getByText('Has Capacity')).toBeVisible()
+    await expect(page.getByText('No Capacity')).toBeHidden()
+  })
+})
+
+test.describe('Bank Management — customer view', () => {
+  test('customer sees rate/capacity profile panel for a bank they do not own', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'customer-co-1',
+      playerId: player.id,
+      name: 'Customer Corp',
+      cash: 200_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [], // no bank building
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.allBanks = [
+      {
+        bankBuildingId: 'ext-bank-1',
+        bankBuildingName: 'External Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'other-co-1',
+        lenderCompanyName: 'Other Corp',
+        depositInterestRatePercent: 4,
+        lendingInterestRatePercent: 9,
+        totalDeposits: 10_000_000,
+        lendableCapacity: 9_000_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 9_000_000,
+        baseCapitalDeposited: true,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/bank/ext-bank-1')
+
+    // Customer view heading shows the bank building name (not generic 'Banking Services')
+    await expect(page.getByRole('heading', { name: 'External Bank' })).toBeVisible()
+
+    // Rate cards must be shown (formatPercent gives 1 decimal place)
+    await expect(page.locator('.customer-rate-card.deposit').getByText('4.0%')).toBeVisible()
+    await expect(page.locator('.customer-rate-card.lending').getByText('9.0%')).toBeVisible()
+    await expect(page.locator('.customer-rate-card.capacity')).toBeVisible()
+  })
+
+  test('authenticated customer can make a deposit and see it listed', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'depositor-co-1',
+      playerId: player.id,
+      name: 'Depositor Corp',
+      cash: 500_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.allBanks = [
+      {
+        bankBuildingId: 'dep-bank-1',
+        bankBuildingName: 'Deposit Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'other-co-2',
+        lenderCompanyName: 'Bank Owner Corp',
+        depositInterestRatePercent: 5,
+        lendingInterestRatePercent: 10,
+        totalDeposits: 5_000_000,
+        lendableCapacity: 4_500_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 4_500_000,
+        baseCapitalDeposited: true,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/bank/dep-bank-1')
+
+    // The deposit form section must be visible
+    await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
+
+    // Fill in the amount and submit
+    await page.locator('#customer-deposit-amount').fill('25000')
+
+    // Rate preview is shown (formatPercent gives 1 decimal place) — scope to preview section
+    await expect(page.locator('.repayment-preview').getByText('5.0%')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Confirm Deposit' }).click()
+
+    // Success message
+    await expect(page.getByText('Deposit created successfully.')).toBeVisible()
+  })
+
+  test('unauthenticated visitor sees login prompt in deposit form', async ({ page }) => {
+    const state = setupMockApi(page, {})
+    state.allBanks = [
+      {
+        bankBuildingId: 'guest-bank-1',
+        bankBuildingName: 'Guest Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'other-co-3',
+        lenderCompanyName: 'Guest Owner Corp',
+        depositInterestRatePercent: 6,
+        lendingInterestRatePercent: 11,
+        totalDeposits: 3_000_000,
+        lendableCapacity: 2_700_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 2_700_000,
+        baseCapitalDeposited: true,
+      },
+    ]
+
+    await page.goto('/bank/guest-bank-1')
+
+    // Rate cards should be visible (public info)
+    await expect(page.locator('.customer-rate-card.deposit')).toBeVisible()
+
+    // Deposit form should show login prompt, not the form
+    await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
+    // auth.login key maps to 'Login' — scope to the auth-prompt div to avoid matching the navbar link
+    await expect(page.locator('.auth-prompt').getByRole('link', { name: 'Login' })).toBeVisible()
+  })
+})
+
+test.describe('Bank Management — owner rate configuration', () => {
+  test('owner can open rate configuration form and see current rates', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    // Owner sees the rates section heading
+    await expect(page.getByRole('heading', { name: 'Bank Rates Configuration' })).toBeVisible()
+
+    // Opening the rate form shows deposit and lending inputs
+    await page.getByRole('button', { name: 'Update Rates' }).click()
+    await expect(page.locator('#deposit-rate')).toBeVisible()
+    await expect(page.locator('#lending-rate')).toBeVisible()
+  })
+
+  test('owner can cancel rate form without saving', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    await page.getByRole('button', { name: 'Update Rates' }).click()
+    await expect(page.locator('#deposit-rate')).toBeVisible()
+
+    // Clicking Cancel hides the form again
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.locator('#deposit-rate')).toBeHidden()
+  })
+
+  test('owner can submit updated rates', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    await page.getByRole('button', { name: 'Update Rates' }).click()
+    await page.locator('#deposit-rate').fill('6')
+    await page.locator('#lending-rate').fill('14')
+
+    await page.getByRole('button', { name: 'Update Rates' }).last().click()
+
+    // Success message appears and form hides
+    await expect(page.getByText('Rates updated')).toBeVisible()
   })
 })

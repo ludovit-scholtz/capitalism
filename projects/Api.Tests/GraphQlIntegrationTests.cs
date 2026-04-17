@@ -23216,6 +23216,122 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(15_000m, loans[0].GetProperty("originalPrincipal").GetDecimal());
     }
 
+    [Fact]
+    public async Task AcceptLoan_InsufficientBankCapacity_ReturnsError()
+    {
+        // Offer has TotalCapacity=5000, UsedCapacity=4900 — requesting 200 would exceed capacity
+        var lenderEmail = $"cap-full-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"cap-full-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "CapFullLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "CapFullBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "CapFullLenderCo", Cash = 500_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "CapFullBorrowerCo", Cash = 1_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "CapFullBank", Level = 1 };
+        db.Buildings.Add(bank);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 10m,
+            MaxPrincipalPerLoan = 10_000m,
+            TotalCapacity = 5_000m,
+            UsedCapacity = 4_900m, // nearly exhausted — only 100 available
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        // Request 200 which exceeds remaining capacity of 100
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 200m } },
+            borrowerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should return error when bank capacity is insufficient.");
+    }
+
+    [Fact]
+    public async Task LoanRepayment_FullRepayment_ClosesLoan()
+    {
+        // When the last payment is due, the loan should transition to PAID_OFF.
+        var lenderEmail = $"full-repay-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"full-repay-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "FullRepayLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "FullRepayBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"FRLenderCo-{Guid.NewGuid():N}", Cash = 500_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = $"FRBorrowerCo-{Guid.NewGuid():N}", Cash = 10_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = $"FRBank-{Guid.NewGuid():N}", Level = 1, TotalDeposits = 100_000m, BaseCapitalDeposited = true };
+        db.Buildings.Add(bank);
+
+        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 10m, MaxPrincipalPerLoan = 5_000m, TotalCapacity = 50_000m, UsedCapacity = 0m, DurationTicks = 1440L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
+        db.LoanOffers.Add(offer);
+
+        var gameState = await db.GameStates.FirstAsync();
+        // Seed a loan where the last payment clears the remaining balance
+        var loan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer.Id,
+            BorrowerCompanyId = borrowerCompany.Id,
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 1_000m,
+            RemainingPrincipal = 600m,
+            AnnualInterestRatePercent = 10m,
+            DurationTicks = 1440L,
+            StartTick = gameState.CurrentTick,
+            DueTick = gameState.CurrentTick + 1440L,
+            NextPaymentTick = gameState.CurrentTick + 1L,
+            PaymentAmount = 600m, // exactly the remaining balance — this is the last payment
+            PaymentsMade = 1,
+            TotalPayments = 2,
+            Status = Api.Data.Entities.LoanStatus.Active,
+            MissedPayments = 0,
+            AccumulatedPenalty = 0m,
+            AcceptedAtUtc = DateTime.UtcNow
+        };
+        db.Loans.Add(loan);
+        gameState.CurrentTick = loan.NextPaymentTick;
+        await db.SaveChangesAsync();
+
+        await ProcessTicksAsync(1);
+
+        await db.Entry(loan).ReloadAsync();
+        Assert.True(
+            loan.Status == Api.Data.Entities.LoanStatus.Repaid || loan.RemainingPrincipal == 0m,
+            $"Loan should be REPAID after final payment. Actual status: {loan.Status}, remaining: {loan.RemainingPrincipal}");
+    }
+
     #endregion
 
     #region Bank Deposits
@@ -23558,6 +23674,276 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // depositor should have received some interest
         Assert.True(depositorCompany.Cash > 0m, "Depositor should have received interest.");
         Assert.True(deposit.TotalInterestPaid > 0m, "Deposit should track interest paid.");
+    }
+
+    [Fact]
+    public async Task GetAllBanks_ReturnsBankListWithLendableCapacity()
+    {
+        // Seed two banks in two different cities so we can verify the list is populated correctly.
+        await RegisterAndGetTokenAsync($"allbanks-owner-{Guid.NewGuid():N}@test.com", "AllBanksOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cities = await db.Cities.Take(2).ToListAsync();
+        var city1 = cities[0];
+        var city2 = cities.Count > 1 ? cities[1] : cities[0];
+
+        var owner1 = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"ab-o1-{Guid.NewGuid():N}@t.com", DisplayName = "O1", Role = "PLAYER", PasswordHash = "x" };
+        var owner2 = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"ab-o2-{Guid.NewGuid():N}@t.com", DisplayName = "O2", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.AddRange(owner1, owner2);
+
+        var co1 = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner1.Id, Name = "BankCo1", Cash = 5_000_000m };
+        var co2 = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner2.Id, Name = "BankCo2", Cash = 5_000_000m };
+        db.Companies.AddRange(co1, co2);
+
+        // Bank 1: 2M deposits → lendable 1.8M; no outstanding loans → available = 1.8M
+        var bank1 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co1.Id, CityId = city1.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Alpha Bank", Level = 1,
+            DepositInterestRatePercent = 4m, LendingInterestRatePercent = 9m,
+            TotalDeposits = 2_000_000m, BaseCapitalDeposited = true,
+        };
+
+        // Bank 2: 5M deposits → lendable 4.5M; 1M outstanding loan → available = 3.5M
+        var bank2 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co2.Id, CityId = city2.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Beta Bank", Level = 1,
+            DepositInterestRatePercent = 6m, LendingInterestRatePercent = 12m,
+            TotalDeposits = 5_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.AddRange(bank1, bank2);
+
+        // Seed an outstanding loan against bank2
+        var borrower = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner1.Id, Name = "Borrow2", Cash = 0m };
+        db.Companies.Add(borrower);
+
+        var offer2 = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank2.Id,
+            LenderCompanyId = co2.Id,
+            AnnualInterestRatePercent = 12m,
+            MaxPrincipalPerLoan = 2_000_000m,
+            TotalCapacity = 5_000_000m,
+            UsedCapacity = 1_000_000m,
+            DurationTicks = 1440,
+            IsActive = true,
+        };
+        db.LoanOffers.Add(offer2);
+
+        var loan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer2.Id,
+            BankBuildingId = bank2.Id,
+            BorrowerCompanyId = borrower.Id,
+            LenderCompanyId = co2.Id,
+            OriginalPrincipal = 1_000_000m,
+            RemainingPrincipal = 1_000_000m,
+            AnnualInterestRatePercent = 12m,
+            DurationTicks = 1440,
+            StartTick = 1,
+            DueTick = 1441,
+            NextPaymentTick = 721,
+            PaymentAmount = 500_000m,
+            TotalPayments = 2,
+            PaymentsMade = 0,
+            Status = Api.Data.Entities.LoanStatus.Active,
+        };
+        db.Loans.Add(loan);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query {
+              allBanks {
+                bankBuildingId
+                bankBuildingName
+                cityName
+                depositInterestRatePercent
+                lendingInterestRatePercent
+                totalDeposits
+                lendableCapacity
+                outstandingLoanPrincipal
+                availableLendingCapacity
+              }
+            }
+            """);
+
+        var banks = result.GetProperty("data").GetProperty("allBanks");
+        var bankArray = banks.EnumerateArray().ToList();
+
+        // The list must contain at least our two seeded banks
+        Assert.True(bankArray.Count >= 2, "Expected at least 2 banks in the list.");
+
+        var alpha = bankArray.FirstOrDefault(b => b.GetProperty("bankBuildingName").GetString() == "Alpha Bank");
+        var beta  = bankArray.FirstOrDefault(b => b.GetProperty("bankBuildingName").GetString() == "Beta Bank");
+
+        Assert.True(alpha.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Alpha Bank should appear in list.");
+        Assert.True(beta.ValueKind  != System.Text.Json.JsonValueKind.Undefined, "Beta Bank should appear in list.");
+
+        // Verify lendable capacity = 90% of deposits
+        Assert.Equal(1_800_000m, alpha.GetProperty("lendableCapacity").GetDecimal());
+        Assert.Equal(1_800_000m, alpha.GetProperty("availableLendingCapacity").GetDecimal()); // no outstanding loans
+
+        Assert.Equal(4_500_000m, beta.GetProperty("lendableCapacity").GetDecimal());
+        Assert.Equal(3_500_000m, beta.GetProperty("availableLendingCapacity").GetDecimal()); // 1M outstanding → 4.5M - 1M
+
+        // Verify rates are exposed correctly
+        Assert.Equal(4m, alpha.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(9m, alpha.GetProperty("lendingInterestRatePercent").GetDecimal());
+        Assert.Equal(6m, beta.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(12m, beta.GetProperty("lendingInterestRatePercent").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GetAllBanks_ExcludesUninitializedBanks()
+    {
+        // Banks that haven't received their base capital (BaseCapitalDeposited = false) must not appear in the list.
+        await RegisterAndGetTokenAsync($"allbanks-excl-{Guid.NewGuid():N}@test.com", "ExclOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+
+        var owner = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"excl-o-{Guid.NewGuid():N}@t.com", DisplayName = "ExclO", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.Add(owner);
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "ExclCo", Cash = 1_000_000m };
+        db.Companies.Add(co);
+
+        var uninitBank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "Uninit Bank", Level = 1,
+            BaseCapitalDeposited = false, // not yet initialized
+        };
+        db.Buildings.Add(uninitBank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync("query { allBanks { bankBuildingName } }");
+        var banks = result.GetProperty("data").GetProperty("allBanks");
+        var names = banks.EnumerateArray().Select(b => b.GetProperty("bankBuildingName").GetString()).ToList();
+        Assert.DoesNotContain("Uninit Bank", names);
+    }
+
+    [Fact]
+    public async Task CreateDeposit_Unauthenticated_ReturnsError()
+    {
+        // Unauthenticated requests to createDeposit must be rejected.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"cd-unauth-o-{Guid.NewGuid():N}@t.com", DisplayName = "CDUnO", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.Add(owner);
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"CDUnCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
+        db.Companies.Add(co);
+        var bank = CreateTestBank(db, co, city.Id);
+        await db.SaveChangesAsync();
+
+        // Call without a token
+        var result = await ExecuteGraphQlAsync(
+            """mutation D($input: CreateDepositInput!) { createDeposit(input: $input) { id } }""",
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = co.Id.ToString(), amount = 1000m } },
+            token: null);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated createDeposit should fail.");
+    }
+
+    [Fact]
+    public async Task WithdrawDeposit_Unauthenticated_ReturnsError()
+    {
+        // Unauthenticated requests to withdrawDeposit must be rejected.
+        var ownerEmail = $"wd-unauth-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "WDUnauth");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"WDUnCo-{Guid.NewGuid():N}", Cash = 1_000_000m };
+        db.Companies.Add(co);
+        var bank = CreateTestBank(db, co, city.Id);
+        var deposit = new Api.Data.Entities.BankDeposit { Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = co.Id, Amount = 50_000m, DepositInterestRatePercent = 5m, DepositedAtTick = 1L, DepositedAtUtc = DateTime.UtcNow, IsActive = true };
+        db.BankDeposits.Add(deposit);
+        await db.SaveChangesAsync();
+
+        // Call without a token
+        var result = await ExecuteGraphQlAsync(
+            """mutation W($input: WithdrawDepositInput!) { withdrawDeposit(input: $input) { id } }""",
+            new { input = new { depositId = deposit.Id.ToString() } },
+            token: null);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated withdrawDeposit should fail.");
+    }
+
+    [Fact]
+    public async Task SetBankRates_ByNonOwner_ReturnsError()
+    {
+        // A player who does not own the bank must not be able to set rates.
+        var ownerEmail = $"sbr-owner-{Guid.NewGuid():N}@test.com";
+        var nonOwnerEmail = $"sbr-nonowner-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "SbrOwner");
+        var nonOwnerToken = await RegisterAndGetTokenAsync(nonOwnerEmail, "SbrNonOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"SbrCo-{Guid.NewGuid():N}", Cash = 15_000_000m };
+        db.Companies.Add(co);
+        var bank = CreateTestBank(db, co, city.Id);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Rates($input: SetBankRatesInput!) {
+              setBankRates(input: $input) { bankBuildingId }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositInterestRatePercent = 3m, lendingInterestRatePercent = 8m } },
+            nonOwnerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Non-owner must not be able to set bank rates.");
+    }
+
+    [Fact]
+    public async Task BankInfo_PublicAccess_UnauthenticatedCanReadRates()
+    {
+        // bankInfo query is intentionally readable without authentication so customers can compare rates.
+        await RegisterAndGetTokenAsync($"binfo-pub-{Guid.NewGuid():N}@test.com", "BInfoPub");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var ownerPlayer = await db.Players.FirstAsync();
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = ownerPlayer.Id, Name = $"BInfoPubCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
+        db.Companies.Add(co);
+        var bank = CreateTestBank(db, co, city.Id);
+        bank.DepositInterestRatePercent = 3.5m;
+        bank.LendingInterestRatePercent = 7.5m;
+        await db.SaveChangesAsync();
+
+        // No token provided — public query
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Info($id: UUID!) {
+              bankInfo(bankBuildingId: $id) {
+                depositInterestRatePercent
+                lendingInterestRatePercent
+              }
+            }
+            """,
+            new { id = bank.Id.ToString() },
+            token: null);
+
+        // Must not error; rates must be readable
+        Assert.False(result.TryGetProperty("errors", out _), "bankInfo should be publicly readable without auth.");
     }
 
     #endregion
