@@ -600,10 +600,13 @@ const estimatedCustomerTotalPayments = computed(() => {
             </div>
           </div>
           <div v-if="ratesError" class="error-message">{{ ratesError }}</div>
-          <div v-if="ratesSuccess" class="success-message">{{ t('bank.ratesUpdated') }}</div>
           <button class="btn btn-primary" :disabled="ratesLoading" @click="saveRates">
             {{ ratesLoading ? t('common.loading') : t('bank.setBankRates') }}
           </button>
+        </div>
+        <!-- Success message shown outside the form so it persists after the form closes -->
+        <div v-if="ratesSuccess && !showRatesForm" class="success-message rates-success">
+          {{ t('bank.ratesUpdated') }}
         </div>
 
         <!-- Bank stats panel -->

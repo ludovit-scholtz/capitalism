@@ -5300,10 +5300,26 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         if (input.lendingInterestRatePercent !== undefined)
           bank.lendingInterestRatePercent = input.lendingInterestRatePercent
       }
+      // Return a full BankInfoSummary so the component can update bankInfo correctly
+      const updatedBank = bank ?? {
+        bankBuildingId: input.bankBuildingId,
+        bankBuildingName: 'Unknown Bank',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        lenderCompanyId: 'lender-company-1',
+        lenderCompanyName: 'Lending Corp',
+        depositInterestRatePercent: input.depositInterestRatePercent ?? 5,
+        lendingInterestRatePercent: input.lendingInterestRatePercent ?? 10,
+        totalDeposits: 10_000_000,
+        lendableCapacity: 9_000_000,
+        outstandingLoanPrincipal: 0,
+        availableLendingCapacity: 9_000_000,
+        baseCapitalDeposited: true,
+      }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { setBankRates: { id: input.bankBuildingId } } }),
+        body: JSON.stringify({ data: { setBankRates: updatedBank } }),
       })
     }
 
