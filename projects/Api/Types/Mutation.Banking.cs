@@ -93,10 +93,16 @@ public sealed partial class Mutation
         bank.Company.Cash += input.Amount;
         bank.TotalDeposits += input.Amount;
 
-        // Auto-repay central-bank debt with the incoming deposit cash
+        // Auto-repay central-bank debt only from surplus cash above the reserve requirement.
+        // This mirrors BankInterestPhase auto-repayment: the deposit has already increased
+        // TotalDeposits (and therefore the required reserve), so we must preserve the full
+        // reserve before applying any payment toward CB debt. Using all available cash would
+        // drain the bank below the reserve that the same deposit just raised.
         if (bank.CentralBankDebt > 0m)
         {
-            var repayment = Math.Min(bank.CentralBankDebt, bank.Company.Cash);
+            var reserveNeeded = bank.TotalDeposits * ReserveRatio;
+            var surplusCash = bank.Company.Cash - reserveNeeded;
+            var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
             if (repayment > 0m)
             {
                 bank.Company.Cash -= repayment;
@@ -107,7 +113,7 @@ public sealed partial class Mutation
                     CompanyId = bank.CompanyId,
                     BuildingId = bank.Id,
                     Category = LedgerCategory.CentralBankRepay,
-                    Description = $"Central bank repayment from incoming deposit",
+                    Description = $"Central bank repayment from incoming deposit (surplus above reserve)",
                     Amount = -repayment,
                     RecordedAtTick = currentTick,
                     RecordedAtUtc = DateTime.UtcNow,

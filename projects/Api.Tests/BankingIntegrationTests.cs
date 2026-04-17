@@ -6,6 +6,9 @@ using Api.Types;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
 namespace Api.Tests;
 
@@ -406,5 +409,220 @@ public sealed class BankingIntegrationTests
         Assert.True(rate > 2m, $"Rate should be above minimum when banks are borrowing. Got {rate}%");
         Assert.True(rate <= 5m, $"Rate must not exceed maximum 5%. Got {rate}%");
         Assert.Equal(3.8m, rate); // locks in the interpolation formula
+    }
+
+    // ── CreateDeposit reserve-preserving repayment ────────────────────────────
+
+    /// <summary>
+    /// Proves that CreateDeposit only repays central-bank debt from surplus cash ABOVE the
+    /// reserve requirement, never draining the bank below its required reserves.
+    ///
+    /// Scenario:
+    ///   Bank: $1M deposits → reserve required = $100K; bank cash = $80K (below reserve = CRITICAL)
+    ///   CB debt = $500K
+    ///   Customer deposits $200K → bank cash becomes $280K; deposits become $1.2M → reserve = $120K
+    ///   Surplus above reserve = $280K - $120K = $160K
+    ///   Expected repayment = $160K (only the surplus); bank cash after = $120K (exactly at reserve)
+    ///   Old buggy behaviour: repayment = min($500K, $280K) = $280K → bank cash drops to $0 (below reserve!)
+    /// </summary>
+    [Fact]
+    public async Task CreateDeposit_UnderPressureBank_OnlyRepaysCbDebtFromSurplusCash()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Register bank owner and depositor
+        var bankOwnerToken = await RegisterAsync(client, $"cd-res-owner-{Guid.NewGuid():N}@test.com", "BankOwner");
+        var depositorToken = await RegisterAsync(client, $"cd-res-dep-{Guid.NewGuid():N}@test.com", "Depositor");
+
+        var bankOwnerEmail  = (await ExecuteAsync(client, "{ me { email } }", token: bankOwnerToken))
+            .GetProperty("data").GetProperty("me").GetProperty("email").GetString()!;
+        var depositorEmail = (await ExecuteAsync(client, "{ me { email } }", token: depositorToken))
+            .GetProperty("data").GetProperty("me").GetProperty("email").GetString()!;
+
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        // Bank starts under reserve: $80K cash, $1M deposits, $500K CB debt
+        var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "PressuredBankCo", Cash = 80_000m };
+        var depositorCompany = new Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "NewDepositorCo", Cash = 500_000m };
+        db.Companies.AddRange(bankCompany, depositorCompany);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCompany.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "PressuredBank", Level = 1,
+            DepositInterestRatePercent = 4m, LendingInterestRatePercent = 9m,
+            TotalDeposits = 1_000_000m, BaseCapitalDeposited = true,
+            CentralBankDebt = 500_000m,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        // Customer deposits $200K
+        var result = await ExecuteAsync(client,
+            """
+            mutation CD($input: CreateDepositInput!) {
+              createDeposit(input: $input) { id amount }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 200_000m } },
+            token: depositorToken);
+
+        var depositData = result.GetProperty("data").GetProperty("createDeposit");
+        Assert.Equal(200_000m, depositData.GetProperty("amount").GetDecimal());
+
+        await db.Entry(bankCompany).ReloadAsync();
+        await db.Entry(bank).ReloadAsync();
+
+        // After deposit: bank cash = 80K + 200K = 280K; deposits = 1.2M; reserve = 120K
+        // Surplus = 280K - 120K = 160K → repayment = 160K
+        // Bank cash after repayment = 120K (exactly at reserve — not below it!)
+        const decimal expectedDeposits = 1_200_000m;
+        const decimal expectedReserve = expectedDeposits * 0.10m;  // = 120,000
+        const decimal expectedSurplus = 280_000m - expectedReserve; // = 160,000
+        const decimal expectedCbDebt = 500_000m - expectedSurplus;  // = 340,000
+        const decimal expectedCash = expectedReserve;               // = 120,000 (all surplus repaid)
+
+        Assert.Equal(expectedDeposits, bank.TotalDeposits);
+        // Bank cash should equal the reserve floor after surplus repayment (not drain below it)
+        Assert.Equal(expectedCash, bankCompany.Cash);
+        // CB debt should decrease by exactly the surplus, not by the full available cash
+        Assert.Equal(expectedCbDebt, bank.CentralBankDebt);
+
+        // Bank cash must be >= reserve requirement (the key invariant)
+        var reserveNeeded = bank.TotalDeposits * 0.10m;
+        Assert.True(bankCompany.Cash >= reserveNeeded,
+            $"Bank cash ({bankCompany.Cash:C}) must not fall below reserve requirement ({reserveNeeded:C}) after CreateDeposit.");
+    }
+
+    /// <summary>
+    /// Verifies that the bankInfo query returns a liquidity summary consistent with actual DB state
+    /// after a deposit arrives at an under-pressure bank. Specifically:
+    ///   - ReserveShortfall should be zero or reduced after the deposit
+    ///   - CentralBankDebt should have decreased by the surplus (not the full deposit)
+    ///   - LiquidityStatus should remain PRESSURED (not flip to HEALTHY if CB debt remains)
+    /// </summary>
+    [Fact]
+    public async Task BankInfo_AfterDepositOnUnderPressureBank_LiquiditySummaryIsConsistentWithDbState()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var bankOwnerToken = await RegisterAsync(client, $"bi-cons-owner-{Guid.NewGuid():N}@test.com", "BiOwner");
+        var depositorToken = await RegisterAsync(client, $"bi-cons-dep-{Guid.NewGuid():N}@test.com", "BiDepositor");
+
+        var bankOwnerEmail  = (await ExecuteAsync(client, "{ me { email } }", token: bankOwnerToken))
+            .GetProperty("data").GetProperty("me").GetProperty("email").GetString()!;
+        var depositorEmail = (await ExecuteAsync(client, "{ me { email } }", token: depositorToken))
+            .GetProperty("data").GetProperty("me").GetProperty("email").GetString()!;
+
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        // Bank: 5M deposits, cash=400K (below reserve of 500K), CB debt=1M → CRITICAL
+        var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "ConsistencyBankCo", Cash = 400_000m };
+        var depositorCompany = new Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "ConsDepositorCo", Cash = 1_000_000m };
+        db.Companies.AddRange(bankCompany, depositorCompany);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCompany.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "ConsistencyBank", Level = 1,
+            DepositInterestRatePercent = 4m, LendingInterestRatePercent = 9m,
+            TotalDeposits = 5_000_000m, BaseCapitalDeposited = true,
+            CentralBankDebt = 1_000_000m,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        // Customer deposits $500K → bank cash: 400K+500K=900K; deposits: 5.5M; reserve: 550K
+        // Surplus = 900K - 550K = 350K → repayment = 350K; CB debt after = 650K
+        await ExecuteAsync(client,
+            """
+            mutation CD($input: CreateDepositInput!) {
+              createDeposit(input: $input) { id }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 500_000m } },
+            token: depositorToken);
+
+        // Now query bankInfo to get the server-computed liquidity summary
+        var bankInfoResult = await ExecuteAsync(client,
+            """
+            query BI($bankBuildingId: UUID!) {
+              bankInfo(bankBuildingId: $bankBuildingId) {
+                availableCash
+                reserveRequirement
+                reserveShortfall
+                centralBankDebt
+                liquidityStatus
+              }
+            }
+            """,
+            new { bankBuildingId = bank.Id.ToString() },
+            token: bankOwnerToken);
+
+        var info = bankInfoResult.GetProperty("data").GetProperty("bankInfo");
+
+        var availableCash       = info.GetProperty("availableCash").GetDecimal();
+        var reserveRequirement  = info.GetProperty("reserveRequirement").GetDecimal();
+        var reserveShortfall    = info.GetProperty("reserveShortfall").GetDecimal();
+        var centralBankDebt     = info.GetProperty("centralBankDebt").GetDecimal();
+        var liquidityStatus     = info.GetProperty("liquidityStatus").GetString();
+
+        // After deposit: deposits = 5.5M → reserve = 550K; cash = 900K - 350K repaid = 550K
+        Assert.Equal(5_500_000m * 0.10m, reserveRequirement);   // 550,000
+        // Reserve shortfall should be 0 after deposit brings bank above reserve
+        Assert.Equal(0m, reserveShortfall);
+        Assert.True(availableCash >= reserveRequirement,
+            $"Bank cash ({availableCash:C}) must be >= reserve ({reserveRequirement:C}) after reserve-preserving repayment.");
+        // CB debt should have decreased from 1M after surplus repayment
+        Assert.True(centralBankDebt < 1_000_000m,
+            $"CB debt should have decreased from 1M after surplus repayment. Got {centralBankDebt:C}");
+        // CB debt should be 650K after 350K surplus repaid
+        Assert.Equal(650_000m, centralBankDebt);
+
+        // Bank still has CB debt → status must be PRESSURED (not HEALTHY)
+        Assert.Equal("PRESSURED", liquidityStatus);
+    }
+
+    // ── Static helpers for HTTP-level tests ───────────────────────────────────
+
+    private static async Task<string> RegisterAsync(HttpClient client, string email, string displayName)
+    {
+        var result = await ExecuteAsync(client,
+            """
+            mutation R($input: RegisterInput!) {
+              register(input: $input) { token }
+            }
+            """,
+            new { input = new { email, displayName, password = "TestPass123!" } });
+        return result.GetProperty("data").GetProperty("register").GetProperty("token").GetString()!;
+    }
+
+    private static async Task<JsonElement> ExecuteAsync(HttpClient client, string query, object? variables = null, string? token = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, "/graphql")
+        {
+            Content = new StringContent(
+                JsonSerializer.Serialize(new { query, variables }),
+                Encoding.UTF8, "application/json"),
+        };
+        if (token is not null)
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.SendAsync(request);
+        response.EnsureSuccessStatusCode();
+        var json = await response.Content.ReadAsStringAsync();
+        return JsonDocument.Parse(json).RootElement;
     }
 }
