@@ -702,6 +702,9 @@ export default {
     bankSetupStep1: 'Deposit the required base capital ($10M) to open the bank.',
     bankSetupStep2: 'Set your deposit and lending interest rates.',
     bankSetupStep3: 'Start accepting deposits and issuing loans to other players.',
+    initialDepositLabel: 'Initial Base Capital Deposit',
+    initialDepositHint: 'Optionally enter $10,000,000 to activate your bank immediately. You can also do this on the bank management page.',
+    initialDepositPlaceholder: '10000000',
   },
   buildingDetail: {
     title: 'Building Details',

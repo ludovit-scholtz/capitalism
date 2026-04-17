@@ -700,6 +700,9 @@ export default {
     bankSetupStep1: 'Vložte požadovaný základný kapitál (10 mil. $) na otvorenie banky.',
     bankSetupStep2: 'Nastavte úrokové sadzby pre vklady a pôžičky.',
     bankSetupStep3: 'Začnite prijímať vklady a vydávať pôžičky ostatným hráčom.',
+    initialDepositLabel: 'Počiatočný vklad základného kapitálu',
+    initialDepositHint: 'Voliteľne zadajte 10 000 000 $ na okamžitú aktiváciu banky. Môžete to urobiť aj na stránke správy banky.',
+    initialDepositPlaceholder: '10000000',
   },
   buildingDetail: {
     title: 'Detaily budovy',

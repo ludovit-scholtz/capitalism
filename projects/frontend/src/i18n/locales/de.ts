@@ -701,6 +701,9 @@ export default {
     bankSetupStep1: 'Hinterlegen Sie das erforderliche Grundkapital (10 Mio. $), um die Bank zu eröffnen.',
     bankSetupStep2: 'Legen Sie Ihre Einlagen- und Kreditzinssätze fest.',
     bankSetupStep3: 'Beginnen Sie, Einlagen anzunehmen und Kredite an andere Spieler zu vergeben.',
+    initialDepositLabel: 'Ersteinlage des Grundkapitals',
+    initialDepositHint: 'Geben Sie optional 10.000.000 $ ein, um Ihre Bank sofort zu aktivieren. Sie können dies auch auf der Bankverwaltungsseite tun.',
+    initialDepositPlaceholder: '10000000',
   },
   buildingDetail: {
     title: 'Geb\u00e4udedetails',
