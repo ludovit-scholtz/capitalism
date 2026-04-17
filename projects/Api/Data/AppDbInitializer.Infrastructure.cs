@@ -246,20 +246,21 @@ public sealed partial class AppDbInitializer
     ///   </description></item>
     ///   <item><description>
     ///     <b>Fresh relational database</b> — <c>EnsureCreatedAsync</c> creates the schema,
-    ///     then a baseline entry is inserted into <c>__EFMigrationsHistory</c> for every
-    ///     currently-defined migration so that <c>MigrateAsync</c> has nothing left to apply.
+    ///     legacy schema repair runs as a no-op safety check, and then a baseline entry is
+    ///     inserted into <c>__EFMigrationsHistory</c> for every currently-defined migration so
+    ///     that <c>MigrateAsync</c> has nothing left to apply.
     ///   </description></item>
     ///   <item><description>
     ///     <b>Legacy relational database</b> (created by <c>EnsureCreatedAsync</c> before
     ///     migration support was introduced, no <c>__EFMigrationsHistory</c> table) —
-    ///     same as fresh path: baseline entries are inserted for all existing migrations so that
-    ///     the initial migration is not replayed against tables that already exist.
+    ///     same as fresh path, except known additive schema gaps are repaired before baseline
+    ///     entries are inserted for all existing migrations.
     ///   </description></item>
     ///   <item><description>
     ///     <b>Relational database already managed by migrations</b> — <c>EnsureCreatedAsync</c>
-    ///     is a no-op, <c>EnsureMigrationsHistoryBaselineAsync</c> detects the existing history
-    ///     table and returns immediately, and <c>MigrateAsync</c> applies only pending
-    ///     migrations.
+    ///     is a no-op, legacy schema repair still runs as a safety net, and <c>MigrateAsync</c>
+    ///     applies only pending migrations. Migration failures are fatal so the app never starts
+    ///     against a partially-upgraded schema.
     ///   </description></item>
     /// </list>
     /// </summary>
@@ -274,15 +275,19 @@ public sealed partial class AppDbInitializer
             return;
         }
 
-        // For relational databases (SQLite in production and test environments):
+        // For relational databases (PostgreSQL in runtime, SQLite in tests):
         //   a) EnsureCreatedAsync is idempotent and safe to call even when tables already exist.
         //      It creates the database file and schema when absent and returns false (no-op)
         //      when the database already exists — regardless of whether it was originally
         //      created by EnsureCreated or by a previous migration run.
         await dbContext.Database.EnsureCreatedAsync();
 
-        //   b) If the database has no __EFMigrationsHistory table, every currently-defined
-        //      migration is marked as already applied so that MigrateAsync (step c) does not
+        //   b) Repair known additive schema drift for legacy databases that were baselined
+        //      without actually having every later migration applied.
+        await RepairKnownLegacySchemaDriftAsync();
+
+        //   c) If the database has no __EFMigrationsHistory table, every currently-defined
+        //      migration is marked as already applied so that MigrateAsync (step d) does not
         //      attempt to re-create tables that already exist.
         var baselinedMigrationsHistory = await EnsureMigrationsHistoryBaselineAsync();
 
@@ -291,16 +296,9 @@ public sealed partial class AppDbInitializer
             return;
         }
 
-        //   c) Apply any migrations that are not yet recorded in __EFMigrationsHistory.
+        //   d) Apply any migrations that are not yet recorded in __EFMigrationsHistory.
         //      This is a no-op for brand-new or already up-to-date databases.
-        try
-        {
-            await dbContext.Database.MigrateAsync();
-        }
-        catch (Exception exc)
-        {
-            Console.Error.WriteLine($"An error occurred while applying migrations: {exc.Message}");
-        }
+        await dbContext.Database.MigrateAsync();
     }
 
     /// <summary>
@@ -354,7 +352,7 @@ public sealed partial class AppDbInitializer
             if (historyExists)
                 return false; // Already managed by migrations — nothing to do.
 
-            // Create the history table using the SQLite-compatible schema that EF Core generates.
+            // Create the history table with a provider-neutral shape that both SQLite and PostgreSQL accept.
             await using var createCmd = connection.CreateCommand();
             createCmd.CommandText =
                 $"""

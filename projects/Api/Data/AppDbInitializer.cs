@@ -25,16 +25,19 @@ public sealed partial class AppDbInitializer(
     /// 1. <c>EnsureCreatedAsync</c> — creates the database and all tables if they do not exist
     ///    yet.  For databases that already exist (whether bootstrapped by a previous
     ///    <c>EnsureCreated</c> call or by an earlier migration run) this is a no-op.
-    /// 2. <c>EnsureMigrationsHistoryBaselineAsync</c> — if <c>__EFMigrationsHistory</c> is
+    /// 2. <c>RepairKnownLegacySchemaDriftAsync</c> — idempotently patches known additive schema
+    ///    gaps for legacy databases that were later baselined as if every migration had already
+    ///    run.
+    /// 3. <c>EnsureMigrationsHistoryBaselineAsync</c> — if <c>__EFMigrationsHistory</c> is
     ///    absent (legacy database that was bootstrapped by <c>EnsureCreatedAsync</c> before
     ///    migration support was introduced) this method creates the history table and marks every
-    ///    currently-defined migration as already applied.  This prevents <c>MigrateAsync</c>
-    ///    from attempting to re-create tables that already exist.
-    /// 3. <c>MigrateAsync</c> — applies only the migrations that are not yet in the history
+    ///    currently-defined migration as already applied after the legacy repair step has brought
+    ///    the schema up to the current model.
+    /// 4. <c>MigrateAsync</c> — applies only the migrations that are not yet in the history
     ///    table.  For a brand-new or already up-to-date database this is a no-op.
     ///
     /// For in-memory databases (used in local development) migrations are not supported by
-    /// the provider; <c>EnsureCreatedAsync</c> is used directly and steps 2–3 are skipped.
+    /// the provider; <c>EnsureCreatedAsync</c> is used directly and steps 2–4 are skipped.
     /// </summary>
     public async Task InitializeAsync()
     {

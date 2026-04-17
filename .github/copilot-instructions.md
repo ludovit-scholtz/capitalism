@@ -25,8 +25,12 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 
 ## Technology and conventions
 - Frontends use Vue 3 + TypeScript + Vite.
-- Game backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, Entity Framework Core (SQLite), and JWT bearer authentication.
-- Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL v15, and Entity Framework Core (SQLite locally) to store the live game-server registry.
+- Game backend uses ASP.NET Core 10, Hot Chocolate GraphQL, Entity Framework Core (PostgreSQL in runtime), and JWT bearer authentication.
+- Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL, and Entity Framework Core to store the live game-server registry.
+- `projects/Api` runs on PostgreSQL in normal runtime. Design-time EF migrations for the game API must also be scaffolded against PostgreSQL via `projects/Api/Data/AppDbContextFactory.cs` and the `GameCatalog` connection string. Do not scaffold API migrations against SQLite placeholders or a temporary SQLite design-time database.
+- When a backend model changes, always add the corresponding EF migration and make the startup upgrade path safe for a server restart onto the new build. If the change could affect a legacy database that was previously created/baselined without full migration history, add idempotent schema-repair logic in `AppDbInitializer` before baseline/migration execution so restart does not boot against a partial schema.
+- Never swallow `MigrateAsync()` failures for the game API. If schema upgrade fails, startup must fail so the server does not continue running with runtime `column does not exist` errors.
+- For every API model/migration change, add or update a regression test that creates a database at the previous schema, runs `AppDbInitializer.InitializeAsync()` to simulate a restart onto the new build, and asserts the new schema artifacts exist afterward.
 - Frontends communicate with their backend exclusively via GraphQL using lightweight fetch-based clients.
 - The game frontend GraphQL endpoint URL is configured via `VITE_GRAPHQL_URL` environment variable (defaults to `https://capitalism.de-4.biatec.io/graphql`).
 - The master frontend GraphQL endpoint URL is configured via `VITE_MASTER_GRAPHQL_URL` environment variable (defaults to `https://localhost:44364/graphql`).
@@ -202,7 +206,7 @@ npx playwright test --debug --project=chromium
 ```
 
 ## Backend testing
-- Integration tests in `Api.Tests/GraphQlIntegrationTests.cs` use `WebApplicationFactory` with a unique SQLite database per test factory instance.
+- Integration tests in `Api.Tests/GraphQlIntegrationTests.cs` use `WebApplicationFactory` with a unique inmemory or postgresql database per test factory instance.
 - Test factory in `Api.Tests/Infrastructure/ApiWebApplicationFactory.cs`.
 - Tests cover: health check, auth (register, login, duplicate email, wrong password), game data queries, company management, building placement, onboarding flow, rankings.
 - Run with: `dotnet test projects/Api.Tests`
@@ -257,6 +261,7 @@ dotnet build
 ## Validation requirements before reporting completion
 - For backend changes, do not stop at Debug-only targeted tests. Always run the workflow-equivalent Release pipeline locally:
   - `cd projects/Api && dotnet restore Api.slnx && dotnet build Api.slnx --configuration Release --no-restore && dotnet test Api.slnx --configuration Release --no-build`
+- For any API entity/model change, also validate the restart upgrade path against an older database state before reporting completion. At minimum, migrate or create a database at the previous schema, run `AppDbInitializer.InitializeAsync()` on the updated build, and confirm the new columns/tables/indexes exist after the restart.
 - For master-backend changes, run at least `cd projects/MasterApi && dotnet build` and, if you add tests later, run those too before reporting completion.
 - **NEVER push with known failing tests.** If a test fails because of your change, you MUST fix it before pushing — even if the test appears "pre-existing" or "unrelated". An existing test that breaks under your new validation is evidence that the test data was invalid under the new rule; fix the test data, not the validation.
 - For frontend changes that affect shipped UI, also run the workflow-equivalent frontend checks:
@@ -706,7 +711,7 @@ Root-cause of a CI failure (April 2026, PR #233 public-sales analytics):
 - `TickProcessor.BuildContextAsync` loaded buildings with three collection Includes:
   `.Include(b => b.Units).Include(b => b.PendingConfiguration).ThenInclude(p => p.Units).Include(b => b.PendingConfiguration).ThenInclude(p => p.Removals)`
 - Without `AsSplitQuery()`, EF Core generates a single SQL with Cartesian product: `BuildingUnits × PlanUnits × PlanRemovals`. Each `BuildingUnit` appears multiple times in the result.
-- EF Core's identity map *should* deduplicate, but fails in certain SQLite + multiple-collection-Include combinations. The navigation property `b.Units` received duplicate entries (same `(GridX, GridY)` position) at runtime.
+- EF Core's identity map *should* deduplicate, but fails in certain inmemory or postgresql + multiple-collection-Include combinations. The navigation property `b.Units` received duplicate entries (same `(GridX, GridY)` position) at runtime.
 - The same issue in `BuildingConfigurationService.ApplyDuePlansAsync`: `plan.Building.Units` could appear empty or duplicated, causing `ApplyDuePlansAsync` to insert **new** `BuildingUnit` rows at positions already occupied, corrupting the database state for all subsequent tick engine calls.
 - CI failures were ordering-dependent: tests that called `StoreBuildingConfiguration` (leaving a pending plan) caused the Cartesian explosion in any later test that called `ProcessTicksAsync`. Locally, test ordering happened to avoid this; CI ordering exposed it consistently.
 
