@@ -503,6 +503,46 @@ public sealed class LoanSummary
     public decimal AccumulatedPenalty { get; set; }
     public DateTime AcceptedAtUtc { get; set; }
     public DateTime? ClosedAtUtc { get; set; }
+
+    // ── Collateral ─────────────────────────────────────────────────────────────────
+    /// <summary>ID of the building pledged as collateral, or null for unsecured loans.</summary>
+    public Guid? CollateralBuildingId { get; set; }
+    /// <summary>Display name of the collateral building, or null for unsecured loans.</summary>
+    public string? CollateralBuildingName { get; set; }
+    /// <summary>Appraised value of the collateral building at origination, or null for unsecured loans.</summary>
+    public decimal? CollateralAppraisedValue { get; set; }
+}
+
+/// <summary>
+/// Collateral eligibility and capacity summary for one of the player's buildings.
+/// Returned by the <c>myCollateralBuildings</c> query so borrowers can compare buildings
+/// before choosing which to pledge.
+/// </summary>
+public sealed class CollateralEligibilitySummary
+{
+    /// <summary>Building ID.</summary>
+    public Guid BuildingId { get; set; }
+    /// <summary>Display name of the building.</summary>
+    public string BuildingName { get; set; } = string.Empty;
+    /// <summary>Building type (e.g. FACTORY, MINE).</summary>
+    public string BuildingType { get; set; } = string.Empty;
+    /// <summary>Current building level.</summary>
+    public int Level { get; set; }
+    /// <summary>Appraised value of the building (used as the LTV base).</summary>
+    public decimal AppraisedValue { get; set; }
+    /// <summary>Maximum borrowable amount (70% of appraised value).</summary>
+    public decimal MaxBorrowable { get; set; }
+    /// <summary>Sum of remaining principal on all active secured loans against this building.</summary>
+    public decimal ExistingSecuredExposure { get; set; }
+    /// <summary>Remaining borrowing capacity (MaxBorrowable - ExistingSecuredExposure, floored at 0).</summary>
+    public decimal RemainingBorrowingCapacity { get; set; }
+    /// <summary>
+    /// True when the building can currently be pledged.
+    /// False when it is already pledged as collateral for another active loan.
+    /// </summary>
+    public bool IsEligible { get; set; }
+    /// <summary>Human-readable reason the building is ineligible, or null when eligible.</summary>
+    public string? IneligibilityReason { get; set; }
 }
 
 /// <summary>Upgrade info for a single building unit: cost, timing, and stat projections.</summary>

@@ -347,6 +347,62 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        // ── Collateral validation (optional) ──────────────────────────────────────
+        Building? collateralBuilding = null;
+        decimal? collateralAppraisedValue = null;
+
+        if (input.CollateralBuildingId.HasValue)
+        {
+            // Building must exist and be owned by the borrower's company.
+            collateralBuilding = await db.Buildings
+                .FirstOrDefaultAsync(b => b.Id == input.CollateralBuildingId.Value
+                                         && b.CompanyId == borrower.Id);
+
+            if (collateralBuilding is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Collateral building not found or is not owned by your company.")
+                        .SetCode("COLLATERAL_NOT_OWNED")
+                        .Build());
+            }
+
+            // Building must not already be pledged as collateral for another active loan.
+            var alreadyPledged = await db.Loans
+                .AnyAsync(l => l.CollateralBuildingId == input.CollateralBuildingId.Value
+                               && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
+            if (alreadyPledged)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("This building is already pledged as collateral for another active loan.")
+                        .SetCode("COLLATERAL_ALREADY_PLEDGED")
+                        .Build());
+            }
+
+            // Compute appraised value and 70% LTV cap.
+            collateralAppraisedValue = Utilities.WealthCalculator.GetBuildingValue(collateralBuilding);
+            var maxBorrowable = decimal.Round(collateralAppraisedValue.Value * 0.70m, 2, MidpointRounding.AwayFromZero);
+
+            // Compute existing secured exposure on this building (should be 0 after the check above,
+            // but guard defensively in case of concurrent requests).
+            var existingSecuredExposure = await db.Loans
+                .Where(l => l.CollateralBuildingId == input.CollateralBuildingId.Value
+                            && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+                .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
+
+            var collateralRemainingCapacity = maxBorrowable - existingSecuredExposure;
+
+            if (input.PrincipalAmount > collateralRemainingCapacity)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"The requested principal of {input.PrincipalAmount:C0} exceeds the collateral lending capacity of {collateralRemainingCapacity:C0} (70% of appraised value {collateralAppraisedValue:C0}, minus {existingSecuredExposure:C0} existing secured debt).")
+                        .SetCode("EXCEEDS_COLLATERAL_LIMIT")
+                        .Build());
+            }
+        }
+
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
 
         // Calculate payment schedule: monthly payments (every 30 in-game days = 720 ticks), minimum 1 payment.
@@ -385,18 +441,23 @@ public sealed partial class Mutation
             Status = LoanStatus.Active,
             MissedPayments = 0,
             AccumulatedPenalty = 0m,
-            AcceptedAtUtc = DateTime.UtcNow
+            AcceptedAtUtc = DateTime.UtcNow,
+            CollateralBuildingId = collateralBuilding?.Id,
+            CollateralAppraisedValue = collateralAppraisedValue,
         };
 
         db.Loans.Add(loan);
 
         // Ledger: borrower receives cash (loan origination).
+        var collateralNote = collateralBuilding is not null
+            ? $" (secured against {collateralBuilding.Name})"
+            : string.Empty;
         db.LedgerEntries.Add(new LedgerEntry
         {
             Id = Guid.NewGuid(),
             CompanyId = borrower.Id,
             Category = LedgerCategory.LoanOrigination,
-            Description = $"Loan received from {offer.LenderCompany.Name} – {offer.AnnualInterestRatePercent}% p.a. over {offer.DurationTicks} ticks",
+            Description = $"Loan received from {offer.LenderCompany.Name} – {offer.AnnualInterestRatePercent}% p.a. over {offer.DurationTicks} ticks{collateralNote}",
             Amount = input.PrincipalAmount,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow

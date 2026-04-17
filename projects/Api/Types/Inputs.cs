@@ -402,6 +402,13 @@ public sealed class AcceptLoanInput
 
     /// <summary>Principal amount to borrow (must be <= offer MaxPrincipalPerLoan and <= remaining capacity).</summary>
     public decimal PrincipalAmount { get; set; }
+
+    /// <summary>
+    /// Optional: ID of a building owned by the borrower to pledge as collateral.
+    /// When provided, the loan is secured and the principal is capped at 70% of the
+    /// building's appraised value minus any existing secured exposure on the same asset.
+    /// </summary>
+    public Guid? CollateralBuildingId { get; set; }
 }
 
 /// <summary>Input for instantly updating the minimum sale price on a PUBLIC_SALES unit.</summary>
