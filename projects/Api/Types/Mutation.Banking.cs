@@ -4,6 +4,7 @@ using Api.Engine;
 using Api.Security;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Api.Types;
 
@@ -58,13 +59,29 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+
         if (!bank.BaseCapitalDeposited)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("This bank has not completed its initial base capital deposit and is not yet open for business.")
-                    .SetCode("BANK_NOT_INITIALIZED")
-                    .Build());
+            if (input.Amount == Mutation.BankBaseCapitalRequirement)
+            {
+                // finish setup
+
+                // Set default interest rates
+                bank.DepositInterestRatePercent = 3m;   // 3% deposit rate
+                bank.LendingInterestRatePercent = 8m;   // 8% lending rate
+
+                bank.TotalDeposits = Mutation.BankBaseCapitalRequirement;
+                bank.BaseCapitalDeposited = true;
+            }
+            else
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("This bank has not completed its initial base capital deposit and is not yet open for business.")
+                        .SetCode("BANK_NOT_INITIALIZED")
+                        .Build());
+            }
         }
 
         if (input.Amount < 1_000m)
@@ -85,7 +102,6 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
         var depositRate = bank.DepositInterestRatePercent ?? 0m;
 
         // Transfer cash: depositor company -> bank company
