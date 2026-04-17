@@ -1587,7 +1587,8 @@ test.describe('Onboarding resume and progress persistence', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    const proPanel = page.locator('.startup-pack-panel')
+    await page.getByRole('tab', { name: 'Pro' }).click()
+    const proPanel = page.locator('.pro-tab-panel')
     await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
     await expect(proPanel.locator('.startup-pack-status')).toHaveText('Inactive')
     await expect(proPanel.getByText('Pro is not active on this account right now.')).toBeVisible()
@@ -1619,7 +1620,8 @@ test.describe('Onboarding resume and progress persistence', () => {
     await page.waitForURL(/\/dashboard/)
     await expect(page).toHaveURL(/\/dashboard/)
 
-    const proPanel = page.locator('.startup-pack-panel')
+    await page.getByRole('tab', { name: 'Pro' }).click()
+    const proPanel = page.locator('.pro-tab-panel')
     await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
     await expect(proPanel.locator('.startup-pack-status')).toHaveText('Active')
     await expect(proPanel.getByText(/Pro is active on your account until/i)).toBeVisible()
@@ -4769,7 +4771,8 @@ test.describe('Pro access panel — mobile viewport', () => {
     await page.setViewportSize({ width: 375, height: 812 })
     await page.goto('/dashboard')
 
-    const proPanel = page.locator('.startup-pack-panel')
+    await page.getByRole('tab', { name: 'Pro' }).click()
+    const proPanel = page.locator('.pro-tab-panel')
     await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
     await expect(proPanel.locator('.startup-pack-status')).toHaveText('Active')
     await expect(proPanel.getByText(/Pro is active on your account until/i)).toBeVisible()
