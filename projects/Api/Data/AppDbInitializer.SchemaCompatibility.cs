@@ -32,6 +32,29 @@ public sealed partial class AppDbInitializer
                 return;
             }
 
+            if (await TableExistsAsync(connection, dialect, "Players"))
+            {
+                await EnsureColumnAsync(connection, dialect, "Players", "PersonalTaxReserve", dialect.RequiredDecimalDefaultZero);
+            }
+
+            if (!await TableExistsAsync(connection, dialect, "ProductResearchBudgets"))
+            {
+                await ExecuteNonQueryAsync(connection, dialect.CreateProductResearchBudgetsTableSql);
+            }
+
+            await EnsureIndexAsync(
+                connection,
+                dialect,
+                "ProductResearchBudgets",
+                "IX_ProductResearchBudgets_CompanyId",
+                dialect.CreateProductResearchBudgetsCompanyIndexSql);
+            await EnsureIndexAsync(
+                connection,
+                dialect,
+                "ProductResearchBudgets",
+                "IX_ProductResearchBudgets_ProductTypeId",
+                dialect.CreateProductResearchBudgetsProductIndexSql);
+
             await EnsureColumnAsync(connection, dialect, "Buildings", "BaseCapitalDeposited", dialect.RequiredBooleanDefaultFalse);
             await EnsureColumnAsync(connection, dialect, "Buildings", "DepositInterestRatePercent", dialect.NullableInterestRate);
             await EnsureColumnAsync(connection, dialect, "Buildings", "LendingInterestRatePercent", dialect.NullableInterestRate);
@@ -89,6 +112,8 @@ public sealed partial class AppDbInitializer
                         dialect.CreateLoansCollateralForeignKeySql);
                 }
             }
+
+            await RepairLegacyPostgresStoreTypesAsync(connection, dialect);
         }
         finally
         {
@@ -211,6 +236,9 @@ public sealed partial class AppDbInitializer
         string NullableShortText,
         string NullableDecimal,
         string NullableGuid,
+        string CreateProductResearchBudgetsTableSql,
+        string CreateProductResearchBudgetsCompanyIndexSql,
+        string CreateProductResearchBudgetsProductIndexSql,
         string CreateBankDepositsTableSql,
         string CreateBankDepositsByBankIndexSql,
         string CreateBankDepositsByDepositorIndexSql,
@@ -227,6 +255,22 @@ public sealed partial class AppDbInitializer
             NullableShortText: "character varying(50)",
             NullableDecimal: "numeric",
             NullableGuid: "uuid",
+            CreateProductResearchBudgetsTableSql:
+                """
+                CREATE TABLE IF NOT EXISTS "ProductResearchBudgets" (
+                    "Id" uuid NOT NULL,
+                    "CompanyId" uuid NOT NULL,
+                    "ProductTypeId" uuid NOT NULL,
+                    "AccumulatedBudget" numeric NOT NULL,
+                    CONSTRAINT "PK_ProductResearchBudgets" PRIMARY KEY ("Id"),
+                    CONSTRAINT "FK_ProductResearchBudgets_Companies_CompanyId" FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ProductResearchBudgets_ProductTypes_ProductTypeId" FOREIGN KEY ("ProductTypeId") REFERENCES "ProductTypes" ("Id") ON DELETE CASCADE
+                )
+                """,
+            CreateProductResearchBudgetsCompanyIndexSql:
+                "CREATE INDEX IF NOT EXISTS \"IX_ProductResearchBudgets_CompanyId\" ON \"ProductResearchBudgets\" (\"CompanyId\")",
+            CreateProductResearchBudgetsProductIndexSql:
+                "CREATE INDEX IF NOT EXISTS \"IX_ProductResearchBudgets_ProductTypeId\" ON \"ProductResearchBudgets\" (\"ProductTypeId\")",
             CreateBankDepositsTableSql:
                 """
                 CREATE TABLE IF NOT EXISTS "BankDeposits" (
@@ -266,6 +310,22 @@ public sealed partial class AppDbInitializer
             NullableShortText: "TEXT",
             NullableDecimal: "TEXT",
             NullableGuid: "TEXT",
+            CreateProductResearchBudgetsTableSql:
+                """
+                CREATE TABLE IF NOT EXISTS "ProductResearchBudgets" (
+                    "Id" TEXT NOT NULL,
+                    "CompanyId" TEXT NOT NULL,
+                    "ProductTypeId" TEXT NOT NULL,
+                    "AccumulatedBudget" TEXT NOT NULL,
+                    CONSTRAINT "PK_ProductResearchBudgets" PRIMARY KEY ("Id"),
+                    CONSTRAINT "FK_ProductResearchBudgets_Companies_CompanyId" FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE CASCADE,
+                    CONSTRAINT "FK_ProductResearchBudgets_ProductTypes_ProductTypeId" FOREIGN KEY ("ProductTypeId") REFERENCES "ProductTypes" ("Id") ON DELETE CASCADE
+                )
+                """,
+            CreateProductResearchBudgetsCompanyIndexSql:
+                "CREATE INDEX IF NOT EXISTS \"IX_ProductResearchBudgets_CompanyId\" ON \"ProductResearchBudgets\" (\"CompanyId\")",
+            CreateProductResearchBudgetsProductIndexSql:
+                "CREATE INDEX IF NOT EXISTS \"IX_ProductResearchBudgets_ProductTypeId\" ON \"ProductResearchBudgets\" (\"ProductTypeId\")",
             CreateBankDepositsTableSql:
                 """
                 CREATE TABLE IF NOT EXISTS "BankDeposits" (

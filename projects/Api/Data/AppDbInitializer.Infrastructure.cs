@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Data.Common;
 using Api.Data.Entities;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,10 @@ namespace Api.Data;
 
 public sealed partial class AppDbInitializer
 {
+    private const string HistoryTableName = "__EFMigrationsHistory";
+    private const string LegacySqlitePostgresMigrationHydrationFloor = "20260413222338_AddPersonalTaxReserve";
+    private const string LegacySqlitePostgresMigrationCutoff = "20260417135125_AddLoanCollateral";
+
     private async Task SeedBuildingLotsAsync()
     {
         var bratislava = await dbContext.Cities.FirstAsync(c => c.Name == "Bratislava");
@@ -296,7 +301,13 @@ public sealed partial class AppDbInitializer
             return;
         }
 
-        //   d) Apply any migrations that are not yet recorded in __EFMigrationsHistory.
+        //   d) PostgreSQL databases that still have pending legacy SQLite-scaffolded migrations
+        //      are repaired to the current model shape and then have just that repaired legacy
+        //      tail marked as applied. Future PostgreSQL-native migrations (added after the
+        //      legacy cutoff) are still left pending and will run normally in the next step.
+        await EnsureRepairedLegacyPostgresMigrationHistoryAsync();
+
+        //   e) Apply any migrations that are not yet recorded in __EFMigrationsHistory.
         //      This is a no-op for brand-new or already up-to-date databases.
         await dbContext.Database.MigrateAsync();
     }
@@ -312,18 +323,10 @@ public sealed partial class AppDbInitializer
     /// </summary>
     private async Task<bool> EnsureMigrationsHistoryBaselineAsync()
     {
-        // The EF Core migration history table name matches the default used by
-        // SqliteHistoryRepository (and other relational providers).
-        const string historyTable = "__EFMigrationsHistory";
-
         // The ProductVersion column records which EF Core version managed each migration.
         // For baseline rows we record the current EF Core runtime version so reviewers can
         // see when the baseline was applied.
-        var efProductVersion =
-            (System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(
-                typeof(Microsoft.EntityFrameworkCore.DbContext).Assembly))
-            ?.InformationalVersion
-            ?? "unknown";
+        var efProductVersion = GetEfProductVersion();
 
         var connection = dbContext.Database.GetDbConnection();
         var wasOpen = connection.State == System.Data.ConnectionState.Open;
@@ -334,20 +337,7 @@ public sealed partial class AppDbInitializer
         try
         {
             // Check whether the migrations-history table already exists.
-            await using var checkCmd = connection.CreateCommand();
-            var provider = dbContext.Database.ProviderName ?? "Unknown";
-            string checkQuery;
-            if (provider.Contains("PostgreSQL"))
-            {
-                checkQuery = $"SELECT COUNT(1) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname = 'public' AND c.relname = '{historyTable}'";
-            }
-            else
-            {
-                checkQuery = $"SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='{historyTable}'";
-            }
-            checkCmd.CommandText = checkQuery;
-            var historyExists =
-                Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0L) > 0;
+            var historyExists = await MigrationsHistoryTableExistsAsync(connection);
 
             if (historyExists)
                 return false; // Already managed by migrations — nothing to do.
@@ -356,10 +346,10 @@ public sealed partial class AppDbInitializer
             await using var createCmd = connection.CreateCommand();
             createCmd.CommandText =
                 $"""
-                CREATE TABLE "{historyTable}" (
+                CREATE TABLE "{HistoryTableName}" (
                     "MigrationId" TEXT NOT NULL,
                     "ProductVersion" TEXT NOT NULL,
-                    CONSTRAINT "PK__{historyTable}" PRIMARY KEY ("MigrationId")
+                    CONSTRAINT "PK__{HistoryTableName}" PRIMARY KEY ("MigrationId")
                 )
                 """;
             await createCmd.ExecuteNonQueryAsync();
@@ -376,7 +366,7 @@ public sealed partial class AppDbInitializer
                 await using var insertCmd = connection.CreateCommand();
                 insertCmd.CommandText =
                     $"""
-                    INSERT INTO "{historyTable}" ("MigrationId", "ProductVersion")
+                    INSERT INTO "{HistoryTableName}" ("MigrationId", "ProductVersion")
                     VALUES (@MigrationId, @ProductVersion)
                     """;
                 var migParam = insertCmd.CreateParameter();
@@ -400,4 +390,88 @@ public sealed partial class AppDbInitializer
                 connection.Close();
         }
     }
+
+    private async Task EnsureRepairedLegacyPostgresMigrationHistoryAsync()
+    {
+        if (!GetSchemaDialect().IsPostgres)
+        {
+            return;
+        }
+
+        var connection = dbContext.Database.GetDbConnection();
+        var wasOpen = connection.State == System.Data.ConnectionState.Open;
+
+        if (!wasOpen)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            if (!await MigrationsHistoryTableExistsAsync(connection))
+            {
+                return;
+            }
+
+            var pendingRepairedLegacyMigrations = (await dbContext.Database.GetPendingMigrationsAsync())
+                .Where(IsRepairedLegacySqlitePostgresMigration)
+                .ToList();
+
+            if (pendingRepairedLegacyMigrations.Count == 0)
+            {
+                return;
+            }
+
+            var efProductVersion = GetEfProductVersion();
+
+            foreach (var migrationId in pendingRepairedLegacyMigrations)
+            {
+                await using var insertCmd = connection.CreateCommand();
+                insertCmd.CommandText =
+                    $"""
+                    INSERT INTO "{HistoryTableName}" ("MigrationId", "ProductVersion")
+                    VALUES (@MigrationId, @ProductVersion)
+                    """;
+
+                var migrationParam = insertCmd.CreateParameter();
+                migrationParam.ParameterName = "@MigrationId";
+                migrationParam.Value = migrationId;
+                insertCmd.Parameters.Add(migrationParam);
+
+                var versionParam = insertCmd.CreateParameter();
+                versionParam.ParameterName = "@ProductVersion";
+                versionParam.Value = efProductVersion;
+                insertCmd.Parameters.Add(versionParam);
+
+                await insertCmd.ExecuteNonQueryAsync();
+            }
+        }
+        finally
+        {
+            if (!wasOpen)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private async Task<bool> MigrationsHistoryTableExistsAsync(DbConnection connection)
+    {
+        await using var checkCmd = connection.CreateCommand();
+        checkCmd.CommandText = GetSchemaDialect().IsPostgres
+            ? $"SELECT COUNT(1) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname = 'public' AND c.relname = '{HistoryTableName}'"
+            : $"SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='{HistoryTableName}'";
+
+        return Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0L) > 0;
+    }
+
+    private static string GetEfProductVersion() =>
+        (System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(
+            typeof(Microsoft.EntityFrameworkCore.DbContext).Assembly))
+        ?.InformationalVersion
+        ?? "unknown";
+
+    private static bool IsRepairedLegacySqlitePostgresMigration(string migrationId) =>
+        string.CompareOrdinal(migrationId, LegacySqlitePostgresMigrationHydrationFloor) >= 0
+        && string.CompareOrdinal(migrationId, LegacySqlitePostgresMigrationCutoff) <= 0;
 }
