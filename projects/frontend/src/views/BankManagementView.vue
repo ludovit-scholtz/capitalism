@@ -65,6 +65,11 @@ const ratesLoading = ref(false)
 const ratesError = ref<string | null>(null)
 const ratesSuccess = ref(false)
 
+// Base capital deposit (activation)
+const baseDepositLoading = ref(false)
+const baseDepositError = ref<string | null>(null)
+const baseDepositSuccess = ref(false)
+
 // Publish offer form
 const showPublishForm = ref(false)
 const publishLoading = ref(false)
@@ -289,6 +294,28 @@ const CREATE_DEPOSIT_MUTATION = `
   }
 `
 
+const INITIATE_BASE_DEPOSIT_MUTATION = `
+  mutation InitiateBaseDeposit($bankBuildingId: UUID!) {
+    initiateBaseDeposit(bankBuildingId: $bankBuildingId) {
+      bankBuildingId
+      bankBuildingName
+      depositInterestRatePercent
+      lendingInterestRatePercent
+      totalDeposits
+      lendableCapacity
+      outstandingLoanPrincipal
+      availableLendingCapacity
+      baseCapitalDeposited
+      centralBankDebt
+      centralBankInterestRatePercent
+      reserveRequirement
+      availableCash
+      reserveShortfall
+      liquidityStatus
+    }
+  }
+`
+
 const ACCEPT_LOAN_MUTATION = `
   mutation AcceptLoan($input: AcceptLoanInput!) {
     acceptLoan(input: $input) {
@@ -459,6 +486,26 @@ async function saveRates() {
   }
 }
 
+async function submitBaseDeposit() {
+  if (!bankBuildingId.value) return
+  baseDepositLoading.value = true
+  baseDepositError.value = null
+  baseDepositSuccess.value = false
+  try {
+    const result = await gqlRequest<{ initiateBaseDeposit: BankInfoSummary }>(
+      INITIATE_BASE_DEPOSIT_MUTATION,
+      { bankBuildingId: bankBuildingId.value },
+    )
+    bankInfo.value = result.initiateBaseDeposit
+    baseDepositSuccess.value = true
+    await loadData(true)
+  } catch (err) {
+    baseDepositError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    baseDepositLoading.value = false
+  }
+}
+
 // ── Customer view helpers ─────────────────────────────────────────────────────
 
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
@@ -577,8 +624,27 @@ const estimatedCustomerTotalPayments = computed(() => {
       <!-- ── OWNER VIEW ─────────────────────────────────────────────── -->
       <template v-if="isOwner">
 
-      <!-- Bank Info & Rate Configuration -->
-      <div v-if="bankInfo" class="bank-info-section">
+      <!-- ── Base Capital Deposit Required ────────────────────────── -->
+      <div v-if="bankInfo && !bankInfo.baseCapitalDeposited" class="base-deposit-required">
+        <div class="base-deposit-icon" aria-hidden="true">🏦</div>
+        <div class="base-deposit-body">
+          <h2 class="base-deposit-title">{{ t('bank.baseDepositRequired') }}</h2>
+          <p class="base-deposit-description">{{ t('bank.baseDepositRequiredBody') }}</p>
+          <p class="base-deposit-hint">{{ t('bank.baseCapitalRequired') }}</p>
+        </div>
+        <div v-if="baseDepositError" class="error-message">{{ baseDepositError }}</div>
+        <div v-if="baseDepositSuccess" class="success-message">{{ t('bank.baseDepositSuccess') }}</div>
+        <button
+          class="btn btn-primary base-deposit-btn"
+          :disabled="baseDepositLoading"
+          @click="submitBaseDeposit"
+        >
+          {{ baseDepositLoading ? t('common.loading') : t('bank.makeBaseDeposit') }}
+        </button>
+      </div>
+
+      <!-- Bank Info & Rate Configuration (only when activated) -->
+      <div v-if="bankInfo && bankInfo.baseCapitalDeposited" class="bank-info-section">
         <div class="bank-info-header">
           <h2>{{ t('bank.bankRates') }}</h2>
           <button class="btn btn-secondary btn-sm" @click="showRatesForm = !showRatesForm">
@@ -653,7 +719,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       </div>
 
       <!-- ── Liquidity Health Panel (owner view) ──────────────────────────── -->
-      <section v-if="bankInfo && bankInfo.liquidityStatus" class="liquidity-section">
+      <section v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" class="liquidity-section">
         <h2 class="section-title">{{ t('bank.liquidityHealth') }}</h2>
         <div class="liquidity-status-banner" :class="`liquidity-${bankInfo.liquidityStatus.toLowerCase()}`">
           <span class="liquidity-status-label">{{ t(`bank.liquidityStatus.${bankInfo.liquidityStatus}`) }}</span>
@@ -713,7 +779,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       <!-- ── end liquidity panel ─────────────────────────────────────────── -->
 
       <!-- Depositors section -->
-      <section class="depositors-section">
+      <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
         <h2 class="section-title">{{ t('bank.bankDepositors') }}</h2>
         <div v-if="bankDeposits.length === 0" class="empty-state">
           <p>{{ t('bank.noBankDepositors') }}</p>
@@ -746,7 +812,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       </section>
 
       <!-- Overview stats -->
-      <div class="stats-row">
+      <div v-if="bankInfo?.baseCapitalDeposited" class="stats-row">
         <div class="stat-card">
           <span class="stat-label">Active Loans</span>
           <span class="stat-value">{{ issuedLoans.filter((l) => l.status === 'ACTIVE').length }}</span>
@@ -766,7 +832,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       </div>
 
       <!-- Loan Offers Management -->
-      <section class="offers-section">
+      <section v-if="bankInfo?.baseCapitalDeposited" class="offers-section">
         <div class="section-header">
           <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
           <button class="btn btn-primary btn-sm" @click="showPublishForm = !showPublishForm">
@@ -846,7 +912,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       </section>
 
       <!-- Issued Loans -->
-      <section class="loans-section">
+      <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
         <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
         <div v-if="issuedLoans.length === 0" class="empty-state">
           <p>{{ t('bank.noIssuedLoans') }}</p>
@@ -1871,5 +1937,47 @@ th {
   font-size: 0.78rem;
   color: var(--color-text-muted);
   font-style: italic;
+}
+
+/* ── Base Capital Deposit Required ───────────────────────────────────────── */
+.base-deposit-required {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  background: var(--color-surface-secondary, rgba(0, 0, 0, 0.03));
+  border: 2px dashed var(--color-border, rgba(0, 0, 0, 0.15));
+  border-radius: var(--radius-md);
+  text-align: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.base-deposit-icon {
+  font-size: 3rem;
+}
+
+.base-deposit-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.base-deposit-description {
+  color: var(--color-text-secondary);
+  margin: 0;
+  max-width: 480px;
+}
+
+.base-deposit-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.base-deposit-btn {
+  min-width: 260px;
+  font-size: 1rem;
+  padding: var(--spacing-sm) var(--spacing-lg);
 }
 </style>

@@ -24315,6 +24315,182 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.False(result.TryGetProperty("errors", out _), "bankInfo should be publicly readable without auth.");
     }
 
+    [Fact]
+    public async Task InitiateBaseDeposit_Succeeds_ActivatesBankAndTransfersCash()
+    {
+        var ownerEmail = $"ibd-owner-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "IbdOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdCo-{Guid.NewGuid():N}", Cash = 15_000_000m };
+        db.Companies.Add(co);
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "IbdBank", Level = 1,
+            BaseCapitalDeposited = false, TotalDeposits = 0m,
+            DepositInterestRatePercent = 5m, LendingInterestRatePercent = 10m,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Ibd($bankBuildingId: UUID!) {
+              initiateBaseDeposit(bankBuildingId: $bankBuildingId) {
+                bankBuildingId
+                baseCapitalDeposited
+                totalDeposits
+              }
+            }
+            """,
+            new { bankBuildingId = bank.Id.ToString() },
+            ownerToken);
+
+        Assert.False(result.TryGetProperty("errors", out _), "InitiateBaseDeposit must succeed for the owner with sufficient cash.");
+        var data = result.GetProperty("data").GetProperty("initiateBaseDeposit");
+        Assert.True(data.GetProperty("baseCapitalDeposited").GetBoolean());
+        Assert.Equal(10_000_000m, data.GetProperty("totalDeposits").GetDecimal());
+
+        // Verify DB state
+        await db.Entry(co).ReloadAsync();
+        await db.Entry(bank).ReloadAsync();
+        Assert.Equal(5_000_000m, co.Cash);          // 15M - 10M
+        Assert.Equal(10_000_000m, bank.TotalDeposits);
+        Assert.True(bank.BaseCapitalDeposited);
+
+        // Verify base-capital deposit record was created
+        var deposit = await db.BankDeposits.FirstOrDefaultAsync(d => d.BankBuildingId == bank.Id && d.IsBaseCapital);
+        Assert.NotNull(deposit);
+        Assert.Equal(10_000_000m, deposit!.Amount);
+        Assert.Equal(0m, deposit.DepositInterestRatePercent);
+        Assert.True(deposit.IsActive);
+    }
+
+    [Fact]
+    public async Task InitiateBaseDeposit_InsufficientFunds_ReturnsError()
+    {
+        var ownerEmail = $"ibd-poor-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "IbdPoor");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdPoorCo-{Guid.NewGuid():N}", Cash = 500_000m };
+        db.Companies.Add(co);
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "PoorBank", Level = 1,
+            BaseCapitalDeposited = false,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """mutation Ibd($bankBuildingId: UUID!) { initiateBaseDeposit(bankBuildingId: $bankBuildingId) { baseCapitalDeposited } }""",
+            new { bankBuildingId = bank.Id.ToString() },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("INSUFFICIENT_FUNDS", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task InitiateBaseDeposit_AlreadyDone_ReturnsError()
+    {
+        var ownerEmail = $"ibd-done-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "IbdDone");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdDoneCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
+        db.Companies.Add(co);
+        // Bank already activated
+        var bank = CreateTestBank(db, co, city.Id);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """mutation Ibd($bankBuildingId: UUID!) { initiateBaseDeposit(bankBuildingId: $bankBuildingId) { baseCapitalDeposited } }""",
+            new { bankBuildingId = bank.Id.ToString() },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("BASE_DEPOSIT_ALREADY_DONE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task InitiateBaseDeposit_NonOwner_ReturnsError()
+    {
+        var ownerEmail = $"ibd-owner2-{Guid.NewGuid():N}@test.com";
+        var nonOwnerEmail = $"ibd-nonowner-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "IbdOwner2");
+        var nonOwnerToken = await RegisterAndGetTokenAsync(nonOwnerEmail, "IbdNonOwner");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdOwn2Co-{Guid.NewGuid():N}", Cash = 20_000_000m };
+        db.Companies.Add(co);
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "NonOwnerBank", Level = 1,
+            BaseCapitalDeposited = false,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """mutation Ibd($bankBuildingId: UUID!) { initiateBaseDeposit(bankBuildingId: $bankBuildingId) { baseCapitalDeposited } }""",
+            new { bankBuildingId = bank.Id.ToString() },
+            nonOwnerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("BANK_NOT_FOUND", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task InitiateBaseDeposit_Unauthenticated_ReturnsError()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+        var player = await db.Players.FirstAsync();
+        var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"IbdUnauthCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
+        db.Companies.Add(co);
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = co.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "IbdUnauthBank", Level = 1,
+            BaseCapitalDeposited = false,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """mutation Ibd($bankBuildingId: UUID!) { initiateBaseDeposit(bankBuildingId: $bankBuildingId) { baseCapitalDeposited } }""",
+            new { bankBuildingId = bank.Id.ToString() },
+            token: null);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated initiateBaseDeposit must be rejected.");
+    }
+
     #endregion
 
     #region Procurement Preview

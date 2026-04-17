@@ -4446,7 +4446,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const pendingActions = (player?.companies ?? [])
         .flatMap((company) =>
           company.buildings
-            .filter((building) => building.pendingConfiguration !== null && building.pendingConfiguration.appliesAtTick > currentTick)
+            .filter((building) => building.pendingConfiguration != null && building.pendingConfiguration.appliesAtTick > currentTick)
             .map((building) => ({
               id: building.pendingConfiguration!.id,
               actionType: 'BUILDING_UPGRADE',
@@ -4979,6 +4979,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('createDeposit') &&
       !q.includes('withdrawDeposit') &&
       !q.includes('setBankRates') &&
+      !q.includes('initiateBaseDeposit') &&
       // acceptLoan mutation response includes paymentAmount which contains 'me'
       !q.includes('acceptLoan') &&
       // procurementPreview contains 'me' as substring
@@ -5368,6 +5369,63 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { setBankRates: updatedBank } }),
+      })
+    }
+
+    if (query.includes('initiateBaseDeposit')) {
+      const bankBuildingId = body.variables?.bankBuildingId
+      // Find the bank building in player companies and mark it as activated
+      for (const player of state.players) {
+        for (const company of player.companies) {
+          const building = (company.buildings ?? []).find(
+            (b) => b.id === bankBuildingId && b.type === 'BANK',
+          )
+          if (building) {
+            // Deduct $10M from company cash
+            company.cash = (company.cash ?? 0) - 10_000_000
+            // Synthesise an activated BankInfoSummary
+            const activatedBankInfo: MockBankInfo = {
+              bankBuildingId,
+              bankBuildingName: building.name,
+              cityId: building.cityId,
+              cityName: 'Bratislava',
+              lenderCompanyId: company.id,
+              lenderCompanyName: company.name,
+              depositInterestRatePercent: 5,
+              lendingInterestRatePercent: 12,
+              totalDeposits: 10_000_000,
+              lendableCapacity: 9_000_000,
+              outstandingLoanPrincipal: 0,
+              availableLendingCapacity: 9_000_000,
+              baseCapitalDeposited: true,
+              centralBankDebt: 0,
+              centralBankInterestRatePercent: 2,
+              reserveRequirement: 1_000_000,
+              availableCash: company.cash,
+              reserveShortfall: 0,
+              liquidityStatus: 'HEALTHY' as const,
+            }
+            // Update or insert in allBanks so subsequent bankInfo queries return the activated state
+            const existingIdx = state.allBanks.findIndex((b) => b.bankBuildingId === bankBuildingId)
+            if (existingIdx >= 0) {
+              state.allBanks[existingIdx] = activatedBankInfo
+            } else {
+              state.allBanks.push(activatedBankInfo)
+            }
+            return route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({ data: { initiateBaseDeposit: activatedBankInfo } }),
+            })
+          }
+        }
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: 'Bank building not found or you do not own it.', extensions: { code: 'BANK_NOT_FOUND' } }],
+        }),
       })
     }
 

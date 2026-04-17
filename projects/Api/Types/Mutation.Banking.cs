@@ -326,6 +326,96 @@ public sealed partial class Mutation
         return await BuildBankInfoAsync(db, bank);
     }
 
+    // ── Bank Activation ──────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Initiates the mandatory base capital deposit ($10,000,000) for a newly purchased bank
+    /// building.  This is the first action a bank owner must take to open the bank for business.
+    /// Only the owning player may call this mutation, and the bank company must have sufficient cash.
+    /// </summary>
+    [Authorize]
+    public async Task<BankInfoSummary> InitiateBaseDeposit(
+        Guid bankBuildingId,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var bank = await db.Buildings
+            .Include(b => b.Company)
+            .ThenInclude(c => c.Player)
+            .Include(b => b.City)
+            .FirstOrDefaultAsync(b => b.Id == bankBuildingId && b.Type == BuildingType.Bank);
+
+        if (bank is null || bank.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Bank building not found or you do not own it.")
+                    .SetCode("BANK_NOT_FOUND")
+                    .Build());
+        }
+
+        if (bank.BaseCapitalDeposited)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This bank has already completed its base capital deposit.")
+                    .SetCode("BASE_DEPOSIT_ALREADY_DONE")
+                    .Build());
+        }
+
+        if (bank.Company.Cash < BankBaseCapitalRequirement)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Insufficient company funds. The base capital deposit requires ${BankBaseCapitalRequirement:N0}.")
+                    .SetCode("INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+
+        // Transfer cash from owning company into the bank
+        bank.Company.Cash -= BankBaseCapitalRequirement;
+        bank.TotalDeposits += BankBaseCapitalRequirement;
+        bank.BaseCapitalDeposited = true;
+
+        // Create the permanent base-capital deposit record (not withdrawable)
+        var deposit = new BankDeposit
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            DepositorCompanyId = bank.CompanyId,
+            Amount = BankBaseCapitalRequirement,
+            DepositInterestRatePercent = 0m, // Owner's own base capital earns no interest
+            IsBaseCapital = true,
+            IsActive = true,
+            DepositedAtTick = currentTick,
+            DepositedAtUtc = DateTime.UtcNow,
+            TotalInterestPaid = 0m,
+        };
+
+        db.BankDeposits.Add(deposit);
+
+        // Ledger: record the base capital transfer as an operating expense for the company
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = bank.CompanyId,
+            BuildingId = bank.Id,
+            Category = LedgerCategory.DepositMade,
+            Description = $"Base capital deposit to activate {bank.Name}",
+            Amount = -BankBaseCapitalRequirement,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+
+        return await BuildBankInfoAsync(db, bank);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     internal static BankDepositSummary MapToDepositSummary(BankDeposit d, Building bank, Company depositor) => new()
