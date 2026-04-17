@@ -239,14 +239,14 @@ useTickRefresh(async () => {
             </div>
             <div v-if="(ledger.totalDepositInterestReceived ?? 0) > 0" class="statement-row">
               <span class="row-label">{{ t('ledger.depositInterestReceived') }}</span>
-              <span class="amount-positive">{{ formatAmount(ledger.totalDepositInterestReceived) }}</span>
+              <span class="amount-positive">{{ formatAmount(ledger.totalDepositInterestReceived ?? 0) }}</span>
               <button class="drill-btn" :class="{ active: drillCategory === 'DEPOSIT_INTEREST_RECEIVED' }" :aria-label="t('ledger.drillDown') + ': ' + t('ledger.depositInterestReceived')" @click="toggleDrill('DEPOSIT_INTEREST_RECEIVED')">
                 {{ drillCategory === 'DEPOSIT_INTEREST_RECEIVED' ? '▲' : '▼' }}
               </button>
             </div>
             <div v-if="(ledger.totalLoanInterestIncome ?? 0) > 0" class="statement-row">
               <span class="row-label">{{ t('ledger.loanInterestIncome') }}</span>
-              <span class="amount-positive">{{ formatAmount(ledger.totalLoanInterestIncome) }}</span>
+              <span class="amount-positive">{{ formatAmount(ledger.totalLoanInterestIncome ?? 0) }}</span>
               <button class="drill-btn" :class="{ active: drillCategory === 'LOAN_INTEREST_INCOME' }" :aria-label="t('ledger.drillDown') + ': ' + t('ledger.loanInterestIncome')" @click="toggleDrill('LOAN_INTEREST_INCOME')">
                 {{ drillCategory === 'LOAN_INTEREST_INCOME' ? '▲' : '▼' }}
               </button>
@@ -293,14 +293,14 @@ useTickRefresh(async () => {
             </div>
             <div v-if="(ledger.totalDepositInterestPaid ?? 0) > 0" class="statement-row cost-row">
               <span class="row-label">{{ t('ledger.depositInterestPaid') }}</span>
-              <span class="amount-negative">{{ formatAmount(-ledger.totalDepositInterestPaid) }}</span>
+              <span class="amount-negative">{{ formatAmount(-(ledger.totalDepositInterestPaid ?? 0)) }}</span>
               <button class="drill-btn" :class="{ active: drillCategory === 'DEPOSIT_INTEREST_PAID' }" :aria-label="t('ledger.drillDown') + ': ' + t('ledger.depositInterestPaid')" @click="toggleDrill('DEPOSIT_INTEREST_PAID')">
                 {{ drillCategory === 'DEPOSIT_INTEREST_PAID' ? '▲' : '▼' }}
               </button>
             </div>
             <div v-if="(ledger.totalLoanInterestExpense ?? 0) > 0" class="statement-row cost-row">
               <span class="row-label">{{ t('ledger.loanInterestExpense') }}</span>
-              <span class="amount-negative">{{ formatAmount(-ledger.totalLoanInterestExpense) }}</span>
+              <span class="amount-negative">{{ formatAmount(-(ledger.totalLoanInterestExpense ?? 0)) }}</span>
               <button class="drill-btn" :class="{ active: drillCategory === 'LOAN_INTEREST_EXPENSE' }" :aria-label="t('ledger.drillDown') + ': ' + t('ledger.loanInterestExpense')" @click="toggleDrill('LOAN_INTEREST_EXPENSE')">
                 {{ drillCategory === 'LOAN_INTEREST_EXPENSE' ? '▲' : '▼' }}
               </button>
@@ -368,7 +368,7 @@ useTickRefresh(async () => {
             </div>
             <div v-if="(ledger.totalDepositsPlaced ?? 0) > 0" class="statement-row">
               <span class="row-label">{{ t('ledger.depositsPlaced') }}</span>
-              <span>{{ formatAmount(ledger.totalDepositsPlaced) }}</span>
+              <span>{{ formatAmount(ledger.totalDepositsPlaced ?? 0) }}</span>
               <button
                 class="drill-btn"
                 :class="{ active: drillCategory === 'DEPOSIT_MADE' }"

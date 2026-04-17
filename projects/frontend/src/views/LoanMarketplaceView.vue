@@ -338,10 +338,10 @@ function navigateToAcquireBank() {
   }
 }
 
-// Banks sorted for the borrow section (by lending rate ascending = lowest interest first)
+// Banks sorted for the borrow section: all open banks sorted by lowest lending rate
 const sortedBanksForBorrow = computed(() =>
   [...allBanks.value]
-    .filter((b) => b.baseCapitalDeposited && b.availableLendingCapacity > 0)
+    .filter((b) => b.baseCapitalDeposited)
     .sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent),
 )
 

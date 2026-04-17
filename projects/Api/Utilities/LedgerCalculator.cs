@@ -109,6 +109,11 @@ public static class LedgerCalculator
     }
 
     /// <summary>Deposit interest paid out by this company's bank to depositors (expense).</summary>
+    /// <summary>
+    /// Total deposit interest paid by this bank to its depositors, as an absolute (positive) expense amount.
+    /// DepositInterestPaid ledger entries are stored as negative amounts (cash outflow for the bank);
+    /// <see cref="Math.Abs"/> converts them to a positive expense figure for reporting.
+    /// </summary>
     public static decimal GetTotalDepositInterestPaid(IEnumerable<LedgerEntry> entries)
     {
         return Math.Abs(entries
