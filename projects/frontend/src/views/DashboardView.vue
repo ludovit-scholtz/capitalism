@@ -52,10 +52,10 @@ const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost
 
 /** Active dashboard tab. Persisted in sessionStorage so navigation preserves state. */
 const _savedTab = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('dashboard_tab') : null
-const activeTab = ref<'overview' | 'buildings' | 'activity' | 'chat'>(
-  (_savedTab as 'overview' | 'buildings' | 'activity' | 'chat') || 'overview',
+const activeTab = ref<'overview' | 'buildings' | 'activity' | 'chat' | 'pro'>(
+  (_savedTab as 'overview' | 'buildings' | 'activity' | 'chat' | 'pro') || 'overview',
 )
-function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat') {
+function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat' | 'pro') {
   activeTab.value = tab
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('dashboard_tab', tab)
 }
@@ -92,6 +92,7 @@ function tabsForCompany(company: Company) {
     { key: 'buildings', label: t('dashboard.tabBuildings'), badge: company.buildings.length },
     { key: 'activity', label: t('dashboard.tabActivity') },
     { key: 'chat', label: t('dashboard.tabChat') },
+    { key: 'pro', label: t('dashboard.tabPro') },
   ]
 }
 const buildingTypeIcons: Record<string, string> = {
@@ -584,37 +585,10 @@ async function createCompany() {
           </div>
 
           <!-- Section tab navigation -->
-          <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat')" />
+          <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat' | 'pro')" />
 
           <!-- ── Overview tab ──────────────────────────────────────────── -->
           <div v-show="activeTab === 'overview'" class="tab-panel" role="tabpanel" aria-label="Overview">
-            <!-- Pro subscription compact status -->
-            <section class="startup-pack-panel" aria-labelledby="dashboard-startup-pack-title">
-              <div class="startup-pack-header">
-                <div>
-                  <span class="startup-pack-eyebrow">{{ t('proAccess.eyebrow') }}</span>
-                  <h2 id="dashboard-startup-pack-title">{{ t('proAccess.title') }}</h2>
-                </div>
-                <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
-                  {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
-                </span>
-              </div>
-              <p class="startup-pack-subtitle">
-                <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
-                  {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
-                </template>
-                <template v-else>
-                  {{ t('proAccess.inactiveBody') }}
-                </template>
-              </p>
-              <p class="startup-pack-free-path">{{ t('proAccess.manageBody') }}</p>
-              <div class="startup-pack-actions">
-                <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
-                  {{ t('proAccess.openPortal') }}
-                </a>
-              </div>
-            </section>
-
             <!-- Financial summary and guidance -->
             <div class="operations-row">
               <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
@@ -689,6 +663,73 @@ async function createCompany() {
           <!-- ── Chat tab ──────────────────────────────────────────────── -->
           <div v-show="activeTab === 'chat'" class="tab-panel" role="tabpanel" aria-label="Chat">
             <DashboardChatPanel />
+          </div>
+
+          <!-- ── Pro tab ───────────────────────────────────────────────── -->
+          <div v-show="activeTab === 'pro'" class="tab-panel" role="tabpanel" :aria-label="t('dashboard.tabPro')">
+            <section class="pro-tab-panel" aria-labelledby="pro-tab-title">
+              <!-- Status header -->
+              <div class="pro-status-header">
+                <div>
+                  <span class="pro-eyebrow">{{ t('proAccess.eyebrow') }}</span>
+                  <h2 id="pro-tab-title">{{ t('proAccess.title') }}</h2>
+                </div>
+                <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+                  {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
+                </span>
+              </div>
+
+              <!-- Subscription state message -->
+              <p class="pro-state-body">
+                <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
+                  {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
+                </template>
+                <template v-else>
+                  {{ t('proAccess.inactiveBody') }}
+                </template>
+              </p>
+
+              <!-- Benefit cards -->
+              <h3 class="pro-benefits-heading">{{ t('dashboard.proBenefitsHeading') }}</h3>
+              <div class="pro-benefits-grid">
+                <article class="pro-benefit-card">
+                  <span class="pro-benefit-icon" aria-hidden="true">🏭</span>
+                  <div>
+                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitProducts') }}</strong>
+                    <p>{{ t('dashboard.proBenefitProductsBody') }}</p>
+                  </div>
+                </article>
+                <article class="pro-benefit-card">
+                  <span class="pro-benefit-icon" aria-hidden="true">📈</span>
+                  <div>
+                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitAdvanced') }}</strong>
+                    <p>{{ t('dashboard.proBenefitAdvancedBody') }}</p>
+                  </div>
+                </article>
+                <article class="pro-benefit-card">
+                  <span class="pro-benefit-icon" aria-hidden="true">🔓</span>
+                  <div>
+                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitUnlock') }}</strong>
+                    <p>{{ t('dashboard.proBenefitUnlockBody') }}</p>
+                  </div>
+                </article>
+                <article class="pro-benefit-card">
+                  <span class="pro-benefit-icon" aria-hidden="true">⚡</span>
+                  <div>
+                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitPriority') }}</strong>
+                    <p>{{ t('dashboard.proBenefitPriorityBody') }}</p>
+                  </div>
+                </article>
+              </div>
+
+              <!-- Portal CTA -->
+              <div class="pro-portal-row">
+                <p class="pro-manage-hint">{{ t('proAccess.manageBody') }}</p>
+                <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
+                  {{ t('proAccess.openPortal') }}
+                </a>
+              </div>
+            </section>
           </div>
 
         </div>
@@ -1387,6 +1428,109 @@ async function createCompany() {
 
   .buildings-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ── Pro subscription tab ──────────────────────────────────────────────── */
+.pro-tab-panel {
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 109, 0, 0.35);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(255, 109, 0, 0.08), rgba(0, 71, 255, 0.07));
+}
+
+.pro-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.pro-eyebrow {
+  display: inline-block;
+  margin-bottom: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-tertiary);
+}
+
+.pro-status-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.pro-state-body {
+  margin: 0 0 1.5rem;
+  color: var(--color-text-secondary);
+}
+
+.pro-benefits-heading {
+  margin: 0 0 0.875rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.pro-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.875rem;
+  margin-bottom: 1.5rem;
+}
+
+.pro-benefit-card {
+  display: flex;
+  gap: 0.875rem;
+  align-items: flex-start;
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  background: rgba(13, 17, 23, 0.32);
+  border: 1px solid rgba(48, 54, 61, 0.8);
+}
+
+.pro-benefit-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.pro-benefit-title {
+  display: block;
+  font-size: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.pro-benefit-card p {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.pro-portal-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.pro-manage-hint {
+  margin: 0;
+  flex: 1;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .pro-status-header {
+    flex-direction: column;
+  }
+
+  .pro-portal-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>

@@ -14,9 +14,9 @@ Implement banking as is described in the product definition below.
 - If player purchased bank property but did not initiated the base deposit, make sure he can do the base deposit with one button in a bank building
 - When player see in the dashboard list of his buildings, make sure he does not go to `/building/:id`, but to `/bank/:id` if the building type is the bank.
 
-### Dashboard (0% complete)
+### Dashboard (50% complete)
 
-- Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with. 
+- ~~Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with.~~ ✅ Done
 
 ### Changelog (0% complete)
 

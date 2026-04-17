@@ -2100,7 +2100,7 @@ test.describe('Dashboard tick-refresh stability', () => {
 })
 
 test.describe('Dashboard — section tab navigation', () => {
-  test('renders all four tabs with Overview active by default', async ({ page }) => {
+  test('renders all five tabs with Overview active by default', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [
@@ -2121,11 +2121,12 @@ test.describe('Dashboard — section tab navigation', () => {
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    // All four tabs should be present
+    // All five tabs should be present
     await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Buildings' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Activity' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Pro' })).toBeVisible()
 
     // Overview is active by default
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
@@ -2682,5 +2683,187 @@ test.describe('Dashboard — personal account panel', () => {
     await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
     await expect(page.getByRole('tab', { name: 'Create company' })).toHaveAttribute('aria-selected', 'false')
     await expect(page.getByRole('tab', { name: 'Ledger' })).toHaveAttribute('aria-selected', 'true')
+  })
+})
+
+test.describe('Dashboard — Pro subscription tab', () => {
+  test('renders all five tabs including Pro tab', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-pro-tab',
+          playerId: 'player-1',
+          name: 'Pro Tab Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Buildings' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Activity' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Chat' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Pro' })).toBeVisible()
+  })
+
+  test('Overview tab does not show Pro subscription section', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-pro-overview',
+          playerId: 'player-1',
+          name: 'Overview Clean Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Overview tab should be active by default
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+
+    // The Pro section heading should NOT be in the overview tab
+    const overviewPanel = page.locator('[role="tabpanel"][aria-label="Overview"]')
+    await expect(overviewPanel.getByRole('heading', { name: 'Pro access' })).toBeHidden()
+  })
+
+  test('Pro tab shows inactive status for free player', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      proSubscriptionEndsAtUtc: null,
+      companies: [
+        {
+          id: 'comp-pro-free',
+          playerId: 'player-1',
+          name: 'Free Player Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await page.getByRole('tab', { name: 'Pro' }).click()
+    await expect(page.getByRole('tab', { name: 'Pro' })).toHaveAttribute('aria-selected', 'true')
+
+    const proPanel = page.locator('.pro-tab-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toContainText('Inactive')
+    await expect(proPanel.getByText('Pro is not active on this account right now.')).toBeVisible()
+  })
+
+  test('Pro tab shows active status with expiry date for subscriber', async ({ page }) => {
+    const expiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      proSubscriptionEndsAtUtc: expiryDate,
+      companies: [
+        {
+          id: 'comp-pro-active',
+          playerId: 'player-1',
+          name: 'Pro Subscriber Corp',
+          cash: 200000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await page.getByRole('tab', { name: 'Pro' }).click()
+
+    const proPanel = page.locator('.pro-tab-panel')
+    await expect(proPanel.getByRole('heading', { name: 'Pro access' })).toBeVisible()
+    await expect(proPanel.locator('.startup-pack-status')).toContainText('Active')
+    await expect(proPanel.getByText('Pro is active on your account until', { exact: false })).toBeVisible()
+  })
+
+  test('Pro tab shows benefit cards including more products benefit', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-pro-benefits',
+          playerId: 'player-1',
+          name: 'Benefits Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    await page.getByRole('tab', { name: 'Pro' }).click()
+
+    const proPanel = page.locator('.pro-tab-panel')
+    await expect(proPanel.getByText('What you unlock with Pro')).toBeVisible()
+    await expect(proPanel.getByText('More products to manufacture')).toBeVisible()
+    await expect(proPanel.getByText('Advanced industries')).toBeVisible()
+    await expect(proPanel.getByText('No product restrictions')).toBeVisible()
+    await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toBeVisible()
+  })
+
+  test('Pro tab persists active state across navigation', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'comp-pro-persist',
+          playerId: 'player-1',
+          name: 'Persist Corp',
+          cash: 100000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Click Pro tab
+    await page.getByRole('tab', { name: 'Pro' }).click()
+    await expect(page.getByRole('tab', { name: 'Pro' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'false')
+
+    // Pro tab content is visible
+    await expect(page.locator('.pro-tab-panel')).toBeVisible()
   })
 })
