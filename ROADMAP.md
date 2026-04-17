@@ -6,44 +6,17 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (95% complete)
+### Banking (50% complete)
 
 Implement banking as is described in the product definition below.
 
-- ✅ **Loan marketplace** (`/loans`): Lists all active banks with deposit and lending rates, lendable capacity, and city. Sortable by deposit rate and lending rate; filterable by city and available capacity.
-- ✅ **Contextual CTA**: Unauthenticated visitors see a login prompt. Authenticated players without a bank see an "Acquire a Bank" link. Players who own a bank see a "Manage My Bank" link going directly to their bank.
-- ✅ **Bank deposit tab**: Shows the sortable list of banks with their deposit/lending rates and available lending capacity so customers can compare terms before committing funds.
-- ✅ **Customer bank view** (`/bank/:id`): Third-party players see professional rate/capacity profile panel, deposit form with interest preview, and deposit history.
-- ✅ **Owner bank view** (`/bank/:id`): Bank owners see operating summary (active loans, capital outstanding, overdue count), rate configuration form, loan-offer publishing, issued-loans table with delinquency badges, and a **Liquidity Health panel** showing reserve status, central-bank debt, and recommended actions.
-- ✅ **Backend APIs**: `allBanks`, `bankInfo`, `createDeposit`, `withdrawDeposit`, `setBankRates`, `publishLoanOffer`, `acceptLoan`, `repayLoan`, `bankLoans`, `myLoans`.
-- ✅ **Tick engine**: Interest paid to depositors each tick; loan repayment deducted from borrower each tick; overdue/defaulted status and penalty accumulation.
-- ✅ **Base capital requirement ($10,000,000)**: Bank creation enforces the minimum base deposit. Undercapitalized banks cannot accept customer deposits.
-- ✅ **Central bank mechanic**: When a bank cannot meet obligations (deposit interest or withdrawals) from its own cash, the shortfall is automatically covered by emergency central-bank funding recorded on `Building.CentralBankDebt`. Variable interest (2–5% p.a. based on how many banks are borrowing) is charged each tick. Banks auto-repay central-bank debt from surplus cash above the reserve requirement. Incoming deposits trigger immediate debt repayment. Owner dashboard shows `liquidityStatus` (HEALTHY/PRESSURED/CRITICAL), reserve shortfall, central-bank debt balance, and recommended actions.
-- ✅ **Loan collateral** — borrow against a specific building up to 70% of its appraised value.
+- Unauthenticated visitors see a login prompt. Authenticated players without a bank see an "Acquire a Bank" link. Players who own a bank see a "Manage My Bank" link going directly to their bank. At the moment in the /loans when user owns a bank it does not show up.
+- If player purchased bank property but did not initiated the base deposit, make sure he can do the base deposit with one button in a bank building
+- When player see in the dashboard list of his buildings, make sure he does not go to `/building/:id`, but to `/bank/:id` if the building type is the bank.
 
 ### Dashboard (0% complete)
 
 - Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with. 
-
-### Unit grid display (90% complete)
-
-- ~~Visually display the flow of the product. The storage capacity from the unit is not showing any more. I would like to see the storage capacity, current usage of the capacity, inflow and outflow in the unit grid display. For example if sales unit has sold 5% of the storage capacity i want to see in that line the separation and the last 5% should be different color or some animation should be used.~~ Implemented: Each grid tile now shows a capacity bar (fill level color-coded low/medium/high), a green animated inflow segment (↑ goods received last tick), an amber outflow segment for generic units, and a distinct green sweeping animation for PUBLIC_SALES sold goods. Flow micro-labels (↑N ↓N) are displayed directly in the tile for quick readability. The capacity bar also carries a tooltip with exact quantity/capacity/inflow/outflow values on hover.
-- TODO: Consider adding per-tick sparkline to tiles for even richer throughput data.
-
-### Unit upgrade (70% complete)
-
-Allow to upgrade more units at the same time. Make sure the upgrade is triggered when "store upgrade" button is clicked.
-
-- ✅ **Multi-unit upgrade queue**: Players can now "Stage Upgrade" for multiple units in a single editing session. The staged upgrades are submitted when the "Store Upgrade" button is clicked, which now also schedules all queued unit level upgrades. The button text updates to show how many upgrades are queued (e.g. "Store Upgrade (2 queued)").
-- ✅ **Storage capacity before/after**: The upgrade impact panel now shows a dedicated "Storage capacity" row with current → next values and a positive delta badge, making it clear how much inventory buffer grows after the upgrade. This applies to PUBLIC_SALES, PURCHASE, MANUFACTURING, MINING, B2B_SALES, and dedicated STORAGE units.
-- ✅ **Stage Upgrade / Remove from queue**: Players can stage and unstage upgrades freely before committing. Cancelling edit mode clears the upgrade queue.
-- TODO: Show the total cost of all staged upgrades in the "Store Upgrade" button tooltip or summary area.
-
-### Research & Development (60% complete)
-
-- ~~In brand quality unit when category is selected as brand scope, the product selection shows up but not the product category selection. Make sure the brand category can be improved as well and the category of products is selected.~~ Fixed: BRAND_QUALITY units with CATEGORY scope now show an industry-category dropdown (Furniture, Food Processing, Healthcare, Electronics, Construction) instead of a product picker. The selected industry is stored directly on the unit and used by the simulation engine.
-- The research progress panel now shows a context-aware "pending" message when R&D units are configured but no research brands exist yet (e.g. plan not yet applied), instead of the generic "no research recorded" empty state.
-- TODO: Investigate why "No research recorded yet" persists if units are live and ticks have run — may require admin tooling to confirm tick processing is running.
 
 ### Changelog (0% complete)
 
