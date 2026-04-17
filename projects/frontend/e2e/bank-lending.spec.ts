@@ -4,6 +4,7 @@ import {
   makePlayer,
   type MockLoanOffer,
   type MockLoan,
+  type MockCollateralBuilding,
 } from './helpers/mock-api'
 
 /** Creates a player who owns a BANK building with id 'bank-building-1'. */
@@ -1084,5 +1085,268 @@ test.describe('Bank Management — owner rate configuration', () => {
 
     // Success message appears and form hides
     await expect(page.getByText('Rates updated')).toBeVisible()
+  })
+})
+
+// ── Collateral selection ──────────────────────────────────────────────────────
+
+test.describe('Loan collateral selection', () => {
+  function makeCompanyPlayer() {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'borrower-co-1',
+      playerId: player.id,
+      name: 'My Company',
+      cash: 15000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+    return player
+  }
+
+  const eligibleBuilding: MockCollateralBuilding = {
+    buildingId: 'factory-1',
+    buildingName: 'Main Factory',
+    buildingType: 'FACTORY',
+    level: 2,
+    appraisedValue: 400000,
+    maxBorrowable: 280000,
+    existingSecuredExposure: 0,
+    remainingBorrowingCapacity: 280000,
+    isEligible: true,
+    ineligibilityReason: null,
+  }
+
+  const alreadyPledgedBuilding: MockCollateralBuilding = {
+    buildingId: 'shop-1',
+    buildingName: 'Old Shop',
+    buildingType: 'SALES_SHOP',
+    level: 1,
+    appraisedValue: 120000,
+    maxBorrowable: 84000,
+    existingSecuredExposure: 84000,
+    remainingBorrowingCapacity: 0,
+    isEligible: false,
+    ineligibilityReason: 'Building is already pledged',
+  }
+
+  test('shows collateral section in accept modal', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    const offer = makeLoanOffer({ id: 'offer-col-1', maxPrincipalPerLoan: 200000, remainingCapacity: 200000 })
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.collateralBuildings = [eligibleBuilding]
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+
+    // Collateral section should be visible
+    await expect(modal.getByText('Pledge a Building as Collateral')).toBeVisible()
+    // "None" option should be present
+    await expect(modal.getByText('None (unsecured loan)')).toBeVisible()
+    // Eligible building should be listed and stats visible
+    await expect(modal.getByText('Main Factory')).toBeVisible({ timeout: 10000 })
+    // Stats: check appraised value appears in the collateral-stats area
+    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('$400,000')
+    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('$280,000')
+  })
+
+  test('selecting collateral shows LTV summary bar and capacity info', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    const offer = makeLoanOffer({ id: 'offer-col-2', maxPrincipalPerLoan: 200000, remainingCapacity: 200000 })
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.collateralBuildings = [eligibleBuilding]
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+
+    // Select the eligible building as collateral
+    await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+
+    // Should show collateral selected summary with building name
+    await expect(modal.locator('.collateral-selected-summary')).toBeVisible()
+    await expect(modal.locator('.collateral-selected-summary').getByText('Main Factory')).toBeVisible()
+    // LTV bar should be visible
+    await expect(modal.locator('.capacity-bar-wrap')).toBeVisible()
+  })
+
+  test('warning shown when principal exceeds collateral cap', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    // Offer allows up to 200000 but collateral cap is 280000 for factory
+    // We'll set principal higher than remaining capacity
+    const offer = makeLoanOffer({ id: 'offer-col-3', maxPrincipalPerLoan: 500000, remainingCapacity: 500000 })
+    const smallCapBuilding: MockCollateralBuilding = {
+      buildingId: 'small-1',
+      buildingName: 'Small Shop',
+      buildingType: 'SALES_SHOP',
+      level: 1,
+      appraisedValue: 100000,
+      maxBorrowable: 70000,
+      existingSecuredExposure: 0,
+      remainingBorrowingCapacity: 70000,
+      isEligible: true,
+      ineligibilityReason: null,
+    }
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.collateralBuildings = [smallCapBuilding]
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+
+    // Select the small building — then set principal above its cap
+    await modal.locator('.collateral-option', { hasText: 'Small Shop' }).click()
+
+    // Set principal above the 70% cap (70000)
+    const principalInput = modal.locator('#principal-amount')
+    await principalInput.fill('90000')
+    await principalInput.blur()
+
+    // Warning should appear
+    await expect(modal.getByText('The requested amount exceeds 70% of the building')).toBeVisible()
+
+    // Accept button should be disabled
+    await expect(modal.getByRole('button', { name: 'Accept Loan' })).toBeDisabled()
+  })
+
+  test('ineligible building (already pledged) is shown as disabled', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    const offer = makeLoanOffer({ id: 'offer-col-4', maxPrincipalPerLoan: 200000, remainingCapacity: 200000 })
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.collateralBuildings = [eligibleBuilding, alreadyPledgedBuilding]
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+
+    // The ineligible building should show in the list
+    await expect(modal.getByText('Old Shop')).toBeVisible()
+    // The ineligible tag should be visible
+    await expect(modal.locator('.collateral-option.ineligible')).toBeVisible()
+    await expect(modal.getByText('Already pledged')).toBeVisible()
+    // Its radio input should be disabled
+    const disabledRadio = modal.locator('.collateral-option.ineligible input[type="radio"]')
+    await expect(disabledRadio).toBeDisabled()
+  })
+
+  test('secured loan shows pledged building badge in my loans list', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    const offer = makeLoanOffer()
+    const securedLoan: MockLoan = {
+      id: 'secured-loan-1',
+      loanOfferId: offer.id,
+      borrowerCompanyId: 'borrower-co-1',
+      borrowerCompanyName: 'My Company',
+      lenderCompanyId: offer.lenderCompanyId,
+      lenderCompanyName: offer.lenderCompanyName,
+      bankBuildingId: offer.bankBuildingId,
+      bankBuildingName: offer.bankBuildingName,
+      originalPrincipal: 120000,
+      remainingPrincipal: 120000,
+      annualInterestRatePercent: offer.annualInterestRatePercent,
+      durationTicks: offer.durationTicks,
+      startTick: 1,
+      dueTick: 1441,
+      nextPaymentTick: 721,
+      paymentAmount: 65000,
+      paymentsMade: 0,
+      totalPayments: 2,
+      status: 'ACTIVE',
+      missedPayments: 0,
+      accumulatedPenalty: 0,
+      acceptedAtUtc: '2026-01-01T00:00:00Z',
+      closedAtUtc: null,
+      collateralBuildingId: 'factory-1',
+      collateralBuildingName: 'Main Factory',
+      collateralAppraisedValue: 400000,
+    }
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer], myLoans: [securedLoan] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await expect(page.getByRole('heading', { name: 'My Loans' })).toBeVisible()
+
+    // Collateral badge should show the pledged building name
+    await expect(page.locator('.collateral-badge')).toBeVisible()
+    await expect(page.locator('.collateral-badge')).toContainText('Main Factory')
+    await expect(page.locator('.collateral-badge')).toContainText('Secured Loan')
+    // Appraised value should also appear
+    await expect(page.locator('.collateral-badge')).toContainText('$400,000')
+  })
+
+  test('accepting secured loan and it appears with collateral badge', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    const offer = makeLoanOffer({ id: 'offer-col-5', maxPrincipalPerLoan: 200000, remainingCapacity: 200000 })
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.collateralBuildings = [eligibleBuilding]
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/loans')
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+
+    // Select Main Factory as collateral
+    await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+
+    // Accept the loan
+    await modal.getByRole('button', { name: 'Accept Loan' }).click()
+    await expect(modal).toBeHidden()
+
+    // Secured loan badge should appear on the created loan
+    await expect(page.getByRole('heading', { name: 'My Loans' })).toBeVisible()
+    await expect(page.locator('.collateral-badge')).toBeVisible()
+    await expect(page.locator('.collateral-badge')).toContainText('Main Factory')
   })
 })

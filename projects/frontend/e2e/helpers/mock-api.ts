@@ -518,6 +518,22 @@ export type MockLoan = {
   accumulatedPenalty: number
   acceptedAtUtc: string
   closedAtUtc: string | null
+  collateralBuildingId?: string | null
+  collateralBuildingName?: string | null
+  collateralAppraisedValue?: number | null
+}
+
+export type MockCollateralBuilding = {
+  buildingId: string
+  buildingName: string
+  buildingType: string
+  level: number
+  appraisedValue: number
+  maxBorrowable: number
+  existingSecuredExposure: number
+  remainingBorrowingCapacity: number
+  isEligible: boolean
+  ineligibilityReason: string | null
 }
 
 export type MockBankDeposit = {
@@ -672,6 +688,8 @@ export type MockState = {
   loanOffers: MockLoanOffer[]
   /** Active loans for the current player's companies */
   myLoans: MockLoan[]
+  /** Collateral building eligibility summaries for the current player */
+  collateralBuildings: MockCollateralBuilding[]
   /** Bank deposits (by depositor companies of the current player) */
   myDeposits: MockBankDeposit[]
   /** All banks visible in the marketplace */
@@ -1595,6 +1613,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     buildingFinancialTimelines: {},
     loanOffers: [],
     myLoans: [],
+    collateralBuildings: [],
     myDeposits: [],
     allBanks: [],
     procurementPreviews: {},
@@ -4965,7 +4984,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // procurementPreview contains 'me' as substring
       !q.includes('procurementPreview') &&
       // personAccount query has companyName field which contains 'me' as substring
-      !q.includes('personAccount')
+      !q.includes('personAccount') &&
+      // myCollateralBuildings has buildingName field (ends in 'me')
+      !q.includes('myCollateralBuildings')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -5179,6 +5200,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { myLoans: state.myLoans } }),
+      })
+    }
+
+    if (query.includes('myCollateralBuildings')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myCollateralBuildings: state.collateralBuildings } }),
       })
     }
 
@@ -5423,6 +5452,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         accumulatedPenalty: 0,
         acceptedAtUtc: new Date().toISOString(),
         closedAtUtc: null,
+        collateralBuildingId: input.collateralBuildingId ?? null,
+        collateralBuildingName: input.collateralBuildingId
+          ? (state.collateralBuildings.find((b) => b.buildingId === input.collateralBuildingId)?.buildingName ?? null)
+          : null,
+        collateralAppraisedValue: input.collateralBuildingId
+          ? (state.collateralBuildings.find((b) => b.buildingId === input.collateralBuildingId)?.appraisedValue ?? null)
+          : null,
       }
       state.myLoans.push(newLoan)
       return route.fulfill({
