@@ -6,13 +6,14 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (85% complete)
+### Banking (50% complete)
 
 Implement banking as is described in the product definition below.
 
-- Unauthenticated visitors see a login prompt. Authenticated players without a bank see an "Acquire a Bank" link. Players who own a bank see a "Manage My Bank" link going directly to their bank. At the moment in the /loans when user owns a bank it does not show up.
-- If player purchased bank property but did not initiated the base deposit, make sure he can do the base deposit with one button in a bank building
-- When player see in the dashboard list of his buildings, make sure he does not go to `/building/:id`, but to `/bank/:id` if the building type is the bank.
+- When player wants to start new bank building, he does not see there the form to setup the initial deposit. When he purchase the property, he is directed to to `/building/:id` and not to `/bank/:id`
+- In the loans page, when player owns bank he still can see button Acquire a Bank.
+- When goes to his own bank, he cannot modify the interest and lending rates
+- On the loan page there should not be list of loan offers. User should pick a bank where he wants to take a loan, and he can do it according to the product definition rules like he picks up the building and creates a loan contract.
 
 ### Dashboard (0% complete)
 
