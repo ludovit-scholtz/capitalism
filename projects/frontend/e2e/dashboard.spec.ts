@@ -2741,7 +2741,7 @@ test.describe('Dashboard — Pro subscription tab', () => {
 
     // The Pro section heading should NOT be in the overview tab
     const overviewPanel = page.locator('[role="tabpanel"][aria-label="Overview"]')
-    await expect(overviewPanel.getByRole('heading', { name: 'Pro access' })).toBeHidden()
+    await expect(overviewPanel.getByRole('heading', { name: 'Pro access' })).not.toBeAttached()
   })
 
   test('Pro tab shows inactive status for free player', async ({ page }) => {
@@ -2834,6 +2834,7 @@ test.describe('Dashboard — Pro subscription tab', () => {
     await expect(proPanel.getByText('More products to manufacture')).toBeVisible()
     await expect(proPanel.getByText('Advanced industries')).toBeVisible()
     await expect(proPanel.getByText('No product restrictions')).toBeVisible()
+    await expect(proPanel.getByText('Priority simulation access')).toBeVisible()
     await expect(proPanel.getByRole('link', { name: 'Open master portal' })).toBeVisible()
   })
 
