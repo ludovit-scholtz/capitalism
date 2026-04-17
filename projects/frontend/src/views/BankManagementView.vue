@@ -125,6 +125,9 @@ const BANK_LOANS_QUERY = `
       accumulatedPenalty
       acceptedAtUtc
       closedAtUtc
+      collateralBuildingId
+      collateralBuildingName
+      collateralAppraisedValue
     }
   }
 `
@@ -874,6 +877,12 @@ const estimatedCustomerTotalPayments = computed(() => {
                   <div v-if="loan.missedPayments > 0" class="missed-hint">
                     {{ loan.missedPayments }} missed
                   </div>
+                  <div v-if="loan.collateralBuildingId" class="collateral-inline">
+                    🏛 {{ loan.collateralBuildingName }}
+                    <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value">
+                      ({{ formatCurrency(loan.collateralAppraisedValue) }})
+                    </span>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -1279,6 +1288,16 @@ th {
   font-size: 0.7rem;
   color: #fbbf24;
   margin-top: 2px;
+}
+
+.collateral-inline {
+  font-size: 0.7rem;
+  color: var(--color-primary, #3b82f6);
+  margin-top: 2px;
+}
+
+.collateral-inline-value {
+  color: var(--color-text-secondary);
 }
 
 .error-message {

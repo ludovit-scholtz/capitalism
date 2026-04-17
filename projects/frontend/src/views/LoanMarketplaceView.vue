@@ -8,8 +8,23 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, Company, BankDepositSummary, BankInfoSummary } from '@/types'
-import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, computeTotalPayments, loanStatusClass, formatCurrency, formatPercent } from '@/lib/loanHelpers'
+import type {
+  LoanOfferSummary,
+  LoanSummary,
+  Company,
+  BankDepositSummary,
+  BankInfoSummary,
+  CollateralEligibilitySummary,
+} from '@/types'
+import {
+  formatLoanDuration,
+  computeTotalRepayment,
+  computePaymentAmount,
+  computeTotalPayments,
+  loanStatusClass,
+  formatCurrency,
+  formatPercent,
+} from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -51,6 +66,11 @@ const selectedCompanyId = ref('')
 const principalAmount = ref(0)
 const acceptLoading = ref(false)
 const acceptError = ref<string | null>(null)
+
+// Collateral selection state
+const collateralBuildings = ref<CollateralEligibilitySummary[]>([])
+const selectedCollateralBuildingId = ref<string | null>(null)
+const collateralLoadError = ref<string | null>(null)
 
 const LOAN_OFFERS_QUERY = `
   {
@@ -101,6 +121,26 @@ const MY_LOANS_QUERY = `
       accumulatedPenalty
       acceptedAtUtc
       closedAtUtc
+      collateralBuildingId
+      collateralBuildingName
+      collateralAppraisedValue
+    }
+  }
+`
+
+const MY_COLLATERAL_BUILDINGS_QUERY = `
+  {
+    myCollateralBuildings {
+      buildingId
+      buildingName
+      buildingType
+      level
+      appraisedValue
+      maxBorrowable
+      existingSecuredExposure
+      remainingBorrowingCapacity
+      isEligible
+      ineligibilityReason
     }
   }
 `
@@ -131,6 +171,8 @@ const ACCEPT_LOAN_MUTATION = `
       remainingPrincipal
       paymentAmount
       totalPayments
+      collateralBuildingId
+      collateralAppraisedValue
     }
   }
 `
@@ -332,14 +374,27 @@ function openAcceptModal(offer: LoanOfferSummary) {
   selectedOffer.value = offer
   principalAmount.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
   selectedCompanyId.value = activeCompany.value.id
+  selectedCollateralBuildingId.value = null
   acceptError.value = null
   showAcceptModal.value = true
+
+  // Load collateral buildings in the background
+  collateralLoadError.value = null
+  gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY)
+    .then((r) => {
+      collateralBuildings.value = r.myCollateralBuildings ?? []
+    })
+    .catch(() => {
+      collateralLoadError.value = 'Failed to load collateral buildings.'
+    })
 }
 
 function closeAcceptModal() {
   showAcceptModal.value = false
   selectedOffer.value = null
   acceptError.value = null
+  selectedCollateralBuildingId.value = null
+  collateralBuildings.value = []
 }
 
 const estimatedTotalRepayment = computed(() => {
@@ -362,6 +417,18 @@ const selectedCompanyCash = computed(() => {
   return company?.cash ?? 0
 })
 
+const selectedCollateral = computed(() =>
+  collateralBuildings.value.find((b) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
+)
+
+const collateralCapacityWarning = computed(() => {
+  if (!selectedCollateral.value || principalAmount.value <= 0) return null
+  if (principalAmount.value > selectedCollateral.value.remainingBorrowingCapacity) {
+    return t('bank.collateralExceedsLimit')
+  }
+  return null
+})
+
 async function confirmAcceptLoan() {
   if (!selectedOffer.value || !selectedCompanyId.value || principalAmount.value <= 0) return
   acceptLoading.value = true
@@ -372,6 +439,7 @@ async function confirmAcceptLoan() {
         loanOfferId: selectedOffer.value.id,
         borrowerCompanyId: selectedCompanyId.value,
         principalAmount: principalAmount.value,
+        collateralBuildingId: selectedCollateralBuildingId.value ?? undefined,
       },
     })
     closeAcceptModal()
@@ -550,6 +618,12 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
               </div>
             </div>
             <div v-if="loan.missedPayments > 0" class="overdue-warning">⚠ {{ loan.missedPayments }} missed payment(s) — penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}</div>
+            <div v-if="loan.collateralBuildingId" class="collateral-badge">
+              🏛 {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
+              <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
+                ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue) }})
+              </span>
+            </div>
           </div>
         </div>
       </section>
@@ -806,13 +880,86 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
             </div>
           </div>
 
+          <!-- Collateral selection -->
+          <div class="form-group collateral-group">
+            <label>{{ t('bank.collateralOptional') }}</label>
+            <p class="form-hint">{{ t('bank.collateralHint') }}</p>
+            <div v-if="collateralLoadError" class="form-hint error-inline">{{ collateralLoadError }}</div>
+            <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
+            <div v-else class="collateral-list">
+              <!-- None option -->
+              <label
+                class="collateral-option"
+                :class="{ selected: selectedCollateralBuildingId === null }"
+              >
+                <input
+                  type="radio"
+                  :value="null"
+                  v-model="selectedCollateralBuildingId"
+                  class="collateral-radio"
+                />
+                <span class="collateral-option-name">{{ t('bank.collateralNone') }}</span>
+              </label>
+              <!-- Buildings -->
+              <label
+                v-for="b in collateralBuildings"
+                :key="b.buildingId"
+                class="collateral-option"
+                :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }"
+              >
+                <input
+                  type="radio"
+                  :value="b.buildingId"
+                  v-model="selectedCollateralBuildingId"
+                  :disabled="!b.isEligible"
+                  class="collateral-radio"
+                />
+                <span class="collateral-option-body">
+                  <span class="collateral-option-name">{{ b.buildingName }}</span>
+                  <span class="collateral-option-type">{{ b.buildingType }} · Lv{{ b.level }}</span>
+                  <span v-if="!b.isEligible" class="collateral-tag ineligible-tag">{{ t('bank.collateralAlreadyPledged') }}</span>
+                  <span v-else class="collateral-stats">
+                    <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
+                    <span class="stat-highlight">{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable) }}</span>
+                    <span v-if="b.existingSecuredExposure > 0" class="stat-warn">
+                      {{ t('bank.collateralExistingExposure') }}: {{ formatCurrency(b.existingSecuredExposure) }}
+                    </span>
+                    <span class="stat-capacity">{{ t('bank.collateralRemainingCapacity') }}: {{ formatCurrency(b.remainingBorrowingCapacity) }}</span>
+                  </span>
+                </span>
+              </label>
+            </div>
+            <!-- Collateral-specific warning -->
+            <p v-if="collateralCapacityWarning" class="risk-warning collateral-warning">⚠ {{ collateralCapacityWarning }}</p>
+            <!-- Selected collateral summary -->
+            <div v-if="selectedCollateral" class="collateral-selected-summary">
+              <span class="collateral-selected-label">{{ t('bank.collateralBuilding') }}:</span>
+              <strong>{{ selectedCollateral.buildingName }}</strong>
+              <span class="capacity-bar-wrap">
+                <span
+                  class="capacity-bar-fill"
+                  :style="{ width: Math.min(100, (principalAmount / selectedCollateral.maxBorrowable) * 100).toFixed(1) + '%' }"
+                  :class="{ 'capacity-bar-danger': principalAmount > selectedCollateral.remainingBorrowingCapacity }"
+                ></span>
+              </span>
+              <span class="capacity-bar-label">
+                {{ formatCurrency(principalAmount) }} / {{ formatCurrency(selectedCollateral.maxBorrowable) }}
+                ({{ Math.min(100, Math.round((principalAmount / selectedCollateral.maxBorrowable) * 100)) }}% LTV)
+              </span>
+            </div>
+          </div>
+
           <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
 
           <div v-if="acceptError" class="error-message">{{ acceptError }}</div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeAcceptModal">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0" @click="confirmAcceptLoan">
+          <button
+            class="btn btn-primary"
+            :disabled="acceptLoading || principalAmount <= 0 || !!collateralCapacityWarning"
+            @click="confirmAcceptLoan"
+          >
             <span v-if="acceptLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.acceptLoan') }}</span>
           </button>
@@ -1620,5 +1767,170 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   color: #22c55e;
   font-size: 0.875rem;
   padding: 0.5rem 0;
+}
+
+/* ── Collateral selection styles ─────────────────────────────────────────── */
+.collateral-group {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.collateral-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: var(--spacing-xs);
+}
+
+.collateral-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  background: var(--color-surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.collateral-option.selected {
+  border-color: var(--color-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.collateral-option.ineligible {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.collateral-radio {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.collateral-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.collateral-option-name {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-size: 0.9rem;
+}
+
+.collateral-option-type {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.collateral-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin-top: 2px;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.stat-highlight {
+  color: var(--color-primary, #3b82f6);
+  font-weight: 600;
+}
+
+.stat-warn {
+  color: #fbbf24;
+}
+
+.stat-capacity {
+  color: #22c55e;
+  font-weight: 600;
+}
+
+.ineligible-tag {
+  font-size: 0.72rem;
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.1);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.collateral-selected-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background: rgba(59, 130, 246, 0.07);
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  margin-top: var(--spacing-xs);
+  font-size: 0.82rem;
+  flex-wrap: wrap;
+}
+
+.collateral-selected-label {
+  color: var(--color-text-secondary);
+}
+
+.capacity-bar-wrap {
+  flex: 1;
+  min-width: 80px;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.capacity-bar-fill {
+  height: 100%;
+  background: var(--color-primary, #3b82f6);
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+
+.capacity-bar-fill.capacity-bar-danger {
+  background: #ef4444;
+}
+
+.capacity-bar-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.collateral-warning {
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.collateral-badge {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--color-primary, #3b82f6);
+  padding: var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  margin-top: var(--spacing-xs);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.collateral-badge-value {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.error-inline {
+  color: #f87171;
+}
+
+.muted-hint {
+  color: var(--color-text-secondary);
+  font-style: italic;
 }
 </style>

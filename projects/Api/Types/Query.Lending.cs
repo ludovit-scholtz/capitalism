@@ -131,6 +131,7 @@ public sealed partial class Query
             .Include(l => l.LenderCompany)
             .Include(l => l.BankBuilding)
             .Include(l => l.BorrowerCompany)
+            .Include(l => l.CollateralBuilding)
             .Where(l => companyIds.Contains(l.BorrowerCompanyId))
             .AsNoTracking()
             .ToListAsync();
@@ -167,6 +168,7 @@ public sealed partial class Query
             .Include(l => l.BorrowerCompany)
             .Include(l => l.LenderCompany)
             .Include(l => l.BankBuilding)
+            .Include(l => l.CollateralBuilding)
             .Where(l => l.BankBuildingId == bankBuildingId)
             .AsNoTracking()
             .ToListAsync();
@@ -199,7 +201,81 @@ public sealed partial class Query
         AccumulatedPenalty = l.AccumulatedPenalty,
         AcceptedAtUtc = l.AcceptedAtUtc,
         ClosedAtUtc = l.ClosedAtUtc,
+        CollateralBuildingId = l.CollateralBuildingId,
+        CollateralBuildingName = l.CollateralBuilding?.Name,
+        CollateralAppraisedValue = l.CollateralAppraisedValue,
     };
+
+    /// <summary>
+    /// Returns collateral eligibility summaries for all buildings owned by the authenticated player.
+    /// Use this to help borrowers pick an appropriate building to pledge before accepting a loan.
+    /// </summary>
+    [Authorize]
+    public async Task<List<CollateralEligibilitySummary>> GetMyCollateralBuildings(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var companyIds = await db.Companies
+            .Where(c => c.PlayerId == userId)
+            .Select(c => c.Id)
+            .ToListAsync();
+
+        var buildings = await db.Buildings
+            .Where(b => companyIds.Contains(b.CompanyId) && !b.IsUnderConstruction)
+            .AsNoTracking()
+            .ToListAsync();
+
+        if (buildings.Count == 0)
+            return [];
+
+        var buildingIds = buildings.Select(b => b.Id).ToList();
+
+        // Load existing secured exposure per building (sum of remaining principal for active secured loans).
+        var exposureByBuilding = await db.Loans
+            .Where(l => l.CollateralBuildingId.HasValue
+                        && buildingIds.Contains(l.CollateralBuildingId!.Value)
+                        && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .GroupBy(l => l.CollateralBuildingId!.Value)
+            .Select(g => new { BuildingId = g.Key, Exposure = g.Sum(l => l.RemainingPrincipal) })
+            .ToDictionaryAsync(x => x.BuildingId, x => x.Exposure);
+
+        // Determine which buildings are already pledged (have at least one active secured loan).
+        var pledgedBuildingIds = await db.Loans
+            .Where(l => l.CollateralBuildingId.HasValue
+                        && buildingIds.Contains(l.CollateralBuildingId!.Value)
+                        && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .Select(l => l.CollateralBuildingId!.Value)
+            .Distinct()
+            .ToListAsync();
+        var pledgedSet = pledgedBuildingIds.ToHashSet();
+
+        return buildings.Select(b =>
+        {
+            var appraised = Utilities.WealthCalculator.GetBuildingValue(b);
+            var maxBorrowable = decimal.Round(appraised * 0.70m, 2, MidpointRounding.AwayFromZero);
+            var exposure = exposureByBuilding.TryGetValue(b.Id, out var exp) ? exp : 0m;
+            var remaining = Math.Max(0m, maxBorrowable - exposure);
+            var isPledged = pledgedSet.Contains(b.Id);
+
+            return new CollateralEligibilitySummary
+            {
+                BuildingId = b.Id,
+                BuildingName = b.Name,
+                BuildingType = b.Type,
+                Level = b.Level,
+                AppraisedValue = appraised,
+                MaxBorrowable = maxBorrowable,
+                ExistingSecuredExposure = exposure,
+                RemainingBorrowingCapacity = remaining,
+                IsEligible = !isPledged,
+                IneligibilityReason = isPledged
+                    ? "This building is already pledged as collateral for another active loan."
+                    : null,
+            };
+        }).OrderByDescending(s => s.RemainingBorrowingCapacity).ToList();
+    }
 
     /// <summary>
     /// Evaluates what a PURCHASE unit would do on the next tick given its current

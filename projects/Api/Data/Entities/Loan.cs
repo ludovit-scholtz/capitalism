@@ -81,6 +81,24 @@ public sealed class Loan
 
     /// <summary>UTC timestamp when the loan was fully repaid or defaulted.</summary>
     public DateTime? ClosedAtUtc { get; set; }
+
+    // ── Collateral ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Optional building pledged as collateral for this loan.
+    /// When set, the loan is a secured loan and the principal was capped at 70% of
+    /// the building's appraised value at the time of origination.
+    /// </summary>
+    public Guid? CollateralBuildingId { get; set; }
+
+    /// <summary>Navigation property to the pledged collateral building (null for unsecured loans).</summary>
+    public Building? CollateralBuilding { get; set; }
+
+    /// <summary>
+    /// Appraised value of the collateral building at the time the loan was accepted.
+    /// Null for unsecured loans.
+    /// </summary>
+    public decimal? CollateralAppraisedValue { get; set; }
 }
 
 /// <summary>Loan status values.</summary>

@@ -1145,6 +1145,26 @@ export interface LoanSummary {
   accumulatedPenalty: number
   acceptedAtUtc: string
   closedAtUtc: string | null
+  /** ID of the building pledged as collateral, or null for unsecured loans. */
+  collateralBuildingId: string | null
+  /** Display name of the collateral building, or null for unsecured loans. */
+  collateralBuildingName: string | null
+  /** Appraised value of the collateral building at origination, or null for unsecured loans. */
+  collateralAppraisedValue: number | null
+}
+
+/** Collateral eligibility summary for one of the player's buildings. */
+export interface CollateralEligibilitySummary {
+  buildingId: string
+  buildingName: string
+  buildingType: string
+  level: number
+  appraisedValue: number
+  maxBorrowable: number
+  existingSecuredExposure: number
+  remainingBorrowingCapacity: number
+  isEligible: boolean
+  ineligibilityReason: string | null
 }
 
 /** A bank deposit made by a company into a bank building. */

@@ -23270,6 +23270,375 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(errors.GetArrayLength() > 0, "Should return error when bank capacity is insufficient.");
     }
 
+    // ── Collateral tests ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AcceptLoan_WithCollateral_StoresCollateralBuildingAndAppraisedValue()
+    {
+        var lenderEmail = $"col-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"col-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "ColLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "ColBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "ColLenderCo", Cash = 1_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "ColBorrowerCo", Cash = 5_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "ColBank", Level = 1 };
+        // Factory owned by borrower (appraised value = 200_000 * level 1 = 200_000; 70% = 140_000)
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "BorrowerFactory", Level = 1 };
+        db.Buildings.AddRange(bank, collateralFactory);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 8m,
+            MaxPrincipalPerLoan = 200_000m,
+            TotalCapacity = 500_000m,
+            UsedCapacity = 0m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        // Borrow 100_000 (< 140_000 = 70% of 200_000 factory value) with collateral
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id status originalPrincipal collateralBuildingId collateralAppraisedValue
+              }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 100_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            borrowerToken);
+
+        var loan = result.GetProperty("data").GetProperty("acceptLoan");
+        Assert.Equal("ACTIVE", loan.GetProperty("status").GetString());
+        Assert.Equal(100_000m, loan.GetProperty("originalPrincipal").GetDecimal());
+        Assert.Equal(collateralFactory.Id.ToString(), loan.GetProperty("collateralBuildingId").GetString());
+        Assert.Equal(200_000m, loan.GetProperty("collateralAppraisedValue").GetDecimal());
+    }
+
+    [Fact]
+    public async Task AcceptLoan_WithCollateral_ExceedsLTV_ReturnsError()
+    {
+        var lenderEmail = $"ltv-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"ltv-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "LTVLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "LTVBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LTVLenderCo", Cash = 1_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "LTVBorrowerCo", Cash = 5_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "LTVBank", Level = 1 };
+        // Factory level 1 → appraised 200_000; 70% cap = 140_000
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "LTVFactory", Level = 1 };
+        db.Buildings.AddRange(bank, collateralFactory);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 8m,
+            MaxPrincipalPerLoan = 300_000m,
+            TotalCapacity = 1_000_000m,
+            UsedCapacity = 0m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        // Try to borrow 160_000 (> 140_000 = 70% of 200_000)
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 160_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            borrowerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should reject loan exceeding 70% LTV.");
+        Assert.Equal("EXCEEDS_COLLATERAL_LIMIT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AcceptLoan_WithCollateral_BuildingNotOwnedByBorrower_ReturnsError()
+    {
+        var lenderEmail = $"notowned-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"notowned-borrower-{Guid.NewGuid():N}@test.com";
+        var otherEmail = $"notowned-other-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "NOLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "NOBorrower");
+        await RegisterAndGetTokenAsync(otherEmail, "NOOther");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var otherPlayer = await db.Players.FirstAsync(p => p.Email == otherEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "NOLenderCo", Cash = 1_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "NOBorrowerCo", Cash = 5_000m };
+        var otherCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = otherPlayer.Id, Name = "NOOtherCo", Cash = 50_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany, otherCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "NOBank", Level = 1 };
+        // Factory owned by OTHER, not borrower
+        var otherFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = otherCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "OtherFactory", Level = 1 };
+        db.Buildings.AddRange(bank, otherFactory);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 8m,
+            MaxPrincipalPerLoan = 200_000m,
+            TotalCapacity = 500_000m,
+            UsedCapacity = 0m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 50_000m, collateralBuildingId = otherFactory.Id.ToString() } },
+            borrowerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should reject pledge of a building not owned by borrower.");
+        Assert.Equal("COLLATERAL_NOT_OWNED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AcceptLoan_WithCollateral_BuildingAlreadyPledged_ReturnsError()
+    {
+        var lenderEmail = $"pledged-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"pledged-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "PledgedLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "PledgedBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "PledgedLenderCo", Cash = 2_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "PledgedBorrowerCo", Cash = 5_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "PledgedBank", Level = 1 };
+        // Factory level 1 → appraised 200_000; 70% = 140_000
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "PledgedFactory", Level = 1 };
+        db.Buildings.AddRange(bank, collateralFactory);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 8m,
+            MaxPrincipalPerLoan = 200_000m,
+            TotalCapacity = 1_000_000m,
+            UsedCapacity = 0m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+
+        // First loan: successfully pledges the factory
+        var gs = await db.GameStates.FirstAsync();
+        var existingLoan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer.Id,
+            BorrowerCompanyId = borrowerCompany.Id,
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 50_000m,
+            RemainingPrincipal = 50_000m,
+            AnnualInterestRatePercent = 8m,
+            DurationTicks = 1440L,
+            StartTick = gs.CurrentTick,
+            DueTick = gs.CurrentTick + 1440L,
+            NextPaymentTick = gs.CurrentTick + 720L,
+            PaymentAmount = 3_000m,
+            PaymentsMade = 0,
+            TotalPayments = 2,
+            Status = Api.Data.Entities.LoanStatus.Active,
+            AcceptedAtUtc = DateTime.UtcNow,
+            CollateralBuildingId = collateralFactory.Id,
+            CollateralAppraisedValue = 200_000m,
+        };
+        db.Loans.Add(existingLoan);
+        await db.SaveChangesAsync();
+
+        // Second loan attempt on the same building
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 30_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            borrowerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should reject pledge of a building already used as collateral.");
+        Assert.Equal("COLLATERAL_ALREADY_PLEDGED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task MyCollateralBuildings_ReturnsEligibilityAndCapacityForOwnedBuildings()
+    {
+        var email = $"colq-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ColQuery");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync();
+
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ColQueryCo", Cash = 100_000m };
+        db.Companies.Add(company);
+
+        // Two buildings: a level-1 FACTORY (appraised 200_000, cap 140_000) and a level-2 MINE (appraised 500_000, cap 350_000)
+        var factory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "ColQFactory", Level = 1 };
+        var mine = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Mine, Name = "ColQMine", Level = 2 };
+        db.Buildings.AddRange(factory, mine);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            {
+              myCollateralBuildings {
+                buildingId buildingName buildingType level
+                appraisedValue maxBorrowable existingSecuredExposure remainingBorrowingCapacity
+                isEligible ineligibilityReason
+              }
+            }
+            """,
+            null,
+            token);
+
+        var buildings = result.GetProperty("data").GetProperty("myCollateralBuildings");
+        Assert.True(buildings.GetArrayLength() >= 2, "Should return at least the two owned buildings.");
+
+        var factoryResult = buildings.EnumerateArray().FirstOrDefault(b => b.GetProperty("buildingId").GetString() == factory.Id.ToString());
+        Assert.Equal("ColQFactory", factoryResult.GetProperty("buildingName").GetString());
+        Assert.Equal(200_000m, factoryResult.GetProperty("appraisedValue").GetDecimal());
+        Assert.Equal(140_000m, factoryResult.GetProperty("maxBorrowable").GetDecimal());
+        Assert.Equal(0m, factoryResult.GetProperty("existingSecuredExposure").GetDecimal());
+        Assert.Equal(140_000m, factoryResult.GetProperty("remainingBorrowingCapacity").GetDecimal());
+        Assert.True(factoryResult.GetProperty("isEligible").GetBoolean());
+
+        var mineResult = buildings.EnumerateArray().FirstOrDefault(b => b.GetProperty("buildingId").GetString() == mine.Id.ToString());
+        Assert.Equal("ColQMine", mineResult.GetProperty("buildingName").GetString());
+        Assert.Equal(500_000m, mineResult.GetProperty("appraisedValue").GetDecimal()); // 250_000 * level 2
+        Assert.Equal(350_000m, mineResult.GetProperty("maxBorrowable").GetDecimal());  // 70% of 500_000
+    }
+
+    [Fact]
+    public async Task AcceptLoan_NoCollateral_StillWorks()
+    {
+        // Ensures the collateral field remains optional and unsecured loans still work.
+        var lenderEmail = $"unsec-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"unsec-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "UnsecLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "UnsecBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "UnsecLenderCo", Cash = 500_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "UnsecBorrowerCo", Cash = 1_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "UnsecBank", Level = 1 };
+        db.Buildings.Add(bank);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 10m,
+            MaxPrincipalPerLoan = 100_000m,
+            TotalCapacity = 300_000m,
+            UsedCapacity = 0m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        db.LoanOffers.Add(offer);
+        await db.SaveChangesAsync();
+
+        // No collateralBuildingId — should succeed as unsecured loan
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id status originalPrincipal collateralBuildingId collateralAppraisedValue
+              }
+            }
+            """,
+            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 20_000m } },
+            borrowerToken);
+
+        var loan = result.GetProperty("data").GetProperty("acceptLoan");
+        Assert.Equal("ACTIVE", loan.GetProperty("status").GetString());
+        Assert.Equal(20_000m, loan.GetProperty("originalPrincipal").GetDecimal());
+        Assert.Equal(JsonValueKind.Null, loan.GetProperty("collateralBuildingId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, loan.GetProperty("collateralAppraisedValue").ValueKind);
+    }
+
     [Fact]
     public async Task LoanRepayment_FullRepayment_ClosesLoan()
     {

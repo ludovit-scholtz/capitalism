@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (85% complete)
+### Banking (95% complete)
 
 Implement banking as is described in the product definition below.
 
@@ -19,7 +19,7 @@ Implement banking as is described in the product definition below.
 - ✅ **Tick engine**: Interest paid to depositors each tick; loan repayment deducted from borrower each tick; overdue/defaulted status and penalty accumulation.
 - ✅ **Base capital requirement ($10,000,000)**: Bank creation enforces the minimum base deposit. Undercapitalized banks cannot accept customer deposits.
 - ✅ **Central bank mechanic**: When a bank cannot meet obligations (deposit interest or withdrawals) from its own cash, the shortfall is automatically covered by emergency central-bank funding recorded on `Building.CentralBankDebt`. Variable interest (2–5% p.a. based on how many banks are borrowing) is charged each tick. Banks auto-repay central-bank debt from surplus cash above the reserve requirement. Incoming deposits trigger immediate debt repayment. Owner dashboard shows `liquidityStatus` (HEALTHY/PRESSURED/CRITICAL), reserve shortfall, central-bank debt balance, and recommended actions.
-- TODO: Loan collateral — borrow against a specific building up to 70% of its appraised value.
+- ✅ **Loan collateral** — borrow against a specific building up to 70% of its appraised value.
 
 ### Dashboard (0% complete)
 
