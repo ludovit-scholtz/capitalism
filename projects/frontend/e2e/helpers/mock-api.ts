@@ -549,6 +549,13 @@ export type MockBankInfo = {
   outstandingLoanPrincipal: number
   availableLendingCapacity: number
   baseCapitalDeposited: boolean
+  // Liquidity / central-bank fields
+  centralBankDebt: number
+  centralBankInterestRatePercent: number
+  reserveRequirement: number
+  availableCash: number
+  reserveShortfall: number
+  liquidityStatus: 'HEALTHY' | 'PRESSURED' | 'CRITICAL'
 }
 
 export type MockGameNewsLocalization = {
@@ -5221,6 +5228,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                     outstandingLoanPrincipal: 0,
                     availableLendingCapacity: 9_000_000,
                     baseCapitalDeposited: true,
+                    centralBankDebt: 0,
+                    centralBankInterestRatePercent: 2,
+                    reserveRequirement: 1_000_000,
+                    availableCash: 5_000_000,
+                    reserveShortfall: 0,
+                    liquidityStatus: 'HEALTHY',
                   },
                 },
               }),
@@ -5315,6 +5328,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         outstandingLoanPrincipal: 0,
         availableLendingCapacity: 9_000_000,
         baseCapitalDeposited: true,
+        centralBankDebt: 0,
+        centralBankInterestRatePercent: 2,
+        reserveRequirement: 1_000_000,
+        availableCash: 5_000_000,
+        reserveShortfall: 0,
+        liquidityStatus: 'HEALTHY' as const,
       }
       return route.fulfill({
         status: 200,

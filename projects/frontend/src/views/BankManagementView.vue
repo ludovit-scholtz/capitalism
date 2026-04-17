@@ -650,7 +650,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       </div>
 
       <!-- ── Liquidity Health Panel (owner view) ──────────────────────────── -->
-      <section v-if="bankInfo" class="liquidity-section">
+      <section v-if="bankInfo && bankInfo.liquidityStatus" class="liquidity-section">
         <h2 class="section-title">{{ t('bank.liquidityHealth') }}</h2>
         <div class="liquidity-status-banner" :class="`liquidity-${bankInfo.liquidityStatus.toLowerCase()}`">
           <span class="liquidity-status-label">{{ t(`bank.liquidityStatus.${bankInfo.liquidityStatus}`) }}</span>
@@ -660,38 +660,38 @@ const estimatedCustomerTotalPayments = computed(() => {
         <div class="liquidity-grid">
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.availableCash') }}</span>
-            <span class="liquidity-stat-value" :class="bankInfo.availableCash >= bankInfo.reserveRequirement ? 'positive' : 'negative'">
-              {{ formatCurrency(bankInfo.availableCash) }}
+            <span class="liquidity-stat-value" :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'">
+              {{ formatCurrency(bankInfo.availableCash ?? 0) }}
             </span>
           </div>
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.reserveRequirement') }}</span>
-            <span class="liquidity-stat-value">{{ formatCurrency(bankInfo.reserveRequirement) }}</span>
+            <span class="liquidity-stat-value">{{ formatCurrency(bankInfo.reserveRequirement ?? 0) }}</span>
             <span class="liquidity-stat-hint">{{ t('bank.reserveInfo') }}</span>
           </div>
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.reserveShortfall') }}</span>
-            <span class="liquidity-stat-value" :class="bankInfo.reserveShortfall > 0 ? 'negative' : 'positive'">
-              {{ bankInfo.reserveShortfall > 0 ? formatCurrency(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
+            <span class="liquidity-stat-value" :class="(bankInfo.reserveShortfall ?? 0) > 0 ? 'negative' : 'positive'">
+              {{ (bankInfo.reserveShortfall ?? 0) > 0 ? formatCurrency(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
             </span>
           </div>
-          <div class="liquidity-stat" :class="{ 'liquidity-stat-warning': bankInfo.centralBankDebt > 0 }">
+          <div class="liquidity-stat" :class="{ 'liquidity-stat-warning': (bankInfo.centralBankDebt ?? 0) > 0 }">
             <span class="liquidity-stat-label">{{ t('bank.centralBankDebt') }}</span>
-            <span class="liquidity-stat-value" :class="bankInfo.centralBankDebt > 0 ? 'negative' : 'positive'">
-              {{ bankInfo.centralBankDebt > 0 ? formatCurrency(bankInfo.centralBankDebt) : '$0' }}
+            <span class="liquidity-stat-value" :class="(bankInfo.centralBankDebt ?? 0) > 0 ? 'negative' : 'positive'">
+              {{ (bankInfo.centralBankDebt ?? 0) > 0 ? formatCurrency(bankInfo.centralBankDebt) : '$0' }}
             </span>
-            <span v-if="bankInfo.centralBankDebt > 0" class="liquidity-stat-hint">
-              {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent) }} p.a.
+            <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint">
+              {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a.
             </span>
           </div>
         </div>
 
         <!-- Central-bank debt context -->
-        <div v-if="bankInfo.centralBankDebt > 0" class="central-bank-notice">
+        <div v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="central-bank-notice">
           <div class="notice-icon">⚠</div>
           <div class="notice-body">
             <strong>{{ t('bank.centralBankDebt') }}</strong>
-            <p>{{ t('bank.centralBankDebtHint', { rate: bankInfo.centralBankInterestRatePercent.toFixed(2) }) }}</p>
+            <p>{{ t('bank.centralBankDebtHint', { rate: (bankInfo.centralBankInterestRatePercent ?? 2).toFixed(2) }) }}</p>
           </div>
         </div>
 
@@ -699,9 +699,9 @@ const estimatedCustomerTotalPayments = computed(() => {
         <div v-if="bankInfo.liquidityStatus !== 'HEALTHY'" class="recommended-actions">
           <h3 class="actions-title">{{ t('bank.recommendedActions') }}</h3>
           <ul class="actions-list">
-            <li v-if="bankInfo.reserveShortfall > 0">{{ t('bank.actionAddDeposits') }}</li>
+            <li v-if="(bankInfo.reserveShortfall ?? 0) > 0">{{ t('bank.actionAddDeposits') }}</li>
             <li v-if="bankInfo.outstandingLoanPrincipal > 0">{{ t('bank.actionReduceLending') }}</li>
-            <li v-if="bankInfo.centralBankDebt > 0">{{ t('bank.actionRecapitalize') }}</li>
+            <li v-if="(bankInfo.centralBankDebt ?? 0) > 0">{{ t('bank.actionRecapitalize') }}</li>
           </ul>
         </div>
 

@@ -787,6 +787,12 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
       outstandingLoanPrincipal: 500_000,
       availableLendingCapacity: available,
       baseCapitalDeposited: true,
+      centralBankDebt: 0,
+      centralBankInterestRatePercent: 2,
+      reserveRequirement: Math.round((available / 0.9 + 1_000_000) * 0.1),
+      availableCash: Math.round((available / 0.9 + 1_000_000) * 0.5),
+      reserveShortfall: 0,
+      liquidityStatus: 'HEALTHY' as const,
     }
   }
 
