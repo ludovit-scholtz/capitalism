@@ -17,6 +17,7 @@ Implement banking as is described in the product definition below.
 - The bank founder's company should not receive the interest on the deposits to his own bank
 - Improve UX and design, mainly the spacing between the components on frontend
 - My Deposits should be scoped to currently selected company
+- Make sure the banking accounting is correct in ledger, make sure to include the interest paid and received in the income statement. Make sure to account also the deposits to bank in balance sheet (at the moment the deposit is missing in balance sheet). Also update the cash flow statement to show the cash flow from the banking from the perspective of the borrower, lender and bank owner. The building performance shows incorrectly the another company bank and does not show the building name and type and when i click the manage i do not go to `/bank/:id` but into the `/building/:id`. 
 
 ### Dashboard (0% complete)
 
