@@ -93,6 +93,34 @@ public sealed partial class Mutation
         bank.Company.Cash += input.Amount;
         bank.TotalDeposits += input.Amount;
 
+        // Auto-repay central-bank debt only from surplus cash above the reserve requirement.
+        // This mirrors BankInterestPhase auto-repayment: the deposit has already increased
+        // TotalDeposits (and therefore the required reserve), so we must preserve the full
+        // reserve before applying any payment toward CB debt. Using all available cash would
+        // drain the bank below the reserve that the same deposit just raised.
+        if (bank.CentralBankDebt > 0m)
+        {
+            var reserveNeeded = bank.TotalDeposits * ReserveRatio;
+            var surplusCash = bank.Company.Cash - reserveNeeded;
+            var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
+            if (repayment > 0m)
+            {
+                bank.Company.Cash -= repayment;
+                bank.CentralBankDebt -= repayment;
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = bank.CompanyId,
+                    BuildingId = bank.Id,
+                    Category = LedgerCategory.CentralBankRepay,
+                    Description = $"Central bank repayment from incoming deposit (surplus above reserve)",
+                    Amount = -repayment,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
+        }
+
         var deposit = new BankDeposit
         {
             Id = Guid.NewGuid(),
@@ -186,11 +214,18 @@ public sealed partial class Mutation
         var bank = deposit.BankBuilding;
         var bankCompany = bank.Company;
 
-        // Determine actual payout: if bank lacks cash, pay what's available (central-bank coverage recorded separately)
-        var payout = Math.Min(input.Amount, Math.Max(0m, bankCompany.Cash));
+        // Determine actual payout: if bank lacks cash, central bank covers the shortfall
+        var payout = input.Amount;
+        var actualBankPay = Math.Min(payout, Math.Max(0m, bankCompany.Cash));
+        var centralBankCoverage = payout - actualBankPay;
 
         // Transfer cash back to depositor
-        bankCompany.Cash -= payout;
+        bankCompany.Cash -= actualBankPay;
+        if (centralBankCoverage > 0m)
+        {
+            // Central bank injects the shortfall directly — bank owes it back
+            bank.CentralBankDebt += centralBankCoverage;
+        }
         deposit.DepositorCompany.Cash += payout;
         bank.TotalDeposits -= input.Amount;
         deposit.Amount -= input.Amount;
@@ -216,18 +251,17 @@ public sealed partial class Mutation
             RecordedAtUtc = DateTime.UtcNow,
         });
 
-        // If bank couldn't fully pay, log central-bank deficit
-        if (payout < input.Amount)
+        // If bank couldn't fully pay from own cash, record central-bank emergency coverage
+        if (centralBankCoverage > 0m)
         {
-            var deficit = input.Amount - payout;
             db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
                 CompanyId = bankCompany.Id,
                 BuildingId = bank.Id,
                 Category = LedgerCategory.CentralBankBorrow,
-                Description = $"Central bank emergency funding covering withdrawal shortfall of {deficit:C0}",
-                Amount = -deficit,
+                Description = $"Central bank emergency funding covering withdrawal shortfall of {centralBankCoverage:C0}",
+                Amount = -centralBankCoverage,
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = DateTime.UtcNow,
             });
@@ -324,6 +358,20 @@ public sealed partial class Mutation
         var lendable = bank.TotalDeposits * LendableRatio;
         var available = Math.Max(0m, lendable - outstandingPrincipal);
 
+        // ── Liquidity calculation ─────────────────────────────────────────────
+        var reserveRequirement = bank.TotalDeposits * ReserveRatio;
+        var availableCash = company?.Cash ?? 0m;
+        var reserveShortfall = Math.Max(0m, reserveRequirement - availableCash);
+        var centralBankRate = ComputeCentralBankRate(db);
+
+        string liquidityStatus;
+        if (bank.CentralBankDebt > 0m && reserveShortfall > 0m)
+            liquidityStatus = BankLiquidityStatus.Critical;
+        else if (bank.CentralBankDebt > 0m || reserveShortfall > 0m)
+            liquidityStatus = BankLiquidityStatus.Pressured;
+        else
+            liquidityStatus = BankLiquidityStatus.Healthy;
+
         return new BankInfoSummary
         {
             BankBuildingId = bank.Id,
@@ -339,6 +387,31 @@ public sealed partial class Mutation
             OutstandingLoanPrincipal = outstandingPrincipal,
             AvailableLendingCapacity = available,
             BaseCapitalDeposited = bank.BaseCapitalDeposited,
+            CentralBankDebt = bank.CentralBankDebt,
+            CentralBankInterestRatePercent = centralBankRate,
+            ReserveRequirement = reserveRequirement,
+            AvailableCash = availableCash,
+            ReserveShortfall = reserveShortfall,
+            LiquidityStatus = liquidityStatus,
         };
+    }
+
+    /// <summary>
+    /// Computes the current central-bank interest rate (2–5% p.a.) based on how many banks
+    /// are actively borrowing from the central bank.  More borrowers → higher rate (market stress).
+    /// </summary>
+    internal static decimal ComputeCentralBankRate(AppDbContext db)
+    {
+        // Count banks with outstanding central-bank debt (synchronous — called from sync context only)
+        var borrowingBanks = db.Buildings
+            .Where(b => b.Type == BuildingType.Bank && b.CentralBankDebt > 0m)
+            .Count();
+
+        // Linear interpolation: 0 banks → 2%, 5+ banks → 5%
+        const decimal minRate = 2m;
+        const decimal maxRate = 5m;
+        const int maxBanksForMaxRate = 5;
+        var rate = minRate + (maxRate - minRate) * Math.Min(1m, (decimal)borrowingBanks / maxBanksForMaxRate);
+        return Math.Round(rate, 2);
     }
 }

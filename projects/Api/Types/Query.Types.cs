@@ -582,4 +582,30 @@ public sealed class BankInfoSummary
     public decimal AvailableLendingCapacity { get; set; }
     /// <summary>Whether the bank has met the base-capital deposit requirement.</summary>
     public bool BaseCapitalDeposited { get; set; }
+
+    // ── Liquidity / Central-Bank fields (owner view) ─────────────────────────
+
+    /// <summary>Outstanding debt owed to the central bank as emergency liquidity funding.</summary>
+    public decimal CentralBankDebt { get; set; }
+    /// <summary>Current variable interest rate charged by the central bank on emergency funding (2–5% p.a.).</summary>
+    public decimal CentralBankInterestRatePercent { get; set; }
+    /// <summary>Minimum cash the bank must hold as reserve (10% of total deposits).</summary>
+    public decimal ReserveRequirement { get; set; }
+    /// <summary>Bank company's actual cash balance.</summary>
+    public decimal AvailableCash { get; set; }
+    /// <summary>Amount by which available cash falls short of the reserve requirement (0 when healthy).</summary>
+    public decimal ReserveShortfall { get; set; }
+    /// <summary>Liquidity status: HEALTHY, PRESSURED, or CRITICAL.</summary>
+    public string LiquidityStatus { get; set; } = BankLiquidityStatus.Healthy;
+}
+
+/// <summary>Liquidity health states for bank buildings.</summary>
+public static class BankLiquidityStatus
+{
+    /// <summary>Bank has sufficient reserves and no central-bank debt.</summary>
+    public const string Healthy = "HEALTHY";
+    /// <summary>Bank has central-bank debt but cash covers the reserve requirement.</summary>
+    public const string Pressured = "PRESSURED";
+    /// <summary>Bank's cash is below the reserve requirement or central-bank debt is large.</summary>
+    public const string Critical = "CRITICAL";
 }
