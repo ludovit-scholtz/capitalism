@@ -301,6 +301,14 @@ public sealed partial class AppDbInitializer
             return;
         }
 
+        // SQLite is used only in tests. Once migrations are scaffolded against PostgreSQL,
+        // replaying them on SQLite is no longer a meaningful validation path. The SQLite test
+        // provider therefore stays on the EnsureCreated + repair + history-baseline path.
+        if (!GetSchemaDialect().IsPostgres)
+        {
+            return;
+        }
+
         //   d) PostgreSQL databases that still have pending legacy SQLite-scaffolded migrations
         //      are repaired to the current model shape and then have just that repaired legacy
         //      tail marked as applied. Future PostgreSQL-native migrations (added after the

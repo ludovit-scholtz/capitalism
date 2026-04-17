@@ -33,8 +33,9 @@ public sealed partial class AppDbInitializer(
     ///    migration support was introduced) this method creates the history table and marks every
     ///    currently-defined migration as already applied after the legacy repair step has brought
     ///    the schema up to the current model.
-    /// 4. <c>MigrateAsync</c> — applies only the migrations that are not yet in the history
-    ///    table.  For a brand-new or already up-to-date database this is a no-op.
+    /// 4. <c>MigrateAsync</c> — on PostgreSQL, applies only the migrations that are not yet in
+    ///    the history table. For SQLite test databases, startup stops after the repair + baseline
+    ///    path because migrations are intentionally scaffolded against PostgreSQL.
     ///
     /// For in-memory databases (used in local development) migrations are not supported by
     /// the provider; <c>EnsureCreatedAsync</c> is used directly and steps 2–4 are skipped.
