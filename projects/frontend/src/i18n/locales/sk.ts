@@ -446,6 +446,20 @@ export default {
     tabBuildings: 'Budovy',
     tabActivity: 'Aktivita',
     tabChat: 'Chat',
+    tabPro: 'Pro',
+    proBenefitsHeading: 'Čo odomknete s Pro',
+    proBenefitProducts: 'Viac produktov na výrobu',
+    proBenefitProductsBody:
+      'Získajte prístup k úplnému katalógu produktov — nábytok, potraviny, zdravotníctvo, elektronika, stavebníctvo a ďalšie. Bezplatné účty sú obmedzené len na štartovacie produkty.',
+    proBenefitAdvanced: 'Pokročilé odvetvia',
+    proBenefitAdvancedBody:
+      'Vyrábajte elektroniku a stavebné materiály s vyššími maržami, ktoré otvárajú úplne nové dodávateľské reťazce.',
+    proBenefitUnlock: 'Žiadne obmedzenia produktov',
+    proBenefitUnlockBody:
+      'Všetky možnosti konfigurácie jednotiek budov sú dostupné. Žiadne zamknuté produkty, žiadne ohraničené recepty, žiadne umelé stropy toho, čo môžete vybudovať.',
+    proBenefitPriority: 'Prioritný prístup k simulácii',
+    proBenefitPriorityBody:
+      'Pro hráči dostávajú prioritnú podporu a skorý prístup k novým herným funkciám s rastom simulácie.',
     personTabOverview: 'Prehľad',
     personTabCreateCompany: 'Založiť firmu',
     personTabLedger: 'Účtovná kniha',

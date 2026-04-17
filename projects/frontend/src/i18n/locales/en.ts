@@ -446,6 +446,20 @@ export default {
     tabBuildings: 'Buildings',
     tabActivity: 'Activity',
     tabChat: 'Chat',
+    tabPro: 'Pro',
+    proBenefitsHeading: 'What you unlock with Pro',
+    proBenefitProducts: 'More products to manufacture',
+    proBenefitProductsBody:
+      'Access the full product catalog — furniture, food, healthcare, electronics, construction, and more. Free accounts are limited to starter products only.',
+    proBenefitAdvanced: 'Advanced industries',
+    proBenefitAdvancedBody:
+      'Manufacture electronics and construction materials that command higher margins and open entirely new supply chains.',
+    proBenefitUnlock: 'No product restrictions',
+    proBenefitUnlockBody:
+      'Every building unit configuration option is available. No locked products, no gated recipes, no artificial ceilings on what you can build.',
+    proBenefitPriority: 'Priority simulation access',
+    proBenefitPriorityBody:
+      'Pro players receive priority support and early access to new game features as the simulation grows.',
     personTabOverview: 'Overview',
     personTabCreateCompany: 'Create company',
     personTabLedger: 'Ledger',

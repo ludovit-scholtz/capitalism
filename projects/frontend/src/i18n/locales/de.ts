@@ -448,6 +448,20 @@ export default {
     tabBuildings: 'Gebäude',
     tabActivity: 'Aktivität',
     tabChat: 'Chat',
+    tabPro: 'Pro',
+    proBenefitsHeading: 'Was Sie mit Pro freischalten',
+    proBenefitProducts: 'Mehr Produkte herstellen',
+    proBenefitProductsBody:
+      'Zugriff auf den vollständigen Produktkatalog — Möbel, Lebensmittel, Gesundheit, Elektronik, Bauwesen und mehr. Kostenlose Konten sind auf Starterprodukte beschränkt.',
+    proBenefitAdvanced: 'Fortgeschrittene Industrien',
+    proBenefitAdvancedBody:
+      'Stellen Sie Elektronik und Baumaterialien mit höheren Margen her, die völlig neue Lieferketten eröffnen.',
+    proBenefitUnlock: 'Keine Produktbeschränkungen',
+    proBenefitUnlockBody:
+      'Alle Konfigurationsoptionen für Gebäudeeinheiten sind verfügbar. Keine gesperrten Produkte, keine gesperrten Rezepte, keine künstlichen Obergrenzen.',
+    proBenefitPriority: 'Prioritätszugang zur Simulation',
+    proBenefitPriorityBody:
+      'Pro-Spieler erhalten Prioritätssupport und frühen Zugang zu neuen Spielfunktionen, wenn die Simulation wächst.',
     personTabOverview: 'Übersicht',
     personTabCreateCompany: 'Unternehmen gründen',
     personTabLedger: 'Hauptbuch',
