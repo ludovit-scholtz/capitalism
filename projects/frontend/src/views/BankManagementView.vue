@@ -667,7 +667,7 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.reserveRequirement') }}</span>
             <span class="liquidity-stat-value">{{ formatCurrency(bankInfo.reserveRequirement) }}</span>
-            <span class="liquidity-stat-hint">10% of deposits</span>
+            <span class="liquidity-stat-hint">{{ t('bank.reserveInfo') }}</span>
           </div>
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.reserveShortfall') }}</span>

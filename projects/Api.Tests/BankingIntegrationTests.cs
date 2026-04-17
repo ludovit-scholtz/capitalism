@@ -405,5 +405,6 @@ public sealed class BankingIntegrationTests
         // With 3 borrowing banks: rate = 2 + (5-2) * (3/5) = 2 + 1.8 = 3.8%
         Assert.True(rate > 2m, $"Rate should be above minimum when banks are borrowing. Got {rate}%");
         Assert.True(rate <= 5m, $"Rate must not exceed maximum 5%. Got {rate}%");
+        Assert.Equal(3.8m, rate); // locks in the interpolation formula
     }
 }

@@ -356,7 +356,7 @@ public sealed partial class Mutation
         var reserveRequirement = bank.TotalDeposits * ReserveRatio;
         var availableCash = company?.Cash ?? 0m;
         var reserveShortfall = Math.Max(0m, reserveRequirement - availableCash);
-        var centralBankRate = ComputeCentralBankRate(db, bank.Id);
+        var centralBankRate = ComputeCentralBankRate(db);
 
         string liquidityStatus;
         if (bank.CentralBankDebt > 0m && reserveShortfall > 0m)
@@ -394,7 +394,7 @@ public sealed partial class Mutation
     /// Computes the current central-bank interest rate (2–5% p.a.) based on how many banks
     /// are actively borrowing from the central bank.  More borrowers → higher rate (market stress).
     /// </summary>
-    internal static decimal ComputeCentralBankRate(AppDbContext db, Guid excludedBankId = default)
+    internal static decimal ComputeCentralBankRate(AppDbContext db)
     {
         // Count banks with outstanding central-bank debt (synchronous — called from sync context only)
         var borrowingBanks = db.Buildings
