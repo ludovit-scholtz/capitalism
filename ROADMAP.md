@@ -15,6 +15,7 @@ Implement banking as is described in the product definition below.
 - When goes to his own bank, he cannot modify the interest and lending rates
 - On the loan page there should not be list of loan offers. User should pick a bank where he wants to take a loan, and he can do it according to the product definition rules like he picks up the building and creates a loan contract.
 - The bank founder's company should not receive the interest on the deposits to his own bank
+- Improve UX and design, mainly the spacing between the components on frontend
 
 ### Dashboard (0% complete)
 
