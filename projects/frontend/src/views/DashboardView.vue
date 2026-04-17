@@ -633,7 +633,7 @@ async function createCompany() {
 
             <div v-else class="buildings-grid">
               <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper">
-                <RouterLink :to="`/building/${building.id}`" class="building-card">
+                <RouterLink :to="building.type === 'BANK' ? `/bank/${building.id}` : `/building/${building.id}`" class="building-card">
                   <div class="building-icon">{{ getBuildingIcon(building.type) }}</div>
                   <div class="building-info">
                     <span class="building-name">{{ building.name }}</span>

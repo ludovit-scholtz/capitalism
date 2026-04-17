@@ -1350,3 +1350,126 @@ test.describe('Loan collateral selection', () => {
     await expect(page.locator('.collateral-badge')).toContainText('Main Factory')
   })
 })
+
+test.describe('Banking ownership — dashboard link and activation flow', () => {
+  test('dashboard routes bank building link to /bank/:id instead of /building/:id', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Click the Buildings tab so the buildings list becomes visible
+    await page.getByRole('tab', { name: 'Buildings' }).click()
+
+    // The bank building card in the dashboard should link to /bank/:id
+    const companyCard = page.locator('.company-card').first()
+    const bankCard = companyCard.locator('.building-card', { hasText: 'City Bank' })
+    await expect(bankCard).toBeVisible()
+    const href = await bankCard.getAttribute('href')
+    expect(href).toMatch(/\/bank\/bank-building-1/)
+    expect(href).not.toMatch(/\/building\/bank-building-1/)
+  })
+
+  test('bank management page shows base deposit required UI when not yet activated', async ({
+    page,
+  }) => {
+    const player = makeBankOwnerPlayer()
+    // Add the bank to allBanks with baseCapitalDeposited = false to simulate unactivated state
+    const state = setupMockApi(page, {
+      players: [player],
+      allBanks: [
+        {
+          bankBuildingId: 'bank-building-1',
+          bankBuildingName: 'City Bank',
+          cityId: 'city-ba',
+          cityName: 'Bratislava',
+          lenderCompanyId: 'lender-company-1',
+          lenderCompanyName: 'Lending Corp',
+          depositInterestRatePercent: 5,
+          lendingInterestRatePercent: 12,
+          totalDeposits: 0,
+          lendableCapacity: 0,
+          outstandingLoanPrincipal: 0,
+          availableLendingCapacity: 0,
+          baseCapitalDeposited: false,
+          centralBankDebt: 0,
+          centralBankInterestRatePercent: 2,
+          reserveRequirement: 0,
+          availableCash: 500_000,
+          reserveShortfall: 0,
+          liquidityStatus: 'HEALTHY' as const,
+        },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    // Should show base deposit required UI
+    await expect(page.getByRole('heading', { name: 'Base Capital Deposit Required' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Make Base Deposit ($10,000,000)' })).toBeVisible()
+
+    // Should NOT show the normal owner management sections (not yet activated)
+    await expect(page.getByText('Bank Rates Configuration')).toBeHidden()
+    await expect(page.getByText('Loan Offers').first()).toBeHidden()
+  })
+
+  test('base deposit button activates the bank and shows management view', async ({ page }) => {
+    const player = makeBankOwnerPlayer()
+    // Set high cash so the deposit can succeed (company is at index 0)
+    player.companies[0]!.cash = 15_000_000
+    const state = setupMockApi(page, {
+      players: [player],
+      allBanks: [
+        {
+          bankBuildingId: 'bank-building-1',
+          bankBuildingName: 'City Bank',
+          cityId: 'city-ba',
+          cityName: 'Bratislava',
+          lenderCompanyId: 'lender-company-1',
+          lenderCompanyName: 'Lending Corp',
+          depositInterestRatePercent: 5,
+          lendingInterestRatePercent: 12,
+          totalDeposits: 0,
+          lendableCapacity: 0,
+          outstandingLoanPrincipal: 0,
+          availableLendingCapacity: 0,
+          baseCapitalDeposited: false,
+          centralBankDebt: 0,
+          centralBankInterestRatePercent: 2,
+          reserveRequirement: 0,
+          availableCash: 15_000_000,
+          reserveShortfall: 0,
+          liquidityStatus: 'HEALTHY' as const,
+        },
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    // Should show the base deposit button
+    const depositBtn = page.getByRole('button', { name: 'Make Base Deposit ($10,000,000)' })
+    await expect(depositBtn).toBeVisible()
+
+    // Click the button
+    await depositBtn.click()
+
+    // After the mutation, the page should show the activated bank management view
+    await expect(page.getByRole('heading', { name: 'Configure Bank' })).toBeVisible()
+    await expect(page.getByText('Bank Rates Configuration')).toBeVisible()
+  })
+})

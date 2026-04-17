@@ -1957,6 +1957,10 @@ export default {
     setBankRates: 'Update Rates',
     ratesUpdated: 'Rates updated. New deposits will use the updated deposit rate.',
     baseCapitalRequired: 'Opening a bank requires a $10,000,000 base capital deposit.',
+    baseDepositRequired: 'Base Capital Deposit Required',
+    baseDepositRequiredBody: 'Your bank property has been acquired, but it is not yet open for business. Make a $10,000,000 base capital deposit from your company funds to activate it.',
+    makeBaseDeposit: 'Make Base Deposit ($10,000,000)',
+    baseDepositSuccess: 'Base capital deposit successful! Your bank is now open for business.',
     // Bank discovery
     allBanks: 'All Banks',
     discoverBanks: 'Discover Banks',
