@@ -66,8 +66,9 @@ public sealed class BankInterestPhase : ITickPhase
 
             foreach (var deposit in bankDeposits)
             {
-                // Skip own base-capital deposits (bank doesn't pay itself interest)
-                if (deposit.IsBaseCapital && deposit.DepositorCompanyId == bank.CompanyId)
+                // Skip all deposits from the bank's own company — the founder/owner does not
+                // earn deposit interest on their own bank (base-capital or otherwise).
+                if (deposit.DepositorCompanyId == bank.CompanyId)
                     continue;
 
                 if (!context.CompaniesById.TryGetValue(deposit.DepositorCompanyId, out var depositor))

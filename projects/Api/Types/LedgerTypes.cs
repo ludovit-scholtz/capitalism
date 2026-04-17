@@ -20,11 +20,17 @@ public sealed class CompanyLedgerSummary
     public decimal TaxableIncome { get; set; }
     public decimal EstimatedIncomeTax { get; set; }
     public decimal NetIncome { get; set; }
+    // Banking income/expense (income statement)
+    public decimal TotalDepositInterestReceived { get; set; }
+    public decimal TotalDepositInterestPaid { get; set; }
+    public decimal TotalLoanInterestIncome { get; set; }
+    public decimal TotalLoanInterestExpense { get; set; }
     // Balance Sheet
     public decimal PropertyValue { get; set; }
     public decimal PropertyAppreciation { get; set; }
     public decimal BuildingValue { get; set; }
     public decimal InventoryValue { get; set; }
+    public decimal TotalDepositsPlaced { get; set; }
     public decimal TotalAssets { get; set; }
     public decimal TotalPropertyPurchases { get; set; }
     public decimal TotalStockPurchaseCashOut { get; set; }
@@ -32,6 +38,7 @@ public sealed class CompanyLedgerSummary
     // Cash Flow
     public decimal CashFromOperations { get; set; }
     public decimal CashFromInvestments { get; set; }
+    public decimal CashFromBanking { get; set; }
     public long FirstRecordedTick { get; set; }
     public long LastRecordedTick { get; set; }
     public long IncomeTaxDueAtTick { get; set; }
@@ -41,6 +48,7 @@ public sealed class CompanyLedgerSummary
     public List<BuildingLedgerSummary> BuildingSummaries { get; set; } = [];
     public List<CompanyLedgerHistoryYear> History { get; set; } = [];
 }
+
 
 public sealed class CompanyLedgerHistoryYear
 {
@@ -96,6 +104,7 @@ public sealed class LedgerEntryResult
     public DateTime RecordedAtUtc { get; set; }
     public Guid? BuildingId { get; set; }
     public string? BuildingName { get; set; }
+    public string? BuildingType { get; set; }
     public Guid? BuildingUnitId { get; set; }
     public Guid? ProductTypeId { get; set; }
     public string? ProductName { get; set; }

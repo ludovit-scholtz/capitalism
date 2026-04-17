@@ -6,18 +6,18 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (50% complete)
+### Banking (85% complete)
 
 Implement banking as is described in the product definition below.
 
-- When player wants to start new bank building, he does not see there the form to setup the initial deposit. When he purchase the property, he is directed to to `/building/:id` and not to `/bank/:id`
-- In the loans page, when player owns bank he still can see button Acquire a Bank.
-- When goes to his own bank, he cannot modify the interest and lending rates
-- On the loan page there should not be list of loan offers. User should pick a bank where he wants to take a loan, and he can do it according to the product definition rules like he picks up the building and creates a loan contract.
-- The bank founder's company should not receive the interest on the deposits to his own bank
-- Improve UX and design, mainly the spacing between the components on frontend
-- My Deposits should be scoped to currently selected company
-- Make sure the banking accounting is correct in ledger, make sure to include the interest paid and received in the income statement. Make sure to account also the deposits to bank in balance sheet (at the moment the deposit is missing in balance sheet). Also update the cash flow statement to show the cash flow from the banking from the perspective of the borrower, lender and bank owner. The building performance shows incorrectly the another company bank and does not show the building name and type and when i click the manage i do not go to `/bank/:id` but into the `/building/:id`. 
+- ~~When player wants to start new bank building, he does not see there the form to setup the initial deposit. When he purchase the property, he is directed to to `/building/:id` and not to `/bank/:id`~~ ✅ Done: Bank purchase now redirects to `/bank/:id` with setup guidance
+- ~~In the loans page, when player owns bank he still can see button Acquire a Bank.~~ ✅ Done (previously fixed)
+- ~~When goes to his own bank, he cannot modify the interest and lending rates~~ ✅ Done (previously fixed)
+- ~~On the loan page there should not be list of loan offers. User should pick a bank where he wants to take a loan, and he can do it according to the product definition rules like he picks up the building and creates a loan contract.~~ ✅ Done: Borrow tab now shows bank list with "Visit Bank to Borrow" routing to `/bank/:id`
+- ~~The bank founder's company should not receive the interest on the deposits to his own bank~~ ✅ Done: All deposits from bank's own company are excluded from interest phase; founder company blocked from depositing into own bank
+- ~~Improve UX and design, mainly the spacing between the components on frontend~~ ✅ Done (previously fixed)
+- ~~My Deposits should be scoped to currently selected company~~ ✅ Done (previously fixed)
+- ~~Make sure the banking accounting is correct in ledger, make sure to include the interest paid and received in the income statement. Make sure to account also the deposits to bank in balance sheet. Also update the cash flow statement to show the cash flow from the banking.~~ ✅ Done: DepositInterestReceived/Paid, LoanInterestIncome/Expense, TotalDepositsPlaced on balance sheet, CashFromBanking added to cash flow
 
 ### Dashboard (50% complete)
 

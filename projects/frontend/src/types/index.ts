@@ -708,16 +708,23 @@ export interface CompanyLedgerSummary {
   taxableIncome: number
   estimatedIncomeTax: number
   netIncome: number
+  // Banking income/expense
+  totalDepositInterestReceived: number
+  totalDepositInterestPaid: number
+  totalLoanInterestIncome: number
+  totalLoanInterestExpense: number
   propertyValue: number
   propertyAppreciation: number
   buildingValue: number
   inventoryValue: number
+  totalDepositsPlaced: number
   totalAssets: number
   totalPropertyPurchases: number
   totalStockPurchaseCashOut: number
   totalStockSaleCashIn: number
   cashFromOperations: number
   cashFromInvestments: number
+  cashFromBanking: number
   firstRecordedTick: number
   lastRecordedTick: number
   incomeTaxDueAtTick: number
@@ -776,6 +783,7 @@ export interface LedgerEntryResult {
   recordedAtTick: number
   buildingId: string | null
   buildingName: string | null
+  buildingType: string | null
   buildingUnitId: string | null
   productTypeId: string | null
   productName: string | null

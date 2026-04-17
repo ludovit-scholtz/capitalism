@@ -16,6 +16,9 @@ public static class LedgerCalculator
         LedgerCategory.ShippingCost,
         LedgerCategory.Other,
         LedgerCategory.UnitUpgrade,
+        // Banking operating costs are deductible (interest paid to depositors, loan interest expense)
+        LedgerCategory.DepositInterestPaid,
+        LedgerCategory.LoanInterestExpense,
     ];
 
     public static decimal GetTotalRevenue(IEnumerable<LedgerEntry> entries)
@@ -95,14 +98,82 @@ public static class LedgerCalculator
             .Sum(entry => entry.Amount);
     }
 
+    // ── Banking income/expense helpers ────────────────────────────────────────
+
+    /// <summary>Deposit interest earned by this company as a depositor (income).</summary>
+    public static decimal GetTotalDepositInterestReceived(IEnumerable<LedgerEntry> entries)
+    {
+        return entries
+            .Where(entry => entry.Category == LedgerCategory.DepositInterestReceived)
+            .Sum(entry => entry.Amount);
+    }
+
+    /// <summary>Deposit interest paid out by this company's bank to depositors (expense).</summary>
+    public static decimal GetTotalDepositInterestPaid(IEnumerable<LedgerEntry> entries)
+    {
+        return Math.Abs(entries
+            .Where(entry => entry.Category == LedgerCategory.DepositInterestPaid)
+            .Sum(entry => entry.Amount));
+    }
+
+    /// <summary>Loan interest income earned by this company as a bank/lender.</summary>
+    public static decimal GetTotalLoanInterestIncome(IEnumerable<LedgerEntry> entries)
+    {
+        return entries
+            .Where(entry => entry.Category == LedgerCategory.LoanInterestIncome)
+            .Sum(entry => entry.Amount);
+    }
+
+    /// <summary>Loan interest expense paid by this company as a borrower.</summary>
+    public static decimal GetTotalLoanInterestExpense(IEnumerable<LedgerEntry> entries)
+    {
+        return Math.Abs(entries
+            .Where(entry => entry.Category == LedgerCategory.LoanInterestExpense)
+            .Sum(entry => entry.Amount));
+    }
+
+    /// <summary>Net cash out for deposits made (positive = cash left company).</summary>
+    public static decimal GetTotalDepositsMade(IEnumerable<LedgerEntry> entries)
+    {
+        return Math.Abs(entries
+            .Where(entry => entry.Category == LedgerCategory.DepositMade)
+            .Sum(entry => entry.Amount));
+    }
+
+    /// <summary>Net cash in from deposit withdrawals (positive = cash returned).</summary>
+    public static decimal GetTotalDepositsWithdrawn(IEnumerable<LedgerEntry> entries)
+    {
+        return entries
+            .Where(entry => entry.Category == LedgerCategory.DepositWithdrawn && entry.Amount > 0m)
+            .Sum(entry => entry.Amount);
+    }
+
+    /// <summary>Total loan originations: principal received by borrower (positive = cash in).</summary>
+    public static decimal GetTotalLoanOriginations(IEnumerable<LedgerEntry> entries)
+    {
+        return entries
+            .Where(entry => entry.Category == LedgerCategory.LoanOrigination && entry.Amount > 0m)
+            .Sum(entry => entry.Amount);
+    }
+
+    /// <summary>Total loan repayment principal paid out by borrower (positive value of outflow).</summary>
+    public static decimal GetTotalLoanRepaymentPrincipal(IEnumerable<LedgerEntry> entries)
+    {
+        return Math.Abs(entries
+            .Where(entry => entry.Category == LedgerCategory.LoanRepaymentPrincipal && entry.Amount < 0m)
+            .Sum(entry => entry.Amount));
+    }
+
     public static decimal ComputeTaxableIncome(IEnumerable<LedgerEntry> entries)
     {
         var ledgerEntries = entries.ToList();
         var revenue = GetTotalRevenue(ledgerEntries);
+        // Banking interest income is also taxable
+        var bankingIncome = GetTotalDepositInterestReceived(ledgerEntries) + GetTotalLoanInterestIncome(ledgerEntries);
         var deductibleCosts = Math.Abs(ledgerEntries
             .Where(entry => DeductibleCategories.Contains(entry.Category) && entry.Amount < 0m)
             .Sum(entry => entry.Amount));
 
-        return Math.Max(revenue - deductibleCosts, 0m);
+        return Math.Max(revenue + bankingIncome - deductibleCosts, 0m);
     }
 }

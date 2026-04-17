@@ -146,7 +146,7 @@ async function buyBuilding() {
       },
     )
 
-    router.push(`/building/${data.purchaseLot.building.id}`)
+    router.push(selectedType.value === 'BANK' ? `/bank/${data.purchaseLot.building.id}` : `/building/${data.purchaseLot.building.id}`)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
   } finally {
@@ -221,6 +221,20 @@ async function buyBuilding() {
           <div v-if="selectedCompany" class="company-banner">
             <span>{{ selectedCompany.name }}</span>
             <strong>{{ formatCurrency(selectedCompany.cash) }}</strong>
+          </div>
+
+          <!-- Bank setup info -->
+          <div v-if="selectedType === 'BANK'" class="bank-setup-info">
+            <div class="bank-setup-icon">🏦</div>
+            <div class="bank-setup-content">
+              <h3>{{ t('buildings.bankSetupTitle') }}</h3>
+              <p>{{ t('buildings.bankSetupDescription') }}</p>
+              <ul>
+                <li>{{ t('buildings.bankSetupStep1') }}</li>
+                <li>{{ t('buildings.bankSetupStep2') }}</li>
+                <li>{{ t('buildings.bankSetupStep3') }}</li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -558,6 +572,43 @@ async function buyBuilding() {
   padding: 0.75rem 2rem;
   font-size: 1rem;
   font-weight: 600;
+}
+
+.bank-setup-info {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.bank-setup-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.bank-setup-content h3 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+}
+
+.bank-setup-content p {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.bank-setup-content ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
 .error-message {
