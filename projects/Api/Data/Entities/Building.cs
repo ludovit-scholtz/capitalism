@@ -110,6 +110,14 @@ public sealed class Building
     /// </summary>
     public bool BaseCapitalDeposited { get; set; }
 
+    /// <summary>
+    /// Outstanding debt owed to the central bank as emergency liquidity funding.
+    /// Accumulates when the bank cannot meet deposit-interest or withdrawal obligations from its own cash.
+    /// Repaid automatically when depositors add funds or the bank has surplus cash.
+    /// Only meaningful for BANK buildings.
+    /// </summary>
+    public decimal CentralBankDebt { get; set; }
+
     /// <summary>UTC timestamp when the building was constructed.</summary>
     public DateTime BuiltAtUtc { get; set; } = DateTime.UtcNow;
 

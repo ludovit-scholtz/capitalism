@@ -1180,6 +1180,13 @@ export interface BankInfoSummary {
   outstandingLoanPrincipal: number
   availableLendingCapacity: number
   baseCapitalDeposited: boolean
+  // Liquidity / central-bank fields
+  centralBankDebt: number
+  centralBankInterestRatePercent: number
+  reserveRequirement: number
+  availableCash: number
+  reserveShortfall: number
+  liquidityStatus: 'HEALTHY' | 'PRESSURED' | 'CRITICAL'
 }
 
 /** Procurement preview result from the backend. */
