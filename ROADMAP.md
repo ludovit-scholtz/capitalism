@@ -42,11 +42,11 @@ Implement banking as is described in the product definition below.
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below
 
-### City map (0% complete)
+### City map (40% complete)
 
-- Add picker to change the city
-- Implement and show weather predictions as is defined in the powerplants seciton
-- When going to the list view, and back to the map view, the map does not show up
+- ~~Add picker to change the city~~ ✅ Done: city picker dropdown in header fetches all cities and navigates to `/city/:id`
+- ~~When going to the list view, and back to the map view, the map does not show up~~ ✅ Done: fixed blank-map regression by switching from `v-if` to `v-show` on the map container so Leaflet never loses its DOM element
+- Implement and show weather predictions as is defined in the powerplants section
 
 ## Multiple Game Servers
 

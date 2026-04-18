@@ -1357,6 +1357,7 @@ export default {
     filterAll: 'Všetky',
     filterAvailable: 'Iba dostupné',
     lotCount: '{count} pozemkov',
+    cityPickerLabel: 'Zmeniť mesto',
     owner: 'Vlastník',
     building: 'Budova',
     company: 'Spoločnosť',

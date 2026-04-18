@@ -34,6 +34,7 @@ const highlightedBuildingId = computed(() => (typeof route.query.building === 's
 const loading = ref(true)
 const error = ref<string | null>(null)
 const city = ref<City | null>(null)
+const allCities = ref<City[]>([])
 const lots = ref<BuildingLot[]>([])
 const companies = ref<Company[]>([])
 const selectedLot = ref<BuildingLot | null>(null)
@@ -214,36 +215,45 @@ async function fetchData() {
       await auth.fetchMe()
     }
 
-    const cityData = await gqlRequest<{ city: City }>(
-      `query GetCity($id: UUID!) {
-        city(id: $id) {
-          id name countryCode latitude longitude population
-          resources { resourceType { id name slug category } abundance }
-        }
-      }`,
-      { id: cityId.value },
-    )
-    const lotsData = await gqlRequest<{ cityLots: BuildingLot[] }>(
-      `query CityLots($cityId: UUID!) {
-        cityLots(cityId: $cityId) {
-          id cityId name description district latitude longitude
-          populationIndex basePrice price suitableTypes
-          ownerCompanyId buildingId
-          ownerCompany { id name }
-          building { id name type isUnderConstruction constructionCompletesAtTick constructionCost }
-          resourceType { id name slug }
-          materialQuality materialQuantity
-        }
-      }`,
-      { cityId: cityId.value },
-    )
-    const companiesData: { myCompanies: Company[] } = auth.isAuthenticated
-      ? await gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`)
-      : { myCompanies: [] }
+    const [cityData, lotsData, companiesData, citiesData] = await Promise.all([
+      gqlRequest<{ city: City }>(
+        `query GetCity($id: UUID!) {
+          city(id: $id) {
+            id name countryCode latitude longitude population
+            resources { resourceType { id name slug category } abundance }
+          }
+        }`,
+        { id: cityId.value },
+      ),
+      gqlRequest<{ cityLots: BuildingLot[] }>(
+        `query CityLots($cityId: UUID!) {
+          cityLots(cityId: $cityId) {
+            id cityId name description district latitude longitude
+            populationIndex basePrice price suitableTypes
+            ownerCompanyId buildingId
+            ownerCompany { id name }
+            building { id name type isUnderConstruction constructionCompletesAtTick constructionCost }
+            resourceType { id name slug }
+            materialQuality materialQuantity
+          }
+        }`,
+        { cityId: cityId.value },
+      ),
+      auth.isAuthenticated
+        ? gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`)
+        : Promise.resolve({ myCompanies: [] as Company[] }),
+      // allCities is a session-level cache: fetch once on first load, reuse on subsequent city switches
+      allCities.value.length > 0
+        ? Promise.resolve({ cities: allCities.value })
+        : gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode } }`),
+    ])
 
     city.value = cityData.city
     lots.value = lotsData.cityLots
     companies.value = companiesData.myCompanies
+    if (allCities.value.length === 0) {
+      allCities.value = citiesData.cities
+    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load city data'
   } finally {
@@ -478,6 +488,12 @@ async function confirmPurchase() {
   }
 }
 
+function switchCity(id: string) {
+  if (id !== cityId.value) {
+    router.push({ name: 'city-map', params: { id } })
+  }
+}
+
 watch(filteredLots, () => {
   if (map) {
     updateMarkers()
@@ -492,6 +508,28 @@ watch(
     }
   },
 )
+
+// Reload data and reinitialize map when city changes via the picker or back navigation.
+// fetchData() handles its own error state (sets error.value), so no extra try-catch needed here.
+watch(cityId, async () => {
+  selectedLot.value = null
+  purchaseMode.value = false
+  purchaseError.value = null
+  purchaseSuccess.value = null
+  justPurchasedBuildingId.value = null
+  justPurchasedBuildingType.value = null
+  viewMode.value = 'map'
+  if (map) {
+    map.remove()
+    map = null
+  }
+  await fetchData()
+  void fetchMediaHouses()
+  if (!error.value) {
+    await nextTick()
+    initMap()
+  }
+})
 
 onMounted(async () => {
   await fetchData()
@@ -510,6 +548,8 @@ onUnmounted(() => {
   }
 })
 
+// Fix blank-map regression: v-show keeps the container in the DOM so we can always
+// call invalidateSize() on the existing Leaflet instance without re-initializing.
 watch(viewMode, async (mode) => {
   if (mode === 'map') {
     await nextTick()
@@ -532,6 +572,20 @@ watch(viewMode, async (mode) => {
         <p class="subtitle">{{ t('cityMap.subtitle') }}</p>
       </div>
       <div class="header-controls">
+        <!-- City picker: shown when more than one city is available -->
+        <div v-if="allCities.length > 1" class="city-picker" :aria-label="t('cityMap.cityPickerLabel')">
+          <label class="city-picker-label" for="city-select">🏙️ {{ t('cityMap.cityPickerLabel') }}</label>
+          <select
+            id="city-select"
+            class="city-picker-select"
+            :value="cityId"
+            @change="switchCity(($event.target as HTMLSelectElement).value)"
+          >
+            <option v-for="c in allCities" :key="c.id" :value="c.id">
+              {{ c.name }} ({{ c.countryCode }})
+            </option>
+          </select>
+        </div>
         <div class="view-toggle">
           <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button>
           <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">📋 {{ t('cityMap.listView') }}</button>
@@ -560,10 +614,12 @@ watch(viewMode, async (mode) => {
     <!-- Content -->
     <template v-else-if="city">
       <div class="city-content" :class="{ 'has-selection': !!selectedLot }">
-        <!-- Map / List -->
+        <!-- Map / List: use v-show instead of v-if so the Leaflet container
+             is never removed from the DOM and the map renders reliably when
+             switching back from list view (fixes blank-map regression). -->
         <div class="map-area">
-          <div v-if="viewMode === 'map'" ref="mapContainer" class="map-container"></div>
-          <div v-else class="lot-list">
+          <div v-show="viewMode === 'map'" ref="mapContainer" class="map-container"></div>
+          <div v-show="viewMode === 'list'" class="lot-list">
             <button
               v-for="lot in filteredLots"
               :key="lot.id"
@@ -989,6 +1045,35 @@ watch(viewMode, async (mode) => {
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+/* City picker */
+.city-picker {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.city-picker-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.city-picker-select {
+  padding: 0.375rem 0.625rem;
+  font-size: 0.8125rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  cursor: pointer;
+  min-width: 160px;
+}
+
+.city-picker-select:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .view-toggle,
