@@ -62,6 +62,7 @@ const customerLoanError = ref<string | null>(null)
 const customerLoanSuccess = ref(false)
 // Collateral
 const collateralBuildings = ref<CollateralEligibilitySummary[]>([])
+const collateralBuildingsLoading = ref(false)
 const selectedCollateralBuildingId = ref<string | null>(null)
 const collateralLoadError = ref<string | null>(null)
 // My active loans at this bank (customer view)
@@ -621,13 +622,16 @@ async function selectLoanOffer(offer: LoanOfferSummary) {
   collateralBuildings.value = []
   collateralLoadError.value = null
   showLoanModal.value = true
-  // Load eligible collateral buildings
+  // Load eligible collateral buildings asynchronously (modal shows loading state)
   if (auth.isAuthenticated) {
+    collateralBuildingsLoading.value = true
     try {
       const result = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY)
       collateralBuildings.value = result.myCollateralBuildings ?? []
     } catch (err) {
       collateralLoadError.value = err instanceof Error ? err.message : String(err)
+    } finally {
+      collateralBuildingsLoading.value = false
     }
   }
 }
@@ -638,6 +642,7 @@ function closeLoanModal() {
   customerLoanError.value = null
   selectedCollateralBuildingId.value = null
   collateralBuildings.value = []
+  collateralBuildingsLoading.value = false
   collateralLoadError.value = null
 }
 
@@ -1031,7 +1036,7 @@ const estimatedCustomerTotalPayments = computed(() => {
                     {{ loan.missedPayments }} missed
                   </div>
                   <div v-if="loan.collateralBuildingId" class="collateral-inline">
-                    🏛 {{ loan.collateralBuildingName }}
+                    <span aria-hidden="true">🏛</span> {{ loan.collateralBuildingName }}
                     <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value">
                       ({{ formatCurrency(loan.collateralAppraisedValue) }})
                     </span>
@@ -1196,7 +1201,7 @@ const estimatedCustomerTotalPayments = computed(() => {
                 <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
               </div>
               <div v-if="loan.collateralBuildingId" class="collateral-badge">
-                🏛 {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
+                <span aria-hidden="true">🏛</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
                 <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
                   ({{ formatCurrency(loan.collateralAppraisedValue) }})
                 </span>
@@ -1259,7 +1264,8 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div class="form-group collateral-group">
             <label>{{ t('bank.collateralOptional') }}</label>
             <p class="form-hint">{{ t('bank.collateralHint') }}</p>
-            <div v-if="collateralLoadError" class="form-hint error-inline">{{ collateralLoadError }}</div>
+            <div v-if="collateralBuildingsLoading" class="form-hint muted-hint">{{ t('common.loading') }}</div>
+            <div v-else-if="collateralLoadError" class="form-hint error-inline">{{ collateralLoadError }}</div>
             <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
             <div v-else class="collateral-list">
               <!-- None option -->
@@ -1291,7 +1297,7 @@ const estimatedCustomerTotalPayments = computed(() => {
                 />
                 <div class="collateral-option-info">
                   <span class="collateral-option-name">{{ b.buildingName }}</span>
-                  <span v-if="!b.isEligible" class="ineligible-tag">{{ b.ineligibilityReason ?? 'Already pledged' }}</span>
+                  <span v-if="!b.isEligible" class="ineligible-tag">{{ b.ineligibilityReason ?? t('bank.collateralAlreadyPledged') }}</span>
                   <div class="collateral-stats">
                     <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
                     <span>{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable) }}</span>
@@ -1318,7 +1324,7 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div v-if="collateralCapacityWarning" class="error-inline">{{ collateralCapacityWarning }}</div>
 
           <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
-          <div v-if="customerLoanSuccess" class="success-message">Loan accepted successfully.</div>
+          <div v-if="customerLoanSuccess" class="success-message">{{ t('bank.loanAcceptedSuccess') }}</div>
           <div v-if="customerLoanError" class="error-message">{{ customerLoanError }}</div>
         </div>
         <div class="modal-footer">

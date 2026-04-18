@@ -2046,5 +2046,6 @@ export default {
     securedLoan: 'Zabezpečený úver',
     unsecuredLoan: 'Nezabezpečený úver',
     noBuildingsForCollateral: 'Nemáte žiadne vhodné budovy na zálohovanie.',
+    loanAcceptedSuccess: 'Úver bol úspešne prijatý.',
   },
 }

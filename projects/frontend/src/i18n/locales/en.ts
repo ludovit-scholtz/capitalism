@@ -2058,5 +2058,6 @@ export default {
     securedLoan: 'Secured Loan',
     unsecuredLoan: 'Unsecured Loan',
     noBuildingsForCollateral: 'You have no eligible buildings to pledge as collateral.',
+    loanAcceptedSuccess: 'Loan accepted successfully.',
   },
 }

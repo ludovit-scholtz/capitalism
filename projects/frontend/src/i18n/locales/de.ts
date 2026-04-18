@@ -2054,5 +2054,6 @@ export default {
     securedLoan: 'Gesichertes Darlehen',
     unsecuredLoan: 'Ungesichertes Darlehen',
     noBuildingsForCollateral: 'Sie haben keine geeigneten Gebäude, die als Sicherheit verpfändet werden können.',
+    loanAcceptedSuccess: 'Darlehen erfolgreich angenommen.',
   },
 }
