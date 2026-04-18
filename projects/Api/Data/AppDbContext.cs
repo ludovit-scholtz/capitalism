@@ -112,5 +112,6 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
         ConfigureIdentityEntities(modelBuilder);
         ConfigureBuildingEntities(modelBuilder);
         ConfigureEconomyEntities(modelBuilder);
+        ConfigureWeatherEntities(modelBuilder);
     }
 }

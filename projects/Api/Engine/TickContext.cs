@@ -71,6 +71,14 @@ public sealed partial class TickContext
     /// </summary>
     public Dictionary<(Guid CompanyId, Guid ProductTypeId), ProductResearchBudget> ResearchBudgetsByKey { get; init; } = [];
 
+    /// <summary>
+    /// Current-tick weather snapshot for each city.
+    /// Pre-loaded by <see cref="TickProcessor"/> from <see cref="Data.AppDbContext.CityWeatherForecasts"/>
+    /// and refreshed in-place by <see cref="Phases.WeatherUpdatePhase"/> each tick.
+    /// Used by <see cref="Phases.PowerDistributionPhase"/> to scale SOLAR and WIND output.
+    /// </summary>
+    public Dictionary<Guid, WeatherSnapshot> WeatherByCity { get; init; } = [];
+
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 

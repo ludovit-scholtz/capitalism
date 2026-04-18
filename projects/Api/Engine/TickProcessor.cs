@@ -123,6 +123,10 @@ public sealed class TickProcessor(
         var exchangeOrders = await db.ExchangeOrders.Where(o => o.IsActive).ToListAsync(ct);
         var researchBudgets = await db.ProductResearchBudgets.ToListAsync(ct);
 
+        // Pre-load current-tick weather snapshot for all cities (used by PowerDistributionPhase).
+        var cityIdList = cities.Select(c => c.Id).ToList();
+        var weatherByCity = await WeatherService.LoadCurrentSnapshotsAsync(db, cityIdList, gameState.CurrentTick, ct);
+
         // Build a city-keyed map of total absolute salary paid in the past
         // RecentSalaryWindowTicks ticks.  This implements the ROADMAP requirement
         // "the game currency collected by salaries in past 10 ticks".
@@ -210,6 +214,7 @@ public sealed class TickProcessor(
             TrendStatesByKey = trendStatesByKey,
             UnitsUnderUpgrade = unitsUnderUpgrade,
             ResearchBudgetsByKey = researchBudgets.ToDictionary(rb => (rb.CompanyId, rb.ProductTypeId)),
+            WeatherByCity = weatherByCity,
         };
     }
 }
