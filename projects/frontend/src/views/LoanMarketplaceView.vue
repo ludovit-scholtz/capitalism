@@ -128,23 +128,6 @@ const MY_LOANS_QUERY = `
   }
 `
 
-const MY_COLLATERAL_BUILDINGS_QUERY = `
-  {
-    myCollateralBuildings {
-      buildingId
-      buildingName
-      buildingType
-      level
-      appraisedValue
-      maxBorrowable
-      existingSecuredExposure
-      remainingBorrowingCapacity
-      isEligible
-      ineligibilityReason
-    }
-  }
-`
-
 const MY_COMPANIES_QUERY = `
   {
     me {
@@ -355,6 +338,13 @@ function navigateToAcquireBank() {
   }
 }
 
+// Banks sorted for the borrow section: all open banks sorted by lowest lending rate
+const sortedBanksForBorrow = computed(() =>
+  [...allBanks.value]
+    .filter((b) => b.baseCapitalDeposited)
+    .sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent),
+)
+
 function navigateToManageBank() {
   if (firstBankBuilding.value) {
     router.push(`/bank/${firstBankBuilding.value.id}`)
@@ -363,30 +353,6 @@ function navigateToManageBank() {
 
 function navigateToBank(bankBuildingId: string) {
   router.push(`/bank/${bankBuildingId}`)
-}
-
-function openAcceptModal(offer: LoanOfferSummary) {
-  if (!isCompanyAccountActive.value || !activeCompany.value) {
-    acceptError.value = t('bank.companyAccountRequired')
-    return
-  }
-
-  selectedOffer.value = offer
-  principalAmount.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
-  selectedCompanyId.value = activeCompany.value.id
-  selectedCollateralBuildingId.value = null
-  acceptError.value = null
-  showAcceptModal.value = true
-
-  // Load collateral buildings in the background
-  collateralLoadError.value = null
-  gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY)
-    .then((r) => {
-      collateralBuildings.value = r.myCollateralBuildings ?? []
-    })
-    .catch(() => {
-      collateralLoadError.value = 'Failed to load collateral buildings.'
-    })
 }
 
 function closeAcceptModal() {
@@ -628,53 +594,45 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </div>
       </section>
 
-      <!-- Available loan offers -->
+      <!-- Bank discovery section for borrowers: choose a bank first, then create loan on bank page -->
       <section class="offers-section">
-        <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
-        <div v-if="offers.length === 0" class="empty-state">
-          <p>{{ t('bank.noOffers') }}</p>
+        <h2 class="section-title">{{ t('bank.chooseBankToBorrow') }}</h2>
+        <p class="section-subtitle">{{ t('bank.chooseBankToBorrowHint') }}</p>
+        <div v-if="sortedBanksForBorrow.length === 0" class="empty-state">
+          <p>{{ t('bank.noBanksAvailable') }}</p>
         </div>
-        <div v-else class="offers-grid">
-          <div v-for="offer in offers" :key="offer.id" class="offer-card">
-            <div class="offer-card-header">
-              <div class="offer-lender">
-                <span class="offer-bank-name">{{ offer.bankBuildingName }}</span>
-                <span class="offer-lender-name">{{ offer.lenderCompanyName }}</span>
+        <div v-else class="banks-for-borrow-grid">
+          <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card">
+            <div class="bank-borrow-card-header">
+              <div class="bank-borrow-identity">
+                <span class="bank-borrow-icon">🏦</span>
+                <div>
+                  <span class="bank-borrow-name">{{ bank.bankBuildingName }}</span>
+                  <span class="bank-borrow-lender">{{ bank.lenderCompanyName }}</span>
+                </div>
               </div>
-              <div class="offer-rate">
-                <span class="rate-value">{{ formatPercent(offer.annualInterestRatePercent) }}</span>
+              <div class="bank-borrow-rate">
+                <span class="rate-value">{{ formatPercent(bank.lendingInterestRatePercent) }}</span>
                 <span class="rate-label">{{ t('bank.perYear') }}</span>
               </div>
             </div>
-            <div class="offer-card-body">
-              <div class="offer-stat">
-                <span class="stat-label">{{ t('bank.maxPrincipal') }}</span>
-                <span class="stat-value">{{ formatCurrency(offer.maxPrincipalPerLoan) }}</span>
+            <div class="bank-borrow-stats">
+              <div class="borrow-stat">
+                <span class="stat-label">{{ t('bank.availableCapacity') }}</span>
+                <span class="stat-value" :class="bank.availableLendingCapacity > 0 ? '' : 'stat-zero'">
+                  {{ formatCurrency(bank.availableLendingCapacity) }}
+                </span>
               </div>
-              <div class="offer-stat">
-                <span class="stat-label">{{ t('bank.remainingCapacity') }}</span>
-                <span class="stat-value">{{ formatCurrency(offer.remainingCapacity) }}</span>
-              </div>
-              <div class="offer-stat">
-                <span class="stat-label">{{ t('bank.duration') }}</span>
-                <span class="stat-value">{{ formatLoanDuration(offer.durationTicks) }}</span>
-              </div>
-              <div class="offer-stat">
+              <div class="borrow-stat">
                 <span class="stat-label">{{ t('common.city') }}</span>
-                <span class="stat-value">{{ offer.cityName }}</span>
+                <span class="stat-value">{{ bank.cityName }}</span>
               </div>
             </div>
-            <div class="offer-card-footer">
-              <button v-if="auth.isAuthenticated" class="btn btn-primary" :disabled="!isCompanyAccountActive" @click="openAcceptModal(offer)">
-                {{ t('bank.acceptLoan') }}
-              </button>
-              <router-link v-else to="/login" class="btn btn-secondary">
-                {{ t('auth.loginToAccess') }}
+            <div class="bank-borrow-card-footer">
+              <router-link :to="`/bank/${bank.bankBuildingId}`" class="btn btn-primary btn-sm">
+                {{ t('bank.visitBankToBorrow') }}
               </router-link>
             </div>
-            <p v-if="auth.isAuthenticated && !isCompanyAccountActive" class="offer-context-hint">
-              {{ t('bank.companyAccountRequired') }}
-            </p>
           </div>
         </div>
       </section>
@@ -1065,6 +1023,101 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: var(--spacing-md);
+}
+
+/* Bank borrow card grid */
+.banks-for-borrow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-md);
+}
+
+.bank-borrow-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  transition: box-shadow 0.2s, border-color 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.bank-borrow-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.bank-borrow-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.bank-borrow-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.bank-borrow-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.bank-borrow-name {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.bank-borrow-lender {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.bank-borrow-rate {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.bank-borrow-stats {
+  display: flex;
+  gap: 1rem;
+}
+
+.borrow-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.borrow-stat .stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.borrow-stat .stat-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.borrow-stat .stat-zero {
+  color: var(--color-danger);
+}
+
+.bank-borrow-card-footer {
+  margin-top: auto;
+}
+
+.section-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
 }
 
 .loan-card,

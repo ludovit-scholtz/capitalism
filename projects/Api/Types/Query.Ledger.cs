@@ -76,6 +76,15 @@ public sealed partial class Query
         var totalPropertyPurchases = LedgerCalculator.GetTotalPropertyPurchases(entries);
         var totalStockPurchaseCashOut = LedgerCalculator.GetTotalStockPurchaseCashOut(entries);
         var totalStockSaleCashIn = LedgerCalculator.GetTotalStockSaleCashIn(entries);
+        // Banking aggregates
+        var totalDepositInterestReceived = LedgerCalculator.GetTotalDepositInterestReceived(entries);
+        var totalDepositInterestPaid = LedgerCalculator.GetTotalDepositInterestPaid(entries);
+        var totalLoanInterestIncome = LedgerCalculator.GetTotalLoanInterestIncome(entries);
+        var totalLoanInterestExpense = LedgerCalculator.GetTotalLoanInterestExpense(entries);
+        var totalDepositsMade = LedgerCalculator.GetTotalDepositsMade(entries);
+        var totalDepositsWithdrawn = LedgerCalculator.GetTotalDepositsWithdrawn(entries);
+        var totalLoanOriginations = LedgerCalculator.GetTotalLoanOriginations(entries);
+        var totalLoanRepaymentPrincipal = LedgerCalculator.GetTotalLoanRepaymentPrincipal(entries);
         var taxableIncome = LedgerCalculator.ComputeTaxableIncome(entries);
         var estimatedIncomeTax = isCurrentYear
             ? GameTime.ComputeEstimatedIncomeTax(taxableIncome, gameState?.TaxRate ?? 0m)
@@ -97,6 +106,12 @@ public sealed partial class Query
             .Include(i => i.ProductType)
             .ToListAsync();
         var inventoryValue = inventories.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i));
+
+        // Active deposits placed by this company appear as assets on the balance sheet
+        var totalDepositsPlaced = await db.BankDeposits
+            .AsNoTracking()
+            .Where(d => d.DepositorCompanyId == companyId && d.IsActive)
+            .SumAsync(d => (decimal?)d.Amount) ?? 0m;
 
         var buildingSummaries = entries
             .Where(e => e.BuildingId.HasValue)
@@ -150,14 +165,27 @@ public sealed partial class Query
             TotalPropertyPurchases = totalPropertyPurchases,
             TotalStockPurchaseCashOut = totalStockPurchaseCashOut,
             TotalStockSaleCashIn = totalStockSaleCashIn,
-            NetIncome = totalRevenue - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
+            // Banking income/expense
+            TotalDepositInterestReceived = totalDepositInterestReceived,
+            TotalDepositInterestPaid = totalDepositInterestPaid,
+            TotalLoanInterestIncome = totalLoanInterestIncome,
+            TotalLoanInterestExpense = totalLoanInterestExpense,
+            NetIncome = totalRevenue + totalDepositInterestReceived + totalLoanInterestIncome
+                - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
+                - totalMarketingCosts - totalTaxPaid - totalOtherCosts
+                - totalDepositInterestPaid - totalLoanInterestExpense,
             PropertyValue = propertyValue,
             PropertyAppreciation = propertyValue - totalPropertyPurchases,
             BuildingValue = buildingValue,
             InventoryValue = inventoryValue,
-            TotalAssets = company.Cash + propertyValue + buildingValue + inventoryValue,
-            CashFromOperations = totalRevenue - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts,
+            TotalDepositsPlaced = totalDepositsPlaced,
+            TotalAssets = company.Cash + propertyValue + buildingValue + inventoryValue + totalDepositsPlaced,
+            CashFromOperations = totalRevenue + totalDepositInterestReceived + totalLoanInterestIncome
+                - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
+                - totalMarketingCosts - totalDepositInterestPaid - totalLoanInterestExpense,
             CashFromInvestments = totalStockSaleCashIn - totalPropertyPurchases - totalStockPurchaseCashOut,
+            CashFromBanking = totalLoanOriginations + totalDepositsWithdrawn
+                - totalDepositsMade - totalLoanRepaymentPrincipal,
             FirstRecordedTick = entries.Count > 0 ? entries.Min(e => e.RecordedAtTick) : 0,
             LastRecordedTick = entries.Count > 0 ? entries.Max(e => e.RecordedAtTick) : 0,
             BuildingSummaries = buildingSummaries,
@@ -220,6 +248,7 @@ public sealed partial class Query
             RecordedAtUtc = e.RecordedAtUtc,
             BuildingId = e.BuildingId,
             BuildingName = e.Building?.Name,
+            BuildingType = e.Building?.Type,
             BuildingUnitId = e.BuildingUnitId,
             ProductTypeId = e.ProductTypeId,
             ProductName = e.ProductType?.Name,

@@ -23,6 +23,16 @@ const selectedType = ref('')
 const selectedCityId = ref('')
 const buildingName = ref('')
 const submitting = ref(false)
+// Initial deposit for BANK type (optional; if provided, initiateBaseDeposit is called after purchase)
+const initialDepositAmount = ref<number | null>(null)
+
+const INITIATE_BASE_DEPOSIT_MUTATION = `
+  mutation InitiateBaseDeposit($input: InitiateBaseDepositInput!) {
+    initiateBaseDeposit(input: $input) {
+      id name baseCapitalDeposited totalDeposits
+    }
+  }
+`
 
 const buildingTypes = [
   'MINE',
@@ -146,7 +156,23 @@ async function buyBuilding() {
       },
     )
 
-    router.push(`/building/${data.purchaseLot.building.id}`)
+    const buildingId = data.purchaseLot.building.id
+
+    // If buying a bank and an initial deposit amount was entered, activate the bank immediately
+    if (selectedType.value === 'BANK' && initialDepositAmount.value && initialDepositAmount.value > 0) {
+      try {
+        await gqlRequest(INITIATE_BASE_DEPOSIT_MUTATION, {
+          input: {
+            bankBuildingId: buildingId,
+            amount: initialDepositAmount.value,
+          },
+        })
+      } catch {
+        // Non-fatal: bank was purchased; deposit can be made from the bank management page
+      }
+    }
+
+    router.push(selectedType.value === 'BANK' ? `/bank/${buildingId}` : `/building/${buildingId}`)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
   } finally {
@@ -221,6 +247,38 @@ async function buyBuilding() {
           <div v-if="selectedCompany" class="company-banner">
             <span>{{ selectedCompany.name }}</span>
             <strong>{{ formatCurrency(selectedCompany.cash) }}</strong>
+          </div>
+
+          <!-- Bank setup info and optional initial deposit -->
+          <div v-if="selectedType === 'BANK'" class="bank-setup-info">
+            <div class="bank-setup-icon">🏦</div>
+            <div class="bank-setup-content">
+              <h3>{{ t('buildings.bankSetupTitle') }}</h3>
+              <p>{{ t('buildings.bankSetupDescription') }}</p>
+              <ul>
+                <li>{{ t('buildings.bankSetupStep1') }}</li>
+                <li>{{ t('buildings.bankSetupStep2') }}</li>
+                <li>{{ t('buildings.bankSetupStep3') }}</li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Initial deposit field (BANK only) -->
+          <div v-if="selectedType === 'BANK'" class="bank-initial-deposit">
+            <label for="initialDepositAmount" class="deposit-label">
+              {{ t('buildings.initialDepositLabel') }}
+              <span class="optional-hint">({{ t('common.optional') }})</span>
+            </label>
+            <p class="deposit-hint">{{ t('buildings.initialDepositHint') }}</p>
+            <input
+              id="initialDepositAmount"
+              v-model.number="initialDepositAmount"
+              type="number"
+              min="10000000"
+              step="1000000"
+              :placeholder="t('buildings.initialDepositPlaceholder')"
+              class="deposit-input"
+            />
           </div>
         </div>
 
@@ -558,6 +616,75 @@ async function buyBuilding() {
   padding: 0.75rem 2rem;
   font-size: 1rem;
   font-weight: 600;
+}
+
+.bank-setup-info {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.bank-setup-icon {
+  font-size: 2rem;
+  flex-shrink: 0;
+}
+
+.bank-setup-content h3 {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  margin-bottom: 0.375rem;
+}
+
+.bank-setup-content p {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.bank-setup-content ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.bank-initial-deposit {
+  margin-top: 1rem;
+  padding: 1rem 1.25rem;
+  background: rgba(16, 185, 129, 0.07);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.deposit-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.deposit-hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.5rem;
+}
+
+.deposit-input {
+  width: 100%;
+  max-width: 320px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-input-bg, var(--color-surface));
+  color: var(--color-text);
+  font-size: 0.9rem;
 }
 
 .error-message {

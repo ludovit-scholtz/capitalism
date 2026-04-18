@@ -595,6 +595,179 @@ public sealed class BankingIntegrationTests
         Assert.Equal("PRESSURED", liquidityStatus);
     }
 
+    // ── SetBankRates tests ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Bank owner can update lending and deposit rates via setBankRates.
+    /// </summary>
+    [Fact]
+    public async Task SetBankRates_BankOwner_UpdatesRatesSuccessfully()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAsync(client, "rateowner@test.com", "Rate Owner");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+
+        var ownerUser = await db.Players.FirstAsync(p => p.Email == "rateowner@test.com");
+        var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Rate Bank Co", Cash = 50_000_000m };
+        db.Companies.Add(ownerCompany);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = ownerCompany.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "Rate Test Bank", Level = 1,
+            DepositInterestRatePercent = 3m, LendingInterestRatePercent = 8m,
+            TotalDeposits = 10_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteAsync(client,
+            """
+            mutation SBR($input: SetBankRatesInput!) {
+              setBankRates(input: $input) {
+                depositInterestRatePercent
+                lendingInterestRatePercent
+              }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositInterestRatePercent = 4.5m, lendingInterestRatePercent = 10.5m } },
+            token: ownerToken);
+
+        var updated = result.GetProperty("data").GetProperty("setBankRates");
+        Assert.Equal(4.5m, updated.GetProperty("depositInterestRatePercent").GetDecimal());
+        Assert.Equal(10.5m, updated.GetProperty("lendingInterestRatePercent").GetDecimal());
+    }
+
+    /// <summary>
+    /// Non-owner cannot update bank rates — should return an error.
+    /// </summary>
+    [Fact]
+    public async Task SetBankRates_NonOwner_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAsync(client, "rateowner2@test.com", "Rate Owner 2");
+        var otherToken = await RegisterAsync(client, "rateother2@test.com", "Rate Other 2");
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await db.Cities.FirstAsync();
+
+        var ownerUser = await db.Players.FirstAsync(p => p.Email == "rateowner2@test.com");
+        var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Rate Bank Co 2", Cash = 50_000_000m };
+        db.Companies.Add(ownerCompany);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = ownerCompany.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "Rate Test Bank 2", Level = 1,
+            DepositInterestRatePercent = 3m, LendingInterestRatePercent = 8m,
+            TotalDeposits = 10_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteAsync(client,
+            """
+            mutation SBR($input: SetBankRatesInput!) {
+              setBankRates(input: $input) {
+                depositInterestRatePercent
+              }
+            }
+            """,
+            new { input = new { bankBuildingId = bank.Id.ToString(), depositInterestRatePercent = 5m, lendingInterestRatePercent = 12m } },
+            token: otherToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Expected an error when non-owner tries to set rates.");
+    }
+
+    // ── Self-interest exclusion tests ─────────────────────────────────────────
+
+    /// <summary>
+    /// During BankInterestPhase, the bank's own founder/owner company does not receive
+    /// deposit interest from its own bank — only external depositors earn interest.
+    /// </summary>
+    [Fact]
+    public async Task BankInterestPhase_FounderDeposit_DoesNotReceiveInterest()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        var city = await db.Cities.FirstAsync();
+        var gs = await db.GameStates.FirstAsync();
+
+        // Bank owner
+        var bankOwner = new Player { Id = Guid.NewGuid(), Email = "selfint@test.com", DisplayName = "Self Int", PasswordHash = "x", Role = PlayerRole.Player };
+        db.Players.Add(bankOwner);
+
+        // External depositor
+        var externalDepositor = new Player { Id = Guid.NewGuid(), Email = "extint@test.com", DisplayName = "External", PasswordHash = "x", Role = PlayerRole.Player };
+        db.Players.Add(externalDepositor);
+
+        var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "SelfInt Bank Co", Cash = 10_000_000m };
+        var externalCompany = new Company { Id = Guid.NewGuid(), PlayerId = externalDepositor.Id, Name = "SelfInt External Co", Cash = 5_000_000m };
+        db.Companies.AddRange(bankCompany, externalCompany);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCompany.Id, CityId = city.Id,
+            Type = BuildingType.Bank, Name = "SelfInt Bank", Level = 1,
+            DepositInterestRatePercent = 10m, // high rate to make assertion easy
+            LendingInterestRatePercent = 20m,
+            TotalDeposits = 0m, BaseCapitalDeposited = false,
+        };
+        db.Buildings.Add(bank);
+
+        // Founder deposit (base capital) — this deposit must NOT earn interest
+        var founderDeposit = new BankDeposit
+        {
+            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = bankCompany.Id,
+            Amount = 10_000_000m, TotalInterestPaid = 0m, IsBaseCapital = true,
+            DepositInterestRatePercent = bank.DepositInterestRatePercent ?? 10m,
+            DepositedAtTick = gs.CurrentTick, DepositedAtUtc = DateTime.UtcNow,
+        };
+        // External deposit — this one SHOULD earn interest
+        var externalDeposit = new BankDeposit
+        {
+            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = externalCompany.Id,
+            Amount = 1_000_000m, TotalInterestPaid = 0m, IsBaseCapital = false,
+            DepositInterestRatePercent = bank.DepositInterestRatePercent ?? 10m,
+            DepositedAtTick = gs.CurrentTick, DepositedAtUtc = DateTime.UtcNow,
+        };
+        db.BankDeposits.AddRange(founderDeposit, externalDeposit);
+
+        bank.TotalDeposits = founderDeposit.Amount + externalDeposit.Amount;
+        bank.BaseCapitalDeposited = true;
+        await db.SaveChangesAsync();
+
+        var founderCashBefore = bankCompany.Cash;
+        var externalCashBefore = externalCompany.Cash;
+
+        await processor.ProcessTickAsync();
+        await db.Entry(bankCompany).ReloadAsync();
+        await db.Entry(externalCompany).ReloadAsync();
+
+        // External depositor must have received interest
+        Assert.True(externalCompany.Cash > externalCashBefore,
+            $"External depositor should have received deposit interest. Before: {externalCashBefore:C}, After: {externalCompany.Cash:C}");
+
+        // Bank owner company must NOT have received deposit interest from its own base capital
+        // (The bank company pays out interest to others; it may gain via lending interest income,
+        // but the founder deposit must not generate an inbound interest LedgerEntry for the bank company.)
+        var founderInterestEntries = await db.LedgerEntries
+            .Where(e => e.CompanyId == bankCompany.Id && e.Category == LedgerCategory.DepositInterestReceived)
+            .ToListAsync();
+        Assert.Empty(founderInterestEntries);
+    }
+
     // ── Static helpers for HTTP-level tests ───────────────────────────────────
 
     private static async Task<string> RegisterAsync(HttpClient client, string email, string displayName)

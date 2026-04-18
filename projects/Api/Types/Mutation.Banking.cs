@@ -59,6 +59,16 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        // Bank's own company cannot deposit into its own bank (no self-interest)
+        if (depositorCompany.Id == bank.CompanyId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A bank's founder company cannot deposit into its own bank. Use the bank's capital directly.")
+                    .SetCode("SELF_DEPOSIT_NOT_ALLOWED")
+                    .Build());
+        }
+
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
 
         if (!bank.BaseCapitalDeposited)
