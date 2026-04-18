@@ -8,7 +8,7 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company } from '@/types'
+import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, CollateralEligibilitySummary } from '@/types'
 import {
   formatLoanDuration,
   formatCurrency,
@@ -52,11 +52,20 @@ const customerDepositAmount = ref(10_000)
 const customerDepositLoading = ref(false)
 const customerDepositError = ref<string | null>(null)
 const customerDepositSuccess = ref(false)
+
+// Loan acceptance modal state
+const showLoanModal = ref(false)
 const customerLoanOffer = ref<LoanOfferSummary | null>(null)
 const customerLoanPrincipal = ref(0)
 const customerLoanLoading = ref(false)
 const customerLoanError = ref<string | null>(null)
 const customerLoanSuccess = ref(false)
+// Collateral
+const collateralBuildings = ref<CollateralEligibilitySummary[]>([])
+const selectedCollateralBuildingId = ref<string | null>(null)
+const collateralLoadError = ref<string | null>(null)
+// My active loans at this bank (customer view)
+const myLoansHere = ref<LoanSummary[]>([])
 
 // Rate configuration form
 const showRatesForm = ref(false)
@@ -283,6 +292,23 @@ const MY_DEPOSITS_QUERY = `
   }
 `
 
+const MY_LOANS_QUERY = `
+  {
+    myLoans {
+      id
+      bankBuildingId
+      bankBuildingName
+      originalPrincipal
+      remainingPrincipal
+      annualInterestRatePercent
+      status
+      collateralBuildingId
+      collateralBuildingName
+      collateralAppraisedValue
+    }
+  }
+`
+
 const CREATE_DEPOSIT_MUTATION = `
   mutation CreateDeposit($input: CreateDepositInput!) {
     createDeposit(input: $input) {
@@ -322,6 +348,23 @@ const ACCEPT_LOAN_MUTATION = `
       id
       status
       originalPrincipal
+    }
+  }
+`
+
+const MY_COLLATERAL_BUILDINGS_QUERY = `
+  {
+    myCollateralBuildings {
+      buildingId
+      buildingName
+      buildingType
+      level
+      appraisedValue
+      maxBorrowable
+      existingSecuredExposure
+      remainingBorrowingCapacity
+      isEligible
+      ineligibilityReason
     }
   }
 `
@@ -378,12 +421,15 @@ async function loadData(isRefresh = false) {
         ratesForm.value.lendingInterestRatePercent = bankInfo.value.lendingInterestRatePercent
       }
     } else {
-      // Customer view: load public loan offers for this bank, and my deposits here
-      const [offersResult, depositsResult] = await Promise.all([
+      // Customer view: load public loan offers, my deposits, and my loans at this bank
+      const [offersResult, depositsResult, myLoansResult] = await Promise.all([
         gqlRequest<{ loanOffers: LoanOfferSummary[] }>(PUBLIC_LOAN_OFFERS_QUERY),
         auth.isAuthenticated
           ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY)
           : Promise.resolve({ myDeposits: [] }),
+        auth.isAuthenticated
+          ? gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY)
+          : Promise.resolve({ myLoans: [] }),
       ])
       const bankOffers = (offersResult.loanOffers ?? []).filter(
         (o) => o.bankBuildingId === bankBuildingId.value && o.isActive,
@@ -396,6 +442,12 @@ async function loadData(isRefresh = false) {
       )
       if (!deepEqual(myDepositsHere.value, myDeposits)) {
         myDepositsHere.value = myDeposits
+      }
+      const loansHere = (myLoansResult.myLoans ?? []).filter(
+        (l: LoanSummary) => l.bankBuildingId === bankBuildingId.value,
+      )
+      if (!deepEqual(myLoansHere.value, loansHere)) {
+        myLoansHere.value = loansHere
       }
     }
   } catch (err) {
@@ -547,10 +599,11 @@ async function submitCustomerLoan() {
         loanOfferId: customerLoanOffer.value.id,
         borrowerCompanyId: activeCompany.value.id,
         principalAmount: customerLoanPrincipal.value,
+        collateralBuildingId: selectedCollateralBuildingId.value ?? undefined,
       },
     })
     customerLoanSuccess.value = true
-    customerLoanOffer.value = null
+    closeLoanModal()
     await loadData()
     setTimeout(() => { customerLoanSuccess.value = false }, 3000)
   } catch (err) {
@@ -560,11 +613,45 @@ async function submitCustomerLoan() {
   }
 }
 
-function selectLoanOffer(offer: LoanOfferSummary) {
+async function selectLoanOffer(offer: LoanOfferSummary) {
   customerLoanOffer.value = offer
   customerLoanPrincipal.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
   customerLoanError.value = null
+  selectedCollateralBuildingId.value = null
+  collateralBuildings.value = []
+  collateralLoadError.value = null
+  showLoanModal.value = true
+  // Load eligible collateral buildings
+  if (auth.isAuthenticated) {
+    try {
+      const result = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY)
+      collateralBuildings.value = result.myCollateralBuildings ?? []
+    } catch (err) {
+      collateralLoadError.value = err instanceof Error ? err.message : String(err)
+    }
+  }
 }
+
+function closeLoanModal() {
+  showLoanModal.value = false
+  customerLoanOffer.value = null
+  customerLoanError.value = null
+  selectedCollateralBuildingId.value = null
+  collateralBuildings.value = []
+  collateralLoadError.value = null
+}
+
+const selectedCollateral = computed<CollateralEligibilitySummary | null>(() =>
+  collateralBuildings.value.find((b: CollateralEligibilitySummary) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
+)
+
+const collateralCapacityWarning = computed(() => {
+  if (!selectedCollateral.value || customerLoanPrincipal.value <= 0) return null
+  if (customerLoanPrincipal.value > selectedCollateral.value.remainingBorrowingCapacity) {
+    return t('bank.collateralExceedsLimit')
+  }
+  return null
+})
 
 const estimatedCustomerTotalRepayment = computed(() => {
   if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
@@ -1084,46 +1171,8 @@ const estimatedCustomerTotalPayments = computed(() => {
                 </div>
               </div>
 
-              <!-- Loan request form for selected offer -->
-              <div v-if="customerLoanOffer?.id === offer.id" class="customer-loan-request">
-                <div class="form-group">
-                  <label for="customer-loan-amount">{{ t('bank.principalAmount') }}</label>
-                  <input
-                    id="customer-loan-amount"
-                    v-model.number="customerLoanPrincipal"
-                    type="number"
-                    :min="1000"
-                    :max="Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)"
-                    step="1000"
-                    class="form-input"
-                  />
-                </div>
-                <div class="repayment-preview">
-                  <div class="preview-row">
-                    <span>{{ t('bank.paymentAmount') }}</span>
-                    <strong>{{ formatCurrency(estimatedCustomerPaymentAmount) }} × {{ estimatedCustomerTotalPayments }}</strong>
-                  </div>
-                  <div class="preview-row total-row">
-                    <span>{{ t('bank.totalRepayment') }}</span>
-                    <strong>{{ formatCurrency(estimatedCustomerTotalRepayment) }}</strong>
-                  </div>
-                </div>
-                <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
-                <div v-if="customerLoanSuccess" class="success-message">Loan accepted successfully.</div>
-                <div v-if="customerLoanError" class="error-message">{{ customerLoanError }}</div>
-                <div class="loan-request-actions">
-                  <button class="btn btn-secondary btn-sm" @click="customerLoanOffer = null">{{ t('common.cancel') }}</button>
-                  <button
-                    class="btn btn-primary"
-                    :disabled="customerLoanLoading || customerLoanPrincipal <= 0"
-                    @click="submitCustomerLoan"
-                  >
-                    {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
-                  </button>
-                </div>
-              </div>
-
-              <div v-else-if="auth.isAuthenticated && isCompanyAccountActive && offer.remainingCapacity > 0">
+              <!-- Loan request: just the Accept button (opens modal) -->
+              <div v-if="auth.isAuthenticated && isCompanyAccountActive && offer.remainingCapacity > 0">
                 <button class="btn btn-primary btn-sm" @click="selectLoanOffer(offer)">
                   {{ t('bank.acceptLoan') }}
                 </button>
@@ -1137,9 +1186,153 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
         </section>
 
+        <!-- My Loans at This Bank -->
+        <section v-if="auth.isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section">
+          <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
+          <div class="loans-list">
+            <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row">
+              <div class="loan-row-main">
+                <span class="loan-amount">{{ formatCurrency(loan.remainingPrincipal) }}</span>
+                <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
+              </div>
+              <div v-if="loan.collateralBuildingId" class="collateral-badge">
+                🏛 {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
+                <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
+                  ({{ formatCurrency(loan.collateralAppraisedValue) }})
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+
       </template><!-- end customer view -->
 
     </template>
+
+    <!-- Accept Loan Modal (with collateral selection) -->
+    <div v-if="showLoanModal && customerLoanOffer" class="modal-overlay" @click.self="closeLoanModal">
+      <div class="modal" role="dialog" :aria-label="t('bank.confirmAccept')">
+        <div class="modal-header">
+          <h2>{{ t('bank.confirmAccept') }}</h2>
+          <button class="modal-close" @click="closeLoanModal" :aria-label="t('common.close')">✕</button>
+        </div>
+        <div class="modal-body">
+          <!-- Loan summary -->
+          <div class="loan-summary">
+            <div class="summary-row">
+              <span>{{ t('bank.interestRate') }}</span>
+              <strong>{{ formatPercent(customerLoanOffer.annualInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+            </div>
+            <div class="summary-row">
+              <span>{{ t('bank.duration') }}</span>
+              <strong>{{ formatLoanDuration(customerLoanOffer.durationTicks) }}</strong>
+            </div>
+          </div>
+
+          <!-- Principal amount -->
+          <div class="form-group">
+            <label for="principal-amount">{{ t('bank.principalAmount') }}</label>
+            <input
+              id="principal-amount"
+              v-model.number="customerLoanPrincipal"
+              type="number"
+              :min="1000"
+              :max="Math.min(customerLoanOffer.maxPrincipalPerLoan, customerLoanOffer.remainingCapacity)"
+              step="1000"
+              class="form-input"
+            />
+          </div>
+
+          <!-- Repayment preview -->
+          <div class="repayment-summary">
+            <div class="summary-row">
+              <span>{{ t('bank.paymentAmount') }}</span>
+              <strong>{{ formatCurrency(estimatedCustomerPaymentAmount) }} × {{ estimatedCustomerTotalPayments }}</strong>
+            </div>
+            <div class="summary-row total-row">
+              <span>{{ t('bank.totalRepayment') }}</span>
+              <strong>{{ formatCurrency(estimatedCustomerTotalRepayment) }}</strong>
+            </div>
+          </div>
+
+          <!-- Collateral selection -->
+          <div class="form-group collateral-group">
+            <label>{{ t('bank.collateralOptional') }}</label>
+            <p class="form-hint">{{ t('bank.collateralHint') }}</p>
+            <div v-if="collateralLoadError" class="form-hint error-inline">{{ collateralLoadError }}</div>
+            <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
+            <div v-else class="collateral-list">
+              <!-- None option -->
+              <label
+                class="collateral-option"
+                :class="{ selected: selectedCollateralBuildingId === null }"
+              >
+                <input
+                  type="radio"
+                  :value="null"
+                  v-model="selectedCollateralBuildingId"
+                  class="collateral-radio"
+                />
+                <span class="collateral-option-name">{{ t('bank.collateralNone') }}</span>
+              </label>
+              <!-- Building options -->
+              <label
+                v-for="b in collateralBuildings"
+                :key="b.buildingId"
+                class="collateral-option"
+                :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }"
+              >
+                <input
+                  type="radio"
+                  :value="b.buildingId"
+                  v-model="selectedCollateralBuildingId"
+                  class="collateral-radio"
+                  :disabled="!b.isEligible"
+                />
+                <div class="collateral-option-info">
+                  <span class="collateral-option-name">{{ b.buildingName }}</span>
+                  <span v-if="!b.isEligible" class="ineligible-tag">{{ b.ineligibilityReason ?? 'Already pledged' }}</span>
+                  <div class="collateral-stats">
+                    <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
+                    <span>{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable) }}</span>
+                  </div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Selected collateral summary -->
+          <div v-if="selectedCollateral" class="collateral-selected-summary">
+            <strong>{{ selectedCollateral.buildingName }}</strong>
+            <span>{{ t('bank.remainingCapacity') }}: {{ formatCurrency(selectedCollateral.remainingBorrowingCapacity) }}</span>
+            <!-- LTV capacity bar -->
+            <div class="capacity-bar-wrap">
+              <div
+                class="capacity-bar"
+                :style="{ width: Math.min(100, (customerLoanPrincipal / selectedCollateral.maxBorrowable) * 100) + '%' }"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Collateral cap warning -->
+          <div v-if="collateralCapacityWarning" class="error-inline">{{ collateralCapacityWarning }}</div>
+
+          <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
+          <div v-if="customerLoanSuccess" class="success-message">Loan accepted successfully.</div>
+          <div v-if="customerLoanError" class="error-message">{{ customerLoanError }}</div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="closeLoanModal">{{ t('common.cancel') }}</button>
+          <button
+            class="btn btn-primary"
+            :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralCapacityWarning"
+            @click="submitCustomerLoan"
+          >
+            {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1979,5 +2172,188 @@ th {
   min-width: 260px;
   font-size: 1rem;
   padding: var(--spacing-sm) var(--spacing-lg);
+}
+
+/* ── Accept Loan Modal ─────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--color-surface, #fff);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 0.25rem;
+}
+
+.modal-body {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.modal-footer {
+  display: flex;
+  gap: var(--spacing-sm);
+  justify-content: flex-end;
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+}
+
+.collateral-group {
+  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+  padding-top: var(--spacing-md);
+}
+
+.collateral-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-sm);
+}
+
+.collateral-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.collateral-option.selected {
+  border-color: var(--color-primary, #3b82f6);
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.collateral-option.ineligible {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.collateral-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.collateral-option-name {
+  font-weight: 600;
+}
+
+.ineligible-tag {
+  font-size: 0.78rem;
+  color: var(--color-danger, #ef4444);
+}
+
+.collateral-stats {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.collateral-selected-summary {
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.capacity-bar-wrap {
+  height: 8px;
+  background: var(--color-border, rgba(0, 0, 0, 0.1));
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.capacity-bar {
+  height: 100%;
+  background: var(--color-primary, #3b82f6);
+  border-radius: 4px;
+  transition: width 0.2s;
+}
+
+.muted-hint {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.error-inline {
+  color: var(--color-danger, #ef4444);
+  font-size: 0.85rem;
+}
+
+.my-loans-here-section {
+  margin-top: var(--spacing-lg);
+}
+
+.loans-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.loan-row {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
+  border-radius: var(--radius-sm);
+}
+
+.loan-row-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.loan-amount {
+  font-weight: 600;
+}
+
+.collateral-badge {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.collateral-badge-value {
+  color: var(--color-text-muted);
 }
 </style>

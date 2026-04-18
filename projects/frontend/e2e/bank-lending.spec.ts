@@ -1354,13 +1354,14 @@ test.describe('Loan collateral selection', () => {
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     state.collateralBuildings = [eligibleBuilding]
+    state.allBanks = [makeBankInfoEntry()]
     player.activeAccountType = 'COMPANY'
 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
-    await page.goto('/loans')
+    await page.goto('/bank/bank-building-1')
 
     await page.getByRole('button', { name: 'Accept Loan' }).click()
     const modal = page.locator('[role="dialog"]')
