@@ -56,6 +56,7 @@ export default {
     emptyTitle: 'No published entries yet',
     emptyBody: 'When administrators publish news or changelog notes, they will appear here.',
     untitled: 'Untitled entry',
+    unread: 'New',
   },
   admin: {
     eyebrow: 'Game administration',

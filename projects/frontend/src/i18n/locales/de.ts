@@ -56,6 +56,7 @@ export default {
     emptyTitle: 'Noch keine veröffentlichten Einträge',
     emptyBody: 'Sobald Administratoren News oder Changelog-Einträge veröffentlichen, erscheinen sie hier.',
     untitled: 'Eintrag ohne Titel',
+    unread: 'Neu',
   },
   admin: {
     eyebrow: 'Spieladministration',

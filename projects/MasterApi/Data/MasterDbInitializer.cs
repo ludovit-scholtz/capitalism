@@ -18,6 +18,11 @@ public sealed class MasterDbInitializer(MasterDbContext db)
             await EnsureLegacyGameNewsSchemaAsync(cancellationToken);
         }
 
+        await ImportChangelogCsvAsync(cancellationToken);
+
+        // The four entries below are kept as a startup fallback so the feed is never empty
+        // if CHANGELOG.csv is unavailable.  If the CSV was already imported (same GUIDs),
+        // SeedChangelogEntryAsync is a no-op.
         await SeedChangelogEntryAsync(
             GameAdministrationLaunchEntryId,
             new DateTime(2026, 4, 10, 8, 0, 0, DateTimeKind.Utc),
@@ -163,6 +168,57 @@ public sealed class MasterDbInitializer(MasterDbContext db)
         });
 
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads CHANGELOG.csv from the standard search path and imports any rows whose GUID is not
+    /// already in the database.  Called on every startup – fully idempotent.
+    /// </summary>
+    private async Task ImportChangelogCsvAsync(CancellationToken cancellationToken)
+    {
+        var csvContent = TryReadChangelogCsv();
+        if (csvContent is null) return;
+
+        var rows = ChangelogCsvImporter.ParseCsv(csvContent);
+        var importer = new ChangelogCsvImporter(db);
+        await importer.ImportAsync(rows, cancellationToken);
+    }
+
+    /// <summary>
+    /// Looks for CHANGELOG.csv in a set of candidate paths so the import works in both
+    /// production (build output) and local development (repo root).
+    /// </summary>
+    internal static string? TryReadChangelogCsv()
+    {
+        var baseDir = AppContext.BaseDirectory;
+
+        var candidates = new[]
+        {
+            // Production / Docker: file is copied next to the binary during CI build.
+            System.IO.Path.Combine(baseDir, "CHANGELOG.csv"),
+            // Local development: repo root is a few levels above the bin directory.
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "..", "..", "..", "CHANGELOG.csv")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "..", "..", "CHANGELOG.csv")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "..", "CHANGELOG.csv")),
+            System.IO.Path.GetFullPath(System.IO.Path.Combine(baseDir, "..", "..", "CHANGELOG.csv")),
+            // Current working directory fallback.
+            "CHANGELOG.csv",
+        };
+
+        foreach (var path in candidates)
+        {
+            try
+            {
+                if (File.Exists(path))
+                    return File.ReadAllText(path);
+            }
+            catch
+            {
+                // Ignore access errors and try the next candidate.
+            }
+        }
+
+        return null;
     }
 
     private async Task EnsureLegacyGameNewsSchemaAsync(CancellationToken cancellationToken)
