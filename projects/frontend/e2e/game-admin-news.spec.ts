@@ -335,6 +335,67 @@ test.describe('Game news and administration', () => {
     await expect(newsCard.locator('.news-pill-news')).toContainText('Newspaper')
   })
 
+  test('unread entries show NEW badge; already-read entries do not', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-02T00:00:00Z' })
+    const state = setupMockApi(page, {
+      players: [player],
+      gameNewsEntries: [
+        makeChangelogEntry({
+          id: 'unread-entry',
+          readByPlayerIds: [],
+          localizations: [{ locale: 'en', title: 'Brand New Feature', summary: 'Just shipped.', htmlContent: '<p>Details.</p>' }],
+        }),
+        makeChangelogEntry({
+          id: 'read-entry',
+          readByPlayerIds: [player.id],
+          localizations: [{ locale: 'en', title: 'Old Feature', summary: 'Already seen.', htmlContent: '<p>Old.</p>' }],
+        }),
+      ],
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7_200_000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/news')
+
+    // Unread entry must show the NEW badge
+    const unreadCard = page.locator('.news-card', { hasText: 'Brand New Feature' })
+    await expect(unreadCard.locator('.news-unread-badge')).toBeVisible()
+    await expect(unreadCard.locator('.news-unread-badge')).toContainText('New')
+
+    // Already-read entry must NOT show the NEW badge
+    const readCard = page.locator('.news-card', { hasText: 'Old Feature' })
+    await expect(readCard.locator('.news-unread-badge')).toHaveCount(0)
+
+    // Unread card should have the visual unread class
+    await expect(unreadCard).toHaveClass(/news-card-unread/)
+    await expect(readCard).not.toHaveClass(/news-card-unread/)
+  })
+
+  test('unauthenticated users see no NEW badge even on unread entries', async ({ page }) => {
+    setupMockApi(page, {
+      players: [],
+      gameNewsEntries: [
+        makeChangelogEntry({
+          id: 'public-entry',
+          readByPlayerIds: [],
+          localizations: [{ locale: 'en', title: 'Public Changelog Entry', summary: 'Open to all.', htmlContent: '<p>Info.</p>' }],
+        }),
+      ],
+    })
+
+    await page.goto('/news')
+
+    const card = page.locator('.news-card', { hasText: 'Public Changelog Entry' })
+    await expect(card).toBeVisible()
+    // Unauthenticated — no NEW badge regardless of read state
+    await expect(card.locator('.news-unread-badge')).toHaveCount(0)
+  })
+
   test('local admin can inspect the dashboard and impersonate a player', async ({ page }) => {
     const admin = makeAdminPlayer({
       id: 'local-admin',

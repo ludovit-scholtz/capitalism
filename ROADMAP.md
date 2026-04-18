@@ -23,9 +23,9 @@ Implement banking as is described in the product definition below.
 
 - ~~Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with.~~ ✅ Done
 
-### Changelog (0% complete)
+### Changelog (90% complete)
 
-- Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.
+- ~~Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.~~ ✅ Done – `ChangelogCsvImporter` imports all entries on every startup (idempotent by GUID), `MasterDbInitializer` calls it automatically, and the frontend News page shows a "New" badge on entries players haven't seen yet.
 
 ### Architecture optimization (0% complete)
 

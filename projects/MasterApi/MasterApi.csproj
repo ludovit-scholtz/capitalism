@@ -11,6 +11,12 @@
 		<DependencyAwareStart>true</DependencyAwareStart>
 	</PropertyGroup>
 
+	<ItemGroup>
+		<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleToAttribute">
+			<_Parameter1>MasterApi.Tests</_Parameter1>
+		</AssemblyAttribute>
+	</ItemGroup>
+
 	<ItemGroup Condition="'$(ImplicitUsings)' == 'enable'">
 		<Using Include="MasterApi" />
 	</ItemGroup>
@@ -38,9 +44,12 @@
 	</ItemGroup>
 
 	<Target Name="CopyFiles" AfterTargets="Build">
-		<!-- CHANGELOG.csv will be supplied by CICD from the root of the git repository -->
+		<!-- In CI/CD the CHANGELOG.csv is copied to the project directory before build.
+		     In local development we locate it at the repository root (two levels up). -->
 		<ItemGroup>
-			<ChangelogFiles Include="CHANGELOG.csv"/>
+			<ChangelogFiles Include="CHANGELOG.csv" Condition="Exists('CHANGELOG.csv')" />
+			<ChangelogFiles Include="$(MSBuildProjectDirectory)/../../CHANGELOG.csv"
+			                Condition="!Exists('CHANGELOG.csv') AND Exists('$(MSBuildProjectDirectory)/../../CHANGELOG.csv')" />
 		</ItemGroup>
 		<Copy
 			SourceFiles="@(ChangelogFiles)"

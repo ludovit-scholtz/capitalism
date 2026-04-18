@@ -56,6 +56,7 @@ export default {
     emptyTitle: 'Zatiaľ nie sú zverejnené žiadne záznamy',
     emptyBody: 'Keď administrátori publikujú novinky alebo changelog, zobrazia sa tu.',
     untitled: 'Záznam bez názvu',
+    unread: 'Nové',
   },
   admin: {
     eyebrow: 'Správa hry',

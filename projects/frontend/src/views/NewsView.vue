@@ -15,6 +15,10 @@ const newsStore = useNewsStore()
 const filter = ref<'ALL' | 'NEWS' | 'CHANGELOG'>('ALL')
 const viewError = ref<string | null>(null)
 
+/** IDs that were unread when the page first loaded – used to keep "New" badges
+ *  visible even after the background markRead call completes. */
+const initiallyUnreadIds = ref<Set<string>>(new Set())
+
 const entries = computed(() => {
   const items = newsStore.feed?.items ?? []
   if (filter.value === 'ALL') {
@@ -49,7 +53,14 @@ async function loadFeed() {
   try {
     const feed = await newsStore.fetchFeed(false)
     if (auth.isAuthenticated) {
-      const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
+      const unreadEntryIds = feed.items
+        .filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead)
+        .map((entry) => entry.id)
+
+      // Capture unread state BEFORE markRead so the "New" badge stays
+      // visible for the duration of the page visit even after the
+      // background mark-read call updates the store.
+      initiallyUnreadIds.value = new Set(unreadEntryIds)
 
       if (unreadEntryIds.length > 0) {
         await newsStore.markRead(unreadEntryIds)
@@ -104,12 +115,15 @@ onMounted(async () => {
       </div>
 
       <div v-else class="news-entry-list">
-        <article v-for="entry in entries" :key="entry.id" class="news-card">
+        <article v-for="entry in entries" :key="entry.id" class="news-card" :class="{ 'news-card-unread': initiallyUnreadIds.has(entry.id) }">
           <div class="news-card-header">
-            <div>
-              <span class="news-pill" :class="entry.entryType === 'CHANGELOG' ? 'news-pill-changelog' : 'news-pill-news'">
-                {{ entry.entryType === 'CHANGELOG' ? t('news.filterChangelog') : t('news.filterNews') }}
-              </span>
+            <div class="news-card-meta">
+              <div class="news-card-pills">
+                <span class="news-pill" :class="entry.entryType === 'CHANGELOG' ? 'news-pill-changelog' : 'news-pill-news'">
+                  {{ entry.entryType === 'CHANGELOG' ? t('news.filterChangelog') : t('news.filterNews') }}
+                </span>
+                <span v-if="initiallyUnreadIds.has(entry.id)" class="news-unread-badge">{{ t('news.unread') }}</span>
+              </div>
               <h2 class="news-card-title">{{ getLocalization(entry)?.title ?? t('news.untitled') }}</h2>
             </div>
             <p class="news-card-date">{{ formatDate(entry.publishedAtUtc ?? entry.updatedAtUtc) }}</p>
@@ -225,8 +239,37 @@ onMounted(async () => {
   margin-bottom: 1rem;
 }
 
+.news-card-meta {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.news-card-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.news-card-unread {
+  border-left: 3px solid rgba(255, 138, 0, 0.7);
+}
+
+.news-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(255, 138, 0, 0.18);
+  color: #ffd7a3;
+  border: 1px solid rgba(255, 138, 0, 0.35);
+}
+
 .news-card-title {
-  margin-top: 0.6rem;
+  margin-top: 0.4rem;
   font-size: 1.5rem;
 }
 
