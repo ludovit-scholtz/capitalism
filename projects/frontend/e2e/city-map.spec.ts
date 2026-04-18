@@ -1046,8 +1046,8 @@ test.describe('City Map — multi-city navigation and graceful empty state', () 
 
     // City name should appear
     await expect(page.getByRole('heading', { name: /Prague/i })).toBeVisible()
-    // No lots: shows 0 lots or "no lots" message
-    await expect(page.getByText(/0 lots/i).or(page.getByText(/No building lots/i))).toBeVisible()
+    // No lots: shows "0 lots" in the lot-count badge
+    await expect(page.locator('.lot-count')).toContainText('0')
   })
 
   test('Vienna city map shows city name with no lots available', async ({ page }) => {
@@ -1061,8 +1061,8 @@ test.describe('City Map — multi-city navigation and graceful empty state', () 
 
     // City name should appear
     await expect(page.getByRole('heading', { name: /Vienna/i })).toBeVisible()
-    // No lots: shows 0 lots or "no lots" message
-    await expect(page.getByText(/0 lots/i).or(page.getByText(/No building lots/i))).toBeVisible()
+    // No lots: shows "0 lots" in the lot-count badge
+    await expect(page.locator('.lot-count')).toContainText('0')
   })
 })
 
@@ -1508,5 +1508,143 @@ test.describe('City Map — construction completion transition', () => {
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await expect(page.locator('[data-testid="under-construction-panel"]')).toBeVisible()
+  })
+})
+
+// ── City picker and multi-city navigation ────────────────────────────────────
+
+test.describe('City Map — city picker', () => {
+  test('shows city picker when multiple cities are available', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    // Default mock has 3 cities → picker should be visible
+    await expect(page.locator('#city-select')).toBeVisible()
+    // Bratislava should be the currently selected city
+    await expect(page.locator('#city-select')).toHaveValue('city-ba')
+  })
+
+  test('city picker lists all available cities', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    // All three seeded cities should appear as options in the select element
+    const select = page.locator('#city-select')
+    await expect(select).toBeVisible()
+    const optionTexts = await page.locator('#city-select option').allTextContents()
+    expect(optionTexts.join(' ')).toContain('Bratislava')
+    expect(optionTexts.join(' ')).toContain('Prague')
+    expect(optionTexts.join(' ')).toContain('Vienna')
+  })
+
+  test('switching city via picker navigates to the new city URL', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
+
+    // Select Prague from the picker
+    await page.locator('#city-select').selectOption('city-pr')
+
+    // URL should update to the Prague city route
+    await page.waitForURL(/\/city\/city-pr/)
+    await expect(page).toHaveURL(/\/city\/city-pr/)
+  })
+
+  test('city map heading updates when switching cities via picker', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
+
+    // Switch to Prague
+    await page.locator('#city-select').selectOption('city-pr')
+    await page.waitForURL(/\/city\/city-pr/)
+    await expect(page.getByRole('heading', { name: /Prague/i })).toBeVisible()
+  })
+
+  test('switching to Vienna (third city) shows Vienna heading', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    // Switch to Vienna
+    await page.locator('#city-select').selectOption('city-vi')
+    await page.waitForURL(/\/city\/city-vi/)
+    await expect(page.getByRole('heading', { name: /Vienna/i })).toBeVisible()
+  })
+
+  test('city picker shows correct selected city when navigating directly to Prague', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    // Navigate directly to Prague (not via picker)
+    await page.goto('/city/city-pr')
+
+    // Picker should reflect Prague as the selected option
+    await expect(page.locator('#city-select')).toHaveValue('city-pr')
+  })
+})
+
+// ── Blank-map regression ─────────────────────────────────────────────────────
+
+test.describe('City Map — blank-map regression (list→map toggle)', () => {
+  test('map container is visible after switching from list view back to map view', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    // Start in map view — map container should be visible
+    await expect(page.locator('.map-container')).toBeVisible()
+
+    // Switch to list view — map container remains in DOM (v-show) but is hidden
+    await page.getByRole('button', { name: /List View/i }).click()
+    await expect(page.locator('.map-container')).toBeHidden()
+
+    // Switch back to map view — map container must become visible again (no blank map)
+    await page.getByRole('button', { name: /Map View/i }).click()
+    await expect(page.locator('.map-container')).toBeVisible()
+  })
+
+  test('map container stays in DOM (v-show) when switching to list view', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    // Switch to list view
+    await page.getByRole('button', { name: /List View/i }).click()
+
+    // The map container element exists in DOM (v-show, not v-if) — toHaveCount(1)
+    await expect(page.locator('.map-container')).toHaveCount(1)
+    // But it is hidden
+    await expect(page.locator('.map-container')).toBeHidden()
+  })
+
+  test('switching back from list view restores lot selection context', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    // Select a lot in list view
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await expect(page.getByRole('heading', { name: 'Industrial Plot A1' })).toBeVisible()
+
+    // Switch to map view and back to list — selection should be preserved
+    await page.getByRole('button', { name: /Map View/i }).click()
+    await page.getByRole('button', { name: /List View/i }).click()
+
+    // The detail panel should still show the previously selected lot
+    await expect(page.getByRole('heading', { name: 'Industrial Plot A1' })).toBeVisible()
   })
 })

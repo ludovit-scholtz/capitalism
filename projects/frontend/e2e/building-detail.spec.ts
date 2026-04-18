@@ -557,7 +557,9 @@ test.describe('Building detail upgrades', () => {
 
     await expect(page).toHaveURL(/\/city\/city-ba\?building=building-overview/)
     await expect(page.getByRole('heading', { name: 'Central Factory Lot' })).toBeVisible()
-    await expect(page.getByText('Your Property')).toBeVisible()
+    // Scope to the detail panel (aside/complementary) so the hidden lot-list status badge
+    // (which is kept in DOM via v-show) does not interfere with the assertion.
+    await expect(page.getByRole('complementary').locator('.status-badge', { hasText: /Your Property/i })).toBeVisible()
   })
 
   test('shows empty state message when building has no financial activity', async ({ page }) => {

@@ -1359,6 +1359,7 @@ export default {
     filterAll: 'All',
     filterAvailable: 'Available Only',
     lotCount: '{count} lots',
+    cityPickerLabel: 'Switch City',
     owner: 'Owner',
     building: 'Building',
     company: 'Company',

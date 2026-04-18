@@ -1362,6 +1362,7 @@ export default {
     filterAll: 'Alle',
     filterAvailable: 'Nur verfügbare',
     lotCount: '{count} Grundstücke',
+    cityPickerLabel: 'Stadt wechseln',
     owner: 'Eigentümer',
     building: 'Gebäude',
     company: 'Unternehmen',
