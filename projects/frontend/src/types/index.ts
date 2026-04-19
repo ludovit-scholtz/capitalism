@@ -962,6 +962,21 @@ export interface CityPowerBalance {
   consumerBuildingCount: number
 }
 
+/** A single future-tick weather forecast entry. */
+export interface WeatherTick {
+  tick: number
+  windPercent: number
+  solarPercent: number
+}
+
+/** Rolling 50-tick weather forecast for a city returned by cityWeatherForecast(cityId). */
+export interface CityWeatherForecast {
+  cityId: string
+  currentWindPercent: number
+  currentSolarPercent: number
+  forecast: WeatherTick[]
+}
+
 /**
  * Research brand state returned by the companyBrands query.
  * Represents a brand entity accumulated by R&D research (product quality)

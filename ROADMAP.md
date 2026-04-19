@@ -13,14 +13,14 @@ Implement banking as is described in the product definition below.
 - When creating a bank building, make the base capital the default value for the initial deposit. Currently after the bank is created through the new building workflow, it does not prpoeseemrly initialize the bank. The interest rates seems not to be initialized nor the deposit is there. Player cannot modify the interest rate from the bank view.
 - Find all occurances where `/building/:id` is used instead of `/bank/:id`, for example at the ledger page
 - Make deposits to be aggregated in one contract like the real bank account and create flow to withdraw and deposit to this bank account
-
-### Dashboard (50% complete)
-
-- ~~Remove Pro subscription details from the overview page and make for it special tab. Add there benefits what users can receive with the pro subscription - more products to play with.~~ ✅ Done
+- rename `/loans` menu item to `/banking`
+- Make the professional design of the banking page. Make sure to preserve the professional spacing between the components. For example button Acquire a Bank looks strange.
 
 ### Changelog (90% complete)
 
-- ~~Make sure to import the CHANGELOG.csv into the database and show it for users whenever the backend is restarted.~~ ✅ Done – `ChangelogCsvImporter` imports all entries on every startup (idempotent by GUID), `MasterDbInitializer` calls it automatically, and the frontend News page shows a "New" badge on entries players haven't seen yet.
+- There is error when storing the changelog items to the database - something related to length of the record in postgresql
+- Make the title of the changelog items nicer - split by :
+- Do not show the news item description if it is the same as the text - For changelog items make description empty.
 
 ### Architecture optimization (0% complete)
 
@@ -39,8 +39,6 @@ Implement banking as is described in the product definition below.
 
 ### City map (40% complete)
 
-- ~~Add picker to change the city~~ ✅ Done: city picker dropdown in header fetches all cities and navigates to `/city/:id`
-- ~~When going to the list view, and back to the map view, the map does not show up~~ ✅ Done: fixed blank-map regression by switching from `v-if` to `v-show` on the map container so Leaflet never loses its DOM element
 - Implement and show weather predictions as is defined in the powerplants section
 
 ## Multiple Game Servers
