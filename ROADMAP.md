@@ -8,7 +8,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Banking (50% complete)
 
-Implement banking as is described in the product definition below.
+Implement banking as is described in the banking section.
 
 - When creating a bank building, make the base capital the default value for the initial deposit. Currently after the bank is created through the new building workflow, it does not prpoeseemrly initialize the bank. The interest rates seems not to be initialized nor the deposit is there. Player cannot modify the interest rate from the bank view.
 - Find all occurances where `/building/:id` is used instead of `/bank/:id`, for example at the ledger page
@@ -25,14 +25,15 @@ Implement banking as is described in the product definition below.
 ### Architecture optimization (0% complete)
 
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
+- Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
-### Marketing  (0% complete)
+### Marketing (0% complete)
 
 - Make sure that in every city is one government owned media house from each type of media
 - Modify the marketing unit media house selection. Make sure to sort the media house by the media content ranking, and show the player's media house companies at the top of the list.
 - Implement all features in the Media house section in this document
 
-### Power plants  (0% complete)
+### Power plants (0% complete)
 
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below
@@ -40,6 +41,20 @@ Implement banking as is described in the product definition below.
 ### City map (40% complete)
 
 - Implement and show weather predictions as is defined in the powerplants section
+
+### Audits (0% complete)
+
+- In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
+
+### Add more global cities to the basic setup
+
+- Setup New York, London, Beijing and Delhi
+- Add to each city the Country's currency. CZK to Prague, EUR to Bratislava and Vienna, USD to New York and so on
+- Use real rates, download the rates from the CNB
+
+### Create forex exchange
+
+- Add to the top menu forex exchange
 
 ## Multiple Game Servers
 
