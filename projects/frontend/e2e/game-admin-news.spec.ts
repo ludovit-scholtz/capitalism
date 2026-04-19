@@ -31,8 +31,7 @@ const makeNewsEntry = (overrides: Partial<MockGameNewsEntry> = {}): MockGameNews
   ...overrides,
 })
 
-const makeChangelogEntry = (overrides: Partial<MockGameNewsEntry> = {}): MockGameNewsEntry =>
-  makeNewsEntry({ entryType: 'CHANGELOG', ...overrides })
+const makeChangelogEntry = (overrides: Partial<MockGameNewsEntry> = {}): MockGameNewsEntry => makeNewsEntry({ entryType: 'CHANGELOG', ...overrides })
 
 test.describe('Game news and administration', () => {
   test('shows unread news badge and clears it after the news page is opened', async ({ page }) => {
@@ -313,15 +312,11 @@ test.describe('Game news and administration', () => {
       gameNewsEntries: [
         makeChangelogEntry({
           id: 'pill-cl',
-          localizations: [
-            { locale: 'en', title: 'Changelog Pill Test', summary: '', htmlContent: '' },
-          ],
+          localizations: [{ locale: 'en', title: 'Changelog Pill Test', summary: '', htmlContent: '' }],
         }),
         makeNewsEntry({
           id: 'pill-news',
-          localizations: [
-            { locale: 'en', title: 'News Pill Test', summary: '', htmlContent: '' },
-          ],
+          localizations: [{ locale: 'en', title: 'News Pill Test', summary: '', htmlContent: '' }],
         }),
       ],
     })

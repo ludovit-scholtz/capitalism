@@ -450,17 +450,13 @@ export default {
     tabPro: 'Pro',
     proBenefitsHeading: 'What you unlock with Pro',
     proBenefitProducts: 'More products to manufacture',
-    proBenefitProductsBody:
-      'Access the full product catalog — furniture, food, healthcare, electronics, construction, and more. Free accounts are limited to starter products only.',
+    proBenefitProductsBody: 'Access the full product catalog — furniture, food, healthcare, electronics, construction, and more. Free accounts are limited to starter products only.',
     proBenefitAdvanced: 'Advanced industries',
-    proBenefitAdvancedBody:
-      'Manufacture electronics and construction materials that command higher margins and open entirely new supply chains.',
+    proBenefitAdvancedBody: 'Manufacture electronics and construction materials that command higher margins and open entirely new supply chains.',
     proBenefitUnlock: 'No product restrictions',
-    proBenefitUnlockBody:
-      'Every building unit configuration option is available. No locked products, no gated recipes, no artificial ceilings on what you can build.',
+    proBenefitUnlockBody: 'Every building unit configuration option is available. No locked products, no gated recipes, no artificial ceilings on what you can build.',
     proBenefitPriority: 'Priority simulation access',
-    proBenefitPriorityBody:
-      'Pro players receive priority support and early access to new game features as the simulation grows.',
+    proBenefitPriorityBody: 'Pro players receive priority support and early access to new game features as the simulation grows.',
     personTabOverview: 'Overview',
     personTabCreateCompany: 'Create company',
     personTabLedger: 'Ledger',
@@ -955,7 +951,8 @@ export default {
       minQuality: 'Min Quality',
       brandScope: 'Brand Scope',
       researchProduct: 'Research Product',
-      researchProductHelp: 'Choose the product whose internal manufacturing know-how this lab should improve over time. Each tick this unit converts a fraction of its operating costs into an accumulated research budget for this product. Budget decays 0.1%/tick; product quality is determined relative to the strongest competitor investing in the same product.',
+      researchProductHelp:
+        'Choose the product whose internal manufacturing know-how this lab should improve over time. Each tick this unit converts a fraction of its operating costs into an accumulated research budget for this product. Budget decays 0.1%/tick; product quality is determined relative to the strongest competitor investing in the same product.',
       researchAnchorProduct: 'Anchor Product',
       researchAnchorProductHelp: 'This product anchors the exact product line you want to research.',
       researchIndustryCategory: 'Industry Category',
@@ -964,7 +961,8 @@ export default {
       none: '— Select —',
       anyResource: '— Any Resource —',
       anyProduct: '— Any Product —',
-      storageUniversalInfo: 'This storage unit is a universal buffer. It automatically accepts any raw material or product that flows into it through linked upstream units — no product selection required.',
+      storageUniversalInfo:
+        'This storage unit is a universal buffer. It automatically accepts any raw material or product that flows into it through linked upstream units — no product selection required.',
       publicSalesProductPickerHelp: 'Choose from products that can reach this sales unit through linked upstream units or that are already stocked here.',
       publicSalesProductPickerEmpty: 'No saleable products are available yet. Link a purchase, manufacturing, or storage chain into this unit, or restock the unit to keep editing existing stock.',
       sourceExchange: 'Exchange',
@@ -980,10 +978,8 @@ export default {
       b2bNoSourceTitle: 'No Upstream Source Configured',
       b2bNoSourceBody:
         'This B2B Sales unit cannot derive a competitive price yet. Configure a Manufacturing unit with an output product, or a Mining unit with a resource type, in this building first.',
-      b2bProductPickerHelp:
-        'Only products connected to this unit through linked upstream units or already stocked in this unit are shown.',
-      b2bProductPickerEmpty:
-        'No eligible products yet. Link a purchase, manufacturing, or storage chain into this unit, or restock the unit to keep selling existing inventory.',
+      b2bProductPickerHelp: 'Only products connected to this unit through linked upstream units or already stocked in this unit are shown.',
+      b2bProductPickerEmpty: 'No eligible products yet. Link a purchase, manufacturing, or storage chain into this unit, or restock the unit to keep selling existing inventory.',
       scopeProduct: 'Product',
       scopeCategory: 'Category',
       scopeCompany: 'Company',
@@ -1700,7 +1696,8 @@ export default {
     mergeReady: 'Merge eligible',
     mergeCompany: 'Merge',
     mergeDialogTitle: 'Merge Company',
-    mergeDialogDesc: 'All assets (buildings, lots, cash, and shareholdings) owned by the target company will be transferred to the destination company you select. The target company will be permanently closed and its shares will cease to exist.',
+    mergeDialogDesc:
+      'All assets (buildings, lots, cash, and shareholdings) owned by the target company will be transferred to the destination company you select. The target company will be permanently closed and its shares will cease to exist.',
     mergeEligibilityHint: 'You need at least 90% combined ownership (person account + controlled companies) to merge this company.',
     mergeDestinationLabel: 'Merge into',
     mergeConfirm: 'Confirm Merge',
@@ -1984,7 +1981,7 @@ export default {
     browseMarketplace: 'Browse Loan Marketplace',
     configureBank: 'Configure Bank',
     becomeALender: 'Become a Lender',
-    noBankCTATitle: 'You Don\'t Own a Bank Yet',
+    noBankCTATitle: "You Don't Own a Bank Yet",
     noBankCTADescription: 'To offer loans and earn interest income, you need to acquire a Bank building. Build one in any city to start providing capital to other players.',
     acquireBank: 'Acquire a Bank',
     hasBankCTATitle: 'You Own a Bank',
@@ -2030,7 +2027,7 @@ export default {
     discoverBanks: 'Discover Banks',
     noBanksAvailable: 'No banks are currently open for business.',
     chooseBankToBorrow: 'Choose a Bank to Borrow From',
-    chooseBankToBorrowHint: 'Select a bank below to view available loan offers and apply for a loan directly on the bank\'s page.',
+    chooseBankToBorrowHint: "Select a bank below to view available loan offers and apply for a loan directly on the bank's page.",
     visitBankToBorrow: 'Visit Bank to Borrow',
     availableCapacity: 'Available Lending Capacity',
     cityFilter: 'Filter by city',
@@ -2053,7 +2050,7 @@ export default {
     liquidityStatusHint: {
       HEALTHY: 'Your bank maintains adequate reserves and has no central-bank debt.',
       PRESSURED: 'Your bank has central-bank debt. New deposits will automatically repay it.',
-      CRITICAL: 'Your bank\'s cash is below the reserve requirement. Add capital or reduce lending.',
+      CRITICAL: "Your bank's cash is below the reserve requirement. Add capital or reduce lending.",
     },
     reserveRequirement: 'Reserve Requirement',
     availableCash: 'Bank Cash',
@@ -2070,7 +2067,7 @@ export default {
     // Collateral
     collateral: 'Collateral',
     collateralOptional: 'Pledge a Building as Collateral (Optional)',
-    collateralHint: 'Pledge one of your buildings to secure this loan. You may borrow up to 70% of the building\'s appraised value.',
+    collateralHint: "Pledge one of your buildings to secure this loan. You may borrow up to 70% of the building's appraised value.",
     collateralBuilding: 'Collateral Building',
     collateralAppraisedValue: 'Appraised Value',
     collateralMaxBorrowable: 'Max Borrowable (70%)',
@@ -2078,7 +2075,7 @@ export default {
     collateralExistingExposure: 'Existing Secured Debt',
     collateralAlreadyPledged: 'Already pledged — choose another building',
     collateralNone: 'None (unsecured loan)',
-    collateralExceedsLimit: 'The requested amount exceeds 70% of the building\'s appraised value.',
+    collateralExceedsLimit: "The requested amount exceeds 70% of the building's appraised value.",
     pledgedBuilding: 'Pledged Building',
     securedLoan: 'Secured Loan',
     unsecuredLoan: 'Unsecured Loan',

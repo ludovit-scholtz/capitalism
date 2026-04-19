@@ -452,17 +452,13 @@ export default {
     tabPro: 'Pro',
     proBenefitsHeading: 'Was Sie mit Pro freischalten',
     proBenefitProducts: 'Mehr Produkte herstellen',
-    proBenefitProductsBody:
-      'Zugriff auf den vollständigen Produktkatalog — Möbel, Lebensmittel, Gesundheit, Elektronik, Bauwesen und mehr. Kostenlose Konten sind auf Starterprodukte beschränkt.',
+    proBenefitProductsBody: 'Zugriff auf den vollständigen Produktkatalog — Möbel, Lebensmittel, Gesundheit, Elektronik, Bauwesen und mehr. Kostenlose Konten sind auf Starterprodukte beschränkt.',
     proBenefitAdvanced: 'Fortgeschrittene Industrien',
-    proBenefitAdvancedBody:
-      'Stellen Sie Elektronik und Baumaterialien mit höheren Margen her, die völlig neue Lieferketten eröffnen.',
+    proBenefitAdvancedBody: 'Stellen Sie Elektronik und Baumaterialien mit höheren Margen her, die völlig neue Lieferketten eröffnen.',
     proBenefitUnlock: 'Keine Produktbeschränkungen',
-    proBenefitUnlockBody:
-      'Alle Konfigurationsoptionen für Gebäudeeinheiten sind verfügbar. Keine gesperrten Produkte, keine gesperrten Rezepte, keine künstlichen Obergrenzen.',
+    proBenefitUnlockBody: 'Alle Konfigurationsoptionen für Gebäudeeinheiten sind verfügbar. Keine gesperrten Produkte, keine gesperrten Rezepte, keine künstlichen Obergrenzen.',
     proBenefitPriority: 'Prioritätszugang zur Simulation',
-    proBenefitPriorityBody:
-      'Pro-Spieler erhalten Prioritätssupport und frühen Zugang zu neuen Spielfunktionen, wenn die Simulation wächst.',
+    proBenefitPriorityBody: 'Pro-Spieler erhalten Prioritätssupport und frühen Zugang zu neuen Spielfunktionen, wenn die Simulation wächst.',
     personTabOverview: 'Übersicht',
     personTabCreateCompany: 'Unternehmen gründen',
     personTabLedger: 'Hauptbuch',
@@ -966,9 +962,11 @@ export default {
       none: '— Auswählen —',
       anyResource: '— Beliebiger Rohstoff —',
       anyProduct: '— Beliebiges Produkt —',
-      storageUniversalInfo: 'Diese Lagereinheit ist ein universeller Puffer. Sie akzeptiert automatisch jeden Rohstoff oder jedes Produkt, das über verknüpfte vorgelagerte Einheiten eingeht — keine Produktauswahl erforderlich.',
+      storageUniversalInfo:
+        'Diese Lagereinheit ist ein universeller Puffer. Sie akzeptiert automatisch jeden Rohstoff oder jedes Produkt, das über verknüpfte vorgelagerte Einheiten eingeht — keine Produktauswahl erforderlich.',
       publicSalesProductPickerHelp: 'Wählen Sie nur Produkte, die diese Verkaufseinheit über verbundene vorgelagerte Einheiten erreichen können oder hier bereits auf Lager sind.',
-      publicSalesProductPickerEmpty: 'Noch keine verkaufsfähigen Produkte verfügbar. Verbinden Sie eine Einkaufs-, Fertigungs- oder Lagerkette mit dieser Einheit oder lagern Sie die Einheit erneut auf, um vorhandenen Bestand weiter bearbeiten zu können.',
+      publicSalesProductPickerEmpty:
+        'Noch keine verkaufsfähigen Produkte verfügbar. Verbinden Sie eine Einkaufs-, Fertigungs- oder Lagerkette mit dieser Einheit oder lagern Sie die Einheit erneut auf, um vorhandenen Bestand weiter bearbeiten zu können.',
       sourceExchange: 'Börse',
       sourceLocal: 'Lokal',
       sourceOptimal: 'Optimaler Preis',
@@ -982,8 +980,7 @@ export default {
       b2bNoSourceTitle: 'Keine Upstream-Quelle konfiguriert',
       b2bNoSourceBody:
         'Diese B2B-Verkaufseinheit kann noch keinen Wettbewerbspreis ableiten. Konfigurieren Sie zuerst eine Fertigungseinheit mit einem Ausgabeprodukt oder eine Abbaueinheit mit einem Ressourcentyp in diesem Gebäude.',
-      b2bProductPickerHelp:
-        'Es werden nur Produkte angezeigt, die über verknüpfte vorgelagerte Einheiten mit dieser Einheit verbunden sind oder bereits hier auf Lager sind.',
+      b2bProductPickerHelp: 'Es werden nur Produkte angezeigt, die über verknüpfte vorgelagerte Einheiten mit dieser Einheit verbunden sind oder bereits hier auf Lager sind.',
       b2bProductPickerEmpty:
         'Noch keine geeigneten Produkte. Verbinden Sie eine Einkaufs-, Fertigungs- oder Lagerkette mit dieser Einheit oder lagern Sie die Einheit erneut auf, um vorhandenen Bestand weiterhin verkaufen zu können.',
       scopeProduct: 'Produkt',
@@ -1699,7 +1696,8 @@ export default {
     mergeReady: 'Fusion möglich',
     mergeCompany: 'Fusion',
     mergeDialogTitle: 'Unternehmen fusionieren',
-    mergeDialogDesc: 'Alle Vermögenswerte (Gebäude, Grundstücke, Bargeld und Beteiligungen) des Zielunternehmens werden auf das ausgewählte Zielunternehmen übertragen. Das Zielunternehmen wird dauerhaft geschlossen und seine Aktien erlöschen.',
+    mergeDialogDesc:
+      'Alle Vermögenswerte (Gebäude, Grundstücke, Bargeld und Beteiligungen) des Zielunternehmens werden auf das ausgewählte Zielunternehmen übertragen. Das Zielunternehmen wird dauerhaft geschlossen und seine Aktien erlöschen.',
     mergeEligibilityHint: 'Sie benötigen mindestens 90 % kombiniertes Eigentum (persönliches Konto + kontrollierte Unternehmen) für eine Fusion.',
     mergeDestinationLabel: 'Fusionieren in',
     mergeConfirm: 'Fusion bestätigen',
@@ -1749,7 +1747,8 @@ export default {
     dividendHistoryDesc: 'Jährliche Dividenden, die auf Ihr persönliches Konto gezahlt wurden.',
     dividendHistoryEmpty: 'Noch keine Dividenden erhalten.',
     totalReserved: 'Gesamt reserviert',
-    taxNote: 'Reservierte Steuern werden am Ende des Steuerjahres abgerechnet. Bis dahin ist dieses Guthaben gesperrt und kann nicht zum Kauf von Aktien oder zur Finanzierung von Operationen verwendet werden.',
+    taxNote:
+      'Reservierte Steuern werden am Ende des Steuerjahres abgerechnet. Bis dahin ist dieses Guthaben gesperrt und kann nicht zum Kauf von Aktien oder zur Finanzierung von Operationen verwendet werden.',
     backToExchange: '← Zurück zur Börse',
     company: 'Unternehmen',
     direction: 'Richtung',
@@ -1831,6 +1830,7 @@ export default {
     renewableBadge: 'Erneuerbar — wetterabhängig',
     fuelBadge: 'Brennstoffbasiert — konstante Leistung',
   },
+  property: {
     panelTitle: 'Immobilienverwaltung',
     setRentBtn: 'Miete festlegen',
     totalArea: 'Gesamtfläche',
@@ -1841,8 +1841,7 @@ export default {
     noRentHint: 'Legen Sie eine Miete pro m² fest, um Einkommen aus diesem Objekt zu erzielen.',
     pendingRentNotice: 'Geplante Mietänderung: {rent} / m² aktiviert sich in {time}',
     rentDialogTitle: 'Mietänderung planen',
-    rentDelayHint:
-      'Die neue Miete tritt nach einem Spieltag (1 Tag) in Kraft. Die Belegung passt sich schrittweise an, basierend auf dem Vergleich Ihres Preises mit dem lokalen Marktdurchschnitt.',
+    rentDelayHint: 'Die neue Miete tritt nach einem Spieltag (1 Tag) in Kraft. Die Belegung passt sich schrittweise an, basierend auf dem Vergleich Ihres Preises mit dem lokalen Marktdurchschnitt.',
     rentLabel: 'Neue Miete pro m²',
     rentPlaceholder: 'Miete pro m² eingeben',
     scheduleRentBtn: 'Änderung planen',
@@ -2020,7 +2019,8 @@ export default {
     ratesUpdated: 'Sätze aktualisiert. Neue Einlagen verwenden den aktualisierten Einlagenzins.',
     baseCapitalRequired: 'Die Eröffnung einer Bank erfordert eine Grundkapitaleinlage von $10.000.000.',
     baseDepositRequired: 'Grundkapitaleinlage erforderlich',
-    baseDepositRequiredBody: 'Ihre Bankimmobilie wurde erworben, ist aber noch nicht für den Geschäftsbetrieb geöffnet. Aktivieren Sie sie durch eine Grundkapitaleinlage von $10.000.000 aus Ihrem Unternehmenskapital.',
+    baseDepositRequiredBody:
+      'Ihre Bankimmobilie wurde erworben, ist aber noch nicht für den Geschäftsbetrieb geöffnet. Aktivieren Sie sie durch eine Grundkapitaleinlage von $10.000.000 aus Ihrem Unternehmenskapital.',
     makeBaseDeposit: 'Grundkapitaleinlage vornehmen ($10.000.000)',
     baseDepositSuccess: 'Grundkapitaleinlage erfolgreich! Ihre Bank ist jetzt für den Geschäftsbetrieb geöffnet.',
     allBanks: 'Alle Banken',

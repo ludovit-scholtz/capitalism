@@ -453,14 +453,11 @@ export default {
     proBenefitProductsBody:
       'Získajte prístup k úplnému katalógu produktov — nábytok, potraviny, zdravotníctvo, elektronika, stavebníctvo a ďalšie. Bezplatné účty sú obmedzené len na štartovacie produkty.',
     proBenefitAdvanced: 'Pokročilé odvetvia',
-    proBenefitAdvancedBody:
-      'Vyrábajte elektroniku a stavebné materiály s vyššími maržami, ktoré otvárajú úplne nové dodávateľské reťazce.',
+    proBenefitAdvancedBody: 'Vyrábajte elektroniku a stavebné materiály s vyššími maržami, ktoré otvárajú úplne nové dodávateľské reťazce.',
     proBenefitUnlock: 'Žiadne obmedzenia produktov',
-    proBenefitUnlockBody:
-      'Všetky možnosti konfigurácie jednotiek budov sú dostupné. Žiadne zamknuté produkty, žiadne ohraničené recepty, žiadne umelé stropy toho, čo môžete vybudovať.',
+    proBenefitUnlockBody: 'Všetky možnosti konfigurácie jednotiek budov sú dostupné. Žiadne zamknuté produkty, žiadne ohraničené recepty, žiadne umelé stropy toho, čo môžete vybudovať.',
     proBenefitPriority: 'Prioritný prístup k simulácii',
-    proBenefitPriorityBody:
-      'Pro hráči dostávajú prioritnú podporu a skorý prístup k novým herným funkciám s rastom simulácie.',
+    proBenefitPriorityBody: 'Pro hráči dostávajú prioritnú podporu a skorý prístup k novým herným funkciám s rastom simulácie.',
     personTabOverview: 'Prehľad',
     personTabCreateCompany: 'Založiť firmu',
     personTabLedger: 'Účtovná kniha',
@@ -762,7 +759,8 @@ export default {
       confirmingButton: 'Pl\u00e1nujem\u2026',
       pendingTitle: 'Vylep\u0161enie prebieha',
       pendingBody: 'Vylep\u0161enie na \u00farovn\u0148 {level} \u2014 zost\u00e1va {time}',
-      pendingDowntimeNotice: '\u26a0 T\u00e1to jednotka je offline po\u010das vylep\u0161enia. Nebude nakupova\u0165, vyr\u00e1ba\u0165, pres\u00fava\u0165 z\u00e1soby ani preda\u0165, k\u00fdm nebude vylep\u0161enie dokon\u010den\u00e9.',
+      pendingDowntimeNotice:
+        '\u26a0 T\u00e1to jednotka je offline po\u010das vylep\u0161enia. Nebude nakupova\u0165, vyr\u00e1ba\u0165, pres\u00fava\u0165 z\u00e1soby ani preda\u0165, k\u00fdm nebude vylep\u0161enie dokon\u010den\u00e9.',
       availableDowntimeNotice: 'T\u00e1to jednotka bude offline po\u010das vylep\u0161enia \u2014 {time} v\u00fdpadku.',
       errorInsufficientFunds: 'Nedostatok hotovosti na vylepšenie.',
       errorMaxLevel: 'Jednotka je už na maximálnej úrovni.',
@@ -962,9 +960,11 @@ export default {
       none: '— Vyberte —',
       anyResource: '— Akákoľvek surovina —',
       anyProduct: '— Akýkoľvek produkt —',
-      storageUniversalInfo: 'Táto skladová jednotka je univerzálna vyrovnávacia pamäť. Automaticky prijíma akúkoľvek surovinu alebo produkt, ktorý do nej prúdi cez prepojené upstream jednotky — nie je potrebný výber produktu.',
+      storageUniversalInfo:
+        'Táto skladová jednotka je univerzálna vyrovnávacia pamäť. Automaticky prijíma akúkoľvek surovinu alebo produkt, ktorý do nej prúdi cez prepojené upstream jednotky — nie je potrebný výber produktu.',
       publicSalesProductPickerHelp: 'Vyberajte len z produktov, ktoré sa do tejto predajnej jednotky dostanú cez prepojené vstupné jednotky, alebo sú tu už naskladnené.',
-      publicSalesProductPickerEmpty: 'Zatiaľ nie sú dostupné žiadne predajné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli upravovať existujúci tovar.',
+      publicSalesProductPickerEmpty:
+        'Zatiaľ nie sú dostupné žiadne predajné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli upravovať existujúci tovar.',
       sourceExchange: 'Burza',
       sourceLocal: 'Lokálny',
       sourceOptimal: 'Optimálna cena',
@@ -978,10 +978,8 @@ export default {
       b2bNoSourceTitle: 'Nie je nakonfigurovaný žiadny zdrojový uzol',
       b2bNoSourceBody:
         'Táto B2B predajná jednotka zatiaľ nemôže odvodiť konkurenčnú cenu. Najprv nakonfigurujte výrobnú jednotku s výstupným produktom alebo ťažobnú jednotku s typom suroviny v tejto budove.',
-      b2bProductPickerHelp:
-        'Zobrazia sa len produkty prepojené s touto jednotkou cez nadradené jednotky alebo už naskladnené v tejto jednotke.',
-      b2bProductPickerEmpty:
-        'Zatiaľ žiadne vhodné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli predávať existujúce zásoby.',
+      b2bProductPickerHelp: 'Zobrazia sa len produkty prepojené s touto jednotkou cez nadradené jednotky alebo už naskladnené v tejto jednotke.',
+      b2bProductPickerEmpty: 'Zatiaľ žiadne vhodné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli predávať existujúce zásoby.',
       scopeProduct: 'Produkt',
       scopeCategory: 'Kategória',
       scopeCompany: 'Firma',
@@ -1825,6 +1823,7 @@ export default {
     renewableBadge: 'Obnoviteľný — závislý od počasia',
     fuelBadge: 'Palivový — konštantný výkon',
   },
+  property: {
     panelTitle: 'Správa nehnuteľnosti',
     setRentBtn: 'Nastaviť nájom',
     totalArea: 'Celková plocha',
@@ -1843,7 +1842,8 @@ export default {
   },
   research: {
     panelTitle: 'Výskumný pokrok',
-    intro: 'Výskum postupuje každý tik. Každá jednotka Kvality produktu konvertuje časť prevádzkových nákladov na kumulatívny výskumný rozpočet pre priradený produkt — a tento rozpočet klesá o 0,1 % za tik. Vaša kvalita produktu sa určuje relatívne k najsilnejšiemu konkurentovi investujúcemu do výskumu. Výskum kvality značky zlepšuje efektívnosť marketingového rozpočtu — priamo nezvyšuje povedomie o značke.',
+    intro:
+      'Výskum postupuje každý tik. Každá jednotka Kvality produktu konvertuje časť prevádzkových nákladov na kumulatívny výskumný rozpočet pre priradený produkt — a tento rozpočet klesá o 0,1 % za tik. Vaša kvalita produktu sa určuje relatívne k najsilnejšiemu konkurentovi investujúcemu do výskumu. Výskum kvality značky zlepšuje efektívnosť marketingového rozpočtu — priamo nezvyšuje povedomie o značke.',
     emptyState: 'Zatiaľ žiadny výskum nezaznamenaný. Nakonfigurujte jednotky Kvality produktu alebo Kvality značky a nechajte simuláciu bežať, aby ste tu videli pokrok.',
     emptyStatePending: 'Výskumné jednotky sú nakonfigurované a čakajú na aktiváciu. Pokrok sa zobrazí tu, akonáhle prebehne simulačný tick a vaša konfigurácia nadobudne účinnosť.',
     qualityLabel: 'Kvalita produktu',
@@ -2012,7 +2012,8 @@ export default {
     ratesUpdated: 'Sadzby aktualizované. Nové vklady budú používať aktualizovanú vkladovú sadzbu.',
     baseCapitalRequired: 'Otvorenie banky vyžaduje základný vklad $10 000 000.',
     baseDepositRequired: 'Vyžaduje sa základný vklad kapitálu',
-    baseDepositRequiredBody: 'Vaša banková nehnuteľnosť bola nadobudnutá, ale ešte nie je otvorená pre podnikanie. Aktivujte ju vkladom $10 000 000 základného kapitálu z prostriedkov vašej spoločnosti.',
+    baseDepositRequiredBody:
+      'Vaša banková nehnuteľnosť bola nadobudnutá, ale ešte nie je otvorená pre podnikanie. Aktivujte ju vkladom $10 000 000 základného kapitálu z prostriedkov vašej spoločnosti.',
     makeBaseDeposit: 'Vykonať základný vklad ($10 000 000)',
     baseDepositSuccess: 'Základný vklad bol úspešný! Vaša banka je teraz otvorená pre podnikanie.',
     allBanks: 'Všetky banky',
