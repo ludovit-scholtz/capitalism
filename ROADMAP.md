@@ -15,6 +15,7 @@ Implement banking as is described in the banking section.
 - Make deposits to be aggregated in one contract like the real bank account and create flow to withdraw and deposit to this bank account
 - rename `/loans` menu item to `/banking`
 - Make the professional design of the banking page. Make sure to preserve the professional spacing between the components. For example button Acquire a Bank looks strange.
+- Extend banks to use the currencies. Make sure the base capital is properly calculated in the currency where the city is located - 10M USD is approx 240M CZK for example.
 
 ### Changelog (90% complete)
 
@@ -46,15 +47,42 @@ Implement banking as is described in the banking section.
 
 - In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Add more global cities to the basic setup
+### Add more global cities to the basic setup (0% complete)
 
 - Setup New York, London, Beijing and Delhi
 - Add to each city the Country's currency. CZK to Prague, EUR to Bratislava and Vienna, USD to New York and so on
-- Use real rates, download the rates from the CNB
+- Use real rates, download the rates from the NBS - https://nbs.sk/export/en/exchange-rate/{date}/csv where {date} is current date in format yyyy-MM-dd, for example 2026-04-17
 
-### Create forex exchange
+### Create forex exchange (0% complete)
 
 - Add to the top menu forex exchange
+- In forex exchange allow to trade all currencies and gold. Gold is in game special currency tight to the real gold price - tokenized gold. The amount of gold player holds is bound to the master server account and usable in every game server.
+- Price of pro subscription is calculated as 20 USD/month, but user will pay it in tokenized gold
+- In each game server he can swap the gold to local in game currency, or he can swap in game currency to the gold token
+- It is allowed to swap any fx currency to any other fx currency, for example CZK to EUR or EUR to USD
+- Ledger is displayed in the currency where player built his first city. Make sure the fx operations are visible in the ledger.
+- Extend banks to use the currencies. Make sure the base capital is properly calculated in the currency where the city is located - 10M USD is approx 240M CZK for example.
+- Make sure the local city currency is used in every unit - for example the purchasing unit shows the local city currency, the b2b sale shows the fx currency, or the public sale unit shows the profit in the city currency. Make sure the user account balance does not mix between the 2 cities, if he makes the profit in prague in czk, and he makes profit in new york, he must have these money on different accounts. Change this everywhere in the game.
+
+### Tokenized gold managemnt (0% complete)
+
+- Create management at the master frontend for game global administrators to manage the tokenized gold funds for users. Create there a table with the list of users and their funds, and allow global admin to add or remove the tokens from the user's account.
+
+## FX Exahcnge
+
+Each city is located in physical country which has the currency - CZK for Prague, EUR for Vienna or USD for New York for example.
+
+The FX exchange is visible in the main menu. When user comes to the FX exchange he picks the currency from which he wants to swap from, then picks the currency to which he wants to swap to, and enters the amount. The system will generate him the quote and if user confirms, he makes the trade. Quote will show also the 1% swapping fee.
+
+Besides the cities fx currencies, the FX exchange will support the gold token.
+
+For swaping gold token special rules applies - requires a liquidity in ingame AMM. It will use traditional AMM functions `fx currency` * `gold` = `constant`. Each player can create a liquidity pool or fund to the existing liquidity pool, and he can see his liquidity pools positions. To create a liquidity pool, person needs to pick the currency, add the fx currency amount and the gold amount, and he creates a liquidity position. Marketize this that liquidity providers earn 1% AMM fee rewards. User must be able to remove his liquidity from the pool. User cannot use the blocked resources in the amm pool.
+
+## Gold token
+
+Gold token is special in game currency which represent 1 gram of gold in real world. The gold token amount is stored at the user's account in the master server.
+
+Server global administrator can manage gold token funds on player's account in the master frontend global administration.
 
 ## Multiple Game Servers
 
