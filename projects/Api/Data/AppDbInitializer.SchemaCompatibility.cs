@@ -115,6 +115,23 @@ public sealed partial class AppDbInitializer
 
             await RepairLegacyPostgresStoreTypesAsync(connection, dialect);
 
+            // Ensure Cities.CurrencyCode column exists (added in AddCityCurrencyCode migration).
+            if (await TableExistsAsync(connection, dialect, "Cities"))
+            {
+                if (!await ColumnExistsAsync(connection, dialect, "Cities", "CurrencyCode"))
+                {
+                    // Add CurrencyCode with default EUR; existing cities get EUR until seeding updates them.
+                    await ExecuteNonQueryAsync(connection,
+                        dialect.IsPostgres
+                            ? "ALTER TABLE \"Cities\" ADD COLUMN \"CurrencyCode\" character varying(3) NOT NULL DEFAULT 'EUR'"
+                            : "ALTER TABLE \"Cities\" ADD COLUMN \"CurrencyCode\" TEXT NOT NULL DEFAULT 'EUR'");
+
+                    // Update the known cities to their correct currency codes.
+                    await ExecuteNonQueryAsync(connection,
+                        "UPDATE \"Cities\" SET \"CurrencyCode\" = 'CZK' WHERE \"Name\" = 'Prague'");
+                }
+            }
+
             // Ensure CityWeatherForecasts table exists (added in AddCityWeatherForecast migration).
             if (!await TableExistsAsync(connection, dialect, "CityWeatherForecasts"))
             {

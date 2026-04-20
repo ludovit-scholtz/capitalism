@@ -398,6 +398,8 @@ export interface City {
   id: string
   name: string
   countryCode: string
+  /** ISO 4217 currency code (e.g. "EUR", "CZK"). */
+  currencyCode?: string
   latitude: number
   longitude: number
   population: number
@@ -1206,6 +1208,8 @@ export interface BankDepositSummary {
   withdrawnAtTick: number | null
   withdrawnAtUtc: string | null
   totalInterestPaid: number
+  /** ISO 4217 currency code for the city where the bank is located (e.g. "EUR", "CZK"). */
+  cityCurrencyCode: string
 }
 
 /** Public information about a bank building. */
@@ -1214,6 +1218,12 @@ export interface BankInfoSummary {
   bankBuildingName: string
   cityId: string
   cityName: string
+  /** ISO 4217 currency code for the city (e.g. "EUR", "CZK"). */
+  cityCurrencyCode: string
+  /** Display symbol for the city currency (e.g. "€", "Kč"). */
+  cityCurrencySymbol: string
+  /** Required base capital to open this bank, expressed in the local city currency. */
+  baseCapitalRequirement: number
   lenderCompanyId: string
   lenderCompanyName: string
   depositInterestRatePercent: number

@@ -58,12 +58,16 @@ public sealed partial class Query
             var lendable = bank.TotalDeposits * 0.90m;
             var available = Math.Max(0m, lendable - outstandingPrincipal);
 
+            var currencyCode = bank.City?.CurrencyCode ?? "EUR";
             results.Add(new BankInfoSummary
             {
                 BankBuildingId = bank.Id,
                 BankBuildingName = bank.Name,
                 CityId = bank.CityId,
                 CityName = bank.City?.Name ?? string.Empty,
+                CityCurrencyCode = currencyCode,
+                CityCurrencySymbol = Mutation.GetCurrencySymbol(currencyCode),
+                BaseCapitalRequirement = Mutation.GetBaseCapitalRequirement(currencyCode),
                 LenderCompanyId = bank.CompanyId,
                 LenderCompanyName = bank.Company?.Name ?? string.Empty,
                 DepositInterestRatePercent = bank.DepositInterestRatePercent ?? 0m,
@@ -98,6 +102,7 @@ public sealed partial class Query
 
         var deposits = await db.BankDeposits
             .Include(d => d.BankBuilding)
+            .ThenInclude(b => b.City)
             .Include(d => d.DepositorCompany)
             .Where(d => companyIds.Contains(d.DepositorCompanyId) && d.IsActive)
             .AsNoTracking()
@@ -120,6 +125,7 @@ public sealed partial class Query
 
         var bank = await db.Buildings
             .Include(b => b.Company)
+            .Include(b => b.City)
             .FirstOrDefaultAsync(b => b.Id == bankBuildingId && b.Type == BuildingType.Bank);
 
         if (bank is null || bank.Company.PlayerId != userId)

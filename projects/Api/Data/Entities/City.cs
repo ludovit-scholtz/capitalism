@@ -34,6 +34,13 @@ public sealed class City
     /// <summary>Base wage per labor-hour used to price company salary settings.</summary>
     public decimal BaseSalaryPerManhour { get; set; }
 
+    /// <summary>
+    /// ISO 4217 currency code used in this city (e.g. "EUR", "CZK", "USD").
+    /// Defaults to "EUR" for cities that had no explicit code before the migration.
+    /// </summary>
+    [MaxLength(3)]
+    public string CurrencyCode { get; set; } = "EUR";
+
     /// <summary>Buildings located in this city.</summary>
     public ICollection<Building> Buildings { get; set; } = [];
 

@@ -768,7 +768,319 @@ public sealed class BankingIntegrationTests
         Assert.Empty(founderInterestEntries);
     }
 
+    // ── Currency-aware banking tests ──────────────────────────────────────────
+
+    /// <summary>
+    /// GetBaseCapitalRequirement returns 240M CZK for Czech Republic (Prague),
+    /// and 10M EUR for Slovakia (Bratislava) and Austria (Vienna).
+    /// </summary>
+    [Fact]
+    public void GetBaseCapitalRequirement_ReturnsCorrectAmountPerCurrency()
+    {
+        Assert.Equal(240_000_000m, Mutation.GetBaseCapitalRequirement("CZK"));
+        Assert.Equal(10_000_000m, Mutation.GetBaseCapitalRequirement("EUR"));
+        Assert.Equal(10_000_000m, Mutation.GetBaseCapitalRequirement("USD"));
+        Assert.Equal(10_000_000m, Mutation.GetBaseCapitalRequirement("XXX")); // fallback
+    }
+
+    /// <summary>
+    /// GetCurrencySymbol returns the correct display symbol for known currencies.
+    /// </summary>
+    [Fact]
+    public void GetCurrencySymbol_ReturnsCorrectSymbol()
+    {
+        Assert.Equal("Kč", Mutation.GetCurrencySymbol("CZK"));
+        Assert.Equal("€", Mutation.GetCurrencySymbol("EUR"));
+        Assert.Equal("$", Mutation.GetCurrencySymbol("USD"));
+        Assert.Equal("£", Mutation.GetCurrencySymbol("GBP"));
+        Assert.Equal("XYZ", Mutation.GetCurrencySymbol("XYZ")); // fallback: code itself
+    }
+
+    /// <summary>
+    /// BankInfoSummary includes CityCurrencyCode and CityCurrencySymbol for a EUR city.
+    /// </summary>
+    [Fact]
+    public async Task BankInfo_EurCity_ReturnsCurrencyCodeAndSymbol()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Use a EUR city (seeded Bratislava or Vienna)
+        var eurCity = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test EUR City",
+            CountryCode = "SK",
+            CurrencyCode = "EUR",
+            Population = 100_000,
+            BaseSalaryPerManhour = 20m,
+            Latitude = 48.15,
+            Longitude = 17.11,
+        };
+        db.Cities.Add(eurCity);
+
+        var (_, _, bank) = SeedBankInCity(db, "eur-info", eurCity, companyCash: 5_000_000m, deposits: 10_000_000m);
+        await db.SaveChangesAsync();
+
+        var bankWithNav = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .FirstAsync(b => b.Id == bank.Id);
+
+        var summary = await Mutation.BuildBankInfoAsync(db, bankWithNav);
+
+        Assert.Equal("EUR", summary.CityCurrencyCode);
+        Assert.Equal("€", summary.CityCurrencySymbol);
+        Assert.Equal(10_000_000m, summary.BaseCapitalRequirement);
+    }
+
+    /// <summary>
+    /// BankInfoSummary includes CityCurrencyCode = CZK and BaseCapitalRequirement = 240M for Prague.
+    /// </summary>
+    [Fact]
+    public async Task BankInfo_CzkCity_ReturnsCzkCurrencyAndHigherBaseCapital()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        factory.CreateClient();
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var czkCity = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test CZK City",
+            CountryCode = "CZ",
+            CurrencyCode = "CZK",
+            Population = 1_000_000,
+            BaseSalaryPerManhour = 22m,
+            Latitude = 50.08,
+            Longitude = 14.44,
+        };
+        db.Cities.Add(czkCity);
+
+        var (_, _, bank) = SeedBankInCity(db, "czk-info", czkCity, companyCash: 120_000_000m, deposits: 240_000_000m);
+        await db.SaveChangesAsync();
+
+        var bankWithNav = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .FirstAsync(b => b.Id == bank.Id);
+
+        var summary = await Mutation.BuildBankInfoAsync(db, bankWithNav);
+
+        Assert.Equal("CZK", summary.CityCurrencyCode);
+        Assert.Equal("Kč", summary.CityCurrencySymbol);
+        Assert.Equal(240_000_000m, summary.BaseCapitalRequirement);
+    }
+
+    /// <summary>
+    /// InitiateBaseDeposit on a Prague (CZK) bank requires 240M CZK, not 10M EUR.
+    /// A company with only 10M cash is rejected; a company with 240M passes.
+    /// </summary>
+    [Fact]
+    public async Task InitiateBaseDeposit_CzkCity_Requires240MCzk()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAsync(client, $"czk-owner-{Guid.NewGuid():N}@test.com", "CZK Owner");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ownerEmail = (await ExecuteAsync(client, "{ me { email } }", token: ownerToken))
+            .GetProperty("data").GetProperty("me").GetProperty("email").GetString()!;
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        // CZK city
+        var czkCity = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "Prague Test",
+            CountryCode = "CZ",
+            CurrencyCode = "CZK",
+            Population = 1_000_000,
+            BaseSalaryPerManhour = 22m,
+            Latitude = 50.08,
+            Longitude = 14.44,
+        };
+        db.Cities.Add(czkCity);
+
+        // Company with only 10M cash — not enough for 240M CZK requirement
+        var insufficientCompany = new Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "CZK Insufficient Co", Cash = 10_000_000m };
+        db.Companies.Add(insufficientCompany);
+
+        var bankInsufficient = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = insufficientCompany.Id, CityId = czkCity.Id,
+            Type = BuildingType.Bank, Name = "CZK Insufficient Bank", Level = 1,
+            BaseCapitalDeposited = false, TotalDeposits = 0m,
+        };
+        db.Buildings.Add(bankInsufficient);
+        await db.SaveChangesAsync();
+
+        // Should fail with INSUFFICIENT_FUNDS because 10M < 240M CZK
+        var failResult = await ExecuteAsync(client,
+            "mutation IB($id: UUID!) { initiateBaseDeposit(bankBuildingId: $id) { baseCapitalDeposited } }",
+            new { id = bankInsufficient.Id.ToString() },
+            token: ownerToken);
+
+        var errors = failResult.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should fail with insufficient funds for CZK bank.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
+
+        // Company with 240M cash — enough
+        var sufficientCompany = new Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "CZK Sufficient Co", Cash = 240_000_000m };
+        db.Companies.Add(sufficientCompany);
+
+        var bankSufficient = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = sufficientCompany.Id, CityId = czkCity.Id,
+            Type = BuildingType.Bank, Name = "CZK Sufficient Bank", Level = 1,
+            BaseCapitalDeposited = false, TotalDeposits = 0m,
+        };
+        db.Buildings.Add(bankSufficient);
+        await db.SaveChangesAsync();
+
+        var successResult = await ExecuteAsync(client,
+            """
+            mutation IB($id: UUID!) {
+              initiateBaseDeposit(bankBuildingId: $id) {
+                baseCapitalDeposited
+                totalDeposits
+                cityCurrencyCode
+                baseCapitalRequirement
+              }
+            }
+            """,
+            new { id = bankSufficient.Id.ToString() },
+            token: ownerToken);
+
+        var data = successResult.GetProperty("data").GetProperty("initiateBaseDeposit");
+        Assert.True(data.GetProperty("baseCapitalDeposited").GetBoolean());
+        Assert.Equal(240_000_000m, data.GetProperty("totalDeposits").GetDecimal());
+        Assert.Equal("CZK", data.GetProperty("cityCurrencyCode").GetString());
+        Assert.Equal(240_000_000m, data.GetProperty("baseCapitalRequirement").GetDecimal());
+    }
+
+    /// <summary>
+    /// For a EUR city (Bratislava/Vienna), the base capital requirement remains 10M EUR.
+    /// </summary>
+    [Fact]
+    public async Task InitiateBaseDeposit_EurCity_Requires10mEur()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var ownerToken = await RegisterAsync(client, $"eur-owner-{Guid.NewGuid():N}@test.com", "EUR Owner");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ownerEmail = (await ExecuteAsync(client, "{ me { email } }", token: ownerToken))
+            .GetProperty("data").GetProperty("me").GetProperty("email").GetString()!;
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var eurCity = new City
+        {
+            Id = Guid.NewGuid(),
+            Name = "Bratislava Test",
+            CountryCode = "SK",
+            CurrencyCode = "EUR",
+            Population = 475_000,
+            BaseSalaryPerManhour = 18m,
+            Latitude = 48.15,
+            Longitude = 17.11,
+        };
+        db.Cities.Add(eurCity);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "EUR Bank Co", Cash = 10_000_000m };
+        db.Companies.Add(company);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = eurCity.Id,
+            Type = BuildingType.Bank, Name = "EUR Bank", Level = 1,
+            BaseCapitalDeposited = false, TotalDeposits = 0m,
+        };
+        db.Buildings.Add(bank);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteAsync(client,
+            """
+            mutation IB($id: UUID!) {
+              initiateBaseDeposit(bankBuildingId: $id) {
+                baseCapitalDeposited
+                totalDeposits
+                cityCurrencyCode
+                cityCurrencySymbol
+                baseCapitalRequirement
+              }
+            }
+            """,
+            new { id = bank.Id.ToString() },
+            token: ownerToken);
+
+        var data = result.GetProperty("data").GetProperty("initiateBaseDeposit");
+        Assert.True(data.GetProperty("baseCapitalDeposited").GetBoolean());
+        Assert.Equal(10_000_000m, data.GetProperty("totalDeposits").GetDecimal());
+        Assert.Equal("EUR", data.GetProperty("cityCurrencyCode").GetString());
+        Assert.Equal("€", data.GetProperty("cityCurrencySymbol").GetString());
+        Assert.Equal(10_000_000m, data.GetProperty("baseCapitalRequirement").GetDecimal());
+    }
+
     // ── Static helpers for HTTP-level tests ───────────────────────────────────
+
+    /// <summary>Variant of SeedBank that accepts an explicit city entity.</summary>
+    private static (Player player, Company company, Building bank) SeedBankInCity(
+        AppDbContext db,
+        string suffix,
+        City city,
+        decimal companyCash,
+        decimal deposits,
+        decimal centralBankDebt = 0m)
+    {
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"bank-{suffix}@test.com",
+            DisplayName = $"Banker {suffix}",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player,
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = $"Bank Corp {suffix}",
+            Cash = companyCash,
+        };
+        db.Companies.Add(company);
+
+        var bank = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Bank,
+            Name = $"Test Bank {suffix}",
+            BaseCapitalDeposited = true,
+            TotalDeposits = deposits,
+            CentralBankDebt = centralBankDebt,
+            DepositInterestRatePercent = 3m,
+            LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+
+        return (player, company, bank);
+    }
 
     private static async Task<string> RegisterAsync(HttpClient client, string email, string displayName)
     {

@@ -221,6 +221,21 @@ describe('loanHelpers', () => {
     it('formats zero', () => {
       expect(formatCurrency(0)).toContain('0')
     })
+    it('formats EUR amount with euro sign', () => {
+      const result = formatCurrency(10_000_000, 'EUR')
+      expect(result).toContain('10,000,000')
+      expect(result).toContain('€')
+    })
+    it('formats CZK amount with CZK currency indicator', () => {
+      const result = formatCurrency(240_000_000, 'CZK')
+      expect(result).toContain('240,000,000')
+      // Node.js Intl may render "CZK" or "Kč" depending on locale data
+      expect(result.includes('CZK') || result.includes('Kč')).toBe(true)
+    })
+    it('defaults to USD when no currency code provided', () => {
+      const result = formatCurrency(5000)
+      expect(result).toContain('$')
+    })
   })
 
   describe('formatPercent', () => {

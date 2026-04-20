@@ -18,6 +18,30 @@ public sealed partial class Mutation
     private const decimal ReserveRatio = 0.10m;  // 10% must be kept as reserve
     private const decimal LendableRatio = 0.90m; // 90% can be lent out
 
+    /// <summary>
+    /// Returns the base capital deposit required to open a bank in the given currency.
+    /// The reference amount is 10,000,000 USD. Other currencies are scaled by approximate FX rates.
+    /// </summary>
+    internal static decimal GetBaseCapitalRequirement(string currencyCode) => currencyCode.ToUpperInvariant() switch
+    {
+        "CZK" => 240_000_000m, // ~10M USD at ~24 CZK/USD
+        "EUR" => 10_000_000m,
+        "USD" => 10_000_000m,
+        _ => 10_000_000m,      // fallback for future currencies
+    };
+
+    /// <summary>
+    /// Returns the display symbol for a given ISO 4217 currency code.
+    /// </summary>
+    internal static string GetCurrencySymbol(string currencyCode) => currencyCode.ToUpperInvariant() switch
+    {
+        "CZK" => "Kč",
+        "EUR" => "€",
+        "USD" => "$",
+        "GBP" => "£",
+        _ => currencyCode,
+    };
+
     // ── Deposit Flows ─────────────────────────────────────────────────────────
 
     /// <summary>
@@ -48,6 +72,7 @@ public sealed partial class Mutation
         var bank = await db.Buildings
             .Include(b => b.Company)
             .ThenInclude(c => c.Player)
+            .Include(b => b.City)
             .FirstOrDefaultAsync(b => b.Id == input.BankBuildingId && b.Type == BuildingType.Bank);
 
         if (bank is null)
@@ -70,10 +95,12 @@ public sealed partial class Mutation
         }
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var cityCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
+        var baseCapitalRequirement = GetBaseCapitalRequirement(cityCurrencyCode);
 
         if (!bank.BaseCapitalDeposited)
         {
-            if (input.Amount == Mutation.BankBaseCapitalRequirement)
+            if (input.Amount == baseCapitalRequirement)
             {
                 // finish setup
 
@@ -81,7 +108,7 @@ public sealed partial class Mutation
                 bank.DepositInterestRatePercent = 3m;   // 3% deposit rate
                 bank.LendingInterestRatePercent = 8m;   // 8% lending rate
 
-                bank.TotalDeposits = Mutation.BankBaseCapitalRequirement;
+                bank.TotalDeposits = baseCapitalRequirement;
                 bank.BaseCapitalDeposited = true;
             }
             else
@@ -98,7 +125,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Minimum deposit amount is $1,000.")
+                    .SetMessage("Minimum deposit amount is 1,000.")
                     .SetCode("INVALID_AMOUNT")
                     .Build());
         }
@@ -479,8 +506,9 @@ public sealed partial class Mutation
     // ── Bank Activation ──────────────────────────────────────────────────────
 
     /// <summary>
-    /// Initiates the mandatory base capital deposit ($10,000,000) for a newly purchased bank
-    /// building.  This is the first action a bank owner must take to open the bank for business.
+    /// Initiates the mandatory base capital deposit for a newly purchased bank building.
+    /// The required amount is determined by the city's currency (e.g. 10M EUR, 240M CZK).
+    /// This is the first action a bank owner must take to open the bank for business.
     /// Only the owning player may call this mutation, and the bank company must have sufficient cash.
     /// </summary>
     [Authorize]
@@ -515,11 +543,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (bank.Company.Cash < BankBaseCapitalRequirement)
+        var cityCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
+        var baseCapitalRequired = GetBaseCapitalRequirement(cityCurrencyCode);
+        var currencySymbol = GetCurrencySymbol(cityCurrencyCode);
+
+        if (bank.Company.Cash < baseCapitalRequired)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage($"Insufficient company funds. The base capital deposit requires ${BankBaseCapitalRequirement:N0}.")
+                    .SetMessage($"Insufficient company funds. The base capital deposit requires {currencySymbol}{baseCapitalRequired:N0}.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }
@@ -527,8 +559,8 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
 
         // Transfer cash from owning company into the bank
-        bank.Company.Cash -= BankBaseCapitalRequirement;
-        bank.TotalDeposits += BankBaseCapitalRequirement;
+        bank.Company.Cash -= baseCapitalRequired;
+        bank.TotalDeposits += baseCapitalRequired;
         bank.BaseCapitalDeposited = true;
 
         // Initialize default interest rates if not already set
@@ -541,7 +573,7 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             BankBuildingId = bank.Id,
             DepositorCompanyId = bank.CompanyId,
-            Amount = BankBaseCapitalRequirement,
+            Amount = baseCapitalRequired,
             DepositInterestRatePercent = 0m, // Owner's own base capital earns no interest
             IsBaseCapital = true,
             IsActive = true,
@@ -560,7 +592,7 @@ public sealed partial class Mutation
             BuildingId = bank.Id,
             Category = LedgerCategory.DepositMade,
             Description = $"Base capital deposit to activate {bank.Name}",
-            Amount = -BankBaseCapitalRequirement,
+            Amount = -baseCapitalRequired,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow,
         });
@@ -588,12 +620,16 @@ public sealed partial class Mutation
         WithdrawnAtTick = d.WithdrawnAtTick,
         WithdrawnAtUtc = d.WithdrawnAtUtc,
         TotalInterestPaid = d.TotalInterestPaid,
+        CityCurrencyCode = bank.City?.CurrencyCode ?? "EUR",
     };
 
     internal static async Task<BankInfoSummary> BuildBankInfoAsync(AppDbContext db, Building bank)
     {
         var city = bank.City ?? await db.Cities.FindAsync(bank.CityId);
         var company = bank.Company ?? await db.Companies.FindAsync(bank.CompanyId);
+
+        var currencyCode = city?.CurrencyCode ?? "EUR";
+        var baseCapitalRequirement = GetBaseCapitalRequirement(currencyCode);
 
         var outstandingPrincipal = await db.Loans
             .Where(l => l.BankBuildingId == bank.Id && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
@@ -622,6 +658,9 @@ public sealed partial class Mutation
             BankBuildingName = bank.Name,
             CityId = bank.CityId,
             CityName = city?.Name ?? string.Empty,
+            CityCurrencyCode = currencyCode,
+            CityCurrencySymbol = GetCurrencySymbol(currencyCode),
+            BaseCapitalRequirement = baseCapitalRequirement,
             LenderCompanyId = bank.CompanyId,
             LenderCompanyName = company?.Name ?? string.Empty,
             DepositInterestRatePercent = bank.DepositInterestRatePercent ?? 0m,
