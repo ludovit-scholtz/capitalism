@@ -119,6 +119,7 @@ onMounted(() => {
         <nav class="site-nav">
           <template v-if="auth.isAuthenticated">
             <span class="nav-player">{{ auth.player?.displayName ?? 'Account' }}</span>
+            <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ Gold Admin</a>
             <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>
           </template>
           <template v-else>
@@ -460,6 +461,12 @@ onMounted(() => {
 .nav-btn--ghost {
   background: transparent;
   color: var(--color-muted);
+}
+
+.nav-btn--gold {
+  background: rgba(255, 215, 0, 0.12);
+  border-color: rgba(255, 215, 0, 0.35);
+  color: #ffd700;
 }
 
 /* ── Hero ── */

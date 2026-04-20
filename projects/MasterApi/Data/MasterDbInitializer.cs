@@ -16,6 +16,7 @@ public sealed class MasterDbInitializer(MasterDbContext db)
         if (db.Database.IsNpgsql())
         {
             await EnsureLegacyGameNewsSchemaAsync(cancellationToken);
+            await EnsureGoldTokenSchemaAsync(cancellationToken);
         }
 
         await ImportChangelogCsvAsync(cancellationToken);
@@ -227,6 +228,43 @@ public sealed class MasterDbInitializer(MasterDbContext db)
         {
             await db.Database.ExecuteSqlRawAsync(commandText, cancellationToken);
         }
+    }
+
+    private async Task EnsureGoldTokenSchemaAsync(CancellationToken cancellationToken)
+    {
+        // Idempotently add GoldTokenBalance column to PlayerAccounts if it is missing.
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "PlayerAccounts"
+                ADD COLUMN IF NOT EXISTS "GoldTokenBalance" numeric(18,8) NOT NULL DEFAULT 0
+            """, cancellationToken);
+
+        // Create GoldTokenTransactions table if it does not exist.
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS "GoldTokenTransactions" (
+                "Id" uuid NOT NULL,
+                "PlayerAccountId" uuid NOT NULL,
+                "PlayerEmail" character varying(200) NOT NULL,
+                "Amount" numeric(18,8) NOT NULL,
+                "BalanceBefore" numeric(18,8) NOT NULL,
+                "BalanceAfter" numeric(18,8) NOT NULL,
+                "AdminEmail" character varying(200) NOT NULL,
+                "Note" character varying(500),
+                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                CONSTRAINT "PK_GoldTokenTransactions" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_GoldTokenTransactions_PlayerAccounts_PlayerAccountId"
+                    FOREIGN KEY ("PlayerAccountId") REFERENCES "PlayerAccounts" ("Id") ON DELETE CASCADE
+            )
+            """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE INDEX IF NOT EXISTS "IX_GoldTokenTransactions_PlayerAccountId"
+                ON "GoldTokenTransactions" ("PlayerAccountId")
+            """, cancellationToken);
+
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE INDEX IF NOT EXISTS "IX_GoldTokenTransactions_CreatedAtUtc"
+                ON "GoldTokenTransactions" ("CreatedAtUtc")
+            """, cancellationToken);
     }
 
     private string[] GetLegacyGameNewsSchemaCommands()

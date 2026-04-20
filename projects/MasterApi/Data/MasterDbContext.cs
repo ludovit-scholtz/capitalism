@@ -21,6 +21,8 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
     public DbSet<BuildingLayoutTemplate> BuildingLayoutTemplates => Set<BuildingLayoutTemplate>();
 
+    public DbSet<GoldTokenTransaction> GoldTokenTransactions => Set<GoldTokenTransaction>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var gameServer = modelBuilder.Entity<GameServerNode>();
@@ -97,5 +99,22 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         layout.Property(l => l.Name).HasMaxLength(120);
         layout.Property(l => l.Description).HasMaxLength(500);
         layout.Property(l => l.BuildingType).HasMaxLength(60);
+
+        player.Property(p => p.GoldTokenBalance).HasColumnType("decimal(18,8)").HasDefaultValue(0m);
+
+        var goldTx = modelBuilder.Entity<GoldTokenTransaction>();
+        goldTx.HasKey(tx => tx.Id);
+        goldTx.HasIndex(tx => tx.PlayerAccountId);
+        goldTx.HasIndex(tx => tx.CreatedAtUtc);
+        goldTx.HasOne(tx => tx.PlayerAccount)
+            .WithMany(p => p.GoldTokenTransactions)
+            .HasForeignKey(tx => tx.PlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+        goldTx.Property(tx => tx.PlayerEmail).HasMaxLength(200);
+        goldTx.Property(tx => tx.AdminEmail).HasMaxLength(200);
+        goldTx.Property(tx => tx.Note).HasMaxLength(500);
+        goldTx.Property(tx => tx.Amount).HasColumnType("decimal(18,8)");
+        goldTx.Property(tx => tx.BalanceBefore).HasColumnType("decimal(18,8)");
+        goldTx.Property(tx => tx.BalanceAfter).HasColumnType("decimal(18,8)");
     }
 }

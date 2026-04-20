@@ -4,8 +4,10 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 
+// Synchronously restore token from localStorage so child views see auth state immediately
+auth.initFromStorage()
+
 onMounted(() => {
-  auth.initFromStorage()
   if (auth.isAuthenticated) {
     void auth.fetchProfile()
     void auth.fetchSubscription()

@@ -291,3 +291,47 @@ public sealed class DeleteBuildingLayoutInput
 {
     public Guid Id { get; set; }
 }
+
+// ── Gold token administration ──────────────────────────────────────────────
+
+public sealed class AdjustGoldTokenInput
+{
+    /// <summary>Email of the target player whose balance will be adjusted.</summary>
+    public string TargetEmail { get; set; } = string.Empty;
+
+    /// <summary>Positive value to add, negative value to deduct.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>Optional administrator note for the audit trail.</summary>
+    public string? Note { get; set; }
+}
+
+public sealed class GoldTokenBalanceInfo
+{
+    public Guid PlayerId { get; set; }
+
+    public string Email { get; set; } = string.Empty;
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public decimal GoldTokenBalance { get; set; }
+}
+
+public sealed class GoldTokenTransactionInfo
+{
+    public Guid Id { get; set; }
+
+    public string PlayerEmail { get; set; } = string.Empty;
+
+    public decimal Amount { get; set; }
+
+    public decimal BalanceBefore { get; set; }
+
+    public decimal BalanceAfter { get; set; }
+
+    public string AdminEmail { get; set; } = string.Empty;
+
+    public string? Note { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+}

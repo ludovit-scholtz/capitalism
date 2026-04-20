@@ -2572,6 +2572,301 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     }
 
     #endregion
+
+    // ── Gold token administration ──────────────────────────────────────────────
+
+    #region Gold token administration
+
+    [Fact]
+    public async Task GoldTokenBalances_Unauthenticated_ReturnsAuthError()
+    {
+        var result = await GraphQlAsync("""
+            query { goldTokenBalances { email goldTokenBalance } }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task GoldTokenBalances_RegularPlayer_ReturnsGlobalAdminRequiredError()
+    {
+        var (token, _) = await RegisterAndGetTokenAsync($"gtbal-player-{Guid.NewGuid():N}@example.com");
+
+        var result = await GraphQlAsync("""
+            query { goldTokenBalances { email goldTokenBalance } }
+            """, token: token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("GLOBAL_ADMIN_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GoldTokenBalances_RootAdmin_ReturnsPlayerList()
+    {
+        // Register a player so there is at least one account in the DB
+        var playerEmail = $"gtbal-target-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(playerEmail, "Target Player");
+
+        // Root admin token (email configured in factory as root@example.com)
+        // We need to register root@example.com so the player account exists
+        var adminEmail = $"gtbal-root-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(adminEmail, "Admin Player");
+
+        // Create a JWT token for root@example.com (configured as root admin in factory)
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        var result = await GraphQlAsync("""
+            query { goldTokenBalances { playerId email displayName goldTokenBalance } }
+            """, token: rootToken);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var balances = result.GetProperty("data").GetProperty("goldTokenBalances");
+        Assert.Equal(JsonValueKind.Array, balances.ValueKind);
+        Assert.True(balances.GetArrayLength() >= 1);
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_Unauthenticated_ReturnsAuthError()
+    {
+        var targetEmail = $"gtadj-unauth-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail);
+
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { email goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 10.0m, note = "test" } });
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_RegularPlayer_ReturnsGlobalAdminRequiredError()
+    {
+        var targetEmail = $"gtadj-nonadmin-target-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail);
+
+        var (token, _) = await RegisterAndGetTokenAsync($"gtadj-nonadmin-actor-{Guid.NewGuid():N}@example.com");
+
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { email goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 10.0m } },
+            token: token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("GLOBAL_ADMIN_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_RootAdmin_AddsGoldSuccessfully()
+    {
+        var targetEmail = $"gtadj-topup-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail, "Gold Target");
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) {
+                email goldTokenBalance
+              }
+            }
+            """,
+            new { input = new { targetEmail, amount = 100.5m, note = "Welcome bonus" } },
+            token: rootToken);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var balance = result.GetProperty("data").GetProperty("adjustGoldTokenBalance");
+        Assert.Equal(targetEmail, balance.GetProperty("email").GetString());
+        Assert.Equal(100.5m, balance.GetProperty("goldTokenBalance").GetDecimal());
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_RootAdmin_DeductsGoldSuccessfully()
+    {
+        var targetEmail = $"gtadj-deduct-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail, "Deduct Target");
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        // Top up first
+        await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 50.0m } },
+            token: rootToken);
+
+        // Deduct partial amount
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) {
+                email goldTokenBalance
+              }
+            }
+            """,
+            new { input = new { targetEmail, amount = -20.0m, note = "Correction" } },
+            token: rootToken);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var balance = result.GetProperty("data").GetProperty("adjustGoldTokenBalance");
+        Assert.Equal(30.0m, balance.GetProperty("goldTokenBalance").GetDecimal());
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_NegativeResultPrevented_ReturnsInsufficientBalanceError()
+    {
+        var targetEmail = $"gtadj-negprev-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail, "Negative Test");
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        // Attempt to deduct from zero balance
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = -10.0m } },
+            token: rootToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("INSUFFICIENT_BALANCE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_ZeroAmount_ReturnsInvalidAmountError()
+    {
+        var targetEmail = $"gtadj-zero-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail);
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 0m } },
+            token: rootToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("INVALID_AMOUNT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_UnknownTargetEmail_ReturnsPlayerNotFoundError()
+    {
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail = "nobody@example.com", amount = 10.0m } },
+            token: rootToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("PLAYER_NOT_FOUND", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task GoldTokenTransactions_RootAdmin_ReturnsAuditLog()
+    {
+        var targetEmail = $"gtlog-target-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail, "Log Target");
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        // Make two adjustments
+        await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 25.0m, note = "Grant 1" } },
+            token: rootToken);
+
+        await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 10.0m, note = "Grant 2" } },
+            token: rootToken);
+
+        var result = await GraphQlAsync("""
+            query Txs($targetEmail: String) {
+              goldTokenTransactions(targetEmail: $targetEmail, limit: 10) {
+                id playerEmail amount balanceBefore balanceAfter adminEmail note createdAtUtc
+              }
+            }
+            """,
+            new { targetEmail },
+            token: rootToken);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var txs = result.GetProperty("data").GetProperty("goldTokenTransactions").EnumerateArray().ToList();
+        Assert.Equal(2, txs.Count);
+        // Ordered by createdAtUtc descending – most recent first
+        Assert.Equal("Grant 2", txs[0].GetProperty("note").GetString());
+        Assert.Equal("Grant 1", txs[1].GetProperty("note").GetString());
+        Assert.Equal(35.0m, txs[0].GetProperty("balanceAfter").GetDecimal());
+    }
+
+    [Fact]
+    public async Task GoldTokenTransactions_Unauthenticated_ReturnsAuthError()
+    {
+        var result = await GraphQlAsync("""
+            query { goldTokenTransactions { id playerEmail amount } }
+            """);
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    [Fact]
+    public async Task GoldTokenBalances_GlobalAdmin_CanAlsoAccessBalances()
+    {
+        // Grant global admin role to another player via service mutation, then test they can access
+        var globalAdminEmail = $"gtbal-gadmin-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(globalAdminEmail, "Global Admin");
+
+        // Grant global admin via service mutation
+        await GraphQlAsync("""
+            mutation Assign($input: GlobalGameAdminGrantInput!) {
+              assignGlobalGameAdmin(input: $input) { id email }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    registrationKey = "test-registration-key",
+                    serverKey = "capitalism-local",
+                    requesterEmail = "root@example.com",
+                    targetEmail = globalAdminEmail,
+                }
+            });
+
+        // Now the global admin should be able to view balances
+        var adminToken = CreateSharedToken(Guid.NewGuid().ToString(), globalAdminEmail, "Global Admin");
+
+        var result = await GraphQlAsync("""
+            query { goldTokenBalances { email goldTokenBalance } }
+            """, token: adminToken);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var balances = result.GetProperty("data").GetProperty("goldTokenBalances");
+        Assert.Equal(JsonValueKind.Array, balances.ValueKind);
+    }
+
+    #endregion
 }
 
 // ── Startup guard test ────────────────────────────────────────────────────────

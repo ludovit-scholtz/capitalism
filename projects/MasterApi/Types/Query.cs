@@ -404,6 +404,99 @@ public sealed class Query
             .ToListAsync();
     }
 
+    /// <summary>Returns all player accounts with their gold token balances. Requires global admin or root admin.</summary>
+    [HotChocolate.Authorization.Authorize]
+    public async Task<List<GoldTokenBalanceInfo>> GetGoldTokenBalances(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions)
+    {
+        var callerEmail = GetEmailFromClaims(claimsPrincipal);
+        var access = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Gold token administration requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        return await db.PlayerAccounts
+            .AsNoTracking()
+            .OrderBy(p => p.Email)
+            .Select(p => new GoldTokenBalanceInfo
+            {
+                PlayerId = p.Id,
+                Email = p.Email,
+                DisplayName = p.DisplayName,
+                GoldTokenBalance = p.GoldTokenBalance,
+            })
+            .ToListAsync();
+    }
+
+    /// <summary>Returns recent gold token transactions (audit log). Requires global admin or root admin.</summary>
+    [HotChocolate.Authorization.Authorize]
+    public async Task<List<GoldTokenTransactionInfo>> GetGoldTokenTransactions(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db,
+        [Service] IOptions<GameAdministrationOptions> gameAdministrationOptions,
+        string? targetEmail = null,
+        int limit = 50)
+    {
+        var callerEmail = GetEmailFromClaims(claimsPrincipal);
+        var access = await BuildGameAdministrationAccessAsync(db, gameAdministrationOptions.Value, callerEmail);
+        if (!access.CanAccessEveryGameDashboard)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Gold token administration requires global admin access.")
+                    .SetCode("GLOBAL_ADMIN_REQUIRED")
+                    .Build());
+        }
+
+        var clampedLimit = Math.Clamp(limit, 1, 200);
+        var query = db.GoldTokenTransactions.AsNoTracking();
+
+        if (!string.IsNullOrWhiteSpace(targetEmail))
+        {
+            var normalized = targetEmail.Trim().ToLowerInvariant();
+            query = query.Where(tx => tx.PlayerEmail == normalized);
+        }
+
+        return await query
+            .OrderByDescending(tx => tx.CreatedAtUtc)
+            .Take(clampedLimit)
+            .Select(tx => new GoldTokenTransactionInfo
+            {
+                Id = tx.Id,
+                PlayerEmail = tx.PlayerEmail,
+                Amount = tx.Amount,
+                BalanceBefore = tx.BalanceBefore,
+                BalanceAfter = tx.BalanceAfter,
+                AdminEmail = tx.AdminEmail,
+                Note = tx.Note,
+                CreatedAtUtc = tx.CreatedAtUtc,
+            })
+            .ToListAsync();
+    }
+
+    /// <summary>Extracts the normalized email from JWT claims for admin-only operations.</summary>
+    internal static string GetEmailFromClaims(ClaimsPrincipal principal)
+    {
+        var email = principal.FindFirstValue(ClaimTypes.Email)?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Authenticated user identity is missing.")
+                    .SetCode("IDENTITY_MISSING")
+                    .Build());
+        }
+
+        return email;
+    }
+
     internal static string NormalizeEmail(string email, string errorCode)
     {
         var normalizedEmail = email.Trim().ToLowerInvariant();
