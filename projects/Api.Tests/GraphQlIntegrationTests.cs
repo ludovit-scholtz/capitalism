@@ -20778,6 +20778,132 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
     #endregion
 
+
+    #region Local City Currency — Analytics
+
+    [Fact]
+    public async Task PublicSalesAnalytics_BratislavaCity_ReturnsCurrencyCodeEUR()
+    {
+        // Bratislava is seeded with EUR. The analytics response must include cityCurrencyCode = "EUR".
+        var token = await RegisterAndGetTokenAsync($"psa-eur-{Guid.NewGuid():N}@test.com", "PsaEur");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "EUR Analytics Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ buildingUnitId cityCurrencyCode }} }}",
+            token: token);
+
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.Equal("EUR", analytics.GetProperty("cityCurrencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task PublicSalesAnalytics_PragueCity_ReturnsCurrencyCodeCZK()
+    {
+        // Prague is seeded with CZK. The analytics response must include cityCurrencyCode = "CZK".
+        var token = await RegisterAndGetTokenAsync($"psa-czk-{Guid.NewGuid():N}@test.com", "PsaCzk");
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(pragueId, "FACTORY,MINE", "Prague Industrial Zone");
+        var shopLotId = await CreateTestLotAsync(pragueId, "SALES_SHOP,COMMERCIAL", "Prague Commercial Zone");
+        var productId = await GetStarterProductIdAsync();
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                company { id }
+              }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId = pragueId, companyName = "CZK Analytics Co", factoryLotId } },
+            token);
+
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ publicSalesAnalytics(unitId: \"{unit.Id}\") {{ buildingUnitId cityCurrencyCode }} }}",
+            token: token);
+
+        var analytics = result.GetProperty("data").GetProperty("publicSalesAnalytics");
+        Assert.Equal("CZK", analytics.GetProperty("cityCurrencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task UnitProductAnalytics_BratislavaCity_ReturnsCurrencyCodeEUR()
+    {
+        // Bratislava factory's MANUFACTURING unit analytics must include cityCurrencyCode = "EUR".
+        var token = await RegisterAndGetTokenAsync($"upa-eur-{Guid.NewGuid():N}@test.com", "UpaEur");
+        var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "UPA EUR Co");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await GetAvailableLotIdAsync(cityId, "SALES_SHOP");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var factoryId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("factory").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var manufacturingUnit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(factoryId) && u.UnitType == "MANUFACTURING");
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ unitProductAnalytics(unitId: \"{manufacturingUnit.Id}\") {{ buildingUnitId cityCurrencyCode }} }}",
+            token: token);
+
+        var analytics = result.GetProperty("data").GetProperty("unitProductAnalytics");
+        Assert.Equal("EUR", analytics.GetProperty("cityCurrencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task UnitProductAnalytics_PragueCity_ReturnsCurrencyCodeCZK()
+    {
+        // Prague factory's MANUFACTURING unit analytics must include cityCurrencyCode = "CZK".
+        var token = await RegisterAndGetTokenAsync($"upa-czk-{Guid.NewGuid():N}@test.com", "UpaCzk");
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(pragueId, "FACTORY,MINE", "Prague Factory Zone");
+        var shopLotId = await CreateTestLotAsync(pragueId, "SALES_SHOP,COMMERCIAL", "Prague Shop Zone");
+        var productId = await GetStarterProductIdAsync();
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                company { id }
+              }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId = pragueId, companyName = "UPA CZK Co", factoryLotId } },
+            token);
+
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        var factoryId = finishResult.GetProperty("data").GetProperty("finishOnboarding").GetProperty("factory").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var manufacturingUnit = await db.BuildingUnits
+            .FirstAsync(u => u.BuildingId == Guid.Parse(factoryId) && u.UnitType == "MANUFACTURING");
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ unitProductAnalytics(unitId: \"{manufacturingUnit.Id}\") {{ buildingUnitId cityCurrencyCode }} }}",
+            token: token);
+
+        var analytics = result.GetProperty("data").GetProperty("unitProductAnalytics");
+        Assert.Equal("CZK", analytics.GetProperty("cityCurrencyCode").GetString());
+    }
+
+    #endregion
 }
 
 /// <summary>
@@ -28795,4 +28921,5 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     #endregion
+
 }

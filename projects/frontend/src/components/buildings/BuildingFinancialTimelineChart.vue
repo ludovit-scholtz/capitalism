@@ -7,6 +7,7 @@ import type { BuildingFinancialTickSnapshot } from '@/types'
 
 const props = defineProps<{
   timeline: BuildingFinancialTickSnapshot[]
+  currencyCode?: string
 }>()
 
 const { t, locale } = useI18n()
@@ -30,11 +31,13 @@ const seriesDisplay: Record<BuildingFinancialSeriesKey, { color: string; labelKe
   },
 }
 
-const currencyFormatter = new Intl.NumberFormat('en-US', {
-  style: 'currency',
-  currency: 'USD',
-  maximumFractionDigits: 0,
-})
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: props.currencyCode ?? 'EUR',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
 
 const chartModel = computed(() => buildBuildingFinancialChartModel(props.timeline, plotWidth, plotHeight))
 const activeTickIndex = ref<number | null>(null)
@@ -52,10 +55,6 @@ watch(
   },
   { immediate: true },
 )
-
-function formatCurrency(value: number): string {
-  return currencyFormatter.format(value)
-}
 
 function setActiveTick(index: number) {
   activeTickIndex.value = index

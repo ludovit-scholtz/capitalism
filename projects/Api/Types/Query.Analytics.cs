@@ -26,6 +26,8 @@ public sealed partial class Query
         var unit = await db.BuildingUnits
             .Include(u => u.Building)
             .ThenInclude(b => b.Company)
+            .Include(u => u.Building)
+            .ThenInclude(b => b.City)
             .FirstOrDefaultAsync(u => u.Id == unitId);
 
         if (unit is null || unit.Building.Company.PlayerId != userId) return null;
@@ -114,6 +116,7 @@ public sealed partial class Query
             EstimatedRevenue = estRevSum,
             EstimatedProfit = estProfitSum,
             Snapshots = snapshots,
+            CityCurrencyCode = unit.Building.City?.CurrencyCode ?? "EUR",
         };
     }
 

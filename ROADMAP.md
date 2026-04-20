@@ -22,7 +22,7 @@ Implement banking as is described in the banking section.
 
 **Remaining:**
 - Forex exchange: cross-city currency trading for companies operating in multiple cities.
-- Extend company building units (purchasing, B2B sales, public sales) to display the correct local city currency instead of always showing EUR.
+- ✅ **Local city currency in building units:** Purchasing, B2B sales, and public sales unit config screens now use `Intl.NumberFormat` with the building's city `currencyCode`. Max Price and Min Price labels carry a currency badge (`<span class="currency-badge">CZK</span>`). Analytics types (`PublicSalesAnalytics`, `UnitProductAnalytics`) expose `cityCurrencyCode`. i18n message strings no longer contain hardcoded `$`. 4 backend integration tests (EUR + CZK × PublicSales + UnitProduct) and 4 new E2E tests (EUR badge, CZK badge, mixed-company, CZK analytics) confirm no regression.
 
 ### Changelog (90% complete)
 
@@ -89,7 +89,7 @@ Implement banking as is described in the banking section.
 
 **Remaining:**
 - ⬜ Tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps) – depends on "Tokenized gold management" roadmap item.
-- ⬜ Extend company building units (purchasing, B2B sales, public sales) to display the correct local city currency instead of always showing EUR.
+- ✅ **Building unit local currency:** All price configuration and analytics panels in purchasing, B2B sales, and public sales units use the building's city currency. No more EUR hardcoding for Prague (CZK), New York (USD), etc.
 
 ### Tokenized gold managemnt (60% complete)
 

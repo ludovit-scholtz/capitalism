@@ -457,6 +457,8 @@ export type MockPublicSalesAnalytics = {
   profitHistory: Array<{ tick: number; profit: number; grossMarginPct: number | null }> | null
   demandDrivers: Array<{ factor: string; impact: string; score: number; description: string }>
   trendFactor?: number | null
+  /** ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK"). */
+  cityCurrencyCode?: string
 }
 
 export type MockUnitProductAnalytics = {
@@ -470,6 +472,8 @@ export type MockUnitProductAnalytics = {
   totalQuantityProduced: number
   estimatedRevenue: number | null
   estimatedProfit: number | null
+  /** ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK"). */
+  cityCurrencyCode?: string
   snapshots: Array<{
     tick: number
     laborCost: number
