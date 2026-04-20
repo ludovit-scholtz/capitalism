@@ -359,7 +359,27 @@ public sealed partial class Mutation
         deposit.DepositorCompany.Cash -= input.Amount;
         bank.Company.Cash += input.Amount;
         bank.TotalDeposits += input.Amount;
-        deposit.Amount += input.Amount;
+
+        // Create a NEW deposit record for this top-up tranche.
+        // Each tranche has its own DepositedAtTick (current tick) and the bank's CURRENT
+        // deposit rate — not the original deposit's snapshotted rate.  This prevents the
+        // retroactive-yield exploit where funds added at tick T could appear to have earned
+        // interest since the original deposit date, and prevents locking in old rates.
+        var currentRate = bank.DepositInterestRatePercent ?? 0m;
+        var topUpDeposit = new BankDeposit
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            DepositorCompanyId = deposit.DepositorCompanyId,
+            Amount = input.Amount,
+            DepositInterestRatePercent = currentRate,
+            IsBaseCapital = false,
+            IsActive = true,
+            DepositedAtTick = currentTick,
+            DepositedAtUtc = DateTime.UtcNow,
+            TotalInterestPaid = 0m,
+        };
+        db.BankDeposits.Add(topUpDeposit);
 
         // Auto-repay central-bank debt from surplus (same logic as CreateDeposit)
         if (bank.CentralBankDebt > 0m)
@@ -391,7 +411,7 @@ public sealed partial class Mutation
             CompanyId = deposit.DepositorCompanyId,
             BuildingId = bank.Id,
             Category = LedgerCategory.DepositMade,
-            Description = $"Top-up deposit into {bank.Name} at {deposit.DepositInterestRatePercent}% p.a.",
+            Description = $"Top-up deposit into {bank.Name} at {currentRate}% p.a.",
             Amount = -input.Amount,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow,
@@ -399,7 +419,7 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
-        return MapToDepositSummary(deposit, bank, deposit.DepositorCompany);
+        return MapToDepositSummary(topUpDeposit, bank, deposit.DepositorCompany);
     }
 
     // ── Bank Rate Configuration ───────────────────────────────────────────────
