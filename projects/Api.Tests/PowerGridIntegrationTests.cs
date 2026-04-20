@@ -153,12 +153,14 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         db.Companies.Add(company);
 
         // 8 MW supply / 15 MW demand (3 × 5 MW factories) = 53% → CONSTRAINED.
+        // Use COAL here so this threshold test stays deterministic and does not depend on
+        // weather-scaled renewable output.
         var powerPlant = new Building
         {
             Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
-            Type = BuildingType.PowerPlant, Name = "Small Solar Plant",
+            Type = BuildingType.PowerPlant, Name = "Small Coal Plant",
             Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
-            PowerPlantType = "SOLAR", PowerOutput = 8m, PowerConsumption = 0m,
+            PowerPlantType = "COAL", PowerOutput = 8m, PowerConsumption = 0m,
             BuiltAtUtc = DateTime.UtcNow
         };
         var factories = Enumerable.Range(1, 3).Select(i => new Building
@@ -184,6 +186,66 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         {
             Assert.True(f.PowerStatus == PowerStatus.Constrained,
                 $"{f.Name} should be CONSTRAINED (53% supply), but was {f.PowerStatus}");
+        }
+    }
+
+    [Fact]
+    public async Task PowerDistribution_RenewableOutput_UsesCurrentWeatherFactor()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync();
+        var gameState = await db.GameStates.FirstAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"SolarCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 49.2, Longitude = 14.2, Population = 100_000, AverageRentPerSqm = 10m
+        };
+        db.Cities.Add(city);
+        var company = new Company { Id = Guid.NewGuid(), Name = "Solar Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        db.CityWeatherForecasts.Add(new CityWeatherForecast
+        {
+            CityId = city.Id,
+            Tick = gameState.CurrentTick + 1,
+            WindPercent = 50m,
+            SolarPercent = 40m,
+        });
+
+        var solarPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Weather Solar Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "SOLAR", PowerOutput = 20m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var factories = Enumerable.Range(1, 3).Select(i => new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = $"Solar Factory {i}",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = GameConstants.PowerDemandMw(BuildingType.Factory, 1),
+            BuiltAtUtc = DateTime.UtcNow
+        }).ToList();
+        db.Buildings.Add(solarPlant);
+        db.Buildings.AddRange(factories);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(solarPlant).ReloadAsync();
+        foreach (var factory in factories) await db.Entry(factory).ReloadAsync();
+
+        Assert.Equal(PowerStatus.Powered, solarPlant.PowerStatus);
+        foreach (var factory in factories)
+        {
+            Assert.Equal(
+                PowerStatus.Constrained,
+                factory.PowerStatus);
         }
     }
 

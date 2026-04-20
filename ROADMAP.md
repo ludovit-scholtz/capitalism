@@ -34,12 +34,12 @@ Implement banking as is described in the banking section.
 - Modify the marketing unit media house selection. Make sure to sort the media house by the media content ranking, and show the player's media house companies at the top of the list.
 - Implement all features in the Media house section in this document
 
-### Power plants (0% complete)
+### Power plants (15% complete)
 
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below
 
-### City map (40% complete)
+### City map (50% complete)
 
 - Implement and show weather predictions as is defined in the powerplants section
 

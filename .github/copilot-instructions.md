@@ -909,3 +909,16 @@ Root-cause of a product-critical quality failure (April 2026, PR #4):
 3. **When testing that a cash reserve blocks a purchase, ensure public float cannot be the failure reason.** Seed the target company with a large enough float (e.g., 99,000 free-float shares) and compute the exact share count that costs between `availableCash` and `grossCash`. Assert exactly `INSUFFICIENT_PERSONAL_FUNDS`, never accept `INSUFFICIENT_PUBLIC_FLOAT` as an allowed outcome in the same test.
 4. **Query `personAccount { availableCash }` directly rather than computing `personalCash - taxReserve` client-side** when verifying the cash constraint in tests — this proves the GraphQL contract returns the correct available cash, not just that arithmetic works.
 5. **For year-end settlement tests, always use an isolated factory with `TaxCycleTicks = 2`** so the test can trigger year-end by processing a single tick without advancing 8,760 ticks.
+
+## Renewable power + weather quality — deterministic backend tests and complete E2E mocks
+
+Root-cause of a CI failure (April 2026, PR #64 / power plant weather forecasts):
+- `PowerDistribution_WithShortage_BuildingsConstrained` used a `SOLAR` plant with `PowerOutput = 8m` but did not seed any weather row.
+- In CI, the current tick's solar factor reduced effective output below 50% of demand, so the buildings correctly became `OFFLINE` instead of `CONSTRAINED`.
+- The shared Playwright mock API also had no `cityWeatherForecast` handler, so the new city-map renewable weather UI had no dedicated coverage and the mock drifted from the real GraphQL surface.
+
+**Rules to prevent recurrence:**
+1. **Threshold tests for city-wide power statuses must use deterministic supply.** If the assertion is about the 50%/100% threshold itself, use a non-weather plant (`COAL`, `GAS`, `NUCLEAR`) or seed the exact weather row for the current tick.
+2. **Any backend test that verifies `SOLAR` or `WIND` output must create `CityWeatherForecast` rows for `GameState.CurrentTick`** before processing ticks, then assert the weather-adjusted result explicitly.
+3. **When shipped UI starts calling a new GraphQL query, update `projects/frontend/e2e/helpers/mock-api.ts` in the same session.** Do not rely on `catch { ... = null }` in the component; add the real mock handler and cover it with Playwright.
+4. **For power-plant weather work, add at least one E2E that proves both the renewable outlook UI and the purchase flow** (weather panel visible → plant type badge visible → purchase succeeds).

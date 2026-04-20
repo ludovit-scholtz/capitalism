@@ -660,6 +660,19 @@ export type MockBuildingLayoutTemplate = {
   updatedAtUtc: string
 }
 
+export type MockWeatherTick = {
+  tick: number
+  windPercent: number
+  solarPercent: number
+}
+
+export type MockCityWeatherForecast = {
+  cityId: string
+  currentWindPercent: number
+  currentSolarPercent: number
+  forecast: MockWeatherTick[]
+}
+
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
@@ -671,6 +684,7 @@ export type MockState = {
   currentUserId: string | null
   currentToken: string | null
   gameState: { currentTick: number; lastTickAtUtc: string; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
+  cityWeatherForecasts: Record<string, MockCityWeatherForecast>
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
   ledgerData: Record<string, MockLedgerSummary>
   drillDownData: Record<string, MockLedgerEntry[]>
@@ -950,6 +964,27 @@ function buildMockGameStatePayload(gameState: MockState['gameState']) {
     nextTaxTick,
     nextTaxGameTimeUtc: computeMockInGameTimeUtc(nextTaxTick),
     nextTaxGameYear: computeMockGameYear(nextTaxTick),
+  }
+}
+
+function buildDefaultCityWeatherForecast(cityId: string, currentTick: number): MockCityWeatherForecast {
+  const forecast = Array.from({ length: 50 }, (_, index) => {
+    const tick = currentTick + index
+    const windPercent = 55 + ((index % 5) - 2) * 4
+    const solarPercent = Math.max(0, 85 - Math.abs((index % 12) - 6) * 12)
+
+    return {
+      tick,
+      windPercent: Math.max(0, Math.min(100, windPercent)),
+      solarPercent: Math.max(0, Math.min(100, solarPercent)),
+    }
+  })
+
+  return {
+    cityId,
+    currentWindPercent: forecast[0]?.windPercent ?? 55,
+    currentSolarPercent: forecast[0]?.solarPercent ?? 85,
+    forecast,
   }
 }
 
@@ -1615,6 +1650,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     currentUserId: null,
     currentToken: null,
     gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 8760, taxRate: 15 },
+    cityWeatherForecasts: {},
     stockPriceHistory: {},
     ledgerData: {},
     drillDownData: {},
@@ -4544,13 +4580,37 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('cityWeatherForecast')) {
+      const cityId = body.variables?.cityId
+      const cityWeatherForecast = cityId
+        ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick))
+        : null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityWeatherForecast } }),
+      })
+    }
+
     if (query.includes('cityPowerBalance')) {
       const cityId = body.variables?.cityId
       const allBuildings = state.players.flatMap((p) => p.companies.flatMap((c) => c.buildings)).filter((b) => b.cityId === cityId)
       const powerPlants = allBuildings.filter((b) => b.type === 'POWER_PLANT')
       const consumers = allBuildings.filter((b) => b.type !== 'POWER_PLANT')
       const defaultOutputByType: Record<string, number> = { COAL: 50, GAS: 40, SOLAR: 20, WIND: 25, NUCLEAR: 200 }
-      const totalSupplyMw = powerPlants.reduce((sum, b) => sum + (b.powerOutput ?? defaultOutputByType[b.powerPlantType ?? ''] ?? 30), 0)
+      const weather = cityId
+        ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick))
+        : null
+      const renewableFactorByType: Record<string, number> = {
+        SOLAR: (weather?.currentSolarPercent ?? 100) / 100,
+        WIND: (weather?.currentWindPercent ?? 100) / 100,
+      }
+      const totalSupplyMw = powerPlants.reduce((sum, b) => {
+        const plantType = b.powerPlantType ?? 'COAL'
+        const baseOutput = b.powerOutput ?? defaultOutputByType[plantType] ?? 30
+        const factor = renewableFactorByType[plantType] ?? 1
+        return sum + baseOutput * factor
+      }, 0)
       const totalDemandMw = consumers.reduce((sum, b) => sum + b.powerConsumption, 0)
       const reserveMw = totalSupplyMw - totalDemandMw
       const reservePercent = totalDemandMw > 0 ? Math.round((reserveMw / totalDemandMw) * 1000) / 10 : 100
@@ -4569,7 +4629,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           buildingId: b.id,
           buildingName: b.name,
           plantType: b.powerPlantType ?? 'COAL',
-          outputMw: b.powerOutput ?? defaultOutputByType[b.powerPlantType ?? ''] ?? 30,
+          outputMw: (() => {
+            const plantType = b.powerPlantType ?? 'COAL'
+            const baseOutput = b.powerOutput ?? defaultOutputByType[plantType] ?? 30
+            const factor = renewableFactorByType[plantType] ?? 1
+            return Math.round(baseOutput * factor * 10) / 10
+          })(),
           powerStatus: b.powerStatus ?? 'POWERED',
         })),
         powerPlantCount: powerPlants.length,
