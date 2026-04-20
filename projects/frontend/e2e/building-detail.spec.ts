@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { makeChairProduct, makeDefaultProducts, makePlayer, setupMockApi, type MockBuildingUnit, type MockPublicSalesAnalytics } from './helpers/mock-api'
+import { makeChairProduct, makeDefaultCities, makeDefaultProducts, makePlayer, setupMockApi, type MockBuildingUnit, type MockPublicSalesAnalytics } from './helpers/mock-api'
 
 function getGridSection(page: Page, heading: string) {
   return page
@@ -454,7 +454,7 @@ test.describe('Building detail upgrades', () => {
 
     // Click sell button
     await page.getByRole('button', { name: 'Sell Building' }).click()
-    await expect(page.getByText('Asking Price ($)')).toBeVisible()
+    await expect(page.getByText('Asking Price')).toBeVisible()
 
     // Fill in price and list for sale
     await page.locator('.sale-dialog .form-input').fill('100000')
@@ -691,7 +691,7 @@ test.describe('Building detail upgrades', () => {
     // Verify loss amounts are shown in the summary grid (scoped to avoid chart detail stats)
     await expect(summaryGrid.locator('.mi-metric').nth(0)).toContainText('€30')
     await expect(summaryGrid.locator('.mi-metric').nth(1)).toContainText('€90')
-    await expect(summaryGrid.locator('.mi-metric').nth(2)).toContainText('$-60')
+    await expect(summaryGrid.locator('.mi-metric').nth(2)).toContainText('-€60')
     // The profit value must carry the negative text styling class
     const profitMetric = summaryGrid.locator('.mi-metric').nth(2)
     await expect(profitMetric.locator('.building-profit-negative-text')).toBeVisible()
@@ -1350,7 +1350,7 @@ test.describe('Building detail upgrades', () => {
     // Min Price field should be auto-filled with the Wooden Chair base price (45)
     const minPriceInput = page
       .locator('.config-field')
-      .filter({ has: page.getByText('Min Price', { exact: true }) })
+      .filter({ has: page.getByText(/Min Price/) })
       .locator('input[type="number"]')
     await expect(minPriceInput).toHaveValue('45')
 
@@ -1448,7 +1448,7 @@ test.describe('Building detail upgrades', () => {
     // Min Price field should be auto-filled with the Wood resource base price (10)
     const minPriceInput = page
       .locator('.config-field')
-      .filter({ has: page.getByText('Min Price', { exact: true }) })
+      .filter({ has: page.getByText(/Min Price/) })
       .locator('input[type="number"]')
     await expect(minPriceInput).toHaveValue('10')
 
@@ -8485,7 +8485,7 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     // Set a negative min price in the number input
     const minPriceField = page
       .locator('.config-field')
-      .filter({ has: page.getByText('Min Price', { exact: true }) })
+      .filter({ has: page.getByText(/Min Price/) })
       .first()
     await minPriceField.locator('input').fill('-5')
 
@@ -8540,7 +8540,7 @@ test.describe('Sales shop PUBLIC_SALES price validation and persistence', () => 
     // Set price to exactly 0
     const minPriceField = page
       .locator('.config-field')
-      .filter({ has: page.getByText('Min Price', { exact: true }) })
+      .filter({ has: page.getByText(/Min Price/) })
       .first()
     await minPriceField.locator('input').fill('0')
 
@@ -9287,7 +9287,7 @@ test.describe('Link-aware product picker — B2B_SALES unit', () => {
     await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
 
     // Pre-existing B2B fields must still be present
-    await expect(page.getByText('Min Price', { exact: true })).toBeVisible()
+    await expect(page.getByText(/Min Price/)).toBeVisible()
     await expect(page.getByText('Sale Visibility', { exact: true })).toBeVisible()
   })
 
@@ -10766,7 +10766,7 @@ test.describe('Property management panel', () => {
     // Occupancy
     await expect(panel).toContainText('72.5%')
     // Active rent
-    await expect(panel).toContainText('€14.00 / m²')
+    await expect(panel).toContainText('€14 / m²')
     // Total area
     await expect(panel).toContainText('2,000 m²')
     // Set Rent button
@@ -10792,7 +10792,7 @@ test.describe('Property management panel', () => {
 
     const notice = page.locator('.pending-rent-notice')
     await expect(notice).toBeVisible()
-    await expect(notice).toContainText('€18.00')
+    await expect(notice).toContainText('€18')
     await expect(notice).toContainText('20 hours')
   })
 
@@ -10823,7 +10823,7 @@ test.describe('Property management panel', () => {
     // Dialog closes and pending notice appears
     await expect(panel.locator('.rent-dialog')).toBeHidden()
     await expect(panel.locator('.pending-rent-notice')).toBeVisible()
-    await expect(panel.locator('.pending-rent-notice')).toContainText('€20.00')
+    await expect(panel.locator('.pending-rent-notice')).toContainText('€20')
   })
 
   test('property panel is not shown for factory buildings', async ({ page }) => {
@@ -10910,7 +10910,7 @@ test.describe('Property management panel', () => {
 
     const panel = page.locator('[aria-label="property management"]')
     await expect(panel).toBeVisible()
-    await expect(panel).toContainText('€22.00 / m²')
+    await expect(panel).toContainText('€22 / m²')
     await expect(panel).toContainText('85.0%')
   })
 })
@@ -16331,9 +16331,9 @@ test.describe('Procurement mode configuration', () => {
     // Should show labor and energy cost items
     const operatingCostsRow = page.locator('.operating-costs-row')
     await expect(operatingCostsRow.locator('.operating-cost-item').first()).toBeVisible()
-    // At least one cost item should contain a dollar amount
+    // At least one cost item should contain a currency amount (EUR for Bratislava)
     const costText = await operatingCostsRow.textContent()
-    expect(costText).toContain('$')
+    expect(costText).toContain('€')
   })
 })
 
@@ -18002,7 +18002,7 @@ test.describe('Sales shop building financial overview', () => {
     await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible()
     const overview = page.locator('.building-overview-detail')
     const summaryGrid = overview.locator('.mi-summary-grid')
-    await expect(summaryGrid.locator('.mi-metric').nth(2)).toContainText('$-120')
+    await expect(summaryGrid.locator('.mi-metric').nth(2)).toContainText('-€120')
     // Profit must carry negative styling
     await expect(summaryGrid.locator('.building-profit-negative-text')).toBeVisible()
     // Chart should still render because there IS activity
@@ -19179,5 +19179,319 @@ test.describe('Building link validation errors — backend error display', () =>
     // The player must remain in edit mode so they can correct the layout (not silently lost)
     await expect(plannedSection).toBeVisible()
     await expect(page.getByRole('button', { name: 'Store Upgrade' })).toBeVisible()
+  })
+})
+
+// ── Local city currency display in building unit config ───────────────────────
+
+test.describe('Local city currency in building unit config', () => {
+  function makeEurShopBuilding() {
+    return {
+      id: 'building-eur-shop',
+      companyId: 'company-eur',
+      cityId: 'city-ba',
+      type: 'SALES_SHOP' as const,
+      name: 'EUR Sales Shop',
+      latitude: 48.15,
+      longitude: 17.11,
+      level: 1,
+      powerConsumption: 2,
+      isForSale: false,
+      builtAtUtc: '2026-01-01T00:00:00Z',
+      pendingConfiguration: null,
+      units: [
+        {
+          id: 'eur-purchase',
+          buildingId: 'building-eur-shop',
+          unitType: 'PURCHASE' as const,
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          linkRight: true,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
+          maxPrice: 50,
+        },
+        {
+          id: 'eur-publicsales',
+          buildingId: 'building-eur-shop',
+          unitType: 'PUBLIC_SALES' as const,
+          gridX: 1,
+          gridY: 0,
+          level: 1,
+          linkRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
+          productTypeId: 'prod-chair',
+          minPrice: 45,
+        },
+      ],
+    }
+  }
+
+  function makeCzkShopBuilding() {
+    return {
+      id: 'building-czk-shop',
+      companyId: 'company-czk',
+      cityId: 'city-pr',
+      type: 'SALES_SHOP' as const,
+      name: 'CZK Sales Shop (Prague)',
+      latitude: 50.08,
+      longitude: 14.44,
+      level: 1,
+      powerConsumption: 2,
+      isForSale: false,
+      builtAtUtc: '2026-01-01T00:00:00Z',
+      pendingConfiguration: null,
+      units: [
+        {
+          id: 'czk-purchase',
+          buildingId: 'building-czk-shop',
+          unitType: 'PURCHASE' as const,
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          linkRight: true,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
+          maxPrice: 1000,
+        },
+        {
+          id: 'czk-publicsales',
+          buildingId: 'building-czk-shop',
+          unitType: 'PUBLIC_SALES' as const,
+          gridX: 1,
+          gridY: 0,
+          level: 1,
+          linkRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
+          productTypeId: 'prod-chair',
+          minPrice: 1100,
+        },
+      ],
+    }
+  }
+
+  test('EUR city (Bratislava) shows EUR currency badge in PURCHASE and PUBLIC_SALES config', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-eur',
+          playerId: 'player-1',
+          name: 'EUR Company',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [makeEurShopBuilding()],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-eur-shop')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    // Click the PURCHASE unit (0,0)
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    // Max Price label should show EUR badge
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'EUR' }).first()).toBeVisible()
+
+    // Click the PUBLIC_SALES unit (1,0)
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+    // Min Price label should show EUR badge
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'EUR' })).toBeVisible()
+  })
+
+  test('CZK city (Prague) shows CZK currency badge in PURCHASE and PUBLIC_SALES config', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-czk',
+          playerId: 'player-1',
+          name: 'CZK Company',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [makeCzkShopBuilding()],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cities = makeDefaultCities()
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-czk-shop')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+
+    // Click the PURCHASE unit (0,0) — should show CZK badge
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'CZK' }).first()).toBeVisible()
+
+    // Click the PUBLIC_SALES unit (1,0) — should show CZK badge
+    await plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'CZK' })).toBeVisible()
+  })
+
+  test('mixed-city company: EUR building shows EUR, CZK building shows CZK', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-mixed',
+          playerId: 'player-1',
+          name: 'Mixed Currency Co',
+          cash: 1000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            // EUR building in Bratislava
+            { ...makeEurShopBuilding(), id: 'building-eur-mixed', companyId: 'company-mixed' },
+            // CZK building in Prague
+            { ...makeCzkShopBuilding(), id: 'building-czk-mixed', companyId: 'company-mixed' },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cities = makeDefaultCities()
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    // Check EUR building shows EUR
+    await page.goto('/building/building-eur-mixed')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+    const eurSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await eurSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'EUR' })).toBeVisible()
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'CZK' })).toBeHidden()
+
+    // Check CZK building shows CZK
+    await page.goto('/building/building-czk-mixed')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+    const czkSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await czkSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'CZK' })).toBeVisible()
+    await expect(page.locator('.config-label .currency-badge', { hasText: 'EUR' })).toBeHidden()
+  })
+
+  test('public sales analytics shows formatted price in city currency', async ({ page }) => {
+    const chair = makeChairProduct()
+    const czkBuilding = makeCzkShopBuilding()
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-czk-analytics',
+          playerId: 'player-1',
+          name: 'CZK Analytics Co',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [{ ...czkBuilding, companyId: 'company-czk-analytics' }],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player], products: [chair] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cities = makeDefaultCities()
+    // Provide analytics for the CZK public sales unit
+    state.publicSalesAnalytics['czk-publicsales'] = {
+      buildingUnitId: 'czk-publicsales',
+      buildingId: 'building-czk-shop',
+      buildingName: 'CZK Sales Shop (Prague)',
+      cityName: 'Prague',
+      cityCurrencyCode: 'CZK',
+      productTypeId: 'prod-chair',
+      productName: 'Wooden Chair',
+      totalRevenue: 55000,
+      totalQuantitySold: 50,
+      averagePricePerUnit: 1100,
+      currentSalesCapacity: 60,
+      dataFromTick: 1,
+      dataToTick: 10,
+      demandSignal: 'STRONG',
+      actionHint: '',
+      recentUtilization: 0.83,
+      trendDirection: 'UP',
+      trendFactor: 1.1,
+      revenueHistory: [{ tick: 1, revenue: 5500, quantitySold: 5 }],
+      priceHistory: [{ tick: 1, pricePerUnit: 1100 }],
+      marketShare: [],
+      elasticityIndex: null,
+      unmetDemandShare: null,
+      populationIndex: null,
+      inventoryQuality: null,
+      brandAwareness: null,
+      totalProfit: null,
+      profitHistory: null,
+      demandDrivers: [],
+    }
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-czk-shop')
+
+    // Click the PUBLIC_SALES unit in the "Current Configuration" (active) grid section
+    const activeSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
+    await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+
+    // The analytics revenue should be formatted in CZK (Kč or CZK symbol)
+    await expect(page.locator('.mi-summary-grid')).toContainText(/CZK|Kč/)
   })
 })
