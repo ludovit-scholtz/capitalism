@@ -1096,6 +1096,166 @@ namespace Api.Data.Migrations
                     b.ToTable("ForexTradeRecords");
                 });
 
+            modelBuilder.Entity("Api.Data.Entities.PlayerGoldBalance", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Balance")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId")
+                        .IsUnique();
+
+                    b.ToTable("PlayerGoldBalances", t =>
+                        {
+                            t.HasCheckConstraint("CK_PlayerGoldBalances_Balance_NonNegative", "\"Balance\" >= 0");
+                        });
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GoldAmmPool", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("FiatReserve")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("GoldReserve")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("TotalLiquidityShares")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrencyCode")
+                        .IsUnique();
+
+                    b.ToTable("GoldAmmPools");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GoldAmmPosition", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("LiquidityShares")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("FiatProvided")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("GoldProvided")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PlayerId");
+
+                    b.HasIndex("PoolId", "PlayerId")
+                        .IsUnique();
+
+                    b.ToTable("GoldAmmPositions");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GoldAmmTradeRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<decimal>("FeeAmount")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("ImpliedPrice")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<decimal>("InputAmount")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<decimal>("OutputAmount")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("numeric(18,8)");
+
+                    b.Property<Guid>("PlayerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PoolId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("ExecutedAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("ExecutedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PoolId");
+
+                    b.HasIndex("PlayerId", "ExecutedAtTick");
+
+                    b.ToTable("GoldAmmTradeRecords");
+                });
+
             modelBuilder.Entity("Api.Data.Entities.PlayerCurrencyBalance", b =>
                 {
                     b.Property<Guid>("Id")
@@ -2306,6 +2466,58 @@ namespace Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.PlayerGoldBalance", b =>
+                {
+                    b.HasOne("Api.Data.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GoldAmmPosition", b =>
+                {
+                    b.HasOne("Api.Data.Entities.GoldAmmPool", "Pool")
+                        .WithMany("Positions")
+                        .HasForeignKey("PoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Api.Data.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                    b.Navigation("Pool");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GoldAmmTradeRecord", b =>
+                {
+                    b.HasOne("Api.Data.Entities.GoldAmmPool", "Pool")
+                        .WithMany()
+                        .HasForeignKey("PoolId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Api.Data.Entities.Player", "Player")
+                        .WithMany()
+                        .HasForeignKey("PlayerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Player");
+                    b.Navigation("Pool");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.GoldAmmPool", b =>
+                {
+                    b.Navigation("Positions");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.PlayerCurrencyBalance", b =>

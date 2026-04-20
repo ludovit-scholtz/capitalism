@@ -252,5 +252,50 @@ public sealed partial class AppDbContext
             e.HasOne(t => t.Player).WithMany().HasForeignKey(t => t.PlayerId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(t => new { t.PlayerId, t.ExecutedAtTick });
         });
+
+        modelBuilder.Entity<PlayerGoldBalance>(e =>
+        {
+            e.HasKey(g => g.Id);
+            e.Property(g => g.Balance).HasPrecision(18, 8);
+            e.HasOne(g => g.Player).WithMany().HasForeignKey(g => g.PlayerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(g => g.PlayerId).IsUnique();
+            e.ToTable("PlayerGoldBalances", t =>
+                t.HasCheckConstraint("CK_PlayerGoldBalances_Balance_NonNegative", "\"Balance\" >= 0"));
+        });
+
+        modelBuilder.Entity<GoldAmmPool>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.CurrencyCode).HasMaxLength(3);
+            e.Property(p => p.FiatReserve).HasPrecision(18, 4);
+            e.Property(p => p.GoldReserve).HasPrecision(18, 8);
+            e.Property(p => p.TotalLiquidityShares).HasPrecision(18, 8);
+            e.HasIndex(p => p.CurrencyCode).IsUnique();
+        });
+
+        modelBuilder.Entity<GoldAmmPosition>(e =>
+        {
+            e.HasKey(p => p.Id);
+            e.Property(p => p.LiquidityShares).HasPrecision(18, 8);
+            e.Property(p => p.FiatProvided).HasPrecision(18, 4);
+            e.Property(p => p.GoldProvided).HasPrecision(18, 8);
+            e.HasOne(p => p.Pool).WithMany(pool => pool.Positions).HasForeignKey(p => p.PoolId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(p => p.Player).WithMany().HasForeignKey(p => p.PlayerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(p => new { p.PoolId, p.PlayerId }).IsUnique();
+        });
+
+        modelBuilder.Entity<GoldAmmTradeRecord>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.Direction).HasMaxLength(20);
+            e.Property(t => t.CurrencyCode).HasMaxLength(3);
+            e.Property(t => t.InputAmount).HasPrecision(18, 8);
+            e.Property(t => t.OutputAmount).HasPrecision(18, 8);
+            e.Property(t => t.FeeAmount).HasPrecision(18, 8);
+            e.Property(t => t.ImpliedPrice).HasPrecision(18, 4);
+            e.HasOne(t => t.Player).WithMany().HasForeignKey(t => t.PlayerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(t => t.Pool).WithMany().HasForeignKey(t => t.PoolId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => new { t.PlayerId, t.ExecutedAtTick });
+        });
     }
 }

@@ -114,6 +114,18 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Completed forex currency swap audit trail.</summary>
     public DbSet<ForexTradeRecord> ForexTradeRecords => Set<ForexTradeRecord>();
 
+    /// <summary>Per-player XAU (gold token) balance on this game server.</summary>
+    public DbSet<PlayerGoldBalance> PlayerGoldBalances => Set<PlayerGoldBalance>();
+
+    /// <summary>AMM liquidity pools for fiat/XAU currency pairs.</summary>
+    public DbSet<GoldAmmPool> GoldAmmPools => Set<GoldAmmPool>();
+
+    /// <summary>Player LP positions in gold AMM pools.</summary>
+    public DbSet<GoldAmmPosition> GoldAmmPositions => Set<GoldAmmPosition>();
+
+    /// <summary>Audit trail for gold AMM swap executions.</summary>
+    public DbSet<GoldAmmTradeRecord> GoldAmmTradeRecords => Set<GoldAmmTradeRecord>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
