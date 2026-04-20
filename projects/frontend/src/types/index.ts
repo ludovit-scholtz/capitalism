@@ -699,6 +699,12 @@ export interface CompanyLedgerSummary {
   gameYear: number
   isCurrentGameYear: boolean
   currentCash: number
+  /** ISO 4217 code for the company's primary operating currency. */
+  primaryCurrencyCode: string
+  /** Display symbol for the primary currency (e.g. "€", "Kč"). */
+  primaryCurrencySymbol: string
+  /** True when the company has buildings in multiple cities with different currencies. */
+  hasMixedCurrencies: boolean
   totalRevenue: number
   totalPurchasingCosts: number
   totalShippingCosts: number
@@ -757,6 +763,8 @@ export interface BuildingLedgerSummary {
   buildingType: string
   revenue: number
   costs: number
+  currencyCode: string
+  currencySymbol: string
 }
 
 export interface BuildingFinancialTickSnapshot {
@@ -791,6 +799,8 @@ export interface LedgerEntryResult {
   productName: string | null
   resourceTypeId: string | null
   resourceName: string | null
+  currencyCode: string
+  currencySymbol: string
 }
 
 export interface PublicSalesAnalytics {

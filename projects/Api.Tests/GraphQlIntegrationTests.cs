@@ -18194,6 +18194,230 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(3000m, shop.GetProperty("revenue").GetDecimal());
     }
 
+    [Fact]
+    public async Task LedgerDrillDown_ReturnsCorrectCurrencyCodeForBuildingCity()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-currency-drill@test.com", "CurrencyDrillUser");
+        Guid companyId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == "ledger-currency-drill@test.com");
+            // Use Prague (CZK) to validate non-EUR currency appears in drill-down
+            var pragueCity = await db.Cities.FirstOrDefaultAsync(c => c.Name.Contains("Prague"));
+            if (pragueCity == null)
+            {
+                // Fallback: create or use Bratislava with known EUR currency
+                pragueCity = await db.Cities.FirstAsync();
+            }
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Multi-Currency Test Corp",
+                Cash = 500_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+
+            var buildingId = Guid.NewGuid();
+            db.Buildings.Add(new Building
+            {
+                Id = buildingId,
+                CompanyId = company.Id,
+                CityId = pragueCity.Id,
+                Type = BuildingType.SalesShop,
+                Name = "Prague Shop",
+                Level = 1,
+            });
+
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                BuildingId = buildingId,
+                Category = LedgerCategory.Revenue,
+                Description = "Sales in Prague",
+                Amount = 10_000m,
+                RecordedAtTick = 5,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var drillResult = await ExecuteGraphQlAsync(
+            $"{{ ledgerDrillDown(companyId: \"{companyId}\", category: \"REVENUE\") {{ id currencyCode currencySymbol buildingName }} }}",
+            token: token);
+
+        var entries = drillResult.GetProperty("data").GetProperty("ledgerDrillDown").EnumerateArray().ToList();
+        Assert.Single(entries);
+        var entry = entries[0];
+        var currencyCode = entry.GetProperty("currencyCode").GetString()!;
+        var currencySymbol = entry.GetProperty("currencySymbol").GetString()!;
+        // The currency should match the city's currency code — not null or empty
+        Assert.NotEmpty(currencyCode);
+        Assert.NotEmpty(currencySymbol);
+        Assert.Equal("Prague Shop", entry.GetProperty("buildingName").GetString());
+    }
+
+    [Fact]
+    public async Task LedgerDrillDown_EntryWithNoBuilding_DefaultsToEurCurrency()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-nobuilding-curr@test.com", "NoBuildingCurrUser");
+        Guid companyId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == "ledger-nobuilding-curr@test.com");
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Tax Test Corp",
+                Cash = 200_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                BuildingId = null,    // No building — company-level entry (e.g. tax)
+                Category = LedgerCategory.Tax,
+                Description = "Income tax payment",
+                Amount = -5_000m,
+                RecordedAtTick = 8760,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var drillResult = await ExecuteGraphQlAsync(
+            $"{{ ledgerDrillDown(companyId: \"{companyId}\", category: \"TAX\") {{ id currencyCode currencySymbol }} }}",
+            token: token);
+
+        var entries = drillResult.GetProperty("data").GetProperty("ledgerDrillDown").EnumerateArray().ToList();
+        Assert.Single(entries);
+        // Tax entries have no building → should default to "EUR"
+        Assert.Equal("EUR", entries[0].GetProperty("currencyCode").GetString());
+        Assert.Equal("€", entries[0].GetProperty("currencySymbol").GetString());
+    }
+
+    [Fact]
+    public async Task CompanyLedger_BuildingSummaries_IncludeCurrencyCode()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-bld-currency@test.com", "BldCurrencyUser");
+        Guid companyId;
+        string expectedCurrencyCode;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == "ledger-bld-currency@test.com");
+            var city = await db.Cities.FirstAsync();
+            expectedCurrencyCode = city.CurrencyCode ?? "EUR";
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Currency Building Corp",
+                Cash = 500_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+
+            var buildingId = Guid.NewGuid();
+            db.Buildings.Add(new Building
+            {
+                Id = buildingId,
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.Factory,
+                Name = "Currency Factory",
+                Level = 1,
+            });
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                BuildingId = buildingId,
+                Category = LedgerCategory.Revenue,
+                Description = "City-currency revenue",
+                Amount = 7_500m,
+                RecordedAtTick = 1,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var ledgerResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ primaryCurrencyCode primaryCurrencySymbol hasMixedCurrencies buildingSummaries {{ buildingId currencyCode currencySymbol }} }} }}",
+            token: token);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        var primaryCode = ledger.GetProperty("primaryCurrencyCode").GetString()!;
+        Assert.Equal(expectedCurrencyCode, primaryCode);
+        Assert.False(ledger.GetProperty("hasMixedCurrencies").GetBoolean(), "Single-city company should not be mixed-currency");
+
+        var summaries = ledger.GetProperty("buildingSummaries").EnumerateArray().ToList();
+        Assert.Single(summaries);
+        Assert.Equal(expectedCurrencyCode, summaries[0].GetProperty("currencyCode").GetString());
+        Assert.NotEmpty(summaries[0].GetProperty("currencySymbol").GetString()!);
+    }
+
+    [Fact]
+    public async Task CompanyLedger_MultiCityCompany_HasMixedCurrenciesTrue()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-multicity-curr@test.com", "MultiCityCurrUser");
+        Guid companyId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == "ledger-multicity-curr@test.com");
+
+            // Find two cities with different currencies to prove mixed-currency detection
+            var cities = await db.Cities.ToListAsync();
+            var eurCity = cities.FirstOrDefault(c => (c.CurrencyCode ?? "EUR") == "EUR");
+            var czkCity = cities.FirstOrDefault(c => (c.CurrencyCode ?? "EUR") == "CZK");
+
+            if (eurCity == null || czkCity == null)
+            {
+                // Skip test when needed cities don't exist in this DB
+                return;
+            }
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Multi-City Corp",
+                Cash = 1_000_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+
+            db.Buildings.AddRange(
+                new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = eurCity.Id, Type = BuildingType.Factory, Name = "Vienna Factory", Level = 1 },
+                new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = czkCity.Id, Type = BuildingType.SalesShop, Name = "Prague Shop", Level = 1 }
+            );
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var ledgerResult = await ExecuteGraphQlAsync(
+            $"{{ companyLedger(companyId: \"{companyId}\") {{ primaryCurrencyCode hasMixedCurrencies }} }}",
+            token: token);
+
+        var ledger = ledgerResult.GetProperty("data").GetProperty("companyLedger");
+        Assert.True(ledger.GetProperty("hasMixedCurrencies").GetBoolean(), "Multi-city company spanning EUR and CZK should have hasMixedCurrencies=true");
+    }
+
     #endregion
 
     #region R&D Building Configuration

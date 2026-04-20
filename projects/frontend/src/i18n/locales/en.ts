@@ -1558,6 +1558,8 @@ export default {
       CENTRAL_BANK_BORROW: 'Central Bank Borrowing',
       CENTRAL_BANK_REPAY: 'Central Bank Repayment',
     },
+    currency: 'Currency',
+    mixedCurrencies: 'Multi-currency',
   },
   companySettings: {
     eyebrow: 'Company Profile',

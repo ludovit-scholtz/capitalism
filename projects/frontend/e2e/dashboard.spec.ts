@@ -1393,7 +1393,7 @@ test.describe('Dashboard — starter operations (supply chain, financials, guida
     // Must NOT show "Business is profitable"
     await expect(page.locator('.starter-guidance')).not.toContainText('Business is profitable')
     // Financial card should display the backend net income as negative
-    await expect(page.locator('.financial-summary-card')).toContainText('-$500')
+    await expect(page.locator('.financial-summary-card')).toContainText('-€500')
   })
 
   test('guidance shows profitable when netIncome is positive even if pre-tax margins are thin', async ({

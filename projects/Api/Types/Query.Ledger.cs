@@ -27,7 +27,7 @@ public sealed partial class Query
 
         var company = await db.Companies
             .AsNoTracking()
-            .Include(c => c.Buildings)
+            .Include(c => c.Buildings).ThenInclude(b => b.City)
             .FirstOrDefaultAsync(c => c.Id == companyId && c.PlayerId == userId);
 
         if (company is null) return null;
@@ -124,11 +124,19 @@ public sealed partial class Query
                     BuildingId = g.Key,
                     BuildingName = b?.Name ?? string.Empty,
                     BuildingType = b?.Type ?? string.Empty,
+                    CurrencyCode = b?.City?.CurrencyCode ?? "EUR",
                     Revenue = g.Where(e => e.Amount > 0).Sum(e => e.Amount),
                     Costs = Math.Abs(g.Where(e => e.Amount < 0).Sum(e => e.Amount)),
                 };
             })
             .ToList();
+
+        // Determine the primary currency and whether multiple currencies are present.
+        var buildingCurrencies = company.Buildings
+            .Select(b => b.City?.CurrencyCode ?? "EUR")
+            .Distinct()
+            .ToList();
+        var primaryCurrencyCode = buildingCurrencies.Count == 1 ? buildingCurrencies[0] : "EUR";
 
         // Build history from the lightweight projection — no in-memory entity hydration needed.
         var history = historyProjection
@@ -152,6 +160,8 @@ public sealed partial class Query
             GameYear = selectedGameYear,
             IsCurrentGameYear = isCurrentYear,
             CurrentCash = company.Cash,
+            PrimaryCurrencyCode = primaryCurrencyCode,
+            HasMixedCurrencies = buildingCurrencies.Count > 1,
             TotalRevenue = totalRevenue,
             TotalPurchasingCosts = totalPurchasingCosts,
             TotalShippingCosts = totalShippingCosts,
@@ -233,7 +243,7 @@ public sealed partial class Query
         var entries = await entriesQuery
             .OrderByDescending(e => e.RecordedAtTick)
             .Take(200)
-            .Include(e => e.Building)
+            .Include(e => e.Building).ThenInclude(b => b!.City)
             .Include(e => e.ProductType)
             .Include(e => e.ResourceType)
             .ToListAsync();
@@ -254,6 +264,7 @@ public sealed partial class Query
             ProductName = e.ProductType?.Name,
             ResourceTypeId = e.ResourceTypeId,
             ResourceName = e.ResourceType?.Name,
+            CurrencyCode = e.Building?.City?.CurrencyCode ?? "EUR",
         }).ToList();
     }
 

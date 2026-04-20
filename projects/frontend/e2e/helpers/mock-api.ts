@@ -68,6 +68,9 @@ export type MockLedgerSummary = {
   gameYear?: number
   isCurrentGameYear?: boolean
   currentCash: number
+  primaryCurrencyCode?: string
+  primaryCurrencySymbol?: string
+  hasMixedCurrencies?: boolean
   totalRevenue: number
   totalPurchasingCosts: number
   totalShippingCosts?: number
@@ -102,6 +105,8 @@ export type MockLedgerSummary = {
     buildingType: string
     revenue: number
     costs: number
+    currencyCode?: string
+    currencySymbol?: string
   }>
 }
 
@@ -132,6 +137,8 @@ export type MockLedgerEntry = {
   productName: string | null
   resourceTypeId: string | null
   resourceName: string | null
+  currencyCode?: string
+  currencySymbol?: string
 }
 
 export type MockCompany = {
@@ -1059,6 +1066,9 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     ...summary,
     gameYear,
     isCurrentGameYear: summary.isCurrentGameYear ?? gameYear === currentGameYear,
+    primaryCurrencyCode: summary.primaryCurrencyCode ?? 'EUR',
+    primaryCurrencySymbol: summary.primaryCurrencySymbol ?? '€',
+    hasMixedCurrencies: summary.hasMixedCurrencies ?? false,
     totalStockPurchaseCashOut: summary.totalStockPurchaseCashOut ?? 0,
     totalStockSaleCashIn: summary.totalStockSaleCashIn ?? 0,
     totalShippingCosts: summary.totalShippingCosts ?? 0,
@@ -1080,6 +1090,11 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     incomeTaxDueGameYear: summary.incomeTaxDueGameYear ?? computeMockGameYear(incomeTaxDueAtTick),
     isIncomeTaxSettled: summary.isIncomeTaxSettled ?? gameYear < currentGameYear,
     history: summary.history ?? [buildMockLedgerHistoryYear(summary, currentGameYear)],
+    buildingSummaries: (summary.buildingSummaries ?? []).map((b) => ({
+      ...b,
+      currencyCode: b.currencyCode ?? 'EUR',
+      currencySymbol: b.currencySymbol ?? '€',
+    })),
   }
 }
 
@@ -5391,10 +5406,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const category = body.variables?.category
       const gameYear = body.variables?.gameYear
       const entries = state.drillDownData[`${companyId}:${category}:${gameYear}`] ?? state.drillDownData[`${companyId}:${category}`] ?? []
+      const enrichedEntries = entries.map((e) => ({
+        ...e,
+        currencyCode: e.currencyCode ?? 'EUR',
+        currencySymbol: e.currencySymbol ?? '€',
+      }))
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { ledgerDrillDown: entries } }),
+        body: JSON.stringify({ data: { ledgerDrillDown: enrichedEntries } }),
       })
     }
 

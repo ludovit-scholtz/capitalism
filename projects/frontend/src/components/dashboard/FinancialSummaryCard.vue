@@ -31,15 +31,25 @@ const netProfit = computed(() => {
 })
 
 function formatAmount(value: number): string {
-  if (!isFinite(value) || isNaN(value)) return '$—'
-  const abs = Math.abs(value)
+  if (!isFinite(value) || isNaN(value)) return '—'
+  const code = props.ledger?.primaryCurrencyCode ?? 'EUR'
   const sign = value < 0 ? '-' : value > 0 ? '+' : ''
-  return `${sign}$${abs.toLocaleString(locale.value, { maximumFractionDigits: 0 })}`
+  const formatted = new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: code,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value))
+  return `${sign}${formatted}`
 }
 
 function formatAmountPlain(value: number): string {
-  if (!isFinite(value) || isNaN(value)) return '$—'
-  return `$${Math.abs(value).toLocaleString(locale.value, { maximumFractionDigits: 0 })}`
+  if (!isFinite(value) || isNaN(value)) return '—'
+  const code = props.ledger?.primaryCurrencyCode ?? 'EUR'
+  return new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: code,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value))
 }
 
 function profitClass(value: number): string {

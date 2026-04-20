@@ -1557,6 +1557,8 @@ export default {
       CENTRAL_BANK_BORROW: 'Zentralbankkredit',
       CENTRAL_BANK_REPAY: 'Rückzahlung Zentralbank',
     },
+    currency: 'Währung',
+    mixedCurrencies: 'Mehrwährung',
   },
   companySettings: {
     eyebrow: 'Unternehmensprofil',

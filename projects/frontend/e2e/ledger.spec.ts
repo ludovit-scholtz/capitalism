@@ -136,8 +136,8 @@ test.describe('Company Ledger', () => {
     await expect(page.getByRole('heading', { name: 'Income Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Balance Sheet' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Cash Flow Statement' })).toBeVisible()
-    await expect(page.locator('.statement-row').filter({ hasText: 'Labor Costs' })).toContainText('-$2,500.00')
-    await expect(page.locator('.statement-row').filter({ hasText: 'Energy Costs' })).toContainText('-$750.00')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Labor Costs' })).toContainText('-€2,500.00')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Energy Costs' })).toContainText('-€750.00')
   })
 
   test('ledger shows shipping costs and shipping drill-down entries', async ({ page }) => {
@@ -204,7 +204,7 @@ test.describe('Company Ledger', () => {
 
     await page.goto(`/ledger/${company.id}`)
 
-    await expect(page.locator('.statement-row').filter({ hasText: 'Shipping Costs' })).toContainText('-$320.00')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Shipping Costs' })).toContainText('-€320.00')
     await page.getByRole('button', { name: 'Detail: Shipping Costs' }).click()
     await expect(page.getByRole('heading', { name: 'Detail: Shipping' })).toBeVisible()
     await expect(page.locator('.drill-table')).toContainText('Wooden Chair')
@@ -452,7 +452,7 @@ test.describe('Company Ledger', () => {
 
     await page.getByRole('button', { name: /Year 2000/ }).click()
     await expect(page.locator('.kpi-card').getByText('Year 2000')).toBeVisible()
-    await expect(page.getByText('$1,200.00')).toBeVisible()
+    await expect(page.getByText('€1,200.00')).toBeVisible()
   })
 
   test('back button returns to dashboard', async ({ page }) => {
@@ -713,8 +713,8 @@ test.describe('Company Ledger', () => {
     await page.getByRole('button', { name: /Year 2000/ }).click()
     await expect(page.locator('.kpi-card').getByText('Year 2000')).toBeVisible()
 
-    // Revenue for year 2000 should show $2,400
-    await expect(page.getByText('$2,400.00')).toBeVisible()
+    // Revenue for year 2000 should show €2,400
+    await expect(page.getByText('€2,400.00')).toBeVisible()
 
     // Open revenue drill-down for the historical year
     const revenueRow = page
@@ -1082,5 +1082,342 @@ test.describe('Ledger tick-refresh stability', () => {
     await expect(page.getByText('Wooden Chair')).toBeVisible()
     // No loading spinner must have appeared
     await expect(page.locator('.state-box')).toBeHidden()
+  })
+
+  test('ledger shows EUR currency badge in KPI row for EUR company', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const company = {
+      id: 'company-eur',
+      playerId: player.id,
+      name: 'EUR Corp',
+      cash: 300000,
+      foundedAtUtc: new Date().toISOString(),
+      buildings: [],
+    }
+    player.companies = [company]
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: 'EUR Corp',
+      primaryCurrencyCode: 'EUR',
+      primaryCurrencySymbol: '€',
+      hasMixedCurrencies: false,
+      currentCash: 300000,
+      totalRevenue: 10000,
+      totalPurchasingCosts: 5000,
+      totalLaborCosts: 1000,
+      totalEnergyCosts: 200,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 3800,
+      buildingValue: 200000,
+      inventoryValue: 0,
+      totalAssets: 500000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 3800,
+      cashFromInvestments: 0,
+      firstRecordedTick: 1,
+      lastRecordedTick: 10,
+      buildingSummaries: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    await expect(page.locator('.kpi-card').filter({ has: page.getByText('Currency') })).toBeVisible()
+    await expect(page.locator('.kpi-card').filter({ has: page.getByText('Currency') }).locator('.currency-badge')).toContainText('EUR')
+  })
+
+  test('ledger shows CZK currency badge for CZK company and formats amounts in CZK', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const company = {
+      id: 'company-czk',
+      playerId: player.id,
+      name: 'CZK Corp',
+      cash: 300000,
+      foundedAtUtc: new Date().toISOString(),
+      buildings: [],
+    }
+    player.companies = [company]
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: 'CZK Corp',
+      primaryCurrencyCode: 'CZK',
+      primaryCurrencySymbol: 'Kč',
+      hasMixedCurrencies: false,
+      currentCash: 300000,
+      totalRevenue: 50000,
+      totalPurchasingCosts: 20000,
+      totalLaborCosts: 5000,
+      totalEnergyCosts: 1000,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 24000,
+      buildingValue: 0,
+      inventoryValue: 0,
+      totalAssets: 300000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 24000,
+      cashFromInvestments: 0,
+      firstRecordedTick: 1,
+      lastRecordedTick: 5,
+      buildingSummaries: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    // Currency KPI card shows CZK badge
+    await expect(page.locator('.kpi-card').filter({ has: page.getByText('Currency') }).locator('.currency-badge')).toContainText('CZK')
+    // Labor costs are formatted in CZK — amount should contain CZK code
+    await expect(page.locator('.statement-row').filter({ hasText: 'Labor Costs' })).toContainText('CZK')
+  })
+
+  test('ledger shows multi-currency hint when company spans multiple currencies', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const company = {
+      id: 'company-mixed',
+      playerId: player.id,
+      name: 'Global Corp',
+      cash: 500000,
+      foundedAtUtc: new Date().toISOString(),
+      buildings: [],
+    }
+    player.companies = [company]
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: 'Global Corp',
+      primaryCurrencyCode: 'EUR',
+      primaryCurrencySymbol: '€',
+      hasMixedCurrencies: true,
+      currentCash: 500000,
+      totalRevenue: 80000,
+      totalPurchasingCosts: 30000,
+      totalLaborCosts: 10000,
+      totalEnergyCosts: 2000,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 38000,
+      buildingValue: 0,
+      inventoryValue: 0,
+      totalAssets: 500000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 38000,
+      cashFromInvestments: 0,
+      firstRecordedTick: 1,
+      lastRecordedTick: 20,
+      buildingSummaries: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    await expect(page.locator('.currency-mixed-hint')).toBeVisible()
+    await expect(page.locator('.currency-mixed-hint')).toContainText('Multi-currency')
+  })
+
+  test('building summaries table shows per-building currency badge and correctly formatted amounts', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const company = makeLedgerCompany(player.id)
+    player.companies = [company]
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: company.name,
+      primaryCurrencyCode: 'EUR',
+      primaryCurrencySymbol: '€',
+      hasMixedCurrencies: true,
+      currentCash: 450000,
+      totalRevenue: 15000,
+      totalPurchasingCosts: 5000,
+      totalLaborCosts: 1200,
+      totalEnergyCosts: 300,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 8500,
+      buildingValue: 350000,
+      inventoryValue: 5000,
+      totalAssets: 810000,
+      totalPropertyPurchases: 200000,
+      cashFromOperations: 8500,
+      cashFromInvestments: -200000,
+      firstRecordedTick: 1,
+      lastRecordedTick: 30,
+      buildingSummaries: [
+        {
+          buildingId: 'building-factory-1',
+          buildingName: 'Vienna Factory',
+          buildingType: 'FACTORY',
+          revenue: 10000,
+          costs: 5000,
+          currencyCode: 'EUR',
+          currencySymbol: '€',
+        },
+        {
+          buildingId: 'building-shop-czk',
+          buildingName: 'Prague Shop',
+          buildingType: 'SALES_SHOP',
+          revenue: 5000,
+          costs: 1500,
+          currencyCode: 'CZK',
+          currencySymbol: 'Kč',
+        },
+      ],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    const buildingsTable = page.locator('.buildings-table')
+    await expect(buildingsTable).toBeVisible()
+
+    // Vienna Factory row shows EUR badge
+    const viennaRow = buildingsTable.locator('tbody tr').filter({ hasText: 'Vienna Factory' })
+    await expect(viennaRow.locator('.currency-badge')).toContainText('EUR')
+
+    // Prague Shop row shows CZK badge
+    const pragueRow = buildingsTable.locator('tbody tr').filter({ hasText: 'Prague Shop' })
+    await expect(pragueRow.locator('.currency-badge')).toContainText('CZK')
+    // Prague Shop amounts should use CZK code (en locale formats CZK as "CZK X,XXX.XX")
+    await expect(pragueRow).toContainText('CZK')
+  })
+
+  test('drill-down shows currency badge for entries in non-primary currency', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const company = makeLedgerCompany(player.id)
+    player.companies = [company]
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: company.name,
+      primaryCurrencyCode: 'EUR',
+      primaryCurrencySymbol: '€',
+      hasMixedCurrencies: true,
+      currentCash: 400000,
+      totalRevenue: 12000,
+      totalPurchasingCosts: 4000,
+      totalLaborCosts: 1500,
+      totalEnergyCosts: 300,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 6200,
+      buildingValue: 200000,
+      inventoryValue: 2000,
+      totalAssets: 612000,
+      totalPropertyPurchases: 150000,
+      cashFromOperations: 6200,
+      cashFromInvestments: -150000,
+      firstRecordedTick: 1,
+      lastRecordedTick: 15,
+      buildingSummaries: [],
+    }
+    state.drillDownData[`${company.id}:REVENUE`] = [
+      {
+        id: 'rev-czk-1',
+        category: 'REVENUE',
+        description: 'Sales in Prague',
+        amount: 7000,
+        recordedAtTick: 10,
+        buildingId: 'building-factory-1',
+        buildingName: 'Prague Shop',
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: 'Wooden Chair',
+        resourceTypeId: null,
+        resourceName: null,
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    // Expand the Revenue drill-down
+    const revenueRow = page.locator('.statement-row').filter({ hasText: /^Revenue/ }).first()
+    await revenueRow.getByRole('button').click()
+    await expect(page.locator('.drill-table')).toBeVisible()
+
+    // Entry in CZK should show CZK badge in the amount cell
+    await expect(page.locator('.drill-table tbody tr').filter({ hasText: 'Wooden Chair' }).locator('.currency-badge-inline')).toContainText('CZK')
   })
 })
