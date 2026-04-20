@@ -195,6 +195,9 @@ const BANK_INFO_QUERY = `
       bankBuildingName
       cityId
       cityName
+      cityCurrencyCode
+      cityCurrencySymbol
+      baseCapitalRequirement
       lenderCompanyId
       lenderCompanyName
       depositInterestRatePercent
@@ -229,6 +232,7 @@ const BANK_DEPOSITS_QUERY = `
       depositedAtTick
       depositedAtUtc
       totalInterestPaid
+      cityCurrencyCode
     }
   }
 `
@@ -237,6 +241,9 @@ const SET_BANK_RATES_MUTATION = `
   mutation SetBankRates($input: SetBankRatesInput!) {
     setBankRates(input: $input) {
       bankBuildingId
+      cityCurrencyCode
+      cityCurrencySymbol
+      baseCapitalRequirement
       depositInterestRatePercent
       lendingInterestRatePercent
       totalDeposits
@@ -301,6 +308,7 @@ const MY_DEPOSITS_QUERY = `
       depositedAtTick
       depositedAtUtc
       totalInterestPaid
+      cityCurrencyCode
     }
   }
 `
@@ -360,6 +368,9 @@ const INITIATE_BASE_DEPOSIT_MUTATION = `
     initiateBaseDeposit(bankBuildingId: $bankBuildingId) {
       bankBuildingId
       bankBuildingName
+      cityCurrencyCode
+      cityCurrencySymbol
+      baseCapitalRequirement
       depositInterestRatePercent
       lendingInterestRatePercent
       totalDeposits
@@ -501,6 +512,12 @@ useTickRefresh(async () => {
 })
 
 const overdueLoans = computed(() => issuedLoans.value.filter((l) => l.status !== 'ACTIVE' && l.status !== 'REPAID'))
+
+/** The active city currency code — from bankInfo when available, fallback to EUR. */
+const cityCurrency = computed(() => bankInfo.value?.cityCurrencyCode ?? 'EUR')
+
+/** Helper: format an amount in the bank's local city currency. */
+const fmt = (amount: number) => formatCurrency(amount, cityCurrency.value)
 
 const totalIssuedCapacity = computed(() =>
   issuedLoans.value
@@ -804,7 +821,10 @@ const estimatedCustomerTotalPayments = computed(() => {
           <button class="btn-back" @click="router.push('/banking')">← {{ t('bank.backToMarketplace') }}</button>
         </div>
         <h1 class="page-title">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
-        <p class="page-subtitle">{{ bankInfo?.lenderCompanyName }} · {{ bankInfo?.cityName }}</p>
+        <p class="page-subtitle">
+          {{ bankInfo?.lenderCompanyName }} · {{ bankInfo?.cityName }}
+          <span v-if="bankInfo?.cityCurrencyCode" class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
+        </p>
       </template>
       <template v-else>
         <h1 class="page-title">{{ t('bank.customerView') }}</h1>
@@ -830,8 +850,22 @@ const estimatedCustomerTotalPayments = computed(() => {
         <div class="base-deposit-icon" aria-hidden="true">🏦</div>
         <div class="base-deposit-body">
           <h2 class="base-deposit-title">{{ t('bank.baseDepositRequired') }}</h2>
-          <p class="base-deposit-description">{{ t('bank.baseDepositRequiredBody') }}</p>
-          <p class="base-deposit-hint">{{ t('bank.baseCapitalRequired') }}</p>
+          <p class="base-deposit-description">
+            {{ t('bank.baseDepositRequiredBody', {
+              amount: fmt(bankInfo.baseCapitalRequirement ?? 10_000_000),
+            }) }}
+          </p>
+          <p class="base-deposit-hint">
+            {{ t('bank.baseCapitalRequired', {
+              amount: fmt(bankInfo.baseCapitalRequirement ?? 10_000_000),
+              currency: bankInfo.cityCurrencyCode ?? 'EUR',
+            }) }}
+          </p>
+          <p v-if="bankInfo.cityCurrencyCode && bankInfo.cityCurrencyCode !== 'EUR'" class="base-deposit-currency-note">
+            <span class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
+            {{ bankInfo.cityCurrencySymbol }}{{ (bankInfo.baseCapitalRequirement ?? 0).toLocaleString() }}
+            {{ t('bank.localCurrencyNote') }}
+          </p>
         </div>
         <div v-if="baseDepositError" class="error-message">{{ baseDepositError }}</div>
         <div v-if="baseDepositSuccess" class="success-message">{{ t('bank.baseDepositSuccess') }}</div>
@@ -903,17 +937,17 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
           <div class="bank-stat">
             <span class="bank-stat-label">{{ t('bank.totalDeposits') }}</span>
-            <span class="bank-stat-value">{{ formatCurrency(bankInfo.totalDeposits) }}</span>
+            <span class="bank-stat-value">{{ fmt(bankInfo.totalDeposits) }}</span>
           </div>
           <div class="bank-stat">
             <span class="bank-stat-label">{{ t('bank.lendableCapacity') }}</span>
-            <span class="bank-stat-value">{{ formatCurrency(bankInfo.lendableCapacity) }}</span>
+            <span class="bank-stat-value">{{ fmt(bankInfo.lendableCapacity) }}</span>
             <span class="bank-stat-hint">{{ t('bank.reserveInfo') }}</span>
           </div>
           <div class="bank-stat">
             <span class="bank-stat-label">{{ t('bank.availableLendingCapacity') }}</span>
             <span class="bank-stat-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'negative'">
-              {{ formatCurrency(bankInfo.availableLendingCapacity) }}
+              {{ fmt(bankInfo.availableLendingCapacity) }}
             </span>
           </div>
         </div>
@@ -931,24 +965,24 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.availableCash') }}</span>
             <span class="liquidity-stat-value" :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'">
-              {{ formatCurrency(bankInfo.availableCash ?? 0) }}
+              {{ fmt(bankInfo.availableCash ?? 0) }}
             </span>
           </div>
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.reserveRequirement') }}</span>
-            <span class="liquidity-stat-value">{{ formatCurrency(bankInfo.reserveRequirement ?? 0) }}</span>
+            <span class="liquidity-stat-value">{{ fmt(bankInfo.reserveRequirement ?? 0) }}</span>
             <span class="liquidity-stat-hint">{{ t('bank.reserveInfo') }}</span>
           </div>
           <div class="liquidity-stat">
             <span class="liquidity-stat-label">{{ t('bank.reserveShortfall') }}</span>
             <span class="liquidity-stat-value" :class="(bankInfo.reserveShortfall ?? 0) > 0 ? 'negative' : 'positive'">
-              {{ (bankInfo.reserveShortfall ?? 0) > 0 ? formatCurrency(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
+              {{ (bankInfo.reserveShortfall ?? 0) > 0 ? fmt(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
             </span>
           </div>
           <div class="liquidity-stat" :class="{ 'liquidity-stat-warning': (bankInfo.centralBankDebt ?? 0) > 0 }">
             <span class="liquidity-stat-label">{{ t('bank.centralBankDebt') }}</span>
             <span class="liquidity-stat-value" :class="(bankInfo.centralBankDebt ?? 0) > 0 ? 'negative' : 'positive'">
-              {{ (bankInfo.centralBankDebt ?? 0) > 0 ? formatCurrency(bankInfo.centralBankDebt) : '$0' }}
+              {{ (bankInfo.centralBankDebt ?? 0) > 0 ? fmt(bankInfo.centralBankDebt) : fmt(0) }}
             </span>
             <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint">
               {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a.
@@ -999,9 +1033,9 @@ const estimatedCustomerTotalPayments = computed(() => {
             <tbody>
               <tr v-for="dep in bankDeposits" :key="dep.id">
                 <td>{{ dep.depositorCompanyName }}</td>
-                <td>{{ formatCurrency(dep.amount) }}</td>
+                <td>{{ formatCurrency(dep.amount, dep.cityCurrencyCode || cityCurrency) }}</td>
                 <td>{{ formatPercent(dep.depositInterestRatePercent) }}</td>
-                <td>{{ formatCurrency(dep.totalInterestPaid) }}</td>
+                <td>{{ formatCurrency(dep.totalInterestPaid, dep.cityCurrencyCode || cityCurrency) }}</td>
                 <td>
                   <span v-if="dep.isBaseCapital" class="badge badge-info">{{ t('bank.baseCapital') }}</span>
                   <span v-else class="badge badge-success">Depositor</span>
@@ -1020,7 +1054,7 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
         <div class="stat-card">
           <span class="stat-label">Capital Outstanding</span>
-          <span class="stat-value">{{ formatCurrency(totalIssuedCapacity) }}</span>
+          <span class="stat-value">{{ fmt(totalIssuedCapacity) }}</span>
         </div>
         <div class="stat-card" :class="{ 'stat-card-warning': overdueLoans.length > 0 }">
           <span class="stat-label">Overdue/Defaulted</span>
@@ -1028,7 +1062,7 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
         <div class="stat-card">
           <span class="stat-label">Expected Income/Payment</span>
-          <span class="stat-value">{{ formatCurrency(expectedMonthlyIncome) }}</span>
+          <span class="stat-value">{{ fmt(expectedMonthlyIncome) }}</span>
         </div>
       </div>
 
@@ -1088,9 +1122,9 @@ const estimatedCustomerTotalPayments = computed(() => {
             <tbody>
               <tr v-for="offer in myOffers" :key="offer.id">
                 <td>{{ formatPercent(offer.annualInterestRatePercent) }}</td>
-                <td>{{ formatCurrency(offer.maxPrincipalPerLoan) }}</td>
+                <td>{{ fmt(offer.maxPrincipalPerLoan) }}</td>
                 <td>
-                  {{ formatCurrency(offer.remainingCapacity) }}
+                  {{ fmt(offer.remainingCapacity) }}
                   <div class="capacity-bar">
                     <div class="capacity-fill" :style="{ width: `${computeCapacityUsedPercent(offer)}%` }" />
                   </div>
@@ -1133,9 +1167,9 @@ const estimatedCustomerTotalPayments = computed(() => {
             <tbody>
               <tr v-for="loan in issuedLoans" :key="loan.id" :class="loanStatusClass(loan.status)">
                 <td>{{ loan.borrowerCompanyName }}</td>
-                <td>{{ formatCurrency(loan.originalPrincipal) }}</td>
-                <td>{{ formatCurrency(loan.remainingPrincipal) }}</td>
-                <td>{{ formatCurrency(loan.paymentAmount) }}</td>
+                <td>{{ fmt(loan.originalPrincipal) }}</td>
+                <td>{{ fmt(loan.remainingPrincipal) }}</td>
+                <td>{{ fmt(loan.paymentAmount) }}</td>
                 <td>{{ loan.paymentsMade }} / {{ loan.totalPayments }}</td>
                 <td>
                   <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
@@ -1147,7 +1181,7 @@ const estimatedCustomerTotalPayments = computed(() => {
                   <div v-if="loan.collateralBuildingId" class="collateral-inline">
                     <span aria-hidden="true">🏛</span> {{ loan.collateralBuildingName }}
                     <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value">
-                      ({{ formatCurrency(loan.collateralAppraisedValue) }})
+                      ({{ fmt(loan.collateralAppraisedValue) }})
                     </span>
                   </div>
                 </td>
@@ -1178,7 +1212,7 @@ const estimatedCustomerTotalPayments = computed(() => {
             <div class="customer-rate-card capacity">
               <span class="customer-rate-label">{{ t('bank.availableLendingCapacity') }}</span>
               <span class="customer-rate-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'muted'">
-                {{ formatCurrency(bankInfo.availableLendingCapacity) }}
+                {{ fmt(bankInfo.availableLendingCapacity) }}
               </span>
               <span class="customer-rate-hint">{{ t('bank.reserveInfo') }}</span>
             </div>
@@ -1206,11 +1240,11 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div v-if="myAccountBalance > 0" class="account-balance-card">
             <div class="account-balance-main">
               <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
-              <span class="account-balance-value">{{ formatCurrency(myAccountBalance) }}</span>
+              <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
             </div>
             <div class="account-balance-meta">
               <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
-              <span class="account-interest-value positive">+{{ formatCurrency(myAccountInterestEarned) }}</span>
+              <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
               <span v-if="bankInfo" class="account-rate-badge">
                 {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}
               </span>
@@ -1226,7 +1260,7 @@ const estimatedCustomerTotalPayments = computed(() => {
               <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
             </div>
             <div class="form-group">
-              <span class="form-hint">{{ t('common.availableFunds') }}: {{ formatCurrency(activeCompany?.cash ?? 0) }}</span>
+              <span class="form-hint">{{ t('common.availableFunds') }}: {{ fmt(activeCompany?.cash ?? 0) }}</span>
             </div>
             <div v-if="topUpError" class="error-message">{{ topUpError }}</div>
             <button class="btn btn-primary" :disabled="topUpLoading || topUpAmount < 1000" @click="submitTopUp">
@@ -1248,7 +1282,7 @@ const estimatedCustomerTotalPayments = computed(() => {
                 step="1000"
                 class="form-input"
               />
-              <span class="form-hint">{{ t('bank.maxWithdraw') }}: {{ formatCurrency(myAccountBalance) }}</span>
+              <span class="form-hint">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
             </div>
             <div v-if="withdrawError" class="error-message">{{ withdrawError }}</div>
             <button
@@ -1324,12 +1358,12 @@ const estimatedCustomerTotalPayments = computed(() => {
               <div class="customer-offer-stats">
                 <div class="offer-stat-row">
                   <span>{{ t('bank.maxPrincipal') }}</span>
-                  <strong>{{ formatCurrency(offer.maxPrincipalPerLoan) }}</strong>
+                  <strong>{{ fmt(offer.maxPrincipalPerLoan) }}</strong>
                 </div>
                 <div class="offer-stat-row">
                   <span>{{ t('bank.remainingCapacity') }}</span>
                   <strong :class="offer.remainingCapacity > 0 ? 'positive' : 'muted'">
-                    {{ formatCurrency(offer.remainingCapacity) }}
+                    {{ fmt(offer.remainingCapacity) }}
                   </strong>
                 </div>
                 <div class="offer-stat-row">
@@ -1359,13 +1393,13 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div class="loans-list">
             <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row">
               <div class="loan-row-main">
-                <span class="loan-amount">{{ formatCurrency(loan.remainingPrincipal) }}</span>
+                <span class="loan-amount">{{ fmt(loan.remainingPrincipal) }}</span>
                 <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
               </div>
               <div v-if="loan.collateralBuildingId" class="collateral-badge">
                 <span aria-hidden="true">🏛</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
                 <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
-                  ({{ formatCurrency(loan.collateralAppraisedValue) }})
+                  ({{ fmt(loan.collateralAppraisedValue) }})
                 </span>
               </div>
             </div>
@@ -1414,11 +1448,11 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div class="repayment-summary">
             <div class="summary-row">
               <span>{{ t('bank.paymentAmount') }}</span>
-              <strong>{{ formatCurrency(estimatedCustomerPaymentAmount) }} × {{ estimatedCustomerTotalPayments }}</strong>
+              <strong>{{ fmt(estimatedCustomerPaymentAmount) }} × {{ estimatedCustomerTotalPayments }}</strong>
             </div>
             <div class="summary-row total-row">
               <span>{{ t('bank.totalRepayment') }}</span>
-              <strong>{{ formatCurrency(estimatedCustomerTotalRepayment) }}</strong>
+              <strong>{{ fmt(estimatedCustomerTotalRepayment) }}</strong>
             </div>
           </div>
 
@@ -1461,8 +1495,8 @@ const estimatedCustomerTotalPayments = computed(() => {
                   <span class="collateral-option-name">{{ b.buildingName }}</span>
                   <span v-if="!b.isEligible" class="ineligible-tag">{{ b.ineligibilityReason ?? t('bank.collateralAlreadyPledged') }}</span>
                   <div class="collateral-stats">
-                    <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
-                    <span>{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable) }}</span>
+                    <span>{{ t('bank.collateralAppraisedValue') }}: {{ fmt(b.appraisedValue) }}</span>
+                    <span>{{ t('bank.collateralMaxBorrowable') }}: {{ fmt(b.maxBorrowable) }}</span>
                   </div>
                 </div>
               </label>
@@ -1472,7 +1506,7 @@ const estimatedCustomerTotalPayments = computed(() => {
           <!-- Selected collateral summary -->
           <div v-if="selectedCollateral" class="collateral-selected-summary">
             <strong>{{ selectedCollateral.buildingName }}</strong>
-            <span>{{ t('bank.remainingCapacity') }}: {{ formatCurrency(selectedCollateral.remainingBorrowingCapacity) }}</span>
+            <span>{{ t('bank.remainingCapacity') }}: {{ fmt(selectedCollateral.remainingBorrowingCapacity) }}</span>
             <!-- LTV capacity bar -->
             <div class="capacity-bar-wrap">
               <div
@@ -2643,5 +2677,26 @@ th {
   color: var(--color-text-secondary);
   margin-bottom: var(--spacing-md);
   font-size: 0.95rem;
+}
+
+.currency-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.1em 0.45em;
+  border-radius: var(--radius-sm, 4px);
+  background: var(--color-accent-alpha, rgba(59, 130, 246, 0.15));
+  color: var(--color-accent, #3b82f6);
+  vertical-align: middle;
+}
+
+.base-deposit-currency-note {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs, 4px);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+  margin-top: var(--spacing-xs, 4px);
 }
 </style>

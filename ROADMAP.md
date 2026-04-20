@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (75% complete)
+### Banking (85% complete)
 
 Implement banking as is described in the banking section.
 
@@ -17,9 +17,11 @@ Implement banking as is described in the banking section.
 - Deposits are now displayed as an account-style relationship with a single balance, interest earned summary, and clear "Add Funds" / "Withdraw" flows. A new `topUpDeposit` backend mutation supports adding to an existing deposit.
 - Navigation item renamed from "Loans" to "Banking" (route moved to `/banking`, `/loans` kept as alias for backward compatibility).
 - CSS improvements to the bank page account section for a professional, readable layout.
+- **Currency-aware banking (new):** Banks are now fully multi-currency aware. Each city has a configured ISO 4217 `CurrencyCode` (Bratislava/Vienna → EUR, Prague → CZK). The base capital requirement is automatically calculated per city: 10M EUR for EUR cities, 240M CZK for CZK cities. `BankInfoSummary` and `BankDepositSummary` GraphQL types now include `cityCurrencyCode`, `cityCurrencySymbol`, and `baseCapitalRequirement`. The `BankManagementView` frontend uses local city currency in all monetary displays (deposits, lending capacity, loans, account balance, withdraw limits). The base capital deposit prompt shows the dynamic amount in the correct local denomination.
 
 **Remaining:**
-- Extend banks to use currencies. Make sure the base capital is properly calculated in the currency where the city is located (10M USD is approx 240M CZK for example).
+- Forex exchange: cross-city currency trading for companies operating in multiple cities.
+- Multi-currency ledger view: show ledger entries denominated per city currency.
 
 ### Changelog (90% complete)
 

@@ -138,13 +138,15 @@ export function computeTicksUntilNextPayment(loan: LoanSummary, currentTick: num
 }
 
 /**
- * Formats a currency amount as a compact string.
- * @example formatCurrency(12345.67) // => "$12,346"
+ * Formats a currency amount as a compact string using the given ISO 4217 currency code.
+ * Defaults to USD when no currency is provided.
+ * @example formatCurrency(12345.67, 'EUR') // => "€12,346"
+ * @example formatCurrency(240000000, 'CZK') // => "Kč240,000,000"
  */
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number, currencyCode = 'USD'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: currencyCode,
     maximumFractionDigits: 0,
   }).format(amount)
 }

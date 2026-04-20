@@ -597,6 +597,8 @@ public sealed class BankDepositSummary
     public long? WithdrawnAtTick { get; set; }
     public DateTime? WithdrawnAtUtc { get; set; }
     public decimal TotalInterestPaid { get; set; }
+    /// <summary>ISO 4217 currency code for the city where the bank is located (e.g. "EUR", "CZK").</summary>
+    public string CityCurrencyCode { get; set; } = "EUR";
 }
 
 /// <summary>Public summary for a bank building: rates, capacity, and reserve status.</summary>
@@ -606,6 +608,12 @@ public sealed class BankInfoSummary
     public string BankBuildingName { get; set; } = string.Empty;
     public Guid CityId { get; set; }
     public string CityName { get; set; } = string.Empty;
+    /// <summary>ISO 4217 currency code for the city (e.g. "EUR", "CZK").</summary>
+    public string CityCurrencyCode { get; set; } = "EUR";
+    /// <summary>Display symbol for the city currency (e.g. "€", "Kč").</summary>
+    public string CityCurrencySymbol { get; set; } = "€";
+    /// <summary>Required base capital amount in the local city currency to open this bank.</summary>
+    public decimal BaseCapitalRequirement { get; set; }
     public Guid LenderCompanyId { get; set; }
     public string LenderCompanyName { get; set; } = string.Empty;
     /// <summary>Annual rate (%) the bank pays to depositors.</summary>
