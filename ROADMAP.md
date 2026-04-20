@@ -53,7 +53,7 @@ Implement banking as is described in the banking section.
 
 - In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Add more global cities to the basic setup (75% complete)
+### Add more global cities to the basic setup (90% complete)
 
 - ✅ New York (USD), London (GBP), Beijing (CNY), and Delhi (INR) added as playable cities
 - ✅ Each city has the correct ISO 4217 currency code wired through all backend and banking flows
@@ -62,6 +62,10 @@ Implement banking as is described in the banking section.
 - ✅ FxRate entity persists exchange rates for reuse by the upcoming forex exchange
 - ✅ `fxRates` GraphQL query exposes current rates to the frontend
 - ✅ Building lots, city resources, and map coordinates seeded for all four new cities
+- ✅ Currency badge (USD/GBP/CNY/INR/EUR/CZK) shown on every city card in the onboarding city picker
+- ✅ 19 backend integration tests covering city seeding, FX rate parsing, and multi-city onboarding
+- ✅ 4 E2E tests: all 7 cities visible in the wizard, USD badge on New York, Delhi selectable
+- ✅ All E2E tests green after 7-city expansion (count assertions updated, logistics-trap tests hardened)
 - ⬜ Full forex trading UI (depends on "Create forex exchange" roadmap item)
 
 ### Create forex exchange (0% complete)

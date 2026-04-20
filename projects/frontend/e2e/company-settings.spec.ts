@@ -66,8 +66,8 @@ test.describe('Company Settings – page load', () => {
     await expect(page.getByRole('columnheader', { name: 'Salary multiplier' })).toBeVisible()
     await expect(page.getByRole('columnheader', { name: 'Effective wage / hour' })).toBeVisible()
 
-    // All three seeded cities appear as rows
-    await expect(page.locator('.salary-table tbody tr')).toHaveCount(3)
+    // All 7 seeded cities appear as rows
+    await expect(page.locator('.salary-table tbody tr')).toHaveCount(7)
     await expect(page.locator('.salary-table').getByText('Bratislava')).toBeVisible()
     await expect(page.locator('.salary-table').getByText('Prague')).toBeVisible()
     await expect(page.locator('.salary-table').getByText('Vienna')).toBeVisible()
@@ -139,11 +139,11 @@ test.describe('Company Settings – salary multiplier', () => {
     const { company } = await setupPlayerWithCompany(page)
     await page.goto(`/company/${company.id}/settings`)
 
-    // All three salary inputs should default to 1
+    // All 7 salary inputs should default to 1
     const salaryInputs = page.locator('.salary-input')
-    await expect(salaryInputs).toHaveCount(3)
+    await expect(salaryInputs).toHaveCount(7)
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 7; i++) {
       const value = await salaryInputs.nth(i).inputValue()
       expect(parseFloat(value)).toBe(1)
     }
@@ -184,7 +184,7 @@ test.describe('Company Settings – salary multiplier', () => {
     })
     await page.goto(`/company/${company.id}/settings`)
 
-    await expect(page.locator('.salary-table tbody tr')).toHaveCount(3)
+    await expect(page.locator('.salary-table tbody tr')).toHaveCount(7)
 
     const bratislavaInput = page.locator('tr', { hasText: 'Bratislava' }).locator('.salary-input')
     const pragueInput = page.locator('tr', { hasText: 'Prague' }).locator('.salary-input')
@@ -396,6 +396,6 @@ test.describe('Company Settings – regression: onboarding-created company', () 
 
     await expect(page.getByRole('heading', { name: 'Onboarding Corp' })).toBeVisible()
     await expect(page.getByText('Administration overhead', { exact: true })).toBeVisible()
-    await expect(page.locator('.salary-table tbody tr')).toHaveCount(3)
+    await expect(page.locator('.salary-table tbody tr')).toHaveCount(7)
   })
 })
