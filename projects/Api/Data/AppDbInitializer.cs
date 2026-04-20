@@ -16,7 +16,8 @@ namespace Api.Data;
 /// </summary>
 public sealed partial class AppDbInitializer(
     AppDbContext dbContext,
-    IOptions<SeedDataOptions> seedOptions)
+    IOptions<SeedDataOptions> seedOptions,
+    NbsExchangeRateService nbsExchangeRateService)
 {
     /// <summary>
     /// Ensures the schema is up to date and seeds initial data if missing.
@@ -111,6 +112,7 @@ public sealed partial class AppDbInitializer(
         if (!await dbContext.BuildingLots.AnyAsync())
         {
             await SeedBuildingLotsAsync();
+            await SeedNewCityLotsAsync();
             await dbContext.SaveChangesAsync();
         }
 
@@ -135,6 +137,19 @@ public sealed partial class AppDbInitializer(
             }
             await dbContext.SaveChangesAsync();
         }
+
+        // Seed FX rates (fetch from NBS or fall back to hardcoded approximate rates).
+        if (!await dbContext.FxRates.AnyAsync())
+        {
+            await SeedFxRatesAsync();
+        }
+    }
+
+    private async Task SeedFxRatesAsync()
+    {
+        var rates = await nbsExchangeRateService.FetchLatestRatesAsync();
+        dbContext.FxRates.AddRange(rates);
+        await dbContext.SaveChangesAsync();
     }
 
     private void SeedResources()
@@ -159,7 +174,11 @@ public sealed partial class AppDbInitializer(
         dbContext.Cities.AddRange(
             new City { Id = CreateDeterministicGuid("city:bratislava"), Name = "Bratislava", CountryCode = "SK", CurrencyCode = "EUR", Latitude = 48.1486, Longitude = 17.1077, Population = 475_000, AverageRentPerSqm = 14m, BaseSalaryPerManhour = 18m },
             new City { Id = CreateDeterministicGuid("city:prague"), Name = "Prague", CountryCode = "CZ", CurrencyCode = "CZK", Latitude = 50.0755, Longitude = 14.4378, Population = 1_350_000, AverageRentPerSqm = 18m, BaseSalaryPerManhour = 22m },
-            new City { Id = CreateDeterministicGuid("city:vienna"), Name = "Vienna", CountryCode = "AT", CurrencyCode = "EUR", Latitude = 48.2082, Longitude = 16.3738, Population = 1_900_000, AverageRentPerSqm = 22m, BaseSalaryPerManhour = 28m });
+            new City { Id = CreateDeterministicGuid("city:vienna"), Name = "Vienna", CountryCode = "AT", CurrencyCode = "EUR", Latitude = 48.2082, Longitude = 16.3738, Population = 1_900_000, AverageRentPerSqm = 22m, BaseSalaryPerManhour = 28m },
+            new City { Id = CreateDeterministicGuid("city:new-york"), Name = "New York", CountryCode = "US", CurrencyCode = "USD", Latitude = 40.7128, Longitude = -74.0060, Population = 8_336_000, AverageRentPerSqm = 55m, BaseSalaryPerManhour = 35m },
+            new City { Id = CreateDeterministicGuid("city:london"), Name = "London", CountryCode = "GB", CurrencyCode = "GBP", Latitude = 51.5074, Longitude = -0.1278, Population = 8_982_000, AverageRentPerSqm = 62m, BaseSalaryPerManhour = 32m },
+            new City { Id = CreateDeterministicGuid("city:beijing"), Name = "Beijing", CountryCode = "CN", CurrencyCode = "CNY", Latitude = 39.9042, Longitude = 116.4074, Population = 21_540_000, AverageRentPerSqm = 30m, BaseSalaryPerManhour = 20m },
+            new City { Id = CreateDeterministicGuid("city:delhi"), Name = "Delhi", CountryCode = "IN", CurrencyCode = "INR", Latitude = 28.6139, Longitude = 77.2090, Population = 32_000_000, AverageRentPerSqm = 8m, BaseSalaryPerManhour = 6m });
     }
 
 
@@ -185,6 +204,30 @@ public sealed partial class AppDbInitializer(
         var vienna = cities.First(c => c.Name == "Vienna");
         dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = vienna.Id, ResourceTypeId = resources["cotton"].Id, Abundance = 0.5m });
         dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = vienna.Id, ResourceTypeId = resources["gold"].Id, Abundance = 0.1m });
+
+        // New York: financial hub, tech-oriented, silicon and coal deposits
+        var newYork = cities.First(c => c.Name == "New York");
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = newYork.Id, ResourceTypeId = resources["silicon"].Id, Abundance = 0.5m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = newYork.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.4m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = newYork.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.3m });
+
+        // London: financial hub, cotton and gold
+        var london = cities.First(c => c.Name == "London");
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = london.Id, ResourceTypeId = resources["cotton"].Id, Abundance = 0.4m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = london.Id, ResourceTypeId = resources["gold"].Id, Abundance = 0.2m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = london.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.5m });
+
+        // Beijing: manufacturing hub, coal and iron ore and silicon
+        var beijing = cities.First(c => c.Name == "Beijing");
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = beijing.Id, ResourceTypeId = resources["coal"].Id, Abundance = 0.8m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = beijing.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.7m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = beijing.Id, ResourceTypeId = resources["silicon"].Id, Abundance = 0.6m });
+
+        // Delhi: agricultural and chemical minerals hub
+        var delhi = cities.First(c => c.Name == "Delhi");
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = delhi.Id, ResourceTypeId = resources["chemical-minerals"].Id, Abundance = 0.5m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = delhi.Id, ResourceTypeId = resources["cotton"].Id, Abundance = 0.7m });
+        dbContext.CityResources.Add(new CityResource { Id = Guid.NewGuid(), CityId = delhi.Id, ResourceTypeId = resources["iron-ore"].Id, Abundance = 0.4m });
     }
 
     private async Task SeedRecipesAsync()

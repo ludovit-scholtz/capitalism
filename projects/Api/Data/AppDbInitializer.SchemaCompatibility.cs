@@ -166,6 +166,45 @@ public sealed partial class AppDbInitializer
                         """);
                 }
             }
+
+            // Ensure FxRates table exists (added in AddFxRates migration).
+            if (!await TableExistsAsync(connection, dialect, "FxRates"))
+            {
+                if (dialect.IsPostgres)
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "FxRates" (
+                            "Id" uuid NOT NULL,
+                            "BaseCurrencyCode" character varying(3) NOT NULL,
+                            "QuoteCurrencyCode" character varying(3) NOT NULL,
+                            "Rate" numeric(18,6) NOT NULL,
+                            "RateDate" date NOT NULL,
+                            "FetchedAtUtc" timestamp with time zone NOT NULL,
+                            "Source" character varying(20) NOT NULL,
+                            CONSTRAINT "PK_FxRates" PRIMARY KEY ("Id")
+                        )
+                        """);
+                    await ExecuteNonQueryAsync(connection,
+                        "CREATE INDEX IF NOT EXISTS \"IX_FxRates_BaseCurrencyCode_QuoteCurrencyCode_RateDate\" ON \"FxRates\" (\"BaseCurrencyCode\", \"QuoteCurrencyCode\", \"RateDate\")");
+                }
+                else
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "FxRates" (
+                            "Id" TEXT NOT NULL,
+                            "BaseCurrencyCode" TEXT NOT NULL,
+                            "QuoteCurrencyCode" TEXT NOT NULL,
+                            "Rate" TEXT NOT NULL,
+                            "RateDate" TEXT NOT NULL,
+                            "FetchedAtUtc" TEXT NOT NULL,
+                            "Source" TEXT NOT NULL,
+                            CONSTRAINT "PK_FxRates" PRIMARY KEY ("Id")
+                        )
+                        """);
+                }
+            }
         }
         finally
         {

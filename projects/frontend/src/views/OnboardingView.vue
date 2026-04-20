@@ -88,6 +88,7 @@ const CITIES_QUERY = `
       id
       name
       countryCode
+      currencyCode
       latitude
       longitude
       population
@@ -1127,6 +1128,7 @@ useTickRefresh(async () => {
             </div>
             <div class="city-meta">
               <span class="city-country">{{ city.countryCode }}</span>
+              <span v-if="city.currencyCode" class="city-currency">{{ city.currencyCode }}</span>
               <span class="city-pop">{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
             </div>
             <div class="city-resources">
@@ -2051,6 +2053,15 @@ useTickRefresh(async () => {
 
 .city-country {
   background: var(--color-surface-raised);
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.city-currency {
+  background: var(--color-accent, #3b82f6);
+  color: #fff;
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-sm);
   font-weight: 600;

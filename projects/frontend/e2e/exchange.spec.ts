@@ -326,13 +326,13 @@ test.describe('Global Exchange — player journey', () => {
     const woodRow = page.locator('.resource-row[data-slug="wood"]')
     await expect(woodRow).toBeVisible()
 
-    // Step 3: At least two city offer cards visible for Wood
+    // Step 3: All 7 city offer cards visible for Wood
     const woodOfferCards = woodRow.locator('.city-offer-card')
-    await expect(woodOfferCards).toHaveCount(3) // Bratislava, Prague, Vienna
+    await expect(woodOfferCards).toHaveCount(7) // all 7 seeded cities
 
     // Step 4: Each card shows delivered price
     const deliveredPrices = woodRow.locator('.delivered-price')
-    await expect(deliveredPrices).toHaveCount(3)
+    await expect(deliveredPrices).toHaveCount(7)
 
     // Step 5: One card is the best option (lowest delivered price) – local card has minimum transit
     const localCard = woodRow.locator('.city-offer-card').filter({ has: page.locator('.transit-cost') }).first()
@@ -721,8 +721,8 @@ test.describe('Global Exchange — sourcing decision legibility', () => {
 
     const grainRow = page.locator('.resource-row[data-slug="grain"]')
     await expect(grainRow).toBeVisible()
-    // All three seeded cities should have Grain offers
-    await expect(grainRow.locator('.city-offer-card')).toHaveCount(3)
+    // All 7 seeded cities should have Grain offers
+    await expect(grainRow.locator('.city-offer-card')).toHaveCount(7)
     // Each card must have a delivered price
     await expect(grainRow.locator('.delivered-price').first()).toBeVisible()
     // One card is best
@@ -740,7 +740,7 @@ test.describe('Global Exchange — sourcing decision legibility', () => {
 
     const chemRow = page.locator('.resource-row[data-slug="chemical-minerals"]')
     await expect(chemRow).toBeVisible()
-    await expect(chemRow.locator('.city-offer-card')).toHaveCount(3)
+    await expect(chemRow.locator('.city-offer-card')).toHaveCount(7)
     await expect(chemRow.locator('.delivered-price').first()).toBeVisible()
     await expect(chemRow.locator('.best-badge')).toHaveCount(1)
   })

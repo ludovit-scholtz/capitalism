@@ -283,12 +283,22 @@ export type MockCity = {
   id: string
   name: string
   countryCode: string
+  currencyCode?: string
   latitude: number
   longitude: number
   population: number
   averageRentPerSqm: number
   baseSalaryPerManhour: number
   resources: { resourceType: { id: string; name: string; slug: string; category: string }; abundance: number }[]
+}
+
+export type MockFxRate = {
+  baseCurrencyCode: string
+  quoteCurrencyCode: string
+  rate: number
+  rateDate: string
+  source: 'NBS' | 'FALLBACK'
+  quoteCurrencySymbol: string
 }
 
 export type MockBuildingLot = {
@@ -744,6 +754,8 @@ export type MockState = {
    * from this map instead of the defaults (both null).
    */
   unitLastTickMovement: Record<string, { lastTickInflow: number; lastTickOutflow: number }>
+  /** FX rates returned by the fxRates query. Keyed by quoteCurrencyCode. */
+  fxRates: MockFxRate[]
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1452,6 +1464,7 @@ export function makeBratislava(): MockCity {
     id: 'city-ba',
     name: 'Bratislava',
     countryCode: 'SK',
+    currencyCode: 'EUR',
     latitude: 48.1486,
     longitude: 17.1077,
     population: 475000,
@@ -1471,6 +1484,7 @@ export function makeDefaultCities(): MockCity[] {
       id: 'city-pr',
       name: 'Prague',
       countryCode: 'CZ',
+      currencyCode: 'CZK',
       latitude: 50.0755,
       longitude: 14.4378,
       population: 1350000,
@@ -1485,6 +1499,7 @@ export function makeDefaultCities(): MockCity[] {
       id: 'city-vi',
       name: 'Vienna',
       countryCode: 'AT',
+      currencyCode: 'EUR',
       latitude: 48.2082,
       longitude: 16.3738,
       population: 1900000,
@@ -1493,6 +1508,70 @@ export function makeDefaultCities(): MockCity[] {
       resources: [
         { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
         { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
+      ],
+    },
+    {
+      id: 'city-ny',
+      name: 'New York',
+      countryCode: 'US',
+      currencyCode: 'USD',
+      latitude: 40.7128,
+      longitude: -74.006,
+      population: 8336000,
+      averageRentPerSqm: 55,
+      baseSalaryPerManhour: 35,
+      resources: [
+        { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
+        { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
+        { resourceType: { id: 'res-silicon', name: 'Silicon', slug: 'silicon', category: 'MINERAL' }, abundance: 0.5 },
+      ],
+    },
+    {
+      id: 'city-ld',
+      name: 'London',
+      countryCode: 'GB',
+      currencyCode: 'GBP',
+      latitude: 51.5074,
+      longitude: -0.1278,
+      population: 8982000,
+      averageRentPerSqm: 62,
+      baseSalaryPerManhour: 32,
+      resources: [
+        { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
+        { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
+        { resourceType: { id: 'res-cotton', name: 'Cotton', slug: 'cotton', category: 'ORGANIC' }, abundance: 0.4 },
+      ],
+    },
+    {
+      id: 'city-bj',
+      name: 'Beijing',
+      countryCode: 'CN',
+      currencyCode: 'CNY',
+      latitude: 39.9042,
+      longitude: 116.4074,
+      population: 21540000,
+      averageRentPerSqm: 30,
+      baseSalaryPerManhour: 20,
+      resources: [
+        { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
+        { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
+        { resourceType: { id: 'res-coal', name: 'Coal', slug: 'coal', category: 'MINERAL' }, abundance: 0.8 },
+      ],
+    },
+    {
+      id: 'city-dl',
+      name: 'Delhi',
+      countryCode: 'IN',
+      currencyCode: 'INR',
+      latitude: 28.6139,
+      longitude: 77.209,
+      population: 32000000,
+      averageRentPerSqm: 8,
+      baseSalaryPerManhour: 6,
+      resources: [
+        { resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.7 },
+        { resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', category: 'ORGANIC' }, abundance: 0.6 },
+        { resourceType: { id: 'res-cotton', name: 'Cotton', slug: 'cotton', category: 'ORGANIC' }, abundance: 0.7 },
       ],
     },
   ]
@@ -1640,6 +1719,17 @@ export function makeDefaultProducts(): MockProductType[] {
   ]
 }
 
+export function makeDefaultFxRates(): MockFxRate[] {
+  const today = new Date().toISOString().slice(0, 10)
+  return [
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.08, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '$' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'GBP', rate: 0.86, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '£' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CNY', rate: 7.83, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '¥' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'INR', rate: 89.5, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '₹' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25.19, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
+  ]
+}
+
 // ── Mock API setup ───────────────────────────────────────────────────────────
 
 export function setupMockApi(page: Page, initial?: Partial<MockState>): MockState {
@@ -1687,6 +1777,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     buildingLayouts: [],
     forceBuildingConfigError: null,
     unitLastTickMovement: {},
+    fxRates: makeDefaultFxRates(),
     ...initial,
   }
 
@@ -4676,6 +4767,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cities: state.cities } }),
+      })
+    }
+
+    if (query.includes('fxRates')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { fxRates: state.fxRates } }),
       })
     }
 

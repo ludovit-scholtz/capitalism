@@ -1010,6 +1010,44 @@ namespace Api.Data.Migrations
                     b.ToTable("ExchangeOrders");
                 });
 
+            modelBuilder.Entity("Api.Data.Entities.FxRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("BaseCurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<DateTime>("FetchedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("QuoteCurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)");
+
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("numeric(18,6)");
+
+                    b.Property<DateOnly>("RateDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BaseCurrencyCode", "QuoteCurrencyCode", "RateDate");
+
+                    b.ToTable("FxRates");
+                });
+
             modelBuilder.Entity("Api.Data.Entities.GameState", b =>
                 {
                     b.Property<int>("Id")

@@ -919,9 +919,9 @@ test.describe('Building detail upgrades', () => {
     await expect(page.getByText('60 / 100')).toBeVisible()
     const exchangeSection = page.locator('.unit-insight-card', { hasText: 'Global exchange offers' })
     await expect(exchangeSection).toBeVisible()
-    await expect(exchangeSection.getByText('Bratislava')).toBeVisible()
-    await expect(exchangeSection.getByText('Prague')).toBeVisible()
-    await expect(exchangeSection.getByText('Vienna')).toBeVisible()
+    await expect(exchangeSection.getByText('Bratislava').first()).toBeVisible()
+    await expect(exchangeSection.getByText('Prague').first()).toBeVisible()
+    await expect(exchangeSection.getByText('Vienna').first()).toBeVisible()
   })
 
   test('preserves readonly unit selection in the route so refresh keeps the sidebar open', async ({ page }) => {
@@ -6044,7 +6044,7 @@ test.describe('Global exchange market', () => {
     // OPTIMAL source also triggers exchange offer visibility
     const exchangeCard = page.locator('.unit-insight-card', { hasText: 'Global exchange offers' })
     await expect(exchangeCard).toBeVisible()
-    await expect(exchangeCard.getByText('Bratislava')).toBeVisible()
+    await expect(exchangeCard.getByText('Bratislava').first()).toBeVisible()
   })
 
   test('configuring a purchase unit with EXCHANGE source persists and shows exchange offers', async ({ page }) => {
@@ -7006,7 +7006,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
 
     // Exchange offers panel must remain visible after save + reload
     await expect(page.getByText('Global exchange offers')).toBeVisible()
-    await expect(page.locator('.exchange-offer-item')).toHaveCount(3)
+    await expect(page.locator('.exchange-offer-item')).toHaveCount(7)
   })
 
   test('negative path: stale sourcing — all exchange offers blocked in read-only view shows actionable warning', async ({ page }) => {
@@ -7083,7 +7083,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
     // All offers must be blocked because maxPrice is too low (stale constraint)
-    await expect(page.locator('.exchange-offer-item.offer-blocked')).toHaveCount(3)
+    await expect(page.locator('.exchange-offer-item.offer-blocked')).toHaveCount(7)
 
     // Actionable "no valid offers" message must be shown
     await expect(page.getByText(/No offers meet your price and quality constraints/)).toBeVisible()
@@ -15491,9 +15491,16 @@ test.describe('Destination-aware purchase sourcing', () => {
     // Override Wood abundances to create the logistics trap:
     // Bratislava: low abundance → higher sticker, but 0 transit → good delivered
     // Prague: medium abundance → lower sticker, but 300km transit → bad delivered
+    // Set other cities to zero Wood so they don't interfere with the trap detection
     state.cities[0]!.resources = [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.4 }]
     state.cities[1]!.resources = [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.5 }]
     state.cities[2]!.resources = [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.1 }]
+    // Cities 3-6 (NY/London/Beijing/Delhi) — clear Wood so abundance defaults to 0.05 (very scarce,
+    // very high sticker price) and they don't become the "cheapest sticker" that hijacks the trap warning
+    state.cities[3]!.resources = []
+    state.cities[4]!.resources = []
+    state.cities[5]!.resources = []
+    state.cities[6]!.resources = []
 
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
@@ -15594,6 +15601,12 @@ test.describe('Destination-aware purchase sourcing', () => {
     state.cities[0]!.resources = [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.4 }]
     state.cities[1]!.resources = [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.5 }]
     state.cities[2]!.resources = [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', category: 'ORGANIC' }, abundance: 0.1 }]
+    // Cities 3-6 (NY/London/Beijing/Delhi) — clear Wood so abundance defaults to 0.05 (very scarce,
+    // very high sticker price) and they don't shift the Exchange-price sort order
+    state.cities[3]!.resources = []
+    state.cities[4]!.resources = []
+    state.cities[5]!.resources = []
+    state.cities[6]!.resources = []
 
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
