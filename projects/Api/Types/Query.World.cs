@@ -377,4 +377,29 @@ public sealed partial class Query
             .ThenBy(r => r.ProductType.Name)
             .ToList();
     }
+
+    /// <summary>
+    /// Returns the latest FX exchange rates (EUR-based) that were seeded from the NBS daily feed.
+    /// Returns one rate per currency, the most recently fetched.
+    /// </summary>
+    public async Task<List<FxRateSummary>> GetFxRates([Service] AppDbContext db)
+    {
+        var latestRates = await db.FxRates
+            .AsNoTracking()
+            .GroupBy(r => r.QuoteCurrencyCode)
+            .Select(g => g.OrderByDescending(r => r.RateDate).First())
+            .ToListAsync();
+
+        return latestRates
+            .OrderBy(r => r.QuoteCurrencyCode)
+            .Select(r => new FxRateSummary
+            {
+                BaseCurrencyCode = r.BaseCurrencyCode,
+                QuoteCurrencyCode = r.QuoteCurrencyCode,
+                Rate = r.Rate,
+                RateDate = r.RateDate,
+                Source = r.Source
+            })
+            .ToList();
+    }
 }

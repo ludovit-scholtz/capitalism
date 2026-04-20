@@ -201,6 +201,16 @@ public sealed partial class AppDbContext
             e.HasIndex(d => new { d.DepositorCompanyId, d.IsActive });
         });
 
+        modelBuilder.Entity<FxRate>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.BaseCurrencyCode).HasMaxLength(3);
+            e.Property(r => r.QuoteCurrencyCode).HasMaxLength(3);
+            e.Property(r => r.Rate).HasPrecision(18, 6);
+            e.Property(r => r.Source).HasMaxLength(20);
+            e.HasIndex(r => new { r.BaseCurrencyCode, r.QuoteCurrencyCode, r.RateDate });
+        });
+
         modelBuilder.Entity<AdminActionAuditLog>(e =>
         {
             e.HasKey(log => log.Id);

@@ -71,8 +71,10 @@ public class Program
         });
         builder.Services.AddScoped<AppDbInitializer>();
         builder.Services.AddScoped<AuthenticatedPlayerClaimsSyncService>();
+        builder.Services.AddScoped<NbsExchangeRateService>();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddHttpClient("push");
+        builder.Services.AddHttpClient("nbs-exchange-rate");
 
         if (builder.Configuration["MasterServer:ApiUrl"]?.Contains("masterapi") == true)
         {

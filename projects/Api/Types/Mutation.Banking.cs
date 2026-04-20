@@ -27,6 +27,9 @@ public sealed partial class Mutation
         "CZK" => 240_000_000m, // ~10M USD at ~24 CZK/USD
         "EUR" => 10_000_000m,
         "USD" => 10_000_000m,
+        "GBP" => 8_600_000m,   // ~10M USD at ~0.86 GBP/USD
+        "CNY" => 72_000_000m,  // ~10M USD at ~7.2 CNY/USD
+        "INR" => 835_000_000m, // ~10M USD at ~83.5 INR/USD
         _ => 10_000_000m,      // fallback for future currencies
     };
 
@@ -39,6 +42,8 @@ public sealed partial class Mutation
         "EUR" => "€",
         "USD" => "$",
         "GBP" => "£",
+        "CNY" => "¥",
+        "INR" => "₹",
         _ => currencyCode,
     };
 

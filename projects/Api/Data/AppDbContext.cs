@@ -105,6 +105,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Accumulated R&amp;D research budget per company per product type.</summary>
     public DbSet<ProductResearchBudget> ProductResearchBudgets => Set<ProductResearchBudget>();
 
+    /// <summary>Persisted foreign exchange rates fetched from the NBS daily CSV feed.</summary>
+    public DbSet<FxRate> FxRates => Set<FxRate>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

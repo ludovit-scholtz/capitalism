@@ -1430,3 +1430,15 @@ export interface GameAdminDashboard {
   globalGameAdminGrants: GlobalGameAdminGrant[]
   recentAuditLogs: GameAdminAuditLog[]
 }
+
+
+/** FX exchange rate summary returned by the fxRates query. EUR-based (1 EUR = rate units of quoteCurrency). */
+export interface FxRate {
+  baseCurrencyCode: string
+  quoteCurrencyCode: string
+  /** How many units of quoteCurrency equal 1 EUR. */
+  rate: number
+  rateDate: string
+  source: 'NBS' | 'FALLBACK'
+  quoteCurrencySymbol: string
+}

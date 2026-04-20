@@ -1,5 +1,6 @@
 using Api.Configuration;
 using Api.Data;
+using Api.Tests.Infrastructure;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -89,7 +90,8 @@ public sealed class DatabaseMigrationBootstrapTests
                 AdminEmail = "admin@migration-test.local",
                 AdminDisplayName = "Migration Test Admin",
                 AdminPassword = "TestPassword123!"
-            }));
+            }),
+            TestHelpers.CreateFallbackNbsService());
 
     private static async Task DropMigrationHistoryAsync(AppDbContext dbContext)
     {

@@ -11425,17 +11425,20 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             new { destinationCityId = bratislavaId, resourceTypeId = woodId });
 
         var offers = result.GetProperty("data").GetProperty("globalExchangeOffers");
-        Assert.Equal(3, offers.GetArrayLength());
+        Assert.Equal(7, offers.GetArrayLength());
 
-        var firstOffer = offers[0];
-        Assert.Equal("Bratislava", firstOffer.GetProperty("cityName").GetString());
-        Assert.Equal("wood", firstOffer.GetProperty("resourceSlug").GetString());
-        Assert.Equal(0m, firstOffer.GetProperty("transitCostPerUnit").GetDecimal());
+        var bratislavaOffer = offers.EnumerateArray()
+            .First(o => o.GetProperty("cityName").GetString() == "Bratislava");
+        Assert.Equal("wood", bratislavaOffer.GetProperty("resourceSlug").GetString());
+        Assert.Equal(0m, bratislavaOffer.GetProperty("transitCostPerUnit").GetDecimal());
         Assert.Equal(
-            firstOffer.GetProperty("exchangePricePerUnit").GetDecimal(),
-            firstOffer.GetProperty("deliveredPricePerUnit").GetDecimal());
+            bratislavaOffer.GetProperty("exchangePricePerUnit").GetDecimal(),
+            bratislavaOffer.GetProperty("deliveredPricePerUnit").GetDecimal());
 
-        var remoteOffers = offers.EnumerateArray().Skip(1).ToList();
+        var remoteOffers = offers.EnumerateArray()
+            .Where(o => o.GetProperty("cityName").GetString() != "Bratislava")
+            .ToList();
+        Assert.Equal(6, remoteOffers.Count);
         Assert.All(remoteOffers, offer =>
         {
             Assert.True(offer.GetProperty("transitCostPerUnit").GetDecimal() > 0m);
@@ -11471,8 +11474,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var offers = result.GetProperty("data").GetProperty("globalExchangeOffers");
 
-        // Seeded: 3 cities × 8 resources = 24 offers.
-        Assert.Equal(24, offers.GetArrayLength());
+        // Seeded: 7 cities × 8 resources = 56 offers.
+        Assert.Equal(56, offers.GetArrayLength());
 
         // All fields must be positive and quality must be in range.
         Assert.All(offers.EnumerateArray(), offer =>
@@ -11606,8 +11609,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var offers = result.GetProperty("data").GetProperty("globalExchangeOffers");
 
-        // 3 seeded cities × 1 filtered resource = 3 offers.
-        Assert.Equal(3, offers.GetArrayLength());
+        // 7 seeded cities × 1 filtered resource = 7 offers.
+        Assert.Equal(7, offers.GetArrayLength());
 
         // Every returned offer must be for coal.
         Assert.All(offers.EnumerateArray(), offer =>
@@ -11641,7 +11644,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         Assert.False(result.TryGetProperty("errors", out _), "globalExchangeOffers should be publicly accessible without authentication");
         var offers = result.GetProperty("data").GetProperty("globalExchangeOffers");
-        Assert.Equal(3, offers.GetArrayLength());
+        Assert.Equal(7, offers.GetArrayLength());
         Assert.All(offers.EnumerateArray(), offer =>
             Assert.True(offer.GetProperty("exchangePricePerUnit").GetDecimal() > 0m));
     }
@@ -20991,7 +20994,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
                 AdminPassword = "TestPassword123!"
             });
 
-            var initializer = new AppDbInitializer(upgradeCtx, testSeedOptions);
+            var initializer = new AppDbInitializer(upgradeCtx, testSeedOptions, TestHelpers.CreateFallbackNbsService());
             var exception = await Record.ExceptionAsync(() => initializer.InitializeAsync());
             if (exception is not null)
                 throw new InvalidOperationException(
@@ -21018,7 +21021,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             // Step 4: A second call to InitializeAsync (simulating a server restart) must also
             // succeed — the history table now exists so the baseline step is skipped.
             await using var restartCtx = new AppDbContext(options);
-            var restartInitializer = new AppDbInitializer(restartCtx, testSeedOptions);
+            var restartInitializer = new AppDbInitializer(restartCtx, testSeedOptions, TestHelpers.CreateFallbackNbsService());
             var restartException = await Record.ExceptionAsync(() => restartInitializer.InitializeAsync());
             if (restartException is not null)
                 throw new InvalidOperationException(
@@ -21089,7 +21092,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.FirstAsync(p => p.Email == email);
-            var city = await db.Cities.FirstAsync();
+            // Use Bratislava explicitly so labor cost ranges are deterministic across city expansions.
+            var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
             // Seed a company for this player (registration does not create one automatically).
             var company = new Company
@@ -24588,7 +24592,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        // Use Bratislava (EUR, 10M base capital) so the test is deterministic across city expansions.
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
 
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdCo-{Guid.NewGuid():N}", Cash = 15_000_000m };
@@ -28354,17 +28359,21 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     [Fact]
     public async Task GetCities_ReturnsAllThreeSeedCities()
     {
-        // Validates that the (cached) GetCities query returns all three seeded cities
+        // Validates that the (cached) GetCities query returns all seven seeded cities
         // and that each city has at least one resource abundance record.
         var result = await ExecuteGraphQlAsync("{ cities { id name resources { abundance } } }");
         var cities = result.GetProperty("data").GetProperty("cities").EnumerateArray().ToList();
 
-        Assert.Equal(3, cities.Count);
+        Assert.Equal(7, cities.Count);
 
         var names = cities.Select(c => c.GetProperty("name").GetString()!).ToList();
         Assert.Contains("Bratislava", names);
         Assert.Contains("Prague", names);
         Assert.Contains("Vienna", names);
+        Assert.Contains("New York", names);
+        Assert.Contains("London", names);
+        Assert.Contains("Beijing", names);
+        Assert.Contains("Delhi", names);
 
         // Each city must have resource abundance data (seeded from AppDbInitializer)
         foreach (var city in cities)

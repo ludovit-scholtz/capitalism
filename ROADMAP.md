@@ -53,11 +53,16 @@ Implement banking as is described in the banking section.
 
 - In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Add more global cities to the basic setup (0% complete)
+### Add more global cities to the basic setup (75% complete)
 
-- Setup New York, London, Beijing and Delhi
-- Add to each city the Country's currency. CZK to Prague, EUR to Bratislava and Vienna, USD to New York and so on
-- Use real rates, download the rates from the NBS - https://nbs.sk/export/en/exchange-rate/{date}/csv where {date} is current date in format yyyy-MM-dd, for example 2026-04-17
+- ✅ New York (USD), London (GBP), Beijing (CNY), and Delhi (INR) added as playable cities
+- ✅ Each city has the correct ISO 4217 currency code wired through all backend and banking flows
+- ✅ Currency symbols (£, ¥, ₹) and locale-correct bank base-capital requirements added for all new currencies
+- ✅ NBS daily CSV feed integrated: rates downloaded from https://nbs.sk/export/en/exchange-rate/{date}/csv on startup; falls back to hardcoded approximate rates when NBS is unreachable
+- ✅ FxRate entity persists exchange rates for reuse by the upcoming forex exchange
+- ✅ `fxRates` GraphQL query exposes current rates to the frontend
+- ✅ Building lots, city resources, and map coordinates seeded for all four new cities
+- ⬜ Full forex trading UI (depends on "Create forex exchange" roadmap item)
 
 ### Create forex exchange (0% complete)
 
