@@ -13,6 +13,11 @@ const router = createRouter({
       name: 'login',
       component: () => import('@/views/LoginView.vue'),
     },
+    {
+      path: '/gold-admin',
+      name: 'gold-admin',
+      component: () => import('@/views/GoldAdminView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

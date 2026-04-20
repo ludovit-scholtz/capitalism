@@ -4,14 +4,11 @@ import { loginAs, makePlayer, makeServer, makeSubscription, setupMockApi } from 
 // ── Unauthenticated home page ───────────────────────────────────────────────
 
 test.describe('Unauthenticated home page', () => {
-  test('shows hero headline and Sign in CTA', async ({ page }) => {
+  test('shows hero headline and Get started CTA', async ({ page }) => {
     setupMockApi(page, { servers: [] })
     await page.goto('/')
 
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(
-      'One master website, multiple live economies.',
-    )
-    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
+    await expect(page.locator('.hero-title')).toContainText('CAPITALISM')
     await expect(page.getByRole('link', { name: 'Get started free →' })).toBeVisible()
   })
 
@@ -19,11 +16,7 @@ test.describe('Unauthenticated home page', () => {
     setupMockApi(page, { servers: [] })
     await page.goto('/')
 
-    await expect(
-      page.getByRole('heading', {
-        name: 'Master infrastructure keeps discovery separate from simulation.',
-      }),
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Play to earn' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Register free' })).toBeVisible()
   })
 
@@ -282,7 +275,7 @@ test.describe('Authenticated home page', () => {
     await expect(page.getByRole('button', { name: 'Confirm' })).toBeVisible()
   })
 
-  test('sign out clears auth and shows Sign in', async ({ page }) => {
+  test('sign out clears auth and shows Get started CTA', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { servers: [] })
     await loginAs(page, state, player)
@@ -290,7 +283,6 @@ test.describe('Authenticated home page', () => {
 
     await page.getByRole('button', { name: 'Sign out' }).click()
 
-    await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
     await expect(page.getByRole('link', { name: 'Get started free →' })).toBeVisible()
   })
 })
@@ -352,9 +344,7 @@ test.describe('Mobile viewport', () => {
     setupMockApi(page, { servers: [makeServer()] })
     await page.goto('/')
 
-    await expect(
-      page.getByRole('heading', { name: 'One master website, multiple live economies.' }),
-    ).toBeVisible()
+    await expect(page.locator('.hero-title')).toContainText('CAPITALISM')
     await expect(page.getByText('Capitalism EU #1')).toBeVisible()
   })
 

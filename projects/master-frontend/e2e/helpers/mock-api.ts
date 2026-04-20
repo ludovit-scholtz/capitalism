@@ -38,11 +38,32 @@ export interface MockPlayer {
   canClaimStartupPack: boolean
 }
 
+export interface MockGoldBalance {
+  playerId: string
+  email: string
+  displayName: string
+  goldTokenBalance: number
+}
+
+export interface MockGoldTransaction {
+  id: string
+  playerEmail: string
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  adminEmail: string
+  note: string | null
+  createdAtUtc: string
+}
+
 export interface MockState {
   servers: MockGameServer[]
   currentToken: string | null
   currentPlayer: MockPlayer | null
   subscription: MockSubscription | null
+  goldBalances: MockGoldBalance[]
+  goldTransactions: MockGoldTransaction[]
+  isGlobalAdmin: boolean
 }
 
 export function makeServer(overrides: Partial<MockGameServer> = {}): MockGameServer {
@@ -99,6 +120,9 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     currentToken: initialState.currentToken ?? null,
     currentPlayer: initialState.currentPlayer ?? null,
     subscription: initialState.subscription ?? null,
+    goldBalances: initialState.goldBalances ?? [],
+    goldTransactions: initialState.goldTransactions ?? [],
+    isGlobalAdmin: initialState.isGlobalAdmin ?? false,
   }
 
   page.route('**/graphql', async (route) => {
@@ -225,12 +249,15 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       return
     }
 
-    // Me query — must not match gameServers, mySubscription, or prolongSubscription
+    // Me query — must not match gameServers, mySubscription, prolongSubscription, or gold token queries
     if (
       query.includes('me') &&
       !query.includes('gameServers') &&
       !query.includes('mySubscription') &&
-      !query.includes('prolongSubscription')
+      !query.includes('prolongSubscription') &&
+      !query.includes('goldTokenBalances') &&
+      !query.includes('goldTokenTransactions') &&
+      !query.includes('adjustGoldTokenBalance')
     ) {
       if (state.currentPlayer) {
         await route.fulfill({
@@ -280,6 +307,136 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { gameServers: state.servers } }),
+      })
+      return
+    }
+
+    // goldTokenBalances query
+    if (query.includes('goldTokenBalances')) {
+      if (!state.currentPlayer || (!state.isGlobalAdmin)) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+          }),
+        })
+      } else {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { goldTokenBalances: state.goldBalances } }),
+        })
+      }
+      return
+    }
+
+    // goldTokenTransactions query
+    if (query.includes('goldTokenTransactions')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+          }),
+        })
+      } else {
+        const vars = body.variables as { targetEmail?: string } | undefined
+        const emailFilter = vars?.targetEmail?.toLowerCase()
+        const filtered = emailFilter
+          ? state.goldTransactions.filter((tx) => tx.playerEmail.toLowerCase() === emailFilter)
+          : state.goldTransactions
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { goldTokenTransactions: filtered } }),
+        })
+      }
+      return
+    }
+
+    // adjustGoldTokenBalance mutation
+    if (query.includes('mutation') && query.includes('adjustGoldTokenBalance')) {
+      if (!state.currentPlayer || !state.isGlobalAdmin) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Gold token administration requires global admin access.', extensions: { code: 'GLOBAL_ADMIN_REQUIRED' } }],
+          }),
+        })
+        return
+      }
+
+      const vars = body.variables as { input: { targetEmail: string; amount: number; note?: string } }
+      const targetEmail = vars?.input?.targetEmail?.toLowerCase()
+      const amount = vars?.input?.amount ?? 0
+      const note = vars?.input?.note ?? null
+
+      if (amount === 0) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Amount must be non-zero.', extensions: { code: 'INVALID_AMOUNT' } }],
+          }),
+        })
+        return
+      }
+
+      const target = state.goldBalances.find((b) => b.email.toLowerCase() === targetEmail)
+      if (!target) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Target player not found.', extensions: { code: 'PLAYER_NOT_FOUND' } }],
+          }),
+        })
+        return
+      }
+
+      const newBalance = target.goldTokenBalance + amount
+      if (newBalance < 0) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Insufficient balance.', extensions: { code: 'INSUFFICIENT_BALANCE' } }],
+          }),
+        })
+        return
+      }
+
+      const balanceBefore = target.goldTokenBalance
+      target.goldTokenBalance = newBalance
+
+      const tx: MockGoldTransaction = {
+        id: `tx-${Date.now()}`,
+        playerEmail: target.email,
+        amount,
+        balanceBefore,
+        balanceAfter: newBalance,
+        adminEmail: state.currentPlayer.email,
+        note,
+        createdAtUtc: new Date().toISOString(),
+      }
+      state.goldTransactions.unshift(tx)
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            adjustGoldTokenBalance: {
+              playerId: target.playerId,
+              email: target.email,
+              displayName: target.displayName,
+              goldTokenBalance: target.goldTokenBalance,
+            },
+          },
+        }),
       })
       return
     }

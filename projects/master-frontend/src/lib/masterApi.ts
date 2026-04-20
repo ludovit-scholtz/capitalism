@@ -217,3 +217,96 @@ export async function claimStartupPack(token: string): Promise<SubscriptionInfo>
   )
   return data.claimStartupPack
 }
+
+// ── Gold token administration ──────────────────────────────────────────────
+
+export interface GoldTokenBalanceInfo {
+  playerId: string
+  email: string
+  displayName: string
+  goldTokenBalance: number
+}
+
+export interface GoldTokenTransactionInfo {
+  id: string
+  playerEmail: string
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  adminEmail: string
+  note: string | null
+  createdAtUtc: string
+}
+
+const GOLD_TOKEN_BALANCES_QUERY = `
+  query GetGoldTokenBalances {
+    goldTokenBalances {
+      playerId
+      email
+      displayName
+      goldTokenBalance
+    }
+  }
+`
+
+const GOLD_TOKEN_TRANSACTIONS_QUERY = `
+  query GetGoldTokenTransactions($targetEmail: String, $limit: Int) {
+    goldTokenTransactions(targetEmail: $targetEmail, limit: $limit) {
+      id
+      playerEmail
+      amount
+      balanceBefore
+      balanceAfter
+      adminEmail
+      note
+      createdAtUtc
+    }
+  }
+`
+
+const ADJUST_GOLD_TOKEN_MUTATION = `
+  mutation AdjustGoldToken($input: AdjustGoldTokenInput!) {
+    adjustGoldTokenBalance(input: $input) {
+      playerId
+      email
+      displayName
+      goldTokenBalance
+    }
+  }
+`
+
+export async function fetchGoldTokenBalances(token: string): Promise<GoldTokenBalanceInfo[]> {
+  const data = await gqlRequest<{ goldTokenBalances: GoldTokenBalanceInfo[] }>(
+    GOLD_TOKEN_BALANCES_QUERY,
+    undefined,
+    token,
+  )
+  return data.goldTokenBalances
+}
+
+export async function fetchGoldTokenTransactions(
+  token: string,
+  targetEmail?: string,
+  limit = 50,
+): Promise<GoldTokenTransactionInfo[]> {
+  const data = await gqlRequest<{ goldTokenTransactions: GoldTokenTransactionInfo[] }>(
+    GOLD_TOKEN_TRANSACTIONS_QUERY,
+    { targetEmail: targetEmail ?? null, limit },
+    token,
+  )
+  return data.goldTokenTransactions
+}
+
+export async function adjustGoldTokenBalance(
+  token: string,
+  targetEmail: string,
+  amount: number,
+  note: string,
+): Promise<GoldTokenBalanceInfo> {
+  const data = await gqlRequest<{ adjustGoldTokenBalance: GoldTokenBalanceInfo }>(
+    ADJUST_GOLD_TOKEN_MUTATION,
+    { input: { targetEmail, amount, note } },
+    token,
+  )
+  return data.adjustGoldTokenBalance
+}
