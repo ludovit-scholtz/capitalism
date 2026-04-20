@@ -719,6 +719,10 @@ const b2bSalesFilteredRankedProducts = computed<RankedProductResult[]>(() =>
 const selectedHistoryItemOptions = computed<UnitResourceHistoryItemOption[]>(() => getUnitResourceHistoryItemOptions(selectedDisplayUnit.value))
 const selectedUnitResourceHistory = computed(() => getSelectedUnitResourceHistory(selectedDisplayUnit.value))
 const buildingOverviewCityName = computed(() => getCityName(building.value?.cityId))
+const cityCurrencyCode = computed(() => {
+  if (!building.value?.cityId) return 'EUR'
+  return cities.value.find((c) => c.id === building.value!.cityId)?.currencyCode ?? 'EUR'
+})
 const buildingOverviewMapRoute = computed(() => {
   if (!building.value) return null
 
@@ -2262,7 +2266,7 @@ function getUnitPrimaryMetric(unit: GridUnit | undefined): string | null {
   if (metric.kind === 'scope') {
     return formatUnitMetric(t('buildingDetail.gridMetrics.scope'), getBrandScopeLabel(metric.value as string))
   }
-  return formatUnitMetric(t(`buildingDetail.gridMetrics.${metric.kind}`), `$${metric.value}`)
+  return formatUnitMetric(t(`buildingDetail.gridMetrics.${metric.kind}`), formatCurrency(metric.value as number))
 }
 
 function getUnitInventorySummary(unit: GridUnit | undefined): BuildingUnitInventorySummary | undefined {
@@ -2467,11 +2471,12 @@ const allUnitsUnderUpgrade = computed<Array<{ unitType: string; gridX: number; g
 
 function formatCurrency(value: number | null | undefined): string {
   const amount = value ?? 0
-  const formatter = new Intl.NumberFormat(locale.value, {
+  return new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: cityCurrencyCode.value,
     minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
     maximumFractionDigits: 2,
-  })
-  return `$${formatter.format(amount)}`
+  }).format(amount)
 }
 
 function getPurchaseVendorTransitLabel(transitCostPerUnit: number): string {
@@ -3121,6 +3126,7 @@ async function loadPublicSalesAnalytics(unitId: string | null, isRefresh = false
           totalProfit
           trendDirection
           trendFactor
+          cityCurrencyCode
           revenueHistory { tick revenue quantitySold }
           priceHistory { tick pricePerUnit }
           profitHistory { tick profit grossMarginPct }
@@ -3162,6 +3168,7 @@ async function loadUnitProductAnalytics(unitId: string | null, isRefresh = false
           totalQuantityProduced
           estimatedRevenue
           estimatedProfit
+          cityCurrencyCode
           snapshots { tick laborCost energyCost totalCost quantityProduced estimatedRevenue estimatedProfit }
         }
       }`,
@@ -3624,7 +3631,7 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
           }
         }
       }`),
-      gqlRequest<{ cities: City[] }>(`{ cities { id name } }`),
+      gqlRequest<{ cities: City[] }>(`{ cities { id name currencyCode } }`),
     ])
 
     if (requestId !== activeBuildingLoadRequest) {
@@ -4115,7 +4122,7 @@ watch(
           <div class="property-metric">
             <span class="property-metric-label">{{ t('property.activeRent') }}</span>
             <span class="property-metric-value">
-              {{ building.pricePerSqm != null ? '€' + building.pricePerSqm.toFixed(2) + ' / m²' : t('property.noRentSet') }}
+              {{ building.pricePerSqm != null ? formatCurrency(building.pricePerSqm) + ' / m²' : t('property.noRentSet') }}
             </span>
           </div>
           <div v-if="building.occupancyPercent != null && building.totalAreaSqm != null" class="property-metric">
@@ -4132,7 +4139,7 @@ watch(
           <span class="pending-rent-text">
             {{
               t('property.pendingRentNotice', {
-                rent: '€' + building.pendingPricePerSqm.toFixed(2),
+                rent: formatCurrency(building.pendingPricePerSqm),
                 time: building.pendingPriceActivationTick != null ? formatTickDuration(Math.max(0, building.pendingPriceActivationTick - currentTick), locale) : '—',
               })
             }}
@@ -4241,18 +4248,18 @@ watch(
             <div v-if="brand.scope === 'PRODUCT' && (brand.accumulatedResearchBudget != null || brand.baseResearchBudget != null)" class="research-budget-panel">
               <div class="research-budget-row">
                 <span class="research-budget-label">{{ t('research.budget.accumulated') }}</span>
-                <span class="research-budget-value">{{ brand.accumulatedResearchBudget != null ? `$${brand.accumulatedResearchBudget.toFixed(0)}` : '—' }}</span>
+                <span class="research-budget-value">{{ brand.accumulatedResearchBudget != null ? formatCurrency(brand.accumulatedResearchBudget) : '—' }}</span>
               </div>
               <div class="research-budget-row">
                 <span class="research-budget-label">{{ t('research.budget.target') }}</span>
-                <span class="research-budget-value">{{ brand.baseResearchBudget != null ? `$${brand.baseResearchBudget.toFixed(0)}` : '—' }}</span>
+                <span class="research-budget-value">{{ brand.baseResearchBudget != null ? formatCurrency(brand.baseResearchBudget) : '—' }}</span>
               </div>
               <div
                 v-if="brand.maxCompetitorBudget != null && brand.accumulatedResearchBudget != null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)"
                 class="research-budget-row research-budget-row--competitor"
               >
                 <span class="research-budget-label">{{ t('research.budget.topCompetitor') }}</span>
-                <span class="research-budget-value research-budget-value--warn">${{ brand.maxCompetitorBudget.toFixed(0) }}</span>
+                <span class="research-budget-value research-budget-value--warn">{{ formatCurrency(brand.maxCompetitorBudget) }}</span>
               </div>
               <p class="research-budget-hint">{{ t('research.budget.decayHint') }}</p>
             </div>
@@ -4461,7 +4468,7 @@ watch(
             <div class="chain-step-type">{{ t('buildingDetail.unitTypes.PUBLIC_SALES') }}</div>
             <div v-if="shopChainStatus.isPublicSalesConfigured" class="chain-step-value">
               {{ getProductName(shopChainDisplayUnits.publicSales?.productTypeId ?? null) }}
-              · ${{ shopChainDisplayUnits.publicSales?.minPrice?.toFixed(2) }}
+              · {{ formatCurrency(shopChainDisplayUnits.publicSales?.minPrice) }}
             </div>
             <div v-else class="chain-step-missing-label">
               {{ t('buildingDetail.salesChain.notConfigured') }}
@@ -4489,7 +4496,7 @@ watch(
             {{
               t('buildingDetail.salesChain.chainCompleteDesc', {
                 product: getProductName(shopChainDisplayUnits.publicSales?.productTypeId ?? null),
-                price: shopChainDisplayUnits.publicSales?.minPrice?.toFixed(2) ?? '0.00',
+                price: formatCurrency(shopChainDisplayUnits.publicSales?.minPrice ?? 0),
               })
             }}
           </p>
@@ -4982,7 +4989,7 @@ watch(
                   </div>
                   <p class="config-help">{{ t('buildingDetail.proAccessHint') }}</p>
                   <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.maxPrice') }}</label>
+                    <label class="config-label">{{ t('buildingDetail.config.maxPrice') }} <span class="currency-badge">{{ cityCurrencyCode }}</span></label>
                     <input
                       type="number"
                       class="form-input"
@@ -5089,7 +5096,7 @@ watch(
                     />
                   </div>
                   <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.minPrice') }}</label>
+                    <label class="config-label">{{ t('buildingDetail.config.minPrice') }} <span class="currency-badge">{{ cityCurrencyCode }}</span></label>
                     <input
                       type="number"
                       class="form-input"
@@ -5102,7 +5109,7 @@ watch(
                       {{
                         t(b2bPriceSource!.sourceType === 'manufacturing' ? 'buildingDetail.config.b2bPriceFromMfg' : 'buildingDetail.config.b2bPriceFromMining', {
                           item: b2bPriceSource!.itemName ?? '?',
-                          price: b2bPriceSource!.price.toFixed(2),
+                          price: formatCurrency(b2bPriceSource!.price),
                         })
                       }}
                       <button type="button" class="btn-link" @click="updateSelectedUnitConfig('minPrice', b2bSuggestedPrice)">{{ t('buildingDetail.config.b2bUseSuggested') }}</button>
@@ -5140,7 +5147,7 @@ watch(
                   </div>
                   <p class="config-help">{{ t('buildingDetail.proAccessHint') }}</p>
                   <div class="config-field">
-                    <label class="config-label">{{ t('buildingDetail.config.minPrice') }}</label>
+                    <label class="config-label">{{ t('buildingDetail.config.minPrice') }} <span class="currency-badge">{{ cityCurrencyCode }}</span></label>
                     <input
                       type="number"
                       class="form-input"
@@ -5442,10 +5449,10 @@ watch(
                     {{
                       t('buildingDetail.exchange.logisticsTrap', {
                         cheapCity: logisticsTrapWarning.cheaperStickerCityName,
-                        cheapExchange: '$' + logisticsTrapWarning.cheaperStickerExchangePrice,
-                        cheapDelivered: '$' + logisticsTrapWarning.cheaperStickerDeliveredPrice,
+                        cheapExchange: formatCurrency(logisticsTrapWarning.cheaperStickerExchangePrice),
+                        cheapDelivered: formatCurrency(logisticsTrapWarning.cheaperStickerDeliveredPrice),
                         bestCity: logisticsTrapWarning.recommendedCityName,
-                        bestDelivered: '$' + logisticsTrapWarning.recommendedDeliveredPrice,
+                        bestDelivered: formatCurrency(logisticsTrapWarning.recommendedDeliveredPrice),
                       })
                     }}
                   </div>
@@ -5473,12 +5480,12 @@ watch(
                         <span>{{ t('buildingDetail.exchange.quality', { quality: formatPercent(offer.estimatedQuality) }) }}</span>
                       </div>
                       <div class="exchange-offer-metrics">
-                        <span>{{ t('buildingDetail.exchange.exchangePrice', { price: '$' + offer.exchangePricePerUnit, unit: offer.unitSymbol }) }}</span>
-                        <span>{{ t('buildingDetail.exchange.transit', { price: '$' + offer.transitCostPerUnit, distance: offer.distanceKm }) }}</span>
-                        <span>{{ t('buildingDetail.exchange.deliveredPrice', { price: '$' + offer.deliveredPricePerUnit, unit: offer.unitSymbol }) }}</span>
+                        <span>{{ t('buildingDetail.exchange.exchangePrice', { price: formatCurrency(offer.exchangePricePerUnit), unit: offer.unitSymbol }) }}</span>
+                        <span>{{ t('buildingDetail.exchange.transit', { price: formatCurrency(offer.transitCostPerUnit), distance: offer.distanceKm }) }}</span>
+                        <span>{{ t('buildingDetail.exchange.deliveredPrice', { price: formatCurrency(offer.deliveredPricePerUnit), unit: offer.unitSymbol }) }}</span>
                       </div>
                       <p v-if="offer.blockedReason === 'maxPrice'" class="offer-blocked-reason">
-                        {{ t('buildingDetail.exchange.blockedMaxPrice', { maxPrice: selectedPurchaseUnit?.maxPrice, unit: offer.unitSymbol }) }}
+                        {{ t('buildingDetail.exchange.blockedMaxPrice', { maxPrice: formatCurrency(selectedPurchaseUnit?.maxPrice ?? 0), unit: offer.unitSymbol }) }}
                       </p>
                       <p v-else-if="offer.blockedReason === 'minQuality'" class="offer-blocked-reason">
                         {{ t('buildingDetail.exchange.blockedMinQuality', { minQuality: formatPercent(selectedPurchaseUnit?.minQuality ?? 0) }) }}
@@ -5635,10 +5642,10 @@ watch(
                   {{ t('buildingDetail.config.productType') }}: {{ getProductName((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).productTypeId) }}
                 </span>
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice != null">
-                  {{ t('buildingDetail.config.minPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice }}
+                  {{ t('buildingDetail.config.minPrice') }}: {{ formatCurrency((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).minPrice) }}
                 </span>
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice != null">
-                  {{ t('buildingDetail.config.maxPrice') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice }}
+                  {{ t('buildingDetail.config.maxPrice') }}: {{ formatCurrency((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).maxPrice) }}
                 </span>
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).purchaseSource">
                   {{ t('buildingDetail.config.procurementMode') }}:
@@ -5648,7 +5655,7 @@ watch(
                   {{ t('buildingDetail.config.saleVisibility') }}: {{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).saleVisibility }}
                 </span>
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget != null">
-                  {{ t('buildingDetail.config.budget') }}: ${{ (getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget }}
+                  {{ t('buildingDetail.config.budget') }}: {{ formatCurrency((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).budget) }}
                 </span>
                 <span class="stat" v-if="(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope">
                   {{ t('buildingDetail.config.brandScope') }}: {{ getBrandScopeLabel((getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y) as BuildingUnit).brandScope) }}
@@ -5818,10 +5825,10 @@ watch(
                     {{
                       t('buildingDetail.exchange.logisticsTrap', {
                         cheapCity: logisticsTrapWarning.cheaperStickerCityName,
-                        cheapExchange: '$' + logisticsTrapWarning.cheaperStickerExchangePrice,
-                        cheapDelivered: '$' + logisticsTrapWarning.cheaperStickerDeliveredPrice,
+                        cheapExchange: formatCurrency(logisticsTrapWarning.cheaperStickerExchangePrice),
+                        cheapDelivered: formatCurrency(logisticsTrapWarning.cheaperStickerDeliveredPrice),
                         bestCity: logisticsTrapWarning.recommendedCityName,
-                        bestDelivered: '$' + logisticsTrapWarning.recommendedDeliveredPrice,
+                        bestDelivered: formatCurrency(logisticsTrapWarning.recommendedDeliveredPrice),
                       })
                     }}
                   </div>
@@ -5849,12 +5856,12 @@ watch(
                         <span>{{ t('buildingDetail.exchange.quality', { quality: formatPercent(offer.estimatedQuality) }) }}</span>
                       </div>
                       <div class="exchange-offer-metrics">
-                        <span>{{ t('buildingDetail.exchange.exchangePrice', { price: '$' + offer.exchangePricePerUnit, unit: offer.unitSymbol }) }}</span>
-                        <span>{{ t('buildingDetail.exchange.transit', { price: '$' + offer.transitCostPerUnit, distance: offer.distanceKm }) }}</span>
-                        <span>{{ t('buildingDetail.exchange.deliveredPrice', { price: '$' + offer.deliveredPricePerUnit, unit: offer.unitSymbol }) }}</span>
+                        <span>{{ t('buildingDetail.exchange.exchangePrice', { price: formatCurrency(offer.exchangePricePerUnit), unit: offer.unitSymbol }) }}</span>
+                        <span>{{ t('buildingDetail.exchange.transit', { price: formatCurrency(offer.transitCostPerUnit), distance: offer.distanceKm }) }}</span>
+                        <span>{{ t('buildingDetail.exchange.deliveredPrice', { price: formatCurrency(offer.deliveredPricePerUnit), unit: offer.unitSymbol }) }}</span>
                       </div>
                       <p v-if="offer.blockedReason === 'maxPrice'" class="offer-blocked-reason">
-                        {{ t('buildingDetail.exchange.blockedMaxPrice', { maxPrice: selectedPurchaseUnit?.maxPrice, unit: offer.unitSymbol }) }}
+                        {{ t('buildingDetail.exchange.blockedMaxPrice', { maxPrice: formatCurrency(selectedPurchaseUnit?.maxPrice ?? 0), unit: offer.unitSymbol }) }}
                       </p>
                       <p v-else-if="offer.blockedReason === 'minQuality'" class="offer-blocked-reason">
                         {{ t('buildingDetail.exchange.blockedMinQuality', { minQuality: formatPercent(selectedPurchaseUnit?.minQuality ?? 0) }) }}
@@ -5886,15 +5893,15 @@ watch(
                       </div>
                       <div class="preview-row" v-if="procurementPreview.exchangePricePerUnit !== null">
                         <span class="preview-label">{{ t('buildingDetail.procurementPreview.exchangePrice') }}</span>
-                        <span class="preview-value">${{ procurementPreview.exchangePricePerUnit?.toFixed(2) }}</span>
+                        <span class="preview-value">{{ formatCurrency(procurementPreview.exchangePricePerUnit) }}</span>
                       </div>
                       <div class="preview-row" v-if="procurementPreview.transitCostPerUnit !== null">
                         <span class="preview-label">{{ t('buildingDetail.procurementPreview.transitCost') }}</span>
-                        <span class="preview-value">${{ procurementPreview.transitCostPerUnit?.toFixed(2) }}</span>
+                        <span class="preview-value">{{ formatCurrency(procurementPreview.transitCostPerUnit) }}</span>
                       </div>
                       <div class="preview-row" v-if="procurementPreview.deliveredPricePerUnit !== null">
                         <span class="preview-label">{{ t('buildingDetail.procurementPreview.deliveredPrice') }}</span>
-                        <span class="preview-value preview-delivered">${{ procurementPreview.deliveredPricePerUnit?.toFixed(2) }}</span>
+                        <span class="preview-value preview-delivered">{{ formatCurrency(procurementPreview.deliveredPricePerUnit) }}</span>
                       </div>
                       <div class="preview-row" v-if="procurementPreview.estimatedQuality !== null">
                         <span class="preview-label">{{ t('buildingDetail.procurementPreview.quality') }}</span>
@@ -5911,7 +5918,7 @@ watch(
                     <div class="preview-details" v-if="procurementPreview.deliveredPricePerUnit !== null">
                       <div class="preview-row">
                         <span class="preview-label">{{ t('buildingDetail.procurementPreview.nearestOffer') }}</span>
-                        <span class="preview-value preview-blocked-price">${{ procurementPreview.deliveredPricePerUnit?.toFixed(2) }}</span>
+                        <span class="preview-value preview-blocked-price">{{ formatCurrency(procurementPreview.deliveredPricePerUnit) }}</span>
                       </div>
                       <div class="preview-row" v-if="procurementPreview.sourceCityName">
                         <span class="preview-label">{{ t('buildingDetail.procurementPreview.source') }}</span>
@@ -5971,16 +5978,16 @@ watch(
                             </span>
                           </td>
                           <td class="sourcing-col-offer">
-                            <span v-if="candidate.exchangePricePerUnit !== null"> ${{ candidate.exchangePricePerUnit.toFixed(2) }} </span>
-                            <span v-else-if="candidate.deliveredPricePerUnit !== null"> ${{ candidate.deliveredPricePerUnit.toFixed(2) }} </span>
+                            <span v-if="candidate.exchangePricePerUnit !== null"> {{ formatCurrency(candidate.exchangePricePerUnit) }} </span>
+                            <span v-else-if="candidate.deliveredPricePerUnit !== null"> {{ formatCurrency(candidate.deliveredPricePerUnit) }} </span>
                             <span v-else>—</span>
                           </td>
                           <td class="sourcing-col-transit">
-                            <span v-if="candidate.transitCostPerUnit !== null" class="transit-cost"> +${{ candidate.transitCostPerUnit.toFixed(2) }} </span>
+                            <span v-if="candidate.transitCostPerUnit !== null" class="transit-cost"> +{{ formatCurrency(candidate.transitCostPerUnit) }} </span>
                             <span v-else>—</span>
                           </td>
                           <td class="sourcing-col-landed col-landed">
-                            <strong v-if="candidate.deliveredPricePerUnit !== null"> ${{ candidate.deliveredPricePerUnit.toFixed(2) }} </strong>
+                            <strong v-if="candidate.deliveredPricePerUnit !== null"> {{ formatCurrency(candidate.deliveredPricePerUnit) }} </strong>
                             <span v-else>—</span>
                           </td>
                           <td class="sourcing-col-quality">
@@ -6290,6 +6297,7 @@ watch(
                     <div class="mi-price-update-row">
                       <label class="mi-price-update-label" for="quick-price-input">
                         {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
+                        <span class="currency-badge">{{ cityCurrencyCode }}</span>
                       </label>
                       <input
                         id="quick-price-input"
@@ -6633,7 +6641,7 @@ watch(
                 </div>
 
                 <template v-if="buildingFinancialTimeline">
-                  <BuildingFinancialTimelineChart v-if="buildingFinancialHasActivity" :timeline="buildingFinancialSnapshots" />
+                  <BuildingFinancialTimelineChart v-if="buildingFinancialHasActivity" :timeline="buildingFinancialSnapshots" :currency-code="cityCurrencyCode" />
 
                   <p v-else class="mi-empty-state">
                     {{ t('buildingDetail.overview.noFinancialData') }}
@@ -10419,5 +10427,19 @@ watch(
   .purchase-selector-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.currency-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: var(--color-surface-hover, rgba(0,0,0,0.06));
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  vertical-align: middle;
+  margin-left: 0.25rem;
 }
 </style>

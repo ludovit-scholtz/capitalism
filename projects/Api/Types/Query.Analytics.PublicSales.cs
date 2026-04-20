@@ -345,6 +345,7 @@ public sealed partial class Query
             ProfitHistory = profitHistory,
             DemandDrivers = demandDrivers,
             TrendFactor = currentTrendFactor,
+            CityCurrencyCode = city?.CurrencyCode ?? "EUR",
         };
     }
 

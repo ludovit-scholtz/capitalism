@@ -399,7 +399,7 @@ export interface City {
   name: string
   countryCode: string
   /** ISO 4217 currency code (e.g. "EUR", "CZK"). */
-  currencyCode?: string
+  currencyCode: string
   latitude: number
   longitude: number
   population: number
@@ -852,6 +852,8 @@ export interface PublicSalesAnalytics {
    * Null when no trend state exists yet (first tick).
    */
   trendFactor: number | null
+  /** ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK"). */
+  cityCurrencyCode: string
 }
 
 export interface SalesTickSnapshot {
@@ -948,6 +950,8 @@ export interface UnitProductAnalytics {
   estimatedProfit: number | null
   /** Per-tick snapshots ordered by tick ascending. */
   snapshots: UnitProductTickSnapshot[]
+  /** ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK"). */
+  cityCurrencyCode: string
 }
 
 /** Summary of a single power plant in the city power balance view. */

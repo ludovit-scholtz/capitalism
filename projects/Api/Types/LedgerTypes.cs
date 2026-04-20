@@ -197,6 +197,8 @@ public sealed class PublicSalesAnalytics
     /// Null when no trend state exists yet (first tick).
     /// </summary>
     public decimal? TrendFactor { get; set; }
+    /// <summary>ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK").</summary>
+    public string CityCurrencyCode { get; set; } = "EUR";
 }
 
 public sealed class ProfitTickSnapshot
@@ -282,6 +284,8 @@ public sealed class UnitProductAnalytics
     public decimal? EstimatedProfit { get; set; }
     /// <summary>Per-tick snapshots ordered by tick ascending.</summary>
     public List<UnitProductTickSnapshot> Snapshots { get; set; } = [];
+    /// <summary>ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK").</summary>
+    public string CityCurrencyCode { get; set; } = "EUR";
 }
 
 /// <summary>Per-tick cost and production snapshot for a MANUFACTURING unit.</summary>
