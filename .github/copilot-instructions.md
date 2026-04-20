@@ -922,3 +922,17 @@ Root-cause of a CI failure (April 2026, PR #64 / power plant weather forecasts):
 2. **Any backend test that verifies `SOLAR` or `WIND` output must create `CityWeatherForecast` rows for `GameState.CurrentTick`** before processing ticks, then assert the weather-adjusted result explicitly.
 3. **When shipped UI starts calling a new GraphQL query, update `projects/frontend/e2e/helpers/mock-api.ts` in the same session.** Do not rely on `catch { ... = null }` in the component; add the real mock handler and cover it with Playwright.
 4. **For power-plant weather work, add at least one E2E that proves both the renewable outlook UI and the purchase flow** (weather panel visible → plant type badge visible → purchase succeeds).
+
+## Currency format changes — scan ALL E2E specs before pushing
+
+Root-cause of CI failures (April 2026, PR #74 / multi-currency ledger):
+- My changes to `FinancialSummaryCard.vue` and `LedgerView.vue` correctly switched from hardcoded `$` to ISO 4217 `€` for EUR amounts.
+- Two E2E tests in unrelated spec files (`dashboard.spec.ts:1396` and `stock-exchange.spec.ts:938`) still asserted the old `$` currency symbol, causing them to fail in CI even though the underlying feature worked correctly.
+- These assertions were in tests written before my changes, targeting a component that previously used a hardcoded dollar sign.
+
+**Rules to prevent recurrence:**
+1. **Before pushing any PR that changes a currency symbol, amount formatter, or `Intl.NumberFormat` call in any shared component, run `grep -rn "'\\\$[0-9]\|ContainText.*'\\\$\|getByText.*'\\\$" e2e/` across ALL spec files.** Update every assertion that relied on the old currency symbol.
+2. **The same applies to `PersonalLedgerView`, `FinancialSummaryCard`, `LedgerView`, and any other component whose currency format changes.** If a component switches from USD (`$`) to EUR (`€`) or any other ISO code, the grep must cover all specs — not just the spec that directly tests the component.
+3. **A safe assertion pattern for currency amounts uses the ISO code** (e.g., `€6,060.00` or `CZK 30,000.00`) rather than `$6,060.00`, which is fragile and will break on any locale or currency change.
+4. **After finding and updating all affected assertions, run the full `npm run test:e2e` suite locally** to confirm no remaining `$`-based assertions fail before `report_progress`.
+5. **Infrastructure rule:** when a component is updated to use `Intl.NumberFormat`, its default currency changes. EUR formats amounts with `€` prefix in `en` locale (not `$`). CZK formats as `CZK X,XXX.XX` in `en` locale (not `Kč`). Always verify the exact output of `Intl.NumberFormat` for the target locale/currency before writing assertions.
