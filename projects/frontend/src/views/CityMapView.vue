@@ -18,7 +18,7 @@ import {
   constructionTicksRemaining as computeConstructionTicksRemaining,
 } from '@/lib/cityMapHelpers'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -44,6 +44,7 @@ const viewMode = ref<'map' | 'list'>('map')
 // Purchase form state
 const purchaseMode = ref(false)
 const selectedBuildingType = ref('')
+const selectedPowerPlantType = ref('')
 const buildingName = ref('')
 const selectedMediaType = ref('')
 const purchasing = ref(false)
@@ -53,6 +54,18 @@ const justPurchasedBuildingId = ref<string | null>(null)
 const justPurchasedBuildingType = ref<string | null>(null)
 const justPurchasedIsUnderConstruction = ref(false)
 const justPurchasedConstructionCompletesAtTick = ref<number | null>(null)
+
+// Weather forecast for the current city
+const cityWeather = ref<CityWeatherForecast | null>(null)
+
+// Power plant type options with MW output
+const POWER_PLANT_TYPES = [
+  { type: 'COAL',    labelKey: 'powerGrid.plantTypes.COAL',    mw: 50,  descKey: 'powerPlant.coalDescription' },
+  { type: 'GAS',     labelKey: 'powerGrid.plantTypes.GAS',     mw: 40,  descKey: 'powerPlant.gasDescription' },
+  { type: 'SOLAR',   labelKey: 'powerGrid.plantTypes.SOLAR',   mw: 20,  descKey: 'powerPlant.solarDescription' },
+  { type: 'WIND',    labelKey: 'powerGrid.plantTypes.WIND',    mw: 25,  descKey: 'powerPlant.windDescription' },
+  { type: 'NUCLEAR', labelKey: 'powerGrid.plantTypes.NUCLEAR', mw: 200, descKey: 'powerPlant.nuclearDescription' },
+]
 
 // Map reference
 const mapContainer = ref<HTMLDivElement | null>(null)
@@ -91,6 +104,8 @@ const canSubmitPurchase = computed(() => {
   const baseValid = isFormSubmittable(selectedBuildingType.value, buildingName.value, activeCompany.value?.id ?? '', purchasing.value)
   // Media houses require a channel type selection.
   if (selectedBuildingType.value === 'MEDIA_HOUSE' && !selectedMediaType.value) return false
+  // Power plants require a plant type selection.
+  if (selectedBuildingType.value === 'POWER_PLANT' && !selectedPowerPlantType.value) return false
   return baseValid
 })
 
@@ -281,6 +296,24 @@ async function fetchMediaHouses() {
   }
 }
 
+async function fetchWeatherForecast() {
+  if (!cityId.value) return
+  try {
+    const data = await gqlRequest<{ cityWeatherForecast: CityWeatherForecast | null }>(
+      `query CityWeatherForecast($cityId: UUID!) {
+        cityWeatherForecast(cityId: $cityId) {
+          cityId currentWindPercent currentSolarPercent
+          forecast { tick windPercent solarPercent }
+        }
+      }`,
+      { cityId: cityId.value },
+    )
+    cityWeather.value = data.cityWeatherForecast ?? null
+  } catch {
+    cityWeather.value = null
+  }
+}
+
 function createMarkerIcon(color: string, isSelected: boolean): L.DivIcon {
   const size = isSelected ? 18 : 12
   const border = isSelected ? '3px solid #fff' : '2px solid rgba(255,255,255,0.8)'
@@ -360,6 +393,7 @@ function selectLot(lot: BuildingLot) {
   selectedBuildingType.value = ''
   buildingName.value = ''
   selectedMediaType.value = ''
+  selectedPowerPlantType.value = ''
 
   // Update markers to show selection
   updateMarkers()
@@ -420,6 +454,7 @@ async function confirmPurchase() {
           buildingType: selectedBuildingType.value,
           buildingName: buildingName.value.trim() || null,
           mediaType: selectedBuildingType.value === 'MEDIA_HOUSE' ? selectedMediaType.value || null : null,
+          powerPlantType: selectedBuildingType.value === 'POWER_PLANT' ? selectedPowerPlantType.value || null : null,
         },
       },
     )
@@ -518,6 +553,7 @@ watch(cityId, async () => {
   purchaseSuccess.value = null
   justPurchasedBuildingId.value = null
   justPurchasedBuildingType.value = null
+  cityWeather.value = null
   viewMode.value = 'map'
   if (map) {
     map.remove()
@@ -525,6 +561,7 @@ watch(cityId, async () => {
   }
   await fetchData()
   void fetchMediaHouses()
+  void fetchWeatherForecast()
   if (!error.value) {
     await nextTick()
     initMap()
@@ -534,6 +571,7 @@ watch(cityId, async () => {
 onMounted(async () => {
   await fetchData()
   void fetchMediaHouses()
+  void fetchWeatherForecast()
   await nextTick()
   if (viewMode.value === 'map') {
     initMap()
@@ -755,6 +793,31 @@ watch(viewMode, async (mode) => {
             </p>
           </div>
 
+          <!-- Weather outlook: shown for lots suitable for POWER_PLANT -->
+          <div
+            v-if="suitableTypesForLot.includes('POWER_PLANT') && cityWeather"
+            class="weather-outlook-panel"
+            data-testid="weather-outlook-panel"
+          >
+            <h3 class="weather-outlook-title">🌤️ {{ t('powerPlant.weatherOutlook') }}</h3>
+            <div class="weather-outlook-row">
+              <span class="weather-badge solar-badge">☀️ {{ t('powerPlant.solarPercent', { percent: Math.round(cityWeather.currentSolarPercent) }) }}</span>
+              <span class="weather-badge wind-badge">💨 {{ t('powerPlant.windPercent', { percent: Math.round(cityWeather.currentWindPercent) }) }}</span>
+            </div>
+            <div v-if="cityWeather.forecast.length > 0" class="weather-forecast-bars">
+              <div
+                v-for="(tick, i) in cityWeather.forecast.slice(0, 12)"
+                :key="tick.tick"
+                class="forecast-bar-group"
+                :title="`Tick ${tick.tick}: ☀️${Math.round(tick.solarPercent)}% 💨${Math.round(tick.windPercent)}%`"
+              >
+                <div class="forecast-bar solar-bar" :style="{ height: Math.round(tick.solarPercent) + '%' }"></div>
+                <div class="forecast-bar wind-bar" :style="{ height: Math.round(tick.windPercent) + '%' }"></div>
+                <span v-if="i === 0 || i === 11" class="forecast-bar-label">{{ i === 0 ? 'Now' : '+12' }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Owner info for owned lots -->
           <div v-if="selectedLot.ownerCompany" class="owner-info">
             <span class="detail-label">{{ t('cityMap.owner') }}</span>
@@ -840,6 +903,38 @@ watch(viewMode, async (mode) => {
                     <option value="TV">📺 {{ t('cityMap.mediaTypeTv') }} (×2.0)</option>
                   </select>
                   <p class="form-hint">{{ t('cityMap.mediaTypeHint') }}</p>
+                </div>
+
+                <!-- Power plant type picker (only for POWER_PLANT) -->
+                <div v-if="selectedBuildingType === 'POWER_PLANT'" class="form-group">
+                  <label>{{ t('powerPlant.plantTypeLabel') }}</label>
+                  <div class="plant-type-cards" role="radiogroup" :aria-label="t('powerPlant.plantTypeLabel')">
+                    <button
+                      v-for="pt in POWER_PLANT_TYPES"
+                      :key="pt.type"
+                      class="plant-type-card"
+                      :class="{ selected: selectedPowerPlantType === pt.type }"
+                      type="button"
+                      role="radio"
+                      :aria-checked="selectedPowerPlantType === pt.type"
+                      @click="selectedPowerPlantType = pt.type"
+                    >
+                      <span class="plant-type-name">{{ t(pt.labelKey) }}</span>
+                      <span class="plant-type-mw">{{ t('powerPlant.outputMw', { output: pt.mw }) }}</span>
+                      <span v-if="pt.type === 'SOLAR' && cityWeather" class="plant-weather-badge solar">
+                        ☀️ {{ Math.round(cityWeather.currentSolarPercent) }}%
+                      </span>
+                      <span v-else-if="pt.type === 'WIND' && cityWeather" class="plant-weather-badge wind">
+                        💨 {{ Math.round(cityWeather.currentWindPercent) }}%
+                      </span>
+                      <span v-else-if="pt.type === 'SOLAR' || pt.type === 'WIND'" class="plant-type-badge renewable">
+                        {{ t('powerPlant.renewableBadge') }}
+                      </span>
+                      <span v-else class="plant-type-badge fuel">{{ t('powerPlant.fuelBadge') }}</span>
+                      <span class="plant-type-desc">{{ t(pt.descKey) }}</span>
+                    </button>
+                  </div>
+                  <p v-if="!selectedPowerPlantType" class="form-hint">{{ t('powerPlant.noPlantTypeSelected') }}</p>
                 </div>
 
                 <!-- Purchase cost summary -->

@@ -114,6 +114,41 @@ public sealed partial class AppDbInitializer
             }
 
             await RepairLegacyPostgresStoreTypesAsync(connection, dialect);
+
+            // Ensure CityWeatherForecasts table exists (added in AddCityWeatherForecast migration).
+            if (!await TableExistsAsync(connection, dialect, "CityWeatherForecasts"))
+            {
+                if (dialect.IsPostgres)
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "CityWeatherForecasts" (
+                            "CityId" uuid NOT NULL,
+                            "Tick" bigint NOT NULL,
+                            "WindPercent" numeric NOT NULL,
+                            "SolarPercent" numeric NOT NULL,
+                            CONSTRAINT "PK_CityWeatherForecasts" PRIMARY KEY ("CityId", "Tick"),
+                            CONSTRAINT "FK_CityWeatherForecasts_Cities_CityId" FOREIGN KEY ("CityId") REFERENCES "Cities" ("Id") ON DELETE CASCADE
+                        )
+                        """);
+                    await ExecuteNonQueryAsync(connection,
+                        "CREATE INDEX IF NOT EXISTS \"IX_CityWeatherForecasts_CityId_Tick\" ON \"CityWeatherForecasts\" (\"CityId\", \"Tick\")");
+                }
+                else
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "CityWeatherForecasts" (
+                            "CityId" TEXT NOT NULL,
+                            "Tick" INTEGER NOT NULL,
+                            "WindPercent" TEXT NOT NULL,
+                            "SolarPercent" TEXT NOT NULL,
+                            CONSTRAINT "PK_CityWeatherForecasts" PRIMARY KEY ("CityId", "Tick"),
+                            CONSTRAINT "FK_CityWeatherForecasts_Cities_CityId" FOREIGN KEY ("CityId") REFERENCES "Cities" ("Id") ON DELETE CASCADE
+                        )
+                        """);
+                }
+            }
         }
         finally
         {

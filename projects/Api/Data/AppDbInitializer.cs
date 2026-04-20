@@ -120,6 +120,21 @@ public sealed partial class AppDbInitializer(
             .FirstOrDefaultAsync();
         await LandService.EnsureMinimumAvailableLotsAsync(dbContext, currentTick);
         await dbContext.SaveChangesAsync();
+
+        // Seed initial weather forecasts for cities that don't have any yet.
+        var citiesWithoutForecast = await dbContext.Cities
+            .Where(c => !dbContext.CityWeatherForecasts.Any(f => f.CityId == c.Id))
+            .Select(c => c.Id)
+            .ToListAsync();
+        if (citiesWithoutForecast.Count > 0)
+        {
+            foreach (var cityId in citiesWithoutForecast)
+            {
+                var forecasts = WeatherService.SeedForecast(cityId, currentTick, WeatherService.ForecastWindow);
+                dbContext.CityWeatherForecasts.AddRange(forecasts);
+            }
+            await dbContext.SaveChangesAsync();
+        }
     }
 
     private void SeedResources()

@@ -164,6 +164,69 @@ test.describe('City Map View', () => {
     await expect(page.getByText(/purchased successfully/i).or(page.locator('.status-badge.yours'))).toBeVisible()
   })
 
+  test('shows renewable weather outlook and purchases a solar power plant', async ({ page }) => {
+    const lots: MockBuildingLot[] = [
+      ...makeDefaultBuildingLots(),
+      {
+        id: 'lot-power-1',
+        cityId: 'city-ba',
+        name: 'Grid Edge Energy Park',
+        description: 'Utility-scale energy lot on the edge of the city grid.',
+        district: 'Energy District',
+        latitude: 48.161,
+        longitude: 17.134,
+        populationIndex: 0.38,
+        basePrice: 150000,
+        price: 160000,
+        suitableTypes: 'POWER_PLANT,FACTORY',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+    ]
+
+    const { player } = setupAuthenticatedPlayer(page)
+    const state = setupMockApi(page, { players: [player], buildingLots: lots })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cityWeatherForecasts['city-ba'] = {
+      cityId: 'city-ba',
+      currentWindPercent: 67,
+      currentSolarPercent: 82,
+      forecast: Array.from({ length: 12 }, (_, index) => ({
+        tick: 42 + index,
+        windPercent: 67 - (index % 3) * 4,
+        solarPercent: Math.max(12, 82 - index * 5),
+      })),
+    }
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Grid Edge Energy Park/i }).click()
+
+    await expect(page.getByTestId('weather-outlook-panel')).toBeVisible()
+    await expect(page.getByText(/82% solar/i)).toBeVisible()
+    await expect(page.getByText(/67% wind/i)).toBeVisible()
+
+    await page.getByRole('button', { name: /Purchase Lot/i }).click()
+    await page.locator('.building-type-card').filter({ hasText: /Power Plant/i }).first().click()
+    await expect(page.getByText('Plant type', { exact: true })).toBeVisible()
+    await expect(page.getByRole('radio', { name: /Solar20 MW/i })).toBeVisible()
+    await expect(page.getByRole('radio', { name: /Solar20 MW/i })).toContainText('82%')
+    await page.getByRole('radio', { name: /Solar20 MW/i }).click()
+    await page.getByRole('complementary').locator('input[type="text"]').fill('Solar Ridge Station')
+    await page.getByRole('button', { name: /Confirm Purchase/i }).click()
+
+    await expect(page.getByRole('heading', { name: 'Grid Edge Energy Park' })).toBeVisible()
+    await expect(page.getByText('Solar Ridge Station')).toBeVisible()
+    await expect(page.locator('.status-badge.yours')).toBeVisible()
+  })
+
   test('shows owned lots with different status', async ({ page }) => {
     const lots: MockBuildingLot[] = makeDefaultBuildingLots()
     // Mark one lot as owned by another player's company

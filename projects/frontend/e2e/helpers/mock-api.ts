@@ -660,6 +660,19 @@ export type MockBuildingLayoutTemplate = {
   updatedAtUtc: string
 }
 
+export type MockWeatherTick = {
+  tick: number
+  windPercent: number
+  solarPercent: number
+}
+
+export type MockCityWeatherForecast = {
+  cityId: string
+  currentWindPercent: number
+  currentSolarPercent: number
+  forecast: MockWeatherTick[]
+}
+
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
@@ -671,6 +684,7 @@ export type MockState = {
   currentUserId: string | null
   currentToken: string | null
   gameState: { currentTick: number; lastTickAtUtc: string; tickIntervalSeconds: number; taxCycleTicks: number; taxRate: number }
+  cityWeatherForecasts: Record<string, MockCityWeatherForecast>
   stockPriceHistory: Record<string, MockStockPriceHistoryPoint[]>
   ledgerData: Record<string, MockLedgerSummary>
   drillDownData: Record<string, MockLedgerEntry[]>
@@ -882,13 +896,7 @@ function ensureMockLedgerSummary(state: MockState, company: MockCompany): MockLe
   return summary
 }
 
-function recordMockCompanyStockLedgerEntry(
-  state: MockState,
-  company: MockCompany,
-  category: 'STOCK_PURCHASE' | 'STOCK_SALE',
-  description: string,
-  amount: number,
-) {
+function recordMockCompanyStockLedgerEntry(state: MockState, company: MockCompany, category: 'STOCK_PURCHASE' | 'STOCK_SALE', description: string, amount: number) {
   const summary = ensureMockLedgerSummary(state, company)
   const currentTick = state.gameState.currentTick
   const drillKey = `${company.id}:${category}`
@@ -959,11 +967,41 @@ function buildMockGameStatePayload(gameState: MockState['gameState']) {
   }
 }
 
+function buildDefaultCityWeatherForecast(cityId: string, currentTick: number): MockCityWeatherForecast {
+  const forecast = Array.from({ length: 50 }, (_, index) => {
+    const tick = currentTick + index
+    const windPercent = 55 + ((index % 5) - 2) * 4
+    const solarPercent = Math.max(0, 85 - Math.abs((index % 12) - 6) * 12)
+
+    return {
+      tick,
+      windPercent: Math.max(0, Math.min(100, windPercent)),
+      solarPercent: Math.max(0, Math.min(100, solarPercent)),
+    }
+  })
+
+  return {
+    cityId,
+    currentWindPercent: forecast[0]?.windPercent ?? 55,
+    currentSolarPercent: forecast[0]?.solarPercent ?? 85,
+    forecast,
+  }
+}
+
 function buildMockLedgerHistoryYear(summary: MockLedgerSummary, currentGameYear: number): MockLedgerHistoryYear {
   const gameYear = summary.gameYear ?? currentGameYear
   const taxableIncome =
     summary.taxableIncome ??
-    Math.max(summary.totalRevenue - summary.totalPurchasingCosts - (summary.totalShippingCosts ?? 0) - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts, 0)
+    Math.max(
+      summary.totalRevenue -
+        summary.totalPurchasingCosts -
+        (summary.totalShippingCosts ?? 0) -
+        summary.totalLaborCosts -
+        summary.totalEnergyCosts -
+        summary.totalMarketingCosts -
+        summary.totalOtherCosts,
+      0,
+    )
 
   return {
     gameYear,
@@ -994,7 +1032,16 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     totalShippingCosts: summary.totalShippingCosts ?? 0,
     taxableIncome:
       summary.taxableIncome ??
-      Math.max(summary.totalRevenue - summary.totalPurchasingCosts - (summary.totalShippingCosts ?? 0) - summary.totalLaborCosts - summary.totalEnergyCosts - summary.totalMarketingCosts - summary.totalOtherCosts, 0),
+      Math.max(
+        summary.totalRevenue -
+          summary.totalPurchasingCosts -
+          (summary.totalShippingCosts ?? 0) -
+          summary.totalLaborCosts -
+          summary.totalEnergyCosts -
+          summary.totalMarketingCosts -
+          summary.totalOtherCosts,
+        0,
+      ),
     estimatedIncomeTax: summary.estimatedIncomeTax ?? summary.totalTaxPaid,
     incomeTaxDueAtTick,
     incomeTaxDueGameTimeUtc: summary.incomeTaxDueGameTimeUtc ?? computeMockInGameTimeUtc(incomeTaxDueAtTick),
@@ -1603,6 +1650,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     currentUserId: null,
     currentToken: null,
     gameState: { currentTick: 42, lastTickAtUtc: new Date(Date.now() - 30000).toISOString(), tickIntervalSeconds: 60, taxCycleTicks: 8760, taxRate: 15 },
+    cityWeatherForecasts: {},
     stockPriceHistory: {},
     ledgerData: {},
     drillDownData: {},
@@ -1920,17 +1968,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const input = body.variables?.input
       const existingId = input?.existingId as string | null | undefined
-      const existingIndex = existingId
-        ? state.buildingLayouts.findIndex(
-            (layout) => layout.id === existingId && layout.ownerPlayerId === state.currentUserId,
-          )
-        : -1
+      const existingIndex = existingId ? state.buildingLayouts.findIndex((layout) => layout.id === existingId && layout.ownerPlayerId === state.currentUserId) : -1
       const updatedAtUtc = new Date().toISOString()
       const layout: MockBuildingLayoutTemplate = {
-        id:
-          existingIndex >= 0
-            ? state.buildingLayouts[existingIndex]!.id
-            : `layout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: existingIndex >= 0 ? state.buildingLayouts[existingIndex]!.id : `layout-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         ownerPlayerId: state.currentUserId,
         name: input?.name ?? 'Untitled Layout',
         description: input?.description ?? null,
@@ -1963,9 +2004,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const input = body.variables?.input
-      state.buildingLayouts = state.buildingLayouts.filter(
-        (layout) => !(layout.id === input?.id && layout.ownerPlayerId === state.currentUserId),
-      )
+      state.buildingLayouts = state.buildingLayouts.filter((layout) => !(layout.id === input?.id && layout.ownerPlayerId === state.currentUserId))
 
       return routeJson({ deleteBuildingLayout: true })
     }
@@ -2728,13 +2767,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         accountName = activeCompany.name
         accountCompanyId = activeCompany.id
         companyCash = activeCompany.cash
-        recordMockCompanyStockLedgerEntry(
-          state,
-          activeCompany,
-          'STOCK_PURCHASE',
-          `Bought ${shareCount} shares in ${company.name} @ ${pricePerShare.toFixed(2)}`,
-          -totalValue,
-        )
+        recordMockCompanyStockLedgerEntry(state, activeCompany, 'STOCK_PURCHASE', `Bought ${shareCount} shares in ${company.name} @ ${pricePerShare.toFixed(2)}`, -totalValue)
 
         if (activeCompany.id === company.id) {
           company.totalSharesIssued = Number(Math.max(getCompanyTotalShares(company) - shareCount, 0).toFixed(4))
@@ -2843,13 +2876,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         accountCompanyId = activeCompany.id
         companyCash = activeCompany.cash
         ownedShareCount = holding.shareCount
-        recordMockCompanyStockLedgerEntry(
-          state,
-          activeCompany,
-          'STOCK_SALE',
-          `Sold ${shareCount} shares in ${company.name} @ ${pricePerShare.toFixed(2)}`,
-          totalValue,
-        )
+        recordMockCompanyStockLedgerEntry(state, activeCompany, 'STOCK_SALE', `Sold ${shareCount} shares in ${company.name} @ ${pricePerShare.toFixed(2)}`, totalValue)
       } else {
         const holding = getOrCreateShareholding(state, company.id, player.id, null)
         if (holding.shareCount < shareCount) {
@@ -3724,24 +3751,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         .find((b) => b.id === buildingId)
 
       // Collect unit product IDs from active + pending configuration
-      const allBuildingUnits = [
-        ...(building?.units ?? []),
-        ...(building?.pendingConfiguration?.units ?? []),
-      ]
+      const allBuildingUnits = [...(building?.units ?? []), ...(building?.pendingConfiguration?.units ?? [])]
 
       const connectedProductIds = new Set<string>()
       // For PRODUCT_QUALITY/BRAND_QUALITY, collect used products across ALL company buildings
       const usedByCompanyIds = new Set<string>()
       if (unitType === 'PUBLIC_SALES') {
         // Connected = products from MANUFACTURING or B2B_SALES units
-        allBuildingUnits
-          .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'B2B_SALES') && u.productTypeId)
-          .forEach((u) => connectedProductIds.add(u.productTypeId!))
+        allBuildingUnits.filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'B2B_SALES') && u.productTypeId).forEach((u) => connectedProductIds.add(u.productTypeId!))
       } else if (unitType === 'STORAGE') {
         // Connected = products from MANUFACTURING units
-        allBuildingUnits
-          .filter((u) => u.unitType === 'MANUFACTURING' && u.productTypeId)
-          .forEach((u) => connectedProductIds.add(u.productTypeId!))
+        allBuildingUnits.filter((u) => u.unitType === 'MANUFACTURING' && u.productTypeId).forEach((u) => connectedProductIds.add(u.productTypeId!))
         // Also products currently in inventory
         allBuildingUnits
           .filter((u) => u.inventoryItems && u.inventoryItems.length > 0)
@@ -3750,9 +3770,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           .forEach((item) => connectedProductIds.add(item.productTypeId!))
       } else if (unitType === 'B2B_SALES') {
         // Connected = products from MANUFACTURING or PURCHASE units
-        allBuildingUnits
-          .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'PURCHASE') && u.productTypeId)
-          .forEach((u) => connectedProductIds.add(u.productTypeId!))
+        allBuildingUnits.filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'PURCHASE') && u.productTypeId).forEach((u) => connectedProductIds.add(u.productTypeId!))
         // Also products currently stocked in B2B_SALES units
         allBuildingUnits
           .filter((u) => u.unitType === 'B2B_SALES' && u.inventoryItems && u.inventoryItems.length > 0)
@@ -3766,13 +3784,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         allCompanyBuildings.forEach((b) => {
           const allUnits = [...(b.units ?? []), ...(b.pendingConfiguration?.units ?? [])]
           allUnits
-            .filter(
-              (u) =>
-                (u.unitType === 'MANUFACTURING' ||
-                  u.unitType === 'PUBLIC_SALES' ||
-                  u.unitType === 'B2B_SALES') &&
-                u.productTypeId,
-            )
+            .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'PUBLIC_SALES' || u.unitType === 'B2B_SALES') && u.productTypeId)
             .forEach((u) => usedByCompanyIds.add(u.productTypeId!))
           // Also inventory products
           allUnits
@@ -4211,8 +4223,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               personalCash: player.personalCash,
               taxReserve: player.personalTaxReserve ?? 0,
               availableCash: computeAvailableCash(player),
-              totalNetWealth: computeAvailableCash(player)
-                + shareholdings.reduce((sum: number, h: { marketValue: number }) => sum + h.marketValue, 0),
+              totalNetWealth: computeAvailableCash(player) + shareholdings.reduce((sum: number, h: { marketValue: number }) => sum + h.marketValue, 0),
               activeAccountType: player.activeAccountType,
               activeCompanyId: player.activeCompanyId,
               shareholdings,
@@ -4284,22 +4295,24 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const namedSharesTotal = companyShareholdings.reduce((sum, h) => sum + h.shareCount, 0)
       const publicFloatShares = Math.max(0, totalShares - namedSharesTotal)
 
-      const shareholders = companyShareholdings.map((h) => {
-        const ownerPlayer = h.ownerPlayerId ? state.players.find((p) => p.id === h.ownerPlayerId) : null
-        const ownerCompany = h.ownerCompanyId ? state.players.flatMap((p) => p.companies).find((c) => c.id === h.ownerCompanyId) : null
-        const holderName = ownerPlayer?.displayName ?? ownerCompany?.name ?? 'Unknown'
-        const holderType = h.ownerPlayerId ? 'PERSON' : 'COMPANY'
-        const ownershipRatio = totalShares > 0 ? Number((h.shareCount / totalShares).toFixed(4)) : 0
+      const shareholders = companyShareholdings
+        .map((h) => {
+          const ownerPlayer = h.ownerPlayerId ? state.players.find((p) => p.id === h.ownerPlayerId) : null
+          const ownerCompany = h.ownerCompanyId ? state.players.flatMap((p) => p.companies).find((c) => c.id === h.ownerCompanyId) : null
+          const holderName = ownerPlayer?.displayName ?? ownerCompany?.name ?? 'Unknown'
+          const holderType = h.ownerPlayerId ? 'PERSON' : 'COMPANY'
+          const ownershipRatio = totalShares > 0 ? Number((h.shareCount / totalShares).toFixed(4)) : 0
 
-        return {
-          holderName,
-          holderType,
-          holderPlayerId: h.ownerPlayerId ?? null,
-          holderCompanyId: h.ownerCompanyId ?? null,
-          shareCount: h.shareCount,
-          ownershipRatio,
-        }
-      }).sort((a, b) => b.ownershipRatio - a.ownershipRatio)
+          return {
+            holderName,
+            holderType,
+            holderPlayerId: h.ownerPlayerId ?? null,
+            holderCompanyId: h.ownerCompanyId ?? null,
+            shareCount: h.shareCount,
+            ownershipRatio,
+          }
+        })
+        .sort((a, b) => b.ownershipRatio - a.ownershipRatio)
 
       return route.fulfill({
         status: 200,
@@ -4567,13 +4580,37 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('cityWeatherForecast')) {
+      const cityId = body.variables?.cityId
+      const cityWeatherForecast = cityId
+        ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick))
+        : null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityWeatherForecast } }),
+      })
+    }
+
     if (query.includes('cityPowerBalance')) {
       const cityId = body.variables?.cityId
       const allBuildings = state.players.flatMap((p) => p.companies.flatMap((c) => c.buildings)).filter((b) => b.cityId === cityId)
       const powerPlants = allBuildings.filter((b) => b.type === 'POWER_PLANT')
       const consumers = allBuildings.filter((b) => b.type !== 'POWER_PLANT')
       const defaultOutputByType: Record<string, number> = { COAL: 50, GAS: 40, SOLAR: 20, WIND: 25, NUCLEAR: 200 }
-      const totalSupplyMw = powerPlants.reduce((sum, b) => sum + (b.powerOutput ?? defaultOutputByType[b.powerPlantType ?? ''] ?? 30), 0)
+      const weather = cityId
+        ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick))
+        : null
+      const renewableFactorByType: Record<string, number> = {
+        SOLAR: (weather?.currentSolarPercent ?? 100) / 100,
+        WIND: (weather?.currentWindPercent ?? 100) / 100,
+      }
+      const totalSupplyMw = powerPlants.reduce((sum, b) => {
+        const plantType = b.powerPlantType ?? 'COAL'
+        const baseOutput = b.powerOutput ?? defaultOutputByType[plantType] ?? 30
+        const factor = renewableFactorByType[plantType] ?? 1
+        return sum + baseOutput * factor
+      }, 0)
       const totalDemandMw = consumers.reduce((sum, b) => sum + b.powerConsumption, 0)
       const reserveMw = totalSupplyMw - totalDemandMw
       const reservePercent = totalDemandMw > 0 ? Math.round((reserveMw / totalDemandMw) * 1000) / 10 : 100
@@ -4592,7 +4629,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           buildingId: b.id,
           buildingName: b.name,
           plantType: b.powerPlantType ?? 'COAL',
-          outputMw: b.powerOutput ?? defaultOutputByType[b.powerPlantType ?? ''] ?? 30,
+          outputMw: (() => {
+            const plantType = b.powerPlantType ?? 'COAL'
+            const baseOutput = b.powerOutput ?? defaultOutputByType[plantType] ?? 30
+            const factor = renewableFactorByType[plantType] ?? 1
+            return Math.round(baseOutput * factor * 10) / 10
+          })(),
           powerStatus: b.powerStatus ?? 'POWERED',
         })),
         powerPlantCount: powerPlants.length,
@@ -4708,7 +4750,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const totalPersonalCash = Number(state.players.reduce((total, player) => total + player.personalCash, 0).toFixed(2))
-      const totalCompanyCash = Number(state.players.flatMap((player) => player.companies).reduce((total, company) => total + company.cash, 0).toFixed(2))
+      const totalCompanyCash = Number(
+        state.players
+          .flatMap((player) => player.companies)
+          .reduce((total, company) => total + company.cash, 0)
+          .toFixed(2),
+      )
       const inflowSummaries =
         state.adminMoneyInflowSummaries.length > 0
           ? state.adminMoneyInflowSummaries.map((summary) => ({ ...summary }))
@@ -4757,9 +4804,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           multiAccountAlerts,
           players: state.players.map(buildGameAdminPlayer).sort((left, right) => left.displayName.localeCompare(right.displayName)),
           invisiblePlayers: state.players.filter((player) => player.isInvisibleInChat).map(buildGameAdminPlayer),
-          globalGameAdminGrants: state.globalGameAdminGrants
-            .map((grant) => ({ ...grant }))
-            .sort((left, right) => left.email.localeCompare(right.email)),
+          globalGameAdminGrants: state.globalGameAdminGrants.map((grant) => ({ ...grant })).sort((left, right) => left.email.localeCompare(right.email)),
           recentAuditLogs: [...state.adminAuditLogs].sort((left, right) => right.recordedAtUtc.localeCompare(left.recordedAtUtc)).slice(0, 12),
         },
       })
@@ -4779,7 +4824,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         return routeJsonError('Player not found.')
       }
 
-      const targetCompany = input?.accountType === 'COMPANY' ? targetPlayer.companies.find((company) => company.id === input?.companyId) ?? null : null
+      const targetCompany = input?.accountType === 'COMPANY' ? (targetPlayer.companies.find((company) => company.id === input?.companyId) ?? null) : null
       if (input?.accountType === 'COMPANY' && !targetCompany) {
         return routeJsonError('Company not found.')
       }
@@ -4863,7 +4908,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const input = body.variables?.input
       const adminActor = resolveAdminActor()
-      const normalizedEmail = String(input?.email ?? '').trim().toLowerCase()
+      const normalizedEmail = String(input?.email ?? '')
+        .trim()
+        .toLowerCase()
 
       if (!normalizedEmail || !adminActor) {
         return routeJsonError('Email is required.')
@@ -4896,7 +4943,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const input = body.variables?.input
-      const normalizedEmail = String(input?.email ?? '').trim().toLowerCase()
+      const normalizedEmail = String(input?.email ?? '')
+        .trim()
+        .toLowerCase()
       state.globalGameAdminGrants = state.globalGameAdminGrants.filter((grant) => grant.email.toLowerCase() !== normalizedEmail)
       return routeJson({ removeGlobalGameAdminRole: true })
     }
@@ -4920,11 +4969,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
 
       const now = new Date().toISOString()
-      const targetServerKey = existingEntry
-        ? existingEntry.targetServerKey
-        : session.isRootAdministrator || session.hasGlobalAdminRole
-          ? null
-          : state.serverKey
+      const targetServerKey = existingEntry ? existingEntry.targetServerKey : session.isRootAdministrator || session.hasGlobalAdminRole ? null : state.serverKey
 
       const nextEntry: MockGameNewsEntry = existingEntry
         ? {
@@ -4933,7 +4978,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             status: input?.status ?? existingEntry.status,
             updatedByEmail: adminActor.email,
             updatedAtUtc: now,
-            publishedAtUtc: (input?.status ?? existingEntry.status) === 'PUBLISHED' ? existingEntry.publishedAtUtc ?? now : null,
+            publishedAtUtc: (input?.status ?? existingEntry.status) === 'PUBLISHED' ? (existingEntry.publishedAtUtc ?? now) : null,
             localizations: (input?.localizations ?? []).map((localization: MockGameNewsLocalization) => ({ ...localization })),
           }
         : {
@@ -5235,9 +5280,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // Synthesize from player companies when the bank isn't in allBanks
       for (const player of state.players) {
         for (const company of player.companies) {
-          const building = (company.buildings ?? []).find(
-            (b) => b.id === bankId && b.type === 'BANK',
-          )
+          const building = (company.buildings ?? []).find((b) => b.id === bankId && b.type === 'BANK')
           if (building) {
             return route.fulfill({
               status: 200,
@@ -5288,9 +5331,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('bankDeposits')) {
       const bankBuildingId = body.variables?.bankBuildingId
-      const deposits = bankBuildingId
-        ? state.myDeposits.filter((d) => d.bankBuildingId === bankBuildingId)
-        : state.myDeposits
+      const deposits = bankBuildingId ? state.myDeposits.filter((d) => d.bankBuildingId === bankBuildingId) : state.myDeposits
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -5338,10 +5379,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const input = body.variables?.input ?? {}
       const bank = state.allBanks.find((b) => b.bankBuildingId === input.bankBuildingId)
       if (bank) {
-        if (input.depositInterestRatePercent !== undefined)
-          bank.depositInterestRatePercent = input.depositInterestRatePercent
-        if (input.lendingInterestRatePercent !== undefined)
-          bank.lendingInterestRatePercent = input.lendingInterestRatePercent
+        if (input.depositInterestRatePercent !== undefined) bank.depositInterestRatePercent = input.depositInterestRatePercent
+        if (input.lendingInterestRatePercent !== undefined) bank.lendingInterestRatePercent = input.lendingInterestRatePercent
       }
       // Return a full BankInfoSummary so the component can update bankInfo correctly
       const updatedBank = bank ?? {
@@ -5377,9 +5416,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // Find the bank building in player companies and mark it as activated
       for (const player of state.players) {
         for (const company of player.companies) {
-          const building = (company.buildings ?? []).find(
-            (b) => b.id === bankBuildingId && b.type === 'BANK',
-          )
+          const building = (company.buildings ?? []).find((b) => b.id === bankBuildingId && b.type === 'BANK')
           if (building) {
             // Deduct $10M from company cash
             company.cash = (company.cash ?? 0) - 10_000_000
@@ -5511,12 +5548,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         acceptedAtUtc: new Date().toISOString(),
         closedAtUtc: null,
         collateralBuildingId: input.collateralBuildingId ?? null,
-        collateralBuildingName: input.collateralBuildingId
-          ? (state.collateralBuildings.find((b) => b.buildingId === input.collateralBuildingId)?.buildingName ?? null)
-          : null,
-        collateralAppraisedValue: input.collateralBuildingId
-          ? (state.collateralBuildings.find((b) => b.buildingId === input.collateralBuildingId)?.appraisedValue ?? null)
-          : null,
+        collateralBuildingName: input.collateralBuildingId ? (state.collateralBuildings.find((b) => b.buildingId === input.collateralBuildingId)?.buildingName ?? null) : null,
+        collateralAppraisedValue: input.collateralBuildingId ? (state.collateralBuildings.find((b) => b.buildingId === input.collateralBuildingId)?.appraisedValue ?? null) : null,
       }
       state.myLoans.push(newLoan)
       return route.fulfill({
@@ -5659,12 +5692,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         currentEnergyCostPerTick: Math.round(0.12 * resolvedLevel * 55 * 100) / 100,
         nextEnergyCostPerTick: Math.round(0.12 * Math.min(resolvedLevel + 1, 4) * 55 * 100) / 100,
         // Inventory holding capacity (mirrors GameConstants.GetUnitHoldingCapacity)
-        currentStorageCapacity: isStorage
-          ? storageCapacities[resolvedLevel] ?? 1000
-          : baseCapacities[resolvedLevel] ?? 100,
-        nextStorageCapacity: isStorage
-          ? storageCapacities[Math.min(resolvedLevel + 1, 4)] ?? 2500
-          : baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250,
+        currentStorageCapacity: isStorage ? (storageCapacities[resolvedLevel] ?? 1000) : (baseCapacities[resolvedLevel] ?? 100),
+        nextStorageCapacity: isStorage ? (storageCapacities[Math.min(resolvedLevel + 1, 4)] ?? 2500) : (baseCapacities[Math.min(resolvedLevel + 1, 4)] ?? 250),
       }
       return route.fulfill({
         status: 200,

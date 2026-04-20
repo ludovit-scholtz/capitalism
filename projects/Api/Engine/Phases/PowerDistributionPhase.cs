@@ -62,10 +62,24 @@ public sealed class PowerDistributionPhase : ITickPhase
             }
 
             // Total supply from all power plants in this city.
+            // SOLAR and WIND plants have their output scaled by the current weather factor.
+            var cityId = cityGroup.Key;
+            context.WeatherByCity.TryGetValue(cityId, out var weather);
+
             var totalSupplyMw = powerPlants.Sum(plant =>
-                plant.PowerOutput > 0m
+            {
+                var baseOutput = plant.PowerOutput > 0m
                     ? plant.PowerOutput.Value
-                    : GameConstants.DefaultPowerOutputMw(plant.PowerPlantType));
+                    : GameConstants.DefaultPowerOutputMw(plant.PowerPlantType);
+
+                var factor = plant.PowerPlantType switch
+                {
+                    Data.Entities.PowerPlantType.Solar => weather is not null ? weather.SolarPercent / 100m : 1m,
+                    Data.Entities.PowerPlantType.Wind  => weather is not null ? weather.WindPercent  / 100m : 1m,
+                    _                                  => 1m,
+                };
+                return baseOutput * factor;
+            });
 
             // Total demand from all consuming buildings in this city.
             // PowerConsumption == 0 means the building predates the power system
