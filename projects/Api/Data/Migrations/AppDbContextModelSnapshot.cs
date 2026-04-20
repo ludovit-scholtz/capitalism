@@ -1125,7 +1125,7 @@ namespace Api.Data.Migrations
                     b.HasIndex("PlayerId", "CurrencyCode")
                         .IsUnique();
 
-                    b.ToTable("PlayerCurrencyBalances");
+                    b.ToTable("PlayerCurrencyBalances", tb => tb.HasCheckConstraint("CK_PlayerCurrencyBalances_Balance_NonNegative", "\"Balance\" >= 0"));
                 });
 
             modelBuilder.Entity("Api.Data.Entities.GameState", b =>

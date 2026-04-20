@@ -235,6 +235,9 @@ public sealed partial class AppDbContext
             e.HasOne(b => b.Player).WithMany().HasForeignKey(b => b.PlayerId).OnDelete(DeleteBehavior.Cascade);
             // One row per player per currency
             e.HasIndex(b => new { b.PlayerId, b.CurrencyCode }).IsUnique();
+            // Persistence-layer safety net: balance can never go negative
+            e.ToTable("PlayerCurrencyBalances", t =>
+                t.HasCheckConstraint("CK_PlayerCurrencyBalances_Balance_NonNegative", "\"Balance\" >= 0"));
         });
 
         modelBuilder.Entity<ForexTradeRecord>(e =>

@@ -68,16 +68,27 @@ Implement banking as is described in the banking section.
 - ✅ All E2E tests green after 7-city expansion (count assertions updated, logistics-trap tests hardened)
 - ⬜ Full forex trading UI (depends on "Create forex exchange" roadmap item)
 
-### Create forex exchange (0% complete)
+### Create forex exchange (60% complete)
 
-- Add to the top menu forex exchange
-- In forex exchange allow to trade all currencies and gold. Gold is in game special currency tight to the real gold price - tokenized gold. The amount of gold player holds is bound to the master server account and usable in every game server.
-- Price of pro subscription is calculated as 20 USD/month, but user will pay it in tokenized gold
-- In each game server he can swap the gold to local in game currency, or he can swap in game currency to the gold token
-- It is allowed to swap any fx currency to any other fx currency, for example CZK to EUR or EUR to USD
-- Ledger is displayed in the currency where player built his first city. Make sure the fx operations are visible in the ledger.
-- Extend banks to use the currencies. Make sure the base capital is properly calculated in the currency where the city is located - 10M USD is approx 240M CZK for example.
-- Make sure the local city currency is used in every unit - for example the purchasing unit shows the local city currency, the b2b sale shows the fx currency, or the public sale unit shows the profit in the city currency. Make sure the user account balance does not mix between the 2 cities, if he makes the profit in prague in czk, and he makes profit in new york, he must have these money on different accounts. Change this everywhere in the game.
+**Shipped in this increment:**
+- ✅ `ForexExchangeView` at `/forex`: source/target currency selectors, amount input, live quote panel showing exchange rate, 1% fee, net receive amount, and available balance.
+- ✅ `getForexQuote` GraphQL query – returns `toAmount`, `feeAmount` (1%), `feePercent`, `rate`, `availableFromBalance`, and currency symbols.
+- ✅ `executeForexSwap` GraphQL mutation – validates `SAME_CURRENCY` / `INSUFFICIENT_FUNDS`, computes cross-rates via EUR pivot from persisted FX rates, updates balances atomically, and persists a `ForexTradeRecord` for audit.
+- ✅ `playerCurrencyBalances` query – returns per-player non-EUR wallets alongside the EUR balance from `Player.PersonalCash`.
+- ✅ `forexTradeHistory` query – returns full audit trail with from/to amounts, rate, fee, and execution tick.
+- ✅ `PlayerCurrencyBalance` entity + `ForexTradeRecord` entity with EF migrations (`AddForexExchangeMvp`, `AddForexBalanceNonNegativeConstraint`).
+- ✅ Database-level `CHECK ("Balance" >= 0)` constraint on `PlayerCurrencyBalances` (PostgreSQL) as a persistence-layer safety net.
+- ✅ Concurrency protection: the swap mutation runs inside a `Serializable` transaction and refreshes `Player.ConcurrencyToken` so concurrent over-spend attempts are caught by both DB isolation and EF's optimistic-concurrency check.
+- ✅ Success banner and trade-history table in the frontend after execution.
+- ✅ Nav menu entry (`Forex Exchange`) visible to authenticated users.
+- ✅ 9 backend integration tests (quote math, EUR↔CZK execution, CZK↔USD cross-rate, insufficient funds, same-currency, history, concurrent swap race, constraint integrity test).
+- ✅ 10 E2E tests covering unauthenticated redirect, selectors, both validation errors, quote+confirm happy path, cancel, history rendering, and nav link.
+- ✅ i18n strings (`forex.*` namespace) in `en`, `sk`, `de`.
+
+**Remaining:**
+- ⬜ Tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps) – depends on "Tokenized gold management" roadmap item.
+- ⬜ Multi-currency ledger view: show ledger entries denominated per city currency.
+- ⬜ Extend company building units (purchasing, B2B sales, public sales) to display the correct local city currency instead of always showing EUR.
 
 ### Tokenized gold managemnt (0% complete)
 

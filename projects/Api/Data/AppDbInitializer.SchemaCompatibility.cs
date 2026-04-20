@@ -226,6 +226,22 @@ public sealed partial class AppDbInitializer
                         """);
                     await ExecuteNonQueryAsync(connection,
                         "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PlayerCurrencyBalances_PlayerId_CurrencyCode\" ON \"PlayerCurrencyBalances\" (\"PlayerId\", \"CurrencyCode\")");
+
+                    // Add the non-negative balance check constraint idempotently.
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        DO $$
+                        BEGIN
+                            IF NOT EXISTS (
+                                SELECT 1 FROM pg_constraint
+                                WHERE conname = 'CK_PlayerCurrencyBalances_Balance_NonNegative'
+                            ) THEN
+                                ALTER TABLE "PlayerCurrencyBalances"
+                                    ADD CONSTRAINT "CK_PlayerCurrencyBalances_Balance_NonNegative" CHECK ("Balance" >= 0);
+                            END IF;
+                        END;
+                        $$;
+                        """);
                 }
                 else
                 {
@@ -243,6 +259,28 @@ public sealed partial class AppDbInitializer
                         )
                         """);
                 }
+            }
+
+            // Ensure the non-negative balance constraint exists even when the
+            // PlayerCurrencyBalances table was already present before this migration ran
+            // (e.g. databases created by the initial AddForexExchangeMvp migration before
+            // AddForexBalanceNonNegativeConstraint was added to the history).
+            if (dialect.IsPostgres)
+            {
+                await ExecuteNonQueryAsync(connection,
+                    """
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'CK_PlayerCurrencyBalances_Balance_NonNegative'
+                        ) THEN
+                            ALTER TABLE "PlayerCurrencyBalances"
+                                ADD CONSTRAINT "CK_PlayerCurrencyBalances_Balance_NonNegative" CHECK ("Balance" >= 0);
+                        END IF;
+                    END;
+                    $$;
+                    """);
             }
 
             // Ensure ForexTradeRecords table exists (added in AddForexExchangeMvp migration).

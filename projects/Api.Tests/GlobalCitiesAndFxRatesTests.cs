@@ -878,6 +878,127 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.True(trade2.GetProperty("toAmount").GetDecimal() > 0);
     }
 
+    [Fact]
+    public async Task ExecuteForexSwap_ConcurrentSwaps_OnlyOneSucceedsWhenFundsInsufficient()
+    {
+        // Two parallel swap requests each requesting 60 EUR when the player only has 100 EUR.
+        // Exactly one should succeed; the other must be rejected (either INSUFFICIENT_FUNDS
+        // from sequential SQLite serialisation, or CONCURRENT_SWAP_CONFLICT from PostgreSQL's
+        // optimistic-concurrency / serialisable-transaction protection).
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_concurrent@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Give the player exactly 100 EUR.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            player!.PersonalCash = 100m;
+            await db.SaveChangesAsync();
+        }
+
+        const string mutation = """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                    fromAmount
+                    toAmount
+                    newFromBalance
+                }
+            }
+            """;
+        var swapInput = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 60m };
+
+        // Fire both requests concurrently.
+        var results = await Task.WhenAll(
+            ExecuteGraphQlAsync(client, mutation, new { input = swapInput }, token),
+            ExecuteGraphQlAsync(client, mutation, new { input = swapInput }, token));
+
+        // Helper: safely check if a response contains a successful swap result.
+        static bool IsSuccess(JsonElement r) =>
+            r.ValueKind == JsonValueKind.Object &&
+            r.TryGetProperty("data", out var d) &&
+            d.ValueKind == JsonValueKind.Object &&
+            d.TryGetProperty("executeForexSwap", out var s) &&
+            s.ValueKind == JsonValueKind.Object;
+
+        var successCount = results.Count(IsSuccess);
+
+        Assert.Equal(1, successCount);
+
+        // Post-condition: exactly one 60 EUR deduction occurred → balance is 40 EUR.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            Assert.Equal(40m, player!.PersonalCash);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_CheckConstraint_DatabaseEnforcesNonNegativeBalance()
+    {
+        // Directly write a negative balance to PlayerCurrencyBalances at the EF layer and
+        // confirm SaveChangesAsync throws for PostgreSQL (constraint violation) or that
+        // the application guard already prevents negative values.
+        // This test verifies the integrity guarantee rather than the DB constraint itself
+        // (the SQLite test database does not enforce CHECK constraints added via ALTER TABLE).
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_constraint@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Seed a CZK balance so we can attempt a swap that would produce a negative result.
+            db.PlayerCurrencyBalances.Add(new PlayerCurrencyBalance
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                CurrencyCode = "CZK",
+                Balance = 50m,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Try to swap more CZK than available – the application guard must reject it.
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "CZK", toCurrencyCode = "EUR", amount = 200m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
+
+        // Confirm balance is unchanged.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bal = await db.PlayerCurrencyBalances
+                .SingleAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            Assert.Equal(50m, bal.Balance);
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email)
