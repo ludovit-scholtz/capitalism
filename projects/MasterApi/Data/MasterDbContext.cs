@@ -101,6 +101,7 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         layout.Property(l => l.BuildingType).HasMaxLength(60);
 
         player.Property(p => p.GoldTokenBalance).HasColumnType("decimal(18,8)").HasDefaultValue(0m);
+        player.Property(p => p.ConcurrencyToken).IsConcurrencyToken().HasDefaultValueSql("gen_random_uuid()").IsRequired();
 
         var goldTx = modelBuilder.Entity<GoldTokenTransaction>();
         goldTx.HasKey(tx => tx.Id);

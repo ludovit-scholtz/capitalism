@@ -238,6 +238,12 @@ public sealed class MasterDbInitializer(MasterDbContext db)
                 ADD COLUMN IF NOT EXISTS "GoldTokenBalance" numeric(18,8) NOT NULL DEFAULT 0
             """, cancellationToken);
 
+        // Idempotently add ConcurrencyToken column used for optimistic concurrency on gold balance writes.
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "PlayerAccounts"
+                ADD COLUMN IF NOT EXISTS "ConcurrencyToken" uuid NOT NULL DEFAULT gen_random_uuid()
+            """, cancellationToken);
+
         // Create GoldTokenTransactions table if it does not exist.
         await db.Database.ExecuteSqlRawAsync("""
             CREATE TABLE IF NOT EXISTS "GoldTokenTransactions" (

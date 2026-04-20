@@ -19,6 +19,14 @@ public sealed class PlayerAccount
     /// <summary>Current gold token balance (grams of gold). Cannot go negative.</summary>
     public decimal GoldTokenBalance { get; set; } = 0m;
 
+    /// <summary>
+    /// Optimistic concurrency token refreshed on every gold balance write.
+    /// EF Core uses this to detect concurrent modifications and throw
+    /// <see cref="Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException"/>
+    /// when two adjustments race against the same balance snapshot.
+    /// </summary>
+    public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
+
     public ICollection<ProSubscription> Subscriptions { get; set; } = [];
 
     public ICollection<GoldTokenTransaction> GoldTokenTransactions { get; set; } = [];
