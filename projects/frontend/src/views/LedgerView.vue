@@ -27,6 +27,7 @@ const LEDGER_QUERY = `
   query GetCompanyLedger($companyId: UUID!, $gameYear: Int) {
     companyLedger(companyId: $companyId, gameYear: $gameYear) {
       companyId companyName gameYear isCurrentGameYear currentCash
+      primaryCurrencyCode primaryCurrencySymbol hasMixedCurrencies
       totalRevenue totalPurchasingCosts totalShippingCosts totalLaborCosts totalEnergyCosts totalMarketingCosts totalTaxPaid totalOtherCosts taxableIncome estimatedIncomeTax netIncome
       totalDepositInterestReceived totalDepositInterestPaid totalLoanInterestIncome totalLoanInterestExpense
       propertyValue propertyAppreciation buildingValue inventoryValue totalDepositsPlaced totalAssets totalPropertyPurchases
@@ -35,7 +36,7 @@ const LEDGER_QUERY = `
       history {
         gameYear isCurrentGameYear totalRevenue totalLaborCosts totalEnergyCosts netIncome totalTaxPaid taxableIncome estimatedIncomeTax firstRecordedTick lastRecordedTick
       }
-      buildingSummaries { buildingId buildingName buildingType revenue costs }
+      buildingSummaries { buildingId buildingName buildingType revenue costs currencyCode currencySymbol }
     }
   }
 `
@@ -46,6 +47,7 @@ const DRILL_QUERY = `
       id category description amount recordedAtTick
       buildingId buildingName buildingType buildingUnitId
       productTypeId productName resourceTypeId resourceName
+      currencyCode currencySymbol
     }
   }
 `
@@ -104,8 +106,15 @@ async function selectGameYear(gameYear: number | null) {
   await fetchLedger()
 }
 
-function formatAmount(amount: number): string {
-  return `${amount < 0 ? '-' : ''}$${Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+function formatAmount(amount: number, currencyCode?: string): string {
+  const code = currencyCode ?? ledger.value?.primaryCurrencyCode ?? 'EUR'
+  if (amount == null || !isFinite(amount) || isNaN(amount)) return '—'
+  return new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: code,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
 }
 
 function amountClass(amount: number): string {
@@ -178,6 +187,13 @@ useTickRefresh(async () => {
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.totalAssets') }}</span>
           <span class="kpi-value">{{ formatAmount(ledger.totalAssets) }}</span>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-label">{{ t('ledger.currency') }}</span>
+          <span class="kpi-value">
+            <span class="currency-badge">{{ ledger.primaryCurrencyCode }}</span>
+            <span v-if="ledger.hasMixedCurrencies" class="currency-mixed-hint">{{ t('ledger.mixedCurrencies') }}</span>
+          </span>
         </div>
       </div>
 
@@ -468,7 +484,10 @@ useTickRefresh(async () => {
             <tbody>
               <tr v-for="entry in drillEntries" :key="entry.id">
                 <td>{{ entry.productName ?? entry.resourceName ?? entry.description }}</td>
-                <td :class="amountClass(entry.amount)">{{ formatAmount(entry.amount) }}</td>
+                <td :class="amountClass(entry.amount)">
+                  {{ formatAmount(entry.amount, entry.currencyCode) }}
+                  <span v-if="entry.currencyCode !== (ledger?.primaryCurrencyCode ?? 'EUR')" class="currency-badge currency-badge-inline">{{ entry.currencyCode }}</span>
+                </td>
                 <td>{{ entry.recordedAtTick }}</td>
                 <td>
                   <RouterLink
@@ -494,6 +513,7 @@ useTickRefresh(async () => {
               <tr>
                 <th>{{ t('ledger.buildingName') }}</th>
                 <th>{{ t('ledger.buildingType') }}</th>
+                <th>{{ t('ledger.currency') }}</th>
                 <th>{{ t('ledger.revenue') }}</th>
                 <th>{{ t('ledger.costs') }}</th>
                 <th>{{ t('ledger.profit') }}</th>
@@ -504,10 +524,11 @@ useTickRefresh(async () => {
               <tr v-for="b in ledger.buildingSummaries" :key="b.buildingId">
                 <td>{{ b.buildingName }}</td>
                 <td>{{ b.buildingType }}</td>
-                <td class="amount-positive">{{ formatAmount(b.revenue) }}</td>
-                <td class="amount-negative">{{ formatAmount(-b.costs) }}</td>
+                <td><span class="currency-badge">{{ b.currencyCode }}</span></td>
+                <td class="amount-positive">{{ formatAmount(b.revenue, b.currencyCode) }}</td>
+                <td class="amount-negative">{{ formatAmount(-b.costs, b.currencyCode) }}</td>
                 <td :class="amountClass(b.revenue - b.costs)">
-                  {{ formatAmount(b.revenue - b.costs) }}
+                  {{ formatAmount(b.revenue - b.costs, b.currencyCode) }}
                 </td>
                 <td>
                   <RouterLink
@@ -756,6 +777,27 @@ useTickRefresh(async () => {
 .btn-sm {
   padding: 0.25rem 0.75rem;
   font-size: 0.875rem;
+}
+.currency-badge {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 0.25rem;
+  background: var(--color-surface-hover, rgba(0,0,0,0.06));
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.currency-badge-inline {
+  margin-left: 0.35rem;
+  vertical-align: middle;
+}
+.currency-mixed-hint {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.15rem;
 }
 .state-box {
   text-align: center;

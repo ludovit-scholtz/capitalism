@@ -1553,6 +1553,8 @@ export default {
       CENTRAL_BANK_BORROW: 'Výpožička od centrálnej banky',
       CENTRAL_BANK_REPAY: 'Splátka centrálnej banke',
     },
+    currency: 'Mena',
+    mixedCurrencies: 'Viac mien',
   },
   companySettings: {
     eyebrow: 'Profil firmy',

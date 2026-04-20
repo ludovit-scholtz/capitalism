@@ -8,6 +8,12 @@ public sealed class CompanyLedgerSummary
     public int GameYear { get; set; }
     public bool IsCurrentGameYear { get; set; }
     public decimal CurrentCash { get; set; }
+    /// <summary>ISO 4217 currency code of the company's primary operating city. Defaults to "EUR".</summary>
+    public string PrimaryCurrencyCode { get; set; } = "EUR";
+    /// <summary>Display symbol for the primary currency (e.g. "€", "Kč").</summary>
+    public string PrimaryCurrencySymbol => Mutation.GetCurrencySymbol(PrimaryCurrencyCode);
+    /// <summary>True when the company has buildings in multiple cities with different currencies.</summary>
+    public bool HasMixedCurrencies { get; set; }
     // Income Statement
     public decimal TotalRevenue { get; set; }
     public decimal TotalPurchasingCosts { get; set; }
@@ -72,6 +78,10 @@ public sealed class BuildingLedgerSummary
     public string BuildingType { get; set; } = string.Empty;
     public decimal Revenue { get; set; }
     public decimal Costs { get; set; }
+    /// <summary>ISO 4217 currency code of the city where this building is located.</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+    /// <summary>Display symbol for the building's city currency (e.g. "€", "Kč").</summary>
+    public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
 }
 
 public sealed class BuildingFinancialTimeline
@@ -110,6 +120,10 @@ public sealed class LedgerEntryResult
     public string? ProductName { get; set; }
     public Guid? ResourceTypeId { get; set; }
     public string? ResourceName { get; set; }
+    /// <summary>ISO 4217 currency code for this entry (from the building's city, or "EUR" for company-level entries).</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+    /// <summary>Display symbol for the entry's currency (e.g. "€", "Kč").</summary>
+    public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
 }
 
 public sealed class PublicSalesAnalytics

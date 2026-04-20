@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (85% complete)
+### Banking (90% complete)
 
 Implement banking as is described in the banking section.
 
@@ -18,10 +18,11 @@ Implement banking as is described in the banking section.
 - Navigation item renamed from "Loans" to "Banking" (route moved to `/banking`, `/loans` kept as alias for backward compatibility).
 - CSS improvements to the bank page account section for a professional, readable layout.
 - **Currency-aware banking (new):** Banks are now fully multi-currency aware. Each city has a configured ISO 4217 `CurrencyCode` (Bratislava/Vienna → EUR, Prague → CZK). The base capital requirement is automatically calculated per city: 10M EUR for EUR cities, 240M CZK for CZK cities. `BankInfoSummary` and `BankDepositSummary` GraphQL types now include `cityCurrencyCode`, `cityCurrencySymbol`, and `baseCapitalRequirement`. The `BankManagementView` frontend uses local city currency in all monetary displays (deposits, lending capacity, loans, account balance, withdraw limits). The base capital deposit prompt shows the dynamic amount in the correct local denomination.
+- **Multi-currency ledger view (new):** `LedgerEntryResult` and `BuildingLedgerSummary` GraphQL types now expose `currencyCode` and `currencySymbol` derived from the building's city at query time. `CompanyLedgerSummary` exposes `primaryCurrencyCode`, `primaryCurrencySymbol`, and `hasMixedCurrencies`. The ledger frontend displays a currency KPI card, shows currency badges per building in the Buildings Performance table, and renders a "Multi-currency" hint for companies with buildings in multiple cities. Drill-down entries show inline CZK/USD/GBP badges when a transaction is in a different currency from the company primary. All amounts are formatted using `Intl.NumberFormat` with the correct ISO 4217 code. `PersonalLedgerView` corrected from hardcoded USD to EUR. `FinancialSummaryCard` uses the ledger's `primaryCurrencyCode` for dashboard summaries. 4 new backend integration tests + 6 new E2E tests cover multi-city and single-city currency flows.
 
 **Remaining:**
 - Forex exchange: cross-city currency trading for companies operating in multiple cities.
-- Multi-currency ledger view: show ledger entries denominated per city currency.
+- Extend company building units (purchasing, B2B sales, public sales) to display the correct local city currency instead of always showing EUR.
 
 ### Changelog (90% complete)
 
@@ -68,7 +69,7 @@ Implement banking as is described in the banking section.
 - ✅ All E2E tests green after 7-city expansion (count assertions updated, logistics-trap tests hardened)
 - ⬜ Full forex trading UI (depends on "Create forex exchange" roadmap item)
 
-### Create forex exchange (60% complete)
+### Create forex exchange (65% complete)
 
 **Shipped in this increment:**
 - ✅ `ForexExchangeView` at `/forex`: source/target currency selectors, amount input, live quote panel showing exchange rate, 1% fee, net receive amount, and available balance.
@@ -84,10 +85,10 @@ Implement banking as is described in the banking section.
 - ✅ 9 backend integration tests (quote math, EUR↔CZK execution, CZK↔USD cross-rate, insufficient funds, same-currency, history, concurrent swap race, constraint integrity test).
 - ✅ 10 E2E tests covering unauthenticated redirect, selectors, both validation errors, quote+confirm happy path, cancel, history rendering, and nav link.
 - ✅ i18n strings (`forex.*` namespace) in `en`, `sk`, `de`.
+- ✅ **Multi-currency ledger downstream:** `ledgerDrillDown` and `companyLedger` queries now return per-entry and per-building `currencyCode`/`currencySymbol` from the city. `CompanyLedgerSummary` exposes `primaryCurrencyCode`, `primaryCurrencySymbol`, and `hasMixedCurrencies` so the frontend can present multi-city company finances clearly labelled.
 
 **Remaining:**
 - ⬜ Tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps) – depends on "Tokenized gold management" roadmap item.
-- ⬜ Multi-currency ledger view: show ledger entries denominated per city currency.
 - ⬜ Extend company building units (purchasing, B2B sales, public sales) to display the correct local city currency instead of always showing EUR.
 
 ### Tokenized gold managemnt (0% complete)
