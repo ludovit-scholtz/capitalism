@@ -292,6 +292,15 @@ export type MockCity = {
   resources: { resourceType: { id: string; name: string; slug: string; category: string }; abundance: number }[]
 }
 
+export type MockFxRate = {
+  baseCurrencyCode: string
+  quoteCurrencyCode: string
+  rate: number
+  rateDate: string
+  source: 'NBS' | 'FALLBACK'
+  quoteCurrencySymbol: string
+}
+
 export type MockBuildingLot = {
   id: string
   cityId: string
@@ -745,6 +754,8 @@ export type MockState = {
    * from this map instead of the defaults (both null).
    */
   unitLastTickMovement: Record<string, { lastTickInflow: number; lastTickOutflow: number }>
+  /** FX rates returned by the fxRates query. Keyed by quoteCurrencyCode. */
+  fxRates: MockFxRate[]
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1708,6 +1719,17 @@ export function makeDefaultProducts(): MockProductType[] {
   ]
 }
 
+export function makeDefaultFxRates(): MockFxRate[] {
+  const today = new Date().toISOString().slice(0, 10)
+  return [
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.08, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '$' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'GBP', rate: 0.86, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '£' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CNY', rate: 7.83, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '¥' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'INR', rate: 89.5, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: '₹' },
+    { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25.19, rateDate: today, source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
+  ]
+}
+
 // ── Mock API setup ───────────────────────────────────────────────────────────
 
 export function setupMockApi(page: Page, initial?: Partial<MockState>): MockState {
@@ -1755,6 +1777,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     buildingLayouts: [],
     forceBuildingConfigError: null,
     unitLastTickMovement: {},
+    fxRates: makeDefaultFxRates(),
     ...initial,
   }
 
@@ -4744,6 +4767,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cities: state.cities } }),
+      })
+    }
+
+    if (query.includes('fxRates')) {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { fxRates: state.fxRates } }),
       })
     }
 

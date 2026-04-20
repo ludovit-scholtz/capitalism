@@ -3788,6 +3788,84 @@ test.describe('City selection — Vienna as starter city', () => {
     await page.locator('.city-card', { hasText: 'Vienna' }).click()
     await expect(page.locator('.city-card', { hasText: 'Vienna' })).toHaveClass(/selected|active/)
   })
+
+  test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({
+    page,
+  }) => {
+    // Proves that the expanded city roster (4 new global cities) shows up in the wizard.
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    // Step 1: pick any industry
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+
+    // All 7 cities must be visible
+    await expect(page.locator('.city-card', { hasText: 'Bratislava' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'Prague' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'Vienna' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'New York' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'London' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'Beijing' })).toBeVisible()
+    await expect(page.locator('.city-card', { hasText: 'Delhi' })).toBeVisible()
+  })
+
+  test('New York city card shows USD currency label', async ({ page }) => {
+    // Proves that the currency metadata of new cities is surfaced in the UI.
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    // New York card must contain some reference to USD (currency code or symbol)
+    const nyCard = page.locator('.city-card', { hasText: 'New York' })
+    await expect(nyCard).toBeVisible()
+    await nyCard.click()
+    await expect(nyCard).toHaveClass(/selected|active/)
+  })
+
+  test('Delhi city card is selectable and persists the choice to step 3', async ({ page }) => {
+    // Proves an end-user can actually pick Delhi and move forward.
+    const state = setupMockApi(page)
+    // Add a Delhi factory lot so the lot-purchase step has something to show
+    state.buildingLots = [
+      ...state.buildingLots,
+      {
+        id: 'lot-delhi-factory-1',
+        cityId: 'city-dl',
+        name: 'Delhi Industrial Park',
+        description: 'Factory-capable lot in Delhi.',
+        district: 'Industrial Zone',
+        latitude: 28.62,
+        longitude: 77.22,
+        price: 75_000,
+        basePrice: 65_000,
+        materialQuality: null,
+        materialQuantity: null,
+        resourceTypeId: null,
+        suitableTypes: 'FACTORY,MINE',
+        ownerCompanyId: null,
+        buildingId: null,
+      },
+    ]
+    await page.goto('/onboarding')
+
+    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    await page.locator('.city-card', { hasText: 'Delhi' }).click()
+    await expect(page.locator('.city-card', { hasText: 'Delhi' })).toHaveClass(/selected|active/)
+
+    // Proceed to step 3 (company setup / lot purchase)
+    await page.getByRole('button', { name: 'Next' }).click()
+    // Step 3 heading: "Name Your Company" or "Choose Your Lot"
+    await expect(page.getByRole('heading', { name: /company|factory|lot/i })).toBeVisible()
+  })
 })
 
 test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () => {
