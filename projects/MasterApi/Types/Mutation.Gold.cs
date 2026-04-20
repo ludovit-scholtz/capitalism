@@ -54,6 +54,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        if (string.IsNullOrWhiteSpace(input.Note))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("An audit note is required for every gold balance adjustment.")
+                    .SetCode("NOTE_REQUIRED")
+                    .Build());
+        }
+
         var targetEmail = Query.NormalizeEmail(input.TargetEmail, "INVALID_TARGET_EMAIL");
 
         // Only relational databases (PostgreSQL in production) support explicit transactions.

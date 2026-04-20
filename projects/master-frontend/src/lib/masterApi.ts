@@ -301,11 +301,11 @@ export async function adjustGoldTokenBalance(
   token: string,
   targetEmail: string,
   amount: number,
-  note?: string,
+  note: string,
 ): Promise<GoldTokenBalanceInfo> {
   const data = await gqlRequest<{ adjustGoldTokenBalance: GoldTokenBalanceInfo }>(
     ADJUST_GOLD_TOKEN_MUTATION,
-    { input: { targetEmail, amount, note: note ?? null } },
+    { input: { targetEmail, amount, note } },
     token,
   )
   return data.adjustGoldTokenBalance

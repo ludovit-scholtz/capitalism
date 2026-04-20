@@ -104,6 +104,12 @@ async function handleAdjust() {
     return
   }
 
+  const note = adjustNote.value.trim()
+  if (!note) {
+    adjustError.value = 'An audit note is required. Please explain the reason for this adjustment.'
+    return
+  }
+
   adjustLoading.value = true
   adjustError.value = ''
   adjustSuccess.value = ''
@@ -113,7 +119,7 @@ async function handleAdjust() {
       auth.token,
       selectedEmail.value,
       amount,
-      adjustNote.value.trim() || undefined,
+      note,
     )
 
     // Update the local balance display
@@ -285,14 +291,18 @@ onMounted(async () => {
           </div>
 
           <div class="form-row">
-            <label for="adjust-note" class="form-label">Note (audit log)</label>
+            <label for="adjust-note" class="form-label">
+              Note (audit log) <span class="required-badge" aria-hidden="true">*</span>
+            </label>
             <input
               id="adjust-note"
               v-model="adjustNote"
               type="text"
               maxlength="500"
-              placeholder="Reason for adjustment…"
+              placeholder="Reason for adjustment (required)…"
               class="form-input"
+              required
+              aria-required="true"
             />
           </div>
 
@@ -301,7 +311,7 @@ onMounted(async () => {
               type="submit"
               class="adjust-btn"
               :class="{ 'adjust-btn--deduct': isDeduction }"
-              :disabled="adjustLoading || !adjustAmount"
+              :disabled="adjustLoading || !adjustAmount || !adjustNote.trim()"
             >
               <template v-if="adjustLoading">Processing…</template>
               <template v-else-if="isDeduction">Deduct Gold</template>
@@ -663,6 +673,12 @@ h2 {
 .form-label {
   font-size: 0.8125rem;
   color: #a0a0b8;
+}
+
+.required-badge {
+  color: #ff8080;
+  font-weight: 700;
+  margin-left: 2px;
 }
 
 .form-input {

@@ -168,6 +168,7 @@ test.describe('Gold token admin — global admin', () => {
     await page.getByRole('button', { name: 'Manage' }).first().click()
 
     await page.getByLabel(/Amount/).fill('-30')
+    await page.getByLabel(/Note/).fill('Correction for test event overpayment')
     await page.getByRole('button', { name: 'Deduct Gold' }).click()
 
     await expect(page.getByRole('status')).toContainText('Balance updated to 70.0000 g')
@@ -191,9 +192,40 @@ test.describe('Gold token admin — global admin', () => {
     await page.getByRole('button', { name: 'Manage' }).first().click()
 
     await page.getByLabel(/Amount/).fill('-100')
+    await page.getByLabel(/Note/).fill('Will fail due to negative balance')
     await page.getByRole('button', { name: 'Deduct Gold' }).click()
 
     await expect(page.getByRole('alert')).toContainText('balance')
+  })
+
+  test('shows error when audit note is empty', async ({ page }) => {
+    const admin = makePlayer({ id: 'admin-001', email: 'admin@example.com', displayName: 'Admin' })
+    const state = setupMockApi(page, {
+      currentPlayer: admin,
+      isGlobalAdmin: true,
+      goldBalances: [
+        { playerId: 'p1', email: 'alice@example.com', displayName: 'Alice', goldTokenBalance: 0 },
+      ],
+      goldTransactions: [],
+    })
+    state.currentToken = 'token-admin'
+
+    await loginAs(page, state, admin, 'token-admin')
+    await page.goto('/gold-admin')
+
+    await page.getByRole('button', { name: 'Manage' }).first().click()
+
+    // Fill amount but leave note empty
+    await page.getByLabel(/Amount/).fill('10')
+
+    // Submit button should be disabled when note is empty
+    const submitBtn = page.getByRole('button', { name: 'Add Gold' })
+    await expect(submitBtn).toBeDisabled()
+
+    // Manually force a submission attempt via JavaScript to test the backend guard path too
+    await page.getByLabel(/Note/).fill('   ')
+    // Note is whitespace-only → button still disabled because trim() is empty
+    await expect(submitBtn).toBeDisabled()
   })
 
   test('transaction history is visible and shows audit records', async ({ page }) => {

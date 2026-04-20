@@ -2704,7 +2704,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
               adjustGoldTokenBalance(input: $input) { goldTokenBalance }
             }
             """,
-            new { input = new { targetEmail, amount = 50.0m } },
+            new { input = new { targetEmail, amount = 50.0m, note = "Initial top-up for deduction test" } },
             token: rootToken);
 
         // Deduct partial amount
@@ -2737,7 +2737,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
               adjustGoldTokenBalance(input: $input) { goldTokenBalance }
             }
             """,
-            new { input = new { targetEmail, amount = -10.0m } },
+            new { input = new { targetEmail, amount = -10.0m, note = "Deduction from zero balance (expected to fail)" } },
             token: rootToken);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
@@ -2765,6 +2765,48 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
     }
 
     [Fact]
+    public async Task AdjustGoldTokenBalance_EmptyNote_ReturnsNoteRequiredError()
+    {
+        var targetEmail = $"gtadj-nonote-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail, "No Note Target");
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        // Omit note entirely — should be rejected with NOTE_REQUIRED.
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 5.0m } },
+            token: rootToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("NOTE_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task AdjustGoldTokenBalance_WhitespaceOnlyNote_ReturnsNoteRequiredError()
+    {
+        var targetEmail = $"gtadj-wsnote-{Guid.NewGuid():N}@example.com";
+        await RegisterAndGetTokenAsync(targetEmail, "Whitespace Note Target");
+
+        var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
+
+        // Pass note that is only whitespace — should be rejected with NOTE_REQUIRED.
+        var result = await GraphQlAsync("""
+            mutation Adjust($input: AdjustGoldTokenInput!) {
+              adjustGoldTokenBalance(input: $input) { goldTokenBalance }
+            }
+            """,
+            new { input = new { targetEmail, amount = 5.0m, note = "   " } },
+            token: rootToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Contains("NOTE_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
     public async Task AdjustGoldTokenBalance_UnknownTargetEmail_ReturnsPlayerNotFoundError()
     {
         var rootToken = CreateSharedToken(Guid.NewGuid().ToString(), "root@example.com", "Root Admin");
@@ -2774,7 +2816,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
               adjustGoldTokenBalance(input: $input) { goldTokenBalance }
             }
             """,
-            new { input = new { targetEmail = "nobody@example.com", amount = 10.0m } },
+            new { input = new { targetEmail = "nobody@example.com", amount = 10.0m, note = "Test note for unknown email" } },
             token: rootToken);
 
         Assert.True(result.TryGetProperty("errors", out var errors));
