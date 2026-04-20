@@ -1019,7 +1019,12 @@ watch(viewMode, async (mode) => {
               <strong class="post-purchase-title">{{ t(`buildings.typeIcons.${justPurchasedBuildingType ?? 'FACTORY'}`) }} {{ t('cityMap.postPurchaseTitle') }}</strong>
               <p class="post-purchase-text">{{ t(`cityMap.${postPurchaseBodyKey(justPurchasedBuildingType ?? 'FACTORY')}`) }}</p>
             </div>
-            <RouterLink :to="`/building/${justPurchasedBuildingId}`" class="btn btn-primary"> {{ t('cityMap.setupBuilding') }} → </RouterLink>
+            <RouterLink
+              :to="justPurchasedBuildingType === 'BANK' ? `/bank/${justPurchasedBuildingId}` : `/building/${justPurchasedBuildingId}`"
+              class="btn btn-primary"
+            >
+              {{ t('cityMap.setupBuilding') }} →
+            </RouterLink>
           </div>
 
           <div v-else-if="isOwnedByDifferentControlledCompany" class="purchase-notice">
@@ -1050,14 +1055,20 @@ watch(viewMode, async (mode) => {
                 }}
               </p>
             </div>
-            <RouterLink :to="`/building/${selectedLot.buildingId}`" class="btn btn-ghost">
+            <RouterLink
+              :to="selectedLot.building?.type === 'BANK' ? `/bank/${selectedLot.buildingId}` : `/building/${selectedLot.buildingId}`"
+              class="btn btn-ghost"
+            >
               {{ t('cityMap.viewConstruction') }}
             </RouterLink>
           </div>
 
           <!-- Already owned by player (standard manage link, building operational) -->
           <div v-else-if="isOwnedByActiveCompany && selectedLot.buildingId" class="your-building-actions">
-            <RouterLink :to="`/building/${selectedLot.buildingId}`" class="btn btn-primary">
+            <RouterLink
+              :to="selectedLot.building?.type === 'BANK' ? `/bank/${selectedLot.buildingId}` : `/building/${selectedLot.buildingId}`"
+              class="btn btn-primary"
+            >
               {{ t('cityMap.manageBuilding') }}
             </RouterLink>
           </div>

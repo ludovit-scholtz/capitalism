@@ -214,7 +214,7 @@ public sealed partial class Mutation
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("You do not own the depositor company.")
-                    .SetCode("DEPOSIT_NOT_FOUND")
+                    .SetCode("UNAUTHORIZED")
                     .Build());
         }
 
@@ -292,6 +292,110 @@ public sealed partial class Mutation
                 RecordedAtUtc = DateTime.UtcNow,
             });
         }
+
+        await db.SaveChangesAsync();
+
+        return MapToDepositSummary(deposit, bank, deposit.DepositorCompany);
+    }
+
+    /// <summary>
+    /// Adds additional funds to an existing active deposit (top-up).
+    /// The depositor company must own the deposit and have sufficient cash.
+    /// </summary>
+    [Authorize]
+    public async Task<BankDepositSummary> TopUpDeposit(
+        TopUpDepositInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var deposit = await db.BankDeposits
+            .Include(d => d.DepositorCompany)
+            .Include(d => d.BankBuilding)
+            .ThenInclude(b => b.Company)
+            .FirstOrDefaultAsync(d => d.Id == input.DepositId && d.IsActive);
+
+        if (deposit is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Active deposit not found.")
+                    .SetCode("DEPOSIT_NOT_FOUND")
+                    .Build());
+        }
+
+        if (deposit.DepositorCompany.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You do not own the depositor company.")
+                    .SetCode("UNAUTHORIZED")
+                    .Build());
+        }
+
+        if (input.Amount < 1_000m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Minimum top-up amount is $1,000.")
+                    .SetCode("INVALID_AMOUNT")
+                    .Build());
+        }
+
+        if (deposit.DepositorCompany.Cash < input.Amount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Insufficient company funds for this top-up.")
+                    .SetCode("INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var bank = deposit.BankBuilding;
+
+        // Transfer cash: depositor -> bank
+        deposit.DepositorCompany.Cash -= input.Amount;
+        bank.Company.Cash += input.Amount;
+        bank.TotalDeposits += input.Amount;
+        deposit.Amount += input.Amount;
+
+        // Auto-repay central-bank debt from surplus (same logic as CreateDeposit)
+        if (bank.CentralBankDebt > 0m)
+        {
+            var reserveNeeded = bank.TotalDeposits * ReserveRatio;
+            var surplusCash = bank.Company.Cash - reserveNeeded;
+            var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
+            if (repayment > 0m)
+            {
+                bank.Company.Cash -= repayment;
+                bank.CentralBankDebt -= repayment;
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = bank.CompanyId,
+                    BuildingId = bank.Id,
+                    Category = LedgerCategory.CentralBankRepay,
+                    Description = $"Central bank repayment from deposit top-up (surplus above reserve)",
+                    Amount = -repayment,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
+        }
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = deposit.DepositorCompanyId,
+            BuildingId = bank.Id,
+            Category = LedgerCategory.DepositMade,
+            Description = $"Top-up deposit into {bank.Name} at {deposit.DepositInterestRatePercent}% p.a.",
+            Amount = -input.Amount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
 
         await db.SaveChangesAsync();
 
@@ -406,6 +510,10 @@ public sealed partial class Mutation
         bank.Company.Cash -= BankBaseCapitalRequirement;
         bank.TotalDeposits += BankBaseCapitalRequirement;
         bank.BaseCapitalDeposited = true;
+
+        // Initialize default interest rates if not already set
+        bank.DepositInterestRatePercent ??= 3m;    // 3% deposit rate
+        bank.LendingInterestRatePercent ??= 8m;    // 8% lending rate
 
         // Create the permanent base-capital deposit record (not withdrawable)
         var deposit = new BankDeposit

@@ -6,16 +6,20 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (50% complete)
+### Banking (75% complete)
 
 Implement banking as is described in the banking section.
 
-- When creating a bank building, make the base capital the default value for the initial deposit. Currently after the bank is created through the new building workflow, it does not prpoeseemrly initialize the bank. The interest rates seems not to be initialized nor the deposit is there. Player cannot modify the interest rate from the bank view.
-- Find all occurances where `/building/:id` is used instead of `/bank/:id`, for example at the ledger page
-- Make deposits to be aggregated in one contract like the real bank account and create flow to withdraw and deposit to this bank account
-- rename `/loans` menu item to `/banking`
-- Make the professional design of the banking page. Make sure to preserve the professional spacing between the components. For example button Acquire a Bank looks strange.
-- Extend banks to use the currencies. Make sure the base capital is properly calculated in the currency where the city is located - 10M USD is approx 240M CZK for example.
+**Shipped in this increment:**
+- Bank purchase flow now auto-initiates the $10M base capital deposit (via `initiateBaseDeposit` called immediately after purchase through both `BuyBuildingView` and `CityMapView`). Default interest rates (3% deposit / 8% lending) are initialized on `PurchaseLot` for BANK type.
+- Interest/lending rates are now visible and editable from the bank view immediately after bank creation (rates form no longer hidden behind `baseCapitalDeposited` gate).
+- All frontend routing now directs to `/bank/:id` instead of `/building/:id` for bank buildings: CityMapView post-purchase link, CityMapView existing building link, LedgerView buildings performance table.
+- Deposits are now displayed as an account-style relationship with a single balance, interest earned summary, and clear "Add Funds" / "Withdraw" flows. A new `topUpDeposit` backend mutation supports adding to an existing deposit.
+- Navigation item renamed from "Loans" to "Banking" (route moved to `/banking`, `/loans` kept as alias for backward compatibility).
+- CSS improvements to the bank page account section for a professional, readable layout.
+
+**Remaining:**
+- Extend banks to use currencies. Make sure the base capital is properly calculated in the currency where the city is located (10M USD is approx 240M CZK for example).
 
 ### Changelog (90% complete)
 

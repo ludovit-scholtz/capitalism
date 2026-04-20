@@ -98,7 +98,7 @@ function actionDebugTitle(action: ScheduledActionSummary): string {
           </div>
         </div>
         <RouterLink
-          :to="`/building/${action.buildingId}`"
+          :to="action.buildingType === 'BANK' ? `/bank/${action.buildingId}` : `/building/${action.buildingId}`"
           class="btn btn-secondary action-link"
           :aria-label="t('pendingActions.viewBuilding') + ': ' + action.buildingName"
         >

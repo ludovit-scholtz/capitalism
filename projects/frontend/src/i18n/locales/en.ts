@@ -20,6 +20,8 @@ export default {
     retry: 'Retry',
     optional: 'optional',
     city: 'City',
+    availableFunds: 'Available funds',
+    company: 'Company',
   },
   languages: {
     en: 'English',
@@ -41,6 +43,7 @@ export default {
     companySettings: 'Company Settings',
     gameTime: 'Game Time',
     loans: 'Loans',
+    banking: 'Banking',
     news: 'News',
     chat: 'Chat',
     admin: 'Admin',
@@ -2081,5 +2084,16 @@ export default {
     unsecuredLoan: 'Unsecured Loan',
     noBuildingsForCollateral: 'You have no eligible buildings to pledge as collateral.',
     loanAcceptedSuccess: 'Loan accepted successfully.',
+    // Account-style deposit management
+    myAccount: 'My Deposit Account',
+    accountBalance: 'Account Balance',
+    totalInterestEarned: 'Total Interest Earned',
+    openAccount: 'Open Account',
+    openAccountHint: 'Earn {rate} annual interest by depositing funds here.',
+    addFunds: 'Add Funds',
+    withdraw: 'Withdraw',
+    withdrawAmount: 'Withdrawal Amount ($)',
+    maxWithdraw: 'Maximum withdrawal',
+    withdrawSuccess: 'Withdrawal processed successfully.',
   },
 }
