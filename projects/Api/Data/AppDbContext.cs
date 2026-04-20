@@ -108,6 +108,12 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Persisted foreign exchange rates fetched from the NBS daily CSV feed.</summary>
     public DbSet<FxRate> FxRates => Set<FxRate>();
 
+    /// <summary>Per-player multi-currency balance wallets (non-EUR currencies).</summary>
+    public DbSet<PlayerCurrencyBalance> PlayerCurrencyBalances => Set<PlayerCurrencyBalance>();
+
+    /// <summary>Completed forex currency swap audit trail.</summary>
+    public DbSet<ForexTradeRecord> ForexTradeRecords => Set<ForexTradeRecord>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

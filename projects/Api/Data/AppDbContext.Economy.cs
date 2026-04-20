@@ -226,5 +226,31 @@ public sealed partial class AppDbContext
             e.HasIndex(log => log.AdminActorPlayerId);
             e.HasIndex(log => log.EffectivePlayerId);
         });
+
+        modelBuilder.Entity<PlayerCurrencyBalance>(e =>
+        {
+            e.HasKey(b => b.Id);
+            e.Property(b => b.CurrencyCode).HasMaxLength(3);
+            e.Property(b => b.Balance).HasPrecision(18, 4);
+            e.HasOne(b => b.Player).WithMany().HasForeignKey(b => b.PlayerId).OnDelete(DeleteBehavior.Cascade);
+            // One row per player per currency
+            e.HasIndex(b => new { b.PlayerId, b.CurrencyCode }).IsUnique();
+            // Persistence-layer safety net: balance can never go negative
+            e.ToTable("PlayerCurrencyBalances", t =>
+                t.HasCheckConstraint("CK_PlayerCurrencyBalances_Balance_NonNegative", "\"Balance\" >= 0"));
+        });
+
+        modelBuilder.Entity<ForexTradeRecord>(e =>
+        {
+            e.HasKey(t => t.Id);
+            e.Property(t => t.FromCurrencyCode).HasMaxLength(3);
+            e.Property(t => t.ToCurrencyCode).HasMaxLength(3);
+            e.Property(t => t.FromAmount).HasPrecision(18, 4);
+            e.Property(t => t.ToAmount).HasPrecision(18, 4);
+            e.Property(t => t.FeeAmount).HasPrecision(18, 4);
+            e.Property(t => t.Rate).HasPrecision(18, 6);
+            e.HasOne(t => t.Player).WithMany().HasForeignKey(t => t.PlayerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasIndex(t => new { t.PlayerId, t.ExecutedAtTick });
+        });
     }
 }

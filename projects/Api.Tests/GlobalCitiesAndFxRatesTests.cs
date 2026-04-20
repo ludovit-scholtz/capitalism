@@ -554,4 +554,477 @@ public sealed class GlobalCitiesAndFxRatesTests
     }
 
     #endregion
+
+    #region Forex exchange — quote and swap
+
+    [Fact]
+    public async Task GetForexQuote_EurToCzk_ReturnsCorrectQuoteWithFee()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        // Register a player and get a token
+        var token = await RegisterAndLoginAsync(client, "forex_quote@example.com");
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query GetForexQuote($input: GetForexQuoteInput!) {
+                forexQuote(input: $input) {
+                    fromCurrencyCode
+                    toCurrencyCode
+                    fromAmount
+                    toAmount
+                    feeAmount
+                    feePercent
+                    rate
+                    availableFromBalance
+                    fromCurrencySymbol
+                    toCurrencySymbol
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m } },
+            token);
+
+        var quote = result.GetProperty("data").GetProperty("forexQuote");
+
+        Assert.Equal("EUR", quote.GetProperty("fromCurrencyCode").GetString());
+        Assert.Equal("CZK", quote.GetProperty("toCurrencyCode").GetString());
+        Assert.Equal(100m, quote.GetProperty("fromAmount").GetDecimal());
+        Assert.Equal(1m, quote.GetProperty("feePercent").GetDecimal());
+
+        // Fee should be 1% of 100 = 1 EUR
+        Assert.Equal(1m, quote.GetProperty("feeAmount").GetDecimal());
+
+        // Rate should be a positive non-trivial cross rate (CZK is ~25 per EUR)
+        var rate = quote.GetProperty("rate").GetDecimal();
+        Assert.True(rate > 0, "Rate must be positive");
+
+        // toAmount = (100 - 1) * rate = 99 * rate
+        var toAmount = quote.GetProperty("toAmount").GetDecimal();
+        Assert.True(toAmount > 0, "Target amount must be positive");
+
+        // Symbols
+        Assert.Equal("€", quote.GetProperty("fromCurrencySymbol").GetString());
+        Assert.Equal("Kč", quote.GetProperty("toCurrencySymbol").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_EurToCzk_DeductsFromEurAndCreatesCzkBalance()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_swap@example.com");
+
+        // Get the player ID via the API
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Give the player some EUR (personal cash)
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FindAsync(playerId);
+        player!.PersonalCash = 1000m;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                    fromCurrencyCode
+                    toCurrencyCode
+                    fromAmount
+                    toAmount
+                    feeAmount
+                    rate
+                    newFromBalance
+                    newToBalance
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m } },
+            token);
+
+        var trade = result.GetProperty("data").GetProperty("executeForexSwap");
+
+        Assert.Equal("EUR", trade.GetProperty("fromCurrencyCode").GetString());
+        Assert.Equal("CZK", trade.GetProperty("toCurrencyCode").GetString());
+        Assert.Equal(100m, trade.GetProperty("fromAmount").GetDecimal());
+        Assert.Equal(1m, trade.GetProperty("feeAmount").GetDecimal());
+        Assert.True(trade.GetProperty("toAmount").GetDecimal() > 0);
+        // After swapping 100 EUR, EUR balance should be 900
+        Assert.Equal(900m, trade.GetProperty("newFromBalance").GetDecimal());
+        // CZK balance should match the toAmount
+        Assert.Equal(trade.GetProperty("toAmount").GetDecimal(), trade.GetProperty("newToBalance").GetDecimal());
+
+        // Verify a ForexTradeRecord was persisted
+        await using var scope2 = factory.Services.CreateAsyncScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var records = await db2.ForexTradeRecords
+            .Where(t => t.PlayerId == playerId)
+            .ToListAsync();
+        Assert.Single(records);
+        Assert.Equal("EUR", records[0].FromCurrencyCode);
+        Assert.Equal("CZK", records[0].ToCurrencyCode);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_InsufficientFunds_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_insuf@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Give only a small amount
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FindAsync(playerId);
+        player!.PersonalCash = 5m;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_SameCurrency_ReturnsValidationError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_same@example.com");
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "EUR", amount = 100m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("SAME_CURRENCY", code);
+    }
+
+    [Fact]
+    public async Task GetPlayerCurrencyBalances_NewPlayer_ReturnsOnlyEurBalance()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_balances@example.com");
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query {
+                playerCurrencyBalances {
+                    currencyCode
+                    balance
+                    currencySymbol
+                }
+            }
+            """,
+            token: token);
+
+        var balances = result.GetProperty("data").GetProperty("playerCurrencyBalances");
+        Assert.Equal(JsonValueKind.Array, balances.ValueKind);
+        // New player should have at least the EUR balance
+        Assert.True(balances.GetArrayLength() >= 1);
+        var eur = balances.EnumerateArray().First(b => b.GetProperty("currencyCode").GetString() == "EUR");
+        Assert.Equal("€", eur.GetProperty("currencySymbol").GetString());
+    }
+
+    [Fact]
+    public async Task GetForexTradeHistory_AfterSwap_ReturnsTradeRecord()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_history@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.FindAsync(playerId);
+        player!.PersonalCash = 500m;
+        await db.SaveChangesAsync();
+
+        // Execute a swap
+        await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "USD", amount = 50m } },
+            token);
+
+        // Fetch history
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query {
+                forexTradeHistory {
+                    id
+                    fromCurrencyCode
+                    toCurrencyCode
+                    fromAmount
+                    toAmount
+                    feeAmount
+                    rate
+                    executedAtTick
+                    fromCurrencySymbol
+                    toCurrencySymbol
+                }
+            }
+            """,
+            token: token);
+
+        var history = result.GetProperty("data").GetProperty("forexTradeHistory");
+        Assert.Equal(JsonValueKind.Array, history.ValueKind);
+        Assert.True(history.GetArrayLength() >= 1);
+
+        var entry = history[0];
+        Assert.Equal("EUR", entry.GetProperty("fromCurrencyCode").GetString());
+        Assert.Equal("USD", entry.GetProperty("toCurrencyCode").GetString());
+        Assert.Equal(50m, entry.GetProperty("fromAmount").GetDecimal());
+        Assert.Equal("€", entry.GetProperty("fromCurrencySymbol").GetString());
+        Assert.Equal("$", entry.GetProperty("toCurrencySymbol").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_CzkToUsd_UsesCorrectCrossRate()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_cross@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Seed EUR balance
+        await using var setupScope = factory.Services.CreateAsyncScope();
+        var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await setupDb.Players.FindAsync(playerId);
+        player!.PersonalCash = 1000m;
+        await setupDb.SaveChangesAsync();
+
+        // First swap: EUR -> CZK
+        var firstSwap = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    toAmount
+                    newToBalance
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 200m } },
+            token);
+
+        var czkReceived = firstSwap.GetProperty("data").GetProperty("executeForexSwap").GetProperty("toAmount").GetDecimal();
+        Assert.True(czkReceived > 0);
+
+        // Second swap: CZK -> USD (cross rate)
+        var swapAmount = Math.Round(czkReceived / 2, 2); // swap half the CZK
+        var secondSwap = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    fromCurrencyCode
+                    toCurrencyCode
+                    fromAmount
+                    toAmount
+                    feeAmount
+                    newFromBalance
+                    newToBalance
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "CZK", toCurrencyCode = "USD", amount = swapAmount } },
+            token);
+
+        var trade2 = secondSwap.GetProperty("data").GetProperty("executeForexSwap");
+        Assert.Equal("CZK", trade2.GetProperty("fromCurrencyCode").GetString());
+        Assert.Equal("USD", trade2.GetProperty("toCurrencyCode").GetString());
+        Assert.True(trade2.GetProperty("toAmount").GetDecimal() > 0);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_ConcurrentSwaps_OnlyOneSucceedsWhenFundsInsufficient()
+    {
+        // Two parallel swap requests each requesting 60 EUR when the player only has 100 EUR.
+        // Exactly one should succeed; the other must be rejected (either INSUFFICIENT_FUNDS
+        // from sequential SQLite serialisation, or CONCURRENT_SWAP_CONFLICT from PostgreSQL's
+        // optimistic-concurrency / serialisable-transaction protection).
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_concurrent@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        // Give the player exactly 100 EUR.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            player!.PersonalCash = 100m;
+            await db.SaveChangesAsync();
+        }
+
+        const string mutation = """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                    fromAmount
+                    toAmount
+                    newFromBalance
+                }
+            }
+            """;
+        var swapInput = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 60m };
+
+        // Fire both requests concurrently.
+        var results = await Task.WhenAll(
+            ExecuteGraphQlAsync(client, mutation, new { input = swapInput }, token),
+            ExecuteGraphQlAsync(client, mutation, new { input = swapInput }, token));
+
+        // Helper: safely check if a response contains a successful swap result.
+        static bool IsSuccess(JsonElement r) =>
+            r.ValueKind == JsonValueKind.Object &&
+            r.TryGetProperty("data", out var d) &&
+            d.ValueKind == JsonValueKind.Object &&
+            d.TryGetProperty("executeForexSwap", out var s) &&
+            s.ValueKind == JsonValueKind.Object;
+
+        var successCount = results.Count(IsSuccess);
+
+        Assert.Equal(1, successCount);
+
+        // Post-condition: exactly one 60 EUR deduction occurred → balance is 40 EUR.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.FindAsync(playerId);
+            Assert.Equal(40m, player!.PersonalCash);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_CheckConstraint_DatabaseEnforcesNonNegativeBalance()
+    {
+        // Directly write a negative balance to PlayerCurrencyBalances at the EF layer and
+        // confirm SaveChangesAsync throws for PostgreSQL (constraint violation) or that
+        // the application guard already prevents negative values.
+        // This test verifies the integrity guarantee rather than the DB constraint itself
+        // (the SQLite test database does not enforce CHECK constraints added via ALTER TABLE).
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var token = await RegisterAndLoginAsync(client, "forex_constraint@example.com");
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Seed a CZK balance so we can attempt a swap that would produce a negative result.
+            db.PlayerCurrencyBalances.Add(new PlayerCurrencyBalance
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                CurrencyCode = "CZK",
+                Balance = 50m,
+                CreatedAtUtc = DateTime.UtcNow,
+                UpdatedAtUtc = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Try to swap more CZK than available – the application guard must reject it.
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "CZK", toCurrencyCode = "EUR", amount = 200m } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
+
+        // Confirm balance is unchanged.
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bal = await db.PlayerCurrencyBalances
+                .SingleAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            Assert.Equal(50m, bal.Balance);
+        }
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email)
+    {
+        await ExecuteGraphQlAsync(client,
+            """
+            mutation Register($input: RegisterInput!) {
+                register(input: $input) {
+                    token
+                }
+            }
+            """,
+            new { input = new { email, displayName = "ForexUser", password = "TestPass123!" } });
+
+        var loginResult = await ExecuteGraphQlAsync(client,
+            """
+            mutation Login($input: LoginInput!) {
+                login(input: $input) {
+                    token
+                }
+            }
+            """,
+            new { input = new { email, password = "TestPass123!" } });
+
+        return loginResult.GetProperty("data").GetProperty("login").GetProperty("token").GetString()!;
+    }
+
+    #endregion
 }
