@@ -572,6 +572,10 @@ export type MockBankInfo = {
   availableCash: number
   reserveShortfall: number
   liquidityStatus: 'HEALTHY' | 'PRESSURED' | 'CRITICAL'
+  // Currency fields
+  cityCurrencyCode?: string
+  cityCurrencySymbol?: string
+  baseCapitalRequirement?: number
 }
 
 export type MockGameNewsLocalization = {
@@ -5307,6 +5311,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                     availableCash: 5_000_000,
                     reserveShortfall: 0,
                     liquidityStatus: 'HEALTHY',
+                    cityCurrencyCode: 'EUR',
+                    cityCurrencySymbol: '€',
+                    baseCapitalRequirement: 10_000_000,
                   },
                 },
               }),
@@ -5431,7 +5438,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         for (const company of player.companies) {
           const building = (company.buildings ?? []).find((b) => b.id === bankBuildingId && b.type === 'BANK')
           if (building) {
-            // Deduct $10M from company cash
+            // Deduct the base capital (use city-appropriate amount) from company cash
             company.cash = (company.cash ?? 0) - 10_000_000
             // Synthesise an activated BankInfoSummary
             const activatedBankInfo: MockBankInfo = {
@@ -5454,6 +5461,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               availableCash: company.cash,
               reserveShortfall: 0,
               liquidityStatus: 'HEALTHY' as const,
+              cityCurrencyCode: 'EUR',
+              cityCurrencySymbol: '€',
+              baseCapitalRequirement: 10_000_000,
             }
             // Update or insert in allBanks so subsequent bankInfo queries return the activated state
             const existingIdx = state.allBanks.findIndex((b) => b.bankBuildingId === bankBuildingId)

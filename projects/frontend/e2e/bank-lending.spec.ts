@@ -113,6 +113,9 @@ function makeBankInfoEntry(overrides: Partial<MockBankInfo> = {}): MockBankInfo 
     availableCash: 5_000_000,
     reserveShortfall: 0,
     liquidityStatus: 'HEALTHY',
+    cityCurrencyCode: 'EUR',
+    cityCurrencySymbol: '€',
+    baseCapitalRequirement: 10_000_000,
     ...overrides,
   }
 }
@@ -1189,8 +1192,8 @@ test.describe('Loan collateral selection', () => {
     // Eligible building should be listed and stats visible
     await expect(modal.getByText('Main Factory')).toBeVisible({ timeout: 10000 })
     // Stats: check appraised value appears in the collateral-stats area
-    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('$400,000')
-    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('$280,000')
+    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('€400,000')
+    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('€280,000')
   })
 
   test('selecting collateral shows LTV summary bar and capacity info', async ({ page }) => {
@@ -1440,6 +1443,9 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
           availableCash: 500_000,
           reserveShortfall: 0,
           liquidityStatus: 'HEALTHY' as const,
+          cityCurrencyCode: 'EUR',
+          cityCurrencySymbol: '€',
+          baseCapitalRequirement: 10_000_000,
         },
       ],
     })
@@ -1453,7 +1459,7 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
 
     // Should show base deposit required UI
     await expect(page.getByRole('heading', { name: 'Base Capital Deposit Required' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Make Base Deposit ($10,000,000)' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Make Base Deposit' })).toBeVisible()
 
     // Rates section is now visible even before activation so the owner can pre-configure
     await expect(page.getByText('Bank Rates Configuration')).toBeVisible()
@@ -1488,6 +1494,9 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
           availableCash: 15_000_000,
           reserveShortfall: 0,
           liquidityStatus: 'HEALTHY' as const,
+          cityCurrencyCode: 'EUR',
+          cityCurrencySymbol: '€',
+          baseCapitalRequirement: 10_000_000,
         },
       ],
     })
@@ -1499,8 +1508,8 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    // Should show the base deposit button
-    const depositBtn = page.getByRole('button', { name: 'Make Base Deposit ($10,000,000)' })
+    // Should show the base deposit button with dynamic label (no hardcoded amount)
+    const depositBtn = page.getByRole('button', { name: 'Make Base Deposit' })
     await expect(depositBtn).toBeVisible()
 
     // Click the button
