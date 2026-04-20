@@ -510,7 +510,10 @@ useTickRefresh(async () => {
                   {{ formatAmount(b.revenue - b.costs) }}
                 </td>
                 <td>
-                  <RouterLink :to="`/building/${b.buildingId}`" class="btn btn-ghost btn-sm">
+                  <RouterLink
+                    :to="b.buildingType === 'BANK' ? `/bank/${b.buildingId}` : `/building/${b.buildingId}`"
+                    class="btn btn-ghost btn-sm"
+                  >
                     {{ t('ledger.manage') }}
                   </RouterLink>
                 </td>

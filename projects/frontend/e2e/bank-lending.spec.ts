@@ -627,18 +627,25 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
 })
 
 test.describe('Loans nav link', () => {
-  test('shows Loans link in nav bar', async ({ page }) => {
+  test('shows Banking link in nav bar', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/')
-    // Use href selector to find nav link (icon-only nav items may be hidden in accessibility tree on desktop)
-    await expect(page.locator('.nav-links a[href="/loans"]')).toBeVisible()
+    // Nav now uses /banking (renamed from /loans); /loans is kept as alias
+    await expect(page.locator('.nav-links a[href="/banking"]')).toBeVisible()
   })
 
-  test('clicking Loans nav link navigates to /loans', async ({ page }) => {
+  test('clicking Banking nav link navigates to /banking', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/')
-    await page.locator('.nav-links a[href="/loans"]').click()
-    await expect(page).toHaveURL('/loans')
+    await page.locator('.nav-links a[href="/banking"]').click()
+    await expect(page).toHaveURL('/banking')
+  })
+
+  test('legacy /loans path still works (alias)', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/loans')
+    // /loans is aliased to /banking — the page content should load
+    await expect(page.locator('.loan-marketplace-view')).toBeVisible()
   })
 })
 
@@ -1004,16 +1011,16 @@ test.describe('Bank Management — customer view', () => {
 
     await page.goto('/bank/dep-bank-1')
 
-    // The deposit form section must be visible
-    await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
+    // New account-style UI: shows "My Deposit Account" heading with empty state
+    await expect(page.getByRole('heading', { name: 'My Deposit Account' })).toBeVisible()
 
-    // Fill in the amount and submit
+    // The empty-state deposit form is shown (no existing deposits)
     await page.locator('#customer-deposit-amount').fill('25000')
 
     // Rate preview is shown (formatPercent gives 1 decimal place) — scope to preview section
     await expect(page.locator('.repayment-preview').getByText('5.0%')).toBeVisible()
 
-    await page.getByRole('button', { name: 'Confirm Deposit' }).click()
+    await page.getByRole('button', { name: 'Open Account' }).click()
 
     // Success message
     await expect(page.getByText('Deposit created successfully.')).toBeVisible()
@@ -1448,8 +1455,9 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
     await expect(page.getByRole('heading', { name: 'Base Capital Deposit Required' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Make Base Deposit ($10,000,000)' })).toBeVisible()
 
-    // Should NOT show the normal owner management sections (not yet activated)
-    await expect(page.getByText('Bank Rates Configuration')).toBeHidden()
+    // Rates section is now visible even before activation so the owner can pre-configure
+    await expect(page.getByText('Bank Rates Configuration')).toBeVisible()
+    // Loan Offers section still NOT shown (activation required to publish offers)
     await expect(page.getByText('Loan Offers').first()).toBeHidden()
   })
 

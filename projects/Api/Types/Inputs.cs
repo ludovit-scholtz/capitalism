@@ -533,6 +533,16 @@ public sealed class WithdrawDepositInput
     public decimal Amount { get; set; }
 }
 
+/// <summary>Input for adding funds to an existing bank deposit (top-up).</summary>
+public sealed class TopUpDepositInput
+{
+    /// <summary>The existing deposit to add funds to.</summary>
+    public Guid DepositId { get; set; }
+
+    /// <summary>Amount to add (must be >= 1,000).</summary>
+    public decimal Amount { get; set; }
+}
+
 /// <summary>Input for configuring a bank's deposit and lending interest rates.</summary>
 public sealed class SetBankRatesInput
 {

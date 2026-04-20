@@ -24046,6 +24046,271 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task TopUpDeposit_CreatesNewDepositRecord_InsteadOfMutatingExisting()
+    {
+        // Arrange: bank + depositor via isolated factory so we can call the mutation with auth
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var bankOwnerEmail = $"top-up-bo-{Guid.NewGuid():N}@test.com";
+        var depositorEmail = $"top-up-dep-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, bankOwnerEmail, "TuBankOwner");
+        var depositorToken = await RegisterAndGetTokenAsync(isolatedClient, depositorEmail, "TuDepositor");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var bankCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "TuBankCo", Cash = 20_000_000m };
+        var depCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "TuDepCo", Cash = 500_000m };
+        db.Companies.AddRange(bankCo, depCo);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCo.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "TuBank", Level = 1,
+            DepositInterestRatePercent = 5m, LendingInterestRatePercent = 10m,
+            TotalDeposits = 10_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+
+        var originalDeposit = new Api.Data.Entities.BankDeposit
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            DepositorCompanyId = depCo.Id,
+            Amount = 50_000m,
+            DepositInterestRatePercent = 5m,
+            IsBaseCapital = false,
+            IsActive = true,
+            DepositedAtTick = 1L,
+            DepositedAtUtc = DateTime.UtcNow,
+        };
+        db.BankDeposits.Add(originalDeposit);
+        await db.SaveChangesAsync();
+
+        // Act: top-up the deposit
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            mutation Tu($input: TopUpDepositInput!) {
+              topUpDeposit(input: $input) {
+                id
+                amount
+                depositedAtTick
+                depositInterestRatePercent
+                isActive
+              }
+            }
+            """,
+            new { input = new { depositId = originalDeposit.Id.ToString(), amount = 30_000m } },
+            depositorToken);
+
+        var data = result.GetProperty("data").GetProperty("topUpDeposit");
+
+        // The returned deposit should be a NEW record (different id) with $30k
+        Assert.Equal(30_000m, data.GetProperty("amount").GetDecimal());
+        Assert.NotEqual(originalDeposit.Id.ToString(), data.GetProperty("id").GetString());
+        Assert.True(data.GetProperty("isActive").GetBoolean());
+
+        // Original deposit must NOT have been mutated — still $50k
+        await db.Entry(originalDeposit).ReloadAsync();
+        Assert.Equal(50_000m, originalDeposit.Amount);
+
+        // Bank.TotalDeposits must have grown by $30k
+        await db.Entry(bank).ReloadAsync();
+        Assert.Equal(10_030_000m, bank.TotalDeposits);
+
+        // Depositor cash reduced by $30k
+        await db.Entry(depCo).ReloadAsync();
+        Assert.Equal(470_000m, depCo.Cash);
+
+        // Two active non-base-capital deposits from this company now exist
+        var allDeposits = await db.BankDeposits
+            .Where(d => d.BankBuildingId == bank.Id && d.DepositorCompanyId == depCo.Id && d.IsActive && !d.IsBaseCapital)
+            .ToListAsync();
+        Assert.Equal(2, allDeposits.Count);
+    }
+
+    [Fact]
+    public async Task TopUpDeposit_TopUpTranche_UsesCurrentBankRate()
+    {
+        // Arrange: bank rate is lowered to 2% after original deposit at 5%.
+        // Top-up should get the NEW rate (2%), not the old snapshotted rate (5%).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var bankOwnerEmail = $"rate-bo-{Guid.NewGuid():N}@test.com";
+        var depositorEmail = $"rate-dep-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(isolatedClient, bankOwnerEmail, "RateBankOwner");
+        var depositorToken = await RegisterAndGetTokenAsync(isolatedClient, depositorEmail, "RateDepositor");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync();
+
+        var bankCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "RateBankCo", Cash = 20_000_000m };
+        var depCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "RateDepCo", Cash = 500_000m };
+        db.Companies.AddRange(bankCo, depCo);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCo.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "RateBank", Level = 1,
+            // Bank now offers 2% — rate was lowered since original deposit was opened
+            DepositInterestRatePercent = 2m, LendingInterestRatePercent = 8m,
+            TotalDeposits = 10_000_000m, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+
+        var originalDeposit = new Api.Data.Entities.BankDeposit
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            DepositorCompanyId = depCo.Id,
+            Amount = 50_000m,
+            DepositInterestRatePercent = 5m, // Original deposit got 5%
+            IsBaseCapital = false,
+            IsActive = true,
+            DepositedAtTick = 1L,
+            DepositedAtUtc = DateTime.UtcNow,
+        };
+        db.BankDeposits.Add(originalDeposit);
+        await db.SaveChangesAsync();
+
+        // Act: top-up at a time when the bank rate is 2%
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            mutation Tu($input: TopUpDepositInput!) {
+              topUpDeposit(input: $input) {
+                id
+                depositInterestRatePercent
+              }
+            }
+            """,
+            new { input = new { depositId = originalDeposit.Id.ToString(), amount = 20_000m } },
+            depositorToken);
+
+        var topUpRate = result.GetProperty("data").GetProperty("topUpDeposit")
+            .GetProperty("depositInterestRatePercent").GetDecimal();
+
+        // Top-up tranche must use the CURRENT bank rate (2%), not the old snapshot (5%)
+        Assert.Equal(2m, topUpRate);
+
+        // Original deposit still has its original 5% rate
+        await db.Entry(originalDeposit).ReloadAsync();
+        Assert.Equal(5m, originalDeposit.DepositInterestRatePercent);
+    }
+
+    [Fact]
+    public async Task TopUpDeposit_InterestAccruesFromTopUpTickOnly_NotRetroactively()
+    {
+        // Scenario: deposit created at tick 1; 5 ticks pass; top-up added at tick 6;
+        // after 5 more ticks (total 10), verify:
+        //   — original tranche earned interest for all 10 ticks
+        //   — top-up tranche earned interest for only 5 ticks (not 10)
+        //   — total depositor cash = interest from original×10 + interest from top-up×5
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+
+        // Use a very high rate so interest amounts are measurable and distinct
+        const decimal ratePercent = 3650m; // 3650% p.a. = 10% of deposit per year × TicksPerYear ⇒ clean per-tick math
+        const decimal originalAmount = 10_000m;
+        const decimal topUpAmount = 40_000m;
+
+        var bankPlayer = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"ti-bank-{Guid.NewGuid():N}@t.com", DisplayName = "TiBank", Role = "PLAYER", PasswordHash = "x" };
+        var depPlayer = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"ti-dep-{Guid.NewGuid():N}@t.com", DisplayName = "TiDep", Role = "PLAYER", PasswordHash = "x" };
+        db.Players.AddRange(bankPlayer, depPlayer);
+
+        var bankCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankPlayer.Id, Name = "TiBankCo", Cash = 5_000_000m };
+        var depCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depPlayer.Id, Name = "TiDepCo", Cash = 0m };
+        db.Companies.AddRange(bankCo, depCo);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = bankCo.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "TiBank", Level = 1,
+            DepositInterestRatePercent = ratePercent,
+            TotalDeposits = originalAmount + topUpAmount, BaseCapitalDeposited = true,
+        };
+        db.Buildings.Add(bank);
+
+        // Original deposit at tick 1
+        var gameState = await db.GameStates.FirstAsync();
+        gameState.CurrentTick = 1L;
+        var origDeposit = new Api.Data.Entities.BankDeposit
+        {
+            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = depCo.Id,
+            Amount = originalAmount, DepositInterestRatePercent = ratePercent,
+            IsBaseCapital = false, IsActive = true, DepositedAtTick = 1L, DepositedAtUtc = DateTime.UtcNow,
+        };
+        db.BankDeposits.Add(origDeposit);
+        await db.SaveChangesAsync();
+
+        var tickProcessor = scope.ServiceProvider.GetRequiredService<Api.Engine.TickProcessor>();
+
+        // Phase 1: process 5 ticks with only the original deposit
+        for (var i = 0; i < 5; i++) await tickProcessor.ProcessTickAsync();
+
+        await db.Entry(depCo).ReloadAsync();
+        var cashAfterPhase1 = depCo.Cash;
+        Assert.True(cashAfterPhase1 > 0m, "Depositor should have received interest in phase 1.");
+
+        // Phase 2: add top-up deposit at the current tick
+        await db.Entry(gameState).ReloadAsync();
+        var topUpTick = gameState.CurrentTick;
+        var topUpDeposit = new Api.Data.Entities.BankDeposit
+        {
+            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = depCo.Id,
+            Amount = topUpAmount, DepositInterestRatePercent = ratePercent,
+            IsBaseCapital = false, IsActive = true, DepositedAtTick = topUpTick, DepositedAtUtc = DateTime.UtcNow,
+        };
+        db.BankDeposits.Add(topUpDeposit);
+        await db.SaveChangesAsync();
+
+        // Phase 3: process 5 more ticks (both deposits earning interest)
+        for (var i = 0; i < 5; i++) await tickProcessor.ProcessTickAsync();
+
+        await db.Entry(origDeposit).ReloadAsync();
+        await db.Entry(topUpDeposit).ReloadAsync();
+        await db.Entry(depCo).ReloadAsync();
+
+        // Each deposit's TotalInterestPaid reflects its own tick count
+        // originalDeposit earned for 10 ticks, topUpDeposit earned for 5 ticks
+        var perTickOrig = decimal.Round(originalAmount * (ratePercent / 100m) / Engine.GameConstants.TicksPerYear, 4, MidpointRounding.AwayFromZero);
+        var perTickTopUp = decimal.Round(topUpAmount * (ratePercent / 100m) / Engine.GameConstants.TicksPerYear, 4, MidpointRounding.AwayFromZero);
+
+        var expectedOrigInterest = perTickOrig * 10m;
+        var expectedTopUpInterest = perTickTopUp * 5m;
+
+        // Top-up interest should be exactly 5 ticks worth (not 10) — the key anti-exploit assertion
+        Assert.True(topUpDeposit.TotalInterestPaid <= expectedTopUpInterest + 0.01m,
+            $"Top-up tranche must not earn more than {expectedTopUpInterest:F4} (5 ticks); got {topUpDeposit.TotalInterestPaid:F4}. " +
+            "This would indicate retroactive interest accrual.");
+        Assert.True(topUpDeposit.TotalInterestPaid >= expectedTopUpInterest - 0.01m,
+            $"Top-up tranche should have earned approximately {expectedTopUpInterest:F4}; got {topUpDeposit.TotalInterestPaid:F4}.");
+
+        // Original deposit earned interest for all 10 ticks
+        Assert.True(origDeposit.TotalInterestPaid >= expectedOrigInterest - 0.01m,
+            $"Original deposit should have earned ~{expectedOrigInterest:F4} over 10 ticks; got {origDeposit.TotalInterestPaid:F4}.");
+
+        // Anti-exploit assertion: the top-up's 5-tick interest must be strictly less than what
+        // it WOULD have earned over 10 ticks (retroactive accrual would produce 2× as much).
+        var retroactiveWouldBe = perTickTopUp * 10m;
+        Assert.True(topUpDeposit.TotalInterestPaid < retroactiveWouldBe - 0.01m,
+            $"Top-up tranche earned {topUpDeposit.TotalInterestPaid:F4} but retroactive accrual would have yielded {retroactiveWouldBe:F4}. " +
+            "The top-up must not earn retroactive interest.");
+    }
+
+    [Fact]
     public async Task GetAllBanks_ReturnsBankListWithLendableCapacity()
     {
         // Seed two banks in two different cities so we can verify the list is populated correctly.

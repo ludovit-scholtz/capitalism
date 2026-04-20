@@ -23,13 +23,17 @@ const selectedType = ref('')
 const selectedCityId = ref('')
 const buildingName = ref('')
 const submitting = ref(false)
-// Initial deposit for BANK type (optional; if provided, initiateBaseDeposit is called after purchase)
-const initialDepositAmount = ref<number | null>(null)
+// Initial deposit for BANK type - defaults to $10M (required to open the bank for business)
+const initialDepositAmount = ref<number | null>(10_000_000)
 
 const INITIATE_BASE_DEPOSIT_MUTATION = `
-  mutation InitiateBaseDeposit($input: InitiateBaseDepositInput!) {
-    initiateBaseDeposit(input: $input) {
-      id name baseCapitalDeposited totalDeposits
+  mutation InitiateBaseDeposit($bankBuildingId: UUID!) {
+    initiateBaseDeposit(bankBuildingId: $bankBuildingId) {
+      bankBuildingId
+      baseCapitalDeposited
+      totalDeposits
+      depositInterestRatePercent
+      lendingInterestRatePercent
     }
   }
 `
@@ -158,17 +162,14 @@ async function buyBuilding() {
 
     const buildingId = data.purchaseLot.building.id
 
-    // If buying a bank and an initial deposit amount was entered, activate the bank immediately
+    // If buying a bank, automatically initiate the base capital deposit to activate the bank
     if (selectedType.value === 'BANK' && initialDepositAmount.value && initialDepositAmount.value > 0) {
       try {
         await gqlRequest(INITIATE_BASE_DEPOSIT_MUTATION, {
-          input: {
-            bankBuildingId: buildingId,
-            amount: initialDepositAmount.value,
-          },
+          bankBuildingId: buildingId,
         })
       } catch {
-        // Non-fatal: bank was purchased; deposit can be made from the bank management page
+        // Non-fatal: bank was purchased; base deposit can be made from the bank management page
       }
     }
 

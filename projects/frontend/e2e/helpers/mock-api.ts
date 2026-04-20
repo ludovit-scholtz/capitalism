@@ -5364,6 +5364,19 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('topUpDeposit')) {
+      const input = body.variables?.input ?? {}
+      const deposit = state.myDeposits.find((d) => d.id === input.depositId && d.isActive)
+      if (deposit) {
+        deposit.amount += input.amount ?? 0
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { topUpDeposit: deposit ?? null } }),
+      })
+    }
+
     if (query.includes('withdrawDeposit')) {
       const depositId = body.variables?.input?.depositId
       const deposit = state.myDeposits.find((d) => d.id === depositId)

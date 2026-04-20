@@ -53,6 +53,18 @@ const customerDepositLoading = ref(false)
 const customerDepositError = ref<string | null>(null)
 const customerDepositSuccess = ref(false)
 
+// Account-style deposit management (customer view)
+const showWithdrawForm = ref(false)
+const withdrawAmount = ref(0)
+const withdrawLoading = ref(false)
+const withdrawError = ref<string | null>(null)
+const withdrawSuccess = ref(false)
+const showTopUpForm = ref(false)
+const topUpAmount = ref(10_000)
+const topUpLoading = ref(false)
+const topUpError = ref<string | null>(null)
+const topUpSuccess = ref(false)
+
 // Loan acceptance modal state
 const showLoanModal = ref(false)
 const customerLoanOffer = ref<LoanOfferSummary | null>(null)
@@ -321,6 +333,28 @@ const CREATE_DEPOSIT_MUTATION = `
   }
 `
 
+const TOP_UP_DEPOSIT_MUTATION = `
+  mutation TopUpDeposit($input: TopUpDepositInput!) {
+    topUpDeposit(input: $input) {
+      id
+      amount
+      depositInterestRatePercent
+      isActive
+      totalInterestPaid
+    }
+  }
+`
+
+const WITHDRAW_DEPOSIT_MUTATION = `
+  mutation WithdrawDeposit($input: WithdrawDepositInput!) {
+    withdrawDeposit(input: $input) {
+      id
+      amount
+      isActive
+    }
+  }
+`
+
 const INITIATE_BASE_DEPOSIT_MUTATION = `
   mutation InitiateBaseDeposit($bankBuildingId: UUID!) {
     initiateBaseDeposit(bankBuildingId: $bankBuildingId) {
@@ -566,6 +600,30 @@ const isCompanyAccountActive = computed(
   () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
 )
 
+// Account-style aggregation: treat all active non-base-capital deposits from active company as one account
+const myActiveDepositsHere = computed(() =>
+  myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital),
+)
+const myAccountBalance = computed(() =>
+  myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0),
+)
+const myAccountInterestEarned = computed(() =>
+  myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0),
+)
+// The most recent active deposit (for top-up), the oldest for partial withdraw
+const myLatestDeposit = computed<BankDepositSummary | null>(() => {
+  const sorted = [...myActiveDepositsHere.value].sort(
+    (a, b) => b.depositedAtTick - a.depositedAtTick,
+  )
+  return sorted[0] ?? null
+})
+const myOldestDeposit = computed<BankDepositSummary | null>(() => {
+  const sorted = [...myActiveDepositsHere.value].sort(
+    (a, b) => a.depositedAtTick - b.depositedAtTick,
+  )
+  return sorted[0] ?? null
+})
+
 async function submitCustomerDeposit() {
   if (!activeCompany.value || !bankBuildingId.value) return
   customerDepositLoading.value = true
@@ -586,6 +644,57 @@ async function submitCustomerDeposit() {
     customerDepositError.value = err instanceof Error ? err.message : String(err)
   } finally {
     customerDepositLoading.value = false
+  }
+}
+
+async function submitTopUp() {
+  const deposit = myLatestDeposit.value
+  if (!deposit || !activeCompany.value) {
+    topUpError.value = 'No active deposit found to top up.'
+    return
+  }
+  topUpLoading.value = true
+  topUpError.value = null
+  topUpSuccess.value = false
+  try {
+    await gqlRequest(TOP_UP_DEPOSIT_MUTATION, {
+      input: { depositId: deposit.id, amount: topUpAmount.value },
+    })
+    topUpSuccess.value = true
+    showTopUpForm.value = false
+    topUpAmount.value = 10_000
+    await loadData()
+    setTimeout(() => { topUpSuccess.value = false }, 3000)
+  } catch (err) {
+    topUpError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    topUpLoading.value = false
+  }
+}
+
+async function submitWithdraw() {
+  const deposit = myOldestDeposit.value
+  if (!deposit || !activeCompany.value) {
+    withdrawError.value = 'No active deposit found to withdraw from.'
+    return
+  }
+  const amount = Math.min(withdrawAmount.value, deposit.amount)
+  withdrawLoading.value = true
+  withdrawError.value = null
+  withdrawSuccess.value = false
+  try {
+    await gqlRequest(WITHDRAW_DEPOSIT_MUTATION, {
+      input: { depositId: deposit.id, amount },
+    })
+    withdrawSuccess.value = true
+    showWithdrawForm.value = false
+    withdrawAmount.value = 0
+    await loadData()
+    setTimeout(() => { withdrawSuccess.value = false }, 3000)
+  } catch (err) {
+    withdrawError.value = err instanceof Error ? err.message : String(err)
+  } finally {
+    withdrawLoading.value = false
   }
 }
 
@@ -692,7 +801,7 @@ const estimatedCustomerTotalPayments = computed(() => {
       </template>
       <template v-else-if="!loading">
         <div class="customer-nav">
-          <button class="btn-back" @click="router.push('/loans')">← {{ t('bank.backToMarketplace') }}</button>
+          <button class="btn-back" @click="router.push('/banking')">← {{ t('bank.backToMarketplace') }}</button>
         </div>
         <h1 class="page-title">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
         <p class="page-subtitle">{{ bankInfo?.lenderCompanyName }} · {{ bankInfo?.cityName }}</p>
@@ -735,8 +844,8 @@ const estimatedCustomerTotalPayments = computed(() => {
         </button>
       </div>
 
-      <!-- Bank Info & Rate Configuration (only when activated) -->
-      <div v-if="bankInfo && bankInfo.baseCapitalDeposited" class="bank-info-section">
+      <!-- Bank Info & Rate Configuration (visible to owner regardless of activation status) -->
+      <div v-if="bankInfo" class="bank-info-section">
         <div class="bank-info-header">
           <h2>{{ t('bank.bankRates') }}</h2>
           <button class="btn btn-secondary btn-sm" @click="showRatesForm = !showRatesForm">
@@ -1076,47 +1185,89 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
         </div>
 
-        <!-- My deposits at this bank -->
-        <section v-if="auth.isAuthenticated && myDepositsHere.length > 0" class="customer-deposits-section">
-          <h2 class="section-title">{{ t('bank.yourDepositsHere') }}</h2>
-          <div class="deposits-list">
-            <div v-for="dep in myDepositsHere" :key="dep.id" class="deposit-card">
-              <div class="deposit-card-header">
-                <span class="deposit-company">{{ dep.depositorCompanyName }}</span>
-                <span class="deposit-rate-badge">{{ formatPercent(dep.depositInterestRatePercent) }} p.a.</span>
-              </div>
-              <div class="deposit-stats">
-                <div class="deposit-stat">
-                  <span class="deposit-stat-label">{{ t('bank.depositAmount') }}</span>
-                  <span class="deposit-stat-value">{{ formatCurrency(dep.amount) }}</span>
-                </div>
-                <div class="deposit-stat">
-                  <span class="deposit-stat-label">{{ t('bank.depositInterestEarned') }}</span>
-                  <span class="deposit-stat-value positive">+{{ formatCurrency(dep.totalInterestPaid) }}</span>
-                </div>
-              </div>
+        <!-- Account-style deposit relationship -->
+        <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section">
+          <div class="account-header">
+            <div class="account-header-info">
+              <h2 class="section-title">{{ t('bank.myAccount') }}</h2>
+              <span class="account-company-tag">{{ activeCompany?.name }}</span>
+            </div>
+            <div class="account-actions" v-if="myAccountBalance > 0">
+              <button class="btn btn-secondary btn-sm" @click="showTopUpForm = !showTopUpForm; showWithdrawForm = false">
+                {{ showTopUpForm ? t('common.cancel') : t('bank.addFunds') }}
+              </button>
+              <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm; showTopUpForm = false">
+                {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
+              </button>
             </div>
           </div>
-        </section>
 
-        <!-- Deposit form -->
-        <section class="customer-deposit-form-section">
-          <h2 class="section-title">{{ t('bank.makeDeposit') }}</h2>
-          <div v-if="!auth.isAuthenticated" class="auth-prompt">
-            <p>{{ t('bank.loginToLendDescription') }}</p>
-            <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
-          </div>
-          <div v-else-if="!isCompanyAccountActive" class="auth-prompt">
-            <p>{{ t('bank.companyAccountRequired') }}</p>
-          </div>
-          <div v-else class="customer-deposit-form">
-            <div class="form-group">
-              <label>{{ t('common.company') }}</label>
-              <div class="active-company-display">
-                <strong>{{ activeCompany?.name }}</strong>
-                <span>{{ formatCurrency(activeCompany?.cash ?? 0) }}</span>
-              </div>
+          <!-- Account balance card -->
+          <div v-if="myAccountBalance > 0" class="account-balance-card">
+            <div class="account-balance-main">
+              <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
+              <span class="account-balance-value">{{ formatCurrency(myAccountBalance) }}</span>
             </div>
+            <div class="account-balance-meta">
+              <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
+              <span class="account-interest-value positive">+{{ formatCurrency(myAccountInterestEarned) }}</span>
+              <span v-if="bankInfo" class="account-rate-badge">
+                {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Top-up form -->
+          <div v-if="showTopUpForm" class="account-action-form">
+            <h3 class="action-form-title">{{ t('bank.addFunds') }}</h3>
+            <div class="form-group">
+              <label for="top-up-amount">{{ t('bank.depositAmount') }}</label>
+              <input id="top-up-amount" v-model.number="topUpAmount" type="number" min="1000" step="1000" class="form-input" />
+              <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
+            </div>
+            <div class="form-group">
+              <span class="form-hint">{{ t('common.availableFunds') }}: {{ formatCurrency(activeCompany?.cash ?? 0) }}</span>
+            </div>
+            <div v-if="topUpError" class="error-message">{{ topUpError }}</div>
+            <button class="btn btn-primary" :disabled="topUpLoading || topUpAmount < 1000" @click="submitTopUp">
+              {{ topUpLoading ? t('common.loading') : t('bank.confirmDeposit') }}
+            </button>
+          </div>
+
+          <!-- Withdraw form -->
+          <div v-if="showWithdrawForm" class="account-action-form">
+            <h3 class="action-form-title">{{ t('bank.withdraw') }}</h3>
+            <div class="form-group">
+              <label for="withdraw-amount">{{ t('bank.withdrawAmount') }}</label>
+              <input
+                id="withdraw-amount"
+                v-model.number="withdrawAmount"
+                type="number"
+                :min="1"
+                :max="myAccountBalance"
+                step="1000"
+                class="form-input"
+              />
+              <span class="form-hint">{{ t('bank.maxWithdraw') }}: {{ formatCurrency(myAccountBalance) }}</span>
+            </div>
+            <div v-if="withdrawError" class="error-message">{{ withdrawError }}</div>
+            <button
+              class="btn btn-primary"
+              :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance"
+              @click="submitWithdraw"
+            >
+              {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
+            </button>
+          </div>
+
+          <!-- Success messages -->
+          <div v-if="topUpSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
+          <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
+          <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
+
+          <!-- First deposit (no account yet) -->
+          <div v-if="myAccountBalance === 0 && !customerDepositSuccess" class="account-empty-state">
+            <p class="account-empty-hint">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
             <div class="form-group">
               <label for="customer-deposit-amount">{{ t('bank.depositAmount') }}</label>
               <input
@@ -1135,15 +1286,26 @@ const estimatedCustomerTotalPayments = computed(() => {
                 <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
               </div>
             </div>
-            <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
             <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
             <button
               class="btn btn-primary"
               :disabled="customerDepositLoading || customerDepositAmount < 1000"
               @click="submitCustomerDeposit"
             >
-              {{ customerDepositLoading ? t('common.loading') : t('bank.confirmDeposit') }}
+              {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
             </button>
+          </div>
+        </section>
+
+        <!-- Prompt to log in or switch account if not in company mode -->
+        <section v-else class="customer-deposit-form-section">
+          <h2 class="section-title">{{ t('bank.makeDeposit') }}</h2>
+          <div v-if="!auth.isAuthenticated" class="auth-prompt">
+            <p>{{ t('bank.loginToLendDescription') }}</p>
+            <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
+          </div>
+          <div v-else class="auth-prompt">
+            <p>{{ t('bank.companyAccountRequired') }}</p>
           </div>
         </section>
 
@@ -2361,5 +2523,125 @@ th {
 
 .collateral-badge-value {
   color: var(--color-text-muted);
+}
+
+/* ── Account-style deposit section ─────────────────────────────── */
+.customer-account-section {
+  margin-bottom: var(--spacing-xl);
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 12px);
+  padding: var(--spacing-lg);
+}
+
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacing-md);
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.account-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-header-info .section-title {
+  margin: 0;
+}
+
+.account-company-tag {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.account-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.account-balance-card {
+  background: var(--color-bg-subtle, rgba(0,0,0,0.03));
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.account-balance-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.account-balance-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.account-balance-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text-primary, #111);
+  line-height: 1.1;
+}
+
+.account-balance-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex-wrap: wrap;
+  margin-top: var(--spacing-xs);
+}
+
+.account-interest-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.account-interest-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.account-rate-badge {
+  font-size: 0.8rem;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--color-primary-bg, rgba(59,130,246,0.1));
+  color: var(--color-primary, #3b82f6);
+  font-weight: 600;
+}
+
+.account-action-form {
+  background: var(--color-surface-raised, rgba(0,0,0,0.02));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.action-form-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 var(--spacing-md) 0;
+}
+
+.account-empty-state {
+  padding: var(--spacing-md) 0;
+}
+
+.account-empty-hint {
+  color: var(--color-text-secondary);
+  margin-bottom: var(--spacing-md);
+  font-size: 0.95rem;
 }
 </style>

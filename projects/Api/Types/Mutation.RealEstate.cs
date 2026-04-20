@@ -144,6 +144,14 @@ public sealed partial class Mutation
             building.MediaType = input.MediaType;
         }
 
+        // Pre-initialize default interest rates for bank buildings so the owner
+        // can see and edit them from the bank management page immediately.
+        if (input.BuildingType == BuildingType.Bank)
+        {
+            building.DepositInterestRatePercent ??= 3m;
+            building.LendingInterestRatePercent ??= 8m;
+        }
+
         try
         {
             var currentTick = await db.GameStates

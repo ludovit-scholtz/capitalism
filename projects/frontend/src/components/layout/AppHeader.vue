@@ -85,8 +85,8 @@ function handleChatToggle() {
         <RouterLink to="/stocks" :title="t('nav.stocks')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.stocks') }}</span>
         </RouterLink>
-        <RouterLink to="/loans" :title="t('nav.loans')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.loans') }}</span>
+        <RouterLink to="/banking" :title="t('nav.banking')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.banking') }}</span>
         </RouterLink>
         <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link-with-badge" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
