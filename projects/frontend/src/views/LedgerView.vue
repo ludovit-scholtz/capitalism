@@ -107,7 +107,7 @@ async function selectGameYear(gameYear: number | null) {
 }
 
 function formatAmount(amount: number, currencyCode?: string): string {
-  const code = currencyCode ?? ledger.value?.primaryCurrencyCode ?? 'EUR'
+  const code = getEffectiveCurrencyCode(currencyCode)
   if (amount == null || !isFinite(amount) || isNaN(amount)) return '—'
   return new Intl.NumberFormat(locale.value, {
     style: 'currency',
@@ -115,6 +115,14 @@ function formatAmount(amount: number, currencyCode?: string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
+}
+
+function getEffectiveCurrencyCode(currencyCode?: string | null): string {
+  return currencyCode ?? ledger.value?.primaryCurrencyCode ?? 'EUR'
+}
+
+function showInlineCurrencyBadge(entryCurrencyCode?: string | null): boolean {
+  return (entryCurrencyCode ?? 'EUR') !== (ledger.value?.primaryCurrencyCode ?? 'EUR')
 }
 
 function amountClass(amount: number): string {
@@ -486,7 +494,7 @@ useTickRefresh(async () => {
                 <td>{{ entry.productName ?? entry.resourceName ?? entry.description }}</td>
                 <td :class="amountClass(entry.amount)">
                   {{ formatAmount(entry.amount, entry.currencyCode) }}
-                  <span v-if="entry.currencyCode !== (ledger?.primaryCurrencyCode ?? 'EUR')" class="currency-badge currency-badge-inline">{{ entry.currencyCode }}</span>
+                  <span v-if="showInlineCurrencyBadge(entry.currencyCode)" class="currency-badge currency-badge-inline">{{ entry.currencyCode }}</span>
                 </td>
                 <td>{{ entry.recordedAtTick }}</td>
                 <td>
