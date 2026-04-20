@@ -249,15 +249,15 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.True(byCode.ContainsKey("CNY"), "CNY must be parsed");
         Assert.True(byCode.ContainsKey("INR"), "INR must be parsed");
 
-        // CZK: 1 CZK = 0.03970 EUR → 1 EUR = 1/0.03970 ≈ 25.188 CZK
+        // CZK: NBS says 1 CZK = 0.03970 EUR → stored rate (EUR→CZK) = 1/0.03970 ≈ 25.19
         Assert.True(byCode["CZK"].Rate > 20m && byCode["CZK"].Rate < 30m,
             $"CZK rate should be ~25, got {byCode["CZK"].Rate}");
 
-        // USD: 1 USD = 1.13500 EUR → 1 EUR = 1/1.13500 ≈ 0.881 USD
+        // USD: NBS says 1 USD = 1.13500 EUR → stored rate (EUR→USD) = 1/1.13500 ≈ 0.881
         Assert.True(byCode["USD"].Rate > 0.8m && byCode["USD"].Rate < 1.0m,
             $"USD rate should be ~0.88, got {byCode["USD"].Rate}");
 
-        // INR has amount=100: 100 INR = 0.01120 EUR → 1 EUR = 100/0.01120 ≈ 8928 INR
+        // INR has amount=100: NBS says 100 INR = 0.01120 EUR → stored rate (EUR→INR) = 100/0.01120 ≈ 8928
         Assert.True(byCode["INR"].Rate > 8000m && byCode["INR"].Rate < 10000m,
             $"INR rate should be ~8928, got {byCode["INR"].Rate}");
 

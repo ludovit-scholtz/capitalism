@@ -3821,9 +3821,12 @@ test.describe('City selection — Vienna as starter city', () => {
     await page.getByRole('button', { name: 'Next' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    // New York card must contain some reference to USD (currency code or symbol)
+    // New York card must show the USD currency code badge
     const nyCard = page.locator('.city-card', { hasText: 'New York' })
     await expect(nyCard).toBeVisible()
+    await expect(nyCard.locator('.city-currency', { hasText: 'USD' })).toBeVisible()
+
+    // Card is also selectable
     await nyCard.click()
     await expect(nyCard).toHaveClass(/selected|active/)
   })
@@ -3863,8 +3866,8 @@ test.describe('City selection — Vienna as starter city', () => {
 
     // Proceed to step 3 (company setup / lot purchase)
     await page.getByRole('button', { name: 'Next' }).click()
-    // Step 3 heading: "Name Your Company" or "Choose Your Lot"
-    await expect(page.getByRole('heading', { name: /company|factory|lot/i })).toBeVisible()
+    // Step 3 heading: "Choose Your First Factory Lot"
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
   })
 })
 
