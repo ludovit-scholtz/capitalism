@@ -555,3 +555,33 @@ public sealed class SetBankRatesInput
     /// <summary>Annual interest rate (%) to charge borrowers. Must be between 0.1 and 200.</summary>
     public decimal LendingInterestRatePercent { get; set; }
 }
+
+/// <summary>Input for requesting a forex swap quote without executing the trade.</summary>
+public sealed class GetForexQuoteInput
+{
+    /// <summary>Currency the player wants to sell (ISO 4217 code, e.g. "EUR").</summary>
+    [Required, MaxLength(3)]
+    public string FromCurrencyCode { get; set; } = string.Empty;
+
+    /// <summary>Currency the player wants to buy (ISO 4217 code, e.g. "CZK").</summary>
+    [Required, MaxLength(3)]
+    public string ToCurrencyCode { get; set; } = string.Empty;
+
+    /// <summary>Amount in the source currency to swap (must be > 0).</summary>
+    public decimal Amount { get; set; }
+}
+
+/// <summary>Input for executing a forex currency swap.</summary>
+public sealed class ExecuteForexSwapInput
+{
+    /// <summary>Currency the player wants to sell (ISO 4217 code, e.g. "EUR").</summary>
+    [Required, MaxLength(3)]
+    public string FromCurrencyCode { get; set; } = string.Empty;
+
+    /// <summary>Currency the player wants to buy (ISO 4217 code, e.g. "CZK").</summary>
+    [Required, MaxLength(3)]
+    public string ToCurrencyCode { get; set; } = string.Empty;
+
+    /// <summary>Amount in the source currency to swap (must be > 0).</summary>
+    public decimal Amount { get; set; }
+}

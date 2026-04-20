@@ -205,6 +205,92 @@ public sealed partial class AppDbInitializer
                         """);
                 }
             }
+
+            // Ensure PlayerCurrencyBalances table exists (added in AddForexExchangeMvp migration).
+            if (!await TableExistsAsync(connection, dialect, "PlayerCurrencyBalances"))
+            {
+                if (dialect.IsPostgres)
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
+                            "Id" uuid NOT NULL,
+                            "PlayerId" uuid NOT NULL,
+                            "CurrencyCode" character varying(3) NOT NULL,
+                            "Balance" numeric(18,4) NOT NULL DEFAULT 0,
+                            "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
+                            "UpdatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
+                            CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id"),
+                            CONSTRAINT "FK_PlayerCurrencyBalances_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
+                        )
+                        """);
+                    await ExecuteNonQueryAsync(connection,
+                        "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PlayerCurrencyBalances_PlayerId_CurrencyCode\" ON \"PlayerCurrencyBalances\" (\"PlayerId\", \"CurrencyCode\")");
+                }
+                else
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
+                            "Id" TEXT NOT NULL,
+                            "PlayerId" TEXT NOT NULL,
+                            "CurrencyCode" TEXT NOT NULL,
+                            "Balance" TEXT NOT NULL DEFAULT '0',
+                            "CreatedAtUtc" TEXT NOT NULL,
+                            "UpdatedAtUtc" TEXT NOT NULL,
+                            CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id"),
+                            CONSTRAINT "FK_PlayerCurrencyBalances_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
+                        )
+                        """);
+                }
+            }
+
+            // Ensure ForexTradeRecords table exists (added in AddForexExchangeMvp migration).
+            if (!await TableExistsAsync(connection, dialect, "ForexTradeRecords"))
+            {
+                if (dialect.IsPostgres)
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "ForexTradeRecords" (
+                            "Id" uuid NOT NULL,
+                            "PlayerId" uuid NOT NULL,
+                            "FromCurrencyCode" character varying(3) NOT NULL,
+                            "ToCurrencyCode" character varying(3) NOT NULL,
+                            "FromAmount" numeric(18,4) NOT NULL,
+                            "ToAmount" numeric(18,4) NOT NULL,
+                            "FeeAmount" numeric(18,4) NOT NULL,
+                            "Rate" numeric(18,6) NOT NULL,
+                            "ExecutedAtTick" bigint NOT NULL,
+                            "ExecutedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
+                            CONSTRAINT "PK_ForexTradeRecords" PRIMARY KEY ("Id"),
+                            CONSTRAINT "FK_ForexTradeRecords_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
+                        )
+                        """);
+                    await ExecuteNonQueryAsync(connection,
+                        "CREATE INDEX IF NOT EXISTS \"IX_ForexTradeRecords_PlayerId_ExecutedAtTick\" ON \"ForexTradeRecords\" (\"PlayerId\", \"ExecutedAtTick\")");
+                }
+                else
+                {
+                    await ExecuteNonQueryAsync(connection,
+                        """
+                        CREATE TABLE IF NOT EXISTS "ForexTradeRecords" (
+                            "Id" TEXT NOT NULL,
+                            "PlayerId" TEXT NOT NULL,
+                            "FromCurrencyCode" TEXT NOT NULL,
+                            "ToCurrencyCode" TEXT NOT NULL,
+                            "FromAmount" TEXT NOT NULL,
+                            "ToAmount" TEXT NOT NULL,
+                            "FeeAmount" TEXT NOT NULL,
+                            "Rate" TEXT NOT NULL,
+                            "ExecutedAtTick" INTEGER NOT NULL,
+                            "ExecutedAtUtc" TEXT NOT NULL,
+                            CONSTRAINT "PK_ForexTradeRecords" PRIMARY KEY ("Id"),
+                            CONSTRAINT "FK_ForexTradeRecords_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
+                        )
+                        """);
+                }
+            }
         }
         finally
         {

@@ -16,6 +16,7 @@ namespace Api.Types;
 /// <item><c>Query.Chat.cs</c> — in-game chat feed</item>
 /// <item><c>Query.Rankings.cs</c> — player/company rankings and game state</item>
 /// <item><c>Query.Lending.cs</c> — bank loan offers and player loans</item>
+/// <item><c>Query.Forex.cs</c> — forex quote, player currency balances, and trade history</item>
 /// </list>
 /// </summary>
 public sealed partial class Query

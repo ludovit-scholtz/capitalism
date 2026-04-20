@@ -1442,3 +1442,54 @@ export interface FxRate {
   source: 'NBS' | 'FALLBACK'
   quoteCurrencySymbol: string
 }
+
+/** Quote for a forex swap — preview before execution. */
+export interface ForexQuote {
+  fromCurrencyCode: string
+  toCurrencyCode: string
+  fromAmount: number
+  toAmount: number
+  feeAmount: number
+  feePercent: number
+  rate: number
+  availableFromBalance: number
+  fromCurrencySymbol: string
+  toCurrencySymbol: string
+}
+
+/** Result of a successfully executed forex trade. */
+export interface ForexTradeResult {
+  tradeId: string
+  fromCurrencyCode: string
+  toCurrencyCode: string
+  fromAmount: number
+  toAmount: number
+  feeAmount: number
+  rate: number
+  newFromBalance: number
+  newToBalance: number
+  fromCurrencySymbol: string
+  toCurrencySymbol: string
+}
+
+/** A single entry in the player's forex trade history. */
+export interface ForexTradeHistoryEntry {
+  id: string
+  fromCurrencyCode: string
+  toCurrencyCode: string
+  fromAmount: number
+  toAmount: number
+  feeAmount: number
+  rate: number
+  executedAtTick: number
+  executedAtUtc: string
+  fromCurrencySymbol: string
+  toCurrencySymbol: string
+}
+
+/** A currency balance in the player's personal multi-currency wallet. */
+export interface CurrencyBalance {
+  currencyCode: string
+  currencySymbol: string
+  balance: number
+}

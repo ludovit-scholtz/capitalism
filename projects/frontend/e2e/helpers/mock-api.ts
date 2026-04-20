@@ -756,6 +756,22 @@ export type MockState = {
   unitLastTickMovement: Record<string, { lastTickInflow: number; lastTickOutflow: number }>
   /** FX rates returned by the fxRates query. Keyed by quoteCurrencyCode. */
   fxRates: MockFxRate[]
+  /** Player currency balances (non-EUR). Populated by executeForexSwap. */
+  playerCurrencyBalances: { currencyCode: string; currencySymbol: string; balance: number }[]
+  /** Forex trade history entries for the authenticated player. */
+  forexTradeHistory: {
+    id: string
+    fromCurrencyCode: string
+    toCurrencyCode: string
+    fromAmount: number
+    toAmount: number
+    feeAmount: number
+    rate: number
+    executedAtTick: number
+    executedAtUtc: string
+    fromCurrencySymbol: string
+    toCurrencySymbol: string
+  }[]
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1778,6 +1794,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     forceBuildingConfigError: null,
     unitLastTickMovement: {},
     fxRates: makeDefaultFxRates(),
+    playerCurrencyBalances: [],
+    forexTradeHistory: [],
     ...initial,
   }
 
@@ -4775,6 +4793,151 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { fxRates: state.fxRates } }),
+      })
+    }
+
+    // Forex exchange handlers
+    if (query.includes('forexQuote') && !query.includes('executeForexSwap')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { fromCurrencyCode: string; toCurrencyCode: string; amount: number } | undefined
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const availableBalance = player ? player.personalCash : 0
+      const feeAmount = Math.round((vars?.amount ?? 0) * 0.01 * 10000) / 10000
+      const netAmount = (vars?.amount ?? 0) - feeAmount
+      const fromRate = state.fxRates.find((r) => r.quoteCurrencyCode === vars?.fromCurrencyCode)
+      const toRate = state.fxRates.find((r) => r.quoteCurrencyCode === vars?.toCurrencyCode)
+      const eurFromRate = fromRate?.rate ?? 1
+      const eurToRate = toRate?.rate ?? 1.1
+      const rate = vars?.fromCurrencyCode === 'EUR' ? eurToRate : vars?.toCurrencyCode === 'EUR' ? 1 / eurFromRate : eurToRate / eurFromRate
+      const toAmount = Math.round(netAmount * rate * 10000) / 10000
+      const fromSymbol = vars?.fromCurrencyCode === 'EUR' ? '€' : fromRate?.quoteCurrencySymbol ?? vars?.fromCurrencyCode ?? ''
+      const toSymbol = vars?.toCurrencyCode === 'EUR' ? '€' : toRate?.quoteCurrencySymbol ?? vars?.toCurrencyCode ?? ''
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            forexQuote: {
+              fromCurrencyCode: vars?.fromCurrencyCode ?? 'EUR',
+              toCurrencyCode: vars?.toCurrencyCode ?? 'CZK',
+              fromAmount: vars?.amount ?? 0,
+              toAmount,
+              feeAmount,
+              feePercent: 1,
+              rate: Math.round(rate * 1000000) / 1000000,
+              availableFromBalance: availableBalance,
+              fromCurrencySymbol: fromSymbol,
+              toCurrencySymbol: toSymbol,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('playerCurrencyBalances')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const eurBalance = { currencyCode: 'EUR', currencySymbol: '€', balance: player?.personalCash ?? 0 }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { playerCurrencyBalances: [eurBalance, ...state.playerCurrencyBalances] },
+        }),
+      })
+    }
+
+    if (query.includes('forexTradeHistory') && !query.includes('executeForexSwap')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { forexTradeHistory: state.forexTradeHistory } }),
+      })
+    }
+
+    if (query.includes('executeForexSwap')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { fromCurrencyCode: string; toCurrencyCode: string; amount: number } | undefined
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Player not found', 'PLAYER_NOT_FOUND')
+      const fromCode = vars?.fromCurrencyCode ?? 'EUR'
+      const toCode = vars?.toCurrencyCode ?? 'CZK'
+      const amount = vars?.amount ?? 0
+
+      // Check balance
+      const availableBalance = fromCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)?.balance ?? 0)
+      if (amount > availableBalance) return routeJsonError('Insufficient balance.', 'INSUFFICIENT_FUNDS')
+
+      const feeAmount = Math.round(amount * 0.01 * 10000) / 10000
+      const netAmount = amount - feeAmount
+      const fromRate = state.fxRates.find((r) => r.quoteCurrencyCode === fromCode)
+      const toRate = state.fxRates.find((r) => r.quoteCurrencyCode === toCode)
+      const eurFromRate = fromRate?.rate ?? 1
+      const eurToRate = toRate?.rate ?? 1.1
+      const rate = fromCode === 'EUR' ? eurToRate : toCode === 'EUR' ? 1 / eurFromRate : eurToRate / eurFromRate
+      const toAmount = Math.round(netAmount * rate * 10000) / 10000
+
+      // Update balances
+      if (fromCode === 'EUR') {
+        player.personalCash -= amount
+      } else {
+        const bal = state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)
+        if (bal) bal.balance -= amount
+      }
+      if (toCode === 'EUR') {
+        player.personalCash += toAmount
+      } else {
+        let toBal = state.playerCurrencyBalances.find((b) => b.currencyCode === toCode)
+        if (!toBal) {
+          const toSym = toRate?.quoteCurrencySymbol ?? toCode
+          toBal = { currencyCode: toCode, currencySymbol: toSym, balance: 0 }
+          state.playerCurrencyBalances.push(toBal)
+        }
+        toBal.balance += toAmount
+      }
+
+      const fromSymbol = fromCode === 'EUR' ? '€' : fromRate?.quoteCurrencySymbol ?? fromCode
+      const toSymbol = toCode === 'EUR' ? '€' : toRate?.quoteCurrencySymbol ?? toCode
+
+      const tradeEntry = {
+        id: crypto.randomUUID(),
+        fromCurrencyCode: fromCode,
+        toCurrencyCode: toCode,
+        fromAmount: amount,
+        toAmount,
+        feeAmount,
+        rate: Math.round(rate * 1000000) / 1000000,
+        executedAtTick: 100,
+        executedAtUtc: new Date().toISOString(),
+        fromCurrencySymbol: fromSymbol,
+        toCurrencySymbol: toSymbol,
+      }
+      state.forexTradeHistory.unshift(tradeEntry)
+
+      const newFromBalance = fromCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)?.balance ?? 0)
+      const newToBalance = toCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === toCode)?.balance ?? 0)
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            executeForexSwap: {
+              tradeId: tradeEntry.id,
+              fromCurrencyCode: fromCode,
+              toCurrencyCode: toCode,
+              fromAmount: amount,
+              toAmount,
+              feeAmount,
+              rate: tradeEntry.rate,
+              newFromBalance,
+              newToBalance,
+              fromCurrencySymbol: fromSymbol,
+              toCurrencySymbol: toSymbol,
+            },
+          },
+        }),
       })
     }
 
