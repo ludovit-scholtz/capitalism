@@ -91,9 +91,11 @@ Implement banking as is described in the banking section.
 - ⬜ Tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps) – depends on "Tokenized gold management" roadmap item.
 - ⬜ Extend company building units (purchasing, B2B sales, public sales) to display the correct local city currency instead of always showing EUR.
 
-### Tokenized gold managemnt (0% complete)
+### Tokenized gold managemnt (60% complete)
 
-- Create management at the master frontend for game global administrators to manage the tokenized gold funds for users. Create there a table with the list of users and their funds, and allow global admin to add or remove the tokens from the user's account.
+**Shipped:** Global administrators can now manage gold token balances from the master frontend (`/gold-admin`). The page shows a searchable table of all players and their current gold balances, an adjust panel to add (positive amount) or deduct (negative amount) gold with a mandatory audit note, and a full transaction history log showing who changed what and when. The backend enforces non-negative balances, persists changes transactionally via a `GoldTokenTransaction` audit table, and requires JWT authentication plus global-admin authorization on all queries and mutations.
+
+**Remaining:** Player-facing gold balance display (my account page), cross-server gold transfers, tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps).
 
 ## FX Exahcnge
 
