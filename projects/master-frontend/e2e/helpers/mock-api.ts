@@ -56,6 +56,15 @@ export interface MockGoldTransaction {
   createdAtUtc: string
 }
 
+export interface MockPlayerGoldTransaction {
+  id: string
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  note: string | null
+  createdAtUtc: string
+}
+
 export interface MockState {
   servers: MockGameServer[]
   currentToken: string | null
@@ -64,6 +73,12 @@ export interface MockState {
   goldBalances: MockGoldBalance[]
   goldTransactions: MockGoldTransaction[]
   isGlobalAdmin: boolean
+  /** Player-facing gold account data (for myGoldAccount query). Defaults to zero balance with no transactions. */
+  playerGoldAccount: {
+    goldTokenBalance: number
+    lastUpdatedAtUtc: string | null
+    recentTransactions: MockPlayerGoldTransaction[]
+  } | null
 }
 
 export function makeServer(overrides: Partial<MockGameServer> = {}): MockGameServer {
@@ -123,6 +138,7 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
     goldBalances: initialState.goldBalances ?? [],
     goldTransactions: initialState.goldTransactions ?? [],
     isGlobalAdmin: initialState.isGlobalAdmin ?? false,
+    playerGoldAccount: initialState.playerGoldAccount ?? null,
   }
 
   page.route('**/graphql', async (route) => {
@@ -257,7 +273,8 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
       !query.includes('prolongSubscription') &&
       !query.includes('goldTokenBalances') &&
       !query.includes('goldTokenTransactions') &&
-      !query.includes('adjustGoldTokenBalance')
+      !query.includes('adjustGoldTokenBalance') &&
+      !query.includes('myGoldAccount')
     ) {
       if (state.currentPlayer) {
         await route.fulfill({
@@ -276,6 +293,31 @@ export function setupMockApi(page: Page, initialState: Partial<MockState> = {}):
           }),
         })
       }
+      return
+    }
+
+    // myGoldAccount query
+    if (query.includes('myGoldAccount')) {
+      if (!state.currentPlayer) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHENTICATED' } }],
+          }),
+        })
+        return
+      }
+      const goldAccount = state.playerGoldAccount ?? {
+        goldTokenBalance: 0,
+        lastUpdatedAtUtc: null,
+        recentTransactions: [],
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myGoldAccount: goldAccount } }),
+      })
       return
     }
 
