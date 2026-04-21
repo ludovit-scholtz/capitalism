@@ -13,6 +13,7 @@ interface Props {
   costs: number | null
   profit: number | null
   loading: boolean
+  currencyCode?: string
 }
 
 const props = defineProps<Props>()
@@ -21,11 +22,11 @@ const { t, locale } = useI18n()
 const hasData = computed(() => hasFinancialData(props.revenue, props.costs, props.profit))
 
 function fmt(value: number | null): string {
-  return fmtBuildingAmount(value, locale.value)
+  return fmtBuildingAmount(value, locale.value, props.currencyCode ?? 'EUR')
 }
 
 function fmtProfit(value: number | null): string {
-  return fmtBuildingProfit(value, locale.value)
+  return fmtBuildingProfit(value, locale.value, props.currencyCode ?? 'EUR')
 }
 </script>
 

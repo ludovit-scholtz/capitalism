@@ -1166,7 +1166,7 @@ export default {
       priceUpdate: {
         title: 'Schnelle Preisanpassung',
         desc: 'Legen Sie einen neuen Mindestverkaufspreis fest, der ab dem nächsten Tick gilt — kein Gebäude-Upgrade erforderlich.',
-        newPrice: 'Neuer Mindestpreis ($)',
+        newPrice: 'Neuer Mindestpreis',
         apply: 'Preis anwenden',
         saving: 'Speichern…',
         success: 'Preis aktualisiert! Der neue Preis gilt ab dem nächsten Tick.',

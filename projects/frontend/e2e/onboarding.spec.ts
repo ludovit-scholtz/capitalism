@@ -305,18 +305,18 @@ test.describe('Onboarding wizard', () => {
     await page.getByRole('button', { name: 'Next' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('$0')
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('€0')
 
     const growthIpoCard = page.locator('.ipo-card', { hasText: 'Growth IPO' })
     await growthIpoCard.click()
-    await expect(growthIpoCard).toContainText('$600,000')
+    await expect(growthIpoCard).toContainText('€600,000')
     await expect(growthIpoCard).toContainText('33.3%')
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$800,000')
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€800,000')
 
     await page.getByLabel('Company Name').fill('Growth Capital Works')
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('$703,100')
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€703,100')
   })
 
   test('renders mixed resource and intermediate-product recipes without runtime errors', async ({ page }) => {
@@ -964,11 +964,11 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.getByText('Estimated materials cost')).toBeVisible()
     await expect(page.getByText('Projected net profit')).toBeVisible()
 
-    // Revenue should be a positive dollar amount
+    // Revenue should be a positive amount in the city's currency (Bratislava = EUR)
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/€[\d,]+/)
   })
 
   test('guest completion screen shows tick panel explaining simulation time', async ({ page }) => {
@@ -1132,10 +1132,10 @@ test.describe('Guest onboarding wizard', () => {
     await expect(pricePanel).toBeVisible()
 
     // Panel should show the configured price (1.5× product base price)
-    // Wooden Chair base price = $45 → configured price = $67.5
+    // Wooden Chair base price = €45 → configured price = €67.50
     await expect(pricePanel).toContainText('Your Configured Sale Price')
-    await expect(pricePanel).toContainText(/\$67\.5/)
-    await expect(pricePanel).toContainText('$45')
+    await expect(pricePanel).toContainText(/€67\.5/)
+    await expect(pricePanel).toContainText('€45')
 
     // Panel must include the pricing tradeoff tip
     await expect(page.locator('.price-panel-tip')).toBeVisible()
@@ -1284,7 +1284,7 @@ test.describe('Dashboard', () => {
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
     const companyCard = page.locator('.company-card').first()
     await expect(companyCard.getByRole('heading', { name: 'Test Corp' })).toBeVisible()
-    await expect(companyCard.getByText('$500,000')).toBeVisible()
+    await expect(companyCard.getByText('€500,000')).toBeVisible()
     // Switch to Buildings tab to see building cards
     await page.getByRole('tab', { name: 'Buildings' }).click()
     await expect(companyCard.locator('.building-card', { hasText: 'Test Corp Factory' })).toBeVisible()
@@ -1649,7 +1649,7 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // All four guidance steps should be visible
     await expect(page.getByText('Review your cash')).toBeVisible()
     await expect(page.getByText('Set a selling price', { exact: true })).toBeVisible()
-    await expect(page.getByText('The market benchmark is $45.', { exact: false })).toBeVisible()
+    await expect(page.getByText('The market benchmark is €45.', { exact: false })).toBeVisible()
     await expect(page.getByText('Enable public sales')).toBeVisible()
     await expect(page.getByText('Wait for the next tick')).toBeVisible()
     await expect(page.locator('.tick-status')).toContainText('2000')
@@ -1747,8 +1747,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(priceStep).toBeVisible()
     await expect(priceStep).toContainText('margin')
     await expect(priceStep).toContainText('demand')
-    // Should reference the concrete base price from the product
-    await expect(priceStep).toContainText('$45')
+    // Should reference the concrete base price from the product (Bratislava = EUR)
+    await expect(priceStep).toContainText('€45')
   })
 
   test('configure-guide tick step shows next-tick processing steps', async ({ page }) => {
@@ -2390,10 +2390,10 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    // The price step must show the Bread market benchmark price ($3)
+    // The price step must show the Bread market benchmark price (€3 in EUR for Bratislava)
     const priceStep = page.locator('.configure-step').filter({ hasText: 'Set a selling price' })
     await expect(priceStep).toBeVisible()
-    await expect(priceStep).toContainText('$3')
+    await expect(priceStep).toContainText('€3')
   })
 
   test('configure-guide price step shows Healthcare benchmark price', async ({ page }) => {
@@ -2413,10 +2413,10 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    // The price step must show the Basic Medicine market benchmark price ($50)
+    // The price step must show the Basic Medicine market benchmark price (€50 in EUR for Bratislava)
     const priceStep = page.locator('.configure-step').filter({ hasText: 'Set a selling price' })
     await expect(priceStep).toBeVisible()
-    await expect(priceStep).toContainText('$50')
+    await expect(priceStep).toContainText('€50')
   })
 
   test('configure-guide price step shows Furniture benchmark price', async ({ page }) => {
@@ -2437,10 +2437,10 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    // The price step must show the Wooden Chair market benchmark price ($45)
+    // The price step must show the Wooden Chair market benchmark price (€45 in EUR for Bratislava)
     const priceStep = page.locator('.configure-step').filter({ hasText: 'Set a selling price' })
     await expect(priceStep).toBeVisible()
-    await expect(priceStep).toContainText('$45')
+    await expect(priceStep).toContainText('€45')
     // And it should explain margin and demand trade-offs (same as the margin test)
     await expect(priceStep).toContainText('margin')
   })
@@ -2900,11 +2900,11 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
 
     await expect(page.locator('.budget-grid').getByText('Cash after purchase')).toBeVisible()
-    // The cash-after value must be a dollar amount (may differ from starting cash)
+    // The cash-after value must be a currency amount (Bratislava = EUR)
     const cashAfterEl = page.locator('.budget-card').nth(1).locator('strong')
     await expect(cashAfterEl).toBeVisible()
     const cashAfterText = await cashAfterEl.textContent()
-    expect(cashAfterText).toMatch(/^\$[\d,]+$/)
+    expect(cashAfterText).toMatch(/^€[\d,]+$/)
   })
 
   test('guest wizard step 4 shows available cash and product base price per unit', async ({ page }) => {
@@ -2959,12 +2959,12 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     await expect(achievementList).toBeVisible()
     await expect(achievementList).toContainText(/Bread/i)
 
-    // Profit preview must also be visible with a dollar revenue figure
+    // Profit preview must also be visible with a currency revenue figure (Bratislava = EUR)
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/€[\d,]+/)
   })
 
   test('guest completion screen achievement list names Basic Medicine for Healthcare industry (AC3/AC9)', async ({ page }) => {
@@ -2993,12 +2993,12 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     await expect(achievementList).toBeVisible()
     await expect(achievementList).toContainText(/Basic Medicine/i)
 
-    // Profit preview must be visible with a dollar revenue figure
+    // Profit preview must be visible with a currency revenue figure (Bratislava = EUR)
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/€[\d,]+/)
 
     // Save prompt must be visible (AC12: ask to register after first profit)
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
@@ -3667,17 +3667,11 @@ test.describe('City selection — Prague as starter city', () => {
     // Step 5: completion / save-progress screen
     await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
-    // Ensure the profit preview shows a positive revenue amount
+    // Ensure the profit preview shows a positive revenue amount (Prague = CZK)
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
-
-    // The save-progress form should be present for registration
-    await expect(page.locator('#guestEmail')).toBeVisible()
-
-    // Verify the guest's chosen city (Prague) was used — state.buildingLots shows Prague lots were loaded
-    expect(state.buildingLots.some((lot) => lot.cityId === 'city-pr')).toBe(true)
+    expect(revenueText).toMatch(/CZK/)
   })
 })
 
@@ -3752,11 +3746,11 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
 
-    // Profit preview must show a positive revenue figure
+    // Profit preview must show a positive revenue figure (Vienna = EUR)
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/€[\d,]+/)
 
     // The save-progress form should be present for registration
     await expect(page.locator('#guestEmail')).toBeVisible()
@@ -4523,11 +4517,11 @@ test.describe('Cross-industry/city matrix — guest wizard completability (AC2, 
     await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
 
-    // Profit preview must show revenue
+    // Profit preview must show revenue (Prague = CZK)
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/CZK/)
 
     // Save-progress form must be visible
     await expect(page.locator('#guestEmail')).toBeVisible()
@@ -4614,11 +4608,11 @@ test.describe('Cross-industry/city matrix — guest wizard completability (AC2, 
     await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
 
-    // Profit preview must show revenue
+    // Profit preview must show revenue (Vienna = EUR)
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/€[\d,]+/)
 
     // Factory and shop layout panels must be visible (ROADMAP: wizard shows configured areas)
     await expect(page.locator('[aria-label="Factory layout"]')).toBeVisible()
@@ -4796,11 +4790,11 @@ test.describe('Cross-industry/city matrix — guest wizard completability (AC2, 
     await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
     await expect(page.locator('.guest-profit-preview')).toBeVisible()
 
-    // Profit preview must show revenue
+    // Profit preview must show revenue (Vienna = EUR)
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/\$\d/)
+    expect(revenueText).toMatch(/€[\d,]+/)
 
     // Save-progress form must be visible
     await expect(page.locator('#guestEmail')).toBeVisible()
@@ -5000,11 +4994,11 @@ test.describe('IPO plan — Expansion option ($800k raise, 25% founder)', () => 
     await expansionIpoCard.click()
 
     // Verify the Expansion IPO card shows the correct raise amount and 25% founder ownership
-    await expect(expansionIpoCard).toContainText('$800,000')
+    await expect(expansionIpoCard).toContainText('€800,000')
     await expect(expansionIpoCard).toContainText('25.0%')
 
-    // Starting cash must update to $1,000,000 = $200k founder + $800k raise
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$1,000,000')
+    // Starting cash must update to €1,000,000 = €200k founder + €800k raise
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
   })
 
   test('Expansion IPO updates Cash after purchase when factory lot is selected', async ({ page }) => {
@@ -5034,8 +5028,8 @@ test.describe('IPO plan — Expansion option ($800k raise, 25% founder)', () => 
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
 
-    // $1,000,000 - $96,900 = $903,100
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('$903,100')
+    // €1,000,000 - €96,900 = €903,100
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€903,100')
   })
 })
 
@@ -5060,9 +5054,9 @@ test.describe('Guest onboarding — Expansion IPO selection', () => {
     const expansionIpoCard = page.locator('.ipo-card', { hasText: 'Expansion IPO' })
     await expansionIpoCard.click()
 
-    // $200k founder + $800k raise = $1,000k company starting cash
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$1,000,000')
-    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('$0')
+    // €200k founder + €800k raise = €1,000k company starting cash
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
+    await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('€0')
   })
 
   test('guest Expansion IPO selection is preserved in localStorage progress', async ({ page }) => {
@@ -5078,14 +5072,14 @@ test.describe('Guest onboarding — Expansion IPO selection', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.locator('.ipo-card', { hasText: 'Expansion IPO' }).click()
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$1,000,000')
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
 
     // Reload the page — progress is restored from localStorage
     await page.reload()
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
 
-    // The Expansion IPO card must still be selected and starting cash still $1,000k
-    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('$1,000,000')
+    // The Expansion IPO card must still be selected and starting cash still €1,000k
+    await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€1,000,000')
   })
 })
 

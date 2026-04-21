@@ -4,23 +4,34 @@
  */
 
 /**
- * Formats an absolute monetary value as "$X,XXX".
- * Returns "$—" for null, NaN, or non-finite values.
+ * Formats an absolute monetary value using the given ISO 4217 currency code.
+ * Returns "—" for null, NaN, or non-finite values.
  */
-export function fmtBuildingAmount(value: number | null, locale = 'en'): string {
-  if (value === null || !isFinite(value) || isNaN(value)) return '$—'
-  return `$${Math.abs(value).toLocaleString(locale, { maximumFractionDigits: 0 })}`
+export function fmtBuildingAmount(value: number | null, locale = 'en', currencyCode = 'EUR'): string {
+  if (value === null || !isFinite(value) || isNaN(value)) return '—'
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value))
 }
 
 /**
- * Formats a profit/loss value with a sign prefix: "+$X,XXX" or "-$X,XXX".
- * Returns "$—" for null, NaN, or non-finite values.
+ * Formats a profit/loss value with a sign prefix using the given ISO 4217 currency code.
+ * Returns "—" for null, NaN, or non-finite values.
  * Zero profit has no sign prefix.
  */
-export function fmtBuildingProfit(value: number | null, locale = 'en'): string {
-  if (value === null || !isFinite(value) || isNaN(value)) return '$—'
+export function fmtBuildingProfit(value: number | null, locale = 'en', currencyCode = 'EUR'): string {
+  if (value === null || !isFinite(value) || isNaN(value)) return '—'
   const sign = value > 0 ? '+' : value < 0 ? '-' : ''
-  return `${sign}$${Math.abs(value).toLocaleString(locale, { maximumFractionDigits: 0 })}`
+  const formatted = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(Math.abs(value))
+  return `${sign}${formatted}`
 }
 
 /**

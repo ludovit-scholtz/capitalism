@@ -1163,7 +1163,7 @@ export default {
       priceUpdate: {
         title: 'Rýchla zmena ceny',
         desc: 'Nastavte novú minimálnu predajnú cenu, ktorá sa uplatní od nasledujúceho tiku — bez nutnosti rekonštrukcie budovy.',
-        newPrice: 'Nová min. cena ($)',
+        newPrice: 'Nová min. cena',
         apply: 'Uplatniť cenu',
         saving: 'Ukladanie…',
         success: 'Cena aktualizovaná! Nová cena sa uplatní od nasledujúceho tiku.',

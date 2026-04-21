@@ -23,6 +23,8 @@ import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, Comp
 
 // Module-level cache for city names — cities are static and never change during a session.
 const _cityNamesCache: Record<string, string> = {}
+// Module-level cache for city currencies — cities are static and never change during a session.
+const _cityCurrenciesCache: Record<string, string> = {}
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -39,6 +41,7 @@ const cityPowerBalances = ref<Record<string, CityPowerBalance>>({})
 const companyLedgers = ref<Record<string, CompanyLedgerSummary>>({})
 const ledgerLoading = ref(false)
 const cityNames = ref<Record<string, string>>({})
+const cityCurrencies = ref<Record<string, string>>({})
 /** Map from buildingId → per-unit operational statuses for supply-chain live status display. */
 const buildingUnitStatuses = ref<Record<string, BuildingUnitOperationalStatus[]>>({})
 /** Map from buildingId → aggregated financial totals (revenue, costs, profit). */
@@ -262,16 +265,23 @@ async function loadCityNames() {
     if (!deepEqual(cityNames.value, _cityNamesCache)) {
       cityNames.value = { ..._cityNamesCache }
     }
+    if (!deepEqual(cityCurrencies.value, _cityCurrenciesCache)) {
+      cityCurrencies.value = { ..._cityCurrenciesCache }
+    }
     return
   }
   try {
-    const data = await gqlRequest<{ cities: City[] }>('{ cities { id name } }')
-    const map: Record<string, string> = {}
+    const data = await gqlRequest<{ cities: City[] }>('{ cities { id name currencyCode } }')
+    const nameMap: Record<string, string> = {}
+    const currencyMap: Record<string, string> = {}
     for (const city of data.cities) {
-      map[city.id] = city.name
+      nameMap[city.id] = city.name
       _cityNamesCache[city.id] = city.name
+      currencyMap[city.id] = city.currencyCode
+      _cityCurrenciesCache[city.id] = city.currencyCode
     }
-    cityNames.value = map
+    cityNames.value = nameMap
+    cityCurrencies.value = currencyMap
   } catch {
     // best-effort — city names are non-critical
   }
@@ -289,6 +299,7 @@ async function loadLedgers(companyIds: string[], isRefresh = false) {
               companyId companyName gameYear isCurrentGameYear currentCash
               totalRevenue totalPurchasingCosts totalLaborCosts totalEnergyCosts
               totalMarketingCosts totalOtherCosts totalTaxPaid netIncome cashFromOperations
+              primaryCurrencyCode
             }
           }`,
           { companyId },
@@ -361,8 +372,13 @@ async function loadBuildingFinancials(buildingIds: string[], isRefresh = false) 
   }
 }
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString(locale.value)
+function formatCurrency(value: number, currencyCode = 'EUR'): string {
+  return new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value)
 }
 
 function formatDateTime(value: string): string {
@@ -472,7 +488,7 @@ async function createCompany() {
           <div class="person-account-metrics">
             <article class="person-metric-card">
               <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
-              <strong class="person-metric-value">${{ formatCurrency(auth.player?.personalCash ?? 0) }}</strong>
+              <strong class="person-metric-value">{{ formatCurrency(auth.player?.personalCash ?? 0, 'EUR') }}</strong>
             </article>
             <article class="person-metric-card">
               <span class="person-metric-label">{{ t('dashboard.controlledCompanies') }}</span>
@@ -485,7 +501,7 @@ async function createCompany() {
             <div class="controlled-companies-grid">
               <article v-for="company in companies" :key="company.id" class="controlled-company-card">
                 <strong>{{ company.name }}</strong>
-                <span>${{ formatCurrency(company.cash) }}</span>
+                <span>{{ formatCurrency(company.cash, companyLedgers[company.id]?.primaryCurrencyCode ?? 'EUR') }}</span>
                 <small>{{ t('dashboard.switchCompanyHint') }}</small>
               </article>
             </div>
@@ -537,7 +553,7 @@ async function createCompany() {
           <div class="person-account-metrics">
             <article class="person-metric-card">
               <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
-              <strong class="person-metric-value">${{ formatCurrency(auth.player?.personalCash ?? 0) }}</strong>
+              <strong class="person-metric-value">{{ formatCurrency(auth.player?.personalCash ?? 0, 'EUR') }}</strong>
             </article>
           </div>
 
@@ -560,7 +576,7 @@ async function createCompany() {
               <div class="company-meta">
                 <span class="meta-item">
                   <span class="meta-label">{{ t('dashboard.cash') }}</span>
-                  <span class="cash">${{ company.cash.toLocaleString() }}</span>
+                  <span class="cash">{{ formatCurrency(company.cash, companyLedgers[company.id]?.primaryCurrencyCode ?? 'EUR') }}</span>
                 </span>
                 <span class="meta-item">
                   <span class="meta-label">{{ t('dashboard.buildings') }}</span>
@@ -627,6 +643,7 @@ async function createCompany() {
                   :costs="buildingFinancials[building.id]?.totalCosts ?? null"
                   :profit="buildingFinancials[building.id]?.totalProfit ?? null"
                   :loading="buildingFinancialsLoading && !buildingFinancials[building.id]"
+                  :currency-code="cityCurrencies[building.cityId] ?? 'EUR'"
                 />
                 <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" class="building-supply-chain" />
               </div>

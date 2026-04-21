@@ -7,66 +7,86 @@ import {
 } from '@/lib/buildingHeaderFormatters'
 
 describe('fmtBuildingAmount', () => {
-  it('formats positive integers correctly', () => {
-    expect(fmtBuildingAmount(12000)).toBe('$12,000')
+  it('formats positive integers with EUR currency', () => {
+    expect(fmtBuildingAmount(12000, 'en', 'EUR')).toBe('€12,000')
   })
 
-  it('formats zero as $0', () => {
-    expect(fmtBuildingAmount(0)).toBe('$0')
+  it('formats positive integers with USD currency', () => {
+    expect(fmtBuildingAmount(12000, 'en', 'USD')).toBe('$12,000')
+  })
+
+  it('formats positive integers with CZK currency', () => {
+    expect(fmtBuildingAmount(12000, 'en', 'CZK')).toBe('CZK\u00a012,000')
+  })
+
+  it('formats zero as €0 with default EUR', () => {
+    expect(fmtBuildingAmount(0, 'en', 'EUR')).toBe('€0')
   })
 
   it('formats negative values as absolute (no minus sign)', () => {
-    expect(fmtBuildingAmount(-4500)).toBe('$4,500')
+    expect(fmtBuildingAmount(-4500, 'en', 'EUR')).toBe('€4,500')
   })
 
-  it('truncates decimals to whole dollars', () => {
-    expect(fmtBuildingAmount(999.99)).toBe('$1,000')
+  it('truncates decimals to whole units', () => {
+    expect(fmtBuildingAmount(999.99, 'en', 'EUR')).toBe('€1,000')
   })
 
-  it('returns $— for null', () => {
-    expect(fmtBuildingAmount(null)).toBe('$—')
+  it('returns — for null', () => {
+    expect(fmtBuildingAmount(null)).toBe('—')
   })
 
-  it('returns $— for NaN', () => {
-    expect(fmtBuildingAmount(NaN)).toBe('$—')
+  it('returns — for NaN', () => {
+    expect(fmtBuildingAmount(NaN)).toBe('—')
   })
 
-  it('returns $— for Infinity', () => {
-    expect(fmtBuildingAmount(Infinity)).toBe('$—')
+  it('returns — for Infinity', () => {
+    expect(fmtBuildingAmount(Infinity)).toBe('—')
   })
 
-  it('returns $— for -Infinity', () => {
-    expect(fmtBuildingAmount(-Infinity)).toBe('$—')
+  it('returns — for -Infinity', () => {
+    expect(fmtBuildingAmount(-Infinity)).toBe('—')
+  })
+
+  it('defaults to EUR when no currency code provided', () => {
+    const result = fmtBuildingAmount(1000)
+    expect(result).toContain('1,000')
+    expect(result).toContain('€')
   })
 })
 
 describe('fmtBuildingProfit', () => {
-  it('prefixes positive profit with +', () => {
-    expect(fmtBuildingProfit(7500)).toBe('+$7,500')
+  it('prefixes positive profit with + (EUR)', () => {
+    expect(fmtBuildingProfit(7500, 'en', 'EUR')).toBe('+€7,500')
   })
 
-  it('prefixes negative profit with -', () => {
-    expect(fmtBuildingProfit(-2000)).toBe('-$2,000')
+  it('prefixes negative profit with - (EUR)', () => {
+    expect(fmtBuildingProfit(-2000, 'en', 'EUR')).toBe('-€2,000')
   })
 
   it('formats zero profit with no sign prefix', () => {
-    expect(fmtBuildingProfit(0)).toBe('$0')
+    expect(fmtBuildingProfit(0, 'en', 'EUR')).toBe('€0')
   })
 
-  it('returns $— for null', () => {
-    expect(fmtBuildingProfit(null)).toBe('$—')
+  it('returns — for null', () => {
+    expect(fmtBuildingProfit(null)).toBe('—')
   })
 
-  it('returns $— for NaN', () => {
-    expect(fmtBuildingProfit(NaN)).toBe('$—')
+  it('returns — for NaN', () => {
+    expect(fmtBuildingProfit(NaN)).toBe('—')
   })
 
-  it('returns $— for Infinity', () => {
-    expect(fmtBuildingProfit(Infinity)).toBe('$—')
+  it('returns — for Infinity', () => {
+    expect(fmtBuildingProfit(Infinity)).toBe('—')
   })
 
-  it('formats large profit values correctly', () => {
-    expect(fmtBuildingProfit(1000000)).toBe('+$1,000,000')
+  it('formats large profit values correctly (EUR)', () => {
+    expect(fmtBuildingProfit(1000000, 'en', 'EUR')).toBe('+€1,000,000')
+  })
+
+  it('formats CZK profit with correct prefix', () => {
+    const result = fmtBuildingProfit(7500, 'en', 'CZK')
+    expect(result).toMatch(/^\+CZK/)
+    expect(result).toContain('7,500')
   })
 })
 
