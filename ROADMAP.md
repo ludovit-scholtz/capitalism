@@ -22,11 +22,13 @@ It will use real world map. The game will start in single city and later other c
 - Make the shipping costs also in similar price range in all cities, but expressed in the local currency.
 - Leaderboard must be expressed in USD currency, make sure the numbers collected in the leaderboard are correctly transformed from the local currencies
 
-### Number formatting
+### Number formatting (0% complete)
 
 Create component for unified number and currency formatting which will allow big numbers to be formatted properly. Examples of numbers: $1M = 1000000 USD, 600k Kč = 600000 CZK, 123.456M € = 123456789 EUR, $2.845k = 2845 USD, $123.456B = 123456789012 USD, $12.345T = 12345678901234 USD, $12.345Q = 12345678901234567 USD
 
 Make sure the Intl.NumberFormat is properly used for the number, so in english the . is used as decimal seperator and comma for thousands separator, and in czech language is comma used as the decimal separator and space as the thousands separator. Bind it to the local language selected not the browser language. For english the en-US is used, for slovak sk-SK, for german de-DE.
+
+Use this everywhere where numbers are visible.
 
 ### Power plants (30% complete)
 
