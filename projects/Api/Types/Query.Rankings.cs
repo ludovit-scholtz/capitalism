@@ -21,6 +21,7 @@ public sealed partial class Query
     ///
     /// Wealth formula for players: Personal cash + value of owned shares.
     /// Wealth formula for companies: Cash + BuildingValue + InventoryValue (unchanged).
+    /// TotalWealthUsd normalizes all local-currency values to USD for cross-city fairness.
     /// </summary>
     public async Task<List<PlayerRanking>> GetRankings([Service] AppDbContext db)
     {
@@ -42,6 +43,22 @@ public sealed partial class Query
 
         var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
 
+        // Load FX rates once for USD normalization.
+        // All stored rates are EUR-based (1 EUR = Rate units). EUR→USD = UsdRate.
+        var usdRate = await GetEurToUsdRateAsync(db);
+        // Company cash currency → EUR rate lookup (EUR per 1 unit of company currency = 1/EurRate)
+        var companyCurrencies = companies.Select(c => c.CurrencyCode).Distinct().ToList();
+        var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencies);
+
+        // Compute per-company share price in USD (share price is denominated in company currency).
+        var sharePriceUsdByCompany = companies.ToDictionary(
+            c => c.Id,
+            c =>
+            {
+                var localPrice = sharePriceByCompany.GetValueOrDefault(c.Id);
+                return ConvertToUsd(localPrice, c.CurrencyCode, eurRatesByCode, usdRate);
+            });
+
         return players
             .Select(p =>
             {
@@ -53,6 +70,15 @@ public sealed partial class Query
                         4,
                         MidpointRounding.AwayFromZero));
 
+                // Normalize to USD: PersonalCash is always EUR; shares use per-company USD share prices.
+                var personalCashUsd = Math.Round(personalCash * usdRate, 4);
+                var sharesValueUsd = shareholdings
+                    .Where(sh => sh.OwnerPlayerId == p.Id && sh.ShareCount > 0m)
+                    .Sum(sh => decimal.Round(
+                        sh.ShareCount * sharePriceUsdByCompany.GetValueOrDefault(sh.CompanyId),
+                        4,
+                        MidpointRounding.AwayFromZero));
+
                 return new PlayerRanking
                 {
                     PlayerId = p.Id,
@@ -60,14 +86,15 @@ public sealed partial class Query
                     PersonalCash = personalCash,
                     SharesValue = sharesValue,
                     TotalWealth = decimal.Round(personalCash + sharesValue, 4, MidpointRounding.AwayFromZero),
+                    TotalWealthUsd = decimal.Round(personalCashUsd + sharesValueUsd, 4, MidpointRounding.AwayFromZero),
                     CompanyCount = companies.Count(c => c.PlayerId == p.Id)
                 };
             })
-            .OrderByDescending(r => r.TotalWealth)
+            .OrderByDescending(r => r.TotalWealthUsd)
             .ToList();
     }
 
-    /// <summary>Returns per-company wealth rankings for the leaderboard.</summary>
+    /// <summary>Returns per-company wealth rankings for the leaderboard, normalized to USD.</summary>
     public async Task<List<CompanyRanking>> GetCompanyRankings([Service] AppDbContext db)
     {
         var companies = await db.Companies
@@ -93,6 +120,11 @@ public sealed partial class Query
             .GroupBy(i => i.BuildingId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Load FX rates once for USD normalization.
+        var usdRate = await GetEurToUsdRateAsync(db);
+        var companyCurrencies = companies.Select(c => c.CurrencyCode).Distinct().ToList();
+        var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencies);
+
         return companies
             .Select(c =>
             {
@@ -102,6 +134,7 @@ public sealed partial class Query
                     .Sum(b => inventoryByBuilding.TryGetValue(b.Id, out var inv)
                         ? inv.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i))
                         : 0m);
+                var totalWealth = c.Cash + buildingValue + inventoryValue;
 
                 return new CompanyRanking
                 {
@@ -110,14 +143,98 @@ public sealed partial class Query
                     PlayerId = c.PlayerId,
                     OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
                     Cash = c.Cash,
+                    CurrencyCode = c.CurrencyCode,
                     BuildingValue = buildingValue,
                     InventoryValue = inventoryValue,
-                    TotalWealth = c.Cash + buildingValue + inventoryValue,
+                    TotalWealth = totalWealth,
+                    TotalWealthUsd = Math.Round(ConvertToUsd(totalWealth, c.CurrencyCode, eurRatesByCode, usdRate), 4),
                     BuildingCount = c.Buildings.Count
                 };
             })
-            .OrderByDescending(r => r.TotalWealth)
+            .OrderByDescending(r => r.TotalWealthUsd)
             .ToList();
+    }
+
+    // ── FX normalization helpers ──────────────────────────────────────────────────
+
+    /// <summary>Returns EUR→USD rate from the FX rate table, defaulting to 1.08 if unavailable.</summary>
+    private static async Task<decimal> GetEurToUsdRateAsync(AppDbContext db)
+    {
+        var rate = await db.FxRates
+            .AsNoTracking()
+            .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "USD")
+            .OrderByDescending(r => r.RateDate)
+            .Select(r => r.Rate)
+            .FirstOrDefaultAsync();
+        return rate > 0 ? rate : 1.08m; // fallback
+    }
+
+    /// <summary>
+    /// Builds a lookup of EUR-based rates for each of the given currency codes.
+    /// Key = currency code, Value = "units of that currency per 1 EUR".
+    /// EUR itself maps to 1.0.
+    /// </summary>
+    private static async Task<Dictionary<string, decimal>> BuildEurRatesLookupAsync(
+        AppDbContext db,
+        IEnumerable<string> currencyCodes)
+    {
+        var codes = currencyCodes.Distinct().Where(c => c != "EUR").ToList();
+        var lookup = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase) { ["EUR"] = 1m };
+
+        if (codes.Count == 0) return lookup;
+
+        var dbRates = await db.FxRates
+            .AsNoTracking()
+            .Where(r => r.BaseCurrencyCode == "EUR" && codes.Contains(r.QuoteCurrencyCode))
+            .GroupBy(r => r.QuoteCurrencyCode)
+            .Select(g => new
+            {
+                CurrencyCode = g.Key,
+                Rate = g.OrderByDescending(r => r.RateDate).Select(r => r.Rate).First()
+            })
+            .ToListAsync();
+
+        foreach (var row in dbRates)
+        {
+            lookup[row.CurrencyCode] = row.Rate;
+        }
+
+        // Fallback rates for any currency not in the database
+        var fallbacks = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CZK"] = 25.20m,
+            ["USD"] = 1.08m,
+            ["GBP"] = 0.86m,
+            ["CNY"] = 7.84m,
+            ["INR"] = 90.50m,
+        };
+        foreach (var code in codes.Where(c => !lookup.ContainsKey(c)))
+        {
+            lookup[code] = fallbacks.TryGetValue(code, out var fallback) ? fallback : 1m;
+        }
+
+        return lookup;
+    }
+
+    /// <summary>
+    /// Converts an amount in <paramref name="currencyCode"/> to USD using EUR-based rates.
+    /// Formula: amount → EUR via eurRatesByCode, then EUR → USD via usdRate.
+    /// </summary>
+    private static decimal ConvertToUsd(
+        decimal amount,
+        string currencyCode,
+        Dictionary<string, decimal> eurRatesByCode,
+        decimal usdRate)
+    {
+        if (amount == 0m) return 0m;
+        if (string.Equals(currencyCode, "USD", StringComparison.OrdinalIgnoreCase)) return amount;
+
+        // Convert from local currency to EUR: EUR = amount / (units of currencyCode per EUR)
+        var eurUnitsPerLocal = eurRatesByCode.TryGetValue(currencyCode, out var r) && r > 0 ? r : 1m;
+        var amountInEur = amount / eurUnitsPerLocal;
+
+        // Convert EUR → USD
+        return amountInEur * usdRate;
     }
 
     /// <summary>Gets the current player's companies with their buildings.</summary>

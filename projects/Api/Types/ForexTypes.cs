@@ -126,3 +126,16 @@ public sealed class ForexTradeHistoryEntry
     /// <summary>Symbol for the target currency.</summary>
     public string ToCurrencySymbol => Mutation.GetCurrencySymbol(ToCurrencyCode);
 }
+
+/// <summary>
+/// A single EUR-based FX rate entry used for frontend price scaling.
+/// Rate means "units of CurrencyCode per 1 EUR".
+/// </summary>
+public sealed class EurFxRate
+{
+    /// <summary>ISO 4217 currency code of the quote currency.</summary>
+    public string CurrencyCode { get; set; } = string.Empty;
+
+    /// <summary>How many units of this currency equal 1 EUR (e.g. 25.20 for CZK, 1.08 for USD).</summary>
+    public decimal Rate { get; set; }
+}

@@ -10755,14 +10755,14 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             richToken);
 
         var result = await ExecuteGraphQlAsync(
-            "{ rankings { displayName totalWealth } }");
+            "{ rankings { displayName totalWealthUsd } }");
 
         var rankings = result.GetProperty("data").GetProperty("rankings")
             .EnumerateArray()
-            .Select(r => r.GetProperty("totalWealth").GetDecimal())
+            .Select(r => r.GetProperty("totalWealthUsd").GetDecimal())
             .ToList();
 
-        // Verify descending order
+        // Verify descending order by USD-normalized wealth (cross-currency fair ranking)
         for (int i = 1; i < rankings.Count; i++)
         {
             Assert.True(rankings[i - 1] >= rankings[i],
@@ -10800,6 +10800,101 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(200_000m, entry.GetProperty("personalCash").GetDecimal());
         Assert.Equal(0m, entry.GetProperty("sharesValue").GetDecimal());
         Assert.Equal(200_000m, entry.GetProperty("totalWealth").GetDecimal());
+    }
+
+    [Fact]
+    public async Task Rankings_TotalWealthUsdIsNonNegativeAndPresentForAllPlayers()
+    {
+        await RegisterAndGetTokenAsync($"usd-rank-{Guid.NewGuid():N}@test.com", "UsdRankPlayer");
+
+        var result = await ExecuteGraphQlAsync(
+            "{ rankings { displayName totalWealth totalWealthUsd } }");
+
+        var rankings = result.GetProperty("data").GetProperty("rankings");
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, rankings.ValueKind);
+
+        foreach (var entry in rankings.EnumerateArray())
+        {
+            var wealthUsd = entry.GetProperty("totalWealthUsd").GetDecimal();
+            Assert.True(wealthUsd >= 0, $"Expected non-negative USD wealth for {entry.GetProperty("displayName").GetString()}, got {wealthUsd}");
+        }
+    }
+
+    [Fact]
+    public async Task Rankings_CompanyRankingsExposeCurrencyCodeAndUsdWealth()
+    {
+        var token = await RegisterAndGetTokenAsync($"comp-rank-{Guid.NewGuid():N}@test.com", "CompRankPlayer");
+        await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "CurrRank Corp" } },
+            token);
+
+        var result = await ExecuteGraphQlAsync(
+            "{ companyRankings { companyName currencyCode totalWealth totalWealthUsd } }");
+
+        var rankings = result.GetProperty("data").GetProperty("companyRankings");
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, rankings.ValueKind);
+
+        var myCompany = rankings.EnumerateArray()
+            .FirstOrDefault(r => r.GetProperty("companyName").GetString() == "CurrRank Corp");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Undefined, myCompany.ValueKind);
+
+        var currencyCode = myCompany.GetProperty("currencyCode").GetString();
+        Assert.False(string.IsNullOrEmpty(currencyCode), "currencyCode should not be empty");
+
+        var totalWealthUsd = myCompany.GetProperty("totalWealthUsd").GetDecimal();
+        Assert.True(totalWealthUsd > 0, $"Expected positive USD wealth, got {totalWealthUsd}");
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_InPrague_CreatesCompanyWithCzkCurrency()
+    {
+        var token = await RegisterAndGetTokenAsync($"prague-{Guid.NewGuid():N}@test.com", "PraguePlayer");
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var lotId = await CreateTestLotAsync(pragueId, "FACTORY,MINE", "Prague District");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) {
+                nextStep
+                company { id name cash currencyCode }
+              }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId = pragueId, companyName = "Prague Factory", factoryLotId = lotId } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "startOnboardingCompany should succeed for Prague");
+
+        var company = result.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company");
+        var currencyCode = company.GetProperty("currencyCode").GetString();
+        var cash = company.GetProperty("cash").GetDecimal();
+
+        Assert.Equal("CZK", currencyCode);
+        // Prague company cash should be > 600_000 EUR (EUR-to-CZK conversion ~25.20)
+        Assert.True(cash > 600_000m,
+            $"Prague company cash ({cash} CZK) should be substantially larger than 600,000 (EUR base) due to EUR→CZK conversion");
+    }
+
+    [Fact]
+    public async Task EurFxRates_ReturnsAtLeastCzkAndUsd()
+    {
+        var result = await ExecuteGraphQlAsync("{ eurFxRates { currencyCode rate } }");
+
+        Assert.False(result.TryGetProperty("errors", out _), "eurFxRates query should succeed without auth");
+        var rates = result.GetProperty("data").GetProperty("eurFxRates");
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, rates.ValueKind);
+
+        var ratesByCurrency = rates.EnumerateArray()
+            .ToDictionary(r => r.GetProperty("currencyCode").GetString()!, r => r.GetProperty("rate").GetDecimal());
+
+        Assert.True(ratesByCurrency.ContainsKey("CZK"), "CZK rate should be present");
+        Assert.True(ratesByCurrency["CZK"] > 1m, $"CZK rate ({ratesByCurrency["CZK"]}) should be > 1 (units of CZK per 1 EUR)");
+
+        Assert.True(ratesByCurrency.ContainsKey("USD"), "USD rate should be present");
+        Assert.True(ratesByCurrency["USD"] > 0.5m && ratesByCurrency["USD"] < 3m,
+            $"USD rate ({ratesByCurrency["USD"]}) should be in a reasonable range (0.5–3)");
     }
 
     #endregion

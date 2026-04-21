@@ -9,6 +9,7 @@ import { useGameStateStore } from '@/stores/gameState'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { formatInGameTime } from '@/lib/gameTime'
+import { formatCompactMoney } from '@/lib/currencyFormat'
 import type { PlayerRanking, CompanyRanking } from '@/types'
 
 const { t, locale } = useI18n()
@@ -40,6 +41,7 @@ const PLAYER_RANKINGS_QUERY = `
       playerId
       displayName
       totalWealth
+      totalWealthUsd
       personalCash
       sharesValue
       companyCount
@@ -55,6 +57,8 @@ const COMPANY_RANKINGS_QUERY = `
       playerId
       ownerDisplayName
       totalWealth
+      totalWealthUsd
+      currencyCode
       cash
       buildingValue
       inventoryValue
@@ -132,14 +136,8 @@ function retryActiveTab() {
   void fetchPlayerRankings()
 }
 
-function formatWealth(value: number): string {
-  if (value >= 1_000_000) {
-    return `$${(value / 1_000_000).toFixed(2)}M`
-  }
-  if (value >= 1_000) {
-    return `$${(value / 1_000).toFixed(1)}K`
-  }
-  return `$${value.toLocaleString()}`
+function formatWealth(value: number, currencyCode = 'USD'): string {
+  return formatCompactMoney(value, currencyCode, locale.value)
 }
 
 function rankBadge(index: number): string {
@@ -233,7 +231,7 @@ const currentGameTime = computed(() => {
               </div>
             </div>
             <div class="rank-wealth">
-              <div class="total-wealth">{{ formatWealth(rank.totalWealth) }}</div>
+              <div class="total-wealth">{{ formatWealth(rank.totalWealthUsd) }}</div>
               <div class="wealth-breakdown">
                 <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.personalCash) }} </span>
                 <span class="breakdown-sep">·</span>
@@ -288,13 +286,13 @@ const currentGameTime = computed(() => {
               <div class="rank-companies">{{ t('leaderboard.ownedBy', { name: rank.ownerDisplayName }) }} · {{ t('leaderboard.buildingsCount', { n: rank.buildingCount }) }}</div>
             </div>
             <div class="rank-wealth">
-              <div class="total-wealth">{{ formatWealth(rank.totalWealth) }}</div>
+              <div class="total-wealth">{{ formatWealth(rank.totalWealthUsd) }}</div>
               <div class="wealth-breakdown">
-                <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.cash) }} </span>
+                <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.cash, rank.currencyCode) }} </span>
                 <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.buildingsTooltip')"> 🏗️ {{ formatWealth(rank.buildingValue) }} </span>
+                <span class="breakdown-item" :title="t('leaderboard.buildingsTooltip')"> 🏗️ {{ formatWealth(rank.buildingValue, rank.currencyCode) }} </span>
                 <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.inventoryTooltip')"> 📦 {{ formatWealth(rank.inventoryValue) }} </span>
+                <span class="breakdown-item" :title="t('leaderboard.inventoryTooltip')"> 📦 {{ formatWealth(rank.inventoryValue, rank.currencyCode) }} </span>
               </div>
             </div>
           </div>
