@@ -97,6 +97,15 @@ public sealed class Building
     public decimal ContentValue { get; set; }
 
     /// <summary>
+    /// Per-tick content spending amount configured by the media house owner.
+    /// Each tick this amount is deducted from the company cash and converted into
+    /// <see cref="ContentValue"/> using the level-based efficiency formula:
+    /// efficiency = 1 – 1/(level+1)  (50% at level 1, 66% at level 2, …).
+    /// Null or zero means no active content investment.
+    /// </summary>
+    public decimal? ContentBudgetPerTick { get; set; }
+
+    /// <summary>
     /// True when this building is a government-owned media house seeded as the baseline
     /// city media market.  Government outlets are always visible and operational but players
     /// cannot buy or configure them.

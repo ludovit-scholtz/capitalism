@@ -35,20 +35,23 @@ Implement banking as is described in the banking section.
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
-### Marketing (65% complete)
+### Marketing (80% complete)
 
 **Shipped in this increment:**
 - Every seeded city now has one government-owned media house of each type (Newspaper, Radio, TV) seeded at startup via `AppDbInitializer.SeedGovernmentMediaHousesAsync`. Government outlets carry an initial `ContentValue` of 1 000 and the `IsGovernmentOwned` flag.
-- `Building` entity extended with `ContentValue` (decimal) and `IsGovernmentOwned` (bool) fields. EF schema repair (`EnsureColumnAsync`) handles legacy databases on restart.
-- `GetCityMediaHouses` GraphQL query updated: now accepts optional `ownerCompanyId` param, returns `contentRanking` (% relative to top outlet in same city+category) and `isGovernmentOwned`, sorts player-owned outlets first then by ranking descending.
-- Frontend `CityMediaHouseInfo` type extended; `BuildingDetailView` marketing-unit picker upgraded from a plain `<select>` to a strategic card list showing type badge, GOV badge, YOUR STATION badge, city, reach multiplier, and content ranking.
-- `CityMapView` media-house section enhanced with GOV badge and content ranking row.
+- `Building` entity extended with `ContentValue` (decimal), `IsGovernmentOwned` (bool), and `ContentBudgetPerTick` (decimal?) fields. EF schema repair (`EnsureColumnAsync`) handles legacy databases on restart.
+- `GetCityMediaHouses` GraphQL query updated: now accepts optional `ownerCompanyId` param, returns `contentRanking`, `contentValue`, `contentBudgetPerTick`, and `isGovernmentOwned`, sorts player-owned outlets first then by ranking descending.
+- `MediaHouseContentPhase` (order 650): each tick decays all media house ContentValue by 0.5%, then converts ContentBudgetPerTick → accumulated content using the roadmap efficiency formula `efficiency = 1 – 1/(level+1)` (50% at L1, 66% at L2, 75% at L3, …). Records `MEDIA_HOUSE_CONTENT` ledger entries for each spend event.
+- `MarketingPhase` updated: brand awareness gain now uses a content-ranking multiplier (`0.5 + rankingFraction × 1.0`), so advertisers on top-ranked outlets gain up to 1.5× more awareness per budget unit while zero-ranked outlets yield only 0.5×.
+- `SetMediaHouseContentBudget` GraphQL mutation: authenticated, validates ownership, building type, and non-negative budget, persists the per-tick spend. Pass 0 or null to stop investing.
+- Frontend `CityMediaHouseInfo` type and `Building` type extended with `contentValue` and `contentBudgetPerTick`.
+- `BuildingDetailView` media-house management panel added: shows accumulated content, active budget, level efficiency, competitor ranking bar chart for same-city+category outlets, content investment form with gain preview, and effective marketing multiplier breakdown.
+- `CityMapView` media-house section and `BuildingDetailView` marketing-unit picker updated to include new fields in GraphQL queries.
 - i18n keys added in all three locales (en/sk/de).
 
 **Remaining:**
-- Implement all remaining Media house features (content production, content decay, competitive ranking lifecycle beyond initial seeding).
-- Implement all remaining Marketing features (brand quality improvements from marketing spend, full brand awareness loop).
-- Full marketing spend ↔ brand awareness ↔ sales demand simulation.
+- Implement full brand quality improvements from marketing spend (brand quality → product demand feedback loop).
+- Full marketing spend ↔ brand quality ↔ sales demand simulation end-to-end.
 
 ### Power plants (15% complete)
 

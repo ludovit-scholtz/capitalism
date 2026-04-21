@@ -284,7 +284,7 @@ async function fetchMediaHouses() {
       `query CityMediaHouses($cityId: UUID!) {
         cityMediaHouses(cityId: $cityId) {
           id name cityName mediaType effectivenessMultiplier ownerCompanyName
-          powerStatus isUnderConstruction contentRanking isGovernmentOwned
+          powerStatus isUnderConstruction contentRanking contentValue contentBudgetPerTick isGovernmentOwned
         }
       }`,
       { cityId: cityId.value },

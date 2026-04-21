@@ -463,6 +463,18 @@ public sealed class CityMediaHouseInfo
     /// </summary>
     public decimal ContentRanking { get; set; }
 
+    /// <summary>
+    /// Current accumulated content value for this media house.
+    /// Grows from per-tick content spending; decays 0.5% per tick.
+    /// </summary>
+    public decimal ContentValue { get; set; }
+
+    /// <summary>
+    /// Per-tick content spending configured by the owner.
+    /// Null means no active investment.
+    /// </summary>
+    public decimal? ContentBudgetPerTick { get; set; }
+
     /// <summary>True when the building is a government-seeded baseline media house.</summary>
     public bool IsGovernmentOwned { get; set; }
 }

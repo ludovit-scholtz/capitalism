@@ -198,6 +198,10 @@ export type MockBuilding = {
   constructionCompletesAtTick?: number | null
   /** Cash cost charged for construction */
   constructionCost?: number
+  /** Accumulated content value for MEDIA_HOUSE buildings */
+  contentValue?: number
+  /** Per-tick content spending budget for MEDIA_HOUSE buildings */
+  contentBudgetPerTick?: number | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }
@@ -710,6 +714,8 @@ export type MockCityMediaHouseInfo = {
   powerStatus: string
   isUnderConstruction: boolean
   contentRanking: number
+  contentValue: number
+  contentBudgetPerTick: number | null
   isGovernmentOwned: boolean
 }
 
@@ -1806,6 +1812,8 @@ export function makeDefaultGovernmentMediaHouses(
       powerStatus: 'POWERED',
       isUnderConstruction: false,
       contentRanking: 100,
+      contentValue: 1000,
+      contentBudgetPerTick: null,
       isGovernmentOwned: true,
     },
     {
@@ -1820,6 +1828,8 @@ export function makeDefaultGovernmentMediaHouses(
       powerStatus: 'POWERED',
       isUnderConstruction: false,
       contentRanking: 100,
+      contentValue: 1000,
+      contentBudgetPerTick: null,
       isGovernmentOwned: true,
     },
     {
@@ -1834,6 +1844,8 @@ export function makeDefaultGovernmentMediaHouses(
       powerStatus: 'POWERED',
       isUnderConstruction: false,
       contentRanking: 100,
+      contentValue: 1000,
+      contentBudgetPerTick: null,
       isGovernmentOwned: true,
     },
   ]
@@ -3617,6 +3629,60 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               pricePerSqm: building.pricePerSqm ?? null,
               pendingPricePerSqm: building.pendingPricePerSqm,
               pendingPriceActivationTick: building.pendingPriceActivationTick,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('SetMediaHouseContentBudget') || query.includes('setMediaHouseContentBudget')) {
+      if (!state.currentUserId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Not authenticated.', extensions: { code: 'AUTH_NOT_AUTHORIZED' } }] }),
+        })
+      }
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      const building = player?.companies.flatMap((company) => company.buildings).find((candidate) => candidate.id === input?.buildingId)
+
+      if (!building) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: "Building not found or you don't own it.", extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+        })
+      }
+
+      if (building.type !== 'MEDIA_HOUSE') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Only media house buildings support content budget.', extensions: { code: 'INVALID_BUILDING_TYPE' } }] }),
+        })
+      }
+
+      const budget = input?.contentBudgetPerTick ?? 0
+      if (budget < 0) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Content budget per tick must be a non-negative value.', extensions: { code: 'INVALID_BUDGET' } }] }),
+        })
+      }
+
+      building.contentBudgetPerTick = budget === 0 ? null : budget
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            setMediaHouseContentBudget: {
+              id: building.id,
+              contentBudgetPerTick: building.contentBudgetPerTick ?? null,
+              contentValue: building.contentValue ?? 0,
             },
           },
         }),

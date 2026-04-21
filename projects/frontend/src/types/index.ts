@@ -103,6 +103,10 @@ export interface Building {
   constructionCompletesAtTick: number | null
   /** Cash cost charged for construction (separate from the land price). */
   constructionCost: number
+  /** Accumulated content value for MEDIA_HOUSE buildings. Grows from content investment; decays 0.5% per tick. */
+  contentValue: number
+  /** Per-tick content spending configured by the media house owner. Null if not set. */
+  contentBudgetPerTick: number | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }
@@ -1137,6 +1141,10 @@ export interface CityMediaHouseInfo {
   isUnderConstruction: boolean
   /** Content ranking as a percentage (0–100) relative to the top outlet in the same city+category */
   contentRanking: number
+  /** Current accumulated content value */
+  contentValue: number
+  /** Per-tick content spending configured by the owner, null if not set */
+  contentBudgetPerTick: number | null
   /** True when the outlet is a government-seeded baseline media house */
   isGovernmentOwned: boolean
 }
