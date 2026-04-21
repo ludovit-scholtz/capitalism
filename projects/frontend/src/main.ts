@@ -20,12 +20,14 @@ import {
   faSignOutAlt,
   faTachometerAlt,
   faTrophy,
+  faCoins,
   faWallet,
   faComments,
+  faBullhorn,
 } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome'
 
-library.add(faHome, faTachometerAlt, faTrophy, faBook, faSignInAlt, faSignOutAlt, faBars, faChartBar, faLandmark, faWallet, faNewspaper, faShieldHalved, faComments)
+library.add(faHome, faTachometerAlt, faTrophy, faCoins, faBook, faSignInAlt, faSignOutAlt, faBars, faChartBar, faLandmark, faWallet, faNewspaper, faShieldHalved, faComments, faBullhorn)
 
 export function createApp() {
   const app = createVueApp(App)
