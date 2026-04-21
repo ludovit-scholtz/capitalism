@@ -2416,10 +2416,10 @@ test.describe('Dashboard — building header financials', () => {
     const financials = wrapper.locator('.building-header-financials')
     await expect(financials).toBeVisible()
 
-    // Revenue, costs, and profit values should be shown
-    await expect(financials).toContainText('$12,000')
-    await expect(financials).toContainText('$4,500')
-    await expect(financials).toContainText('+$7,500')
+    // Revenue, costs, and profit values should be shown (Bratislava = EUR)
+    await expect(financials).toContainText('€12,000')
+    await expect(financials).toContainText('€4,500')
+    await expect(financials).toContainText('+€7,500')
   })
 
   test('shows no-data message when building has no financial activity', async ({ page }) => {
@@ -2493,8 +2493,8 @@ test.describe('Dashboard — building header financials', () => {
 
     const financials = page.locator('.building-card-wrapper').first().locator('.building-header-financials')
     await expect(financials).toBeVisible()
-    // Negative profit displayed with minus sign
-    await expect(financials).toContainText('-$2,000')
+    // Negative profit displayed with minus sign (EUR)
+    await expect(financials).toContainText('-€2,000')
     // Loss profit value has negative class
     await expect(financials.locator('.bh-negative')).toBeVisible()
   })

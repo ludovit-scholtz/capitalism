@@ -936,8 +936,14 @@ function getCityResourceName(city: City, index: number): string {
   return resource ? getLocalizedResourceName(resource, locale.value) : ''
 }
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString(locale.value)
+function formatCurrency(value: number, currencyCode?: string): string {
+  const code = currencyCode ?? selectedCity.value?.currencyCode ?? 'EUR'
+  return new Intl.NumberFormat(locale.value, {
+    style: 'currency',
+    currency: code,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value)
 }
 
 function formatPercent(value: number): string {
@@ -1160,19 +1166,19 @@ useTickRefresh(async () => {
         <div class="budget-grid">
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.startingCash') }}</span>
-            <strong>${{ formatCurrency(companyStartingCash) }}</strong>
+            <strong>{{ formatCurrency(companyStartingCash) }}</strong>
           </article>
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.founderContribution') }}</span>
-            <strong>${{ formatCurrency(FOUNDER_CONTRIBUTION) }}</strong>
+            <strong>{{ formatCurrency(FOUNDER_CONTRIBUTION) }}</strong>
           </article>
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.personalCash') }}</span>
-            <strong>${{ formatCurrency(remainingPersonalCash) }}</strong>
+            <strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
           </article>
           <article class="budget-card" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
             <span class="budget-label">{{ t('onboarding.cashAfterPurchase') }}</span>
-            <strong>${{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
+            <strong>{{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
           </article>
         </div>
 
@@ -1188,7 +1194,7 @@ useTickRefresh(async () => {
               @click="selectedIpoRaiseTarget = option.raiseTarget"
             >
               <span class="card-title">{{ t(option.titleKey) }}</span>
-              <span class="ipo-metric">{{ t('onboarding.ipoRaise') }}: ${{ formatCurrency(option.raiseTarget) }}</span>
+              <span class="ipo-metric">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget) }}</span>
               <span class="ipo-metric">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
               <span class="ipo-metric">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
               <span class="card-desc">{{ t(option.descriptionKey) }}</span>
@@ -1248,7 +1254,7 @@ useTickRefresh(async () => {
             {{
               t('onboarding.factoryPurchasedBody', {
                 lot: selectedFactoryLot?.name ?? '',
-                cash: '$' + formatCurrency(starterCash),
+                cash: formatCurrency(starterCash),
               })
             }}
           </span>
@@ -1257,11 +1263,11 @@ useTickRefresh(async () => {
         <div class="budget-grid">
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.availableCash') }}</span>
-            <strong>${{ formatCurrency(starterCash) }}</strong>
+            <strong>{{ formatCurrency(starterCash) }}</strong>
           </article>
           <article class="budget-card" :class="{ warning: !!selectedShopLot && starterCash < selectedShopLot.price }">
             <span class="budget-label">{{ t('onboarding.cashAfterPurchase') }}</span>
-            <strong>${{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
+            <strong>{{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
           </article>
         </div>
 
@@ -1279,7 +1285,7 @@ useTickRefresh(async () => {
             <button v-for="prod in sortedProducts" :key="prod.id" class="product-card" :class="{ selected: selectedProductId === prod.id }" @click="selectedProductId = prod.id">
               <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="product-image" />
               <span class="card-title">{{ getProductName(prod) }}</span>
-              <span class="product-price">${{ prod.basePrice }}{{ t('onboarding.perUnit') }}</span>
+              <span class="product-price">{{ formatCurrency(prod.basePrice) }}{{ t('onboarding.perUnit') }}</span>
               <span class="product-craft">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
               <span class="card-desc">{{ getProductDescription(prod) }}</span>
               <div class="product-recipe">
@@ -1389,8 +1395,8 @@ useTickRefresh(async () => {
           <div class="achievement-item">
             <span class="achievement-icon">💰</span>
             <div class="achievement-text">
-              <strong>${{ formatCurrency(onboardingCompanyCash ?? companyStartingCash) }}</strong>
-              <span>{{ t('onboarding.completionCapital', { amount: '$' + formatCurrency(onboardingCompanyCash ?? companyStartingCash) }) }}</span>
+              <strong>{{ formatCurrency(onboardingCompanyCash ?? companyStartingCash) }}</strong>
+              <span>{{ t('onboarding.completionCapital', { amount: formatCurrency(onboardingCompanyCash ?? companyStartingCash) }) }}</span>
             </div>
           </div>
         </div>
@@ -1448,16 +1454,16 @@ useTickRefresh(async () => {
           <div class="profit-preview-stats">
             <div class="profit-stat">
               <span class="profit-stat-label">{{ t('onboarding.guestProfitRevenue') }}</span>
-              <span class="profit-stat-value profit-stat-revenue">${{ formatCurrency(simulatedProfit.revenue) }}</span>
+              <span class="profit-stat-value profit-stat-revenue">{{ formatCurrency(simulatedProfit.revenue) }}</span>
             </div>
             <div class="profit-stat">
               <span class="profit-stat-label">{{ t('onboarding.guestProfitCost') }}</span>
-              <span class="profit-stat-value profit-stat-cost">-${{ formatCurrency(simulatedProfit.cost) }}</span>
+              <span class="profit-stat-value profit-stat-cost">-{{ formatCurrency(simulatedProfit.cost) }}</span>
             </div>
             <div class="profit-stat profit-stat-net">
               <span class="profit-stat-label">{{ t('onboarding.guestProfitNet') }}</span>
               <span class="profit-stat-value" :class="simulatedProfit.profit >= 0 ? 'profit-stat-positive' : 'profit-stat-negative'">
-                {{ simulatedProfit.profit >= 0 ? '+' : '' }}${{ formatCurrency(simulatedProfit.profit) }}
+                {{ simulatedProfit.profit >= 0 ? '+' : '' }}{{ formatCurrency(simulatedProfit.profit) }}
               </span>
             </div>
           </div>
@@ -1473,8 +1479,8 @@ useTickRefresh(async () => {
                 {{
                   t('onboarding.guestPriceDesc', {
                     product: getProductName(selectedProduct),
-                    price: '$' + formatCurrency(guestConfiguredShopPrice),
-                    basePrice: '$' + formatCurrency(selectedProduct.basePrice),
+                    price: formatCurrency(guestConfiguredShopPrice),
+                    basePrice: formatCurrency(selectedProduct.basePrice),
                   })
                 }}
               </p>
@@ -1559,8 +1565,8 @@ useTickRefresh(async () => {
           <div class="achievement-item">
             <span class="achievement-icon">💰</span>
             <div class="achievement-text">
-              <strong>${{ completionResult.company.cash.toLocaleString() }}</strong>
-              <span>{{ t('onboarding.completionCapital', { amount: '$' + completionResult.company.cash.toLocaleString() }) }}</span>
+              <strong>{{ formatCurrency(completionResult.company.cash) }}</strong>
+              <span>{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash) }) }}</span>
             </div>
           </div>
         </div>
@@ -1632,7 +1638,7 @@ useTickRefresh(async () => {
               <span class="configure-step-icon">💰</span>
               <div class="configure-step-body">
                 <strong>{{ t('onboarding.configureStepCash') }}</strong>
-                <p>{{ t('onboarding.configureStepCashDesc', { amount: '$' + formatCurrency(configureGuideCash) }) }}</p>
+                <p>{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash) }) }}</p>
               </div>
             </article>
 
@@ -1645,7 +1651,7 @@ useTickRefresh(async () => {
                     configureGuideBasePrice === null
                       ? t('onboarding.configureStepPriceDesc')
                       : t('onboarding.configureStepPriceDescWithPrice', {
-                          price: '$' + formatCurrency(configureGuideBasePrice),
+                          price: formatCurrency(configureGuideBasePrice),
                         })
                   }}
                 </p>
@@ -1752,7 +1758,7 @@ useTickRefresh(async () => {
               </div>
               <div v-if="firstSaleMission.firstSaleRevenue !== null" class="first-sale-stat">
                 <dt>{{ t('onboarding.firstSaleCelebrationRevenue') }}</dt>
-                <dd class="first-sale-revenue">${{ formatCurrency(firstSaleMission.firstSaleRevenue) }}</dd>
+                <dd class="first-sale-revenue">{{ formatCurrency(firstSaleMission.firstSaleRevenue) }}</dd>
               </div>
               <div v-if="firstSaleMission.firstSaleQuantity !== null" class="first-sale-stat">
                 <dt>{{ t('onboarding.firstSaleCelebrationQuantity') }}</dt>
@@ -1760,7 +1766,7 @@ useTickRefresh(async () => {
               </div>
               <div v-if="firstSaleMission.firstSalePricePerUnit !== null" class="first-sale-stat">
                 <dt>{{ t('onboarding.firstSaleCelebrationPrice') }}</dt>
-                <dd>${{ formatCurrency(firstSaleMission.firstSalePricePerUnit) }}</dd>
+                <dd>{{ formatCurrency(firstSaleMission.firstSalePricePerUnit) }}</dd>
               </div>
               <div v-if="firstSaleMission.firstSaleTick !== null" class="first-sale-stat">
                 <dt>{{ t('onboarding.firstSaleCelebrationTick') }}</dt>

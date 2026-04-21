@@ -1163,7 +1163,7 @@ export default {
       priceUpdate: {
         title: 'Quick Price Update',
         desc: 'Set a new minimum sale price that takes effect next tick — no building upgrade required.',
-        newPrice: 'New Min Price ($)',
+        newPrice: 'New Min Price',
         apply: 'Apply Price',
         saving: 'Saving…',
         success: 'Price updated! The new price will be used from the next tick onwards.',
