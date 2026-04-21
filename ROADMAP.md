@@ -82,6 +82,15 @@ Use this everywhere where numbers are visible.
 
 - In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
+### Media house (0% complete)
+
+- When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
+
+### Mining (0% complete)
+
+- When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. 
+- Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
+
 ## FX Exahcnge
 
 Each city is located in physical country which has the currency - CZK for Prague, EUR for Vienna or USD for New York for example.
