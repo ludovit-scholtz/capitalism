@@ -35,7 +35,7 @@ Implement banking as is described in the banking section.
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
-### Marketing (80% complete)
+### Marketing (95% complete)
 
 **Shipped in this increment:**
 - Every seeded city now has one government-owned media house of each type (Newspaper, Radio, TV) seeded at startup via `AppDbInitializer.SeedGovernmentMediaHousesAsync`. Government outlets carry an initial `ContentValue` of 1 000 and the `IsGovernmentOwned` flag.
@@ -48,10 +48,15 @@ Implement banking as is described in the banking section.
 - `BuildingDetailView` media-house management panel added: shows accumulated content, active budget, level efficiency, competitor ranking bar chart for same-city+category outlets, content investment form with gain preview, and effective marketing multiplier breakdown.
 - `CityMapView` media-house section and `BuildingDetailView` marketing-unit picker updated to include new fields in GraphQL queries.
 - i18n keys added in all three locales (en/sk/de).
+- **Brand quality progression (new):** `Brand.MarketingQuality` — a new `decimal(5,4)` persistent field that accumulates from sustained marketing investment and decays at 0.03%/tick when investment stops. Formula: each marketing tick adds `budget × channelMultiplier × efficiencyMultiplier × BrandMarketingQualityPerBudget`; the gain is capped at `[0, 1]`.
+- **`PublicSalesPhase` brand demand boost (new):** `ComputeCombinedBrandQuality` blends R&D quality and marketing prestige via `1 - (1-q)×(1-mq)` so both sources contribute independently. The combined quality boosts `brandFactor` by up to 50% (`BrandQualityBoostFactor = 0.5`) which feeds into the competitiveness calculation: `competitiveness = priceIndex × qualityMultiplier × brandFactor × populationIndex`. A company with `MarketingQuality=0.8` wins ~58% more city demand share than an identical competitor with zero brand prestige.
+- **GraphQL exposure:** `companyBrands` query returns `marketingQuality` and `combinedBrandQuality`; `publicSalesAnalytics` query returns `brandQuality` (combined). All three locales have i18n keys for the Market Intelligence panel display.
+- **Frontend Market Intelligence panel:** `BuildingDetailView` shows Brand Quality % with `Premium` (≥50%) and `Growing` (≥20%) status badges alongside demand driver explanations.
+- **EF migration + schema repair:** `20260421090000_AddBrandMarketingQuality` adds the column; idempotent `EnsureColumnAsync` in `AppDbInitializer.SchemaCompatibility` ensures live restarts onto older DB schemas succeed without breaking startup.
+- **7 new backend integration tests:** `MarketingPhase_BrandQuality_IncreasesAfterMarketingSpend`, `MarketingPhase_BrandQuality_DecaysWhenMarketingStopped`, `CompanyBrands_ReturnsMarketingQualityAndCombinedQuality`, `PublicSalesPhase_HigherBrandQuality_IncreasesCompetitiveness`, `PublicSalesAnalytics_ReturnsBrandQualityForPublicSalesUnit`, `MarketingPhase_BrandQuality_HigherChannelMultiplier_GivesMoreQuality`, `MarketingPhase_BrandQuality_TwoProducts_GetIndependentQuality`, `MarketingPhase_BrandQualityDecayIsBoundedAboveZero`.
 
 **Remaining:**
-- Implement full brand quality improvements from marketing spend (brand quality → product demand feedback loop).
-- Full marketing spend ↔ brand quality ↔ sales demand simulation end-to-end.
+- Full end-to-end analytics: brand quality vs. pricing A/B comparison in the campaign analytics dashboard.
 
 ### Power plants (15% complete)
 

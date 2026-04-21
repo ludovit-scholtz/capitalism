@@ -16,20 +16,20 @@ public sealed class MarketingPhase : ITickPhase
 
     public Task ProcessAsync(TickContext context)
     {
-        if (!context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var shops))
-            return Task.CompletedTask;
-
-        foreach (var building in shops)
+        if (context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var shops))
         {
-            if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units))
-                continue;
-            if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
-                continue;
-
-            foreach (var unit in units)
+            foreach (var building in shops)
             {
-                if (unit.UnitType != UnitType.Marketing) continue;
-                ProcessMarketingUnit(context, building, unit, company, units);
+                if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units))
+                    continue;
+                if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
+                    continue;
+
+                foreach (var unit in units)
+                {
+                    if (unit.UnitType != UnitType.Marketing) continue;
+                    ProcessMarketingUnit(context, building, unit, company, units);
+                }
             }
         }
 
