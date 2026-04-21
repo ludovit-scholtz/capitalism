@@ -10,11 +10,11 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<decimal>(
-                name: "ContentBudgetPerTick",
-                table: "Buildings",
-                type: "numeric",
-                nullable: true);
+            // Use IF NOT EXISTS to safely recover databases where the schema-repair code
+            // pre-created this column before the migration was applied (42701 duplicate-column
+            // startup failure documented in copilot instructions — "never pre-create the next column").
+            migrationBuilder.Sql(
+                "ALTER TABLE \"Buildings\" ADD COLUMN IF NOT EXISTS \"ContentBudgetPerTick\" numeric");
         }
 
         /// <inheritdoc />

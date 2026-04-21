@@ -18,7 +18,7 @@ import {
   constructionTicksRemaining as computeConstructionTicksRemaining,
 } from '@/lib/cityMapHelpers'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CityMediaHouseInfo, CityWeatherForecast, CityPowerBalance } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -55,8 +55,9 @@ const justPurchasedBuildingType = ref<string | null>(null)
 const justPurchasedIsUnderConstruction = ref(false)
 const justPurchasedConstructionCompletesAtTick = ref<number | null>(null)
 
-// Weather forecast for the current city
+// Weather forecast and power balance for the current city
 const cityWeather = ref<CityWeatherForecast | null>(null)
+const cityPowerBalance = ref<CityPowerBalance | null>(null)
 
 // Power plant type options with MW output
 const POWER_PLANT_TYPES = [
@@ -315,6 +316,24 @@ async function fetchWeatherForecast() {
   }
 }
 
+async function fetchCityPowerBalance() {
+  if (!cityId.value) return
+  try {
+    const data = await gqlRequest<{ cityPowerBalance: CityPowerBalance }>(
+      `query CityPowerBalance($cityId: UUID!) {
+        cityPowerBalance(cityId: $cityId) {
+          cityId totalSupplyMw totalDemandMw reserveMw reservePercent status
+          powerPlantCount consumerBuildingCount
+        }
+      }`,
+      { cityId: cityId.value },
+    )
+    cityPowerBalance.value = data.cityPowerBalance ?? null
+  } catch {
+    cityPowerBalance.value = null
+  }
+}
+
 function createMarkerIcon(color: string, isSelected: boolean): L.DivIcon {
   const size = isSelected ? 18 : 12
   const border = isSelected ? '3px solid #fff' : '2px solid rgba(255,255,255,0.8)'
@@ -555,6 +574,7 @@ watch(cityId, async () => {
   justPurchasedBuildingId.value = null
   justPurchasedBuildingType.value = null
   cityWeather.value = null
+  cityPowerBalance.value = null
   viewMode.value = 'map'
   if (map) {
     map.remove()
@@ -563,6 +583,7 @@ watch(cityId, async () => {
   await fetchData()
   void fetchMediaHouses()
   void fetchWeatherForecast()
+  void fetchCityPowerBalance()
   if (!error.value) {
     await nextTick()
     initMap()
@@ -573,6 +594,7 @@ onMounted(async () => {
   await fetchData()
   void fetchMediaHouses()
   void fetchWeatherForecast()
+  void fetchCityPowerBalance()
   await nextTick()
   if (viewMode.value === 'map') {
     initMap()
@@ -1122,6 +1144,111 @@ watch(viewMode, async (mode) => {
               {{ t('cityMap.mediaHouses.contentRanking') }}: <strong>{{ mh.contentRanking.toFixed(0) }}%</strong>
             </div>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- City Power Planning & Weather Forecast section (always visible) -->
+    <section
+      class="city-power-section"
+      aria-labelledby="city-power-heading"
+      data-testid="city-power-section"
+    >
+      <h2 id="city-power-heading" class="section-heading">⚡ {{ t('powerGrid.weatherSectionTitle') }}</h2>
+
+      <div class="power-planning-grid">
+        <!-- Weather forecast card -->
+        <div v-if="cityWeather" class="power-card weather-card" data-testid="city-weather-card">
+          <h3 class="power-card-title">🌤️ {{ t('powerGrid.currentConditions') }}</h3>
+          <div class="weather-badges">
+            <span class="weather-big-badge solar" data-testid="solar-badge">
+              ☀️ {{ Math.round(cityWeather.currentSolarPercent) }}%
+            </span>
+            <span class="weather-big-badge wind" data-testid="wind-badge">
+              💨 {{ Math.round(cityWeather.currentWindPercent) }}%
+            </span>
+          </div>
+
+          <div v-if="cityWeather.forecast.length > 0" class="forecast-chart">
+            <p class="forecast-chart-label">
+              {{ t('powerGrid.forecastBarsLabel', { count: Math.min(cityWeather.forecast.length, 24) }) }}
+            </p>
+            <div class="forecast-bars-row" aria-label="Weather forecast chart">
+              <div
+                v-for="(tick, i) in cityWeather.forecast.slice(0, 24)"
+                :key="tick.tick"
+                class="forecast-bar-group"
+                :title="`Tick ${tick.tick}: ☀️${Math.round(tick.solarPercent)}% 💨${Math.round(tick.windPercent)}%`"
+              >
+                <div class="forecast-bar solar-bar" :style="{ height: Math.round(tick.solarPercent) + '%' }"></div>
+                <div class="forecast-bar wind-bar" :style="{ height: Math.round(tick.windPercent) + '%' }"></div>
+                <span v-if="i === 0 || i === 23 || (i === cityWeather.forecast.slice(0, 24).length - 1 && i !== 23)" class="forecast-bar-label">
+                  {{ i === 0 ? t('powerGrid.forecastNow') : t('powerGrid.forecastTickLabel', { count: i + 1 }) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Power balance card -->
+        <div class="power-card balance-card" data-testid="city-power-balance-card">
+          <h3 class="power-card-title">🏭 {{ t('powerGrid.planningTitle') }}</h3>
+          <template v-if="cityPowerBalance">
+            <div class="balance-status-row">
+              <span
+                class="balance-status-badge"
+                :class="{
+                  'status-balanced': cityPowerBalance.status === 'BALANCED',
+                  'status-constrained': cityPowerBalance.status === 'CONSTRAINED',
+                  'status-critical': cityPowerBalance.status === 'CRITICAL',
+                }"
+              >
+                {{ t(`powerGrid.status.${cityPowerBalance.status}`) }}
+              </span>
+              <span v-if="cityPowerBalance.powerPlantCount === 0" class="legacy-badge">{{ t('powerGrid.legacyGrid') }}</span>
+            </div>
+            <div class="balance-metrics">
+              <div class="balance-metric">
+                <span class="balance-metric-label">{{ t('powerGrid.supply') }}</span>
+                <span class="balance-metric-value supply">{{ cityPowerBalance.totalSupplyMw.toFixed(1) }} MW</span>
+              </div>
+              <div class="balance-metric">
+                <span class="balance-metric-label">{{ t('powerGrid.demand') }}</span>
+                <span class="balance-metric-value demand">{{ cityPowerBalance.totalDemandMw.toFixed(1) }} MW</span>
+              </div>
+              <div class="balance-metric">
+                <span class="balance-metric-label">{{ t('powerGrid.reserve') }}</span>
+                <span
+                  class="balance-metric-value"
+                  :class="cityPowerBalance.reserveMw >= 0 ? 'reserve-ok' : 'reserve-low'"
+                >
+                  {{ cityPowerBalance.reserveMw >= 0 ? '+' : '' }}{{ cityPowerBalance.reserveMw.toFixed(1) }} MW
+                </span>
+              </div>
+            </div>
+            <p class="balance-guidance">
+              {{
+                cityPowerBalance.powerPlantCount === 0
+                  ? t('powerGrid.guidanceLegacy')
+                  : cityPowerBalance.status === 'BALANCED'
+                    ? t('powerGrid.guidanceBalanced')
+                    : cityPowerBalance.status === 'CONSTRAINED'
+                      ? t('powerGrid.guidanceConstrained')
+                      : t('powerGrid.guidanceCritical')
+              }}
+            </p>
+          </template>
+          <p v-else class="balance-loading">{{ t('common.loading') }}</p>
+        </div>
+
+        <!-- Why it matters card -->
+        <div class="power-card why-card" data-testid="why-matters-card">
+          <h3 class="power-card-title">💡 {{ t('powerGrid.whyMattersTitle') }}</h3>
+          <ul class="why-list">
+            <li class="why-item solar-item">☀️ {{ t('powerGrid.whyMattersSolar') }}</li>
+            <li class="why-item wind-item">💨 {{ t('powerGrid.whyMattersWind') }}</li>
+            <li class="why-item power-item">⚡ {{ t('powerGrid.whyMattersPower') }}</li>
+          </ul>
         </div>
       </div>
     </section>
@@ -2175,5 +2302,246 @@ watch(viewMode, async (mode) => {
   font-size: 0.8125rem;
   color: var(--color-text-secondary);
   margin-top: 0.25rem;
+}
+
+/* ── City Power Planning & Weather section ────────────────────────────────── */
+
+.city-power-section {
+  margin-top: 2.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.power-planning-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+  margin-top: 1rem;
+}
+
+.power-card {
+  background: var(--color-bg-elevated, var(--color-bg));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+}
+
+.power-card-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0 0 1rem;
+  color: var(--color-text);
+}
+
+/* Weather card */
+.weather-badges {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.weather-big-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+}
+
+.weather-big-badge.solar {
+  background: #fff9c4;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.weather-big-badge.wind {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.forecast-chart {
+  margin-top: 0.75rem;
+}
+
+.forecast-chart-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.5rem;
+}
+
+.forecast-bars-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 64px;
+  position: relative;
+}
+
+.forecast-bar-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  position: relative;
+  flex: 1;
+  min-width: 4px;
+  max-width: 16px;
+  height: 100%;
+}
+
+.forecast-bar {
+  flex: 1;
+  border-radius: 1px 1px 0 0;
+  min-height: 2px;
+  transition: height 0.3s;
+}
+
+.forecast-bar.solar-bar {
+  background: #fbbf24;
+}
+
+.forecast-bar.wind-bar {
+  background: #38bdf8;
+}
+
+.forecast-bar-label {
+  position: absolute;
+  bottom: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.6rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+/* Power balance card */
+.balance-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.875rem;
+  flex-wrap: wrap;
+}
+
+.balance-status-badge {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+}
+
+.status-balanced {
+  background: #dcfce7;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.status-constrained {
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+}
+
+.status-critical {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.legacy-badge {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.balance-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 0.875rem;
+}
+
+.balance-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.balance-metric-label {
+  font-size: 0.7rem;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.balance-metric-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.balance-metric-value.supply {
+  color: #16a34a;
+}
+
+.balance-metric-value.demand {
+  color: var(--color-text);
+}
+
+.balance-metric-value.reserve-ok {
+  color: #16a34a;
+}
+
+.balance-metric-value.reserve-low {
+  color: #dc2626;
+}
+
+.balance-guidance {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  padding-top: 0.625rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.balance-loading {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+/* Why it matters card */
+.why-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.why-item {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--color-text);
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.why-item.solar-item {
+  background: #fffbeb;
+  border-left: 3px solid #fbbf24;
+}
+
+.why-item.wind-item {
+  background: #f0f9ff;
+  border-left: 3px solid #38bdf8;
+}
+
+.why-item.power-item {
+  background: #f0fdf4;
+  border-left: 3px solid #4ade80;
 }
 </style>

@@ -22,20 +22,48 @@ It will use real world map. The game will start in single city and later other c
 - Make the shipping costs also in similar price range in all cities, but expressed in the local currency.
 - Leaderboard must be expressed in USD currency, make sure the numbers collected in the leaderboard are correctly transformed from the local currencies
 
-### Number formatting
+### Number formatting (0% complete)
 
 Create component for unified number and currency formatting which will allow big numbers to be formatted properly. Examples of numbers: $1M = 1000000 USD, 600k Kč = 600000 CZK, 123.456M € = 123456789 EUR, $2.845k = 2845 USD, $123.456B = 123456789012 USD, $12.345T = 12345678901234 USD, $12.345Q = 12345678901234567 USD
 
 Make sure the Intl.NumberFormat is properly used for the number, so in english the . is used as decimal seperator and comma for thousands separator, and in czech language is comma used as the decimal separator and space as the thousands separator. Bind it to the local language selected not the browser language. For english the en-US is used, for slovak sk-SK, for german de-DE.
 
-### Power plants (15% complete)
+Use this everywhere where numbers are visible.
+
+### Power plants (30% complete)
 
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below
 
-### City map (50% complete)
+**Shipped in this increment:**
+- ✅ `CityWeatherForecast` entity stores per-city rolling 50-tick wind and solar forecast maintained by `WeatherUpdatePhase`.
+- ✅ `cityWeatherForecast(cityId)` GraphQL query (public, no auth required) returns `currentWindPercent`, `currentSolarPercent`, and the full rolling `forecast` array.
+- ✅ `cityPowerBalance(cityId)` GraphQL query (public) returns `totalSupplyMw`, `totalDemandMw`, `reserveMw`, `reservePercent`, and `status` (BALANCED / CONSTRAINED / CRITICAL).
+- ✅ Tick engine `WeatherUpdatePhase` maintains the 50-tick rolling forecast window per city.
+- ✅ Power plants (COAL, GAS, SOLAR, WIND, NUCLEAR) purchasable from city map with correct MW defaults.
+- ✅ Solar and wind plant output is weather-adjusted each tick via `WeatherUpdatePhase` factor.
+- ✅ City-level power distribution: buildings are POWERED / CONSTRAINED / OFFLINE based on supply ratio.
+- ✅ 3 new backend tests for `cityWeatherForecast` query: rolling data, public access, null for no-data city.
+
+**Remaining:**
+- Power plant unit grid (purchasing, wind turbine, energy producing, battery, storage units).
+- P&L chart for power plant building detail.
+- Government fine for under-supply / surplus-sale income for over-supply.
+
+### City map (70% complete)
 
 - Implement and show weather predictions as is defined in the powerplants section
+
+**Shipped in this increment:**
+- ✅ Weather forecast panel shown in lot detail panel for POWER_PLANT-suitable lots (solar %, wind %, rolling forecast bar chart).
+- ✅ **City-level Power Planning & Weather section (new):** always-visible panel at the bottom of the city map page showing current solar/wind conditions, rolling 24-tick forecast bar chart, city power balance (supply/demand/reserve), status badge (Balanced / Constrained / Critical), and "Why This Matters" infrastructure guidance for renewable planning.
+- ✅ Power-planning guidance text explains how weather affects solar/wind output and why power shortage ROI is high in under-served cities.
+- ✅ 2 new E2E tests for the city-level power planning section: happy path with weather data and power shortage state rendering.
+- ✅ i18n keys in all three locales (`en`, `sk`, `de`) for the new weather/power planning panel.
+
+**Remaining:**
+- Add weather forecast to city overview card in the onboarding city picker.
+- Weather-driven demand modifier for seasonal gameplay.
 
 ### Audits (0% complete)
 

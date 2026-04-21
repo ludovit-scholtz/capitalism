@@ -1850,6 +1850,27 @@ export default {
     powerCardTitle: 'Strom',
     powerCardNoPower: 'Stadtversorgung',
     viewDetails: 'Details anzeigen',
+    weatherSectionTitle: 'Stadtklima & Energieplanung',
+    currentConditions: 'Aktuelle Bedingungen',
+    forecastBarsLabel: 'Nächste {count} Ticks',
+    whyMattersTitle: 'Warum das für Infrastruktur wichtig ist',
+    whyMattersSolar:
+      'Hohe Sonneneinstrahlung steigert den Ertrag von Solaranlagen pro Tick.',
+    whyMattersWind:
+      'Starker Wind erhöht die Windturbinen-Leistung. Planen Sie Verträge bei günstigem Forecast.',
+    whyMattersPower:
+      'Stromknappheit schränkt alle Gebäude in der Stadt ein. Ein neues Kraftwerk generiert Einnahmen und stabilisiert den Betrieb.',
+    planningTitle: 'Energiebilanz der Stadt',
+    guidanceBalanced:
+      'Netz ist ausgeglichen. Ein neues Kraftwerk kann Überschusserlöse mit geringem Risiko erzielen.',
+    guidanceConstrained:
+      'Teilweise Knappheit erkannt. Gebäude arbeiten mit reduzierter Kapazität. Ein Kraftwerk hier bringt starke Renditen.',
+    guidanceCritical:
+      'Kritischer Mangel — die meisten Gebäude sind offline. Kraftwerkinvestition hat aktuell den höchsten ROI in dieser Stadt.',
+    guidanceLegacy:
+      'Noch keine Spieler-Kraftwerke. Gebäude laufen über das Stadtverteilnetz. Bauen Sie das erste Kraftwerk und erzielen Sie Einnahmen.',
+    forecastNow: 'Jetzt',
+    forecastTickLabel: '+{count}',
   },
   powerPlant: {
     panelTitle: 'Kraftwerksverwaltung',

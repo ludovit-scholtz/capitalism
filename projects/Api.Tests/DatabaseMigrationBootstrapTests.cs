@@ -43,6 +43,65 @@ public sealed class DatabaseMigrationBootstrapTests
         Assert.True(shouldRepair);
     }
 
+    /// <summary>
+    /// Regression test for the "ContentBudgetPerTick duplicate-column" startup failure
+    /// (42701: column already exists).
+    ///
+    /// Scenario: a previous build's repair code pre-created the Buildings.ContentBudgetPerTick
+    /// column on a PostgreSQL database before the migration was applied, leaving the DB in a
+    /// broken state (column exists, migration still pending).  On the SQLite test path the same
+    /// broken state is simulated: column manually added, migration record removed from history.
+    /// Startup must succeed and the column must remain in place.
+    ///
+    /// On PostgreSQL (production) the recovery relies on the migration using
+    /// IF NOT EXISTS so MigrateAsync can apply it without raising 42701.
+    /// On SQLite (tests) the recovery goes through the EnsureCreated + repair + baseline path
+    /// where EnsureColumnAsync is idempotent, so the pre-created column is silently accepted.
+    /// </summary>
+    [Fact]
+    public async Task StartupWithPreCreatedContentBudgetColumn_SucceedsWithoutDuplicateColumnError()
+    {
+        var dbPath = CreateDatabasePath();
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            // Step 1: Build a database at the schema one migration before ContentBudgetPerTick.
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync("20260421054822_AddMediaHouseContentValue");
+            }
+
+            // Step 2: Manually add the ContentBudgetPerTick column — simulating what the
+            // schema-repair bug did: repair code ran before MigrateAsync, pre-creating
+            // the column while the migration was still pending in __EFMigrationsHistory.
+            await using (var damagedCtx = new AppDbContext(options))
+            {
+                await damagedCtx.Database.ExecuteSqlRawAsync(
+                    "ALTER TABLE \"Buildings\" ADD COLUMN \"ContentBudgetPerTick\" TEXT");
+            }
+
+            // Step 3: Restart onto the new build.  Must complete without throwing a
+            // duplicate-column error (42701 on PostgreSQL, or equivalent on SQLite).
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                var exception = await Record.ExceptionAsync(
+                    () => CreateInitializer(upgradeCtx).InitializeAsync());
+
+                Assert.Null(exception);
+            }
+
+            // Step 4: Verify the column is still present after startup.
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertColumnExistsAsync(verifyCtx, "Buildings", "ContentBudgetPerTick");
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
     [Fact]
     public async Task StartupWithLegacyDatabaseMissingHistory_RepairsBankingSchemaBeforeBaselining()
     {
