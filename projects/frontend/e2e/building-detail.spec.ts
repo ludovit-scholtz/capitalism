@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { makeChairProduct, makeDefaultCities, makeDefaultProducts, makePlayer, setupMockApi, type MockBuildingUnit, type MockPublicSalesAnalytics } from './helpers/mock-api'
+import { makeChairProduct, makeDefaultCities, makeDefaultProducts, makePlayer, setupMockApi, type MockBuildingUnit, type MockBuilding, type MockPublicSalesAnalytics } from './helpers/mock-api'
 
 function getGridSection(page: Page, heading: string) {
   return page
@@ -19493,5 +19493,222 @@ test.describe('Local city currency in building unit config', () => {
 
     // The analytics revenue should be formatted in CZK (Kč or CZK symbol)
     await expect(page.locator('.mi-summary-grid')).toContainText(/CZK|Kč/)
+  })
+})
+
+// ── Media house management panel ─────────────────────────────────────────────
+
+test.describe('Media house management panel', () => {
+  function makeMediaHouseBuilding(overrides: Partial<MockBuilding> = {}): MockBuilding {
+    return {
+      id: 'building-mh',
+      companyId: 'company-mh',
+      cityId: 'city-ba',
+      type: 'MEDIA_HOUSE',
+      name: 'City Gazette',
+      latitude: 48.148,
+      longitude: 17.107,
+      level: 1,
+      powerConsumption: 0,
+      isForSale: false,
+      powerStatus: 'POWERED',
+      mediaType: 'NEWSPAPER',
+      builtAtUtc: new Date().toISOString(),
+      isUnderConstruction: false,
+      constructionCost: 0,
+      contentValue: 1250,
+      contentBudgetPerTick: 500,
+      units: [],
+      pendingConfiguration: null,
+      ...overrides,
+    }
+  }
+
+  function setupMediaHouseTest(player: ReturnType<typeof makePlayer>, buildingOverrides: Partial<MockBuilding> = {}) {
+    const mediaHouse = makeMediaHouseBuilding(buildingOverrides)
+    player.companies.push({
+      id: 'company-mh',
+      playerId: player.id,
+      name: 'Media Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [mediaHouse],
+    })
+    return mediaHouse
+  }
+
+  test('shows accumulated content and active budget in metrics row', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities() })
+    const mediaHouse = setupMediaHouseTest(player)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cityMediaHouses['city-ba'] = [
+      {
+        id: 'building-mh',
+        name: 'City Gazette',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'NEWSPAPER',
+        ownerCompanyId: 'company-mh',
+        ownerCompanyName: 'Media Corp',
+        effectivenessMultiplier: 1.0,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 75,
+        contentValue: mediaHouse.contentValue ?? 1250,
+        contentBudgetPerTick: mediaHouse.contentBudgetPerTick ?? null,
+        isGovernmentOwned: false,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/building/building-mh')
+
+    const panel = page.locator('[aria-label="media house management"]')
+    await expect(panel).toBeVisible()
+    await expect(panel.getByRole('heading', { name: 'Media House Management' })).toBeVisible()
+    // Accumulated content should show 1250
+    await expect(panel.locator('.mh-content-value')).toContainText('1250')
+    // Active budget per tick
+    await expect(panel.locator('.mh-budget-active')).toBeVisible()
+  })
+
+  test('shows no-budget state when content budget is null', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities() })
+    setupMediaHouseTest(player, { contentBudgetPerTick: null, contentValue: 0 })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/building/building-mh')
+
+    const panel = page.locator('[aria-label="media house management"]')
+    await expect(panel).toBeVisible()
+    await expect(panel.locator('.mh-budget-none')).toBeVisible()
+    await expect(panel.locator('.mh-budget-none')).toContainText('No investment')
+  })
+
+  test('shows city competitor ranking bars', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities() })
+    setupMediaHouseTest(player, { contentValue: 2000 })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cityMediaHouses['city-ba'] = [
+      {
+        id: 'building-mh',
+        name: 'City Gazette',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'NEWSPAPER',
+        ownerCompanyId: 'company-mh',
+        ownerCompanyName: 'Media Corp',
+        effectivenessMultiplier: 1.0,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 100,
+        contentValue: 2000,
+        contentBudgetPerTick: 500,
+        isGovernmentOwned: false,
+      },
+      {
+        id: 'gov-newspaper-city-ba',
+        name: 'Bratislava Gazette',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'NEWSPAPER',
+        ownerCompanyId: 'gov-company-id',
+        ownerCompanyName: 'Government',
+        effectivenessMultiplier: 1.0,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 50,
+        contentValue: 1000,
+        contentBudgetPerTick: null,
+        isGovernmentOwned: true,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/building/building-mh')
+
+    const panel = page.locator('[aria-label="media house management"]')
+    await expect(panel).toBeVisible()
+    const rankingSection = panel.locator('.media-house-ranking-section')
+    await expect(rankingSection).toBeVisible()
+    await expect(rankingSection.locator('.mh-competitor-row')).toHaveCount(2)
+    await expect(rankingSection.locator('.mh-competitor-you')).toBeVisible()
+    await expect(rankingSection.getByText('100%', { exact: true })).toBeVisible()
+  })
+
+  test('saving content budget updates metric display', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities() })
+    setupMediaHouseTest(player, { contentBudgetPerTick: null })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/building/building-mh')
+
+    const panel = page.locator('[aria-label="media house management"]')
+    await expect(panel).toBeVisible()
+    const budgetSection = panel.locator('.media-house-budget-section')
+    await expect(budgetSection).toBeVisible()
+    await budgetSection.locator('input[type="number"]').fill('750')
+    await budgetSection.getByRole('button', { name: 'Save Budget' }).click()
+    await expect(budgetSection.locator('.media-house-budget-success')).toBeVisible()
+    await expect(budgetSection.locator('.media-house-budget-success')).toContainText('Content budget saved')
+  })
+
+  test('shows effectiveness multiplier context for TV channel', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities() })
+    setupMediaHouseTest(player, { mediaType: 'TV', contentValue: 3000, contentBudgetPerTick: 1000 })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cityMediaHouses['city-ba'] = [
+      {
+        id: 'building-mh',
+        name: 'City TV',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'TV',
+        ownerCompanyId: 'company-mh',
+        ownerCompanyName: 'Media Corp',
+        effectivenessMultiplier: 2.0,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 100,
+        contentValue: 3000,
+        contentBudgetPerTick: 1000,
+        isGovernmentOwned: false,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/building/building-mh')
+
+    const panel = page.locator('[aria-label="media house management"]')
+    const effectivenessSection = panel.locator('.media-house-effectiveness-section')
+    await expect(effectivenessSection).toBeVisible()
+    await expect(effectivenessSection.locator('.mh-channel-mult-value').first()).toContainText('×2.0')
   })
 })

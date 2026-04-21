@@ -43,6 +43,7 @@ public static class LedgerCategory
     public const string Marketing = "MARKETING";
     public const string ShippingCost = "SHIPPING_COST";
     public const string MediaHouseIncome = "MEDIA_HOUSE_INCOME";
+    public const string MediaHouseContent = "MEDIA_HOUSE_CONTENT";
     public const string Tax = "TAX";
     public const string Dividend = "DIVIDEND";
     public const string RentIncome = "RENT_INCOME";

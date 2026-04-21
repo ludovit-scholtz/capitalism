@@ -338,6 +338,8 @@ public sealed partial class Query
                 PowerStatus = b.PowerStatus,
                 IsUnderConstruction = b.IsUnderConstruction,
                 ContentRanking = ranking,
+                ContentValue = b.ContentValue,
+                ContentBudgetPerTick = b.ContentBudgetPerTick,
                 IsGovernmentOwned = b.IsGovernmentOwned,
             };
         }).ToList();

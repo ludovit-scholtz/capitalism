@@ -84,6 +84,11 @@ public sealed class MarketingPhase : ITickPhase
             {
                 channelMultiplier = MediaType.EffectivenessMultiplier(mediaHouse.MediaType);
                 channelDescription = mediaHouse.MediaType?.ToLowerInvariant() ?? "media";
+
+                // Apply content ranking multiplier: top-ranked outlet = 1.5×, zero-ranked = 0.5×.
+                var contentRankingFraction = ComputeContentRankingFraction(mediaHouse, context);
+                channelMultiplier *= GameConstants.ContentRankingBaseMultiplier
+                    + contentRankingFraction * GameConstants.ContentRankingMarketingBoostRange;
             }
         }
 
@@ -136,5 +141,29 @@ public sealed class MarketingPhase : ITickPhase
             // Combined: channel reach × R&D efficiency.
             brand.Awareness = Math.Min(1m, brand.Awareness + budgetPerProduct * GameConstants.BrandAwarenessPerBudget * channelMultiplier * efficiencyMultiplier);
         }
+    }
+
+    /// <summary>
+    /// Computes the content ranking fraction (0–1) for a media house relative to all
+    /// outlets in the same city and media category.
+    /// The top outlet returns 1.0; an outlet with zero content returns 0.0.
+    /// </summary>
+    private static decimal ComputeContentRankingFraction(Building mediaHouse, TickContext context)
+    {
+        var mediaType = mediaHouse.MediaType ?? string.Empty;
+        decimal maxContent = 0m;
+
+        if (!context.BuildingsByType.TryGetValue(BuildingType.MediaHouse, out var allMediaHouses))
+            return 0m;
+
+        foreach (var mh in allMediaHouses)
+        {
+            if (mh.CityId != mediaHouse.CityId) continue;
+            if ((mh.MediaType ?? string.Empty) != mediaType) continue;
+            if (mh.ContentValue > maxContent) maxContent = mh.ContentValue;
+        }
+
+        if (maxContent <= 0m) return 0m;
+        return Math.Clamp(mediaHouse.ContentValue / maxContent, 0m, 1m);
     }
 }

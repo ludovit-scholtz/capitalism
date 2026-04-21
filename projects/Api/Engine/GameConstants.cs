@@ -129,6 +129,38 @@ public static class GameConstants
     /// </summary>
     public const decimal MaxMarketingEfficiencyMultiplier = 2m;
 
+    // ── Media house content constants ─────────────────────────────────────────
+
+    /// <summary>
+    /// Fraction of ContentValue that decays every tick for all media house buildings.
+    /// 0.005 = 0.5% per tick as specified by the ROADMAP.
+    /// </summary>
+    public const decimal MediaHouseContentDecayRate = 0.005m;
+
+    /// <summary>
+    /// Converts a media house building level to its content-accumulation efficiency.
+    /// Level 1 → 50%, level 2 → 66.7%, level 3 → 75%, …
+    /// Formula: efficiency = 1 – 1/(level+1)
+    /// </summary>
+    public static decimal MediaHouseContentEfficiency(int level) =>
+        1m - 1m / ((decimal)level + 1m);
+
+    /// <summary>
+    /// Range of the brand-awareness boost from content ranking.
+    /// A top-ranked outlet (100%) multiplies marketing effectiveness by
+    /// 1.0 + ContentRankingMarketingBoostRange.  A zero-ranked outlet
+    /// multiplies by 0.5 (half the base).
+    /// The full range runs from 0.5× to (1.0 + range)×.
+    /// </summary>
+    public const decimal ContentRankingMarketingBoostRange = 1.0m;
+
+    /// <summary>
+    /// Base effectiveness multiplier applied even when content ranking is zero.
+    /// Combined formula: multiplier = ContentRankingBaseMultiplier + rankingFraction * ContentRankingMarketingBoostRange
+    /// At 0% ranking → 0.5×; at 100% ranking → 1.5×.
+    /// </summary>
+    public const decimal ContentRankingBaseMultiplier = 0.5m;
+
     /// <summary>R&amp;D efficiency multiplier increment per tick per unit level (for BRAND_QUALITY research).</summary>
     public static decimal ResearchEfficiencyRate(int level) => level switch
     {

@@ -228,6 +228,20 @@ public sealed class SetRentPerSqmInput
     public decimal RentPerSqm { get; set; }
 }
 
+/// <summary>Input for setting the per-tick content spending budget for a media house building.</summary>
+public sealed class SetMediaHouseContentBudgetInput
+{
+    /// <summary>MEDIA_HOUSE building to configure.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>
+    /// Amount to spend on content per tick.
+    /// Set to null or 0 to stop content investment.
+    /// Must be non-negative.
+    /// </summary>
+    public decimal? ContentBudgetPerTick { get; set; }
+}
+
 /// <summary>Input for purchasing a building lot and placing a building on it.</summary>
 public sealed class PurchaseLotInput
 {
