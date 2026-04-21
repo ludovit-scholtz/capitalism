@@ -1507,3 +1507,91 @@ export interface CurrencyBalance {
   currencySymbol: string
   balance: number
 }
+
+// ── Gold AMM types ────────────────────────────────────────────────────────────
+
+/** Summary of a gold AMM liquidity pool. */
+export interface GoldAmmPool {
+  id: string
+  currencyCode: string
+  currencySymbol: string
+  fiatReserve: number
+  goldReserve: number
+  totalLiquidityShares: number
+  impliedGoldPrice: number
+  myPosition?: GoldAmmPosition | null
+}
+
+/** A player's liquidity position in a gold AMM pool. */
+export interface GoldAmmPosition {
+  id: string
+  poolId: string
+  currencyCode: string
+  liquidityShares: number
+  sharePercent: number
+  claimableFiat: number
+  claimableGold: number
+  fiatProvided: number
+  goldProvided: number
+}
+
+/** Quote for a gold AMM swap. */
+export interface GoldAmmSwapQuote {
+  direction: string
+  currencyCode: string
+  currencySymbol: string
+  inputAmount: number
+  outputAmount: number
+  feeAmount: number
+  feePercent: number
+  impliedPrice: number
+  slippagePercent: number
+  poolFiatReserve: number
+  poolGoldReserve: number
+  availableInputBalance: number
+}
+
+/** Result of an executed gold AMM swap. */
+export interface GoldAmmSwapResult {
+  tradeId: string
+  direction: string
+  currencyCode: string
+  inputAmount: number
+  outputAmount: number
+  feeAmount: number
+  impliedPrice: number
+  newFiatBalance: number
+  newGoldBalance: number
+}
+
+/** Result of creating a pool or adding liquidity. */
+export interface GoldAmmLiquidityResult {
+  poolId: string
+  positionId: string
+  currencyCode: string
+  liquidityShares: number
+  fiatProvided: number
+  goldProvided: number
+  poolFiatReserve: number
+  poolGoldReserve: number
+  newFiatBalance: number
+  newGoldBalance: number
+}
+
+/** Result of removing liquidity from a gold AMM pool. */
+export interface GoldAmmRemoveLiquidityResult {
+  positionId: string
+  currencyCode: string
+  fiatReturned: number
+  goldReturned: number
+  remainingShares: number
+  newFiatBalance: number
+  newGoldBalance: number
+}
+
+/** Player's gold (XAU) balance. */
+export interface GoldBalanceInfo {
+  balance: number
+  blockedInPools: number
+  availableBalance: number
+}
