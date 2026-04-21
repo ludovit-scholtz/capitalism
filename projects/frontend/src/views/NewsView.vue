@@ -47,6 +47,26 @@ function sanitizeHtml(html: string) {
   return DOMPurify.sanitize(html)
 }
 
+/** Returns the plain text of an HTML string by stripping all tags. */
+function htmlToPlainText(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim()
+}
+
+/**
+ * Returns true when the summary should be shown to the user.
+ * For CHANGELOG entries the summary is hidden when it is empty or would merely
+ * repeat the plain-text content that is already rendered in the HTML body.
+ */
+function shouldShowSummary(entry: GameNewsEntry): boolean {
+  const loc = getLocalization(entry)
+  if (!loc?.summary) return false
+  if (entry.entryType === 'CHANGELOG') {
+    const bodyText = htmlToPlainText(loc.htmlContent)
+    return loc.summary.trim() !== bodyText
+  }
+  return true
+}
+
 async function loadFeed() {
   viewError.value = null
 
@@ -129,7 +149,7 @@ onMounted(async () => {
             <p class="news-card-date">{{ formatDate(entry.publishedAtUtc ?? entry.updatedAtUtc) }}</p>
           </div>
 
-          <p v-if="getLocalization(entry)?.summary" class="news-card-summary">
+          <p v-if="shouldShowSummary(entry)" class="news-card-summary">
             {{ getLocalization(entry)?.summary }}
           </p>
 

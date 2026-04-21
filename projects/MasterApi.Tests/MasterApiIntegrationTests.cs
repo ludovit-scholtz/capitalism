@@ -585,7 +585,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                                                 registrationKey = "test-registration-key",
                                                 serverKey = "capitalism-local",
                                                 includeDrafts = false,
-                                                limit = 50,
+                                                limit = 200,
                                         }
                                 });
 
@@ -621,7 +621,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 50,
+                        limit = 200,
                     }
                 });
 
@@ -658,7 +658,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 50,
+                        limit = 200,
                     }
                 });
 
@@ -695,7 +695,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 50,
+                        limit = 200,
                     }
                 });
 
@@ -731,7 +731,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 50,
+                        limit = 200,
                     }
                 });
 
@@ -925,8 +925,41 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
             var truncated = MasterApi.Data.ChangelogCsvImporter.TruncateAtWordBoundary(longText, 100);
 
-            Assert.True(truncated.Length <= 101, $"Truncated length {truncated.Length} should be <= 101");
+            Assert.True(truncated.Length <= 100, $"Truncated length {truncated.Length} should be <= 100");
             Assert.EndsWith("…", truncated);
+        }
+
+        [Fact]
+        public void ChangelogCsvImporter_TruncateAtWordBoundary_NeverExceedsMaxLengthWhenNoSpaces()
+        {
+            // A single uninterrupted token longer than maxLength must still fit in maxLength chars.
+            var noSpaceText = new string('a', 250);
+
+            var truncated = MasterApi.Data.ChangelogCsvImporter.TruncateAtWordBoundary(noSpaceText, 220);
+
+            Assert.True(truncated.Length <= 220, $"Truncated length {truncated.Length} should be <= 220");
+            Assert.EndsWith("…", truncated);
+        }
+
+        [Fact]
+        public void ChangelogCsvImporter_ExtractTitle_SplitsOnColon()
+        {
+            const string text = "Feature name: full description that is quite long and would overflow the column.";
+
+            var title = MasterApi.Data.ChangelogCsvImporter.ExtractTitle(text);
+
+            Assert.Equal("Feature name", title);
+        }
+
+        [Fact]
+        public void ChangelogCsvImporter_ExtractTitle_FallsBackToTruncationWhenNoColon()
+        {
+            var longText = string.Concat(Enumerable.Repeat("word ", 60));
+
+            var title = MasterApi.Data.ChangelogCsvImporter.ExtractTitle(longText);
+
+            Assert.True(title.Length <= 220, $"Title length {title.Length} should be <= 220");
+            Assert.EndsWith("…", title);
         }
 
         [Fact]
@@ -1004,7 +1037,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             Assert.Contains("de", locales);
 
             var enLoc = entry.Localizations.First(l => l.Locale == "en");
-            Assert.Equal("English summary.", enLoc.Summary);
+            Assert.Equal(string.Empty, enLoc.Summary);
         }
 
         [Fact]
@@ -1035,7 +1068,91 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
 
             var skLoc = entry.Localizations.FirstOrDefault(l => l.Locale == "sk");
             Assert.NotNull(skLoc);
-            Assert.Equal("English-only entry.", skLoc.Summary);
+            Assert.Equal(string.Empty, skLoc.Summary);
+        }
+
+        [Fact]
+        public async Task ChangelogCsvImporter_ImportAsync_PersistsLongRealisticEntry()
+        {
+            // Regression test: long changelog entries (with ':' separator and multi-byte chars)
+            // must be stored without PostgreSQL column-length violations.
+            await using var factory = new MasterApi.Tests.Infrastructure.MasterApiWebApplicationFactory(
+                $"import-long-{Guid.NewGuid():N}");
+
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterApi.Data.MasterDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            // Realistic entry modelled on actual CHANGELOG.csv rows – title before ':' is short,
+            // full text is well over 220 characters but within the 'text' HtmlContent column.
+            const string longEn = "Tokenized gold AMM liquidity pools launched: players can now create fiat/XAU constant-product pools, add or remove liquidity, get swap quotes with slippage info, and execute gold \u2194 fiat swaps \u2014 liquidity providers earn the 1% fee automatically, and pool-committed assets are blocked from concurrent use.";
+            const string longSk = "Spusten\u00e9 tokenizovan\u00e9 zlat\u00e9 AMM likvidn\u00e9 fondy: hr\u00e1\u010di teraz m\u00f4\u017eu vytvori\u0165 fiat/XAU fondy s kon\u0161tant\u00fdm produktom, prida\u0165 alebo odobra\u0165 likviditu, z\u00edska\u0165 ceny swapov a vykon\u00e1va\u0165 swapy zlato \u2194 fiat \u2014 poskytovatelia likvidity zar\u00e1baj\u00fa 1% poplatok automaticky a prostriedky viazan\u00e9 vo fonde s\u00fa blokovan\u00e9.";
+            const string longDe = "Tokenisierte Gold-AMM-Liquidit\u00e4tspools gestartet: Spieler k\u00f6nnen jetzt Fiat/XAU-Pools mit konstantem Produkt erstellen, Liquidit\u00e4t hinzuf\u00fcgen oder entfernen, Swap-Angebote mit Slippage-Informationen erhalten und Gold \u2194 Fiat-Swaps ausf\u00fchren \u2014 Liquidit\u00e4tsanbieter verdienen automatisch die 1%-Geb\u00fchr und im Pool gebundene Mittel sind gesperrt.";
+
+            var csv = $"id;date;en;sk;de\nf1e2d3c4-b5a6-7890-abcd-ef1234567890;2026-04-20T23:40:00Z;{longEn};{longSk};{longDe}";
+
+            var rows = MasterApi.Data.ChangelogCsvImporter.ParseCsv(csv);
+            var importer = new MasterApi.Data.ChangelogCsvImporter(db);
+
+            // Must not throw a column-length violation.
+            var imported = await importer.ImportAsync(rows);
+
+            Assert.Equal(1, imported);
+
+            var entry = await db.GameNewsEntries
+                .Include(e => e.Localizations)
+                .FirstOrDefaultAsync(e => e.Id == Guid.Parse("f1e2d3c4-b5a6-7890-abcd-ef1234567890"));
+
+            Assert.NotNull(entry);
+            Assert.Equal(3, entry.Localizations.Count);
+
+            foreach (var loc in entry.Localizations)
+            {
+                // Title is the portion before ':' — must be well under the 220-char limit.
+                Assert.True(loc.Title.Length <= 220, $"Title for locale '{loc.Locale}' has {loc.Title.Length} chars");
+                // Summary must be empty for changelog entries.
+                Assert.Equal(string.Empty, loc.Summary);
+            }
+
+            var enLoc = entry.Localizations.First(l => l.Locale == "en");
+            // The title should have been extracted from the text before the colon.
+            Assert.Equal("Tokenized gold AMM liquidity pools launched", enLoc.Title);
+        }
+
+        [Fact]
+        public async Task ChangelogCsvImporter_ImportAsync_TitleExtractedBeforeColonForAllLocales()
+        {
+            await using var factory = new MasterApi.Tests.Infrastructure.MasterApiWebApplicationFactory(
+                $"import-title-{Guid.NewGuid():N}");
+
+            using var scope = factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<MasterApi.Data.MasterDbContext>();
+            await db.Database.EnsureCreatedAsync();
+
+            const string csv = """
+                id;date;en;sk;de
+                a2b3c4d5-e6f7-8901-abcd-ef2345678901;2026-04-15T10:00:00Z;Power plant upgrade: solar panels now generate 20% more power in summer months.;Upgrejd elektrárne: solárne panely teraz generujú o 20% viac energie v letných mesiacoch.;Kraftwerk-Upgrade: Solarmodule erzeugen jetzt im Sommer 20% mehr Strom.
+                """;
+
+            var rows = MasterApi.Data.ChangelogCsvImporter.ParseCsv(csv);
+            var importer = new MasterApi.Data.ChangelogCsvImporter(db);
+            await importer.ImportAsync(rows);
+
+            var entry = await db.GameNewsEntries
+                .Include(e => e.Localizations)
+                .FirstOrDefaultAsync(e => e.Id == Guid.Parse("a2b3c4d5-e6f7-8901-abcd-ef2345678901"));
+
+            Assert.NotNull(entry);
+
+            var enLoc = entry.Localizations.First(l => l.Locale == "en");
+            Assert.Equal("Power plant upgrade", enLoc.Title);
+            Assert.Equal(string.Empty, enLoc.Summary);
+
+            var skLoc = entry.Localizations.First(l => l.Locale == "sk");
+            Assert.Equal("Upgrejd elektrárne", skLoc.Title);
+
+            var deLoc = entry.Localizations.First(l => l.Locale == "de");
+            Assert.Equal("Kraftwerk-Upgrade", deLoc.Title);
         }
 
         [Fact]
