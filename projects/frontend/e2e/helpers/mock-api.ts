@@ -742,6 +742,8 @@ export type MockState = {
   publicSalesAnalytics: Record<string, MockPublicSalesAnalytics>
   /** Unit product analytics by unit ID (for MANUFACTURING units) */
   unitProductAnalytics: Record<string, MockUnitProductAnalytics>
+  /** Campaign analytics result keyed by companyId */
+  campaignAnalytics: Record<string, object | null>
   /** Building financial history keyed by building ID */
   buildingFinancialTimelines: Record<string, MockBuildingFinancialTimeline>
   /** Loan offers available in the marketplace */
@@ -1873,6 +1875,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     publicSalesRecords: [],
     publicSalesAnalytics: {},
     unitProductAnalytics: {},
+    campaignAnalytics: {},
     buildingFinancialTimelines: {},
     loanOffers: [],
     myLoans: [],
@@ -5478,7 +5481,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // personAccount query has companyName field which contains 'me' as substring
       !q.includes('personAccount') &&
       // myCollateralBuildings has buildingName field (ends in 'me')
-      !q.includes('myCollateralBuildings')
+      !q.includes('myCollateralBuildings') &&
+      // campaignAnalytics has companyName/cityName fields that contain 'me' as substring
+      !q.includes('campaignAnalytics')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -5610,6 +5615,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { unitProductAnalytics: analytics } }),
+      })
+    }
+
+    if (query.includes('campaignAnalytics')) {
+      const companyId: string = body.variables?.companyId ?? body.variables?.cid ?? ''
+      const result = state.campaignAnalytics[companyId] ?? {
+        companyId,
+        windowTicks: 10,
+        totalRevenue: 0,
+        totalMarketingSpend: 0,
+        bestPerformingCity: null,
+        bestPerformingProduct: null,
+        globalRecommendation: 'No sales data yet. Open a sales shop and start selling to see campaign analytics.',
+        rows: [],
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { campaignAnalytics: result } }),
       })
     }
 

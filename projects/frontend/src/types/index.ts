@@ -1620,3 +1620,58 @@ export interface GoldBalanceInfo {
   blockedInPools: number
   availableBalance: number
 }
+
+/** Per-product/per-city analytics row for the campaign analytics dashboard. */
+export interface CampaignAnalyticsRow {
+  buildingUnitId: string
+  buildingId: string
+  buildingName: string
+  productName: string | null
+  productTypeId: string | null
+  cityName: string
+
+  // Brand metrics
+  brandAwareness: number | null
+  brandQuality: number | null
+  marketingQuality: number | null
+
+  // Pricing metrics
+  currentPrice: number | null
+  basePrice: number | null
+  priceIndex: number | null
+  pricePremiumPct: number | null
+
+  // Recent performance
+  revenueLastTicks: number
+  quantityLastTicks: number
+  utilizationRate: number
+  trendDirection: string
+  trendFactor: number | null
+  demandSignal: string
+
+  // Demand insight
+  topPositiveFactor: string | null
+  topNegativeFactor: string | null
+
+  // Campaign ROI
+  marketingSpendLastTicks: number | null
+  brandRevenueBoost: number | null
+  campaignImpact: string
+
+  // Strategic insights
+  brandVsPriceBalance: string
+  recommendation: string
+  cityCurrencyCode: string
+}
+
+/** Aggregated campaign analytics result for a company. */
+export interface CampaignAnalyticsResult {
+  companyId: string
+  windowTicks: number
+  totalRevenue: number
+  totalMarketingSpend: number
+  bestPerformingCity: string | null
+  bestPerformingProduct: string | null
+  globalRecommendation: string
+  rows: CampaignAnalyticsRow[]
+}

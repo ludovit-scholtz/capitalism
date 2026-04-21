@@ -137,6 +137,13 @@ public static class GameConstants
     public const decimal BrandMarketingQualityDecayRate = 0.0003m;
 
     /// <summary>
+    /// Number of recent ticks included in the campaign analytics window.
+    /// All revenue, spend, and performance metrics in <c>CampaignAnalyticsResult</c>
+    /// are computed over this window so players see current-campaign performance.
+    /// </summary>
+    public const int CampaignAnalyticsWindowTicks = 10;
+
+    /// <summary>
     /// Maximum demand boost factor that combined brand quality (R&amp;D + marketing) can provide
     /// on top of the awareness-based brand factor.
     /// At full combined quality (1.0) the brand factor receives a 50% bonus multiplier.

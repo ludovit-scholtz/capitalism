@@ -24,6 +24,11 @@ const router = createRouter({
     { path: '/banking', name: 'loan-marketplace', alias: '/loans', component: () => import('@/views/LoanMarketplaceView.vue') },
     { path: '/bank/:buildingId', name: 'bank-management', component: () => import('@/views/BankManagementView.vue') },
     { path: '/personal-ledger', name: 'personal-ledger', component: () => import('@/views/PersonalLedgerView.vue') },
+    {
+      path: '/marketing-analytics',
+      name: 'marketing-analytics',
+      component: () => import('@/views/MarketingAnalyticsView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

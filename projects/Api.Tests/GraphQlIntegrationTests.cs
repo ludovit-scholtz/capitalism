@@ -21440,6 +21440,207 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal("CZK", analytics.GetProperty("cityCurrencyCode").GetString());
     }
 
+
+    // ── Campaign Analytics Tests ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CampaignAnalytics_NoPublicSalesUnits_ReturnsEmptyResult()
+    {
+        var token = await RegisterAndGetTokenAsync("campaign-empty2@test.com", "CampaignEmpty2");
+        var (companyId, _, _, _) = await StartOnboardingCompanyAsync(token, "Campaign Empty Co2");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CA($cid: UUID!) {
+              campaignAnalytics(companyId: $cid) {
+                companyId
+                windowTicks
+                totalRevenue
+                totalMarketingSpend
+                globalRecommendation
+                rows { buildingUnitId }
+              }
+            }
+            """,
+            new { cid = Guid.Parse(companyId) },
+            token);
+
+        var ca = result.GetProperty("data").GetProperty("campaignAnalytics");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Null, ca.ValueKind);
+        Assert.Equal(0, ca.GetProperty("rows").GetArrayLength());
+        Assert.Equal(10, ca.GetProperty("windowTicks").GetInt32());
+        var rec = ca.GetProperty("globalRecommendation").GetString();
+        Assert.False(string.IsNullOrWhiteSpace(rec));
+    }
+
+    [Fact]
+    public async Task CampaignAnalytics_WithSalesData_ReturnsAnalyticsRow()
+    {
+        var token = await RegisterAndGetTokenAsync("campaign-data2@test.com", "CampaignData2");
+        var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Campaign Data Co2");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding")
+            .GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.City)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+        var gameState = await db.GameStates.FindAsync(1);
+        var currentTick = gameState?.CurrentTick ?? 1L;
+
+        for (var i = 1; i <= 5; i++)
+        {
+            db.PublicSalesRecords.Add(new PublicSalesRecord
+            {
+                Id = Guid.NewGuid(),
+                BuildingUnitId = unit.Id,
+                BuildingId = unit.BuildingId,
+                CompanyId = unit.Building.CompanyId,
+                CityId = unit.Building.CityId,
+                ProductTypeId = productType.Id,
+                Tick = currentTick - (5 - i),
+                Revenue = productType.BasePrice * 10m,
+                QuantitySold = 10m,
+                PricePerUnit = productType.BasePrice,
+                Demand = 15m,
+                SalesCapacity = 20m,
+                TrendFactor = 1.0m,
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CA($cid: UUID!) {
+              campaignAnalytics(companyId: $cid) {
+                companyId windowTicks totalRevenue bestPerformingCity bestPerformingProduct globalRecommendation
+                rows {
+                  buildingUnitId productName cityName revenueLastTicks quantityLastTicks
+                  utilizationRate trendDirection demandSignal brandVsPriceBalance campaignImpact recommendation cityCurrencyCode
+                }
+              }
+            }
+            """,
+            new { cid = Guid.Parse(companyId) },
+            token);
+
+        var ca = result.GetProperty("data").GetProperty("campaignAnalytics");
+        Assert.Equal(1, ca.GetProperty("rows").GetArrayLength());
+
+        var row = ca.GetProperty("rows")[0];
+        Assert.Equal(unit.Id.ToString(), row.GetProperty("buildingUnitId").GetString());
+        Assert.True(row.GetProperty("revenueLastTicks").GetDecimal() > 0);
+        Assert.Equal(50m, row.GetProperty("quantityLastTicks").GetDecimal());
+        Assert.False(string.IsNullOrWhiteSpace(row.GetProperty("recommendation").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(ca.GetProperty("bestPerformingCity").GetString()));
+        Assert.False(string.IsNullOrWhiteSpace(ca.GetProperty("bestPerformingProduct").GetString()));
+    }
+
+    [Fact]
+    public async Task CampaignAnalytics_WithBrandData_ReturnsBrandMetrics()
+    {
+        var token = await RegisterAndGetTokenAsync("campaign-brand2@test.com", "CampaignBrand2");
+        var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Campaign Brand Co2");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial Zone");
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        var shopId = finishResult.GetProperty("data").GetProperty("finishOnboarding")
+            .GetProperty("salesShop").GetProperty("id").GetString()!;
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building).ThenInclude(b => b.City)
+            .FirstAsync(u => u.BuildingId == Guid.Parse(shopId) && u.UnitType == "PUBLIC_SALES");
+        var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
+
+        db.Brands.Add(new Brand
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = Guid.Parse(companyId),
+            Name = "TestBrand2",
+            Scope = BrandScope.Product,
+            ProductTypeId = productType.Id,
+            Awareness = 0.7m,
+            Quality = 0.6m,
+            MarketingQuality = 0.5m,
+            MarketingEfficiencyMultiplier = 1.0m,
+        });
+
+        var gameState = await db.GameStates.FindAsync(1);
+        var currentTick = gameState?.CurrentTick ?? 1L;
+
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unit.Id,
+            BuildingId = unit.BuildingId,
+            CompanyId = unit.Building.CompanyId,
+            CityId = unit.Building.CityId,
+            ProductTypeId = productType.Id,
+            Tick = currentTick,
+            Revenue = productType.BasePrice * 15m,
+            QuantitySold = 15m,
+            PricePerUnit = productType.BasePrice * 1.1m,
+            Demand = 20m,
+            SalesCapacity = 20m,
+            TrendFactor = 1.05m,
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CA($cid: UUID!) {
+              campaignAnalytics(companyId: $cid) {
+                rows { brandAwareness brandQuality marketingQuality campaignImpact brandRevenueBoost brandVsPriceBalance }
+              }
+            }
+            """,
+            new { cid = Guid.Parse(companyId) },
+            token);
+
+        var rows = result.GetProperty("data").GetProperty("campaignAnalytics").GetProperty("rows");
+        Assert.Equal(1, rows.GetArrayLength());
+        var row = rows[0];
+
+        Assert.True(row.GetProperty("brandAwareness").GetDecimal() > 0.5m);
+        Assert.True(row.GetProperty("brandQuality").GetDecimal() > 0.5m);
+        Assert.Equal("STRONG", row.GetProperty("campaignImpact").GetString());
+        Assert.True(row.GetProperty("brandRevenueBoost").GetDecimal() > 0m);
+        Assert.Equal("PREMIUM_JUSTIFIED", row.GetProperty("brandVsPriceBalance").GetString());
+    }
+
+    [Fact]
+    public async Task CampaignAnalytics_WrongOwner_ReturnsNull()
+    {
+        var token1 = await RegisterAndGetTokenAsync("campaign-o1@test.com", "CampaignOwner1a");
+        var token2 = await RegisterAndGetTokenAsync("campaign-o2@test.com", "CampaignOwner2a");
+        var (companyId, _, _, _) = await StartOnboardingCompanyAsync(token1, "Campaign Owner Co1");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CA($cid: UUID!) {
+              campaignAnalytics(companyId: $cid) { companyId }
+            }
+            """,
+            new { cid = Guid.Parse(companyId) },
+            token2);
+
+        var ca = result.GetProperty("data").GetProperty("campaignAnalytics");
+        Assert.Equal(System.Text.Json.JsonValueKind.Null, ca.ValueKind);
+    }
+
     #endregion
 }
 
