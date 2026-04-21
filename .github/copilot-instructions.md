@@ -29,6 +29,8 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL, and Entity Framework Core to store the live game-server registry.
 - `projects/Api` runs on PostgreSQL in normal runtime. Design-time EF migrations for the game API must also be scaffolded against PostgreSQL via `projects/Api/Data/AppDbContextFactory.cs` and the `GameCatalog` connection string. Do not scaffold API migrations against SQLite placeholders or a temporary SQLite design-time database.
 - When a backend model changes, always add the corresponding EF migration and make the startup upgrade path safe for a server restart onto the new build. If the change could affect a legacy database that was previously created/baselined without full migration history, add idempotent schema-repair logic in `AppDbInitializer` before baseline/migration execution so restart does not boot against a partial schema.
+- **Schema repair must not pre-create artifacts for a migration that is still pending on an already-migrated PostgreSQL database.** For normal databases with `__EFMigrationsHistory`, let EF apply pending PostgreSQL-native migrations itself; otherwise restart can fail with duplicate-column/table errors (`42701`, `42P07`). Only repair a pending migration when it is part of the explicit legacy SQLite-tail that startup intentionally hydrates and marks as applied.
+- **Every `AppDbInitializer` repair block must be mapped to its owning migration ID and covered by a regression test for both branches:** pending normal migration => repair skipped, pending legacy hydrated migration => repair allowed. This is the guardrail that keeps live player databases upgradeable without data loss or startup failures.
 - Never swallow `MigrateAsync()` failures for the game API. If schema upgrade fails, startup must fail so the server does not continue running with runtime `column does not exist` errors.
 - For every API model/migration change, add or update a regression test that creates a database at the previous schema, runs `AppDbInitializer.InitializeAsync()` to simulate a restart onto the new build, and asserts the new schema artifacts exist afterward.
 - Frontends communicate with their backend exclusively via GraphQL using lightweight fetch-based clients.
@@ -729,6 +731,21 @@ Root-cause of a CI failure (April 2026, PR #233 public-sales analytics):
 3. **After applying `AsSplitQuery()`, the query is split into separate round-trips per Include path.** This avoids the Cartesian product and guarantees navigation collections are populated correctly.
 4. **CI ordering vs local ordering is not deterministic.** If tests share a database (via `IClassFixture`), any test that creates an entity with pending child collections (e.g., `BuildingConfigurationPlan`) but does NOT apply/delete it leaves state that can corrupt subsequent tests. Both the query fix (`AsSplitQuery`) AND the test isolation matter.
 5. **When CI fails with "An item with the same key has already been added" in a `ToDictionary` on a navigation collection, immediately suspect a Cartesian explosion in an EF Core Include chain.** Add `AsSplitQuery()` and re-run; do not try to work around with `DistinctBy` as that would hide the underlying data corruption.
+
+## Migration repair vs pending Postgres migrations — never pre-create the next column
+
+Root-cause of a startup failure (April 2026, `ContentBudgetPerTick` duplicate-column crash):
+- `AppDbInitializer.RepairKnownLegacySchemaDriftAsync()` added `Buildings.ContentBudgetPerTick` before `MigrateAsync()` ran.
+- The database already had `__EFMigrationsHistory`, so this was a normal migrated PostgreSQL database with one legitimate pending migration: `20260421070000_AddMediaHouseContentBudgetPerTick`.
+- Startup then reached `MigrateAsync()`, EF replayed the pending migration, and PostgreSQL correctly failed with `42701: column "ContentBudgetPerTick" of relation "Buildings" already exists`.
+- The deeper issue was not the migration itself; it was schema-repair logic stealing work from a still-pending PostgreSQL-native migration.
+
+**Rules to prevent recurrence:**
+1. **Treat schema repair and pending migrations as mutually exclusive on normal PostgreSQL databases.** If `__EFMigrationsHistory` exists and a migration is pending, repair MUST skip artifacts owned by that migration unless it is part of the explicitly hydrated legacy SQLite tail.
+2. **Keep the legacy auto-hydration list explicit and narrow.** Only migrations that startup intentionally repairs and then marks as applied may bypass the pending-migration guard. New PostgreSQL-native migrations must run through `MigrateAsync()`.
+3. **When adding a new repair block in `AppDbInitializer.SchemaCompatibility.cs`, wire it to the owning migration ID in code.** The repair decision must be migration-aware, not just table/column-aware.
+4. **Add a regression test for the decision logic itself**: pending new PostgreSQL migration => `ShouldRepairSchemaArtifact(...) == false`; pending legacy hydrated migration => `true`.
+5. **If you see PostgreSQL duplicate-artifact startup errors (`42701` duplicate column, `42P07` relation already exists) immediately inspect whether startup repair created the artifact before `MigrateAsync()`.** Fix the repair guard first; do not paper over it by swallowing migration failures.
 
 ## Tick-refresh flicker prevention — always verify selectors against actual i18n labels before pushing E2E tests
 

@@ -10,6 +10,38 @@ namespace Api.Tests;
 public sealed class DatabaseMigrationBootstrapTests
 {
     private const string PreBankingMigration = "20260415025150_AddProductResearchBudget";
+    private const string AddMediaHouseContentBudgetPerTickMigration = "20260421070000_AddMediaHouseContentBudgetPerTick";
+    private const string LegacySqlitePostgresTailMigration = "20260417135125_AddLoanCollateral";
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_SkipsPendingPostgresNativeMigration()
+    {
+        var pendingMigrations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            AddMediaHouseContentBudgetPerTickMigration
+        };
+
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            AddMediaHouseContentBudgetPerTickMigration,
+            pendingMigrations);
+
+        Assert.False(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_KeepsHydratedLegacySqliteTailRepairEnabled()
+    {
+        var pendingMigrations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            LegacySqlitePostgresTailMigration
+        };
+
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            LegacySqlitePostgresTailMigration,
+            pendingMigrations);
+
+        Assert.True(shouldRepair);
+    }
 
     [Fact]
     public async Task StartupWithLegacyDatabaseMissingHistory_RepairsBankingSchemaBeforeBaselining()

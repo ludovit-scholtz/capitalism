@@ -6,58 +6,27 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Banking (90% complete)
-
-Implement banking as is described in the banking section.
-
-**Shipped in this increment:**
-- Bank purchase flow now auto-initiates the $10M base capital deposit (via `initiateBaseDeposit` called immediately after purchase through both `BuyBuildingView` and `CityMapView`). Default interest rates (3% deposit / 8% lending) are initialized on `PurchaseLot` for BANK type.
-- Interest/lending rates are now visible and editable from the bank view immediately after bank creation (rates form no longer hidden behind `baseCapitalDeposited` gate).
-- All frontend routing now directs to `/bank/:id` instead of `/building/:id` for bank buildings: CityMapView post-purchase link, CityMapView existing building link, LedgerView buildings performance table.
-- Deposits are now displayed as an account-style relationship with a single balance, interest earned summary, and clear "Add Funds" / "Withdraw" flows. A new `topUpDeposit` backend mutation supports adding to an existing deposit.
-- Navigation item renamed from "Loans" to "Banking" (route moved to `/banking`, `/loans` kept as alias for backward compatibility).
-- CSS improvements to the bank page account section for a professional, readable layout.
-- **Currency-aware banking (new):** Banks are now fully multi-currency aware. Each city has a configured ISO 4217 `CurrencyCode` (Bratislava/Vienna → EUR, Prague → CZK). The base capital requirement is automatically calculated per city: 10M EUR for EUR cities, 240M CZK for CZK cities. `BankInfoSummary` and `BankDepositSummary` GraphQL types now include `cityCurrencyCode`, `cityCurrencySymbol`, and `baseCapitalRequirement`. The `BankManagementView` frontend uses local city currency in all monetary displays (deposits, lending capacity, loans, account balance, withdraw limits). The base capital deposit prompt shows the dynamic amount in the correct local denomination.
-- **Multi-currency ledger view (new):** `LedgerEntryResult` and `BuildingLedgerSummary` GraphQL types now expose `currencyCode` and `currencySymbol` derived from the building's city at query time. `CompanyLedgerSummary` exposes `primaryCurrencyCode`, `primaryCurrencySymbol`, and `hasMixedCurrencies`. The ledger frontend displays a currency KPI card, shows currency badges per building in the Buildings Performance table, and renders a "Multi-currency" hint for companies with buildings in multiple cities. Drill-down entries show inline CZK/USD/GBP badges when a transaction is in a different currency from the company primary. All amounts are formatted using `Intl.NumberFormat` with the correct ISO 4217 code. `PersonalLedgerView` corrected from hardcoded USD to EUR. `FinancialSummaryCard` uses the ledger's `primaryCurrencyCode` for dashboard summaries. 4 new backend integration tests + 6 new E2E tests cover multi-city and single-city currency flows.
-
-**Remaining:**
-- Forex exchange: cross-city currency trading for companies operating in multiple cities.
-- ✅ **Local city currency in building units:** Purchasing, B2B sales, and public sales unit config screens now use `Intl.NumberFormat` with the building's city `currencyCode`. Max Price and Min Price labels carry a currency badge (`<span class="currency-badge">CZK</span>`). Analytics types (`PublicSalesAnalytics`, `UnitProductAnalytics`) expose `cityCurrencyCode`. i18n message strings no longer contain hardcoded `$`. 4 backend integration tests (EUR + CZK × PublicSales + UnitProduct) and 4 new E2E tests (EUR badge, CZK badge, mixed-company, CZK analytics) confirm no regression.
-
-### Changelog (100% complete)
-
-- ✅ Long changelog entries can now be stored successfully in PostgreSQL: `TruncateAtWordBoundary` was fixed to always return at most `maxLength` characters (previously could return `maxLength + 1` due to the ellipsis character, causing a column-length violation).
-- ✅ Changelog titles are now generated in a human-readable format by extracting the portion before the first `:` separator (e.g. "Feature name: description…" → title = "Feature name").
-- ✅ Changelog descriptions (summary) are stored as empty string so the same text is never shown twice — the full text is already in the HTML body card.
-
 ### Architecture optimization (0% complete)
 
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
-### Marketing (100% complete)
+### Currencies (10% complete)
 
-**Shipped in this increment:**
-- Every seeded city now has one government-owned media house of each type (Newspaper, Radio, TV) seeded at startup via `AppDbInitializer.SeedGovernmentMediaHousesAsync`. Government outlets carry an initial `ContentValue` of 1 000 and the `IsGovernmentOwned` flag.
-- `Building` entity extended with `ContentValue` (decimal), `IsGovernmentOwned` (bool), and `ContentBudgetPerTick` (decimal?) fields. EF schema repair (`EnsureColumnAsync`) handles legacy databases on restart.
-- `GetCityMediaHouses` GraphQL query updated: now accepts optional `ownerCompanyId` param, returns `contentRanking`, `contentValue`, `contentBudgetPerTick`, and `isGovernmentOwned`, sorts player-owned outlets first then by ranking descending.
-- `MediaHouseContentPhase` (order 650): each tick decays all media house ContentValue by 0.5%, then converts ContentBudgetPerTick → accumulated content using the roadmap efficiency formula `efficiency = 1 – 1/(level+1)` (50% at L1, 66% at L2, 75% at L3, …). Records `MEDIA_HOUSE_CONTENT` ledger entries for each spend event.
-- `MarketingPhase` updated: brand awareness gain now uses a content-ranking multiplier (`0.5 + rankingFraction × 1.0`), so advertisers on top-ranked outlets gain up to 1.5× more awareness per budget unit while zero-ranked outlets yield only 0.5×.
-- `SetMediaHouseContentBudget` GraphQL mutation: authenticated, validates ownership, building type, and non-negative budget, persists the per-tick spend. Pass 0 or null to stop investing.
-- Frontend `CityMediaHouseInfo` type and `Building` type extended with `contentValue` and `contentBudgetPerTick`.
-- `BuildingDetailView` media-house management panel added: shows accumulated content, active budget, level efficiency, competitor ranking bar chart for same-city+category outlets, content investment form with gain preview, and effective marketing multiplier breakdown.
-- `CityMapView` media-house section and `BuildingDetailView` marketing-unit picker updated to include new fields in GraphQL queries.
-- i18n keys added in all three locales (en/sk/de).
-- **Brand quality progression (new):** `Brand.MarketingQuality` — a new `decimal(5,4)` persistent field that accumulates from sustained marketing investment and decays at 0.03%/tick when investment stops. Formula: each marketing tick adds `budget × channelMultiplier × efficiencyMultiplier × BrandMarketingQualityPerBudget`; the gain is capped at `[0, 1]`.
-- **`PublicSalesPhase` brand demand boost (new):** `ComputeCombinedBrandQuality` blends R&D quality and marketing prestige via `1 - (1-q)×(1-mq)` so both sources contribute independently. The combined quality boosts `brandFactor` by up to 50% (`BrandQualityBoostFactor = 0.5`) which feeds into the competitiveness calculation: `competitiveness = priceIndex × qualityMultiplier × brandFactor × populationIndex`. A company with `MarketingQuality=0.8` wins ~58% more city demand share than an identical competitor with zero brand prestige.
-- **GraphQL exposure:** `companyBrands` query returns `marketingQuality` and `combinedBrandQuality`; `publicSalesAnalytics` query returns `brandQuality` (combined). All three locales have i18n keys for the Market Intelligence panel display.
-- **Frontend Market Intelligence panel:** `BuildingDetailView` shows Brand Quality % with `Premium` (≥50%) and `Growing` (≥20%) status badges alongside demand driver explanations.
-- **EF migration + schema repair:** `20260421090000_AddBrandMarketingQuality` adds the column; idempotent `EnsureColumnAsync` in `AppDbInitializer.SchemaCompatibility` ensures live restarts onto older DB schemas succeed without breaking startup.
-- **7 new backend integration tests:** `MarketingPhase_BrandQuality_IncreasesAfterMarketingSpend`, `MarketingPhase_BrandQuality_DecaysWhenMarketingStopped`, `CompanyBrands_ReturnsMarketingQualityAndCombinedQuality`, `PublicSalesPhase_HigherBrandQuality_IncreasesCompetitiveness`, `PublicSalesAnalytics_ReturnsBrandQualityForPublicSalesUnit`, `MarketingPhase_BrandQuality_HigherChannelMultiplier_GivesMoreQuality`, `MarketingPhase_BrandQuality_TwoProducts_GetIndependentQuality`, `MarketingPhase_BrandQualityDecayIsBoundedAboveZero`.
-- **Campaign Analytics Dashboard (new — closes Marketing roadmap):** New `/marketing-analytics` view exposes a player-facing decision dashboard comparing brand quality, awareness, marketing prestige, pricing level, campaign ROI, and sales outcomes per product/city. Backend `campaignAnalytics(companyId)` query returns `CampaignAnalyticsResult` with per-unit rows containing brand vs price balance labels (`PREMIUM_JUSTIFIED`, `PREMIUM_RISKY`, `DISCOUNT_WITH_BRAND`, `COMPETITIVE_BASELINE`, `BRAND_BUILDING`, `NO_BRAND`), campaign impact (`STRONG` / `MODERATE` / `WEAK` / `NONE`), demand signal, trend direction, top positive/negative demand driver, revenue boost from brand, and a plain-language recommendation. Portfolio-level KPI summary row shows total revenue, total marketing spend, revenue/spend ROI ratio, best-performing city, and global portfolio recommendation. Nav link added in `AppHeader.vue` (authenticated only). 4 backend integration tests cover the empty case, sales-data case, brand-metrics case, and wrong-owner security case.
+- In forex exchange show the fx rate list table
+- When starting the onboarding process make sure the initial investment is fair for every user in every currency. At the moment when i select prague i see starting cash 600000 CZK, and if i select new york i see 600000 USD. The founder contribution must be $200000 but multiplied with the currency for the city they plan to do the business in.
+- The encyclopedia shows currently the base price in USD. Extend encyclopedia to select the currency and show it multiplied by the current currency rate.
+- Products in the units are not affected by currency. At the moment when i do chair business, the sale price is 60 kč, while in the new york is $60. The products must have similar prices in every city, but adjusted by the currency.
+- Property prices must be expressed in local currency as well.
+- Extend the model where currency is missing and every time do every monetary operations under the currency. Do not mix two currencies together.
+- Make the shipping costs also in similar price range in all cities, but expressed in the local currency.
+- Leaderboard must be expressed in USD currency, make sure the numbers collected in the leaderboard are correctly transformed from the local currencies
 
-**Remaining:**
-- None. All Marketing roadmap items are now shipped.
+### Number formatting
+
+Create component for unified number and currency formatting which will allow big numbers to be formatted properly. Examples of numbers: $1M = 1000000 USD, 600k Kč = 600000 CZK, 123.456M € = 123456789 EUR, $2.845k = 2845 USD, $123.456B = 123456789012 USD, $12.345T = 12345678901234 USD, $12.345Q = 12345678901234567 USD
+
+Make sure the Intl.NumberFormat is properly used for the number, so in english the . is used as decimal seperator and comma for thousands separator, and in czech language is comma used as the decimal separator and space as the thousands separator. Bind it to the local language selected not the browser language. For english the en-US is used, for slovak sk-SK, for german de-DE.
 
 ### Power plants (15% complete)
 
@@ -71,51 +40,6 @@ Implement banking as is described in the banking section.
 ### Audits (0% complete)
 
 - In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
-
-### Add more global cities to the basic setup (90% complete)
-
-- ✅ New York (USD), London (GBP), Beijing (CNY), and Delhi (INR) added as playable cities
-- ✅ Each city has the correct ISO 4217 currency code wired through all backend and banking flows
-- ✅ Currency symbols (£, ¥, ₹) and locale-correct bank base-capital requirements added for all new currencies
-- ✅ NBS daily CSV feed integrated: rates downloaded from https://nbs.sk/export/en/exchange-rate/{date}/csv on startup; falls back to hardcoded approximate rates when NBS is unreachable
-- ✅ FxRate entity persists exchange rates for reuse by the upcoming forex exchange
-- ✅ `fxRates` GraphQL query exposes current rates to the frontend
-- ✅ Building lots, city resources, and map coordinates seeded for all four new cities
-- ✅ Currency badge (USD/GBP/CNY/INR/EUR/CZK) shown on every city card in the onboarding city picker
-- ✅ 19 backend integration tests covering city seeding, FX rate parsing, and multi-city onboarding
-- ✅ 4 E2E tests: all 7 cities visible in the wizard, USD badge on New York, Delhi selectable
-- ✅ All E2E tests green after 7-city expansion (count assertions updated, logistics-trap tests hardened)
-- ⬜ Full forex trading UI (depends on "Create forex exchange" roadmap item)
-
-### Create forex exchange (100% complete)
-
-**Shipped in this increment:**
-- ✅ `ForexExchangeView` at `/forex`: source/target currency selectors, amount input, live quote panel showing exchange rate, 1% fee, net receive amount, and available balance.
-- ✅ `getForexQuote` GraphQL query – returns `toAmount`, `feeAmount` (1%), `feePercent`, `rate`, `availableFromBalance`, and currency symbols.
-- ✅ `executeForexSwap` GraphQL mutation – validates `SAME_CURRENCY` / `INSUFFICIENT_FUNDS`, computes cross-rates via EUR pivot from persisted FX rates, updates balances atomically, and persists a `ForexTradeRecord` for audit.
-- ✅ `playerCurrencyBalances` query – returns per-player non-EUR wallets alongside the EUR balance from `Player.PersonalCash`.
-- ✅ `forexTradeHistory` query – returns full audit trail with from/to amounts, rate, fee, and execution tick.
-- ✅ `PlayerCurrencyBalance` entity + `ForexTradeRecord` entity with EF migrations (`AddForexExchangeMvp`, `AddForexBalanceNonNegativeConstraint`).
-- ✅ Database-level `CHECK ("Balance" >= 0)` constraint on `PlayerCurrencyBalances` (PostgreSQL) as a persistence-layer safety net.
-- ✅ Concurrency protection: the swap mutation runs inside a `Serializable` transaction and refreshes `Player.ConcurrencyToken` so concurrent over-spend attempts are caught by both DB isolation and EF's optimistic-concurrency check.
-- ✅ Success banner and trade-history table in the frontend after execution.
-- ✅ Nav menu entry (`Forex Exchange`) visible to authenticated users.
-- ✅ 9 backend integration tests (quote math, EUR↔CZK execution, CZK↔USD cross-rate, insufficient funds, same-currency, history, concurrent swap race, constraint integrity test).
-- ✅ 10 E2E tests covering unauthenticated redirect, selectors, both validation errors, quote+confirm happy path, cancel, history rendering, and nav link.
-- ✅ i18n strings (`forex.*` namespace) in `en`, `sk`, `de`.
-- ✅ **Multi-currency ledger downstream:** `ledgerDrillDown` and `companyLedger` queries now return per-entry and per-building `currencyCode`/`currencySymbol` from the city. `CompanyLedgerSummary` exposes `primaryCurrencyCode`, `primaryCurrencySymbol`, and `hasMixedCurrencies` so the frontend can present multi-city company finances clearly labelled.
-- ✅ **Tokenized gold AMM pools (this increment):** constant-product AMM (x·y=k) for fiat/XAU pairs. Pool creation, add/remove liquidity, swap quote preview, and swap execution. 1% fee stays in pool and accrues to liquidity providers. Blocked-resource enforcement prevents double-spending pool-committed assets. `GoldAmmSection.vue` component embedded in `ForexExchangeView`. 26 backend tests + full i18n (en/sk/de).
-- ✅ **Building unit local currency (this increment):** All price configuration and analytics panels in purchasing, B2B sales, and public sales units use the building's city currency. `buildingHeaderFormatters.ts` now uses `Intl.NumberFormat` with the building's `currencyCode`. `BuildingHeaderFinancials.vue` accepts a `currencyCode` prop. `DashboardView` fetches city currencies alongside city names and passes them to every building financial summary. Company cash and player personal cash in the dashboard header use the company's `primaryCurrencyCode` (from `companyLedger`) and EUR respectively. `OnboardingView` `formatCurrency` uses the selected city's currency for all budget cards, IPO raise targets, product prices, configure-guide amounts, profit previews, and first-sale stats. i18n `newPrice` labels in all three locales no longer contain a hardcoded `($)` suffix.
-
-### Tokenized gold management (90% complete)
-
-**Shipped:** Global administrators can now manage gold token balances from the master frontend (`/gold-admin`). The page shows a searchable table of all players and their current gold balances, an adjust panel to add (positive amount) or deduct (negative amount) gold with a mandatory audit note, and a full transaction history log showing who changed what and when. The backend enforces non-negative balances, persists changes transactionally via a `GoldTokenTransaction` audit table, and requires JWT authentication plus global-admin authorization on all queries and mutations.
-
-**Also shipped:** `PlayerGoldBalance` entity on the game server. Four new GraphQL operations: `myGoldBalance`, `myGoldAmmPositions`, `goldAmmPools` (public), `goldAmmSwapQuote`. Five new mutations: `createGoldAmmPool`, `addGoldAmmLiquidity`, `removeGoldAmmLiquidity`, `executeGoldAmmSwap`, `adminSetPlayerGoldBalance`. EF migration `AddGoldAmmPools`.
-
-**Also shipped (this increment):** Player-facing gold balance account page at `/account` on the master frontend. Authenticated players see their current gold token balance in grams, a clear statement that 1 token = 1 gram of real-world gold, a premium financial UI with zero-balance empty state, recent transaction history (up to 10 entries with signed amounts), and a "What is tokenized gold?" educational section explaining cross-server asset ownership and AMM trading. Backend: new `myGoldAccount` GraphQL query returns balance and recent player-scoped transactions for any authenticated user (no admin role required). Navigation: "My Gold" link added to the master portal header for authenticated users.
-
-**Remaining:** Player-facing gold balance on the account page, cross-server gold transfers.
 
 ## FX Exahcnge
 

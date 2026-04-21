@@ -479,6 +479,16 @@ public sealed partial class AppDbInitializer
         ?.InformationalVersion
         ?? "unknown";
 
+    internal static bool ShouldRepairSchemaArtifact(string migrationId, IReadOnlySet<string>? pendingMigrations)
+    {
+        if (pendingMigrations is null || !pendingMigrations.Contains(migrationId))
+        {
+            return true;
+        }
+
+        return IsRepairedLegacySqlitePostgresMigration(migrationId);
+    }
+
     private static bool IsRepairedLegacySqlitePostgresMigration(string migrationId) =>
         string.CompareOrdinal(migrationId, LegacySqlitePostgresMigrationHydrationFloor) >= 0
         && string.CompareOrdinal(migrationId, LegacySqlitePostgresMigrationCutoff) <= 0;

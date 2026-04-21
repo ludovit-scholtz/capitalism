@@ -32,71 +32,105 @@ public sealed partial class AppDbInitializer
                 return;
             }
 
-            if (await TableExistsAsync(connection, dialect, "Players"))
+            IReadOnlySet<string>? pendingMigrations = null;
+            if (dialect.IsPostgres && await MigrationsHistoryTableExistsAsync(connection))
+            {
+                pendingMigrations = (await dbContext.Database.GetPendingMigrationsAsync())
+                    .ToHashSet(StringComparer.Ordinal);
+            }
+
+            if (await TableExistsAsync(connection, dialect, "Players")
+                && ShouldRepairSchemaArtifact("20260413222338_AddPersonalTaxReserve", pendingMigrations))
             {
                 await EnsureColumnAsync(connection, dialect, "Players", "PersonalTaxReserve", dialect.RequiredDecimalDefaultZero);
             }
 
-            if (!await TableExistsAsync(connection, dialect, "ProductResearchBudgets"))
+            if (ShouldRepairSchemaArtifact("20260415025150_AddProductResearchBudget", pendingMigrations)
+                && !await TableExistsAsync(connection, dialect, "ProductResearchBudgets"))
             {
                 await ExecuteNonQueryAsync(connection, dialect.CreateProductResearchBudgetsTableSql);
             }
 
-            await EnsureIndexAsync(
-                connection,
-                dialect,
-                "ProductResearchBudgets",
-                "IX_ProductResearchBudgets_CompanyId",
-                dialect.CreateProductResearchBudgetsCompanyIndexSql);
-            await EnsureIndexAsync(
-                connection,
-                dialect,
-                "ProductResearchBudgets",
-                "IX_ProductResearchBudgets_ProductTypeId",
-                dialect.CreateProductResearchBudgetsProductIndexSql);
+            if (ShouldRepairSchemaArtifact("20260415025150_AddProductResearchBudget", pendingMigrations))
+            {
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "ProductResearchBudgets",
+                    "IX_ProductResearchBudgets_CompanyId",
+                    dialect.CreateProductResearchBudgetsCompanyIndexSql);
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "ProductResearchBudgets",
+                    "IX_ProductResearchBudgets_ProductTypeId",
+                    dialect.CreateProductResearchBudgetsProductIndexSql);
+            }
 
-            await EnsureColumnAsync(connection, dialect, "Buildings", "BaseCapitalDeposited", dialect.RequiredBooleanDefaultFalse);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "DepositInterestRatePercent", dialect.NullableInterestRate);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "LendingInterestRatePercent", dialect.NullableInterestRate);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "TotalDeposits", dialect.RequiredMoneyDefaultZero);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "CentralBankDebt", dialect.RequiredDecimalDefaultZero);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "ContentValue", dialect.RequiredDecimalDefaultZero);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "IsGovernmentOwned", dialect.RequiredBooleanDefaultFalse);
-            await EnsureColumnAsync(connection, dialect, "Buildings", "ContentBudgetPerTick", dialect.NullableDecimal);
+            if (ShouldRepairSchemaArtifact("20260415204838_AddBankDeposits", pendingMigrations))
+            {
+                await EnsureColumnAsync(connection, dialect, "Buildings", "BaseCapitalDeposited", dialect.RequiredBooleanDefaultFalse);
+                await EnsureColumnAsync(connection, dialect, "Buildings", "DepositInterestRatePercent", dialect.NullableInterestRate);
+                await EnsureColumnAsync(connection, dialect, "Buildings", "LendingInterestRatePercent", dialect.NullableInterestRate);
+                await EnsureColumnAsync(connection, dialect, "Buildings", "TotalDeposits", dialect.RequiredMoneyDefaultZero);
+            }
 
-            if (await TableExistsAsync(connection, dialect, "BankDeposits"))
+            if (ShouldRepairSchemaArtifact("20260417045454_AddBankCentralBankDebt", pendingMigrations))
+            {
+                await EnsureColumnAsync(connection, dialect, "Buildings", "CentralBankDebt", dialect.RequiredDecimalDefaultZero);
+            }
+
+            if (ShouldRepairSchemaArtifact("20260421054822_AddMediaHouseContentValue", pendingMigrations))
+            {
+                await EnsureColumnAsync(connection, dialect, "Buildings", "ContentValue", dialect.RequiredDecimalDefaultZero);
+                await EnsureColumnAsync(connection, dialect, "Buildings", "IsGovernmentOwned", dialect.RequiredBooleanDefaultFalse);
+            }
+
+            if (ShouldRepairSchemaArtifact("20260421070000_AddMediaHouseContentBudgetPerTick", pendingMigrations))
+            {
+                await EnsureColumnAsync(connection, dialect, "Buildings", "ContentBudgetPerTick", dialect.NullableDecimal);
+            }
+
+            if (ShouldRepairSchemaArtifact("20260415204838_AddBankDeposits", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "BankDeposits"))
             {
                 await EnsureColumnAsync(connection, dialect, "BankDeposits", "TotalInterestPaid", dialect.RequiredDecimal4DefaultZero);
             }
-            else
+            else if (ShouldRepairSchemaArtifact("20260415204838_AddBankDeposits", pendingMigrations))
             {
                 await ExecuteNonQueryAsync(connection, dialect.CreateBankDepositsTableSql);
             }
 
-            await EnsureIndexAsync(
-                connection,
-                dialect,
-                "BankDeposits",
-                "IX_BankDeposits_BankBuildingId_IsActive",
-                dialect.CreateBankDepositsByBankIndexSql);
-            await EnsureIndexAsync(
-                connection,
-                dialect,
-                "BankDeposits",
-                "IX_BankDeposits_DepositorCompanyId_IsActive",
-                dialect.CreateBankDepositsByDepositorIndexSql);
+            if (ShouldRepairSchemaArtifact("20260415204838_AddBankDeposits", pendingMigrations))
+            {
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "BankDeposits",
+                    "IX_BankDeposits_BankBuildingId_IsActive",
+                    dialect.CreateBankDepositsByBankIndexSql);
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "BankDeposits",
+                    "IX_BankDeposits_DepositorCompanyId_IsActive",
+                    dialect.CreateBankDepositsByDepositorIndexSql);
+            }
 
-            if (await TableExistsAsync(connection, dialect, "BuildingUnits"))
+            if (ShouldRepairSchemaArtifact("20260416060146_AddIndustryCategoryToBuildingUnit", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "BuildingUnits"))
             {
                 await EnsureColumnAsync(connection, dialect, "BuildingUnits", "IndustryCategory", dialect.NullableShortText);
             }
 
-            if (await TableExistsAsync(connection, dialect, "BuildingConfigurationPlanUnits"))
+            if (ShouldRepairSchemaArtifact("20260416060146_AddIndustryCategoryToBuildingUnit", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "BuildingConfigurationPlanUnits"))
             {
                 await EnsureColumnAsync(connection, dialect, "BuildingConfigurationPlanUnits", "IndustryCategory", dialect.NullableShortText);
             }
 
-            if (await TableExistsAsync(connection, dialect, "Loans"))
+            if (ShouldRepairSchemaArtifact("20260417135125_AddLoanCollateral", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "Loans"))
             {
                 await EnsureColumnAsync(connection, dialect, "Loans", "CollateralAppraisedValue", dialect.NullableDecimal);
                 await EnsureColumnAsync(connection, dialect, "Loans", "CollateralBuildingId", dialect.NullableGuid);
@@ -119,7 +153,8 @@ public sealed partial class AppDbInitializer
             await RepairLegacyPostgresStoreTypesAsync(connection, dialect);
 
             // Ensure Cities.CurrencyCode column exists (added in AddCityCurrencyCode migration).
-            if (await TableExistsAsync(connection, dialect, "Cities"))
+            if (ShouldRepairSchemaArtifact("20260420034843_AddCityCurrencyCode", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "Cities"))
             {
                 if (!await ColumnExistsAsync(connection, dialect, "Cities", "CurrencyCode"))
                 {
@@ -136,7 +171,8 @@ public sealed partial class AppDbInitializer
             }
 
             // Ensure CityWeatherForecasts table exists (added in AddCityWeatherForecast migration).
-            if (!await TableExistsAsync(connection, dialect, "CityWeatherForecasts"))
+            if (ShouldRepairSchemaArtifact("20260418054625_AddCityWeatherForecast", pendingMigrations)
+                && !await TableExistsAsync(connection, dialect, "CityWeatherForecasts"))
             {
                 if (dialect.IsPostgres)
                 {
@@ -171,7 +207,8 @@ public sealed partial class AppDbInitializer
             }
 
             // Ensure FxRates table exists (added in AddFxRates migration).
-            if (!await TableExistsAsync(connection, dialect, "FxRates"))
+            if (ShouldRepairSchemaArtifact("20260420100000_AddFxRates", pendingMigrations)
+                && !await TableExistsAsync(connection, dialect, "FxRates"))
             {
                 if (dialect.IsPostgres)
                 {
@@ -210,7 +247,8 @@ public sealed partial class AppDbInitializer
             }
 
             // Ensure PlayerCurrencyBalances table exists (added in AddForexExchangeMvp migration).
-            if (!await TableExistsAsync(connection, dialect, "PlayerCurrencyBalances"))
+            if (ShouldRepairSchemaArtifact("20260420110000_AddForexExchangeMvp", pendingMigrations)
+                && !await TableExistsAsync(connection, dialect, "PlayerCurrencyBalances"))
             {
                 if (dialect.IsPostgres)
                 {
@@ -268,7 +306,8 @@ public sealed partial class AppDbInitializer
             // PlayerCurrencyBalances table was already present before this migration ran
             // (e.g. databases created by the initial AddForexExchangeMvp migration before
             // AddForexBalanceNonNegativeConstraint was added to the history).
-            if (dialect.IsPostgres)
+            if (dialect.IsPostgres
+                && ShouldRepairSchemaArtifact("20260420130000_AddForexBalanceNonNegativeConstraint", pendingMigrations))
             {
                 await ExecuteNonQueryAsync(connection,
                     """
@@ -287,7 +326,8 @@ public sealed partial class AppDbInitializer
             }
 
             // Ensure ForexTradeRecords table exists (added in AddForexExchangeMvp migration).
-            if (!await TableExistsAsync(connection, dialect, "ForexTradeRecords"))
+            if (ShouldRepairSchemaArtifact("20260420110000_AddForexExchangeMvp", pendingMigrations)
+                && !await TableExistsAsync(connection, dialect, "ForexTradeRecords"))
             {
                 if (dialect.IsPostgres)
                 {
@@ -334,7 +374,8 @@ public sealed partial class AppDbInitializer
             }
 
             // Ensure Brands.MarketingQuality column exists (added in AddBrandMarketingQuality migration).
-            if (await TableExistsAsync(connection, dialect, "Brands"))
+            if (ShouldRepairSchemaArtifact("20260421090000_AddBrandMarketingQuality", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "Brands"))
             {
                 await EnsureColumnAsync(connection, dialect, "Brands", "MarketingQuality", dialect.RequiredDecimalDefaultZero);
             }
