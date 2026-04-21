@@ -1849,6 +1849,27 @@ export default {
     powerCardTitle: 'Power',
     powerCardNoPower: 'Legacy grid',
     viewDetails: 'View power details',
+    weatherSectionTitle: 'City Weather & Power Planning',
+    currentConditions: 'Current Conditions',
+    forecastBarsLabel: 'Next {count} ticks',
+    whyMattersTitle: 'Why This Matters for Infrastructure',
+    whyMattersSolar:
+      'High solar irradiance benefits solar power plants, boosting their effective output each tick.',
+    whyMattersWind:
+      'Strong winds increase wind turbine output. Plan contracts when sustained wind is forecast.',
+    whyMattersPower:
+      'Power shortages constrain all buildings city-wide. A new power plant earns grid income while stabilising operations.',
+    planningTitle: 'City Power Balance',
+    guidanceBalanced:
+      'Grid is balanced. A new power plant investment can earn surplus-sale income with low risk.',
+    guidanceConstrained:
+      'Partial shortage detected. Buildings operate at reduced capacity. A power plant here offers strong returns.',
+    guidanceCritical:
+      'Critical shortage — most buildings are offline. Power plant investment has the highest ROI in this city right now.',
+    guidanceLegacy:
+      'No player power plants yet. Buildings run on the city legacy grid. Build the first plant to earn grid revenue.',
+    forecastNow: 'Now',
+    forecastTickLabel: '+{count}',
   },
   powerPlant: {
     panelTitle: 'Power Plant Management',

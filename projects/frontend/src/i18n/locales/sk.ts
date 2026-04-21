@@ -1843,6 +1843,27 @@ export default {
     powerCardTitle: 'Energia',
     powerCardNoPower: 'Mestská sieť',
     viewDetails: 'Zobraziť detaily',
+    weatherSectionTitle: 'Počasie a plánovanie energie',
+    currentConditions: 'Aktuálne podmienky',
+    forecastBarsLabel: 'Nasledujúcich {count} tikov',
+    whyMattersTitle: 'Prečo je to dôležité pre infraštruktúru',
+    whyMattersSolar:
+      'Vysoká slnečná intenzita zvyšuje výkon solárnych elektrární každý tik.',
+    whyMattersWind:
+      'Silný vietor zvyšuje výkon veterných turbín. Plánujte zmluvy pri priaznivej predpovedi.',
+    whyMattersPower:
+      'Nedostatok energie obmedzuje všetky budovy v meste. Nová elektráreň prináša príjmy aj stabilitu.',
+    planningTitle: 'Energetická bilancia mesta',
+    guidanceBalanced:
+      'Sieť je vyvážená. Nová elektráreň môže zarábať na predaji prebytkov s nízkym rizikom.',
+    guidanceConstrained:
+      'Čiastočný nedostatok. Budovy pracujú so zníženou kapacitou. Elektráreň tu prinesie solídne výnosy.',
+    guidanceCritical:
+      'Kritický nedostatok — väčšina budov je offline. Investícia do elektrárne má v tomto meste najvyššiu návratnosť.',
+    guidanceLegacy:
+      'Zatiaľ žiadne hráčske elektrárne. Budovy bežia na mestskej sieti. Postavte prvú elektráreň a zarábajte.',
+    forecastNow: 'Teraz',
+    forecastTickLabel: '+{count}',
   },
   powerPlant: {
     panelTitle: 'Správa elektrárne',

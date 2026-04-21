@@ -1815,4 +1815,144 @@ test.describe('City Media Houses', () => {
     await expect(page.locator('.mh-gov-badge')).toBeVisible()
     await expect(page.locator('.media-house-card').filter({ hasText: 'My TV Station' })).toBeVisible()
   })
+
+  test('city power planning section is visible with weather conditions and power balance', async ({
+    page,
+  }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.cityWeatherForecasts['city-ba'] = {
+      cityId: 'city-ba',
+      currentWindPercent: 54,
+      currentSolarPercent: 78,
+      forecast: Array.from({ length: 24 }, (_, i) => ({
+        tick: 100 + i,
+        windPercent: 54 + (i % 5),
+        solarPercent: Math.max(10, 78 - i * 3),
+      })),
+    }
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    const powerSection = page.locator('[data-testid="city-power-section"]')
+    await expect(powerSection).toBeVisible()
+
+    // Should show section heading
+    await expect(powerSection.getByRole('heading', { name: /Weather & Power/i })).toBeVisible()
+
+    // Weather card should show solar and wind badges
+    const weatherCard = page.locator('[data-testid="city-weather-card"]')
+    await expect(weatherCard).toBeVisible()
+    await expect(weatherCard.locator('[data-testid="solar-badge"]')).toContainText('78%')
+    await expect(weatherCard.locator('[data-testid="wind-badge"]')).toContainText('54%')
+
+    // Power balance card should be visible
+    await expect(page.locator('[data-testid="city-power-balance-card"]')).toBeVisible()
+
+    // Why it matters card should be visible
+    const whyCard = page.locator('[data-testid="why-matters-card"]')
+    await whyCard.scrollIntoViewIfNeeded()
+    await expect(whyCard).toBeVisible()
+    await expect(whyCard.locator('.why-item.solar-item')).toBeVisible()
+    await expect(whyCard.locator('.why-item.wind-item')).toBeVisible()
+    await expect(whyCard.locator('.why-item.power-item')).toBeVisible()
+  })
+
+  test('city power planning section shows power shortage status correctly', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-power',
+          playerId: 'player-1',
+          name: 'Power Corp',
+          cash: 2000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'plant-1',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'POWER_PLANT' as const,
+              name: 'Small Coal Plant',
+              latitude: 48.155,
+              longitude: 17.115,
+              level: 1,
+              powerConsumption: 0,
+              powerOutput: 8,
+              powerPlantType: 'COAL',
+              powerStatus: 'POWERED',
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-1',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY' as const,
+              name: 'Factory A',
+              latitude: 48.16,
+              longitude: 17.12,
+              level: 1,
+              powerConsumption: 5,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-2',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY' as const,
+              name: 'Factory B',
+              latitude: 48.17,
+              longitude: 17.13,
+              level: 1,
+              powerConsumption: 5,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+            {
+              id: 'factory-3',
+              companyId: 'company-power',
+              cityId: 'city-ba',
+              type: 'FACTORY' as const,
+              name: 'Factory C',
+              latitude: 48.18,
+              longitude: 17.14,
+              level: 1,
+              powerConsumption: 5,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              units: [],
+              pendingConfiguration: null,
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+
+    const balanceCard = page.locator('[data-testid="city-power-balance-card"]')
+    await balanceCard.scrollIntoViewIfNeeded()
+    await expect(balanceCard).toBeVisible()
+
+    // 8 MW supply / 15 MW demand = CONSTRAINED — balance card should show constrained status
+    await expect(balanceCard.locator('.status-constrained')).toBeVisible()
+    // Should show the constrained guidance text
+    await expect(balanceCard.locator('.balance-guidance')).toContainText(/shortage|capacity|returns/i)
+  })
 })
