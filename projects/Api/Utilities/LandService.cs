@@ -123,8 +123,18 @@ public static class LandService
             && lot.BasePrice > 0m
             && lot.BasePrice < GameConstants.EurAnchoredLotBasePriceThreshold;
 
-        if (lot.BasePrice <= 0m || (lot.OwnerCompanyId == null && looksEurAnchored))
+        if (lot.BasePrice <= 0m)
         {
+            // BasePrice not set — prefer existing Price as anchor (handles manually-created test lots
+            // that set only Price), otherwise compute from scratch with FX scaling.
+            lot.BasePrice = lot.Price > 0m
+                ? lot.Price
+                : ComputeBasePrice(city, FirstSuitableType(lot), ComputeDistanceKmToCityCenter(lot, city), cityFxRate);
+        }
+        else if (lot.OwnerCompanyId == null && looksEurAnchored)
+        {
+            // Self-heal: unowned lot in a high-FX-rate city with a suspiciously low BasePrice
+            // that was generated before FX-rate scaling was introduced. Reprice it.
             lot.BasePrice = ComputeBasePrice(city, FirstSuitableType(lot), ComputeDistanceKmToCityCenter(lot, city), cityFxRate);
         }
 

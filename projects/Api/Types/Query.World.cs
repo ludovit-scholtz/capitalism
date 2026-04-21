@@ -30,7 +30,8 @@ public sealed partial class Query
             .AsNoTracking()
             .Include(c => c.Resources)
             .ThenInclude(r => r.ResourceType)
-            .OrderBy(c => c.Name)
+            .OrderBy(c => c.Population)
+            .ThenBy(c => c.Name)
             .ToListAsync();
 
         cache.Set(CitiesCacheKey, cities, CitiesCacheDuration);
