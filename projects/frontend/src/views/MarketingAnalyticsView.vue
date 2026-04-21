@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
@@ -7,6 +7,7 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { formatCurrency } from '@/lib/loanHelpers'
+import { getActiveCompany } from '@/lib/accountContext'
 import type { CampaignAnalyticsResult, CampaignAnalyticsRow, Company } from '@/types'
 
 const { t } = useI18n()
