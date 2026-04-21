@@ -22640,6 +22640,158 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task GovernmentMediaHouses_AreSeededForAllCities()
+    {
+        // After AppDbInitializer, every seeded city should have exactly 3 government-owned
+        // media houses: NEWSPAPER, RADIO, and TV.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cities = await db.Cities.ToListAsync();
+        Assert.True(cities.Count >= 3, "At least 3 cities must be seeded.");
+
+        foreach (var city in cities)
+        {
+            var govHouses = await db.Buildings
+                .Where(b => b.CityId == city.Id && b.Type == BuildingType.MediaHouse && b.IsGovernmentOwned)
+                .ToListAsync();
+
+            Assert.Equal(3, govHouses.Count);
+            Assert.Contains(govHouses, h => h.MediaType == Data.Entities.MediaType.Newspaper);
+            Assert.Contains(govHouses, h => h.MediaType == Data.Entities.MediaType.Radio);
+            Assert.Contains(govHouses, h => h.MediaType == Data.Entities.MediaType.Tv);
+        }
+    }
+
+    [Fact]
+    public async Task GovernmentMediaHouses_HaveNonZeroContentValue()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var govHouses = await db.Buildings
+            .Where(b => b.Type == BuildingType.MediaHouse && b.IsGovernmentOwned)
+            .ToListAsync();
+
+        Assert.True(govHouses.Count > 0, "Government media houses must be seeded.");
+        Assert.All(govHouses, h => Assert.True(h.ContentValue > 0m, $"Government media house '{h.Name}' must have ContentValue > 0."));
+    }
+
+    [Fact]
+    public async Task CityMediaHouses_ReturnsContentRankingAndIsGovernmentOwned()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ cityMediaHouses(cityId: \"{city.Id}\") {{ id contentRanking isGovernmentOwned }} }}");
+
+        var houses = result.GetProperty("data").GetProperty("cityMediaHouses");
+        Assert.True(houses.GetArrayLength() >= 3, "At least the 3 government-seeded media houses must be returned.");
+
+        // Every government media house should report IsGovernmentOwned=true.
+        var govHouses = houses.EnumerateArray()
+            .Where(h => h.GetProperty("isGovernmentOwned").GetBoolean())
+            .ToList();
+        Assert.True(govHouses.Count >= 3, "At least 3 government-owned media houses must be in the result.");
+
+        // All government media houses start at 100% ranking since they all have the same initial ContentValue.
+        foreach (var govHouse in govHouses)
+        {
+            var ranking = govHouse.GetProperty("contentRanking").GetDecimal();
+            Assert.Equal(100m, ranking);
+        }
+    }
+
+    [Fact]
+    public async Task CityMediaHouses_ContentRanking_PlayerOutletHigherThanGovernment_WhenPlayerHasMoreContent()
+    {
+        // Seed a player-owned TV station with ContentValue > government TV ContentValue.
+        // The player station should rank at 100%, the government at a lower percentage.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var player = new Player { Id = Guid.NewGuid(), Email = $"tv-rank-{Guid.NewGuid():N}@test.com", DisplayName = "TV Rank", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Elite TV Corp", Cash = 1_000_000m };
+        db.Companies.Add(company);
+        // Government TV has initial ContentValue = 1000; player station has 2500.
+        var playerTv = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.MediaHouse,
+            Name = "Elite TV Station",
+            MediaType = Data.Entities.MediaType.Tv,
+            Level = 1,
+            ContentValue = 2_500m,
+            IsGovernmentOwned = false
+        };
+        db.Buildings.Add(playerTv);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ cityMediaHouses(cityId: \"{city.Id}\") {{ id mediaType isGovernmentOwned contentRanking }} }}");
+
+        var houses = result.GetProperty("data").GetProperty("cityMediaHouses");
+        var tvHouses = houses.EnumerateArray()
+            .Where(h => h.GetProperty("mediaType").GetString() == "TV")
+            .ToList();
+
+        Assert.True(tvHouses.Count >= 2, "Should have at least 2 TV houses (player + government).");
+
+        var eliteTv = tvHouses.First(h => !h.GetProperty("isGovernmentOwned").GetBoolean());
+        var govTv = tvHouses.First(h => h.GetProperty("isGovernmentOwned").GetBoolean());
+
+        Assert.Equal(100m, eliteTv.GetProperty("contentRanking").GetDecimal()); // 2500/2500 = 100%
+        // Government has 1000/2500 = 40%
+        Assert.Equal(40m, govTv.GetProperty("contentRanking").GetDecimal());
+    }
+
+    [Fact]
+    public async Task CityMediaHouses_SortedByPlayerOwnedFirst_ThenByContentRankingDesc()
+    {
+        // Player's own media house should appear first regardless of ContentRanking.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var player = new Player { Id = Guid.NewGuid(), Email = $"sort-{Guid.NewGuid():N}@test.com", DisplayName = "Sort Test", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "My Media Corp", Cash = 500_000m };
+        db.Companies.Add(company);
+        // Player newspaper with low ContentValue (below government baseline 1000).
+        var playerNp = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.MediaHouse,
+            Name = "My Newspaper",
+            MediaType = Data.Entities.MediaType.Newspaper,
+            Level = 1,
+            ContentValue = 100m,
+            IsGovernmentOwned = false
+        };
+        db.Buildings.Add(playerNp);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            $"{{ cityMediaHouses(cityId: \"{city.Id}\", ownerCompanyId: \"{company.Id}\") {{ id ownerCompanyId contentRanking }} }}");
+
+        var houses = result.GetProperty("data").GetProperty("cityMediaHouses").EnumerateArray().ToList();
+        Assert.True(houses.Count >= 1, "Should have at least 1 result.");
+
+        // The first returned item must belong to the player's company.
+        var firstId = houses[0].GetProperty("ownerCompanyId").GetString();
+        Assert.Equal(company.Id.ToString(), firstId);
+    }
+
+    [Fact]
     public async Task MarketingPhase_WithTvMediaHouse_AppliesChannelMultiplierAndRoutesIncome()
     {
         await using var scope = _factory.Services.CreateAsyncScope();

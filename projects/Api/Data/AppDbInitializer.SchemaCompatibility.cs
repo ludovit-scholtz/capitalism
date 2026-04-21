@@ -60,6 +60,8 @@ public sealed partial class AppDbInitializer
             await EnsureColumnAsync(connection, dialect, "Buildings", "LendingInterestRatePercent", dialect.NullableInterestRate);
             await EnsureColumnAsync(connection, dialect, "Buildings", "TotalDeposits", dialect.RequiredMoneyDefaultZero);
             await EnsureColumnAsync(connection, dialect, "Buildings", "CentralBankDebt", dialect.RequiredDecimalDefaultZero);
+            await EnsureColumnAsync(connection, dialect, "Buildings", "ContentValue", dialect.RequiredDecimalDefaultZero);
+            await EnsureColumnAsync(connection, dialect, "Buildings", "IsGovernmentOwned", dialect.RequiredBooleanDefaultFalse);
 
             if (await TableExistsAsync(connection, dialect, "BankDeposits"))
             {

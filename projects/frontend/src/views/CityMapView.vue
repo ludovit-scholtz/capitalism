@@ -283,7 +283,8 @@ async function fetchMediaHouses() {
     const data = await gqlRequest<{ cityMediaHouses: CityMediaHouseInfo[] }>(
       `query CityMediaHouses($cityId: UUID!) {
         cityMediaHouses(cityId: $cityId) {
-          id name mediaType effectivenessMultiplier ownerCompanyName powerStatus isUnderConstruction
+          id name cityName mediaType effectivenessMultiplier ownerCompanyName
+          powerStatus isUnderConstruction contentRanking isGovernmentOwned
         }
       }`,
       { cityId: cityId.value },
@@ -1099,13 +1100,16 @@ watch(viewMode, async (mode) => {
           </div>
           <div class="mh-info">
             <strong class="mh-name">{{ mh.name }}</strong>
-            <span class="mh-type-badge">{{ mh.mediaType ?? '?' }}</span>
-            <span v-if="mh.isUnderConstruction" class="mh-status-badge construction">
-              {{ t('cityMap.mediaHouses.underConstruction') }}
-            </span>
-            <span v-else-if="mh.powerStatus === 'OFFLINE'" class="mh-status-badge offline">
-              {{ t('cityMap.mediaHouses.offline') }}
-            </span>
+            <div class="mh-badges">
+              <span class="mh-type-badge">{{ mh.mediaType ?? '?' }}</span>
+              <span v-if="mh.isGovernmentOwned" class="mh-gov-badge" :title="t('cityMap.mediaHouses.governmentOwned')">{{ t('cityMap.mediaHouses.govBadge') }}</span>
+              <span v-if="mh.isUnderConstruction" class="mh-status-badge construction">
+                {{ t('cityMap.mediaHouses.underConstruction') }}
+              </span>
+              <span v-else-if="mh.powerStatus === 'OFFLINE'" class="mh-status-badge offline">
+                {{ t('cityMap.mediaHouses.offline') }}
+              </span>
+            </div>
             <div class="mh-owner">{{ t('cityMap.mediaHouses.owner') }}: {{ mh.ownerCompanyName }}</div>
             <div class="mh-effectiveness">
               {{ t('cityMap.mediaHouses.effectiveness') }}:
@@ -1113,6 +1117,9 @@ watch(viewMode, async (mode) => {
               <span class="effectiveness-hint">
                 {{ mh.mediaType === 'TV' ? t('cityMap.mediaHouses.tvHint') : mh.mediaType === 'RADIO' ? t('cityMap.mediaHouses.radioHint') : t('cityMap.mediaHouses.newspaperHint') }}
               </span>
+            </div>
+            <div class="mh-ranking">
+              {{ t('cityMap.mediaHouses.contentRanking') }}: <strong>{{ mh.contentRanking.toFixed(0) }}%</strong>
             </div>
           </div>
         </div>
@@ -2099,6 +2106,14 @@ watch(viewMode, async (mode) => {
   margin-bottom: 0.25rem;
 }
 
+.mh-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.375rem;
+}
+
 .mh-type-badge {
   display: inline-block;
   font-size: 0.75rem;
@@ -2107,8 +2122,17 @@ watch(viewMode, async (mode) => {
   border-radius: 9999px;
   background: var(--color-primary);
   color: #fff;
-  margin-right: 0.5rem;
-  margin-bottom: 0.375rem;
+}
+
+.mh-gov-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 0.125rem 0.4rem;
+  border-radius: 9999px;
+  background: #e8f4fd;
+  border: 1px solid #90caf9;
+  color: #1565c0;
 }
 
 .mh-status-badge {
@@ -2117,7 +2141,6 @@ watch(viewMode, async (mode) => {
   font-weight: 600;
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
-  margin-bottom: 0.375rem;
 }
 
 .mh-status-badge.construction {
@@ -2146,5 +2169,11 @@ watch(viewMode, async (mode) => {
   color: var(--color-text-secondary);
   font-style: italic;
   margin-top: 0.125rem;
+}
+
+.mh-ranking {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.25rem;
 }
 </style>

@@ -3063,23 +3063,27 @@ async function loadResearchBrands() {
 async function loadCityMediaHouses() {
   const cityId = building.value?.cityId
   if (!cityId) return
+  const ownerCompanyId = building.value?.companyId ?? null
   cityMediaHousesLoading.value = true
   try {
     const data = await gqlRequest<{ cityMediaHouses: CityMediaHouseInfo[] }>(
-      `query CityMediaHouses($cityId: UUID!) {
-        cityMediaHouses(cityId: $cityId) {
+      `query CityMediaHouses($cityId: UUID!, $ownerCompanyId: UUID) {
+        cityMediaHouses(cityId: $cityId, ownerCompanyId: $ownerCompanyId) {
           id
           name
           cityId
+          cityName
           mediaType
           ownerCompanyId
           ownerCompanyName
           effectivenessMultiplier
           powerStatus
           isUnderConstruction
+          contentRanking
+          isGovernmentOwned
         }
       }`,
-      { cityId },
+      { cityId, ownerCompanyId },
     )
     cityMediaHouses.value = data.cityMediaHouses ?? []
   } catch {
@@ -5175,23 +5179,48 @@ watch(
                   <div class="config-field">
                     <label class="config-label">{{ t('buildingDetail.config.mediaHouse') }}</label>
                     <div v-if="cityMediaHousesLoading" class="config-loading">{{ t('common.loading') }}</div>
-                    <select
-                      v-else
-                      class="form-input"
-                      :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId ?? ''"
-                      @change="updateSelectedUnitConfig('mediaHouseBuildingId', ($event.target as HTMLSelectElement).value || null)"
-                    >
-                      <option value="">{{ t('buildingDetail.config.noMediaHouse') }}</option>
-                      <option v-for="mh in cityMediaHouses" :key="mh.id" :value="mh.id" :disabled="mh.isUnderConstruction || mh.powerStatus === 'OFFLINE'">
-                        {{ mh.name }} ({{ mh.mediaType ?? '?' }}, ×{{ mh.effectivenessMultiplier.toFixed(1) }})
-                        <template v-if="mh.isUnderConstruction"> – {{ t('buildingDetail.config.underConstruction') }}</template>
-                        <template v-else-if="mh.powerStatus === 'OFFLINE'"> – {{ t('buildingDetail.config.offline') }}</template>
-                      </option>
-                    </select>
-                    <p v-if="cityMediaHouses.length === 0 && !cityMediaHousesLoading" class="config-hint">
+                    <div v-else-if="cityMediaHouses.length === 0" class="config-hint">
                       {{ t('buildingDetail.config.noMediaHouseAvailable') }}
-                    </p>
-                    <p v-else-if="selectedDraftMediaHouse" class="config-hint">{{ t('buildingDetail.config.channelEffect') }} ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
+                    </div>
+                    <div v-else class="media-house-picker">
+                      <!-- None option -->
+                      <div
+                        class="media-house-option"
+                        :class="{ selected: !getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId }"
+                        @click="updateSelectedUnitConfig('mediaHouseBuildingId', null)"
+                      >
+                        <span class="mh-option-name">{{ t('buildingDetail.config.noMediaHouse') }}</span>
+                      </div>
+                      <!-- Picker items sorted by server (player-owned first, then by ranking) -->
+                      <div
+                        v-for="mh in cityMediaHouses"
+                        :key="mh.id"
+                        class="media-house-option"
+                        :class="{
+                          selected: getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId === mh.id,
+                          'mh-disabled': mh.isUnderConstruction || mh.powerStatus === 'OFFLINE',
+                          'mh-own': mh.ownerCompanyId === building?.companyId,
+                        }"
+                        @click="!(mh.isUnderConstruction || mh.powerStatus === 'OFFLINE') && updateSelectedUnitConfig('mediaHouseBuildingId', mh.id)"
+                      >
+                        <div class="mh-option-row">
+                          <span class="mh-option-name">{{ mh.name }}</span>
+                          <span class="mh-badge mh-type-badge">{{ mh.mediaType ?? '?' }}</span>
+                          <span v-if="mh.isGovernmentOwned" class="mh-badge mh-gov-badge" :title="t('buildingDetail.config.governmentOwned')">{{ t('buildingDetail.config.govBadge') }}</span>
+                          <span v-else-if="mh.ownerCompanyId === building?.companyId" class="mh-badge mh-own-badge">{{ t('buildingDetail.config.yourStation') }}</span>
+                        </div>
+                        <div class="mh-option-meta">
+                          <span class="mh-meta-city">{{ mh.cityName }}</span>
+                          <span class="mh-meta-reach">×{{ mh.effectivenessMultiplier.toFixed(1) }}</span>
+                          <span class="mh-meta-ranking">
+                            {{ t('buildingDetail.config.contentRanking') }}: {{ mh.contentRanking.toFixed(0) }}%
+                          </span>
+                          <span v-if="mh.isUnderConstruction" class="mh-meta-status mh-status-construction">{{ t('buildingDetail.config.underConstruction') }}</span>
+                          <span v-else-if="mh.powerStatus === 'OFFLINE'" class="mh-meta-status mh-status-offline">{{ t('buildingDetail.config.offline') }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <p v-if="selectedDraftMediaHouse" class="config-hint">{{ t('buildingDetail.config.channelEffect') }} ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
                   </div>
                 </template>
 
@@ -10441,5 +10470,119 @@ watch(
   color: var(--color-text-secondary);
   vertical-align: middle;
   margin-left: 0.25rem;
+}
+
+/* ── Media house strategic picker ───────────────────────────── */
+.media-house-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.media-house-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 0.4rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.media-house-option:hover:not(.mh-disabled) {
+  border-color: var(--color-primary, #4caf50);
+  background: var(--color-surface-hover, rgba(0,0,0,0.04));
+}
+
+.media-house-option.selected {
+  border-color: var(--color-primary, #4caf50);
+  background: color-mix(in srgb, var(--color-primary, #4caf50) 10%, transparent);
+}
+
+.media-house-option.mh-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.media-house-option.mh-own {
+  border-color: color-mix(in srgb, var(--color-primary, #4caf50) 40%, transparent);
+}
+
+.mh-option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.mh-option-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+  flex: 1;
+}
+
+.mh-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+.mh-type-badge {
+  background: var(--color-surface-hover, rgba(0,0,0,0.06));
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.mh-gov-badge {
+  background: #e8f4fd;
+  border: 1px solid #90caf9;
+  color: #1565c0;
+}
+
+.mh-own-badge {
+  background: #e8f5e9;
+  border: 1px solid #81c784;
+  color: #2e7d32;
+}
+
+.mh-option-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  flex-wrap: wrap;
+}
+
+.mh-meta-city {
+  font-style: italic;
+}
+
+.mh-meta-reach {
+  font-weight: 600;
+}
+
+.mh-meta-ranking {
+  color: var(--color-text-secondary);
+}
+
+.mh-meta-status {
+  font-weight: 600;
+}
+
+.mh-status-offline {
+  color: #c62828;
+}
+
+.mh-status-construction {
+  color: #f57f17;
 }
 </style>

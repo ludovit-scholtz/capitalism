@@ -35,11 +35,20 @@ Implement banking as is described in the banking section.
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
-### Marketing (0% complete)
+### Marketing (65% complete)
 
-- Make sure that in every city is one government owned media house from each type of media
-- Modify the marketing unit media house selection. Make sure to sort the media house by the media content ranking, and show the player's media house companies at the top of the list.
-- Implement all features in the Media house section in this document
+**Shipped in this increment:**
+- Every seeded city now has one government-owned media house of each type (Newspaper, Radio, TV) seeded at startup via `AppDbInitializer.SeedGovernmentMediaHousesAsync`. Government outlets carry an initial `ContentValue` of 1 000 and the `IsGovernmentOwned` flag.
+- `Building` entity extended with `ContentValue` (decimal) and `IsGovernmentOwned` (bool) fields. EF schema repair (`EnsureColumnAsync`) handles legacy databases on restart.
+- `GetCityMediaHouses` GraphQL query updated: now accepts optional `ownerCompanyId` param, returns `contentRanking` (% relative to top outlet in same city+category) and `isGovernmentOwned`, sorts player-owned outlets first then by ranking descending.
+- Frontend `CityMediaHouseInfo` type extended; `BuildingDetailView` marketing-unit picker upgraded from a plain `<select>` to a strategic card list showing type badge, GOV badge, YOUR STATION badge, city, reach multiplier, and content ranking.
+- `CityMapView` media-house section enhanced with GOV badge and content ranking row.
+- i18n keys added in all three locales (en/sk/de).
+
+**Remaining:**
+- Implement all remaining Media house features (content production, content decay, competitive ranking lifecycle beyond initial seeding).
+- Implement all remaining Marketing features (brand quality improvements from marketing spend, full brand awareness loop).
+- Full marketing spend ↔ brand awareness ↔ sales demand simulation.
 
 ### Power plants (15% complete)
 

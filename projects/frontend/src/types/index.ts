@@ -1125,6 +1125,7 @@ export interface CityMediaHouseInfo {
   id: string
   name: string
   cityId: string
+  cityName: string
   /** NEWSPAPER | RADIO | TV — null if not yet configured */
   mediaType: string | null
   ownerCompanyId: string
@@ -1134,6 +1135,10 @@ export interface CityMediaHouseInfo {
   /** POWERED | CONSTRAINED | OFFLINE */
   powerStatus: string
   isUnderConstruction: boolean
+  /** Content ranking as a percentage (0–100) relative to the top outlet in the same city+category */
+  contentRanking: number
+  /** True when the outlet is a government-seeded baseline media house */
+  isGovernmentOwned: boolean
 }
 
 /** A loan offer published by a bank building. */
