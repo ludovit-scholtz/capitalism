@@ -137,20 +137,44 @@ public sealed class ChangelogCsvImporter(MasterDbContext db)
         {
             Id = Guid.NewGuid(),
             Locale = locale,
-            Title = TruncateAtWordBoundary(text, MaxTitleLength),
-            Summary = TruncateAtWordBoundary(text, MaxSummaryLength),
+            Title = ExtractTitle(text),
+            Summary = string.Empty,
             HtmlContent = $"<p>{System.Web.HttpUtility.HtmlEncode(text)}</p>",
         };
     }
 
+    /// <summary>
+    /// Extracts a concise human-readable title from <paramref name="text"/>.
+    /// When the text contains a ':' separator (e.g. "Feature name: full description…"),
+    /// the portion before the colon is used as the title so that machine-generated changelog
+    /// strings become easy to scan.  Falls back to word-boundary truncation when no colon
+    /// is present or when the portion before the colon would itself exceed the title column limit.
+    /// </summary>
+    internal static string ExtractTitle(string text)
+    {
+        var colonIdx = text.IndexOf(':');
+        if (colonIdx > 0)
+        {
+            var beforeColon = text[..colonIdx].Trim();
+            if (beforeColon.Length > 0 && beforeColon.Length <= MaxTitleLength)
+            {
+                return beforeColon;
+            }
+        }
+
+        return TruncateAtWordBoundary(text, MaxTitleLength);
+    }
+
     /// <summary>Truncates <paramref name="text"/> to at most <paramref name="maxLength"/> characters,
-    /// breaking at the last space before the limit to avoid cutting mid-word.</summary>
+    /// breaking at the last space before the limit to avoid cutting mid-word.
+    /// The returned string is always at most <paramref name="maxLength"/> characters long.</summary>
     internal static string TruncateAtWordBoundary(string text, int maxLength)
     {
         if (text.Length <= maxLength) return text;
 
-        var lastSpace = text.LastIndexOf(' ', maxLength);
-        var cutAt = lastSpace > maxLength / 2 ? lastSpace : maxLength;
+        // Search up to maxLength-1 so there is always room for the ellipsis character.
+        var lastSpace = text.LastIndexOf(' ', maxLength - 1);
+        var cutAt = lastSpace > maxLength / 2 ? lastSpace : maxLength - 1;
         return text[..cutAt] + "…";
     }
 }

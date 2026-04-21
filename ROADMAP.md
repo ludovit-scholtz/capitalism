@@ -24,11 +24,11 @@ Implement banking as is described in the banking section.
 - Forex exchange: cross-city currency trading for companies operating in multiple cities.
 - ✅ **Local city currency in building units:** Purchasing, B2B sales, and public sales unit config screens now use `Intl.NumberFormat` with the building's city `currencyCode`. Max Price and Min Price labels carry a currency badge (`<span class="currency-badge">CZK</span>`). Analytics types (`PublicSalesAnalytics`, `UnitProductAnalytics`) expose `cityCurrencyCode`. i18n message strings no longer contain hardcoded `$`. 4 backend integration tests (EUR + CZK × PublicSales + UnitProduct) and 4 new E2E tests (EUR badge, CZK badge, mixed-company, CZK analytics) confirm no regression.
 
-### Changelog (90% complete)
+### Changelog (100% complete)
 
-- There is error when storing the changelog items to the database - something related to length of the record in postgresql
-- Make the title of the changelog items nicer - split by :
-- Do not show the news item description if it is the same as the text - For changelog items make description empty.
+- ✅ Long changelog entries can now be stored successfully in PostgreSQL: `TruncateAtWordBoundary` was fixed to always return at most `maxLength` characters (previously could return `maxLength + 1` due to the ellipsis character, causing a column-length violation).
+- ✅ Changelog titles are now generated in a human-readable format by extracting the portion before the first `:` separator (e.g. "Feature name: description…" → title = "Feature name").
+- ✅ Changelog descriptions (summary) are stored as empty string so the same text is never shown twice — the full text is already in the HTML body card.
 
 ### Architecture optimization (0% complete)
 
