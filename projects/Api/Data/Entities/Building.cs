@@ -89,6 +89,20 @@ public sealed class Building
     [MaxLength(20)]
     public string? MediaType { get; set; }
 
+    /// <summary>
+    /// Accumulated content budget for media house buildings.
+    /// Increases when the media house spends on content each tick; decays 0.5% per tick.
+    /// Used to compute content ranking across competitors in the same city and media category.
+    /// </summary>
+    public decimal ContentValue { get; set; }
+
+    /// <summary>
+    /// True when this building is a government-owned media house seeded as the baseline
+    /// city media market.  Government outlets are always visible and operational but players
+    /// cannot buy or configure them.
+    /// </summary>
+    public bool IsGovernmentOwned { get; set; }
+
     /// <summary>Interest rate percentage for banks (legacy; use DepositInterestRatePercent/LendingInterestRatePercent).</summary>
     public decimal? InterestRate { get; set; }
 

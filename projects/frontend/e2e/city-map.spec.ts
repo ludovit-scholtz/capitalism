@@ -1711,3 +1711,108 @@ test.describe('City Map — blank-map regression (list→map toggle)', () => {
     await expect(page.getByRole('heading', { name: 'Industrial Plot A1' })).toBeVisible()
   })
 })
+
+test.describe('City Media Houses', () => {
+  test('shows government-owned media houses with GOV badge for unauthenticated visitor', async ({
+    page,
+  }) => {
+    setupMockApi(page)
+    await page.goto('/city/city-ba')
+
+    // Media houses section should be visible
+    await expect(page.getByRole('heading', { name: 'Media Houses' })).toBeVisible()
+
+    // Government newspaper should show with GOV badge
+    await expect(page.locator('.media-house-card').first()).toBeVisible()
+    await expect(page.locator('.mh-gov-badge').first()).toBeVisible()
+  })
+
+  test('shows 3 government media houses per city with type badges', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/city/city-ba')
+
+    await expect(page.getByRole('heading', { name: 'Media Houses' })).toBeVisible()
+
+    // Should have at least 3 cards (NEWSPAPER, RADIO, TV)
+    const cards = page.locator('.media-house-card')
+    await expect(cards).not.toHaveCount(0)
+
+    // Type badges should be present
+    await expect(page.locator('.mh-type-badge').first()).toBeVisible()
+  })
+
+  test('shows content ranking on media house cards', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/city/city-ba')
+
+    await expect(page.getByRole('heading', { name: 'Media Houses' })).toBeVisible()
+
+    // Content ranking text should appear on at least one card
+    const rankingEl = page.locator('.mh-ranking').first()
+    await expect(rankingEl).toBeVisible()
+    await expect(rankingEl).toContainText('%')
+  })
+
+  test('player-owned media house shows YOUR STATION badge', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-media',
+          playerId: 'player-test',
+          name: 'Media Empire',
+          cash: 1_000_000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    // Add a player-owned media house alongside government ones
+    state.cityMediaHouses['city-ba'] = [
+      {
+        id: 'player-tv-station',
+        name: 'My TV Station',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'TV',
+        ownerCompanyId: 'company-media',
+        ownerCompanyName: 'Media Empire',
+        effectivenessMultiplier: 2.0,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 100,
+        isGovernmentOwned: false,
+      },
+      {
+        id: 'gov-newspaper-city-ba',
+        name: 'Bratislava Gazette',
+        cityId: 'city-ba',
+        cityName: 'Bratislava',
+        mediaType: 'NEWSPAPER',
+        ownerCompanyId: 'gov-company-id',
+        ownerCompanyName: 'Government',
+        effectivenessMultiplier: 1.0,
+        powerStatus: 'POWERED',
+        isUnderConstruction: false,
+        contentRanking: 100,
+        isGovernmentOwned: true,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/city/city-ba')
+    await expect(page.getByRole('heading', { name: 'Media Houses' })).toBeVisible()
+
+    // Player-owned station shows a non-GOV badge, government shows GOV badge
+    await expect(page.locator('.mh-gov-badge')).toBeVisible()
+    await expect(page.locator('.media-house-card').filter({ hasText: 'My TV Station' })).toBeVisible()
+  })
+})

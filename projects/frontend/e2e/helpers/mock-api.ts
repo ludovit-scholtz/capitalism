@@ -698,6 +698,21 @@ export type MockCityWeatherForecast = {
   forecast: MockWeatherTick[]
 }
 
+export type MockCityMediaHouseInfo = {
+  id: string
+  name: string
+  cityId: string
+  cityName: string
+  mediaType: string | null
+  ownerCompanyId: string
+  ownerCompanyName: string
+  effectivenessMultiplier: number
+  powerStatus: string
+  isUnderConstruction: boolean
+  contentRanking: number
+  isGovernmentOwned: boolean
+}
+
 export type MockState = {
   serverKey: string
   players: MockPlayer[]
@@ -783,6 +798,8 @@ export type MockState = {
     fromCurrencySymbol: string
     toCurrencySymbol: string
   }[]
+  /** Media houses returned by cityMediaHouses query, keyed by cityId. */
+  cityMediaHouses: Record<string, MockCityMediaHouseInfo[]>
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1765,6 +1782,63 @@ export function makeDefaultFxRates(): MockFxRate[] {
   ]
 }
 
+/**
+ * Returns 3 default government-owned media houses (NEWSPAPER, RADIO, TV) for a city.
+ * Used as the fallback when `state.cityMediaHouses[cityId]` is not set.
+ */
+export function makeDefaultGovernmentMediaHouses(
+  cityId: string,
+  state: Pick<MockState, 'cities'>,
+): MockCityMediaHouseInfo[] {
+  const city = state.cities.find((c) => c.id === cityId)
+  const cityName = city?.name ?? 'Unknown City'
+  const govCompanyId = 'gov-company-id'
+  return [
+    {
+      id: `gov-newspaper-${cityId}`,
+      name: `${cityName} Gazette`,
+      cityId,
+      cityName,
+      mediaType: 'NEWSPAPER',
+      ownerCompanyId: govCompanyId,
+      ownerCompanyName: 'Government',
+      effectivenessMultiplier: 1.0,
+      powerStatus: 'POWERED',
+      isUnderConstruction: false,
+      contentRanking: 100,
+      isGovernmentOwned: true,
+    },
+    {
+      id: `gov-radio-${cityId}`,
+      name: `${cityName} Radio`,
+      cityId,
+      cityName,
+      mediaType: 'RADIO',
+      ownerCompanyId: govCompanyId,
+      ownerCompanyName: 'Government',
+      effectivenessMultiplier: 1.5,
+      powerStatus: 'POWERED',
+      isUnderConstruction: false,
+      contentRanking: 100,
+      isGovernmentOwned: true,
+    },
+    {
+      id: `gov-tv-${cityId}`,
+      name: `${cityName} TV`,
+      cityId,
+      cityName,
+      mediaType: 'TV',
+      ownerCompanyId: govCompanyId,
+      ownerCompanyName: 'Government',
+      effectivenessMultiplier: 2.0,
+      powerStatus: 'POWERED',
+      isUnderConstruction: false,
+      contentRanking: 100,
+      isGovernmentOwned: true,
+    },
+  ]
+}
+
 // ── Mock API setup ───────────────────────────────────────────────────────────
 
 export function setupMockApi(page: Page, initial?: Partial<MockState>): MockState {
@@ -1815,6 +1889,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     fxRates: makeDefaultFxRates(),
     playerCurrencyBalances: [],
     forexTradeHistory: [],
+    cityMediaHouses: {},
     ...initial,
   }
 
@@ -4776,6 +4851,26 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { cityPowerBalance } }),
+      })
+    }
+
+    if (query.includes('cityMediaHouses')) {
+      const cityId = body.variables?.cityId as string | undefined
+      const ownerCompanyId = body.variables?.ownerCompanyId as string | undefined
+      const allHouses: MockCityMediaHouseInfo[] = cityId
+        ? (state.cityMediaHouses[cityId] ?? makeDefaultGovernmentMediaHouses(cityId, state))
+        : []
+      // Sort: player-owned first, then by contentRanking desc
+      const sorted = [...allHouses].sort((a, b) => {
+        const aOwn = ownerCompanyId && a.ownerCompanyId === ownerCompanyId ? 0 : 1
+        const bOwn = ownerCompanyId && b.ownerCompanyId === ownerCompanyId ? 0 : 1
+        if (aOwn !== bOwn) return aOwn - bOwn
+        return b.contentRanking - a.contentRanking
+      })
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { cityMediaHouses: sorted } }),
       })
     }
 

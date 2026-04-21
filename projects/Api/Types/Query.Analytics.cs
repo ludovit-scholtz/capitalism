@@ -294,31 +294,60 @@ public sealed partial class Query
 
     /// <summary>
     /// Lists all MEDIA_HOUSE buildings in a city. Public — no auth required.
-    /// Includes channel type (NEWSPAPER, RADIO, TV), owner company name, and effectiveness multiplier.
-    /// Players use this to discover where to route their marketing budget.
+    /// Includes channel type (NEWSPAPER, RADIO, TV), owner company name, effectiveness multiplier,
+    /// content ranking (percentage relative to top outlet in same city+category), and whether the
+    /// outlet is government-owned.
+    /// Results are sorted so that the authenticated player's own media houses appear first (within
+    /// each category), followed by all others sorted by content ranking descending.
+    /// The optional <paramref name="ownerCompanyId"/> parameter (the player's current company)
+    /// is used for the "player-first" ordering; it is safe to omit.
     /// </summary>
     public async Task<List<CityMediaHouseInfo>> GetCityMediaHouses(
         Guid cityId,
+        Guid? ownerCompanyId,
         [Service] AppDbContext db)
     {
         var mediaHouses = await db.Buildings
             .Where(b => b.CityId == cityId && b.Type == Data.Entities.BuildingType.MediaHouse)
             .Include(b => b.Company)
+            .Include(b => b.City)
             .AsNoTracking()
             .ToListAsync();
 
-        return mediaHouses.Select(b => new CityMediaHouseInfo
+        // Compute per-category content ranking.
+        // Within a city the top ContentValue for each media type = 100 %; all others are proportional.
+        var maxContentByType = mediaHouses
+            .GroupBy(b => b.MediaType ?? string.Empty)
+            .ToDictionary(g => g.Key, g => g.Max(b => b.ContentValue));
+
+        var infos = mediaHouses.Select(b =>
         {
-            Id = b.Id,
-            Name = b.Name,
-            CityId = b.CityId,
-            MediaType = b.MediaType,
-            OwnerCompanyId = b.CompanyId,
-            OwnerCompanyName = b.Company.Name,
-            EffectivenessMultiplier = Data.Entities.MediaType.EffectivenessMultiplier(b.MediaType),
-            PowerStatus = b.PowerStatus,
-            IsUnderConstruction = b.IsUnderConstruction,
+            var maxContent = maxContentByType.TryGetValue(b.MediaType ?? string.Empty, out var max) ? max : 0m;
+            var ranking = (maxContent > 0m) ? Math.Round(b.ContentValue / maxContent * 100m, 1) : 0m;
+
+            return new CityMediaHouseInfo
+            {
+                Id = b.Id,
+                Name = b.Name,
+                CityId = b.CityId,
+                CityName = b.City.Name,
+                MediaType = b.MediaType,
+                OwnerCompanyId = b.CompanyId,
+                OwnerCompanyName = b.Company.Name,
+                EffectivenessMultiplier = Data.Entities.MediaType.EffectivenessMultiplier(b.MediaType),
+                PowerStatus = b.PowerStatus,
+                IsUnderConstruction = b.IsUnderConstruction,
+                ContentRanking = ranking,
+                IsGovernmentOwned = b.IsGovernmentOwned,
+            };
         }).ToList();
+
+        // Sort: player-owned outlets first (if ownerCompanyId provided), then by ContentRanking desc.
+        return infos
+            .OrderBy(mh => ownerCompanyId.HasValue && mh.OwnerCompanyId == ownerCompanyId.Value ? 0 : 1)
+            .ThenByDescending(mh => mh.ContentRanking)
+            .ThenBy(mh => mh.Name)
+            .ToList();
     }
 
     /// <summary>

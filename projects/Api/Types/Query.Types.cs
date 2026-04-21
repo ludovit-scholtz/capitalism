@@ -437,6 +437,7 @@ public sealed class CityMediaHouseInfo
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
     public Guid CityId { get; set; }
+    public string CityName { get; set; } = string.Empty;
 
     /// <summary>Channel type: NEWSPAPER, RADIO, TV. Null if not configured.</summary>
     public string? MediaType { get; set; }
@@ -454,6 +455,16 @@ public sealed class CityMediaHouseInfo
     public string PowerStatus { get; set; } = Data.Entities.PowerStatus.Powered;
 
     public bool IsUnderConstruction { get; set; }
+
+    /// <summary>
+    /// Content ranking as a percentage (0–100) relative to the top-ranked outlet in the same
+    /// city and media category.  The media house with the highest ContentValue in that slot is
+    /// always 100%; all others are proportional.  Returns 0 when ContentValue is 0.
+    /// </summary>
+    public decimal ContentRanking { get; set; }
+
+    /// <summary>True when the building is a government-seeded baseline media house.</summary>
+    public bool IsGovernmentOwned { get; set; }
 }
 
 /// <summary>Read model for a loan offer visible to borrowers or bank owners.</summary>

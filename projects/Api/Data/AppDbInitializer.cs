@@ -143,12 +143,124 @@ public sealed partial class AppDbInitializer(
         {
             await SeedFxRatesAsync();
         }
+
+        // Seed government-owned baseline media houses in every city (idempotent).
+        await SeedGovernmentMediaHousesAsync();
     }
 
     private async Task SeedFxRatesAsync()
     {
         var rates = await nbsExchangeRateService.FetchLatestRatesAsync();
         dbContext.FxRates.AddRange(rates);
+        await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seeds one government-owned media house of each type (NEWSPAPER, RADIO, TV) in every city.
+    /// Idempotent: checks for the sentinel government player before inserting.
+    /// Government outlets provide a baseline media market from day one so players always have
+    /// something to route their marketing budgets through.
+    /// </summary>
+    private async Task SeedGovernmentMediaHousesAsync()
+    {
+        const string GovEmail = "government@capitalism.game";
+
+        // Idempotency guard: if the government player already exists we assume all
+        // dependent rows (company + media houses) have already been seeded.
+        if (await dbContext.Players.AnyAsync(p => p.Email == GovEmail))
+        {
+            return;
+        }
+
+        var hasher = new PasswordHasher<Player>();
+        var govPlayerId = CreateDeterministicGuid("player:government");
+        var govPlayer = new Player
+        {
+            Id = govPlayerId,
+            Email = GovEmail,
+            DisplayName = "Government",
+            Role = PlayerRole.Player,
+            PersonalCash = 0m,
+            ActiveAccountType = AccountContextType.Person,
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        govPlayer.PasswordHash = hasher.HashPassword(govPlayer, Guid.NewGuid().ToString());
+        dbContext.Players.Add(govPlayer);
+
+        var govCompanyId = CreateDeterministicGuid("company:government");
+        var govCompany = new Company
+        {
+            Id = govCompanyId,
+            PlayerId = govPlayerId,
+            Name = "Government",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+        };
+        dbContext.Companies.Add(govCompany);
+
+        var cities = await dbContext.Cities.ToListAsync();
+
+        // Baseline initial content for government outlets.
+        // Higher than 0 so they display at a non-zero ranking until players invest more.
+        const decimal InitialContentValue = 1_000m;
+
+        foreach (var city in cities)
+        {
+            // NEWSPAPER
+            dbContext.Buildings.Add(new Building
+            {
+                Id = CreateDeterministicGuid($"gov-media:{city.Id}:newspaper"),
+                CompanyId = govCompanyId,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = $"{city.Name} Gazette",
+                Latitude = city.Latitude,
+                Longitude = city.Longitude,
+                Level = 1,
+                MediaType = Entities.MediaType.Newspaper,
+                ContentValue = InitialContentValue,
+                IsGovernmentOwned = true,
+                PowerStatus = Entities.PowerStatus.Powered,
+                BuiltAtUtc = DateTime.UtcNow
+            });
+
+            // RADIO
+            dbContext.Buildings.Add(new Building
+            {
+                Id = CreateDeterministicGuid($"gov-media:{city.Id}:radio"),
+                CompanyId = govCompanyId,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = $"{city.Name} Radio",
+                Latitude = city.Latitude,
+                Longitude = city.Longitude,
+                Level = 1,
+                MediaType = Entities.MediaType.Radio,
+                ContentValue = InitialContentValue,
+                IsGovernmentOwned = true,
+                PowerStatus = Entities.PowerStatus.Powered,
+                BuiltAtUtc = DateTime.UtcNow
+            });
+
+            // TV
+            dbContext.Buildings.Add(new Building
+            {
+                Id = CreateDeterministicGuid($"gov-media:{city.Id}:tv"),
+                CompanyId = govCompanyId,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = $"{city.Name} TV",
+                Latitude = city.Latitude,
+                Longitude = city.Longitude,
+                Level = 1,
+                MediaType = Entities.MediaType.Tv,
+                ContentValue = InitialContentValue,
+                IsGovernmentOwned = true,
+                PowerStatus = Entities.PowerStatus.Powered,
+                BuiltAtUtc = DateTime.UtcNow
+            });
+        }
+
         await dbContext.SaveChangesAsync();
     }
 
