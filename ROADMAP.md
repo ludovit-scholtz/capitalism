@@ -91,6 +91,25 @@ Use this everywhere where numbers are visible.
 - When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. 
 - Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
+### Units (0% complete)
+
+- When person clicks on the unit, organize different sections to tabs
+- For example public sales unit create tab layout for Basic info, Quick actions, Stored inventory, Movement history, Market Intelligence, Recent Activity. In basic info show some basic unit statistics like the profit similarily as on the building when no unit is selected. In quick actions allow user to efficienty change the selling price, so that when he clicks between the units he can do it very easily. Organize all units to tabs, not just the public sales unit.
+
+### R&D Building (0% complete)
+
+- When selecting the product, make sure to show at the top the products the company is currently producing.
+- When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
+- For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
+
+### Appartment and commercial buildings (0% complete)
+
+- The appartment and commenrcial buildings layouts must not contain the grid - it is single unit building.
+- When i want to set a rent i dont see any reference rate. Make sure to show the reference rate chart in the city. The reference rate chart for appartments show in appartments, and reference rate  chart for commenrcial buildings show in the commercial buildings.
+- When the current rent is higher then the city accepted rate adjusted to the location index, the residency will slowly decrease to 50%.
+- When the current rent is lower then the city accepted rate adjusted to the location index, the occupancy will increase. The occupancy can convergate to 100% if the current rate is for long time below 60% of the city rate. If it is at the current city rate adjusted by the location index plus 10%, it can reach maximum 90% of the occupancy.
+- Every appartment and commercial building bears with it the constant costs which are calculated to be equal to earning if the occupancy is equal to 75%
+
 ## FX Exahcnge
 
 Each city is located in physical country which has the currency - CZK for Prague, EUR for Vienna or USD for New York for example.
