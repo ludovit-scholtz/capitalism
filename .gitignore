@@ -52,3 +52,4 @@ __screenshots__/
 test-results/
 playwright-report/
 projects/Api.Tests/TestResults/
+*.trx
