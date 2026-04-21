@@ -98,7 +98,16 @@ public sealed class GoldAmmRemoveLiquidityResult
 /// <summary>Player's gold (XAU) balance info.</summary>
 public sealed class GoldBalanceInfo
 {
+    /// <summary>Current wallet balance (pool-committed gold is already excluded — it was deducted on deposit).</summary>
     public decimal Balance { get; set; }
+    /// <summary>
+    /// Sum of GoldProvided across all active positions (informational: original deposit amounts).
+    /// This is NOT subtracted from Balance again — Balance already reflects the deduction.
+    /// </summary>
     public decimal BlockedInPools { get; set; }
-    public decimal AvailableBalance => Balance - BlockedInPools;
+    /// <summary>
+    /// Gold available to spend or swap. Equal to Balance because pool amounts were already deducted
+    /// from the wallet at deposit time. BlockedInPools is for display/reference only.
+    /// </summary>
+    public decimal AvailableBalance => Balance;
 }

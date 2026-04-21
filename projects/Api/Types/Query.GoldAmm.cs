@@ -226,24 +226,21 @@ public sealed partial class Query
             .Where(p => p.PlayerId == playerId)
             .SumAsync(p => p.GoldProvided);
 
-    internal static async Task<decimal> GetAvailableGoldAsync(AppDbContext db, Guid playerId)
-    {
-        var total = await GetTotalGoldAsync(db, playerId);
-        var blocked = await GetBlockedGoldAsync(db, playerId);
-        return Math.Max(0m, total - blocked);
-    }
+    /// <summary>
+    /// Returns the player's available gold for spending/swapping.
+    /// Pool-committed gold is already deducted from PlayerGoldBalance.Balance at deposit time,
+    /// so the wallet balance IS the available amount — no additional "blocked" subtraction needed.
+    /// </summary>
+    internal static Task<decimal> GetAvailableGoldAsync(AppDbContext db, Guid playerId)
+        => GetTotalGoldAsync(db, playerId);
 
-    internal static async Task<decimal> GetAvailableFiatAsync(AppDbContext db, Guid playerId, string currencyCode)
-    {
-        var total = await GetPersonalBalanceAsync(db, playerId, currencyCode);
-        var blocked = await db.GoldAmmPositions
-            .AsNoTracking()
-            .Where(p => p.PlayerId == playerId)
-            .Join(db.GoldAmmPools, pos => pos.PoolId, pool => pool.Id, (pos, pool) => new { pos, pool })
-            .Where(x => x.pool.CurrencyCode == currencyCode)
-            .SumAsync(x => x.pos.FiatProvided);
-        return Math.Max(0m, total - blocked);
-    }
+    /// <summary>
+    /// Returns the player's available fiat for spending/swapping.
+    /// Pool-committed fiat is already deducted from PersonalCash/PlayerCurrencyBalance at deposit time,
+    /// so the wallet balance IS the available amount — no additional "blocked" subtraction needed.
+    /// </summary>
+    internal static Task<decimal> GetAvailableFiatAsync(AppDbContext db, Guid playerId, string currencyCode)
+        => GetPersonalBalanceAsync(db, playerId, currencyCode);
 
     // ── Position claims helper ──────────────────────────────────────────────────
 

@@ -515,9 +515,9 @@ public sealed class GoldAmmTests
         Assert.NotEqual(Guid.Empty.ToString(), swap.GetProperty("tradeId").GetString());
         Assert.Equal("FIAT_TO_GOLD", swap.GetProperty("direction").GetString());
         Assert.True(swap.GetProperty("outputAmount").GetDecimal() > 0);
-        // EUR: started 20k, deposited 5k in pool (balance=15k), swapped 1k → 14k
+        // EUR: started 20k, deposited 5k in pool (wallet=15k), swapped 1k → wallet=14k
         Assert.Equal(14_000m, swap.GetProperty("newFiatBalance").GetDecimal());
-        // Gold: started 20, deposited 5 in pool (balance=15), received gold from swap
+        // Gold: started 20, deposited 5 in pool (wallet=15), received gold from swap
         var receivedGold = swap.GetProperty("outputAmount").GetDecimal();
         Assert.Equal(15m + receivedGold, swap.GetProperty("newGoldBalance").GetDecimal());
     }
@@ -555,7 +555,7 @@ public sealed class GoldAmmTests
 
         var swap = result.GetProperty("data").GetProperty("executeGoldAmmSwap");
         Assert.True(swap.GetProperty("outputAmount").GetDecimal() > 0);
-        // EUR: started 20k, deposited 5k in pool (balance=15k), received EUR from swap
+        // EUR: started 20k, deposited 5k in pool (wallet=15k), received EUR from swap
         var receivedFiat = swap.GetProperty("outputAmount").GetDecimal();
         Assert.Equal(15_000m + receivedFiat, swap.GetProperty("newFiatBalance").GetDecimal());
     }
@@ -722,7 +722,7 @@ public sealed class GoldAmmTests
     }
 
     [Fact]
-    public async Task MyGoldBalance_WithPool_ShowsBlockedAmount()
+    public async Task MyGoldBalance_WithPool_ShowsCorrectAvailableBalance()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -742,14 +742,14 @@ public sealed class GoldAmmTests
             "{ myGoldBalance { balance blockedInPools availableBalance } }", null, token);
 
         var info = result.GetProperty("data").GetProperty("myGoldBalance");
-        // After depositing 10 XAU into pool:
-        // - PlayerGoldBalance.Balance = 0 (deducted)
-        // - GoldAmmPosition.GoldProvided = 10 (blocked tracking)
-        // - GetBlockedGoldAsync = 10 (sums GoldProvided)
-        // - GoldBalanceInfo.AvailableBalance = Balance - BlockedInPools = 0 - 10 = -10 (no clamp in DTO)
+        // After depositing ALL 10 XAU into pool via DeductGold:
+        //   PlayerGoldBalance.Balance = 0 (physically deducted)
+        //   GoldAmmPosition.GoldProvided = 10 (informational: original deposit)
+        //   AvailableBalance = Balance = 0  (no double-subtract)
+        // Available must never be negative — pool gold was deducted at deposit time.
         Assert.Equal(0m, info.GetProperty("balance").GetDecimal());
         Assert.Equal(10m, info.GetProperty("blockedInPools").GetDecimal());
-        Assert.Equal(-10m, info.GetProperty("availableBalance").GetDecimal());
+        Assert.Equal(0m, info.GetProperty("availableBalance").GetDecimal());  // NOT -10
     }
 
     [Fact]
@@ -838,6 +838,146 @@ public sealed class GoldAmmTests
         // After swap: pool has 10000 + 1000 EUR = 11000 EUR, and less gold
         // Player A owns 100% → claimable fiat should now be 11000 EUR
         Assert.True(pos.GetProperty("claimableFiat").GetDecimal() > 10_000m);
+    }
+
+    #endregion
+
+    #region Balance accounting invariants
+
+    /// <summary>
+    /// Full-balance deposit followed by full removal must restore the original balance exactly.
+    /// Proves there is no double-accounting loss on the round-trip.
+    /// </summary>
+    [Fact]
+    public async Task FullBalanceDeposit_ThenFullRemoval_RestoresExactBalance()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "roundtrip@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "roundtrip@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 8_000m);
+        await SetGoldBalanceAsync(db, playerId, 8m);
+
+        // Deposit ALL funds into pool
+        var createResult = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { positionId newFiatBalance newGoldBalance } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 8_000m, goldAmount = 8m } }, token);
+        var poolData = createResult.GetProperty("data").GetProperty("createGoldAmmPool");
+        Assert.Equal(0m, poolData.GetProperty("newFiatBalance").GetDecimal());  // all in pool
+        Assert.Equal(0m, poolData.GetProperty("newGoldBalance").GetDecimal());  // all in pool
+
+        // Available balance = 0 (wallet emptied)
+        var balResult = await ExecuteGraphQlAsync(client,
+            "{ myGoldBalance { balance availableBalance } }", null, token);
+        var balInfo = balResult.GetProperty("data").GetProperty("myGoldBalance");
+        Assert.Equal(0m, balInfo.GetProperty("balance").GetDecimal());
+        Assert.Equal(0m, balInfo.GetProperty("availableBalance").GetDecimal());
+
+        // Remove all liquidity
+        var positionId = createResult.GetProperty("data").GetProperty("createGoldAmmPool").GetProperty("positionId").GetString()!;
+        var removeResult = await ExecuteGraphQlAsync(client,
+            """
+            mutation RemoveLiq($input: RemoveGoldAmmLiquidityInput!) {
+              removeGoldAmmLiquidity(input: $input) {
+                fiatReturned goldReturned newFiatBalance newGoldBalance
+              }
+            }
+            """,
+            new { input = new { positionId = Guid.Parse(positionId), shareFraction = 1.0m } }, token);
+        var removeData = removeResult.GetProperty("data").GetProperty("removeGoldAmmLiquidity");
+        Assert.Equal(8_000m, removeData.GetProperty("fiatReturned").GetDecimal());
+        Assert.Equal(8m, removeData.GetProperty("goldReturned").GetDecimal());
+        Assert.Equal(8_000m, removeData.GetProperty("newFiatBalance").GetDecimal());  // fully restored
+        Assert.Equal(8m, removeData.GetProperty("newGoldBalance").GetDecimal());       // fully restored
+    }
+
+    /// <summary>
+    /// Partial removal returns exactly half the deposited funds; remaining shares are consistent.
+    /// </summary>
+    [Fact]
+    public async Task PartialRemoval_ReturnsHalfFunds_RemainingSharesCorrect()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "partial-remove@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "partial-remove@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 10m);
+
+        var createResult = await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { positionId liquidityShares } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 6_000m, goldAmount = 6m } }, token);
+        var positionId = createResult.GetProperty("data").GetProperty("createGoldAmmPool").GetProperty("positionId").GetString()!;
+        var totalShares = createResult.GetProperty("data").GetProperty("createGoldAmmPool").GetProperty("liquidityShares").GetDecimal();
+
+        // Remove exactly 50% of position
+        var removeResult = await ExecuteGraphQlAsync(client,
+            """
+            mutation RemoveLiq($input: RemoveGoldAmmLiquidityInput!) {
+              removeGoldAmmLiquidity(input: $input) {
+                fiatReturned goldReturned remainingShares newFiatBalance newGoldBalance
+              }
+            }
+            """,
+            new { input = new { positionId = Guid.Parse(positionId), shareFraction = 0.5m } }, token);
+        var data = removeResult.GetProperty("data").GetProperty("removeGoldAmmLiquidity");
+
+        Assert.Equal(3_000m, data.GetProperty("fiatReturned").GetDecimal());   // half of 6000
+        Assert.Equal(3m, data.GetProperty("goldReturned").GetDecimal());        // half of 6
+        // After partial removal: wallet = 4000 EUR + 3000 returned = 7000 EUR, 4 gold + 3 gold = 7 gold
+        Assert.Equal(7_000m, data.GetProperty("newFiatBalance").GetDecimal());
+        Assert.Equal(7m, data.GetProperty("newGoldBalance").GetDecimal());
+
+        var remainingShares = data.GetProperty("remainingShares").GetDecimal();
+        Assert.True(remainingShares > 0, "Remaining shares should be > 0 after partial removal");
+        Assert.True(remainingShares < totalShares, "Remaining shares should be less than original");
+    }
+
+    /// <summary>
+    /// After depositing partial funds into a pool, the remaining wallet balance is correctly available
+    /// for further swaps — proving no double-accounting on the available balance.
+    /// </summary>
+    [Fact]
+    public async Task PostLiquidityDeposit_RemainingWalletBalanceIsAvailableForSwap()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "post-liq-swap@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var playerId = await GetPlayerIdByEmailAsync(db, "post-liq-swap@test.com");
+        await SetFiatBalanceAsync(db, playerId, "EUR", 10_000m);
+        await SetGoldBalanceAsync(db, playerId, 10m);
+
+        // Deposit half into pool: 5000 EUR + 5 XAU → wallet has 5000 EUR + 5 XAU left
+        await ExecuteGraphQlAsync(client,
+            "mutation CreatePool($input: CreateGoldAmmPoolInput!) { createGoldAmmPool(input: $input) { poolId } }",
+            new { input = new { currencyCode = "EUR", fiatAmount = 5_000m, goldAmount = 5m } }, token);
+
+        // Verify myGoldBalance shows correct wallet balance (no double-subtract)
+        var balResult = await ExecuteGraphQlAsync(client,
+            "{ myGoldBalance { balance blockedInPools availableBalance } }", null, token);
+        var balInfo = balResult.GetProperty("data").GetProperty("myGoldBalance");
+        Assert.Equal(5m, balInfo.GetProperty("balance").GetDecimal());           // wallet gold
+        Assert.Equal(5m, balInfo.GetProperty("blockedInPools").GetDecimal());    // original deposit (informational)
+        Assert.Equal(5m, balInfo.GetProperty("availableBalance").GetDecimal());  // = balance, NOT balance - blocked
+
+        // Swap the remaining 5 XAU (wallet gold) for EUR — must succeed
+        var swapResult = await ExecuteGraphQlAsync(client,
+            "mutation Swap($input: ExecuteGoldAmmSwapInput!) { executeGoldAmmSwap(input: $input) { outputAmount newGoldBalance } }",
+            new { input = new { direction = "GOLD_TO_FIAT", currencyCode = "EUR", amount = 5m, minOutputAmount = 0m } },
+            token);
+        Assert.Null(GetError(swapResult));
+        var swapData = swapResult.GetProperty("data").GetProperty("executeGoldAmmSwap");
+        Assert.True(swapData.GetProperty("outputAmount").GetDecimal() > 0, "Swap should succeed with remaining wallet gold");
+        Assert.Equal(0m, swapData.GetProperty("newGoldBalance").GetDecimal());   // wallet gold fully spent
     }
 
     #endregion
