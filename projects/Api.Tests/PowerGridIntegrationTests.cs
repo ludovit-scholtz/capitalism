@@ -727,4 +727,110 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         Assert.True(testBuilding.ValueKind != JsonValueKind.Undefined, "Test building should appear in myCompanies result");
         Assert.Equal("POWERED", testBuilding.GetProperty("powerStatus").GetString());
     }
+
+    // ── cityWeatherForecast query tests ──────────────────────────────────────
+
+    [Fact]
+    public async Task CityWeatherForecast_Query_ReturnsRollingForecastData()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"WeatherCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 51.0, Longitude = 16.0, Population = 50_000, AverageRentPerSqm = 5m
+        };
+        db.Cities.Add(city);
+
+        // Seed 5 forecast rows for this city.
+        for (var i = 0; i < 5; i++)
+        {
+            db.CityWeatherForecasts.Add(new CityWeatherForecast
+            {
+                CityId = city.Id,
+                Tick = 100 + i,
+                WindPercent = 60m + i,
+                SolarPercent = 70m - (i * 2),
+            });
+        }
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityWeatherForecast($cityId: UUID!) {
+              cityWeatherForecast(cityId: $cityId) {
+                cityId currentWindPercent currentSolarPercent
+                forecast { tick windPercent solarPercent }
+              }
+            }
+            """,
+            new { cityId = city.Id.ToString() });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityWeatherForecast should not return errors");
+
+        var forecast = result.GetProperty("data").GetProperty("cityWeatherForecast");
+        Assert.Equal(city.Id.ToString(), forecast.GetProperty("cityId").GetString());
+
+        // currentWindPercent/currentSolarPercent = values from the first (lowest-tick) row.
+        Assert.Equal(60m, forecast.GetProperty("currentWindPercent").GetDecimal());
+        Assert.Equal(70m, forecast.GetProperty("currentSolarPercent").GetDecimal());
+
+        var forecastTicks = forecast.GetProperty("forecast").EnumerateArray().ToList();
+        Assert.Equal(5, forecastTicks.Count);
+        Assert.Equal(100, forecastTicks[0].GetProperty("tick").GetInt64());
+        Assert.Equal(60m, forecastTicks[0].GetProperty("windPercent").GetDecimal());
+        Assert.Equal(70m, forecastTicks[0].GetProperty("solarPercent").GetDecimal());
+    }
+
+    [Fact]
+    public async Task CityWeatherForecast_Query_IsPublic_NoAuthRequired()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"PubWeather_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 51.5, Longitude = 16.5, Population = 40_000, AverageRentPerSqm = 5m
+        };
+        db.Cities.Add(city);
+        db.CityWeatherForecasts.Add(new CityWeatherForecast
+        {
+            CityId = city.Id, Tick = 200, WindPercent = 55m, SolarPercent = 45m,
+        });
+        await db.SaveChangesAsync();
+
+        // Execute WITHOUT a bearer token — query must be public.
+        var result = await ExecuteGraphQlAsync(
+            "query CityWeatherForecast($cityId: UUID!) { cityWeatherForecast(cityId: $cityId) { cityId currentWindPercent currentSolarPercent } }",
+            new { cityId = city.Id.ToString() }); // no token argument
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityWeatherForecast should be accessible without auth");
+        var data = result.GetProperty("data").GetProperty("cityWeatherForecast");
+        Assert.Equal(city.Id.ToString(), data.GetProperty("cityId").GetString());
+    }
+
+    [Fact]
+    public async Task CityWeatherForecast_Query_ReturnsNullForCityWithNoForecastData()
+    {
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"NoWeather_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 52.0, Longitude = 17.0, Population = 30_000, AverageRentPerSqm = 5m
+        };
+        db.Cities.Add(city);
+        await db.SaveChangesAsync();
+
+        // No forecast rows seeded for this city — query should return null.
+        var result = await ExecuteGraphQlAsync(
+            "query CityWeatherForecast($cityId: UUID!) { cityWeatherForecast(cityId: $cityId) { cityId } }",
+            new { cityId = city.Id.ToString() });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityWeatherForecast with no data should not error");
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("data").GetProperty("cityWeatherForecast").ValueKind);
+    }
 }
