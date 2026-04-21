@@ -35,7 +35,7 @@ Implement banking as is described in the banking section.
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
-### Marketing (95% complete)
+### Marketing (100% complete)
 
 **Shipped in this increment:**
 - Every seeded city now has one government-owned media house of each type (Newspaper, Radio, TV) seeded at startup via `AppDbInitializer.SeedGovernmentMediaHousesAsync`. Government outlets carry an initial `ContentValue` of 1 000 and the `IsGovernmentOwned` flag.
@@ -54,9 +54,10 @@ Implement banking as is described in the banking section.
 - **Frontend Market Intelligence panel:** `BuildingDetailView` shows Brand Quality % with `Premium` (≥50%) and `Growing` (≥20%) status badges alongside demand driver explanations.
 - **EF migration + schema repair:** `20260421090000_AddBrandMarketingQuality` adds the column; idempotent `EnsureColumnAsync` in `AppDbInitializer.SchemaCompatibility` ensures live restarts onto older DB schemas succeed without breaking startup.
 - **7 new backend integration tests:** `MarketingPhase_BrandQuality_IncreasesAfterMarketingSpend`, `MarketingPhase_BrandQuality_DecaysWhenMarketingStopped`, `CompanyBrands_ReturnsMarketingQualityAndCombinedQuality`, `PublicSalesPhase_HigherBrandQuality_IncreasesCompetitiveness`, `PublicSalesAnalytics_ReturnsBrandQualityForPublicSalesUnit`, `MarketingPhase_BrandQuality_HigherChannelMultiplier_GivesMoreQuality`, `MarketingPhase_BrandQuality_TwoProducts_GetIndependentQuality`, `MarketingPhase_BrandQualityDecayIsBoundedAboveZero`.
+- **Campaign Analytics Dashboard (new — closes Marketing roadmap):** New `/marketing-analytics` view exposes a player-facing decision dashboard comparing brand quality, awareness, marketing prestige, pricing level, campaign ROI, and sales outcomes per product/city. Backend `campaignAnalytics(companyId)` query returns `CampaignAnalyticsResult` with per-unit rows containing brand vs price balance labels (`PREMIUM_JUSTIFIED`, `PREMIUM_RISKY`, `DISCOUNT_WITH_BRAND`, `COMPETITIVE_BASELINE`, `BRAND_BUILDING`, `NO_BRAND`), campaign impact (`STRONG` / `MODERATE` / `WEAK` / `NONE`), demand signal, trend direction, top positive/negative demand driver, revenue boost from brand, and a plain-language recommendation. Portfolio-level KPI summary row shows total revenue, total marketing spend, revenue/spend ROI ratio, best-performing city, and global portfolio recommendation. Nav link added in `AppHeader.vue` (authenticated only). 4 backend integration tests cover the empty case, sales-data case, brand-metrics case, and wrong-owner security case.
 
 **Remaining:**
-- Full end-to-end analytics: brand quality vs. pricing A/B comparison in the campaign analytics dashboard.
+- None. All Marketing roadmap items are now shipped.
 
 ### Power plants (15% complete)
 

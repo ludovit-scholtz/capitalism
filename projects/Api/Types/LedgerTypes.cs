@@ -294,6 +294,117 @@ public sealed class UnitProductAnalytics
     public string CityCurrencyCode { get; set; } = "EUR";
 }
 
+/// <summary>
+/// Per-product/per-city analytics row for the campaign analytics dashboard.
+/// Combines brand, pricing, and sales data so players can compare strategies.
+/// </summary>
+public sealed class CampaignAnalyticsRow
+{
+    /// <summary>Building unit identifier (PUBLIC_SALES unit).</summary>
+    public Guid BuildingUnitId { get; set; }
+    /// <summary>Building identifier.</summary>
+    public Guid BuildingId { get; set; }
+    /// <summary>Human-readable building name.</summary>
+    public string BuildingName { get; set; } = string.Empty;
+    /// <summary>Display name of the product being sold in this unit. Null when no product configured.</summary>
+    public string? ProductName { get; set; }
+    /// <summary>Product type ID. Null when no product is configured.</summary>
+    public Guid? ProductTypeId { get; set; }
+    /// <summary>City where the shop is located.</summary>
+    public string CityName { get; set; } = string.Empty;
+
+    // ── Brand metrics ─────────────────────────────────────────────────────
+    /// <summary>Brand awareness (0–1). Null when no brand is set.</summary>
+    public decimal? BrandAwareness { get; set; }
+    /// <summary>Combined brand quality blending R&amp;D and marketing prestige (0–1). Null when no brand.</summary>
+    public decimal? BrandQuality { get; set; }
+    /// <summary>Marketing-driven prestige component of brand quality (0–1). Null when no brand.</summary>
+    public decimal? MarketingQuality { get; set; }
+
+    // ── Pricing metrics ───────────────────────────────────────────────────
+    /// <summary>Current selling price configured on the unit. Null when not configured.</summary>
+    public decimal? CurrentPrice { get; set; }
+    /// <summary>Product's market base price. Null when no product data.</summary>
+    public decimal? BasePrice { get; set; }
+    /// <summary>
+    /// Price index (0–1.5). 1.0 = at base price, &lt;1.0 = premium, &gt;1.0 = discount.
+    /// Null when price or base price unavailable.
+    /// </summary>
+    public decimal? PriceIndex { get; set; }
+    /// <summary>
+    /// Percentage that the current price is above the base price (positive = premium, negative = discount).
+    /// Null when price or base price unavailable.
+    /// </summary>
+    public decimal? PricePremiumPct { get; set; }
+
+    // ── Recent performance (last CampaignAnalyticsWindowTicks ticks) ───────
+    /// <summary>Total revenue in the analytics window.</summary>
+    public decimal RevenueLastTicks { get; set; }
+    /// <summary>Total quantity sold in the analytics window.</summary>
+    public decimal QuantityLastTicks { get; set; }
+    /// <summary>Average capacity utilisation (0–1) in the analytics window.</summary>
+    public decimal UtilizationRate { get; set; }
+    /// <summary>Revenue trend direction: UP | FLAT | DOWN | NO_DATA.</summary>
+    public string TrendDirection { get; set; } = "NO_DATA";
+    /// <summary>Most-recent market trend factor (0.5–1.5). Null when no trend data.</summary>
+    public decimal? TrendFactor { get; set; }
+    /// <summary>Demand signal: NO_DATA | SUPPLY_CONSTRAINED | STRONG | MODERATE | WEAK.</summary>
+    public string DemandSignal { get; set; } = "NO_DATA";
+
+    // ── Demand insight ────────────────────────────────────────────────────
+    /// <summary>Factor identifier with the strongest positive impact on demand. Null when no data.</summary>
+    public string? TopPositiveFactor { get; set; }
+    /// <summary>Factor identifier with the strongest negative impact on demand. Null when no data.</summary>
+    public string? TopNegativeFactor { get; set; }
+
+    // ── Campaign ROI ──────────────────────────────────────────────────────
+    /// <summary>Total marketing spend ledger entries in the analytics window. Null when no marketing units.</summary>
+    public decimal? MarketingSpendLastTicks { get; set; }
+    /// <summary>
+    /// Estimated brand contribution multiplier on revenue.
+    /// Computed as: brandFactor − 1, where brandFactor = 1 + combinedBrandQuality × BrandQualityBoostFactor.
+    /// Null when no brand data available.
+    /// </summary>
+    public decimal? BrandRevenueBoost { get; set; }
+    /// <summary>Campaign effectiveness: STRONG | MODERATE | WEAK | NONE.</summary>
+    public string CampaignImpact { get; set; } = "NONE";
+
+    // ── Strategic insights ─────────────────────────────────────────────────
+    /// <summary>
+    /// Brand-versus-price balance indicator.
+    /// Values: PREMIUM_JUSTIFIED | PREMIUM_RISKY | DISCOUNT_WITH_BRAND | COMPETITIVE_BASELINE | BRAND_BUILDING | NO_BRAND
+    /// </summary>
+    public string BrandVsPriceBalance { get; set; } = "NO_BRAND";
+    /// <summary>Short player-facing recommendation based on the current brand/price/demand combination.</summary>
+    public string Recommendation { get; set; } = string.Empty;
+    /// <summary>ISO 4217 currency code for the city where this unit is located.</summary>
+    public string CityCurrencyCode { get; set; } = "EUR";
+}
+
+/// <summary>
+/// Aggregated campaign analytics result for a company.
+/// Returned by the <c>campaignAnalytics</c> query.
+/// </summary>
+public sealed class CampaignAnalyticsResult
+{
+    /// <summary>Company identifier.</summary>
+    public Guid CompanyId { get; set; }
+    /// <summary>Number of ticks covered by the analysis window.</summary>
+    public int WindowTicks { get; set; }
+    /// <summary>Sum of revenue across all public sales units in the window.</summary>
+    public decimal TotalRevenue { get; set; }
+    /// <summary>Sum of marketing spend across all marketing units in the window.</summary>
+    public decimal TotalMarketingSpend { get; set; }
+    /// <summary>City with the highest revenue in the window. Null when no data.</summary>
+    public string? BestPerformingCity { get; set; }
+    /// <summary>Product with the highest revenue in the window. Null when no data.</summary>
+    public string? BestPerformingProduct { get; set; }
+    /// <summary>High-level recommendation for the entire company's campaign portfolio.</summary>
+    public string GlobalRecommendation { get; set; } = string.Empty;
+    /// <summary>Per-product/per-city analytics rows.</summary>
+    public List<CampaignAnalyticsRow> Rows { get; set; } = [];
+}
+
 /// <summary>Per-tick cost and production snapshot for a MANUFACTURING unit.</summary>
 public sealed class UnitProductTickSnapshot
 {
