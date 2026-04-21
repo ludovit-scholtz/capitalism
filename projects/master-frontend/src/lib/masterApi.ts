@@ -218,6 +218,49 @@ export async function claimStartupPack(token: string): Promise<SubscriptionInfo>
   return data.claimStartupPack
 }
 
+// ── Player gold account ────────────────────────────────────────────────────
+
+export interface PlayerGoldTransactionInfo {
+  id: string
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  note: string | null
+  createdAtUtc: string
+}
+
+export interface PlayerGoldAccountInfo {
+  goldTokenBalance: number
+  lastUpdatedAtUtc: string | null
+  recentTransactions: PlayerGoldTransactionInfo[]
+}
+
+const MY_GOLD_ACCOUNT_QUERY = `
+  query GetMyGoldAccount {
+    myGoldAccount {
+      goldTokenBalance
+      lastUpdatedAtUtc
+      recentTransactions {
+        id
+        amount
+        balanceBefore
+        balanceAfter
+        note
+        createdAtUtc
+      }
+    }
+  }
+`
+
+export async function fetchMyGoldAccount(token: string): Promise<PlayerGoldAccountInfo> {
+  const data = await gqlRequest<{ myGoldAccount: PlayerGoldAccountInfo }>(
+    MY_GOLD_ACCOUNT_QUERY,
+    undefined,
+    token,
+  )
+  return data.myGoldAccount
+}
+
 // ── Gold token administration ──────────────────────────────────────────────
 
 export interface GoldTokenBalanceInfo {

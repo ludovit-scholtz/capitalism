@@ -404,6 +404,43 @@ public sealed class Query
             .ToListAsync();
     }
 
+    /// <summary>Returns the authenticated player's own gold token account details (balance and recent transactions).</summary>
+    [HotChocolate.Authorization.Authorize]
+    public async Task<PlayerGoldAccountInfo> GetMyGoldAccount(
+        ClaimsPrincipal claimsPrincipal,
+        [Service] MasterDbContext db)
+    {
+        var player = await GetCurrentUserAsync(claimsPrincipal, db)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Player not found.")
+                    .SetCode("PLAYER_NOT_FOUND")
+                    .Build());
+
+        var recentTx = await db.GoldTokenTransactions
+            .AsNoTracking()
+            .Where(tx => tx.PlayerAccountId == player.Id)
+            .OrderByDescending(tx => tx.CreatedAtUtc)
+            .Take(10)
+            .Select(tx => new PlayerGoldTransactionInfo
+            {
+                Id = tx.Id,
+                Amount = tx.Amount,
+                BalanceBefore = tx.BalanceBefore,
+                BalanceAfter = tx.BalanceAfter,
+                Note = tx.Note,
+                CreatedAtUtc = tx.CreatedAtUtc,
+            })
+            .ToListAsync();
+
+        return new PlayerGoldAccountInfo
+        {
+            GoldTokenBalance = player.GoldTokenBalance,
+            LastUpdatedAtUtc = recentTx.Count > 0 ? recentTx[0].CreatedAtUtc : null,
+            RecentTransactions = recentTx,
+        };
+    }
+
     /// <summary>Returns all player accounts with their gold token balances. Requires global admin or root admin.</summary>
     [HotChocolate.Authorization.Authorize]
     public async Task<List<GoldTokenBalanceInfo>> GetGoldTokenBalances(

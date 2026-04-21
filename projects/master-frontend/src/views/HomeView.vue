@@ -119,6 +119,7 @@ onMounted(() => {
         <nav class="site-nav">
           <template v-if="auth.isAuthenticated">
             <span class="nav-player">{{ auth.player?.displayName ?? 'Account' }}</span>
+            <a class="nav-btn nav-btn--gold" href="/account">⬛ My Gold</a>
             <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ Gold Admin</a>
             <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>
           </template>

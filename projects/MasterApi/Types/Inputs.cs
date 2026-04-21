@@ -294,6 +294,36 @@ public sealed class DeleteBuildingLayoutInput
 
 // ── Gold token administration ──────────────────────────────────────────────
 
+/// <summary>Player-facing view of their own gold token account.</summary>
+public sealed class PlayerGoldAccountInfo
+{
+    /// <summary>Current gold token balance in grams.</summary>
+    public decimal GoldTokenBalance { get; set; }
+
+    /// <summary>UTC timestamp of the most recent transaction, or null if no transactions exist.</summary>
+    public DateTime? LastUpdatedAtUtc { get; set; }
+
+    /// <summary>The player's most recent gold token transactions (up to 10), newest first.</summary>
+    public List<PlayerGoldTransactionInfo> RecentTransactions { get; set; } = [];
+}
+
+/// <summary>A single gold token transaction visible to the owning player.</summary>
+public sealed class PlayerGoldTransactionInfo
+{
+    public Guid Id { get; set; }
+
+    /// <summary>Positive = received, negative = deducted.</summary>
+    public decimal Amount { get; set; }
+
+    public decimal BalanceBefore { get; set; }
+
+    public decimal BalanceAfter { get; set; }
+
+    public string? Note { get; set; }
+
+    public DateTime CreatedAtUtc { get; set; }
+}
+
 public sealed class AdjustGoldTokenInput
 {
     /// <summary>Email of the target player whose balance will be adjusted.</summary>

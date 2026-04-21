@@ -91,11 +91,13 @@ Implement banking as is described in the banking section.
 **Remaining:**
 - ⬜ **Building unit local currency:** All price configuration and analytics panels in purchasing, B2B sales, and public sales units use the building's city currency. No more EUR hardcoding for Prague (CZK), New York (USD), etc.
 
-### Tokenized gold management (80% complete)
+### Tokenized gold management (90% complete)
 
 **Shipped:** Global administrators can now manage gold token balances from the master frontend (`/gold-admin`). The page shows a searchable table of all players and their current gold balances, an adjust panel to add (positive amount) or deduct (negative amount) gold with a mandatory audit note, and a full transaction history log showing who changed what and when. The backend enforces non-negative balances, persists changes transactionally via a `GoldTokenTransaction` audit table, and requires JWT authentication plus global-admin authorization on all queries and mutations.
 
-**Also shipped (this increment):** `PlayerGoldBalance` entity on the game server. Four new GraphQL operations: `myGoldBalance`, `myGoldAmmPositions`, `goldAmmPools` (public), `goldAmmSwapQuote`. Five new mutations: `createGoldAmmPool`, `addGoldAmmLiquidity`, `removeGoldAmmLiquidity`, `executeGoldAmmSwap`, `adminSetPlayerGoldBalance`. EF migration `AddGoldAmmPools`.
+**Also shipped:** `PlayerGoldBalance` entity on the game server. Four new GraphQL operations: `myGoldBalance`, `myGoldAmmPositions`, `goldAmmPools` (public), `goldAmmSwapQuote`. Five new mutations: `createGoldAmmPool`, `addGoldAmmLiquidity`, `removeGoldAmmLiquidity`, `executeGoldAmmSwap`, `adminSetPlayerGoldBalance`. EF migration `AddGoldAmmPools`.
+
+**Also shipped (this increment):** Player-facing gold balance account page at `/account` on the master frontend. Authenticated players see their current gold token balance in grams, a clear statement that 1 token = 1 gram of real-world gold, a premium financial UI with zero-balance empty state, recent transaction history (up to 10 entries with signed amounts), and a "What is tokenized gold?" educational section explaining cross-server asset ownership and AMM trading. Backend: new `myGoldAccount` GraphQL query returns balance and recent player-scoped transactions for any authenticated user (no admin role required). Navigation: "My Gold" link added to the master portal header for authenticated users.
 
 **Remaining:** Player-facing gold balance on the account page, cross-server gold transfers.
 
