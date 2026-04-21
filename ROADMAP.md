@@ -19,13 +19,14 @@ It will use real world map. The game will start in single city and later other c
 - Support light mode and dark mode
 - Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
 
-### Currencies (55% complete)
+### Currencies (70% complete)
 
 - In forex exchange show the fx rate list table
 - ✅ When starting the onboarding process make sure the initial investment is fair for every user in every currency. Onboarding now scales founder contribution and IPO raise by EUR→city FX rate (e.g. Prague company starts with ~15M CZK, not 600k CZK).
-- The encyclopedia shows currently the base price in USD. Extend encyclopedia to select the currency and show it multiplied by the current currency rate.
+- ✅ Encyclopedia shows product base prices in EUR as a reference anchor via `formatMoney`; city-map lot prices use city `currencyCode`; company settings uses company `currencyCode`.
+- ✅ Property (land lot) prices are expressed in local city currency. `LandService.ComputeBasePrice` applies EUR→cityCurrency FX rate. Prague lots are priced in CZK (~2 M+), Bratislava in EUR. Existing EUR-anchored lots in non-EUR cities are self-healed on the next tick cycle.
+- ✅ `Company.CurrencyCode` field propagated to `CompanySettingsResult` so all company-level monetary displays use the correct local currency.
 - Products in the units are not affected by currency. At the moment when i do chair business, the sale price is 60 kč, while in the new york is $60. The products must have similar prices in every city, but adjusted by the currency.
-- Property prices must be expressed in local currency as well.
 - Extend the model where currency is missing and every time do every monetary operations under the currency. Do not mix two currencies together.
 - Make the shipping costs also in similar price range in all cities, but expressed in the local currency.
 - ✅ Leaderboard must be expressed in USD currency. Rankings now sort and display by `totalWealthUsd` (all local currencies converted to USD via FX rates). Company breakdown shows local currency for individual components.

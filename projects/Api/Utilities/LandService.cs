@@ -113,13 +113,15 @@ public static class LandService
         decimal cityFxRate = 1m)
     {
         // Detect lots whose BasePrice was set before FX-rate scaling was introduced.
-        // Condition: unowned lot in a high-FX-rate city (rate > 1.5×) with an unusually
-        // low BasePrice that looks EUR-anchored (< 500 000 in the local currency).
+        // Condition: unowned lot in a high-FX-rate city (rate > HighFxRateThreshold) with an
+        // unusually low BasePrice that looks EUR-anchored (< EurAnchoredLotBasePriceThreshold).
         // For EUR cities (fxRate ≈ 1) this condition is never true, so manually-seeded
         // Bratislava/Vienna lots keep their precise seeded prices.
-        // For CZK (fxRate ≈ 25), any EUR-anchored lot < 500 000 CZK gets self-healed.
+        // For CZK (fxRate ≈ 25), any EUR-anchored lot below the threshold gets self-healed.
         // For INR (fxRate ≈ 90) and other high-rate currencies the same logic applies.
-        var looksEurAnchored = cityFxRate > 1.5m && lot.BasePrice > 0m && lot.BasePrice < 500_000m;
+        var looksEurAnchored = cityFxRate > GameConstants.HighFxRateThreshold
+            && lot.BasePrice > 0m
+            && lot.BasePrice < GameConstants.EurAnchoredLotBasePriceThreshold;
 
         if (lot.BasePrice <= 0m || (lot.OwnerCompanyId == null && looksEurAnchored))
         {

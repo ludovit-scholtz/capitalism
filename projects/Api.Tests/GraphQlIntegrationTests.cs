@@ -2655,6 +2655,61 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task RefreshLandState_EurAnchoredLotInCzkCity_SelfHealsToLocalCurrencyPrice()
+    {
+        // Regression test for EUR-anchored lot self-healing.
+        // Simulates a lot generated before FX-rate scaling was introduced (BasePrice = 100 000, EUR-level).
+        // After RefreshLandState with CZK fxRate ~25.2, the BasePrice should be > 500 000 (CZK-correct).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var scope = isolatedFactory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Ensure the DB is initialized with FX rates.
+        var initializer = scope.ServiceProvider.GetRequiredService<AppDbInitializer>();
+        await initializer.InitializeAsync();
+
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+        var fxRate = await db.FxRates
+            .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "CZK")
+            .OrderByDescending(r => r.FetchedAtUtc)
+            .Select(r => r.Rate)
+            .FirstOrDefaultAsync();
+        Assert.True(fxRate > GameConstants.HighFxRateThreshold, $"CZK FX rate {fxRate} should be > {GameConstants.HighFxRateThreshold}");
+
+        // Create an EUR-anchored lot (BasePrice well below the EurAnchoredLotBasePriceThreshold)
+        var eurAnchoredLot = new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = prague.Id,
+            Name = "Test EUR-Anchored Lot",
+            Description = "A lot with EUR-anchored price needing self-healing",
+            District = "Industrial Zone",
+            Latitude = 50.083,
+            Longitude = 14.426,
+            SuitableTypes = "FACTORY",
+            BasePrice = 100_000m, // EUR-anchored — below the 500 000 threshold
+            Price = 100_000m,
+            PopulationIndex = 1m,
+            OwnerCompanyId = null,
+            ConcurrencyToken = Guid.NewGuid(),
+        };
+        db.BuildingLots.Add(eurAnchoredLot);
+        await db.SaveChangesAsync();
+
+        // Act: call RefreshLandState with the CZK FX rate
+        LandService.RefreshLandState(eurAnchoredLot, prague, [], 1L, fxRate);
+
+        // Assert: BasePrice is now well above the EUR-anchored threshold (self-healed to CZK scale)
+        Assert.True(
+            eurAnchoredLot.BasePrice > GameConstants.EurAnchoredLotBasePriceThreshold,
+            $"Self-healed BasePrice {eurAnchoredLot.BasePrice} should be > {GameConstants.EurAnchoredLotBasePriceThreshold} CZK");
+        Assert.True(
+            eurAnchoredLot.BasePrice > 1_000_000m,
+            $"Self-healed BasePrice {eurAnchoredLot.BasePrice} should be > 1 000 000 CZK (EUR 85k × 25.2 FX ≈ 2.1M CZK)");
+    }
+
+
+    [Fact]
     public async Task EurFxRates_ReturnsKnownCurrencies()
     {
         // eurFxRates is a public query (no auth required).
