@@ -1765,7 +1765,8 @@ useTickRefresh(async () => {
                 <dd>{{ firstSaleMission.firstSaleQuantity }}</dd>
               </div>
               <div v-if="firstSaleMission.firstSalePricePerUnit !== null" class="first-sale-stat">
-                <dt>{{ t('onboarding.firstSaleCelebrationPrice') }}</dt>                <dd>{{ formatCurrency(firstSaleMission.firstSalePricePerUnit) }}</dd>
+                <dt>{{ t('onboarding.firstSaleCelebrationPrice') }}</dt>
+                <dd>{{ formatCurrency(firstSaleMission.firstSalePricePerUnit) }}</dd>
               </div>
               <div v-if="firstSaleMission.firstSaleTick !== null" class="first-sale-stat">
                 <dt>{{ t('onboarding.firstSaleCelebrationTick') }}</dt>

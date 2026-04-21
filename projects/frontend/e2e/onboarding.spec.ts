@@ -3671,7 +3671,7 @@ test.describe('City selection — Prague as starter city', () => {
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/CZK/)
+    expect(revenueText).toMatch(/CZK[\s\u00a0][\d,]+/)
   })
 })
 
@@ -4521,7 +4521,7 @@ test.describe('Cross-industry/city matrix — guest wizard completability (AC2, 
     const revenueEl = page.locator('.profit-stat-revenue')
     await expect(revenueEl).toBeVisible()
     const revenueText = await revenueEl.textContent()
-    expect(revenueText).toMatch(/CZK/)
+    expect(revenueText).toMatch(/CZK[\s\u00a0][\d,]+/)
 
     // Save-progress form must be visible
     await expect(page.locator('#guestEmail')).toBeVisible()
