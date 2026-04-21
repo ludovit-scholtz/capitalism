@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { getOverheadStatus } from '@/lib/companyOverhead'
+import { formatMoney } from '@/lib/currencyFormat'
 import type { CompanySettings } from '@/types'
 
 const { t, locale } = useI18n()
@@ -33,6 +34,7 @@ const SETTINGS_QUERY = `
       ageFactor
       assetFactor
       assetValue
+      currencyCode
       citySalarySettings {
         cityId
         cityName
@@ -112,11 +114,7 @@ async function saveSettings() {
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 2,
-  }).format(value)
+  return formatMoney(value, settings.value?.currencyCode ?? 'EUR', locale.value)
 }
 
 function formatPercent(value: number): string {

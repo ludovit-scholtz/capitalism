@@ -1956,3 +1956,61 @@ test.describe('City Media Houses', () => {
     await expect(balanceCard.locator('.balance-guidance')).toContainText(/shortage|capacity|returns/i)
   })
 })
+
+test.describe('currency-aware lot price display', () => {
+  test('EUR city shows lot price in EUR (€ symbol)', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    // Bratislava is EUR — lots with prices like 96 900 should render as "€"
+    const lots = makeDefaultBuildingLots() // all city-ba (EUR) lots
+    const state = setupMockApi(page, { players: [player], buildingLots: lots })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // Price panel should contain €, not $
+    const aside = page.getByRole('complementary')
+    await expect(aside).toContainText('€')
+    await expect(aside).not.toContainText('$')
+  })
+
+  test('CZK city shows lot price without $ symbol', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    // Prague is CZK — lots should not show $ symbol
+    const czkLots: MockBuildingLot[] = [
+      {
+        id: 'lot-prague-factory-1',
+        cityId: 'city-pr',
+        name: 'Prague Industrial Plot',
+        description: 'Factory land in Prague',
+        district: 'Industrial Zone',
+        latitude: 50.083,
+        longitude: 14.426,
+        populationIndex: 0.85,
+        basePrice: 2_142_000, // ~EUR 85 000 × 25.2 CZK rate
+        price: 2_500_000,
+        suitableTypes: 'FACTORY',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+    ]
+    const state = setupMockApi(page, { players: [player], buildingLots: czkLots })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-pr')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Prague Industrial Plot/i }).click()
+    // CZK price should not display a dollar sign
+    const aside = page.getByRole('complementary')
+    await expect(aside).not.toContainText('$')
+  })
+})

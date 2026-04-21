@@ -67,6 +67,8 @@ export interface CompanySettings {
   /** 0–1: how much company scale (assets) contributes to overhead */
   assetFactor: number
   assetValue: number
+  /** ISO 4217 currency code for this company's local currency (e.g. "EUR", "CZK", "USD") */
+  currencyCode: string
   citySalarySettings: CompanyCitySalarySetting[]
 }
 

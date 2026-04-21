@@ -14,6 +14,7 @@ public sealed class CompanySettingsResult
     /// <summary>0–1 fraction representing how much company scale (assets) contributes to overhead.</summary>
     public decimal AssetFactor { get; set; }
     public decimal AssetValue { get; set; }
+    public string CurrencyCode { get; set; } = "EUR";
     public List<CompanyCitySalarySettingResult> CitySalarySettings { get; set; } = [];
 }
 

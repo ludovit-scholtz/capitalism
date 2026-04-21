@@ -109,6 +109,12 @@ public sealed partial class AppDbInitializer(
             await dbContext.SaveChangesAsync();
         }
 
+        // Seed FX rates before lot generation so LandService can apply correct currency multipliers.
+        if (!await dbContext.FxRates.AnyAsync())
+        {
+            await SeedFxRatesAsync();
+        }
+
         if (!await dbContext.BuildingLots.AnyAsync())
         {
             await SeedBuildingLotsAsync();
@@ -136,12 +142,6 @@ public sealed partial class AppDbInitializer(
                 dbContext.CityWeatherForecasts.AddRange(forecasts);
             }
             await dbContext.SaveChangesAsync();
-        }
-
-        // Seed FX rates (fetch from NBS or fall back to hardcoded approximate rates).
-        if (!await dbContext.FxRates.AnyAsync())
-        {
-            await SeedFxRatesAsync();
         }
 
         // Seed government-owned baseline media houses in every city (idempotent).

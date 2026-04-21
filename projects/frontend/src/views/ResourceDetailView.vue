@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
 import { isProductLocked } from '@/lib/productAccess'
+import { formatMoney } from '@/lib/currencyFormat'
 import {
   getLocalizedCategory,
   getLocalizedIndustry,
@@ -291,7 +292,7 @@ function goBack() {
           <div class="resource-meta">
             <div class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.basePrice') }}</span>
-              <strong class="meta-value">${{ selectedResource?.basePrice ?? selectedProduct?.basePrice }}</strong>
+              <strong class="meta-value">{{ formatMoney((selectedResource?.basePrice ?? selectedProduct?.basePrice) ?? 0, 'EUR', locale) }}</strong>
             </div>
             <div v-if="selectedResource" class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.weight') }}</span>

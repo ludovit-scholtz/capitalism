@@ -475,6 +475,7 @@ public sealed partial class Query
             AgeFactor = ageFactor,
             AssetFactor = assetFactor,
             AssetValue = assetValue,
+            CurrencyCode = company.CurrencyCode,
             CitySalarySettings = cities
                 .Select(city =>
                 {

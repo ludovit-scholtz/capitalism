@@ -42,7 +42,17 @@ public static class LandService
             .Where(building => cityIdSet == null || cityIdSet.Contains(building.CityId))
             .ToListAsync();
 
-        EnsureMinimumAvailableLots(db, cities, lots, buildings, currentTick);
+        // Load EUR-based FX rates so lot prices are expressed in the city's local currency.
+        // EUR/EUR = 1 is always added as a baseline so EUR-currency cities are unaffected.
+        var fxRateRows = await db.FxRates
+            .Where(r => r.BaseCurrencyCode == "EUR")
+            .ToListAsync();
+        var fxRatesByCurrency = fxRateRows
+            .GroupBy(r => r.QuoteCurrencyCode)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.FetchedAtUtc).First().Rate);
+        fxRatesByCurrency["EUR"] = 1m;
+
+        EnsureMinimumAvailableLots(db, cities, lots, buildings, currentTick, fxRatesByCurrency);
     }
 
     public static void EnsureMinimumAvailableLots(
@@ -50,10 +60,12 @@ public static class LandService
         IReadOnlyCollection<City> cities,
         IReadOnlyCollection<BuildingLot> existingLots,
         IReadOnlyCollection<Building> buildings,
-        long currentTick)
+        long currentTick,
+        Dictionary<string, decimal>? fxRatesByCurrency = null)
     {
         foreach (var city in cities)
         {
+            var cityFxRate = fxRatesByCurrency?.GetValueOrDefault(city.CurrencyCode, 1m) ?? 1m;
             var cityBuildings = buildings.Where(building => building.CityId == city.Id).ToList();
             var cityLots = existingLots.Where(lot => lot.CityId == city.Id).ToList();
 
@@ -65,7 +77,7 @@ public static class LandService
                 for (var offset = 0; offset < missingCount; offset++)
                 {
                     var sequence = cityLots.Count + 1;
-                    var generatedLot = CreateGeneratedLot(city, buildingType, sequence, cityBuildings, currentTick);
+                    var generatedLot = CreateGeneratedLot(city, buildingType, sequence, cityBuildings, currentTick, cityFxRate);
                     db.BuildingLots.Add(generatedLot);
                     cityLots.Add(generatedLot);
                 }
@@ -73,7 +85,7 @@ public static class LandService
 
             foreach (var lot in cityLots)
             {
-                RefreshLandState(lot, city, cityBuildings, currentTick);
+                RefreshLandState(lot, city, cityBuildings, currentTick, cityFxRate);
 
                 if (lot.BuildingId is not Guid buildingId)
                 {
@@ -97,13 +109,21 @@ public static class LandService
         BuildingLot lot,
         City city,
         IReadOnlyCollection<Building> cityBuildings,
-        long currentTick)
+        long currentTick,
+        decimal cityFxRate = 1m)
     {
-        if (lot.BasePrice <= 0m)
+        // Detect lots whose BasePrice was set before FX-rate scaling was introduced.
+        // Condition: unowned lot in a high-FX-rate city (rate > 1.5×) with an unusually
+        // low BasePrice that looks EUR-anchored (< 500 000 in the local currency).
+        // For EUR cities (fxRate ≈ 1) this condition is never true, so manually-seeded
+        // Bratislava/Vienna lots keep their precise seeded prices.
+        // For CZK (fxRate ≈ 25), any EUR-anchored lot < 500 000 CZK gets self-healed.
+        // For INR (fxRate ≈ 90) and other high-rate currencies the same logic applies.
+        var looksEurAnchored = cityFxRate > 1.5m && lot.BasePrice > 0m && lot.BasePrice < 500_000m;
+
+        if (lot.BasePrice <= 0m || (lot.OwnerCompanyId == null && looksEurAnchored))
         {
-            lot.BasePrice = lot.Price > 0m
-                ? lot.Price
-                : ComputeBasePrice(city, FirstSuitableType(lot), ComputeDistanceKmToCityCenter(lot, city));
+            lot.BasePrice = ComputeBasePrice(city, FirstSuitableType(lot), ComputeDistanceKmToCityCenter(lot, city), cityFxRate);
         }
 
         lot.PopulationIndex = ComputePopulationIndex(lot, city, cityBuildings, currentTick);
@@ -198,7 +218,8 @@ public static class LandService
         string buildingType,
         int sequence,
         IReadOnlyCollection<Building> cityBuildings,
-        long currentTick)
+        long currentTick,
+        decimal cityFxRate = 1m)
     {
         var radiusKm = PreferredRadiusKm(buildingType, sequence);
         var angleDegrees = Math.Abs(HashCode.Combine(city.Id, buildingType, sequence)) % 360;
@@ -206,7 +227,7 @@ public static class LandService
 
         var latitude = city.Latitude + KmToLatitudeDelta(radiusKm * Math.Cos(angleRadians));
         var longitude = city.Longitude + KmToLongitudeDelta(radiusKm * Math.Sin(angleRadians), city.Latitude);
-        var basePrice = ComputeBasePrice(city, buildingType, radiusKm);
+        var basePrice = ComputeBasePrice(city, buildingType, radiusKm, cityFxRate);
 
         var lot = new BuildingLot
         {
@@ -224,11 +245,11 @@ public static class LandService
             ConcurrencyToken = Guid.NewGuid(),
         };
 
-        RefreshLandState(lot, city, cityBuildings, currentTick);
+        RefreshLandState(lot, city, cityBuildings, currentTick, cityFxRate);
         return lot;
     }
 
-    private static decimal ComputeBasePrice(City city, string? buildingType, double radiusKm)
+    private static decimal ComputeBasePrice(City city, string? buildingType, double radiusKm, decimal fxRate = 1m)
     {
         var typeBasePrice = buildingType switch
         {
@@ -250,7 +271,7 @@ public static class LandService
             + Clamp(city.Population / 2_500_000m, 0.05m, 0.60m);
         var radiusDiscount = Clamp(1.15m - ((decimal)radiusKm / 12m), 0.75m, 1.15m);
 
-        return decimal.Round(typeBasePrice * cityMultiplier * radiusDiscount, 2, MidpointRounding.AwayFromZero);
+        return decimal.Round(typeBasePrice * cityMultiplier * radiusDiscount * fxRate, 2, MidpointRounding.AwayFromZero);
     }
 
     private static double PreferredRadiusKm(string buildingType, int sequence)

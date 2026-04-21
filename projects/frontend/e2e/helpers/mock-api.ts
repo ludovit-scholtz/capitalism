@@ -4446,6 +4446,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               ageFactor,
               assetFactor,
               assetValue: companyAssetValue,
+              currencyCode: company.currencyCode ?? 'EUR',
               citySalarySettings: state.cities.map((city) => {
                 const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
                 return {

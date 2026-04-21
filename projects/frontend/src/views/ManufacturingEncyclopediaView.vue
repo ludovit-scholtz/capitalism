@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
 import { isProductLocked } from '@/lib/productAccess'
+import { formatMoney } from '@/lib/currencyFormat'
 import {
   getLocalizedCategory,
   getLocalizedIndustry,
@@ -82,7 +83,7 @@ const catalogEntries = computed<CatalogEntry[]>(() => {
         pill: resource.unitSymbol,
         badge: t('encyclopedia.resourceTypeRaw'),
         meta: [
-          `${t('encyclopedia.basePrice')}: $${resource.basePrice}`,
+          `${t('encyclopedia.basePrice')}: ${formatMoney(resource.basePrice, 'EUR', locale.value)}`,
           `${t('encyclopedia.weight')}: ${resource.weightPerUnit} kg/${resource.unitSymbol}`,
           getLocalizedCategory(resource.category, locale.value),
         ],
@@ -106,7 +107,7 @@ const catalogEntries = computed<CatalogEntry[]>(() => {
         pill: product.unitSymbol,
         badge: getLocalizedIndustry(product.industry, locale.value),
         meta: [
-          `${t('encyclopedia.basePrice')}: $${product.basePrice}`,
+          `${t('encyclopedia.basePrice')}: ${formatMoney(product.basePrice, 'EUR', locale.value)}`,
           `${t('encyclopedia.energy')}: ${product.energyConsumptionMwh} MWh`,
           `${t('encyclopedia.basicLaborHours')}: ${product.basicLaborHours} h`,
           `${t('encyclopedia.output')}: ${product.outputQuantity} ${product.unitSymbol}`,
