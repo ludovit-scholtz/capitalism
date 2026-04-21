@@ -17,6 +17,7 @@ It will use real world map. The game will start in single city and later other c
 - Minimize the css usage
 - Make sure all components are properly readable and has contrast between the text and background
 - Support light mode and dark mode
+- Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
 
 ### Currencies (10% complete)
 
@@ -71,6 +72,11 @@ Use this everywhere where numbers are visible.
 **Remaining:**
 - Add weather forecast to city overview card in the onboarding city picker.
 - Weather-driven demand modifier for seasonal gameplay.
+
+### Banks (10% complete)
+
+- Acquire a Bank button looks strange as it is missing padding
+- Please make a banking onboarding much more user friendly. For example navigate from acquire a bank button directly to the form to create a bank, make sure the user has enough base capital, and allow him to set the borrowing and lending interest rates. When user goes from new building button, and he selects that he wants to create a bank, go to this bank setup form
 
 ### Audits (0% complete)
 
