@@ -1155,6 +1155,11 @@ export default {
       productQualityHint: 'Aktuelle Lagerqualität. Höhere Qualität steigert die Nachfrage.',
       brandAwareness: 'Markenbekanntheit',
       brandAwarenessHint: 'Markenbekanntheit für dieses Produkt. Höhere Bekanntheit fördert den Absatz.',
+      brandQuality: 'Markenqualität',
+      brandQualityHint:
+        'Kombinierter Markenruf (F&E + Marketing-Prestige). Steigert die Nachfrage bei voller Qualität um bis zu 50%. Aufbau durch langfristiges Marketing und Produktforschung.',
+      brandQualityPremium: 'Premium',
+      brandQualityGrowing: 'Wachsend',
       demandDrivers: {
         title: 'Nachfragefaktoren',
         factor_PRICE: 'Preis',

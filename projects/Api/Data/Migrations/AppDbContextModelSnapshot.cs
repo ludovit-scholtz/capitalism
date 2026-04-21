@@ -167,6 +167,10 @@ namespace Api.Data.Migrations
                         .HasColumnType("numeric(7,4)")
                         .HasDefaultValue(1m);
 
+                    b.Property<decimal>("MarketingQuality")
+                        .HasPrecision(5, 4)
+                        .HasColumnType("numeric(5,4)");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)

@@ -225,6 +225,7 @@ public sealed partial class Query
             inventoryQuality = inventory.Quality;
 
         Data.Entities.ProductType? productTypeForAnalytics = null;
+        decimal? brandQuality = null;
         if (productTypeIdForElasticity.HasValue)
         {
             productTypeForAnalytics = await db.ProductTypes.FindAsync(productTypeIdForElasticity.Value);
@@ -238,7 +239,13 @@ public sealed partial class Query
                     .OrderByDescending(b => b.Awareness)
                     .FirstOrDefaultAsync();
                 if (brand is not null)
+                {
                     brandAwareness = brand.Awareness;
+                    // Combined brand quality: R&D quality + marketing prestige (additive blend).
+                    var rdQuality = Math.Clamp(brand.Quality, 0m, 1m);
+                    var mktQuality = Math.Clamp(brand.MarketingQuality, 0m, 1m);
+                    brandQuality = Math.Clamp(1m - (1m - rdQuality) * (1m - mktQuality), 0m, 1m);
+                }
             }
         }
 
@@ -299,7 +306,7 @@ public sealed partial class Query
         var demandDrivers = ComputeDemandDrivers(
             unit, productTypeForAnalytics, inventoryQuality, brandAwareness, populationIndex,
             marketShare, unmetDemandShare, city?.BaseSalaryPerManhour,
-            recentCitySalary, city?.Population ?? 0, currentTrendFactor);
+            recentCitySalary, city?.Population ?? 0, currentTrendFactor, brandQuality);
 
         // ── Trend direction ─────────────────────────────────────────────────────
         // Compare average revenue in the most-recent 5 ticks vs the prior 5 ticks to give
@@ -341,6 +348,7 @@ public sealed partial class Query
             PopulationIndex = populationIndex,
             InventoryQuality = inventoryQuality,
             BrandAwareness = brandAwareness,
+            BrandQuality = brandQuality,
             TotalProfit = totalProfit,
             ProfitHistory = profitHistory,
             DemandDrivers = demandDrivers,

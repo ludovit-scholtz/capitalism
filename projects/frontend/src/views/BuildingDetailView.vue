@@ -3179,6 +3179,7 @@ async function loadPublicSalesAnalytics(unitId: string | null, isRefresh = false
           populationIndex
           inventoryQuality
           brandAwareness
+          brandQuality
           totalProfit
           trendDirection
           trendFactor
@@ -6470,6 +6471,25 @@ watch(
                           {{ Math.round(publicSalesAnalytics.brandAwareness * 100) }}%
                         </strong>
                         <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.brandAwarenessHint') }}</span>
+                      </div>
+                      <div v-if="publicSalesAnalytics.brandQuality !== null" class="mi-context-item">
+                        <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.brandQuality') }}</span>
+                        <strong
+                          class="mi-context-value"
+                          :class="{
+                            'mi-quality-high': publicSalesAnalytics.brandQuality >= 0.5,
+                            'mi-quality-low': publicSalesAnalytics.brandQuality < 0.2,
+                          }"
+                        >
+                          {{ Math.round(publicSalesAnalytics.brandQuality * 100) }}%
+                          <span v-if="publicSalesAnalytics.brandQuality >= 0.5" class="mi-quality-badge mi-quality-badge-premium">{{
+                            t('buildingDetail.marketIntelligence.brandQualityPremium')
+                          }}</span>
+                          <span v-else-if="publicSalesAnalytics.brandQuality >= 0.2" class="mi-quality-badge mi-quality-badge-growing">{{
+                            t('buildingDetail.marketIntelligence.brandQualityGrowing')
+                          }}</span>
+                        </strong>
+                        <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.brandQualityHint') }}</span>
                       </div>
                     </div>
                   </div>

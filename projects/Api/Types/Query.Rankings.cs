@@ -235,6 +235,10 @@ public sealed partial class Query
                 maxBudget = maxBudgetPerProduct.TryGetValue(b.ProductTypeId.Value, out var mb) ? mb : null;
             }
 
+            var rdQuality = Math.Clamp(b.Quality, 0m, 1m);
+            var mktQuality = Math.Clamp(b.MarketingQuality, 0m, 1m);
+            var combined = Math.Clamp(1m - (1m - rdQuality) * (1m - mktQuality), 0m, 1m);
+
             return new ResearchBrandState
             {
                 Id = b.Id,
@@ -246,6 +250,8 @@ public sealed partial class Query
                 IndustryCategory = b.IndustryCategory,
                 Awareness = b.Awareness,
                 Quality = b.Quality,
+                MarketingQuality = mktQuality,
+                CombinedBrandQuality = combined,
                 MarketingEfficiencyMultiplier = b.MarketingEfficiencyMultiplier,
                 AccumulatedResearchBudget = accBudget,
                 BaseResearchBudget = baseBudget,
@@ -275,6 +281,8 @@ public sealed partial class Query
                 IndustryCategory = null,
                 Awareness = 0m,
                 Quality = 0m,
+                MarketingQuality = 0m,
+                CombinedBrandQuality = 0m,
                 MarketingEfficiencyMultiplier = 1m,
                 AccumulatedResearchBudget = budget.AccumulatedBudget,
                 BaseResearchBudget = baseBudget,

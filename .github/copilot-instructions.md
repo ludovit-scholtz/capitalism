@@ -936,3 +936,36 @@ Root-cause of CI failures (April 2026, PR #74 / multi-currency ledger):
 3. **A safe assertion pattern for currency amounts uses the ISO code** (e.g., `€6,060.00` or `CZK 30,000.00`) rather than `$6,060.00`, which is fragile and will break on any locale or currency change.
 4. **After finding and updating all affected assertions, run the full `npm run test:e2e` suite locally** to confirm no remaining `$`-based assertions fail before `report_progress`.
 5. **Infrastructure rule:** when a component is updated to use `Intl.NumberFormat`, its default currency changes. EUR formats amounts with `€` prefix in `en` locale (not `$`). CZK formats as `CZK X,XXX.XX` in `en` locale (not `Kč`). Always verify the exact output of `Intl.NumberFormat` for the target locale/currency before writing assertions.
+
+## PublicSalesPhase demand-differentiation tests — unit capacity must not be the binding factor
+
+Root-cause of a quality failure (April 2026, PR brand-quality):
+- `PublicSalesPhase_HigherBrandQuality_IncreasesCompetitiveness` was marked "Known gap" in the PR description because both sellers sold exactly the same amount after one tick.
+- Root cause: both sales units had `Level = 1`. `SalesCapacity(level=1) = 20` — so each seller's individual capacity was exactly 20 units/tick.
+- The real city demand (Bratislava pop 475,000 × 0.001 × salaryFactor ≈ 427 units/tick) far exceeded the capacity cap. Both sellers hit their 20-unit ceiling regardless of brand competitiveness.
+- The PR was pushed with the test noted as failing rather than diagnosing and fixing it.
+
+**Rules to prevent recurrence:**
+1. **Any test that verifies market-share splitting (brand, price, quality, trend) must use high-level sales units so demand — not capacity — is the binding constraint.** Use `Level = 3` (capacity = 100/tick) or higher when the test city has moderate population.
+2. **For deterministic market-share split tests, use a small custom test city** (e.g., `Population = 50_000`) so `effectiveCityDemand ≈ 14 units/tick` is safely below the unit capacity. Add the city inline in the test: `db.Cities.Add(new City { ..., Population = 50_000 })`.
+3. **The formula to check capacity vs demand:** `SalesCapacity(level)` is from `GameConstants.cs`. For a city with population `P`, `effectiveCityDemand ≈ P × 0.001 × salaryFactor × marketDemandFactor`. If `effectiveCityDemand / numSellers ≥ SalesCapacity(level)` the test will be capacity-capped and market share differences are invisible.
+4. **When a test fails because both sellers sell identical amounts, always investigate the binding factor:** is it unit capacity (`remainingCapacity`), stock turnover cap (`stockTurnoverCap`), or actual demand? Adding debug output or checking the exact values from `SalesCapacity` is faster than guessing.
+5. **Never push a PR with a "Known gap: test still fails" note.** The gap must be fixed before pushing.
+
+## MarketingPhase early-return bug pattern — decay must not be skipped when no shops exist
+
+Root-cause of a quality failure (April 2026, PR brand-quality):
+- `DecayMarketingQuality` was placed AFTER `if (!context.BuildingsByType.TryGetValue(SalesShop)) return Task.CompletedTask`. When the test database had no SalesShop buildings, the method returned early and decay never ran.
+- The test `MarketingPhase_BrandQualityDecayIsBoundedAboveZero` created a company with only a brand and no buildings — so decay was never applied and the value remained 0.5 after 200 ticks.
+
+**Fix applied:** Move the early return inside a conditional block so `DecayMarketingQuality(context)` always runs:
+```csharp
+if (context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var shops))
+{
+    foreach (var building in shops) { ... process marketing units ... }
+}
+// Decay always runs — even when no shops exist.
+DecayMarketingQuality(context);
+```
+
+**Rule:** Any phase-level operation that should run unconditionally (decay, expiry, interest accrual) must be placed OUTSIDE any early-return or conditional block. Only skip the unconditional operation if the game design explicitly requires it to be conditional.

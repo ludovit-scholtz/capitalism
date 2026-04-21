@@ -179,6 +179,12 @@ public sealed class PublicSalesAnalytics
     /// <summary>Brand awareness of the selling company for this product (0.0–1.0). Null if no brand set.</summary>
     public decimal? BrandAwareness { get; set; }
     /// <summary>
+    /// Combined brand quality score (0.0–1.0) for this product. Blends R&amp;D research quality and
+    /// marketing-driven prestige. Higher quality amplifies the brand demand factor by up to 50%.
+    /// Null when no brand data is available.
+    /// </summary>
+    public decimal? BrandQuality { get; set; }
+    /// <summary>
     /// Total gross profit across the analytics window (TotalRevenue - QuantitySold × BasePrice).
     /// Positive when selling above the product base price. Null when base price is unavailable.
     /// </summary>

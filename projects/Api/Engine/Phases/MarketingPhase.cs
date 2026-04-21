@@ -16,24 +16,46 @@ public sealed class MarketingPhase : ITickPhase
 
     public Task ProcessAsync(TickContext context)
     {
-        if (!context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var shops))
-            return Task.CompletedTask;
-
-        foreach (var building in shops)
+        if (context.BuildingsByType.TryGetValue(BuildingType.SalesShop, out var shops))
         {
-            if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units))
-                continue;
-            if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
-                continue;
-
-            foreach (var unit in units)
+            foreach (var building in shops)
             {
-                if (unit.UnitType != UnitType.Marketing) continue;
-                ProcessMarketingUnit(context, building, unit, company, units);
+                if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units))
+                    continue;
+                if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
+                    continue;
+
+                foreach (var unit in units)
+                {
+                    if (unit.UnitType != UnitType.Marketing) continue;
+                    ProcessMarketingUnit(context, building, unit, company, units);
+                }
             }
         }
 
+        // Decay marketing quality for all brands every tick.
+        // This runs even when no marketing units are active so that
+        // prestige erodes gradually when investment stops.
+        DecayMarketingQuality(context);
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Applies a slow per-tick decay to all brands' MarketingQuality.
+    /// This ensures brand prestige erodes gradually when marketing investment stops,
+    /// making sustained marketing a continuous strategic commitment.
+    /// </summary>
+    private static void DecayMarketingQuality(TickContext context)
+    {
+        foreach (var brand in context.AllBrands)
+        {
+            if (brand.MarketingQuality <= 0m) continue;
+            var decay = decimal.Round(
+                brand.MarketingQuality * GameConstants.BrandMarketingQualityDecayRate,
+                6, MidpointRounding.AwayFromZero);
+            brand.MarketingQuality = Math.Max(0m, brand.MarketingQuality - decay);
+        }
     }
 
     private static void ProcessMarketingUnit(
@@ -140,6 +162,14 @@ public sealed class MarketingPhase : ITickPhase
 
             // Combined: channel reach × R&D efficiency.
             brand.Awareness = Math.Min(1m, brand.Awareness + budgetPerProduct * GameConstants.BrandAwarenessPerBudget * channelMultiplier * efficiencyMultiplier);
+
+            // Brand prestige (marketing quality): sustained marketing spend builds long-term brand reputation.
+            // This grows much more slowly than awareness and accumulates as a durable competitive advantage.
+            // Channel quality and R&D efficiency both amplify the quality gain rate.
+            var qualityGain = decimal.Round(
+                budgetPerProduct * GameConstants.BrandMarketingQualityPerBudget * channelMultiplier * efficiencyMultiplier,
+                6, MidpointRounding.AwayFromZero);
+            brand.MarketingQuality = Math.Min(1m, brand.MarketingQuality + qualityGain);
         }
     }
 
