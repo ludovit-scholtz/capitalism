@@ -11,6 +11,13 @@ It will use real world map. The game will start in single city and later other c
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
+### Tailwind migration (0% complete)
+
+- Update all pages to use the tailwind as primary stying method
+- Minimize the css usage
+- Make sure all components are properly readable and has contrast between the text and background
+- Support light mode and dark mode
+
 ### Currencies (10% complete)
 
 - In forex exchange show the fx rate list table
