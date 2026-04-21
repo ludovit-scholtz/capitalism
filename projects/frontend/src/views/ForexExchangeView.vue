@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
+import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import type {
   FxRate,
   ForexQuote,
@@ -451,6 +452,13 @@ onMounted(async () => {
           </div>
         </section>
       </template>
+
+      <!-- Gold AMM Section -->
+      <GoldAmmSection
+        :available-currencies="availableCurrencies"
+        :balances="balances"
+        @refresh="loadData"
+      />
     </div>
   </main>
 </template>

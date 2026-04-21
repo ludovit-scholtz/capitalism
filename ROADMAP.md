@@ -69,7 +69,7 @@ Implement banking as is described in the banking section.
 - ✅ All E2E tests green after 7-city expansion (count assertions updated, logistics-trap tests hardened)
 - ⬜ Full forex trading UI (depends on "Create forex exchange" roadmap item)
 
-### Create forex exchange (65% complete)
+### Create forex exchange (90% complete)
 
 **Shipped in this increment:**
 - ✅ `ForexExchangeView` at `/forex`: source/target currency selectors, amount input, live quote panel showing exchange rate, 1% fee, net receive amount, and available balance.
@@ -86,16 +86,18 @@ Implement banking as is described in the banking section.
 - ✅ 10 E2E tests covering unauthenticated redirect, selectors, both validation errors, quote+confirm happy path, cancel, history rendering, and nav link.
 - ✅ i18n strings (`forex.*` namespace) in `en`, `sk`, `de`.
 - ✅ **Multi-currency ledger downstream:** `ledgerDrillDown` and `companyLedger` queries now return per-entry and per-building `currencyCode`/`currencySymbol` from the city. `CompanyLedgerSummary` exposes `primaryCurrencyCode`, `primaryCurrencySymbol`, and `hasMixedCurrencies` so the frontend can present multi-city company finances clearly labelled.
+- ✅ **Tokenized gold AMM pools (this increment):** constant-product AMM (x·y=k) for fiat/XAU pairs. Pool creation, add/remove liquidity, swap quote preview, and swap execution. 1% fee stays in pool and accrues to liquidity providers. Blocked-resource enforcement prevents double-spending pool-committed assets. `GoldAmmSection.vue` component embedded in `ForexExchangeView`. 26 backend tests + full i18n (en/sk/de).
 
 **Remaining:**
-- ⬜ Tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps) – depends on "Tokenized gold management" roadmap item.
-- ✅ **Building unit local currency:** All price configuration and analytics panels in purchasing, B2B sales, and public sales units use the building's city currency. No more EUR hardcoding for Prague (CZK), New York (USD), etc.
+- ⬜ **Building unit local currency:** All price configuration and analytics panels in purchasing, B2B sales, and public sales units use the building's city currency. No more EUR hardcoding for Prague (CZK), New York (USD), etc.
 
-### Tokenized gold managemnt (60% complete)
+### Tokenized gold management (80% complete)
 
 **Shipped:** Global administrators can now manage gold token balances from the master frontend (`/gold-admin`). The page shows a searchable table of all players and their current gold balances, an adjust panel to add (positive amount) or deduct (negative amount) gold with a mandatory audit note, and a full transaction history log showing who changed what and when. The backend enforces non-negative balances, persists changes transactionally via a `GoldTokenTransaction` audit table, and requires JWT authentication plus global-admin authorization on all queries and mutations.
 
-**Remaining:** Player-facing gold balance display (my account page), cross-server gold transfers, tokenized gold support in the forex exchange (AMM pools, gold ↔ fiat swaps).
+**Also shipped (this increment):** `PlayerGoldBalance` entity on the game server. Four new GraphQL operations: `myGoldBalance`, `myGoldAmmPositions`, `goldAmmPools` (public), `goldAmmSwapQuote`. Five new mutations: `createGoldAmmPool`, `addGoldAmmLiquidity`, `removeGoldAmmLiquidity`, `executeGoldAmmSwap`, `adminSetPlayerGoldBalance`. EF migration `AddGoldAmmPools`.
+
+**Remaining:** Player-facing gold balance on the account page, cross-server gold transfers.
 
 ## FX Exahcnge
 
