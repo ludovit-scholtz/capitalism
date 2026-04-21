@@ -332,6 +332,12 @@ public sealed partial class AppDbInitializer
                         """);
                 }
             }
+
+            // Ensure Brands.MarketingQuality column exists (added in AddBrandMarketingQuality migration).
+            if (await TableExistsAsync(connection, dialect, "Brands"))
+            {
+                await EnsureColumnAsync(connection, dialect, "Brands", "MarketingQuality", dialect.RequiredDecimalDefaultZero);
+            }
         }
         finally
         {

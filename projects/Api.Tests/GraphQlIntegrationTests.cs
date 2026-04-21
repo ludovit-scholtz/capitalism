@@ -17468,6 +17468,298 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task MarketingPhase_BrandQuality_IncreasesAfterMarketingSpend()
+    {
+        // Verifies: Marketing activity contributes to a persistent brand quality value.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"bq-prog-{Guid.NewGuid():N}@test.com",
+            DisplayName = "BQ Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "BQ Corp",
+            Cash = 1_000_000m
+        };
+        db.Companies.Add(company);
+
+        var shop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "BQ Shop",
+            Level = 1
+        };
+        db.Buildings.Add(shop);
+
+        // PUBLIC_SALES unit with the target product — marketing unit targets it for budget allocation.
+        var salesUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0, GridY = 0,
+            Level = 1,
+            ProductTypeId = product.Id,
+            MinPrice = product.BasePrice
+        };
+
+        // Large marketing budget ensures visible quality gain per tick.
+        var marketingUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = shop.Id,
+            UnitType = UnitType.Marketing,
+            GridX = 1, GridY = 0,
+            Level = 1,
+            Budget = 500_000m
+        };
+        db.BuildingUnits.AddRange(salesUnit, marketingUnit);
+        await db.SaveChangesAsync();
+
+        // Run 10 ticks to accumulate marketing quality.
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var logger = new NullLogger<TickProcessor>();
+        var processor = new TickProcessor(db, phases, logger);
+        for (int i = 0; i < 10; i++)
+            await processor.ProcessTickAsync();
+
+        var brand = await db.Brands
+            .FirstOrDefaultAsync(b => b.CompanyId == company.Id && b.ProductTypeId == product.Id);
+
+        Assert.NotNull(brand);
+        Assert.True(brand.Awareness > 0m, "Marketing spend must increase brand awareness.");
+        Assert.True(brand.MarketingQuality > 0m,
+            "Marketing spend must increase brand MarketingQuality (marketing prestige).");
+        Assert.True(brand.MarketingQuality < brand.Awareness,
+            "MarketingQuality grows slower than awareness — quality is a long-term investment.");
+    }
+
+    [Fact]
+    public async Task MarketingPhase_BrandQuality_DecaysWhenMarketingStopped()
+    {
+        // Verifies: MarketingQuality decays gradually when marketing investment stops.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"bq-decay-{Guid.NewGuid():N}@test.com",
+            DisplayName = "BQ Decay Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = "BQ Decay Corp",
+            Cash = 1_000_000m
+        };
+
+        // Seed a brand with existing marketing quality.
+        var brand = new Brand
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            Name = product.Name,
+            Scope = BrandScope.Product,
+            ProductTypeId = product.Id,
+            Awareness = 0.8m,
+            Quality = 0m,
+            MarketingQuality = 0.5m,
+            MarketingEfficiencyMultiplier = 1m
+        };
+        db.Players.Add(player);
+        db.Companies.Add(company);
+        db.Brands.Add(brand);
+
+        // Shop with NO marketing unit so no new marketing spend occurs.
+        var shop = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Idle Shop",
+            Level = 1
+        };
+        db.Buildings.Add(shop);
+        await db.SaveChangesAsync();
+
+        var qualityBefore = brand.MarketingQuality;
+
+        // Run ticks without any marketing spend — quality should decay.
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var logger = new NullLogger<TickProcessor>();
+        var processor = new TickProcessor(db, phases, logger);
+        for (int i = 0; i < 20; i++)
+            await processor.ProcessTickAsync();
+
+        await db.Entry(brand).ReloadAsync();
+
+        Assert.True(brand.MarketingQuality < qualityBefore,
+            $"MarketingQuality ({brand.MarketingQuality}) should decay below initial {qualityBefore} when no marketing is active.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_HigherBrandQuality_IncreasesCompetitiveness()
+    {
+        // Verifies: Brand quality is connected to public-sales demand and market-share outcomes.
+        // Two sellers in the SAME city compete for the same demand pool.
+        // Seller A: awareness=0.8, marketingQuality=0.8 → brandFactor = 1.4× baseline
+        // Seller B: awareness=0.8, marketingQuality=0.0 → brandFactor = 1.0× baseline
+        // Seller A's higher brandFactor yields higher competitiveness → more demand allocated → more sales.
+        // Gap = 0.4× > 2× TrendRandomAmplitude(0.08), so the ordering is deterministic regardless of rng.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // ── Company A: has brand quality ──
+        var playerA = new Player { Id = Guid.NewGuid(), Email = $"bq-high-{Guid.NewGuid():N}@test.com", DisplayName = "A", PasswordHash = "hash", Role = PlayerRole.Player };
+        var companyA = new Company { Id = Guid.NewGuid(), PlayerId = playerA.Id, Name = "BQ High", Cash = 500_000m };
+        db.Players.Add(playerA);
+        db.Companies.Add(companyA);
+
+        var shopA = new Building { Id = Guid.NewGuid(), CompanyId = companyA.Id, CityId = city.Id, Type = BuildingType.SalesShop, Name = "ShopA", Level = 1 };
+        db.Buildings.Add(shopA);
+
+        var salesUnitA = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shopA.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice };
+        db.BuildingUnits.Add(salesUnitA);
+
+        var inventoryA = new Inventory { Id = Guid.NewGuid(), BuildingUnitId = salesUnitA.Id, BuildingId = shopA.Id, ProductTypeId = product.Id, Quantity = 500m, Quality = 0.5m };
+        db.Inventories.Add(inventoryA);
+
+        // Brand A: high awareness + significant marketing quality → brandFactor boost of 40%.
+        var brandA = new Brand { Id = Guid.NewGuid(), CompanyId = companyA.Id, Name = product.Name, Scope = BrandScope.Product, ProductTypeId = product.Id, Awareness = 0.8m, Quality = 0m, MarketingQuality = 0.8m, MarketingEfficiencyMultiplier = 1m };
+        db.Brands.Add(brandA);
+
+        // ── Company B: same city, same price, same quality, zero brand prestige ──
+        var playerB = new Player { Id = Guid.NewGuid(), Email = $"bq-low-{Guid.NewGuid():N}@test.com", DisplayName = "B", PasswordHash = "hash", Role = PlayerRole.Player };
+        var companyB = new Company { Id = Guid.NewGuid(), PlayerId = playerB.Id, Name = "BQ Low", Cash = 500_000m };
+        db.Players.Add(playerB);
+        db.Companies.Add(companyB);
+
+        var shopB = new Building { Id = Guid.NewGuid(), CompanyId = companyB.Id, CityId = city.Id, Type = BuildingType.SalesShop, Name = "ShopB", Level = 1 };
+        db.Buildings.Add(shopB);
+
+        var salesUnitB = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = shopB.Id, UnitType = UnitType.PublicSales, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice };
+        db.BuildingUnits.Add(salesUnitB);
+
+        var inventoryB = new Inventory { Id = Guid.NewGuid(), BuildingUnitId = salesUnitB.Id, BuildingId = shopB.Id, ProductTypeId = product.Id, Quantity = 500m, Quality = 0.5m };
+        db.Inventories.Add(inventoryB);
+
+        // Brand B: same awareness, NO marketing quality → no brandFactor boost.
+        var brandB = new Brand { Id = Guid.NewGuid(), CompanyId = companyB.Id, Name = product.Name, Scope = BrandScope.Product, ProductTypeId = product.Id, Awareness = 0.8m, Quality = 0m, MarketingQuality = 0m, MarketingEfficiencyMultiplier = 1m };
+        db.Brands.Add(brandB);
+
+        // Add salary signal to drive city demand (same for both sellers — shares the same city).
+        var gameState = await db.GameStates.FirstAsync();
+        var salaryTick = gameState.CurrentTick;
+        db.LedgerEntries.AddRange(
+            Enumerable.Range(0, 10).Select(i =>
+                new LedgerEntry { Id = Guid.NewGuid(), CompanyId = companyA.Id, BuildingId = shopA.Id, Category = LedgerCategory.LaborCost, Amount = -10_000m, RecordedAtTick = salaryTick - i, RecordedAtUtc = DateTime.UtcNow, Description = "salary" }
+            )
+        );
+
+        await db.SaveChangesAsync();
+
+        // Run one tick — PublicSalesPhase distributes demand between the two sellers.
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var logger = new NullLogger<TickProcessor>();
+        var processor = new TickProcessor(db, phases, logger);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(inventoryA).ReloadAsync();
+        await db.Entry(inventoryB).ReloadAsync();
+
+        var soldA = 500m - inventoryA.Quantity;
+        var soldB = 500m - inventoryB.Quantity;
+
+        Assert.True(soldA > soldB,
+            $"Company A with MarketingQuality=0.8 must win more market share ({soldA}) than Company B with MarketingQuality=0 ({soldB}). Brand quality must amplify competitiveness.");
+    }
+
+    [Fact]
+    public async Task CompanyBrands_ReturnsMarketingQualityAndCombinedQuality()
+    {
+        // Verifies: Brand quality is exposed via GraphQL with correct combined calculation.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+        var token = await RegisterAndGetTokenAsync($"bq-gql-{Guid.NewGuid():N}@test.com", "BQ GQL");
+
+        var result = await ExecuteGraphQlAsync(
+            """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+            new { input = new { name = "BQ GQL Corp" } }, token);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+        var cid = Guid.Parse(companyId);
+
+        // Seed a brand with known quality values.
+        var brand = new Brand
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = cid,
+            Name = product.Name,
+            Scope = BrandScope.Product,
+            ProductTypeId = product.Id,
+            Awareness = 0.5m,
+            Quality = 0.4m,
+            MarketingQuality = 0.3m,
+            MarketingEfficiencyMultiplier = 1m
+        };
+        db.Brands.Add(brand);
+        await db.SaveChangesAsync();
+
+        var brands = await ExecuteGraphQlAsync(
+            """
+            query($companyId: UUID!) {
+              companyBrands(companyId: $companyId) {
+                awareness quality marketingQuality combinedBrandQuality marketingEfficiencyMultiplier
+              }
+            }
+            """,
+            new { companyId }, token);
+
+        Assert.False(brands.TryGetProperty("errors", out _), "companyBrands must succeed for owned company.");
+        var b = brands.GetProperty("data").GetProperty("companyBrands").EnumerateArray()
+            .FirstOrDefault(x => x.GetProperty("awareness").GetDecimal() == 0.5m);
+
+        Assert.True(b.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Brand with awareness=0.5 not found in response.");
+        Assert.Equal(0.4m, b.GetProperty("quality").GetDecimal());
+        Assert.Equal(0.3m, b.GetProperty("marketingQuality").GetDecimal());
+
+        // Combined quality: 1 - (1 - 0.4) × (1 - 0.3) = 1 - 0.6 × 0.7 = 1 - 0.42 = 0.58
+        var combined = b.GetProperty("combinedBrandQuality").GetDecimal();
+        Assert.True(Math.Abs(combined - 0.58m) < 0.01m,
+            $"CombinedBrandQuality should be ~0.58 (1-(1-0.4)*(1-0.3)). Got {combined}.");
+    }
+
+    [Fact]
     public async Task CompanyLedger_AfterMarketingTick_ReflectsMarketingCosts()
     {
         var token = await RegisterAndGetTokenAsync("ledger-mktg@test.com", "LedgerMktg");

@@ -25,7 +25,8 @@ public sealed partial class Query
         decimal? baseSalaryPerManhour = null,
         decimal recentCitySalary = 0m,
         long cityPopulation = 0,
-        decimal? trendFactor = null)
+        decimal? trendFactor = null,
+        decimal? brandQuality = null)
     {
         var drivers = new List<DemandDriverEntry>();
 
@@ -85,30 +86,43 @@ public sealed partial class Query
             drivers.Add(new DemandDriverEntry { Factor = "QUALITY", Impact = qImpact, Score = q, Description = qDesc });
         }
 
-        // BRAND driver – brand awareness multiplies demand.
+        // BRAND driver – brand awareness and quality drive demand.
         {
             var awareness = brandAwareness ?? 0m;
-            var brandScore = Math.Clamp(awareness, 0m, 1m);
+            var quality = brandQuality ?? 0m;
+            // Combined score: awareness drives reach, quality drives conversion premium.
+            var combinedBrandScore = Math.Clamp(awareness * 0.6m + quality * 0.4m, 0m, 1m);
             string brandImpact;
             string brandDesc;
-            if (awareness >= 0.5m)
+            var qualityPct = (int)Math.Round(quality * 100m);
+            var awarenessPct = (int)Math.Round(awareness * 100m);
+            if (awareness >= 0.5m && quality >= 0.3m)
             {
                 brandImpact = "POSITIVE";
-                brandDesc = $"Strong brand awareness ({awareness * 100m:F0}%) is boosting demand.";
+                brandDesc = $"Strong brand presence — {awarenessPct}% awareness and {qualityPct}% brand quality are boosting demand and conversion.";
+            }
+            else if (awareness >= 0.5m)
+            {
+                brandImpact = "POSITIVE";
+                brandDesc = quality > 0m
+                    ? $"Strong brand awareness ({awarenessPct}%) is driving reach. Continue marketing investment to build quality prestige ({qualityPct}%) for an additional demand multiplier."
+                    : $"Strong brand awareness ({awarenessPct}%) is driving reach. Build brand quality through sustained marketing to further amplify sales.";
             }
             else if (awareness >= 0.15m)
             {
                 brandImpact = "NEUTRAL";
-                brandDesc = $"Moderate brand awareness ({awareness * 100m:F0}%). Invest in marketing to improve reach.";
+                brandDesc = quality > 0m
+                    ? $"Moderate brand awareness ({awarenessPct}%) and {qualityPct}% brand quality. Increase marketing budget to grow reach and compound prestige."
+                    : $"Moderate brand awareness ({awarenessPct}%). Invest consistently in marketing to improve reach and start building brand quality.";
             }
             else
             {
                 brandImpact = "NEGATIVE";
                 brandDesc = brandAwareness.HasValue
-                    ? $"Low brand awareness ({awareness * 100m:F0}%). Customers don't know your product yet."
-                    : "No brand set. Creating a brand would increase visibility and demand.";
+                    ? $"Low brand awareness ({awarenessPct}%). Customers don't know your product yet. Sustained marketing builds both awareness and long-term brand quality."
+                    : "No brand set. Creating a brand and investing in marketing would increase visibility, demand, and brand quality over time.";
             }
-            drivers.Add(new DemandDriverEntry { Factor = "BRAND", Impact = brandImpact, Score = brandScore, Description = brandDesc });
+            drivers.Add(new DemandDriverEntry { Factor = "BRAND", Impact = brandImpact, Score = combinedBrandScore, Description = brandDesc });
         }
 
         // LOCATION driver – lot population index (foot traffic) scales demand.

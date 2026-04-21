@@ -1152,6 +1152,11 @@ export default {
       productQualityHint: 'Aktuálna kvalita zásob. Vyššia kvalita zvyšuje dopyt.',
       brandAwareness: 'Povedomie o značke',
       brandAwarenessHint: 'Rozpoznateľnosť značky pre tento produkt. Vyššie povedomie podporuje predaj.',
+      brandQuality: 'Kvalita značky',
+      brandQualityHint:
+        'Kombinovaná reputácia značky (výskum + marketingová prestíž). Pri maximálnej kvalite zvyšuje dopyt až o 50%. Budujte dlhodobým marketingom a výskumom produktu.',
+      brandQualityPremium: 'Prémiová',
+      brandQualityGrowing: 'Rastúca',
       demandDrivers: {
         title: 'Faktory dopytu',
         factor_PRICE: 'Cena',

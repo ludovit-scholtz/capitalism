@@ -325,6 +325,19 @@ public sealed class ResearchBrandState
     public decimal Quality { get; set; }
 
     /// <summary>
+    /// Marketing-driven brand prestige (0.0–1.0). Accumulated slowly from sustained marketing spend.
+    /// Decays gradually when investment stops. Distinct from R&amp;D-driven <see cref="Quality"/>.
+    /// </summary>
+    public decimal MarketingQuality { get; set; }
+
+    /// <summary>
+    /// Combined effective brand quality (0.0–1.0): blends R&amp;D quality and marketing prestige.
+    /// Formula: <c>1 - (1 - Quality) × (1 - MarketingQuality)</c>.
+    /// This is the value that amplifies sales demand in the public-sales simulation.
+    /// </summary>
+    public decimal CombinedBrandQuality { get; set; }
+
+    /// <summary>
     /// Accumulated R&amp;D research budget (game currency) for this product.
     /// Grows each tick by a fraction of the PRODUCT_QUALITY unit's operating cost,
     /// and decays by 0.1% per tick.  Null when no research has been done for this product.

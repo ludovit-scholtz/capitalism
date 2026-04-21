@@ -97,7 +97,8 @@ public sealed class PublicSalesPhase : ITickPhase
 
                     var brand = context.FindBrand(building.CompanyId, inv.ProductTypeId, industry);
                     brandAwareness = Math.Clamp(brand?.Awareness ?? 0m, 0m, 1m);
-                    var brandFactor = ComputeBrandFactor(brandAwareness.Value);
+                    var brandQuality = ComputeCombinedBrandQuality(brand);
+                    var brandFactor = ComputeBrandFactor(brandAwareness.Value, brandQuality);
 
                     // Competitiveness score determines market-share allocation.
                     // PopulationIndex represents foot traffic / location advantage.
@@ -123,6 +124,7 @@ public sealed class PublicSalesPhase : ITickPhase
                         PriceIndex = priceIndex,
                         QualityDemandFactor = qualityDemandFactor,
                         BrandAwareness = brandAwareness.Value,
+                        BrandQuality = brandQuality,
                         BrandFactor = brandFactor,
                         Competitiveness = competitiveness,
                         CurrentStock = inv.Quantity,
@@ -351,8 +353,31 @@ public sealed class PublicSalesPhase : ITickPhase
     private static decimal ComputeQualityDemandFactor(decimal quality) =>
         Math.Clamp(0.2m + Math.Min(1m, quality) * 0.8m, 0.2m, 1m);
 
-    private static decimal ComputeBrandFactor(decimal awareness) =>
-        Math.Clamp(0.2m + awareness * 0.8m, 0.2m, 1m);
+    /// <summary>
+    /// Computes the combined brand quality from R&amp;D quality and marketing prestige.
+    /// Both components contribute independently using an additive blending formula:
+    /// <c>combined = 1 - (1 - Quality) × (1 - MarketingQuality)</c>
+    /// so each source provides diminishing returns when the other is already high.
+    /// Range: [0, 1].
+    /// </summary>
+    private static decimal ComputeCombinedBrandQuality(Brand? brand)
+    {
+        if (brand is null) return 0m;
+        var rdQuality = Math.Clamp(brand.Quality, 0m, 1m);
+        var mktQuality = Math.Clamp(brand.MarketingQuality, 0m, 1m);
+        return Math.Clamp(1m - (1m - rdQuality) * (1m - mktQuality), 0m, 1m);
+    }
+
+    /// <summary>
+    /// Computes the brand demand factor from awareness and combined brand quality.
+    /// Awareness drives the base factor [0.2, 1.0]. Combined brand quality then amplifies
+    /// this by up to <see cref="GameConstants.BrandQualityBoostFactor"/> (50%) at full quality,
+    /// rewarding companies that have built both reach (awareness) and reputation (quality).
+    /// The boost is multiplicative so zero quality preserves the old awareness-only behaviour.
+    /// </summary>
+    private static decimal ComputeBrandFactor(decimal awareness, decimal brandQuality) =>
+        Math.Clamp(0.2m + awareness * 0.8m, 0.2m, 1m)
+        * (1m + brandQuality * GameConstants.BrandQualityBoostFactor);
 
     private static decimal ComputeSaturationFactor(decimal cityBaseDemand, decimal totalCurrentStock)
     {
@@ -438,6 +463,7 @@ public sealed class PublicSalesPhase : ITickPhase
         public decimal PriceIndex { get; init; }
         public decimal QualityDemandFactor { get; init; }
         public decimal BrandAwareness { get; init; }
+        public decimal BrandQuality { get; init; }
         public decimal BrandFactor { get; init; }
         public decimal Competitiveness { get; init; }
         public decimal CurrentStock { get; init; }

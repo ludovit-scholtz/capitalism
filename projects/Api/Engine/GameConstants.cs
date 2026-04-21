@@ -124,6 +124,27 @@ public static class GameConstants
     public const decimal BrandAwarenessPerBudget = 0.0001m;
 
     /// <summary>
+    /// Marketing-quality gain per unit of marketing budget spent.
+    /// Much slower than awareness (1/20th) — brand prestige builds over many ticks of sustained investment.
+    /// Combined with channel effectiveness and R&amp;D efficiency multipliers in MarketingPhase.
+    /// </summary>
+    public const decimal BrandMarketingQualityPerBudget = 0.000005m;
+
+    /// <summary>
+    /// Decay rate for marketing-driven brand quality per tick (0.03% per tick).
+    /// Slower than research-budget decay (0.1%) so prestige erodes gradually when investment stops.
+    /// </summary>
+    public const decimal BrandMarketingQualityDecayRate = 0.0003m;
+
+    /// <summary>
+    /// Maximum demand boost factor that combined brand quality (R&amp;D + marketing) can provide
+    /// on top of the awareness-based brand factor.
+    /// At full combined quality (1.0) the brand factor receives a 50% bonus multiplier.
+    /// Formula: effectiveBrandFactor = awarenessBasedFactor × (1 + combinedQuality × BrandQualityBoostFactor).
+    /// </summary>
+    public const decimal BrandQualityBoostFactor = 0.5m;
+
+    /// <summary>
     /// Maximum marketing efficiency multiplier achievable through BRAND_QUALITY R&amp;D.
     /// At full research saturation the company's marketing budget is this many times more effective.
     /// </summary>

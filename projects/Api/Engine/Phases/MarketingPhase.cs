@@ -33,7 +33,29 @@ public sealed class MarketingPhase : ITickPhase
             }
         }
 
+        // Decay marketing quality for all brands every tick.
+        // This runs even when no marketing units are active so that
+        // prestige erodes gradually when investment stops.
+        DecayMarketingQuality(context);
+
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Applies a slow per-tick decay to all brands' MarketingQuality.
+    /// This ensures brand prestige erodes gradually when marketing investment stops,
+    /// making sustained marketing a continuous strategic commitment.
+    /// </summary>
+    private static void DecayMarketingQuality(TickContext context)
+    {
+        foreach (var brand in context.AllBrands)
+        {
+            if (brand.MarketingQuality <= 0m) continue;
+            var decay = decimal.Round(
+                brand.MarketingQuality * GameConstants.BrandMarketingQualityDecayRate,
+                6, MidpointRounding.AwayFromZero);
+            brand.MarketingQuality = Math.Max(0m, brand.MarketingQuality - decay);
+        }
     }
 
     private static void ProcessMarketingUnit(
@@ -140,6 +162,14 @@ public sealed class MarketingPhase : ITickPhase
 
             // Combined: channel reach × R&D efficiency.
             brand.Awareness = Math.Min(1m, brand.Awareness + budgetPerProduct * GameConstants.BrandAwarenessPerBudget * channelMultiplier * efficiencyMultiplier);
+
+            // Brand prestige (marketing quality): sustained marketing spend builds long-term brand reputation.
+            // This grows much more slowly than awareness and accumulates as a durable competitive advantage.
+            // Channel quality and R&D efficiency both amplify the quality gain rate.
+            var qualityGain = decimal.Round(
+                budgetPerProduct * GameConstants.BrandMarketingQualityPerBudget * channelMultiplier * efficiencyMultiplier,
+                6, MidpointRounding.AwayFromZero);
+            brand.MarketingQuality = Math.Min(1m, brand.MarketingQuality + qualityGain);
         }
     }
 

@@ -1152,6 +1152,11 @@ export default {
       productQualityHint: 'Current inventory quality. Higher quality increases demand.',
       brandAwareness: 'Brand Awareness',
       brandAwarenessHint: 'Brand recognition for this product. Higher awareness drives more sales.',
+      brandQuality: 'Brand Quality',
+      brandQualityHint:
+        'Combined brand reputation (R&D + marketing prestige). Amplifies demand by up to 50% at full quality. Build through sustained marketing and product R&D.',
+      brandQualityPremium: 'Premium',
+      brandQualityGrowing: 'Growing',
       demandDrivers: {
         title: 'Demand Drivers',
         factor_PRICE: 'Price',

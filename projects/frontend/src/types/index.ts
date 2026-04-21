@@ -844,6 +844,11 @@ export interface PublicSalesAnalytics {
   inventoryQuality: number | null
   /** Brand awareness for this product (0–1). */
   brandAwareness: number | null
+  /**
+   * Combined brand quality score (0–1): blends R&D research quality and marketing prestige.
+   * Higher quality amplifies brand demand factor by up to 50%. Null when no brand data available.
+   */
+  brandQuality: number | null
   /** Total gross profit (revenue − quantity × basePrice). Null when base price unavailable. */
   totalProfit: number | null
   /** Per-tick gross profit history, ordered by tick ascending. Null when base price unavailable. */
@@ -1015,6 +1020,13 @@ export interface ResearchBrandState {
   awareness: number
   /** 0.0–1.0: Driven by PRODUCT_QUALITY R&D. Higher = better manufactured output quality. */
   quality: number
+  /** 0.0–1.0: Accumulated from sustained marketing spend. Decays when investment stops. */
+  marketingQuality: number
+  /**
+   * 0.0–1.0: Combined brand quality blending R&D quality and marketing prestige.
+   * This is the value that amplifies sales demand (up to 50% bonus at quality = 1.0).
+   */
+  combinedBrandQuality: number
   /**
    * Accumulated R&D research budget (game currency) invested into this product.
    * Grows each tick by fraction of PRODUCT_QUALITY unit operating costs; decays 0.1%/tick.

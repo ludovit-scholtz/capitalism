@@ -42,6 +42,15 @@ public sealed class Brand
     public decimal Quality { get; set; }
 
     /// <summary>
+    /// Marketing-driven brand prestige/reputation (0.0-1.0).
+    /// Accumulated slowly over time from sustained marketing spend.
+    /// Decays gradually when marketing investment stops.
+    /// Distinct from <see cref="Quality"/> which is driven by R&amp;D research.
+    /// Both combine to form the effective brand quality used in demand calculations.
+    /// </summary>
+    public decimal MarketingQuality { get; set; }
+
+    /// <summary>
     /// Marketing efficiency multiplier (≥ 1.0). Increased by R&amp;D brand-quality research.
     /// A value of 1.0 means standard marketing effectiveness.
     /// A value of 2.0 means each unit of marketing budget generates twice the awareness gain.

@@ -226,4 +226,12 @@ public sealed partial class TickContext
         Db.ProductResearchBudgets.Add(budget);
         return budget;
     }
+
+    /// <summary>
+    /// Returns a flat enumeration of every brand across all companies currently in context.
+    /// Used by phases that need to apply per-brand operations (e.g., decay) without knowing
+    /// which company owns each brand.
+    /// </summary>
+    public IEnumerable<Brand> AllBrands =>
+        BrandsByCompany.Values.SelectMany(brands => brands);
 }
