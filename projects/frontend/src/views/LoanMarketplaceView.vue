@@ -332,7 +332,7 @@ function toggleBankSort(field: BankSortField) {
 
 function navigateToAcquireBank() {
   if (firstCompanyId.value) {
-    router.push(`/buy-building/${firstCompanyId.value}`)
+    router.push(`/buy-building/${firstCompanyId.value}?type=BANK`)
   } else {
     router.push('/dashboard')
   }
@@ -1499,6 +1499,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   flex-shrink: 0;
   width: auto;
   white-space: nowrap;
+  padding: 0.625rem 1.5rem;
 }
 
 @media (max-width: 600px) {

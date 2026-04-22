@@ -68,7 +68,7 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('heading', { name: /Danube Works/i })).toBeVisible()
   })
 
-  test('shows bank setup info panel and initial deposit field when BANK type is selected', async ({
+  test('shows bank setup info panel, capital check, and rate fields when BANK type is selected', async ({
     page,
   }) => {
     const player = makePlayer({
@@ -95,8 +95,73 @@ test.describe('Buy Building View', () => {
 
     // Bank setup info panel should appear
     await expect(page.getByText('Setting up your bank')).toBeVisible()
-    await expect(page.getByText('Initial Base Capital Deposit')).toBeVisible()
-    await expect(page.getByLabel(/Initial Base Capital Deposit/i)).toBeVisible()
+
+    // Capital check shows sufficient funds (company has 50M, requirement is 10M)
+    await expect(page.getByText('Company has sufficient funds')).toBeVisible()
+
+    // Deposit and lending rate fields should be visible with defaults
+    await expect(page.getByLabel(/Deposit Interest Rate/i)).toBeVisible()
+    await expect(page.getByLabel(/Lending Interest Rate/i)).toBeVisible()
+  })
+
+  test('shows capital insufficient warning when company lacks funds for bank', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Startup Corp',
+          cash: 500000, // Only 500K, needs 10M for bank
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.locator('.type-card', { hasText: 'Bank' }).click()
+    await page.getByRole('button', { name: /Bratislava/i }).click()
+
+    // Should show insufficient funds warning
+    await expect(page.locator('.capital-warn')).toBeVisible()
+    await expect(page.locator('.capital-status-warn')).toBeVisible()
+
+    // Buy Now button should be disabled
+    await page.locator('.lot-card').first().click()
+    await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
+  })
+
+  test('pre-selects BANK type when navigating with ?type=BANK query param', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Banking Corp',
+          cash: 50000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    // Navigate with ?type=BANK query param (as "Acquire a Bank" button does)
+    await page.goto('/buy-building/company-1?type=BANK')
+
+    // Bank type should be pre-selected and bank setup UI should be visible immediately
+    await expect(page.getByText('Setting up your bank')).toBeVisible()
+    await expect(page.locator('.type-card.selected', { hasText: 'Bank' })).toBeVisible()
   })
 
   test('purchasing a BANK lot redirects to /bank/:id, not /building/:id', async ({ page }) => {
