@@ -3794,9 +3794,7 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(page.locator('.city-card', { hasText: 'Vienna' })).toHaveClass(/selected|active/)
   })
 
-  test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({
-    page,
-  }) => {
+  test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({ page }) => {
     // Proves that the expanded city roster (4 new global cities) shows up in the wizard.
     setupMockApi(page)
     await page.goto('/onboarding')

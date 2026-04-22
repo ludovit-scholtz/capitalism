@@ -1815,10 +1815,7 @@ export function makeDefaultFxRates(): MockFxRate[] {
  * Returns 3 default government-owned media houses (NEWSPAPER, RADIO, TV) for a city.
  * Used as the fallback when `state.cityMediaHouses[cityId]` is not set.
  */
-export function makeDefaultGovernmentMediaHouses(
-  cityId: string,
-  state: Pick<MockState, 'cities'>,
-): MockCityMediaHouseInfo[] {
+export function makeDefaultGovernmentMediaHouses(cityId: string, state: Pick<MockState, 'cities'>): MockCityMediaHouseInfo[] {
   const city = state.cities.find((c) => c.id === cityId)
   const cityName = city?.name ?? 'Unknown City'
   const govCompanyId = 'gov-company-id'
@@ -4291,10 +4288,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       // Determine FX rate for the destination city (EUR→local currency).
       const destCurrencyCode = destinationCity?.currencyCode ?? 'EUR'
-      const destFxRate =
-        destCurrencyCode === 'EUR'
-          ? 1
-          : (state.fxRates.find((r) => r.quoteCurrencyCode === destCurrencyCode)?.rate ?? 1)
+      const destFxRate = destCurrencyCode === 'EUR' ? 1 : (state.fxRates.find((r) => r.quoteCurrencyCode === destCurrencyCode)?.rate ?? 1)
 
       const globalExchangeOffers = destinationCity
         ? state.cities
@@ -4897,9 +4891,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('cityWeatherForecast')) {
       const cityId = body.variables?.cityId
-      const cityWeatherForecast = cityId
-        ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick))
-        : null
+      const cityWeatherForecast = cityId ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick)) : null
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -4913,9 +4905,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const powerPlants = allBuildings.filter((b) => b.type === 'POWER_PLANT')
       const consumers = allBuildings.filter((b) => b.type !== 'POWER_PLANT')
       const defaultOutputByType: Record<string, number> = { COAL: 50, GAS: 40, SOLAR: 20, WIND: 25, NUCLEAR: 200 }
-      const weather = cityId
-        ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick))
-        : null
+      const weather = cityId ? (state.cityWeatherForecasts[cityId] ?? buildDefaultCityWeatherForecast(cityId, state.gameState.currentTick)) : null
       const renewableFactorByType: Record<string, number> = {
         SOLAR: (weather?.currentSolarPercent ?? 100) / 100,
         WIND: (weather?.currentWindPercent ?? 100) / 100,
@@ -4965,9 +4955,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('cityMediaHouses')) {
       const cityId = body.variables?.cityId as string | undefined
       const ownerCompanyId = body.variables?.ownerCompanyId as string | undefined
-      const allHouses: MockCityMediaHouseInfo[] = cityId
-        ? (state.cityMediaHouses[cityId] ?? makeDefaultGovernmentMediaHouses(cityId, state))
-        : []
+      const allHouses: MockCityMediaHouseInfo[] = cityId ? (state.cityMediaHouses[cityId] ?? makeDefaultGovernmentMediaHouses(cityId, state)) : []
       // Sort: player-owned first, then by contentRanking desc
       const sorted = [...allHouses].sort((a, b) => {
         const aOwn = ownerCompanyId && a.ownerCompanyId === ownerCompanyId ? 0 : 1
@@ -5032,8 +5020,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const eurToRate = toRate?.rate ?? 1.1
       const rate = vars?.fromCurrencyCode === 'EUR' ? eurToRate : vars?.toCurrencyCode === 'EUR' ? 1 / eurFromRate : eurToRate / eurFromRate
       const toAmount = Math.round(netAmount * rate * 10000) / 10000
-      const fromSymbol = vars?.fromCurrencyCode === 'EUR' ? '€' : fromRate?.quoteCurrencySymbol ?? vars?.fromCurrencyCode ?? ''
-      const toSymbol = vars?.toCurrencyCode === 'EUR' ? '€' : toRate?.quoteCurrencySymbol ?? vars?.toCurrencyCode ?? ''
+      const fromSymbol = vars?.fromCurrencyCode === 'EUR' ? '€' : (fromRate?.quoteCurrencySymbol ?? vars?.fromCurrencyCode ?? '')
+      const toSymbol = vars?.toCurrencyCode === 'EUR' ? '€' : (toRate?.quoteCurrencySymbol ?? vars?.toCurrencyCode ?? '')
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -5080,10 +5068,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('eurFxRates') && !query.includes('executeForexSwap') && !query.includes('forexTradeHistory')) {
       // Public endpoint — no auth required
-      const eurRates = [
-        { currencyCode: 'EUR', rate: 1 },
-        ...(state.fxRates ?? []).map((r) => ({ currencyCode: r.quoteCurrencyCode, rate: r.rate })),
-      ]
+      const eurRates = [{ currencyCode: 'EUR', rate: 1 }, ...(state.fxRates ?? []).map((r) => ({ currencyCode: r.quoteCurrencyCode, rate: r.rate }))]
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -5132,8 +5117,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         toBal.balance += toAmount
       }
 
-      const fromSymbol = fromCode === 'EUR' ? '€' : fromRate?.quoteCurrencySymbol ?? fromCode
-      const toSymbol = toCode === 'EUR' ? '€' : toRate?.quoteCurrencySymbol ?? toCode
+      const fromSymbol = fromCode === 'EUR' ? '€' : (fromRate?.quoteCurrencySymbol ?? fromCode)
+      const toSymbol = toCode === 'EUR' ? '€' : (toRate?.quoteCurrencySymbol ?? toCode)
 
       const tradeEntry = {
         id: crypto.randomUUID(),
