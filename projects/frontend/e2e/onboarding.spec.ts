@@ -6,6 +6,17 @@
 import { test, expect, type Page } from '@playwright/test'
 import { setupMockApi, makePlayer, makeDefaultBuildingLots } from './helpers/mock-api'
 
+const STARTER_FACTORY_LOT_NAME = /Factory Site B1/i
+const STARTER_SHOP_LOT_NAME = /High Street Retail Space/i
+
+async function chooseStarterFactoryLot(page: Page) {
+  await page.getByRole('button', { name: STARTER_FACTORY_LOT_NAME }).click()
+}
+
+async function chooseStarterShopLot(page: Page) {
+  await page.getByRole('button', { name: STARTER_SHOP_LOT_NAME }).click()
+}
+
 async function authenticateViaLocalStorage(page: Page, token: string) {
   await page.addInitScript((storedToken) => {
     localStorage.setItem('auth_token', storedToken)
@@ -27,11 +38,11 @@ async function getGuestProfitRevenue(page: Page, industry: string, productName: 
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
   await page.locator('.product-card', { hasText: productName }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
   await expect(page.locator('.profit-stat-revenue')).toBeVisible()
   const text = (await page.locator('.profit-stat-revenue').textContent()) ?? '$0'
@@ -46,11 +57,11 @@ async function completeGuestSteps1to4(page: Page, companyName = 'Guest Corp') {
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
   await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
   await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
 }
@@ -64,13 +75,13 @@ async function completeGuidedOnboarding(page: Page, companyName: string) {
   await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
   await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
   await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 }
 
@@ -87,13 +98,13 @@ async function completeGuidedOnboardingForIndustry(page: Page, companyName: stri
   await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
   await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
   await page.locator('.product-card', { hasText: productLabel }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 }
 
