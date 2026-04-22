@@ -86,7 +86,7 @@ This is a Capitalism II-style multiplayer economic strategy game. Key entities:
 
 ### Core entities (in `Api/Data/Entities/`)
 - **Player**: Registered user with email, displayName, passwordHash, role (PLAYER/ADMIN).
-- **Company**: Player-owned corporation with name and cash balance. One player can own multiple companies.
+- **Company**: Player-owned corporation with name. In the target money model, spendable funds must live in bank accounts, not as direct `Player` or `Company` cash balances. One player can own multiple companies.
 - **Building**: Placed in a city, owned by a company. Types: MINE, FACTORY, SALES_SHOP, RESEARCH_DEVELOPMENT, APARTMENT, COMMERCIAL, MEDIA_HOUSE, BANK, EXCHANGE, POWER_PLANT.
 - **BuildingUnit**: A 4×4 grid slot inside a building. Types: MINING, STORAGE, B2B_SALES, PURCHASE, MANUFACTURING, BRANDING, MARKETING, PUBLIC_SALES, PRODUCT_QUALITY, BRAND_QUALITY. Units can be linked (right, down, diagonal).
 - **City**: Game world location with population, rent rates, and available resources.
@@ -113,6 +113,14 @@ The game is seeded with:
   - **Mutations**: `register(input)`, `login(input)`, `createCompany(input)`, `placeBuilding(input)`, `completeOnboarding(input)`, `startOnboardingCompany(input)`, `finishOnboarding(input)`, `purchaseLot(input)`, `markGameNewsRead(input)`, `upsertGameNewsEntry(input)`, `startAdminImpersonation(input)`, `stopAdminImpersonation`, `setPlayerInvisibleInChat(input)`, `setLocalGameAdminRole(input)`, `assignGlobalGameAdminRole(input)`, `removeGlobalGameAdminRole(input)`
 - The staged onboarding flow now uses `startOnboardingCompany` to create the first company and purchase the first factory lot, then `finishOnboarding` to select the starter product, purchase the first sales shop lot, configure both buildings, and complete onboarding.
 - Master-server GraphQL operations are `gameServers` and `registerGameServer(input)`.
+
+## Currency and bank-account model
+- Treat bank accounts as the only money container in the target design. Do not introduce or preserve new gameplay logic that stores spendable money directly on `Player` or `Company` balances.
+- Each currency should have one government bank. Bank account numbers must be unique 16-digit identifiers within the game server.
+- Every building must have a bank account in its city currency. If a payable action targets a building without one, the backend must create the account before settlement.
+- All monetary movement must settle as bank-account-to-bank-account transfers and be visible in both the ledger and bank statement review. This includes onboarding funding, lot purchases, unit purchases, FX swaps, stock trades, dividends, taxes, transport costs, and monetization credits.
+- FX exchange UX must allow selecting source and destination bank accounts, display current balances in the selectors, and default to the swap tab.
+- Affordability checks, recommended prices, transportation costs, onboarding prices, and unit prices must use FX-adjusted local-currency amounts tied to the debited bank account. Do not rely on same-nominal numbers across cities.
 
 ## Server-controlled game state
 - Never trust client-provided values for derived or economy-sensitive fields. Activation ticks, upgrade durations, ownership, IDs, server timestamps, levels, prices, balances, and similar progression state must be computed or validated on the backend.
@@ -307,7 +315,7 @@ dotnet build
 
 ## Startup pack and monetization conventions
 - StartupPackOffer entity is in `projects/Api/Data/Entities/StartupPackOffer.cs` with states: `PENDING` (pre-onboarding), `ELIGIBLE` (offer active), `SHOWN`, `DISMISSED`, `CLAIMED`, `EXPIRED`.
-- StartupPackService is in `projects/Api/Utilities/StartupPackService.cs`. It handles activation (idempotent), expiry calculation, and claim with cash grant + pro entitlement.
+- StartupPackService is in `projects/Api/Utilities/StartupPackService.cs`. It handles activation (idempotent), expiry calculation, and claim with bank-account credit + pro entitlement.
 - The offer is activated in `completeOnboarding` and `finishOnboarding` mutations when `OnboardingCompletedAtUtc` is set.
 - Backend GraphQL exposes `startupPackOffer` query on the authenticated player and mutations `markStartupPackOfferShown`, `dismissStartupPackOffer`, `claimStartupPack`.
 - Frontend analytics hooks are in `src/lib/startupPackAnalytics.ts`. Always call these when displaying, dismissing, or claiming the offer.
@@ -333,13 +341,27 @@ dotnet build
 - GraphQL: `cityLots(cityId)` is a **public query** (no auth required) so unauthenticated visitors can browse. `lot(id)` is also public. `purchaseLot` mutation requires auth and uses optimistic concurrency via `ConcurrencyToken`.
 - A building placed via `purchaseLot` inherits the lot's `Latitude`/`Longitude` exactly.
 - All city map UI strings use the `cityMap.*` i18n namespace, with district names under `cityMap.districts.*`. All three locales (en/sk/de) must have these keys.
-- `makeDefaultBuildingLots()` factory in `e2e/helpers/mock-api.ts` provides 4 mock lots (2 factory, 1 commercial, 1 residential) for E2E tests. Use `state.buildingLots` to customize lot ownership in tests.
+- `makeDefaultBuildingLots()` factory in `e2e/helpers/mock-api.ts` provides 5 mock lots for E2E tests: 1 premium mine/factory lot (`Industrial Plot A1`), 1 affordable factory-only starter lot (`Factory Site B1`), 1 commercial lot, 1 residential lot, and 1 business lot. Use `state.buildingLots` to customize lot ownership in tests.
 - When adding new city map E2E tests, always include `city-map.spec.ts` in the run; it is the canonical spec for the `/city/:id` route.
 - Bratislava coordinates (for validation): lat 47.8–48.4°N, lon 16.8–17.5°E.
 - The lot detail panel shows both `appraisedValue` (basePrice) and `price` (asking price) separately. When a lot has a raw material deposit and `price > basePrice`, a "resource premium" badge is shown next to the asking price. This implements the ROADMAP requirement: "The price to purchase the land includes also the base price for the raw material."
 - A PR titled `[WIP]` must not be left in that state. Drive every PR to a production-ready, fully-tested state before reporting complete.
 - Always confirm CI would pass by running the full local validation pipeline (backend Release build + tests, frontend lint + unit tests + build, full Playwright suite) before reporting completion.
 - Remove `[WIP]` from the PR title when all acceptance criteria are met, all tests pass, and the code has been reviewed.
+
+## Shared mock lot fixtures — premium mining vs starter onboarding
+
+Root-cause of a quality failure (April 2026, PR #107 mining premium pricing):
+- `makeDefaultBuildingLots()` was updated so `Industrial Plot A1` became a premium Iron Ore mine (~€32M) and a new affordable factory-only lot (`Factory Site B1`) was added, but onboarding and buy-building E2E tests still hardcoded `Industrial Plot A1` as the starter factory purchase path.
+- The shared mock change also invalidated old exact-count assumptions (`4 lots`) and unscoped `getByText(/Population index/i)` assertions in other specs.
+- `OnboardingLotSelector` emitted a Leaflet `_leaflet_pos` page error during rapid map-to-list or step transitions because the wizard reused/teared down Leaflet state too aggressively while the map animation path was still active.
+
+**Rules to prevent recurrence:**
+1. **When you change `makeDefaultBuildingLots()`, rerun every spec that depends on starter-lot affordability or exact lot counts.** At minimum this means `e2e/onboarding.spec.ts`, `e2e/city-map.spec.ts`, `e2e/buy-building.spec.ts`, then the full `npm run test:e2e` suite.
+2. **Keep the shared mock aligned with the real seeded product flow.** Premium mine lots may be `FACTORY,MINE`, but the default mock must also include a separate affordable factory-only starter lot so onboarding can complete with starter capital.
+3. **Do not hardcode premium mining lots as the starter factory choice in onboarding or buy-building E2E flows.** Use the affordable starter lot (`Factory Site B1`) for first-factory purchase journeys.
+4. **When a shared mock gains a new default item, audit every assertion that depends on exact counts or repeated labels.** Replace broad `getByText(...)` calls with container-scoped assertions so strict mode does not break when the fixture grows.
+5. **For Leaflet-based onboarding selectors, force separate component instances per wizard step and disable/stop map animations during teardown.** Rapid transitions between map/list or factory/shop steps must not emit page errors.
 
 ## PR description accuracy — preventing feature-claim / diff-only mismatch
 
@@ -387,7 +409,7 @@ Root-cause of a quality failure (March 2026, PR #51 onboarding follow-up):
 
 **When a first-session or guided-flow feature is "green but not ready":**
 1. Re-read the relevant ROADMAP acceptance text and inspect the actual rendered UI, not just the tests.
-2. Verify the completion state exposes the concrete business context a player needs (cash, numeric price target, current tick/time, next action).
+2. Verify the completion state exposes the concrete business context a player needs (paying bank-account balance, numeric price target, current tick/time, next action).
 3. Add or tighten E2E assertions for those concrete values so future regressions are caught.
 4. Add backend assertions for authoritative starter configuration values when the guided flow depends on them (for example min/max prices, product/resource bindings, and unit links).
 5. Do not respond to product-review feedback with "tests already pass" alone — prove the player-visible outcome and then update the PR description accordingly.
@@ -601,7 +623,7 @@ Root-cause of a gap (March 2026, PR #107):
 1. **When adding a test for one industry variant, always add equivalent tests for all other starter industries (FURNITURE, FOOD_PROCESSING, HEALTHCARE).** Do not stop at the first happy-path industry.
 2. **When the configure-guide or wizard teaches a price/margin concept, assert the concrete numeric value for each industry** — not just that "some price" is shown.
 3. **Backend `FinishOnboarding` result must include `selectedProduct.basePrice`** so the frontend configure-guide can show the industry-specific benchmark. Test this with a dedicated backend test covering all 3 industries.
-4. **For any ROADMAP teaching moment** (price configuration, tick explanation, cash display), add both a backend test validating the data is returned and an E2E test validating the data is displayed.
+4. **For any ROADMAP teaching moment** (price configuration, tick explanation, bank-balance display), add both a backend test validating the data is returned and an E2E test validating the data is displayed.
 
 ## Encyclopedia / discovery-layer quality — cover all industry chains end-to-end
 
@@ -879,7 +901,7 @@ Root-cause of a quality gap (April 2026, PR #301 stock exchange):
 1. **For the stock exchange feature, the minimum test coverage must include all of:**
    - `StockExchangeListings_BidAskSpreadIsOnePercentOfSharePrice` — bid = sharePrice × 0.99, ask = sharePrice × 1.01
    - `StockExchangeListings_PublicFloatDecreasesAfterBuyShares` — float decreases by exactly the purchased share count
-   - `DividendPhase_PaysCompanyShareholderAndRecordsDividendPayment` — company-held shares receive dividends in the company cash
+  - `DividendPhase_PaysCompanyShareholderAndRecordsDividendPayment` — company-held shares receive dividends in the company settlement bank account
    - `PersonAccount_ReturnsPortfolioWithShareholdingMarketValues` — personAccount query returns marketValue = shareCount × sharePrice
 2. **E2E coverage must include portfolio and dividend sections:** portfolio shows owned shares with quantity + market value; empty state visible when player has no personal shareholdings; dividend history shows company name, game year, per-share amount, and total.
 3. **When a stored memory says a higher test count than local, verify the actual count before trusting the memory.** Run `dotnet test projects/Api.Tests` and compare; if counts differ, the memory reflects a different branch state.
@@ -918,14 +940,14 @@ Root-cause of a recurring CI failure pattern (April 2026, PR #360 dashboard/ledg
 Root-cause of a product-critical quality failure (April 2026, PR #4):
 - The `PersonalTaxReserve` was implemented as grow-only: `SellShares` accumulated the reserve but no code path ever reduced it.
 - The product copy and ROADMAP both said "will be settled at the tax year-end", but no settlement code existed.
-- Repeated personal share sales could permanently trap a player's liquidity — once `personalCash - personalTaxReserve ≤ 0`, `BuyShares` would always reject with `INSUFFICIENT_PERSONAL_FUNDS` and the player was soft-locked forever.
-- Additionally, the `BuyShares_PersonAccount_CannotUseTaxReservedCash` test had an escape hatch: it accepted both `INSUFFICIENT_PERSONAL_FUNDS` **and** `INSUFFICIENT_PUBLIC_FLOAT` as passing outcomes, meaning the test could pass even if the available-cash check was entirely removed.
+- Repeated personal share sales could permanently trap a player's liquidity — once the spendable balance in the player's personal settlement bank account was fully reserved for tax, `BuyShares` would always reject with `INSUFFICIENT_PERSONAL_FUNDS` and the player was soft-locked forever.
+- Additionally, the `BuyShares_PersonAccount_CannotUseTaxReservedCash` test had an escape hatch: it accepted both `INSUFFICIENT_PERSONAL_FUNDS` **and** `INSUFFICIENT_PUBLIC_FLOAT` as passing outcomes, meaning the test could pass even if the spendable-balance check was entirely removed.
 
 **Rules to prevent recurrence:**
 1. **Every financial reserve, block, or holdback must have a complete lifecycle: accumulation AND release/settlement.** Before closing a PR that introduces any `Reserve`, `Block`, or `Hold` field, verify there is code that clears it under the defined business condition.
-2. **For personal stock-sale tax: settlement runs in `TaxPhase` at each tax year-end (`gs.CurrentTick % gs.TaxCycleTicks == 0`).** The settled amount is `Math.Min(personalCash, personalTaxReserve)`, deducted from `PersonalCash` and the reserve is zeroed. This prevents soft-lock even after many sells.
-3. **When testing that a cash reserve blocks a purchase, ensure public float cannot be the failure reason.** Seed the target company with a large enough float (e.g., 99,000 free-float shares) and compute the exact share count that costs between `availableCash` and `grossCash`. Assert exactly `INSUFFICIENT_PERSONAL_FUNDS`, never accept `INSUFFICIENT_PUBLIC_FLOAT` as an allowed outcome in the same test.
-4. **Query `personAccount { availableCash }` directly rather than computing `personalCash - taxReserve` client-side** when verifying the cash constraint in tests — this proves the GraphQL contract returns the correct available cash, not just that arithmetic works.
+2. **For personal stock-sale tax: settlement runs in `TaxPhase` at each tax year-end (`gs.CurrentTick % gs.TaxCycleTicks == 0`).** The settled amount must be debited from the person's settlement bank account and the reserve then zeroed. If a legacy `PersonalCash` field still exists during the migration, treat it only as a temporary proxy for bank-account balance and plan its removal.
+3. **When testing that a reserved balance blocks a purchase, ensure public float cannot be the failure reason.** Seed the target company with a large enough float (e.g., 99,000 free-float shares) and compute the exact share count that costs between the spendable bank-account balance and the gross trade cost. Assert exactly `INSUFFICIENT_PERSONAL_FUNDS`, never accept `INSUFFICIENT_PUBLIC_FLOAT` as an allowed outcome in the same test.
+4. **Query `personAccount { availableCash }` directly rather than recomputing spendable balance client-side** when verifying the purchase constraint in tests. Treat `availableCash` as a legacy GraphQL field name for spendable settlement balance until the contract is renamed.
 5. **For year-end settlement tests, always use an isolated factory with `TaxCycleTicks = 2`** so the test can trigger year-end by processing a single tick without advancing 8,760 ticks.
 
 ## Renewable power + weather quality — deterministic backend tests and complete E2E mocks
@@ -993,7 +1015,7 @@ DecayMarketingQuality(context);
 Root-cause of a pre-existing test failure (April 2026, PR #98 currency-aware pricing):
 - `PlaceBuilding_MediaHouse_WithValidMediaType_SetsMediaType` used `db.Cities.FirstAsync()` expecting Bratislava (the affordable EUR starter city).
 - In SQLite, TEXT primary keys are stored in a B-tree ordered by lexicographic UUID string value. The city whose UUID happens to sort first alphabetically is Delhi (INR), not Bratislava.
-- Delhi lots are priced at ~14–18 M INR (FX rate ≈ 90.5). The default company starting cash is 1 000 000. `placeBuilding` failed with `INSUFFICIENT_FUNDS`, returning `data: null`.
+- Delhi lots are priced at ~14–18 M INR (FX rate ≈ 90.5). The default company starting funding-account balance in legacy tests is 1 000 000. `placeBuilding` failed with `INSUFFICIENT_FUNDS`, returning `data: null`.
 - `WithValidMediaType` was the only test that actually reached lot lookup; all sibling MediaHouse tests check for early-validation errors (`INVALID_MEDIA_TYPE`) and return before any lot is queried, so they were unaffected.
 
 **Rules to prevent recurrence:**

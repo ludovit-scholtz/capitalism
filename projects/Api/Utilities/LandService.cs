@@ -15,12 +15,16 @@ public static class LandService
     private const double NeighborhoodRadiusKm = 1.5d;
 
     /// <summary>
-    /// Land capture rate: the fraction of the quality-discounted total extractable resource value
-    /// that is added to the asking price as a raw-material deposit premium.
-    /// Rationale: a mine owner captures ongoing extraction benefit, so land price reflects
-    /// a portion (10%) of the discounted resource value rather than the full reserve.
+    /// Strategic multiplier applied to the quality-discounted spot value of the raw material
+    /// deposit when computing the asking price of a mine lot.
+    /// Rationale: mining land is a long-term strategic asset — the price reflects not just the
+    /// current spot value of the deposit but also extraction rights, scarcity, and future
+    /// production advantage. A multiplier of 100 means the land price equals 100× the
+    /// total spot value of the extractable reserve, which puts typical mine lots in the
+    /// $20M–$200M band depending on resource type, deposit quality, and estimated quantity.
+    /// Non-mine lots with no resource data are unaffected (ComputeResourcePremium returns 0).
     /// </summary>
-    public const decimal ResourcePremiumCaptureRate = 0.10m;
+    public const decimal ResourcePremiumCaptureRate = 100m;
 
     public static async Task EnsureMinimumAvailableLotsAsync(
         AppDbContext db,

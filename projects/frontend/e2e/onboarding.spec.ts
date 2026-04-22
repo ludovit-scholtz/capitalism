@@ -6,6 +6,17 @@
 import { test, expect, type Page } from '@playwright/test'
 import { setupMockApi, makePlayer, makeDefaultBuildingLots } from './helpers/mock-api'
 
+const STARTER_FACTORY_LOT_NAME = /Factory Site B1/i
+const STARTER_SHOP_LOT_NAME = /High Street Retail Space/i
+
+async function chooseStarterFactoryLot(page: Page) {
+  await page.getByRole('button', { name: STARTER_FACTORY_LOT_NAME }).click()
+}
+
+async function chooseStarterShopLot(page: Page) {
+  await page.getByRole('button', { name: STARTER_SHOP_LOT_NAME }).click()
+}
+
 async function authenticateViaLocalStorage(page: Page, token: string) {
   await page.addInitScript((storedToken) => {
     localStorage.setItem('auth_token', storedToken)
@@ -27,11 +38,11 @@ async function getGuestProfitRevenue(page: Page, industry: string, productName: 
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
   await page.locator('.product-card', { hasText: productName }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
   await expect(page.locator('.profit-stat-revenue')).toBeVisible()
   const text = (await page.locator('.profit-stat-revenue').textContent()) ?? '$0'
@@ -46,11 +57,11 @@ async function completeGuestSteps1to4(page: Page, companyName = 'Guest Corp') {
   await page.getByRole('button', { name: 'Next' }).click()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
   await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
   await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
 }
@@ -64,13 +75,13 @@ async function completeGuidedOnboarding(page: Page, companyName: string) {
   await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
   await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
   await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 }
 
@@ -87,13 +98,13 @@ async function completeGuidedOnboardingForIndustry(page: Page, companyName: stri
   await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
   await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+  await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
   await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
   await page.locator('.product-card', { hasText: productLabel }).click()
   await page.getByRole('button', { name: 'List View' }).click()
-  await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+  await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 }
 
@@ -264,7 +275,7 @@ test.describe('Onboarding wizard', () => {
     await page.getByLabel('Company Name').fill('My Empire Inc')
     await expect(page.getByText('Starting cash')).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await expect(page.locator('.budget-card').getByText('Cash after purchase')).toBeVisible()
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
@@ -315,8 +326,8 @@ test.describe('Onboarding wizard', () => {
 
     await page.getByLabel('Company Name').fill('Growth Capital Works')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€703,100')
+    await chooseStarterFactoryLot(page)
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€710,000')
   })
 
   test('renders mixed resource and intermediate-product recipes without runtime errors', async ({ page }) => {
@@ -402,7 +413,7 @@ test.describe('Onboarding wizard', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Mixed Recipe Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
@@ -456,7 +467,7 @@ test.describe('Onboarding wizard', () => {
 
     await page.getByLabel('Company Name').fill('Starter Product Co')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.locator('.product-card')).toHaveCount(1)
@@ -484,7 +495,7 @@ test.describe('Onboarding wizard', () => {
 
     await page.getByLabel('Company Name').fill('Food Processing Co')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Only the industry-appropriate product should be shown
@@ -516,7 +527,7 @@ test.describe('Onboarding wizard', () => {
 
     await page.getByLabel('Company Name').fill('Pharma Co')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Only the industry-appropriate product should be shown
@@ -610,7 +621,7 @@ test.describe('Onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Bread Empire Inc')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: choose product (Bread) and shop lot
@@ -650,7 +661,7 @@ test.describe('Onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Pharma Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: choose product (Basic Medicine) and shop lot
@@ -685,7 +696,7 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: Choose product and shop lot (no backend call)
@@ -721,7 +732,7 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Bread Factory Guest')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: Choose Bread product and shop lot
@@ -758,7 +769,7 @@ test.describe('Guest onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Pharma Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: Choose Basic Medicine product and shop lot
@@ -786,7 +797,7 @@ test.describe('Guest onboarding wizard', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -814,7 +825,7 @@ test.describe('Guest onboarding wizard', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -840,7 +851,7 @@ test.describe('Guest onboarding wizard', () => {
     await completeGuestSteps1to4(page)
 
     // Mark the factory lot as already owned before the guest submits
-    const factoryLot = state.buildingLots.find((l) => l.id === 'lot-industrial-1')!
+    const factoryLot = state.buildingLots.find((l) => l.id === 'lot-industrial-2')!
     factoryLot.ownerCompanyId = 'other-company'
 
     await page.locator('#guestEmail').fill('newguest@test.com')
@@ -1095,7 +1106,7 @@ test.describe('Guest onboarding wizard', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Refresh Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Refresh on step 4 as a guest — should resume at step 4
@@ -1172,7 +1183,7 @@ test.describe('Guest onboarding wizard', () => {
     // factory_configured fires after the player purchases the factory lot.
     await page.getByLabel('Company Name').fill('Analytics Test Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // shop_configured fires after the player purchases the shop lot.
@@ -1379,7 +1390,7 @@ test.describe('Full onboarding journey', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Bakery Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Bread' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -1418,7 +1429,7 @@ test.describe('Full onboarding journey', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Pharma Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -1481,7 +1492,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Resume Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
 
@@ -1507,7 +1518,7 @@ test.describe('Onboarding resume and progress persistence', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Recovery Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
@@ -1659,8 +1670,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // ROADMAP: "Wizard will show them important areas on the screen like how much money they have."
     // This test verifies that the "Review your cash" configure-guide step displays the player's
     // actual remaining cash balance after both factory and shop lot purchases — not just a heading.
-    // Default mock lots: Industrial Plot A1 ($96,900) + High Street Retail Space ($120,000).
-    // Default starter IPO cash $600,000 - $96,900 - $120,000 = $383,100.
+    // Default mock lots: Factory Site B1 ($90,000) + High Street Retail Space ($120,000).
+    // Default starter IPO cash $600,000 - $90,000 - $120,000 = $390,000.
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -1676,8 +1687,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     // The cash step must show the remaining balance, not just the label.
     const cashStep = page.locator('.configure-step').filter({ hasText: 'Review your cash' })
     await expect(cashStep).toBeVisible()
-    // Remaining cash after factory ($96,900) and shop ($120,000) from starter IPO cash $600,000 = $383,100
-    await expect(cashStep).toContainText('383,100')
+    // Remaining cash after factory ($90,000) and shop ($120,000) from starter IPO cash $600,000 = $390,000
+    await expect(cashStep).toContainText('390,000')
   })
 
   test('configure-guide cash step shows different remaining balance for Food Processing (ROADMAP: show money available)', async ({ page }) => {
@@ -1698,8 +1709,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
 
     const cashStep = page.locator('.configure-step').filter({ hasText: 'Review your cash' })
     await expect(cashStep).toBeVisible()
-    // Same lot prices as Furniture: $600,000 - $96,900 - $120,000 = $383,100
-    await expect(cashStep).toContainText('383,100')
+    // Same lot prices as Furniture: $600,000 - $90,000 - $120,000 = $390,000
+    await expect(cashStep).toContainText('390,000')
   })
 
   test('configure-guide public sales step shows description explaining city-wide buyer discovery (AC 7)', async ({ page }) => {
@@ -2806,7 +2817,7 @@ test.describe('Onboarding on narrow/mobile layouts', () => {
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Mobile Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeVisible()
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
@@ -2837,7 +2848,7 @@ test.describe('Onboarding on narrow/mobile layouts', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Mobile Save Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -2897,7 +2908,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     // Select a lot and verify "Cash after purchase" updates
     await page.getByLabel('Company Name').fill('Budget Test Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
 
     await expect(page.locator('.budget-grid').getByText('Cash after purchase')).toBeVisible()
     // The cash-after value must be a currency amount (Bratislava = EUR)
@@ -2918,7 +2929,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Pricing Test Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: shop lot — available cash panel + product price must be visible
@@ -2947,7 +2958,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Bread Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Bread' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -2981,7 +2992,7 @@ test.describe('Onboarding budget coaching — guest cash visibility (AC 6)', () 
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Pharma Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -3019,7 +3030,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
     await completeGuestSteps1to4(page, 'Conflict Recovery Corp')
 
     // Mark the factory lot as taken so migration fails with LOT_ALREADY_OWNED
-    const factoryLot = state.buildingLots.find((l) => l.id === 'lot-industrial-1')!
+    const factoryLot = state.buildingLots.find((l) => l.id === 'lot-industrial-2')!
     factoryLot.ownerCompanyId = 'other-company'
 
     // Register and trigger migration — account is created but wizard restarts
@@ -3045,7 +3056,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Conflict Recovery Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
@@ -3067,7 +3078,7 @@ test.describe('Guest conflict recovery — authenticated restart flow', () => {
     // Add a second factory lot so the player can use it after the shop-lot conflict restart
     // (the first factory lot gets owned by the new company during the first migration attempt)
     state.buildingLots.push({
-      id: 'lot-industrial-2',
+      id: 'lot-industrial-3',
       cityId: 'city-ba',
       name: 'Industrial Plot A2',
       description: 'Second industrial plot in the eastern logistics corridor.',
@@ -3162,7 +3173,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
 
     // Select lot without company name — fill name first then clear to test
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     // Now both name + lot are set: CTA must be enabled
     await expect(page.getByRole('button', { name: 'Purchase First Factory' })).toBeEnabled()
 
@@ -3182,7 +3193,7 @@ test.describe('Onboarding wizard CTA validation and budget guard rails', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('CTA Test Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
@@ -3538,7 +3549,7 @@ test.describe('Empty-lots graceful degradation (AC11)', () => {
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('No Shop Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
@@ -3783,9 +3794,7 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(page.locator('.city-card', { hasText: 'Vienna' })).toHaveClass(/selected|active/)
   })
 
-  test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({
-    page,
-  }) => {
+  test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({ page }) => {
     // Proves that the expanded city roster (4 new global cities) shows up in the wizard.
     setupMockApi(page)
     await page.goto('/onboarding')
@@ -3889,7 +3898,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Bakery Migration Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: Bread product + shop lot
@@ -3936,7 +3945,7 @@ test.describe('Guest migration — all starter industries (AC2, AC9, AC13)', () 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await page.getByLabel('Company Name').fill('Pharma Migration Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
     // Step 4: Basic Medicine product + shop lot
@@ -4896,7 +4905,7 @@ test.describe('Guest save-progress conversion step — city, industry, and keeps
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Bread Guest Co')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Bread' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -4919,7 +4928,7 @@ test.describe('Guest save-progress conversion step — city, industry, and keeps
     await page.getByRole('button', { name: 'Next' }).click()
     await page.getByLabel('Company Name').fill('Pharma Guest Co')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
     await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
@@ -5026,10 +5035,10 @@ test.describe('IPO plan — Expansion option ($800k raise, 25% founder)', () => 
     // Fill company name and select factory lot
     await page.getByLabel('Company Name').fill('Expansion Corp')
     await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await chooseStarterFactoryLot(page)
 
-    // €1,000,000 - €96,900 = €903,100
-    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€903,100')
+    // €1,000,000 - €90,000 = €910,000
+    await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€910,000')
   })
 })
 

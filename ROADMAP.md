@@ -11,6 +11,11 @@ It will use real world map. The game will start in single city and later other c
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
+### Archive E2E tests (0% complete)
+
+- Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
+- Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
+
 ### Tailwind migration (0% complete)
 
 - Update all pages to use the tailwind as primary stying method
@@ -19,31 +24,40 @@ It will use real world map. The game will start in single city and later other c
 - Support light mode and dark mode
 - Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
 
-### Currencies (90% complete)
+### Government company
 
+- Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
+- Create one government bank for each currency
+
+### Currencies and bank accounts (0% complete)
+
+Change cash flow management completely from the onboarding process, through unit calculations, payments in stock exchange up to the ledger calculation
+
+- The only place where user can have money is in the bank account! Remove the cash balance from the player or company account.
+- Create one government bank for each currency with deposit interest rate 0%, and borrowing interest rate 20%. Create bank account in format 16 random digits where bank accounts must be unique in game server.
+- Currency can be moved only between the bank accounts. Every money transfer must be visible in the ledger and also in the bank statement review. 
+- Create bank statement review where players can see the transfers in their bank accounts.
+- Every building has the bank account assigned, if it does not have, create one bank account in the government bank for the currency in the building's city. In edit building make sure user can change the building's bank account to different bank account. Allow to change the bank account only if the city's currency is equal to the bank account to which player wants to change the bank account.
 - In forex exchange show the fx rate list table
-- ✅ When starting the onboarding process make sure the initial investment is fair for every user in every currency. Onboarding now scales founder contribution and IPO raise by EUR→city FX rate (e.g. Prague company starts with ~15M CZK, not 600k CZK).
-- ✅ Encyclopedia shows product base prices in EUR as a reference anchor via `formatMoney`; city-map lot prices use city `currencyCode`; company settings uses company `currencyCode`.
-- ✅ Property (land lot) prices are expressed in local city currency. `LandService.ComputeBasePrice` applies EUR→cityCurrency FX rate. Prague lots are priced in CZK (~2 M+), Bratislava in EUR. Existing EUR-anchored lots in non-EUR cities are self-healed on the next tick cycle.
-- ✅ `Company.CurrencyCode` field propagated to `CompanySettingsResult` so all company-level monetary displays use the correct local currency.
-- ✅ Products in PUBLIC_SALES units now use FX-normalized base prices for demand/price-index calculations. A Wooden Chair priced at 1 134 CZK in Prague is evaluated against a 1 134 CZK base (EUR 45 × 25.20), not 45 EUR — so the price-index is 1.0 and demand is not suppressed.
-- ✅ Shipping/transit costs from the global exchange are expressed in the destination city's local currency (e.g. Prague factory sees CZK-denominated transit cost). `GlobalExchangeCalculator.ComputeTransitCostPerUnit` and `ComputeExchangePrice` have FX-rate overloads used by `PurchasingPhase` and `Query.Exchange`.
-- ✅ Global exchange UI (`GlobalExchangeView`) now formats all prices in the selected destination city's local currency using `formatMoney` instead of hardcoded `$`.
-- ✅ `Mutation.OnboardingHelpers` sets `MinPrice`/`MaxPrice` on starter units in the city's local currency so early factories have FX-correct purchase caps.
-- ✅ Leaderboard must be expressed in USD currency. Rankings now sort and display by `totalWealthUsd` (all local currencies converted to USD via FX rates). Company breakdown shows local currency for individual components.
+- Allow player to select bank account from which he wants to do the swap, and bank account to which he wants to do swap when doing trades in the forex exchange. Make sure to show also the current balance in the bank account selector.
+- Organizie forex exchange to tabs, make sure the default one is the swap tab
+- Player cannot go to minus on the bank account unles he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
+- When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
+- Make the research budget be calculated in USD.
+- Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
+- In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
+- When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
+- If player wants to expand to different city with different currency, he must first open the bank account for that currency and do the fx swap. Otherwise in the buy building guide should be warning that player does not have any money in this currency and steps what he should do with the links.
 
-**Shipped in this increment (PR #100):**
-- ✅ `FxRateHelper` shared utility with `BuildEurRatesLookupAsync` — loads live rates from DB with fallbacks for CZK (25.20), USD (1.08), GBP (0.86), CNY (7.84), INR (90.50).
-- ✅ `TickContext.EurFxRates` and `GetCityFxRate(city)` — FX rates pre-loaded once per tick and available to all engine phases.
-- ✅ `PublicSalesPhase` — `localBasePrice = product.BasePrice × cityFxRate` before price-index comparison; fixes "chair costs 60 CZK vs $60" cross-city distortion.
-- ✅ `PurchasingPhase.Global` — exchange prices and transit costs computed in destination city currency, ending EUR/local-currency mixing in purchasing ledger entries.
-- ✅ `Query.Exchange (globalExchangeOffers)` — `exchangePricePerUnit`, `transitCostPerUnit`, and `deliveredPricePerUnit` returned in the destination city's local currency.
-- ✅ `GlobalExchangeView.vue` — `formatPrice` now uses `formatMoney(value, selectedCityCurrencyCode, locale)` so Prague shows CZK amounts, New York shows USD, etc.
-- ✅ `Mutation.OnboardingHelpers` (`ConfigureStarterFactory`, `AddStarterShop`) — `MinPrice`/`MaxPrice` scaled to city currency so onboarding factories in non-EUR cities have correct purchase caps.
+### Onboarding
+
+- When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
+- For each product category show at least 3 products to produce
 
 ### Number formatting (80% complete)
 
-✅ Shared `currencyFormat.ts` utility created with `formatMoney`, `formatCompactMoney`, `formatNumber`, and `formatCompactNumber`. Locale mapping: en → en-US, sk → sk-SK, de → de-DE. Used in OnboardingView, LeaderboardView, and available for all other screens. Unit tests cover compact notation, edge cases (NaN, Infinity, 0, negative), and locale-specific separators.
+- Everywhere where the currency is displayed, for example in the units, use the number formatting component
+- Add to the title the original number to be formatted and currency after it
 
 ### Power plants (30% complete)
 
@@ -65,30 +79,31 @@ It will use real world map. The game will start in single city and later other c
 - P&L chart for power plant building detail.
 - Government fine for under-supply / surplus-sale income for over-supply.
 
-### City map (70% complete)
+### Units
 
-- Implement and show weather predictions as is defined in the powerplants section
+- Add tab routing in unit details to the route, so that when person click on one unit in the grid and he is in quick actions does not change the tab when he clicks another unit in the grid
 
-**Shipped in this increment:**
-- ✅ Weather forecast panel shown in lot detail panel for POWER_PLANT-suitable lots (solar %, wind %, rolling forecast bar chart).
-- ✅ **City-level Power Planning & Weather section (new):** always-visible panel at the bottom of the city map page showing current solar/wind conditions, rolling 24-tick forecast bar chart, city power balance (supply/demand/reserve), status badge (Balanced / Constrained / Critical), and "Why This Matters" infrastructure guidance for renewable planning.
-- ✅ Power-planning guidance text explains how weather affects solar/wind output and why power shortage ROI is high in under-served cities.
-- ✅ 2 new E2E tests for the city-level power planning section: happy path with weather data and power shortage state rendering.
-- ✅ i18n keys in all three locales (`en`, `sk`, `de`) for the new weather/power planning panel.
+#### B2B sales unit
 
-**Remaining:**
-- Add weather forecast to city overview card in the onboarding city picker.
-- Weather-driven demand modifier for seasonal gameplay.
+- The product selection is not localized
+- Make the sale visibility default to be Group
+
+#### Public sales unit
+
+- The product selection is not localized
+- Set the min price to be the city average price for the product
+- Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
+- Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
 
 ### Banks (35% complete)
 
 **Shipped in this increment:**
 - Fixed "Acquire a Bank" button padding so it matches the surrounding UI quality
 - "Acquire a Bank" button now routes directly to the buy-building form with the Bank type pre-selected (`?type=BANK` query param), removing the extra step of manually selecting bank from the type grid
-- Bank setup section in the buy-building flow now clearly shows the required base capital and whether the company has sufficient funds, with a green ✅ / red ⚠️ capital-check panel
+- Bank setup section in the buy-building flow now clearly shows the required base capital and whether the selected funding bank account has sufficient balance, with a green ✅ / red ⚠️ capital-check panel
 - Players can now configure their initial deposit (savings) interest rate and lending interest rate directly in the bank setup form before completing the purchase
 - The interest rates (deposit default 3%, lending default 8%) are applied to the bank immediately after purchase via `setBankRates` mutation
-- Invalid bank creation is blocked at the UI level when company cash is below the base capital requirement
+- Invalid bank creation is blocked at the UI level when the selected funding bank account balance is below the base capital requirement
 
 ### Audits (0% complete)
 
@@ -98,17 +113,12 @@ It will use real world map. The game will start in single city and later other c
 
 - When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
 
-### Mining (0% complete)
+### Mining (40% complete)
 
-- When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. 
-- Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
+**Shipped:** Mining land now shows deposit details and premium valuation — the lot list items display a resource type badge (e.g. ⛏ Iron Ore) before the player clicks, the detail panel already shows the full raw material panel with quality and estimated reserve, and the purchase form now surfaces a Deposit Investment Summary when Mine building type is selected. Pricing has been reworked so mine lots land in a $20M–$200M band: `ResourcePremiumCaptureRate` is now 100× the market spot value of the deposit, translating typical reserves (Iron Ore 18,000 t at 72% ≈ $32M, Chemical Minerals 12,000 t at 55% ≈ $20M, Gold 3,200 kg at 82% ≈ $131M) into a premium strategic investment range. A new seeded Carpathian Gold Seam lot (Bratislava Extraction Belt) demonstrates the upper end of the range.
 
-### Units (40% complete)
-
-**Shipped:** Tabbed unit detail layout — clicking any active unit now shows a focused tab bar (Basic Info, Inventory, History, Activity; plus Quick Actions and Market Intelligence for applicable unit types). Public Sales has all 6 tabs including a dedicated Quick Actions tab for fast price changes without entering edit mode. Market Intelligence and Recent Activity are now scoped to their own tabs, reducing visual noise. The same tab pattern applies to Purchase and Manufacturing units.
-
-- When person clicks on the unit, organize different sections to tabs
-- For example public sales unit create tab layout for Basic info, Quick actions, Stored inventory, Movement history, Market Intelligence, Recent Activity. In basic info show some basic unit statistics like the profit similarily as on the building when no unit is selected. In quick actions allow user to efficienty change the selling price, so that when he clicks between the units he can do it very easily. Organize all units to tabs, not just the public sales unit.
+- When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. ✅ **Shipped**
+- Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined. ✅ **Shipped**
 
 ### R&D Building (0% complete)
 
@@ -374,12 +384,12 @@ When unit is being modified user can still change it. For example when user upgr
 ## The onboarding 
 
 Onboarding process:
-1. User is given $200000 to his personal account and he picks the game player name
-2. IPO Process - User puts his $50k to the business and has decision how much money he wants to raise - $800 000, $600000, or $400 000 varying his own shares to be 25% or 33% or 50% in the company. User picks the company name.
+1. User is given $200000 to his personal bank account and he picks the game player name
+2. IPO Process - User transfers $50k from his personal bank account to the business bank account and has decision how much money he wants to raise - $800 000, $600000, or $400 000 varying his own shares to be 25% or 33% or 50% in the company. User picks the company name.
 3. Player selects the industry type they want to start with. The Furniture, Food processing, or Healthcare.
 4. Player selects the product he wants to produce - Each starting industry allows 3 basic products to be produced.
-5. Then they pick the location of their first factory. This will set the factory layout for them and user pays for all costs associated with it - the property as well company layout (show costs analysis before the purchase). Wizzard will show them important areas on the screen like how much money they have, the price configuration or public sales configuration.
-6. Next the player buys his first sales shop and configures it to set the sales price to public. User pays for the land and sales shop unit layour - make sure the user has clear information about this.
+5. Then they pick the location of their first factory. This will set the factory layout for them and user pays for all costs associated with it - the property as well company layout (show costs analysis before the purchase). Wizard will show them important areas on the screen like which bank account pays, the current bank balance, the price configuration or public sales configuration.
+6. Next the player buys his first sales shop and configures it to set the sales price to public. User pays for the land and sales shop unit layout from the selected company/building bank account - make sure the user has clear information about this.
 7. The player is shown that the time goes on and he makes the profit from his business.
 8. User is asked to create the user account.
 
@@ -387,11 +397,11 @@ Do not require authentication for new not authenticated users. Do not store the 
 
 ## Stock exchange
 
-There is one global stock exchange where all company shares are traded. The share price is calculated as the sum of all equities of the company (including land, units, warehouse stocks, cash, owned stocks, and other assets) plus profit expectation divided by number of issued stocks.
+There is one global stock exchange where all company shares are traded. The share price is calculated as the sum of all equities of the company (including land, units, warehouse stocks, bank-account balances, owned stocks, and other assets) plus profit expectation divided by number of issued stocks.
 
 Profit expectation is complex formula where new companies has this as zero. The formula includes the profit this year, history of prifits in past years and dividends paid.
 
-Player acting for the company or person account can buy shares for any company including its own from public investors. Market bid price is 1% below the share price and offer is 1% above the share price. The buying of the company shares directly by the company is considered as the company buy back and reduces the number of issued shares.
+Player acting for the company or person account can buy shares for any company including its own from public investors. Market bid price is 1% below the share price and offer is 1% above the share price. The buying of the company shares directly by the company is considered as the company buy back and reduces the number of issued shares. Every trade settles between bank accounts and the acting person/company must choose the source or destination bank account for the settlement.
 
 Player acting for the company or person account can sell shares it owns.
 
@@ -406,7 +416,7 @@ In the stock exchange in company details, is list of all shareholders and the pi
 ### What was delivered
 - Global stock exchange UI with company listings, share prices, bid/ask spread, shareholder tables, and pie charts.
 - Buy and sell share trading with person account and company account switching.
-- Personal account ledger showing portfolio holdings, available cash, tax reserve, and dividend history.
+- Personal account ledger showing portfolio holdings, available bank-account buying power, tax reserve, and dividend history.
 - Trading controls redesigned using CSS grid for precise vertical alignment across all viewport sizes; input and Buy/Sell buttons share the same grid row guaranteeing identical baseline.
 - Responsive layout: labels hidden on mobile (aria-label covers accessibility), input spans full width, buttons collapse to side-by-side pair.
 - Loading, disabled, validation-error, and success/error feedback states all implemented.
@@ -430,7 +440,7 @@ In the top menu player can switch between person account or companies account. I
 
 In the onboarding the player picks the game player name. This is the person account. At the start he owns certain amount of company shares the player creates. The ledger info for the player account is customized to person view.
 
-Person cannot own land or buildings and does not pay tax. He can only own the cash or shares in the companies. Person account income is the sale of shares and dividends.
+Person cannot own land or buildings and does not pay tax. He can only own bank account balances or shares in the companies. Person account income is the sale of shares and dividends.
 
 Player can switch to person view so that he can trade the stocks.
 
@@ -538,7 +548,7 @@ In bank building, allow people to deposit funds to receive interest from the pla
 
 Bank building does not have any configurable unit, whole bank acts as a single unit.
 
-In the bank, there is a configuration to set the interest to pay to cash depositers, and interest rate which lenders pay to the player.
+In the bank, there is a configuration to set the interest to pay to deposit account holders, and interest rate which lenders pay to the player.
 
 When player creates a bank, he must deposit there the base capital of $10000000. This serves as the initial capital to be lended and is counted towards the bank deposits. 
 

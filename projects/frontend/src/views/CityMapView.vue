@@ -698,6 +698,9 @@ watch(viewMode, async (mode) => {
               <div class="lot-list-info">
                 <span class="lot-list-name">{{ lot.name }}</span>
                 <span class="lot-list-district">{{ lot.district }}</span>
+                <span v-if="lot.resourceType" class="lot-list-resource-badge" data-testid="lot-resource-badge">
+                  ⛏ {{ lot.resourceType.name }}
+                </span>
               </div>
               <div class="lot-list-meta">
                 <span class="lot-list-price">{{ formatCurrency(lot.price) }}</span>
@@ -959,6 +962,33 @@ watch(viewMode, async (mode) => {
                     </button>
                   </div>
                   <p v-if="!selectedPowerPlantType" class="form-hint">{{ t('powerPlant.noPlantTypeSelected') }}</p>
+                </div>
+
+                <!-- Mining deposit investment summary (shown when MINE type selected and lot has resource) -->
+                <div
+                  v-if="selectedBuildingType === 'MINE' && selectedLot?.resourceType"
+                  class="mining-deposit-summary"
+                  data-testid="mining-deposit-summary"
+                >
+                  <h4 class="deposit-summary-title">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
+                  <div class="deposit-summary-grid">
+                    <div class="deposit-summary-item">
+                      <span class="deposit-label">{{ t('cityMap.rawMaterialResource') }}</span>
+                      <span class="deposit-value deposit-resource-name">{{ selectedLot.resourceType.name }}</span>
+                    </div>
+                    <div class="deposit-summary-item" v-if="selectedLot.materialQuality !== null">
+                      <span class="deposit-label">{{ t('cityMap.rawMaterialQuality') }}</span>
+                      <span class="quality-badge" :class="materialQualityClass(selectedLot.materialQuality)">
+                        {{ materialQualityLabel(selectedLot.materialQuality) }}
+                        ({{ Math.round(selectedLot.materialQuality * 100) }}%)
+                      </span>
+                    </div>
+                    <div class="deposit-summary-item" v-if="selectedLot.materialQuantity !== null">
+                      <span class="deposit-label">{{ t('cityMap.rawMaterialQuantity') }}</span>
+                      <span class="deposit-value">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</span>
+                    </div>
+                  </div>
+                  <p class="deposit-investment-hint">{{ t('cityMap.miningInvestmentHint') }}</p>
                 </div>
 
                 <!-- Purchase cost summary -->
@@ -1431,6 +1461,18 @@ watch(viewMode, async (mode) => {
   color: var(--color-text-secondary);
 }
 
+.lot-list-resource-badge {
+  display: inline-block;
+  margin-top: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
+  padding: 0.05rem 0.4rem;
+}
+
 .lot-list-meta {
   text-align: right;
   flex-shrink: 0;
@@ -1673,6 +1715,62 @@ watch(viewMode, async (mode) => {
   margin: 0;
   border-top: 1px solid rgba(139, 92, 246, 0.15);
   padding-top: 0.5rem;
+}
+
+/* Mining deposit investment summary (shown in purchase form when MINE type selected) */
+.mining-deposit-summary {
+  background: rgba(139, 92, 246, 0.08);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.deposit-summary-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem;
+  color: var(--color-text);
+}
+
+.deposit-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.deposit-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.deposit-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.deposit-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.deposit-resource-name {
+  color: var(--color-primary);
+}
+
+.deposit-investment-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  border-top: 1px solid rgba(139, 92, 246, 0.15);
+  padding-top: 0.5rem;
+  font-style: italic;
 }
 
 .quality-badge {

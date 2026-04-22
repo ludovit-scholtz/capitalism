@@ -240,9 +240,7 @@ const starterCompany = computed(() => {
 })
 const selectedIpoOption = computed(() => ipoOptions.find((option) => option.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoOptions[0])
 /** Company starting cash in the selected city's local currency. */
-const companyStartingCash = computed(() =>
-  Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityFxRate.value),
-)
+const companyStartingCash = computed(() => Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityFxRate.value))
 const remainingPersonalCash = computed(() => PERSONAL_STARTING_CASH - FOUNDER_CONTRIBUTION)
 const starterCash = computed(() => onboardingCompanyCash.value ?? starterCompany.value?.cash ?? companyStartingCash.value)
 
@@ -1232,6 +1230,7 @@ useTickRefresh(async () => {
         </p>
         <OnboardingLotSelector
           v-else
+          key="factory-lot-selector"
           v-model:selected-lot-id="selectedFactoryLotId"
           :lots="availableFactoryLots"
           required-building-type="FACTORY"
@@ -1313,6 +1312,7 @@ useTickRefresh(async () => {
         </p>
         <OnboardingLotSelector
           v-else
+          key="shop-lot-selector"
           v-model:selected-lot-id="selectedShopLotId"
           :lots="availableShopLots"
           required-building-type="SALES_SHOP"

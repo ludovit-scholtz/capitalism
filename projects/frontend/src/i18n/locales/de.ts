@@ -1445,6 +1445,8 @@ export default {
     rawMaterialQualityFair: 'Mittel',
     rawMaterialQualityPoor: 'Gering',
     rawMaterialHint: 'Errichten Sie hier eine Mine, um diesen Rohstoff zu fördern und direkt in Ihre Produktionskette einzuspeisen. Höhere Qualität bedeutet besseren Output pro Tick.',
+    miningDepositSummaryTitle: 'Investitionszusammenfassung Vorkommen',
+    miningInvestmentHint: 'Minen-Grundstücke werden mit einem Aufschlag bewertet, der den strategischen Wert des Rohstoffvorkommens widerspiegelt. Reichhaltigere Vorkommen mit höherer Qualität und größeren Reserven sind deutlich teurer — es handelt sich um ein langfristiges Industrieanlagegut.',
     placementGuidanceTitle: 'Platzierungsempfehlung',
     placementGuidanceSalesShop: 'Hohe Bevölkerungsdichte macht diesen Standort ideal für den Einzelhandel. Ein Verkaufsshop profitiert hier von starker Laufkundschaft.',
     placementGuidanceFactory: 'Industriezonierung hält die Betriebskosten niedrig. Eine Fabrik kann hier energieintensive Produktion ohne Einschränkungen betreiben.',

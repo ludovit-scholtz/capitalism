@@ -77,7 +77,7 @@ test.describe('City Map View', () => {
 
     // Should show the city name and lot count
     await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
-    await expect(page.getByText(/4 lots/i)).toBeVisible()
+    await expect(page.getByText(/5 lots/i)).toBeVisible()
   })
 
   test('shows lot details when clicking a lot in list view', async ({ page }) => {
@@ -95,7 +95,8 @@ test.describe('City Map View', () => {
     // Should show lot details in the detail panel
     await expect(page.getByRole('heading', { name: 'Industrial Plot A1' })).toBeVisible()
     await expect(page.getByRole('complementary').getByText('Industrial Zone')).toBeVisible()
-    await expect(page.getByRole('complementary').getByText(/96,900|96900/)).toBeVisible()
+    // Price should be in the millions range (premium mine lot with Iron Ore deposit)
+    await expect(page.getByTestId('asking-price')).toBeVisible()
     await expect(page.locator('.type-tag', { hasText: 'Factory' })).toBeVisible()
   })
 
@@ -144,8 +145,8 @@ test.describe('City Map View', () => {
     // Switch to list view
     await page.getByRole('button', { name: /List View/i }).click()
 
-    // Select a lot
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // Use an affordable commercial lot ($120K) — the mine lot costs $32M+ which exceeds starter cash
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
 
     // Click Purchase Lot button
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
@@ -153,9 +154,9 @@ test.describe('City Map View', () => {
     // Fill in purchase form
     await page
       .locator('.building-type-card')
-      .filter({ hasText: /Factory/i })
+      .filter({ hasText: /Sales Shop/i })
       .click()
-    await page.getByRole('complementary').locator('input[type="text"]').fill('My New Factory')
+    await page.getByRole('complementary').locator('input[type="text"]').fill('My New Sales Shop')
 
     // Click confirm
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
@@ -214,7 +215,11 @@ test.describe('City Map View', () => {
     await expect(page.getByText(/67% wind/i)).toBeVisible()
 
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
-    await page.locator('.building-type-card').filter({ hasText: /Power Plant/i }).first().click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Power Plant/i })
+      .first()
+      .click()
     await expect(page.getByText('Plant type', { exact: true })).toBeVisible()
     await expect(page.getByRole('radio', { name: /Solar20 MW/i })).toBeVisible()
     await expect(page.getByRole('radio', { name: /Solar20 MW/i })).toContainText('82%')
@@ -339,14 +344,14 @@ test.describe('City Map View', () => {
 
     await page.goto('/city/city-ba')
 
-    // Initially shows all 4 lots
-    await expect(page.getByText(/4 lots/i)).toBeVisible()
+    // Initially shows all 5 lots
+    await expect(page.getByText(/5 lots/i)).toBeVisible()
 
     // Click "Available Only" filter
     await page.getByRole('button', { name: /Available Only/i }).click()
 
-    // Should show 3 lots (one is owned)
-    await expect(page.getByText(/3 lots/i)).toBeVisible()
+    // Should show 4 lots (one is owned)
+    await expect(page.getByText(/4 lots/i)).toBeVisible()
   })
 
   test('unauthenticated user sees login required notice', async ({ page }) => {
@@ -454,9 +459,9 @@ test.describe('City Map View', () => {
 
     await page.goto('/city/city-ba')
 
-    // Switch to list view and select an available lot
+    // Switch to list view and select an affordable commercial lot ($120K within $500K cash)
     await page.getByRole('button', { name: /List View/i }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
 
     // Open purchase form
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
@@ -464,9 +469,9 @@ test.describe('City Map View', () => {
     // Select building type via card picker, fill name, and submit
     await page
       .locator('.building-type-card')
-      .filter({ hasText: /Factory/i })
+      .filter({ hasText: /Sales Shop/i })
       .click()
-    await page.getByRole('complementary').locator('input[type="text"]').fill('Victory Factory')
+    await page.getByRole('complementary').locator('input[type="text"]').fill('Victory Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // After purchase the construction banner should appear
@@ -562,6 +567,61 @@ test.describe('City Map View', () => {
   })
 
   // ── Raw Material & Placement Guidance ──────────────────────────────────────
+
+  test('lot list shows resource type badge for mining-capable lots', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+
+    // Industrial Plot A1 is a MINE-eligible lot with Iron Ore — its list item should show the badge
+    const mineListItem = page.locator('.lot-list-item').filter({ hasText: /Industrial Plot A1/i })
+    await expect(mineListItem.getByTestId('lot-resource-badge')).toBeVisible()
+    await expect(mineListItem.getByTestId('lot-resource-badge')).toContainText(/Iron Ore/i)
+
+    // High Street Retail Space has no resource — no badge should appear
+    const commercialListItem = page.locator('.lot-list-item').filter({ hasText: /High Street Retail Space/i })
+    await expect(commercialListItem.locator('[data-testid="lot-resource-badge"]')).toHaveCount(0)
+  })
+
+  test('mining deposit summary shown in purchase form when MINE type selected', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await page.getByRole('button', { name: /Purchase Lot/i }).click()
+
+    // Select Mine building type
+    await page.locator('.building-type-card').filter({ hasText: /Mine/i }).click()
+
+    // Deposit investment summary should appear
+    const depositSummary = page.locator('[data-testid="mining-deposit-summary"]')
+    await expect(depositSummary).toBeVisible()
+    await expect(depositSummary.getByText(/Iron Ore/i)).toBeVisible()
+    await expect(depositSummary.getByText(/72%/)).toBeVisible()
+    // Investment hint explains the premium pricing
+    await expect(depositSummary.getByText(/long-term industrial asset/i)).toBeVisible()
+  })
+
+  test('mining deposit summary hidden when Factory type selected on mine lot', async ({ page }) => {
+    const { player } = setupAuthenticatedPlayer(page)
+    await authenticateViaLocalStorage(page, player.id)
+
+    await page.goto('/city/city-ba')
+    await page.getByRole('button', { name: /List View/i }).click()
+    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await page.getByRole('button', { name: /Purchase Lot/i }).click()
+
+    // Select Factory building type (not Mine) — deposit summary should NOT appear
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
+    await expect(page.locator('[data-testid="mining-deposit-summary"]')).toHaveCount(0)
+  })
 
   test('shows raw material panel for MINE-eligible lots with resource data', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
@@ -787,9 +847,12 @@ test.describe('City Map — invalid and stale selection paths', () => {
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
 
-    // Price is visible (Industrial lot has price=96900 with Iron Ore resource premium in mock data)
+    // Price is visible (Industrial lot has price=32464500 with Iron Ore resource premium in mock data)
+    // New premium pricing: 18000t × $25/t × 72% × captureRate(100) = $32.4M deposit premium
     const detailPanel = page.getByRole('complementary')
-    await expect(detailPanel.getByText(/96,900|96900/)).toBeVisible()
+    await expect(detailPanel.getByTestId('asking-price')).toBeVisible()
+    // Price should be in the millions range (premium mine lot)
+    await expect(detailPanel.getByText(/32[,.]?464[,.]?500|32\.4[Mm]|32,464/)).toBeVisible()
   })
 
   test('lot detail shows appraised value and asking price separately', async ({ page }) => {
@@ -800,7 +863,7 @@ test.describe('City Map — invalid and stale selection paths', () => {
     await page.getByRole('button', { name: /List View/i }).click()
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
 
-    // Industrial lot has basePrice=75000 and price=96900 (includes Iron Ore resource premium)
+    // Industrial lot has basePrice=75000 and price=32464500 (includes $32.4M Iron Ore resource premium)
     const detailPanel = page.getByRole('complementary')
     // Appraised value label shows base land value
     await expect(detailPanel.getByText(/Appraised Value/i)).toBeVisible()
@@ -956,14 +1019,15 @@ test.describe('City Map — building type card picker', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // Use affordable commercial lot — mine lot now costs $32M+ (premium pricing)
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     await page
       .locator('.building-type-card')
-      .filter({ hasText: /Factory/i })
+      .filter({ hasText: /Sales Shop/i })
       .click()
-    await page.locator('.form-input').fill('Supply Chain Factory')
+    await page.locator('.form-input').fill('Supply Chain Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // Post-purchase banner should show construction started state
@@ -978,17 +1042,18 @@ test.describe('City Map — building type card picker', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // Use affordable commercial lot — mine lot now costs $32M+ (premium pricing)
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
 
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // On mobile the card picker should still be visible and usable
-    const factoryCard = page.locator('.building-type-card').filter({ hasText: /Factory/i })
-    await expect(factoryCard).toBeVisible()
-    await factoryCard.click()
-    await expect(factoryCard).toHaveClass(/selected/)
+    const shopCard = page.locator('.building-type-card').filter({ hasText: /Sales Shop/i })
+    await expect(shopCard).toBeVisible()
+    await shopCard.click()
+    await expect(shopCard).toHaveClass(/selected/)
 
-    await page.locator('.form-input').fill('Mobile Factory')
+    await page.locator('.form-input').fill('Mobile Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // Success: construction-started banner appears
@@ -1004,7 +1069,7 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    // Select an available lot (Industrial Plot A1 costs $96,900)
+    // Select an available mine lot (Industrial Plot A1 — premium mine lot at ~$32M with Iron Ore deposit)
     await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
@@ -1026,9 +1091,15 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    // Industrial Plot A1 costs $96,900; player has $500,000 → remaining is $403,100
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // High Street Retail Space costs $120K; player has $500,000 → remaining is $372,000 (after $8K shop construction)
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
+
+    // Select a building type to trigger cost calculation
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Sales Shop/i })
+      .click()
 
     const summary = page.locator('[aria-label="Purchase cost summary"]')
     await expect(summary).toBeVisible()
@@ -1066,8 +1137,8 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    // Industrial Plot A1 costs $96,900
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // High Street Retail Space costs $120,000 — affordable with $500K starting cash
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // The purchase form now uses the active company from the header switcher.
@@ -1078,22 +1149,22 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
 
     await page
       .locator('.building-type-card')
-      .filter({ hasText: /Factory/i })
+      .filter({ hasText: /Sales Shop/i })
       .click()
-    await page.locator('.form-input').fill('Iron Works')
+    await page.locator('.form-input').fill('Retail Outlet')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // Success banner appears — confirms the purchase went through
     await expect(page.locator('.post-purchase-banner').or(page.locator('[data-testid="construction-banner"]'))).toBeVisible()
 
     // Now select a second available lot and open the purchase form to verify the company
-    // cash has been reduced (500,000 - 96,900 lot - 15,000 factory construction = 388,100)
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
+    // cash has been reduced (500,000 - 120,000 lot - 8,000 shop construction = 372,000)
+    await page.getByRole('button', { name: /Riverside Apartment Block/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
-    // The active company summary should now reflect the updated cash (contains $388,100)
+    // The active company summary should now reflect the updated cash (contains $372,000)
     await expect(activeCompanySummary).toBeVisible()
-    await expect(activeCompanySummary).toContainText('388,100')
+    await expect(activeCompanySummary).toContainText('372,000')
   })
 })
 
@@ -1308,14 +1379,15 @@ test.describe('City Map — construction order flow', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // Use affordable commercial lot — mine lot now costs $32M+ (premium pricing)
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     await page
       .locator('.building-type-card')
-      .filter({ hasText: /Factory/i })
+      .filter({ hasText: /Sales Shop/i })
       .click()
-    await page.locator('.form-input').fill('Construction Test Factory')
+    await page.locator('.form-input').fill('Construction Test Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
     // Construction banner is shown (not the legacy "Set Up Your Building" CTA)
@@ -1328,7 +1400,7 @@ test.describe('City Map — construction order flow', () => {
 
   test('insufficient funds for construction cost shows error', async ({ page }) => {
     const lots = makeDefaultBuildingLots()
-    // Player has $100,000 — enough for lot ($96,900) but not lot + factory construction ($15,000 extra)
+    // Player has $124,000 — enough for the lot ($120,000) but not lot + shop construction ($8,000 extra = $128,000 total)
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [
@@ -1336,7 +1408,7 @@ test.describe('City Map — construction order flow', () => {
           id: 'company-1',
           playerId: 'player-1',
           name: 'Low Cash Corp',
-          cash: 100000,
+          cash: 124000,
           foundedAtUtc: '2026-01-01T00:00:00Z',
           buildings: [],
         },
@@ -1349,17 +1421,18 @@ test.describe('City Map — construction order flow', () => {
 
     await page.goto('/city/city-ba')
     await page.getByRole('button', { name: /List View/i }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    // Use High Street Retail Space ($120K lot) — player has $124K which is not enough for lot + construction ($128K total)
+    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     await page
       .locator('.building-type-card')
-      .filter({ hasText: /Factory/i })
+      .filter({ hasText: /Sales Shop/i })
       .click()
-    await page.locator('.form-input').fill('Underfunded Factory')
+    await page.locator('.form-input').fill('Underfunded Shop')
     await page.getByRole('button', { name: /Confirm Purchase/i }).click()
 
-    // The mock should return an INSUFFICIENT_FUNDS error (96,900 lot + 15,000 construction = 111,900 > 100,000)
+    // The mock should return an INSUFFICIENT_FUNDS error (120,000 lot + 8,000 construction = 128,000 > 124,000)
     await expect(page.getByRole('alert').or(page.locator('.error-message')).first()).toBeVisible()
   })
 })
@@ -1713,9 +1786,7 @@ test.describe('City Map — blank-map regression (list→map toggle)', () => {
 })
 
 test.describe('City Media Houses', () => {
-  test('shows government-owned media houses with GOV badge for unauthenticated visitor', async ({
-    page,
-  }) => {
+  test('shows government-owned media houses with GOV badge for unauthenticated visitor', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/city/city-ba')
 
@@ -1816,9 +1887,7 @@ test.describe('City Media Houses', () => {
     await expect(page.locator('.media-house-card').filter({ hasText: 'My TV Station' })).toBeVisible()
   })
 
-  test('city power planning section is visible with weather conditions and power balance', async ({
-    page,
-  }) => {
+  test('city power planning section is visible with weather conditions and power balance', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id

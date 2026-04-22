@@ -63,6 +63,25 @@ public sealed partial class AppDbInitializer
                 MaterialQuality = 0.55m,
                 MaterialQuantity = 12_000m
             },
+            // Premium gold deposit site (upper range of mine pricing, ~$130M)
+            // Gold: 3,200 kg × 500 EUR/kg × 82% quality × captureRate(100) = 131,200,000 EUR
+            new BuildingLot
+            {
+                Id = CreateDeterministicGuid("lot:ba-mine-gold-1"),
+                CityId = bratislava.Id,
+                Name = "Carpathian Gold Seam",
+                Description = "Rare high-grade gold deposit in the Carpathian foothills north of Bratislava. Geological surveys confirm 3,200 kg of recoverable gold at 82% purity — one of the richest seams in Central Europe.",
+                District = "Extraction Belt",
+                Latitude = 48.1740, Longitude = 17.0950,
+                PopulationIndex = 0.42m,
+                BasePrice = 80_000m,
+                Price = 80_000m,  // will be recomputed below — resource premium ≈ $131M
+                SuitableTypes = "MINE",
+                ResourceTypeId = resources.TryGetValue("gold", out var gold) ? gold.Id : null,
+                ResourceType = resources.TryGetValue("gold", out var goldNav) ? goldNav : null,
+                MaterialQuality = 0.82m,
+                MaterialQuantity = 3_200m
+            },
             new BuildingLot
             {
                 Id = CreateDeterministicGuid("lot:ba-industrial-3"),
@@ -233,6 +252,50 @@ public sealed partial class AppDbInitializer
                 lot.Price = appraisedLandValue + resourcePremium;
             }
         }
+    }
+
+    /// <summary>
+    /// Idempotent upgrade: adds the Carpathian Gold Seam lot to Bratislava if it was not
+    /// present when the database was first seeded (e.g., pre-mining-premium databases).
+    /// Safe to call on every startup — no-op when the lot already exists.
+    /// </summary>
+    private async Task EnsureCarpathianGoldSeamLotAsync()
+    {
+        var goldLotId = CreateDeterministicGuid("lot:ba-mine-gold-1");
+        if (await dbContext.BuildingLots.AnyAsync(l => l.Id == goldLotId))
+            return;
+
+        var bratislava = await dbContext.Cities.FirstOrDefaultAsync(c => c.Name == "Bratislava");
+        if (bratislava == null) return;
+
+        var gold = await dbContext.ResourceTypes.FirstOrDefaultAsync(r => r.Slug == "gold");
+        var lot = new BuildingLot
+        {
+            Id = goldLotId,
+            CityId = bratislava.Id,
+            Name = "Carpathian Gold Seam",
+            Description = "Rare high-grade gold deposit in the Carpathian foothills north of Bratislava. Geological surveys confirm 3,200 kg of recoverable gold at 82% purity — one of the richest seams in Central Europe.",
+            District = "Extraction Belt",
+            Latitude = 48.1740, Longitude = 17.0950,
+            PopulationIndex = 0.42m,
+            BasePrice = 80_000m,
+            Price = 80_000m,
+            SuitableTypes = "MINE",
+            ResourceTypeId = gold?.Id,
+            ResourceType = gold,
+            MaterialQuality = 0.82m,
+            MaterialQuantity = 3_200m
+        };
+
+        var resourcePremium = LandService.ComputeResourcePremium(lot.ResourceType, lot.MaterialQuality, lot.MaterialQuantity);
+        if (resourcePremium > 0m)
+        {
+            var appraisedLandValue = LandService.ComputeAppraisedPrice(lot.BasePrice, lot.PopulationIndex);
+            lot.Price = appraisedLandValue + resourcePremium;
+        }
+
+        dbContext.BuildingLots.Add(lot);
+        await dbContext.SaveChangesAsync();
     }
 
     private static Guid CreateDeterministicGuid(string key)
