@@ -21,7 +21,7 @@ export function formatInGameTime(currentGameTimeUtc: string, locale: string): st
     timeZone: 'UTC',
   }).format(gameTime)
 
-  return formatted.replace(/\b24:(\d{2})\b/, '00:$1')
+  return formatted.replace(/24:(\d{2})/, '00:$1')
 }
 
 export function computeGameYearFromTick(currentTick: number): number {

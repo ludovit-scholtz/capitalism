@@ -41,9 +41,12 @@ const showConfirm = ref(false)
 
 type ForexTab = 'swap' | 'rates' | 'history' | 'gold'
 
+function parseForexTab(value: unknown): ForexTab {
+  return value === 'rates' || value === 'history' || value === 'gold' ? value : 'swap'
+}
+
 function getInitialTab(): ForexTab {
-  const queryTab = route.query.tab
-  return queryTab === 'rates' || queryTab === 'history' || queryTab === 'gold' ? queryTab : 'swap'
+  return parseForexTab(route.query.tab)
 }
 
 const activeTab = ref<ForexTab>(getInitialTab())
@@ -236,10 +239,7 @@ function formatTick(tick: number): string {
 }
 
 function applyQueryDefaults() {
-  const queryTab = route.query.tab
-  if (queryTab === 'swap' || queryTab === 'rates' || queryTab === 'history' || queryTab === 'gold') {
-    activeTab.value = queryTab
-  }
+  activeTab.value = parseForexTab(route.query.tab)
 
   const queryToCurrency = typeof route.query.toCurrency === 'string' ? route.query.toCurrency.toUpperCase() : null
   if (queryToCurrency && availableCurrencies.value.includes(queryToCurrency)) {
