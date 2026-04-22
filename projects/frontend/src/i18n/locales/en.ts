@@ -1446,6 +1446,8 @@ export default {
     rawMaterialQualityFair: 'Fair',
     rawMaterialQualityPoor: 'Poor',
     rawMaterialHint: 'Build a Mine here to extract this resource and feed it directly into your production chain. Higher quality means better output per tick.',
+    miningDepositSummaryTitle: 'Deposit Investment Summary',
+    miningInvestmentHint: 'Mine land commands a premium price that reflects the strategic value of the raw material deposit. Richer deposits with higher grade and larger reserves command significantly higher prices — this is a long-term industrial asset.',
     placementGuidanceTitle: 'Placement Guidance',
     placementGuidanceSalesShop: 'High population density makes this an ideal retail location. A Sales Shop here benefits from strong walk-in demand and fast turnover.',
     placementGuidanceFactory: 'Industrial zoning keeps operating costs low. A Factory here can run energy-intensive production without restrictions from nearby residents.',

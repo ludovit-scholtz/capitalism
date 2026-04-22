@@ -122,6 +122,11 @@ public sealed partial class AppDbInitializer(
             await dbContext.SaveChangesAsync();
         }
 
+        // Idempotent: ensure the Carpathian Gold Seam lot is present (added in the
+        // mining premium increment).  Databases seeded before this change will not have
+        // the lot; databases created after the initial seed will have it already.
+        await EnsureCarpathianGoldSeamLotAsync();
+
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)

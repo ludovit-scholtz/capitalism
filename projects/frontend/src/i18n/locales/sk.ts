@@ -1441,6 +1441,8 @@ export default {
     rawMaterialQualityFair: 'Priemerná',
     rawMaterialQualityPoor: 'Nízka',
     rawMaterialHint: 'Postavte tu Baňu na ťažbu tejto suroviny a dodávajte ju priamo do výrobného reťazca. Vyššia kvalita znamená lepšiu produkciu za tik.',
+    miningDepositSummaryTitle: 'Zhrnutie investície do ložiska',
+    miningInvestmentHint: 'Pozemok s baňou má prémiovú cenu, ktorá odráža strategickú hodnotu ložiska surovín. Bohatšie ložiská s vyššou kvalitou a väčšími zásobami majú výrazne vyššie ceny — ide o dlhodobé priemyselné aktívum.',
     placementGuidanceTitle: 'Odporúčanie pre umiestnenie',
     placementGuidanceSalesShop: 'Hustota obyvateľstva robí toto miesto ideálnym pre maloobchod. Predajňa tu ťaží zo silného záujmu zákazníkov.',
     placementGuidanceFactory: 'Priemyselné zónovanie znižuje prevádzkové náklady. Továreň tu môže fungovať bez obmedzení od okolitých obyvateľov.',

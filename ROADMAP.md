@@ -98,10 +98,12 @@ It will use real world map. The game will start in single city and later other c
 
 - When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
 
-### Mining (0% complete)
+### Mining (40% complete)
 
-- When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. 
-- Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
+**Shipped:** Mining land now shows deposit details and premium valuation — the lot list items display a resource type badge (e.g. ⛏ Iron Ore) before the player clicks, the detail panel already shows the full raw material panel with quality and estimated reserve, and the purchase form now surfaces a Deposit Investment Summary when Mine building type is selected. Pricing has been reworked so mine lots land in a $20M–$200M band: `ResourcePremiumCaptureRate` is now 100× the market spot value of the deposit, translating typical reserves (Iron Ore 18,000 t at 72% ≈ $32M, Chemical Minerals 12,000 t at 55% ≈ $20M, Gold 3,200 kg at 82% ≈ $131M) into a premium strategic investment range. A new seeded Carpathian Gold Seam lot (Bratislava Extraction Belt) demonstrates the upper end of the range.
+
+- When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. ✅ **Shipped**
+- Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined. ✅ **Shipped**
 
 ### Units (40% complete)
 

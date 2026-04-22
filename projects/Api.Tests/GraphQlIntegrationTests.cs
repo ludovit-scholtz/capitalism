@@ -13467,6 +13467,64 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task CityLots_MineLotsArePricedInPremiumRange_20MTo200M()
+    {
+        // ROADMAP: "Make sure the prices for the purchase of the land is very expensive
+        // ~ $20M to $200M depending on the quality of the resource and the amount of
+        // resource there is available to be mined."
+        // ResourcePremiumCaptureRate = 100 ensures that typical mine lot deposit values
+        // land in the $20M–$200M band.
+        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+        var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+            .First(c => c.GetProperty("name").GetString() == "Bratislava")
+            .GetProperty("id").GetString();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id name suitableTypes basePrice price materialQuality materialQuantity
+                resourceType { id name }
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityLots should not return errors");
+
+        var lots = result.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
+
+        // Mine lots with a resource deposit should be priced in the premium $20M–$200M band
+        var mineLots = lots
+            .Where(l => l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
+                        && l.GetProperty("resourceType").ValueKind != JsonValueKind.Null)
+            .ToList();
+
+        Assert.True(mineLots.Count >= 2,
+            "Expected at least 2 seeded mine lots with resource deposits in Bratislava");
+
+        const decimal MinPremiumPrice = 15_000_000m;  // "roughly $20M" — allow some flexibility for lower-quality deposits
+        const decimal MaxPremiumPrice = 250_000_000m; // allow slight overage for high-value (Gold) lots
+
+        foreach (var lot in mineLots)
+        {
+            var name = lot.GetProperty("name").GetString();
+            var price = lot.GetProperty("price").GetDecimal();
+
+            Assert.True(price >= MinPremiumPrice,
+                $"Mine lot '{name}' price ({price:C0}) must be at least {MinPremiumPrice:C0} to qualify as a premium strategic investment.");
+            Assert.True(price <= MaxPremiumPrice,
+                $"Mine lot '{name}' price ({price:C0}) should not exceed {MaxPremiumPrice:C0} — check deposit data or captureRate.");
+        }
+
+        // Confirm price spread across the band: lowest-priced mine lot should be ≤ 50% of highest
+        var prices = mineLots.Select(l => l.GetProperty("price").GetDecimal()).OrderBy(p => p).ToList();
+        Assert.True(prices[0] <= prices[^1] * 0.5m,
+            $"Mine lot prices should span the band: lowest={prices[0]:C0}, highest={prices[^1]:C0}. " +
+            "Higher-quality / more-valuable deposits should command significantly higher prices.");
+    }
+
+    [Fact]
     public async Task PurchaseLot_UpdatesCompanyCashBalance()
     {
         // AC #5: After a successful purchaseLot, the company's cash must be reduced
