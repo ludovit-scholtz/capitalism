@@ -97,10 +97,10 @@ Change cash flow management completely from the onboarding process, through unit
 **Shipped in this increment:**
 - Fixed "Acquire a Bank" button padding so it matches the surrounding UI quality
 - "Acquire a Bank" button now routes directly to the buy-building form with the Bank type pre-selected (`?type=BANK` query param), removing the extra step of manually selecting bank from the type grid
-- Bank setup section in the buy-building flow now clearly shows the required base capital and whether the company has sufficient funds, with a green ✅ / red ⚠️ capital-check panel
+- Bank setup section in the buy-building flow now clearly shows the required base capital and whether the selected funding bank account has sufficient balance, with a green ✅ / red ⚠️ capital-check panel
 - Players can now configure their initial deposit (savings) interest rate and lending interest rate directly in the bank setup form before completing the purchase
 - The interest rates (deposit default 3%, lending default 8%) are applied to the bank immediately after purchase via `setBankRates` mutation
-- Invalid bank creation is blocked at the UI level when company cash is below the base capital requirement
+- Invalid bank creation is blocked at the UI level when the selected funding bank account balance is below the base capital requirement
 
 ### Audits (0% complete)
 
@@ -381,12 +381,12 @@ When unit is being modified user can still change it. For example when user upgr
 ## The onboarding 
 
 Onboarding process:
-1. User is given $200000 to his personal account and he picks the game player name
-2. IPO Process - User puts his $50k to the business and has decision how much money he wants to raise - $800 000, $600000, or $400 000 varying his own shares to be 25% or 33% or 50% in the company. User picks the company name.
+1. User is given $200000 to his personal bank account and he picks the game player name
+2. IPO Process - User transfers $50k from his personal bank account to the business bank account and has decision how much money he wants to raise - $800 000, $600000, or $400 000 varying his own shares to be 25% or 33% or 50% in the company. User picks the company name.
 3. Player selects the industry type they want to start with. The Furniture, Food processing, or Healthcare.
 4. Player selects the product he wants to produce - Each starting industry allows 3 basic products to be produced.
-5. Then they pick the location of their first factory. This will set the factory layout for them and user pays for all costs associated with it - the property as well company layout (show costs analysis before the purchase). Wizzard will show them important areas on the screen like how much money they have, the price configuration or public sales configuration.
-6. Next the player buys his first sales shop and configures it to set the sales price to public. User pays for the land and sales shop unit layour - make sure the user has clear information about this.
+5. Then they pick the location of their first factory. This will set the factory layout for them and user pays for all costs associated with it - the property as well company layout (show costs analysis before the purchase). Wizard will show them important areas on the screen like which bank account pays, the current bank balance, the price configuration or public sales configuration.
+6. Next the player buys his first sales shop and configures it to set the sales price to public. User pays for the land and sales shop unit layout from the selected company/building bank account - make sure the user has clear information about this.
 7. The player is shown that the time goes on and he makes the profit from his business.
 8. User is asked to create the user account.
 
@@ -394,11 +394,11 @@ Do not require authentication for new not authenticated users. Do not store the 
 
 ## Stock exchange
 
-There is one global stock exchange where all company shares are traded. The share price is calculated as the sum of all equities of the company (including land, units, warehouse stocks, cash, owned stocks, and other assets) plus profit expectation divided by number of issued stocks.
+There is one global stock exchange where all company shares are traded. The share price is calculated as the sum of all equities of the company (including land, units, warehouse stocks, bank-account balances, owned stocks, and other assets) plus profit expectation divided by number of issued stocks.
 
 Profit expectation is complex formula where new companies has this as zero. The formula includes the profit this year, history of prifits in past years and dividends paid.
 
-Player acting for the company or person account can buy shares for any company including its own from public investors. Market bid price is 1% below the share price and offer is 1% above the share price. The buying of the company shares directly by the company is considered as the company buy back and reduces the number of issued shares.
+Player acting for the company or person account can buy shares for any company including its own from public investors. Market bid price is 1% below the share price and offer is 1% above the share price. The buying of the company shares directly by the company is considered as the company buy back and reduces the number of issued shares. Every trade settles between bank accounts and the acting person/company must choose the source or destination bank account for the settlement.
 
 Player acting for the company or person account can sell shares it owns.
 
@@ -413,7 +413,7 @@ In the stock exchange in company details, is list of all shareholders and the pi
 ### What was delivered
 - Global stock exchange UI with company listings, share prices, bid/ask spread, shareholder tables, and pie charts.
 - Buy and sell share trading with person account and company account switching.
-- Personal account ledger showing portfolio holdings, available cash, tax reserve, and dividend history.
+- Personal account ledger showing portfolio holdings, available bank-account buying power, tax reserve, and dividend history.
 - Trading controls redesigned using CSS grid for precise vertical alignment across all viewport sizes; input and Buy/Sell buttons share the same grid row guaranteeing identical baseline.
 - Responsive layout: labels hidden on mobile (aria-label covers accessibility), input spans full width, buttons collapse to side-by-side pair.
 - Loading, disabled, validation-error, and success/error feedback states all implemented.
@@ -437,7 +437,7 @@ In the top menu player can switch between person account or companies account. I
 
 In the onboarding the player picks the game player name. This is the person account. At the start he owns certain amount of company shares the player creates. The ledger info for the player account is customized to person view.
 
-Person cannot own land or buildings and does not pay tax. He can only own the cash or shares in the companies. Person account income is the sale of shares and dividends.
+Person cannot own land or buildings and does not pay tax. He can only own bank account balances or shares in the companies. Person account income is the sale of shares and dividends.
 
 Player can switch to person view so that he can trade the stocks.
 
@@ -545,7 +545,7 @@ In bank building, allow people to deposit funds to receive interest from the pla
 
 Bank building does not have any configurable unit, whole bank acts as a single unit.
 
-In the bank, there is a configuration to set the interest to pay to cash depositers, and interest rate which lenders pay to the player.
+In the bank, there is a configuration to set the interest to pay to deposit account holders, and interest rate which lenders pay to the player.
 
 When player creates a bank, he must deposit there the base capital of $10000000. This serves as the initial capital to be lended and is counted towards the bank deposits. 
 
