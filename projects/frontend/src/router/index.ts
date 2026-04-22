@@ -29,6 +29,16 @@ const router = createRouter({
       name: 'marketing-analytics',
       component: () => import('@/views/MarketingAnalyticsView.vue'),
     },
+    {
+      path: '/bank-statement/:companyId',
+      name: 'bank-statement',
+      component: () => import('@/views/BankStatementView.vue'),
+    },
+    {
+      path: '/bank-statement',
+      name: 'bank-statement-default',
+      component: () => import('@/views/BankStatementView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

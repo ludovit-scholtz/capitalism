@@ -806,6 +806,18 @@ export type MockState = {
     fromCurrencySymbol: string
     toCurrencySymbol: string
   }[]
+  /** Bank statement rows returned by the bankStatement query (keyed by companyId). */
+  bankStatementRows: Record<string, Array<{
+    id: string
+    recordedAtTick: number
+    recordedAtUtc: string
+    description: string
+    category: string
+    amount: number
+    runningBalance: number
+    buildingId: string | null
+    buildingName: string | null
+  }>>
   /** Media houses returned by cityMediaHouses query, keyed by cityId. */
   cityMediaHouses: Record<string, MockCityMediaHouseInfo[]>
 }
@@ -1922,6 +1934,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     fxRates: makeDefaultFxRates(),
     playerCurrencyBalances: [],
     forexTradeHistory: [],
+    bankStatementRows: {},
     cityMediaHouses: {},
     ...initial,
   }
@@ -5155,6 +5168,37 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               newToBalance,
               fromCurrencySymbol: fromSymbol,
               toCurrencySymbol: toSymbol,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('bankStatement') && !query.includes('executeForexSwap')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { companyId?: string; limit?: number } | undefined
+      const companyId = vars?.companyId ?? ''
+      const limit = vars?.limit ?? 50
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Player not found', 'PLAYER_NOT_FOUND')
+      const company = player.companies.find((c) => c.id === companyId)
+      if (!company) return routeJsonError('Company not found or you do not own it.', 'COMPANY_NOT_FOUND')
+      const allRows = state.bankStatementRows[companyId] ?? []
+      const rows = allRows.slice(0, limit)
+      const currentBalance = allRows.reduce((sum, r) => sum + r.amount, 0)
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            bankStatement: {
+              companyId: company.id,
+              companyName: company.name,
+              currencyCode: 'EUR',
+              currencySymbol: '€',
+              currentBalance,
+              totalEntries: allRows.length,
+              rows,
             },
           },
         }),

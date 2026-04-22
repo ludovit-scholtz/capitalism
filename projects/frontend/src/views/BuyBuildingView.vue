@@ -5,7 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { formatMoney } from '@/lib/currencyFormat'
-import type { City, BuildingLot, Company, PurchaseLotResult } from '@/types'
+import type { City, BuildingLot, Company, PurchaseLotResult, CurrencyBalance } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
@@ -27,6 +27,8 @@ const submitting = ref(false)
 // Bank setup fields
 const depositRatePercent = ref<number>(3)
 const lendingRatePercent = ref<number>(8)
+// Funding guidance
+const playerBalances = ref<CurrencyBalance[]>([])
 
 const SET_BANK_RATES_MUTATION = `
   mutation SetBankRates($input: SetBankRatesInput!) {
@@ -96,6 +98,19 @@ const bankCapitalInsufficientMessage = computed<string>(() =>
   }),
 )
 
+/** City currency code for the selected city (EUR if none selected). */
+const selectedCityCurrencyCode = computed<string>(
+  () => selectedCityObj.value?.currencyCode?.toUpperCase() ?? 'EUR',
+)
+
+/** True when the player has no balance in the selected city's currency (and currency ≠ EUR). */
+const hasFundingGap = computed<boolean>(() => {
+  const cc = selectedCityCurrencyCode.value
+  if (cc === 'EUR') return false
+  const found = playerBalances.value.find((b) => b.currencyCode === cc)
+  return !found || found.balance <= 0
+})
+
 const canSubmit = computed(
   () => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value,
 )
@@ -112,10 +127,14 @@ onMounted(async () => {
 
   loading.value = true
   try {
-    const data = await gqlRequest<{ cities: City[] }>(
-      '{ cities { id name countryCode currencyCode population } }',
-    )
-    cities.value = data.cities
+    const [citiesData, balancesData] = await Promise.all([
+      gqlRequest<{ cities: City[] }>('{ cities { id name countryCode currencyCode population } }'),
+      gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>(
+        '{ playerCurrencyBalances { currencyCode currencySymbol balance } }',
+      ),
+    ])
+    cities.value = citiesData.cities
+    playerBalances.value = balancesData.playerCurrencyBalances ?? []
 
     if (!selectedCompany.value) {
       error.value = t('cityMap.noCompany')
@@ -303,6 +322,31 @@ async function buyBuilding() {
                   <span class="city-name">{{ city.name }}</span>
                   <span class="city-country">{{ city.countryCode }}</span>
                 </button>
+              </div>
+            </div>
+
+            <!-- Funding guidance: shown when city currency ≠ EUR and player lacks that currency -->
+            <div v-if="selectedCityId && hasFundingGap" class="funding-guidance" role="alert" aria-live="polite">
+              <div class="funding-guidance-icon" aria-hidden="true">⚠️</div>
+              <div class="funding-guidance-body">
+                <strong class="funding-guidance-title">
+                  {{ t('buildings.fundingGapTitle', { currency: selectedCityCurrencyCode }) }}
+                </strong>
+                <p class="funding-guidance-text">
+                  {{ t('buildings.fundingGapText', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
+                </p>
+                <div class="funding-guidance-actions">
+                  <RouterLink to="/forex" class="btn-guidance-primary">
+                    {{ t('buildings.fundingGapGoToForex') }}
+                  </RouterLink>
+                  <RouterLink
+                    v-if="selectedCompany"
+                    :to="`/bank-statement/${selectedCompany.id}`"
+                    class="btn-guidance-secondary"
+                  >
+                    {{ t('buildings.fundingGapViewStatement') }}
+                  </RouterLink>
+                </div>
               </div>
             </div>
           </div>
@@ -874,6 +918,83 @@ async function buyBuilding() {
   text-align: center;
   padding: 2rem;
   color: var(--color-text-secondary);
+}
+
+/* Funding guidance banner */
+.funding-guidance {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  background: rgba(255, 159, 67, 0.08);
+  border: 1px solid var(--color-warning, #ff9f43);
+  border-radius: 10px;
+  margin-top: 0.75rem;
+}
+
+.funding-guidance-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.funding-guidance-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.funding-guidance-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-warning, #ff9f43);
+}
+
+.funding-guidance-text {
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.funding-guidance-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 0.3rem;
+}
+
+.btn-guidance-primary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 1rem;
+  background: var(--color-accent, #4f8ef7);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.btn-guidance-primary:hover {
+  opacity: 0.88;
+}
+
+.btn-guidance-secondary {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45rem 1rem;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.btn-guidance-secondary:hover {
+  background: var(--color-surface-alt, #1e2a3a);
 }
 
 @media (max-width: 640px) {
