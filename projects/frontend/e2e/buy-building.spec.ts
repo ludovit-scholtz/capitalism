@@ -69,9 +69,7 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('heading', { name: /Danube Works/i })).toBeVisible()
   })
 
-  test('shows bank setup info panel, capital check, and rate fields when BANK type is selected', async ({
-    page,
-  }) => {
+  test('shows bank setup info panel, capital check, and rate fields when BANK type is selected', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [

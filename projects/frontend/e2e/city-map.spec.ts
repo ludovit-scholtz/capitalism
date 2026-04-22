@@ -215,7 +215,11 @@ test.describe('City Map View', () => {
     await expect(page.getByText(/67% wind/i)).toBeVisible()
 
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
-    await page.locator('.building-type-card').filter({ hasText: /Power Plant/i }).first().click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Power Plant/i })
+      .first()
+      .click()
     await expect(page.getByText('Plant type', { exact: true })).toBeVisible()
     await expect(page.getByRole('radio', { name: /Solar20 MW/i })).toBeVisible()
     await expect(page.getByRole('radio', { name: /Solar20 MW/i })).toContainText('82%')
@@ -612,7 +616,10 @@ test.describe('City Map View', () => {
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // Select Factory building type (not Mine) — deposit summary should NOT appear
-    await page.locator('.building-type-card').filter({ hasText: /Factory/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Factory/i })
+      .click()
     await expect(page.locator('[data-testid="mining-deposit-summary"]')).toHaveCount(0)
   })
 
@@ -1089,7 +1096,10 @@ test.describe('City Map — purchase cost summary and cash delta', () => {
     await page.getByRole('button', { name: /Purchase Lot/i }).click()
 
     // Select a building type to trigger cost calculation
-    await page.locator('.building-type-card').filter({ hasText: /Sales Shop/i }).click()
+    await page
+      .locator('.building-type-card')
+      .filter({ hasText: /Sales Shop/i })
+      .click()
 
     const summary = page.locator('[aria-label="Purchase cost summary"]')
     await expect(summary).toBeVisible()
@@ -1776,9 +1786,7 @@ test.describe('City Map — blank-map regression (list→map toggle)', () => {
 })
 
 test.describe('City Media Houses', () => {
-  test('shows government-owned media houses with GOV badge for unauthenticated visitor', async ({
-    page,
-  }) => {
+  test('shows government-owned media houses with GOV badge for unauthenticated visitor', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/city/city-ba')
 
@@ -1879,9 +1887,7 @@ test.describe('City Media Houses', () => {
     await expect(page.locator('.media-house-card').filter({ hasText: 'My TV Station' })).toBeVisible()
   })
 
-  test('city power planning section is visible with weather conditions and power balance', async ({
-    page,
-  }) => {
+  test('city power planning section is visible with weather conditions and power balance', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
