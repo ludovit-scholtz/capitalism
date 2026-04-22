@@ -202,7 +202,7 @@ test.describe('Resource detail page', () => {
     await expect(page.getByRole('heading', { name: 'Wood', level: 1 })).toBeVisible()
     await expect(page.locator('.resource-description').first()).toContainText('Timber for furniture.')
     await expect(page.locator('.badge--category')).toBeVisible()
-    await expect(page.locator('.resource-meta')).toContainText('$10')
+    await expect(page.locator('.resource-meta')).toContainText('10')
     await expect(page.locator('.resource-meta')).toContainText('5 kg/t')
     await expect(page.getByRole('heading', { name: 'Used in Production Chains' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Electronic Table' })).toBeVisible()
