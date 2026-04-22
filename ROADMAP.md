@@ -41,11 +41,13 @@ Change cash flow management completely from the onboarding process, through unit
 - In forex exchange show the fx rate list table
 - Allow player to select bank account from which he wants to do the swap, and bank account to which he wants to do swap when doing trades in the forex exchange. Make sure to show also the current balance in the bank account selector.
 - Organizie forex exchange to tabs, make sure the default one is the swap tab
-- Player cannot go to minus on the bank account unles he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account.
+- Player cannot go to minus on the bank account unles he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
 - When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
+- Make the research budget be calculated in USD.
 - Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
 - In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
 - When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
+- If player wants to expand to different city with different currency, he must first open the bank account for that currency and do the fx swap. Otherwise in the buy building guide should be warning that player does not have any money in this currency and steps what he should do with the links.
 
 ### Onboarding
 
@@ -91,6 +93,7 @@ Change cash flow management completely from the onboarding process, through unit
 - The product selection is not localized
 - Set the min price to be the city average price for the product
 - Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
+- Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
 
 ### Banks (35% complete)
 
