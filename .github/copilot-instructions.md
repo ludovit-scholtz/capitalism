@@ -333,13 +333,27 @@ dotnet build
 - GraphQL: `cityLots(cityId)` is a **public query** (no auth required) so unauthenticated visitors can browse. `lot(id)` is also public. `purchaseLot` mutation requires auth and uses optimistic concurrency via `ConcurrencyToken`.
 - A building placed via `purchaseLot` inherits the lot's `Latitude`/`Longitude` exactly.
 - All city map UI strings use the `cityMap.*` i18n namespace, with district names under `cityMap.districts.*`. All three locales (en/sk/de) must have these keys.
-- `makeDefaultBuildingLots()` factory in `e2e/helpers/mock-api.ts` provides 4 mock lots (2 factory, 1 commercial, 1 residential) for E2E tests. Use `state.buildingLots` to customize lot ownership in tests.
+- `makeDefaultBuildingLots()` factory in `e2e/helpers/mock-api.ts` provides 5 mock lots for E2E tests: 1 premium mine/factory lot (`Industrial Plot A1`), 1 affordable factory-only starter lot (`Factory Site B1`), 1 commercial lot, 1 residential lot, and 1 business lot. Use `state.buildingLots` to customize lot ownership in tests.
 - When adding new city map E2E tests, always include `city-map.spec.ts` in the run; it is the canonical spec for the `/city/:id` route.
 - Bratislava coordinates (for validation): lat 47.8–48.4°N, lon 16.8–17.5°E.
 - The lot detail panel shows both `appraisedValue` (basePrice) and `price` (asking price) separately. When a lot has a raw material deposit and `price > basePrice`, a "resource premium" badge is shown next to the asking price. This implements the ROADMAP requirement: "The price to purchase the land includes also the base price for the raw material."
 - A PR titled `[WIP]` must not be left in that state. Drive every PR to a production-ready, fully-tested state before reporting complete.
 - Always confirm CI would pass by running the full local validation pipeline (backend Release build + tests, frontend lint + unit tests + build, full Playwright suite) before reporting completion.
 - Remove `[WIP]` from the PR title when all acceptance criteria are met, all tests pass, and the code has been reviewed.
+
+## Shared mock lot fixtures — premium mining vs starter onboarding
+
+Root-cause of a quality failure (April 2026, PR #107 mining premium pricing):
+- `makeDefaultBuildingLots()` was updated so `Industrial Plot A1` became a premium Iron Ore mine (~€32M) and a new affordable factory-only lot (`Factory Site B1`) was added, but onboarding and buy-building E2E tests still hardcoded `Industrial Plot A1` as the starter factory purchase path.
+- The shared mock change also invalidated old exact-count assumptions (`4 lots`) and unscoped `getByText(/Population index/i)` assertions in other specs.
+- `OnboardingLotSelector` emitted a Leaflet `_leaflet_pos` page error during rapid map-to-list or step transitions because the wizard reused/teared down Leaflet state too aggressively while the map animation path was still active.
+
+**Rules to prevent recurrence:**
+1. **When you change `makeDefaultBuildingLots()`, rerun every spec that depends on starter-lot affordability or exact lot counts.** At minimum this means `e2e/onboarding.spec.ts`, `e2e/city-map.spec.ts`, `e2e/buy-building.spec.ts`, then the full `npm run test:e2e` suite.
+2. **Keep the shared mock aligned with the real seeded product flow.** Premium mine lots may be `FACTORY,MINE`, but the default mock must also include a separate affordable factory-only starter lot so onboarding can complete with starter capital.
+3. **Do not hardcode premium mining lots as the starter factory choice in onboarding or buy-building E2E flows.** Use the affordable starter lot (`Factory Site B1`) for first-factory purchase journeys.
+4. **When a shared mock gains a new default item, audit every assertion that depends on exact counts or repeated labels.** Replace broad `getByText(...)` calls with container-scoped assertions so strict mode does not break when the fixture grows.
+5. **For Leaflet-based onboarding selectors, force separate component instances per wizard step and disable/stop map animations during teardown.** Rapid transitions between map/list or factory/shop steps must not emit page errors.
 
 ## PR description accuracy — preventing feature-claim / diff-only mismatch
 

@@ -77,7 +77,7 @@ test.describe('City Map View', () => {
 
     // Should show the city name and lot count
     await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
-    await expect(page.getByText(/4 lots/i)).toBeVisible()
+    await expect(page.getByText(/5 lots/i)).toBeVisible()
   })
 
   test('shows lot details when clicking a lot in list view', async ({ page }) => {
@@ -340,14 +340,14 @@ test.describe('City Map View', () => {
 
     await page.goto('/city/city-ba')
 
-    // Initially shows all 4 lots
-    await expect(page.getByText(/4 lots/i)).toBeVisible()
+    // Initially shows all 5 lots
+    await expect(page.getByText(/5 lots/i)).toBeVisible()
 
     // Click "Available Only" filter
     await page.getByRole('button', { name: /Available Only/i }).click()
 
-    // Should show 3 lots (one is owned)
-    await expect(page.getByText(/3 lots/i)).toBeVisible()
+    // Should show 4 lots (one is owned)
+    await expect(page.getByText(/4 lots/i)).toBeVisible()
   })
 
   test('unauthenticated user sees login required notice', async ({ page }) => {

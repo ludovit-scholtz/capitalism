@@ -143,8 +143,20 @@ function updateMarkers(): void {
 
   if (filteredLots.value.length > 0) {
     const bounds = L.latLngBounds(filteredLots.value.map((lot) => [lot.latitude, lot.longitude] as [number, number]))
-    map.fitBounds(bounds.pad(0.15))
+    map.fitBounds(bounds.pad(0.15), { animate: false })
   }
+}
+
+function destroyMap(): void {
+  markers.forEach((marker) => marker.remove())
+  markers = []
+
+  if (!map) return
+
+  map.stop()
+  map.off()
+  map.remove()
+  map = null
 }
 
 function initMap(): void {
@@ -157,6 +169,9 @@ function initMap(): void {
     center: [fallbackLot.latitude, fallbackLot.longitude],
     zoom: 14,
     zoomControl: true,
+    zoomAnimation: false,
+    fadeAnimation: false,
+    markerZoomAnimation: false,
   })
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -179,7 +194,7 @@ watch(
     if (map) {
       updateMarkers()
       if (selectedLot.value) {
-        map.panTo([selectedLot.value.latitude, selectedLot.value.longitude])
+        map.panTo([selectedLot.value.latitude, selectedLot.value.longitude], { animate: false })
       }
     }
   },
@@ -193,7 +208,10 @@ watch(viewMode, async (mode) => {
     } else {
       map.invalidateSize()
     }
+    return
   }
+
+  destroyMap()
 })
 
 onMounted(async () => {
@@ -204,10 +222,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  if (map) {
-    map.remove()
-    map = null
-  }
+  destroyMap()
 })
 </script>
 

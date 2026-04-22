@@ -33,8 +33,9 @@ test.describe('Buy Building View', () => {
     await page.getByRole('button', { name: /Factory/i }).click()
     await page.getByRole('button', { name: /Bratislava/i }).click()
 
-    await expect(page.getByRole('button', { name: /Industrial Plot A1/i })).toBeVisible()
-    await expect(page.getByText(/Population index/i)).toBeVisible()
+    const starterFactoryLot = page.getByRole('button', { name: /Factory Site B1/i })
+    await expect(starterFactoryLot).toBeVisible()
+    await expect(starterFactoryLot.getByText(/Population index/i)).toBeVisible()
   })
 
   test('purchases a selected land parcel and opens the building detail page', async ({ page }) => {
@@ -61,7 +62,7 @@ test.describe('Buy Building View', () => {
     await page.getByRole('button', { name: /Factory/i }).click()
     await page.getByLabel('Building Name').fill('Danube Works')
     await page.getByRole('button', { name: /Bratislava/i }).click()
-    await page.getByRole('button', { name: /Industrial Plot A1/i }).click()
+    await page.getByRole('button', { name: /Factory Site B1/i }).click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
 
     await page.waitForURL(/\/building\//)

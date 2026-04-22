@@ -11,6 +11,11 @@ It will use real world map. The game will start in single city and later other c
 - Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
+### Archive E2E tests (0% complete)
+
+- Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
+- Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
+
 ### Tailwind migration (0% complete)
 
 - Update all pages to use the tailwind as primary stying method
@@ -19,31 +24,38 @@ It will use real world map. The game will start in single city and later other c
 - Support light mode and dark mode
 - Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
 
-### Currencies (90% complete)
+### Government company
 
+- Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
+- Create one government bank for each currency
+
+### Currencies and bank accounts (0% complete)
+
+Change cash flow management completely from the onboarding process, through unit calculations, payments in stock exchange up to the ledger calculation
+
+- The only place where user can have money is in the bank account! Remove the cash balance from the player or company account.
+- Create one government bank for each currency with deposit interest rate 0%, and borrowing interest rate 20%. Create bank account in format 16 random digits where bank accounts must be unique in game server.
+- Currency can be moved only between the bank accounts. Every money transfer must be visible in the ledger and also in the bank statement review. 
+- Create bank statement review where players can see the transfers in their bank accounts.
+- Every building has the bank account assigned, if it does not have, create one bank account in the government bank for the currency in the building's city.
 - In forex exchange show the fx rate list table
-- ✅ When starting the onboarding process make sure the initial investment is fair for every user in every currency. Onboarding now scales founder contribution and IPO raise by EUR→city FX rate (e.g. Prague company starts with ~15M CZK, not 600k CZK).
-- ✅ Encyclopedia shows product base prices in EUR as a reference anchor via `formatMoney`; city-map lot prices use city `currencyCode`; company settings uses company `currencyCode`.
-- ✅ Property (land lot) prices are expressed in local city currency. `LandService.ComputeBasePrice` applies EUR→cityCurrency FX rate. Prague lots are priced in CZK (~2 M+), Bratislava in EUR. Existing EUR-anchored lots in non-EUR cities are self-healed on the next tick cycle.
-- ✅ `Company.CurrencyCode` field propagated to `CompanySettingsResult` so all company-level monetary displays use the correct local currency.
-- ✅ Products in PUBLIC_SALES units now use FX-normalized base prices for demand/price-index calculations. A Wooden Chair priced at 1 134 CZK in Prague is evaluated against a 1 134 CZK base (EUR 45 × 25.20), not 45 EUR — so the price-index is 1.0 and demand is not suppressed.
-- ✅ Shipping/transit costs from the global exchange are expressed in the destination city's local currency (e.g. Prague factory sees CZK-denominated transit cost). `GlobalExchangeCalculator.ComputeTransitCostPerUnit` and `ComputeExchangePrice` have FX-rate overloads used by `PurchasingPhase` and `Query.Exchange`.
-- ✅ Global exchange UI (`GlobalExchangeView`) now formats all prices in the selected destination city's local currency using `formatMoney` instead of hardcoded `$`.
-- ✅ `Mutation.OnboardingHelpers` sets `MinPrice`/`MaxPrice` on starter units in the city's local currency so early factories have FX-correct purchase caps.
-- ✅ Leaderboard must be expressed in USD currency. Rankings now sort and display by `totalWealthUsd` (all local currencies converted to USD via FX rates). Company breakdown shows local currency for individual components.
+- Allow player to select bank account from which he wants to do the swap, and bank account to which he wants to do swap when doing trades in the forex exchange. Make sure to show also the current balance in the bank account selector.
+- Organizie forex exchange to tabs, make sure the default one is the swap tab
+- Player cannot go to minus on the bank account unles he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account.
+- When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
+- Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
+- In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
+- When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
 
-**Shipped in this increment (PR #100):**
-- ✅ `FxRateHelper` shared utility with `BuildEurRatesLookupAsync` — loads live rates from DB with fallbacks for CZK (25.20), USD (1.08), GBP (0.86), CNY (7.84), INR (90.50).
-- ✅ `TickContext.EurFxRates` and `GetCityFxRate(city)` — FX rates pre-loaded once per tick and available to all engine phases.
-- ✅ `PublicSalesPhase` — `localBasePrice = product.BasePrice × cityFxRate` before price-index comparison; fixes "chair costs 60 CZK vs $60" cross-city distortion.
-- ✅ `PurchasingPhase.Global` — exchange prices and transit costs computed in destination city currency, ending EUR/local-currency mixing in purchasing ledger entries.
-- ✅ `Query.Exchange (globalExchangeOffers)` — `exchangePricePerUnit`, `transitCostPerUnit`, and `deliveredPricePerUnit` returned in the destination city's local currency.
-- ✅ `GlobalExchangeView.vue` — `formatPrice` now uses `formatMoney(value, selectedCityCurrencyCode, locale)` so Prague shows CZK amounts, New York shows USD, etc.
-- ✅ `Mutation.OnboardingHelpers` (`ConfigureStarterFactory`, `AddStarterShop`) — `MinPrice`/`MaxPrice` scaled to city currency so onboarding factories in non-EUR cities have correct purchase caps.
+### Onboarding
+
+- When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
+- For each product category show at least 3 products to produce
 
 ### Number formatting (80% complete)
 
-✅ Shared `currencyFormat.ts` utility created with `formatMoney`, `formatCompactMoney`, `formatNumber`, and `formatCompactNumber`. Locale mapping: en → en-US, sk → sk-SK, de → de-DE. Used in OnboardingView, LeaderboardView, and available for all other screens. Unit tests cover compact notation, edge cases (NaN, Infinity, 0, negative), and locale-specific separators.
+- Everywhere where the currency is displayed, for example in the units, use the number formatting component
+- Add to the title the original number to be formatted and currency after it
 
 ### Power plants (30% complete)
 
@@ -65,20 +77,20 @@ It will use real world map. The game will start in single city and later other c
 - P&L chart for power plant building detail.
 - Government fine for under-supply / surplus-sale income for over-supply.
 
-### City map (70% complete)
+### Units
 
-- Implement and show weather predictions as is defined in the powerplants section
+- Add tab routing in unit details to the route, so that when person click on one unit in the grid and he is in quick actions does not change the tab when he clicks another unit in the grid
 
-**Shipped in this increment:**
-- ✅ Weather forecast panel shown in lot detail panel for POWER_PLANT-suitable lots (solar %, wind %, rolling forecast bar chart).
-- ✅ **City-level Power Planning & Weather section (new):** always-visible panel at the bottom of the city map page showing current solar/wind conditions, rolling 24-tick forecast bar chart, city power balance (supply/demand/reserve), status badge (Balanced / Constrained / Critical), and "Why This Matters" infrastructure guidance for renewable planning.
-- ✅ Power-planning guidance text explains how weather affects solar/wind output and why power shortage ROI is high in under-served cities.
-- ✅ 2 new E2E tests for the city-level power planning section: happy path with weather data and power shortage state rendering.
-- ✅ i18n keys in all three locales (`en`, `sk`, `de`) for the new weather/power planning panel.
+#### B2B sales unit
 
-**Remaining:**
-- Add weather forecast to city overview card in the onboarding city picker.
-- Weather-driven demand modifier for seasonal gameplay.
+- The product selection is not localized
+- Make the sale visibility default to be Group
+
+#### Public sales unit
+
+- The product selection is not localized
+- Set the min price to be the city average price for the product
+- Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
 
 ### Banks (35% complete)
 
@@ -104,13 +116,6 @@ It will use real world map. The game will start in single city and later other c
 
 - When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. ✅ **Shipped**
 - Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined. ✅ **Shipped**
-
-### Units (40% complete)
-
-**Shipped:** Tabbed unit detail layout — clicking any active unit now shows a focused tab bar (Basic Info, Inventory, History, Activity; plus Quick Actions and Market Intelligence for applicable unit types). Public Sales has all 6 tabs including a dedicated Quick Actions tab for fast price changes without entering edit mode. Market Intelligence and Recent Activity are now scoped to their own tabs, reducing visual noise. The same tab pattern applies to Purchase and Manufacturing units.
-
-- When person clicks on the unit, organize different sections to tabs
-- For example public sales unit create tab layout for Basic info, Quick actions, Stored inventory, Movement history, Market Intelligence, Recent Activity. In basic info show some basic unit statistics like the profit similarily as on the building when no unit is selected. In quick actions allow user to efficienty change the selling price, so that when he clicks between the units he can do it very easily. Organize all units to tabs, not just the public sales unit.
 
 ### R&D Building (0% complete)
 

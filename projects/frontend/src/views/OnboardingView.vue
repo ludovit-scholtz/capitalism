@@ -1232,6 +1232,7 @@ useTickRefresh(async () => {
         </p>
         <OnboardingLotSelector
           v-else
+          key="factory-lot-selector"
           v-model:selected-lot-id="selectedFactoryLotId"
           :lots="availableFactoryLots"
           required-building-type="FACTORY"
@@ -1313,6 +1314,7 @@ useTickRefresh(async () => {
         </p>
         <OnboardingLotSelector
           v-else
+          key="shop-lot-selector"
           v-model:selected-lot-id="selectedShopLotId"
           :lots="availableShopLots"
           required-building-type="SALES_SHOP"
