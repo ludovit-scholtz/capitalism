@@ -298,6 +298,10 @@ public static class SourcingComparisonService
 
         var allCities = await db.Cities.ToListAsync();
 
+        // Get FX rate so exchange prices are shown in destination city's local currency.
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [destinationCity.CurrencyCode]);
+        var destinationFxRate = FxRateHelper.GetEurRate(fxRates, destinationCity.CurrencyCode);
+
         var candidateCities = applyLockedCity && unit.LockedCityId.HasValue
             ? allCities.Where(c => c.Id == unit.LockedCityId.Value).ToList()
             : allCities;
@@ -308,8 +312,8 @@ public static class SourcingComparisonService
                 .FirstOrDefault(cr => cr.CityId == sourceCity.Id)
                 ?.Abundance ?? GlobalExchangeCalculator.DefaultMissingAbundance;
 
-            var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance);
-            var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource);
+            var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, destinationFxRate);
+            var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, destinationFxRate);
             var deliveredPrice = exchangePrice + transitCost;
             var quality = GlobalExchangeCalculator.ComputeExchangeQuality(abundance);
             var (qualityMin, qualityMax) = GlobalExchangeCalculator.ComputeExchangeQualityBand(abundance);

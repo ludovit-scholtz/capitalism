@@ -160,7 +160,7 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(BuildingType.Factory, 1),
             nowUtc,
             city.Id);
-        ConfigureStarterFactory(db, factory, product, starterResourceId.Value);
+        ConfigureStarterFactory(db, factory, product, starterResourceId.Value, fxRate);
 
         var shopLotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, BuildingType.SalesShop);
         var (_, shop) = await PrepareLotPurchaseAsync(
@@ -172,7 +172,7 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(BuildingType.SalesShop, 1),
             nowUtc,
             city.Id);
-        AddStarterShop(db, company.Id, shop.Id, product);
+        AddStarterShop(db, company.Id, shop.Id, product, fxRate);
 
         // Mark onboarding as completed for this player
         player.OnboardingCompletedAtUtc = nowUtc;
@@ -444,6 +444,10 @@ public sealed partial class Mutation
 
         var onboardingCityId = player.OnboardingCityId!.Value;
 
+        // Look up the FX rate for the company's local currency to normalize starter prices.
+        // The company currency was set from the city chosen in StartOnboardingCompany.
+        var finishFxRate = await Query.ComputeForexRateAsync(db, "EUR", company.CurrencyCode);
+
         var (_, shop) = await PrepareLotPurchaseAsync(
             db,
             company,
@@ -454,8 +458,8 @@ public sealed partial class Mutation
             nowUtc,
             onboardingCityId);
 
-        ConfigureStarterFactory(db, factory, product, starterResourceId.Value);
-        AddStarterShop(db, company.Id, shop.Id, product);
+        ConfigureStarterFactory(db, factory, product, starterResourceId.Value, finishFxRate);
+        AddStarterShop(db, company.Id, shop.Id, product, finishFxRate);
 
         player.OnboardingCompletedAtUtc = nowUtc;
         player.OnboardingShopBuildingId = shop.Id;

@@ -87,11 +87,18 @@ public sealed class PublicSalesPhase : ITickPhase
                         continue;
                     }
 
-                    var price = unit.MinPrice ?? basePrice;
-                    if (price <= 0m) price = basePrice;
+                    // BasePrice is stored in EUR. Convert to the city's local currency so that
+                    // price-index comparisons (price vs basePrice) are in the same unit of account.
+                    // Without this, a Prague seller pricing at 1 500 CZK would compare against a
+                    // 45 EUR base price and appear ~33× overpriced, killing all demand.
+                    var cityFxRate = context.GetCityFxRate(city);
+                    var localBasePrice = basePrice * cityFxRate;
+
+                    var price = unit.MinPrice ?? localBasePrice;
+                    if (price <= 0m) price = localBasePrice;
 
                     var populationIndex = lot?.PopulationIndex > 0m ? lot.PopulationIndex : 1m;
-                    var priceIndex = PublicSalesPricingModel.ComputePriceIndex(basePrice, price, priceElasticity);
+                    var priceIndex = PublicSalesPricingModel.ComputePriceIndex(localBasePrice, price, priceElasticity);
                     var qualityMultiplier = Math.Max(0.15m, inv.Quality);
                     var qualityDemandFactor = ComputeQualityDemandFactor(inv.Quality);
 
@@ -115,7 +122,7 @@ public sealed class PublicSalesPhase : ITickPhase
                         Company = company,
                         Lot = lot,
                         Inventory = inv,
-                        BasePrice = basePrice,
+                        BasePrice = localBasePrice,
                         Price = price,
                         Industry = industry,
                         ProductName = productName,

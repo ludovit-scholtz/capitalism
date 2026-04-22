@@ -15,11 +15,23 @@ public static class GlobalExchangeCalculator
     public const decimal MinimumWeightPerUnit = 0.1m;
 
     public static decimal ComputeExchangePrice(City city, ResourceType resourceType, decimal abundance)
+        => ComputeExchangePrice(city, resourceType, abundance, 1m);
+
+    /// <summary>
+    /// Computes the global exchange price for a resource in a city, expressed in the
+    /// destination city's local currency.
+    /// </summary>
+    /// <param name="fxRate">
+    /// Units of the destination city currency per 1 EUR (e.g. 25.20 for CZK).
+    /// Pass 1.0 to keep the result in EUR.
+    /// </param>
+    public static decimal ComputeExchangePrice(City city, ResourceType resourceType, decimal abundance, decimal fxRate)
     {
         var normalizedAbundance = Math.Clamp(abundance, 0m, 1m);
         var scarcityMultiplier = 1.55m - (normalizedAbundance * 0.75m);
         var cityMultiplier = 0.95m + (city.AverageRentPerSqm / 100m);
-        return decimal.Round(resourceType.BasePrice * scarcityMultiplier * cityMultiplier, 2, MidpointRounding.AwayFromZero);
+        var eurPrice = resourceType.BasePrice * scarcityMultiplier * cityMultiplier;
+        return decimal.Round(eurPrice * fxRate, 2, MidpointRounding.AwayFromZero);
     }
 
     public static decimal ComputeExchangeQuality(decimal abundance)
@@ -69,13 +81,24 @@ public static class GlobalExchangeCalculator
     }
 
     public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType)
+        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, 1m);
+
+    /// <summary>
+    /// Computes the per-unit transit cost between two cities, expressed in the
+    /// destination city's local currency.
+    /// </summary>
+    /// <param name="fxRate">
+    /// Units of the destination city currency per 1 EUR (e.g. 25.20 for CZK).
+    /// Pass 1.0 to keep the result in EUR.
+    /// </param>
+    public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType, decimal fxRate)
     {
         if (sourceCity.Id == destinationCity.Id)
         {
             return 0m;
         }
 
-        return Math.Max(
+        var eurCost = Math.Max(
             ComputeTransitCostPerUnit(
             sourceCity.Latitude,
             sourceCity.Longitude,
@@ -83,6 +106,7 @@ public static class GlobalExchangeCalculator
             destinationCity.Longitude,
             resourceType.WeightPerUnit),
             MinimumCityTransitCostPerUnit);
+        return decimal.Round(eurCost * fxRate, 2, MidpointRounding.AwayFromZero);
     }
 
     public static decimal ComputeTransitCostPerUnit(

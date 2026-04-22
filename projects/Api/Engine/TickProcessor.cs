@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Api.Data;
 using Api.Data.Entities;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -150,6 +151,12 @@ public sealed class TickProcessor(
         var trendStates = await db.MarketTrendStates.ToListAsync(ct);
         var trendStatesByKey = trendStates.ToDictionary(t => (t.CityId, t.ItemId));
 
+        // Pre-load EUR FX rates for all city currencies used in this game.
+        // These are used by purchasing and sales phases to normalise EUR-denominated
+        // base prices into local city currency, preventing cross-city price distortions.
+        var cityCurrencyCodes = cities.Select(c => c.CurrencyCode).Distinct().ToList();
+        var eurFxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, cityCurrencyCodes);
+
         // Build a position-keyed unit map and derive which units are currently under upgrade.
         // A unit is "under upgrade" when its building has a pending configuration plan containing
         // an IsChanged entry with TicksRequired > 0 whose AppliesAtTick is still in the future OR
@@ -212,6 +219,7 @@ public sealed class TickProcessor(
             TickStartRemainingQuantityByInventoryId = inventories.ToDictionary(i => i.Id, i => i.Quantity),
             RecentSalaryByCity = recentSalaryByCity,
             TrendStatesByKey = trendStatesByKey,
+            EurFxRates = eurFxRates,
             UnitsUnderUpgrade = unitsUnderUpgrade,
             ResearchBudgetsByKey = researchBudgets.ToDictionary(rb => (rb.CompanyId, rb.ProductTypeId)),
             WeatherByCity = weatherByCity,

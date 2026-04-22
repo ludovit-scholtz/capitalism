@@ -103,7 +103,9 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
     private async Task<(Guid CompanyId, Guid FactoryId, Guid ShopId)> SeedFactoryAndShopAsync(AppDbContext db)
     {
-        var city = await db.Cities.Include(c => c.Resources).FirstAsync();
+        // Use Bratislava (EUR) so that EUR-denominated seed prices (product.BasePrice=45)
+        // are in the same unit of account as the city's local currency after FX normalisation.
+        var city = await db.Cities.Include(c => c.Resources).FirstAsync(c => c.Name == "Bratislava");
 
         var player = new Player
         {
@@ -230,7 +232,8 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
     private async Task<(Guid CompanyId, Guid FactoryId, Guid ShopId, Guid ShopPurchaseUnitId, Guid ShopPublicSalesUnitId)> SeedFactoryToShopSupplyChainAsync(AppDbContext db)
     {
-        var city = await db.Cities.Include(c => c.Resources).FirstAsync();
+        // Use Bratislava (EUR) so that EUR-denominated seed prices match the city currency.
+        var city = await db.Cities.Include(c => c.Resources).FirstAsync(c => c.Name == "Bratislava");
 
         var player = new Player
         {
@@ -724,9 +727,12 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var processor = await CreateProcessorAsync(scope);
         await processor.ProcessTickAsync();
 
-        // Sales should have generated revenue.
+        // Reload entity to pick up changes committed by TickProcessor.
+        await db.Entry(company).ReloadAsync();
+
+        // Sales should have generated revenue (net of operating costs).
         Assert.True(company.Cash > cashBefore,
-            "Company cash should increase after public sales.");
+            $"Company cash should increase after public sales. CashBefore={cashBefore}, CashAfter={company.Cash}");
     }
 
     [Fact]
