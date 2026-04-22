@@ -260,6 +260,10 @@ public static class ProcurementPreviewService
 
         var allCities = await db.Cities.ToListAsync();
 
+        // Get FX rate so exchange prices are expressed in the destination city's local currency.
+        var fxRate = await FxRateHelper.BuildEurRatesLookupAsync(db, [destinationCity.CurrencyCode]);
+        var destinationFxRate = FxRateHelper.GetEurRate(fxRate, destinationCity.CurrencyCode);
+
         // Apply LockedCityId filter only when applyLockedCity=true (EXCHANGE mode only).
         // OPTIMAL mode must not be constrained by LockedCityId so it can pick the globally cheapest source.
         var candidateCities = applyLockedCity && unit.LockedCityId.HasValue
@@ -273,8 +277,8 @@ public static class ProcurementPreviewService
                     .FirstOrDefault(cr => cr.CityId == sourceCity.Id)
                     ?.Abundance ?? GlobalExchangeCalculator.DefaultMissingAbundance;
 
-                var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance);
-                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource);
+                var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, destinationFxRate);
+                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, destinationFxRate);
                 var deliveredPrice = exchangePrice + transitCost;
                 var quality = GlobalExchangeCalculator.ComputeExchangeQuality(abundance);
 

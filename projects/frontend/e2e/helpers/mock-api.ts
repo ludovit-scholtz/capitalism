@@ -1195,10 +1195,10 @@ function computeDistanceKm(latitudeA: number, longitudeA: number, latitudeB: num
   return earthRadiusKm * (2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)))
 }
 
-function computeMockExchangePrice(basePrice: number, abundance: number, averageRentPerSqm: number) {
+function computeMockExchangePrice(basePrice: number, abundance: number, averageRentPerSqm: number, fxRate = 1) {
   const scarcityMultiplier = 1.55 - Math.min(Math.max(abundance, 0), 1) * 0.75
   const cityMultiplier = 0.95 + averageRentPerSqm / 100
-  return Number((basePrice * scarcityMultiplier * cityMultiplier).toFixed(2))
+  return Number((basePrice * scarcityMultiplier * cityMultiplier * fxRate).toFixed(2))
 }
 
 function computeMockExchangeQuality(abundance: number) {
@@ -1215,9 +1215,10 @@ function computeMockExchangeQualityBand(abundance: number): { min: number; max: 
   return { min, max }
 }
 
-function computeMockTransitCost(weightPerUnit: number, distanceKm: number) {
+function computeMockTransitCost(weightPerUnit: number, distanceKm: number, fxRate = 1) {
   const rawCost = distanceKm * Math.max(weightPerUnit, 0.1) * 0.0025
-  return Number(Math.max(rawCost, 0.01).toFixed(2))
+  const eurCost = Math.max(rawCost, 0.05)
+  return Number(Math.max(eurCost * fxRate, 0.01).toFixed(2))
 }
 
 function getMockUnitCapacity(unit: MockBuildingUnit) {
@@ -4268,14 +4269,21 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const destinationCity = state.cities.find((city) => city.id === destinationCityId)
       const resources = state.resourceTypes.filter((resource) => !resourceTypeId || resource.id === resourceTypeId)
 
+      // Determine FX rate for the destination city (EUR→local currency).
+      const destCurrencyCode = destinationCity?.currencyCode ?? 'EUR'
+      const destFxRate =
+        destCurrencyCode === 'EUR'
+          ? 1
+          : (state.fxRates.find((r) => r.quoteCurrencyCode === destCurrencyCode)?.rate ?? 1)
+
       const globalExchangeOffers = destinationCity
         ? state.cities
             .flatMap((city) =>
               resources.map((resource) => {
                 const abundance = city.resources.find((entry) => entry.resourceType.id === resource.id)?.abundance ?? 0.05
                 const distanceKm = computeDistanceKm(city.latitude, city.longitude, destinationCity.latitude, destinationCity.longitude)
-                const exchangePricePerUnit = computeMockExchangePrice(resource.basePrice, abundance, city.averageRentPerSqm)
-                const transitCostPerUnit = computeMockTransitCost(resource.weightPerUnit, distanceKm)
+                const exchangePricePerUnit = computeMockExchangePrice(resource.basePrice, abundance, city.averageRentPerSqm, destFxRate)
+                const transitCostPerUnit = city.id === destinationCity.id ? 0 : computeMockTransitCost(resource.weightPerUnit, distanceKm, destFxRate)
                 const qualityBand = computeMockExchangeQualityBand(abundance)
                 return {
                   cityId: city.id,

@@ -56,6 +56,23 @@ public sealed partial class TickContext
     public Dictionary<(Guid CityId, Guid ItemId), MarketTrendState> TrendStatesByKey { get; init; } = [];
 
     /// <summary>
+    /// EUR-based FX rates for the currencies used across all cities in the game.
+    /// Key = ISO 4217 currency code, Value = units of that currency per 1 EUR.
+    /// EUR itself maps to 1.0. Pre-loaded by <see cref="TickProcessor"/> from
+    /// <see cref="Data.AppDbContext.FxRates"/> with <see cref="Utilities.FxRateHelper"/> fallbacks.
+    /// Used by purchasing and sales phases to convert EUR-denominated base prices
+    /// into the correct local city currency.
+    /// </summary>
+    public IReadOnlyDictionary<string, decimal> EurFxRates { get; init; } = new Dictionary<string, decimal>();
+
+    /// <summary>
+    /// Returns the EUR→local-currency FX rate for a city.
+    /// Uses the pre-loaded <see cref="EurFxRates"/> table with fallback to hardcoded rates.
+    /// </summary>
+    public decimal GetCityFxRate(City city)
+        => Utilities.FxRateHelper.GetEurRate(EurFxRates, city.CurrencyCode);
+
+    /// <summary>
     /// Set of <see cref="BuildingUnit"/> IDs that currently have a pending upgrade in progress
     /// (i.e., a <see cref="BuildingConfigurationPlanUnit"/> with <c>IsChanged = true</c>,
     /// <c>TicksRequired &gt; 0</c>, and <c>AppliesAtTick &gt; CurrentTick</c>).

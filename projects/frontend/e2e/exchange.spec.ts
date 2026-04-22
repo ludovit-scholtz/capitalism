@@ -531,10 +531,12 @@ test.describe('Global Exchange — quality and abundance data', () => {
     const allDeliveredPrices = woodRow.locator('.delivered-price')
     const priceTexts = await allDeliveredPrices.allTextContents()
     const bestDeliveredText = await bestCard.locator('.delivered-price').textContent()
-    const bestDelivered = parseFloat(bestDeliveredText?.replace('$', '').split('/')[0] ?? '999')
+    // Strip any currency symbol/code prefix and trailing unit (e.g. "€8.52/t", "$8.52/t", "213.12 CZK/t")
+    const parsePrice = (text: string) => parseFloat(text.replace(/[^0-9.]/g, '') || '999')
+    const bestDelivered = parsePrice(bestDeliveredText ?? '999')
 
     for (const priceText of priceTexts) {
-      const price = parseFloat(priceText.replace('$', '').split('/')[0])
+      const price = parsePrice(priceText)
       expect(bestDelivered).toBeLessThanOrEqual(price)
     }
   })
@@ -1009,8 +1011,8 @@ test.describe('Global Exchange — Products marketplace tab', () => {
     await expect(chairRow).toContainText('Bid price')
     await expect(chairRow).toContainText('Ask price')
 
-    // Listing details should be visible
-    await expect(page.locator('.listing-price', { hasText: '$55' })).toBeVisible()
+    // Listing details should be visible — price shown in seller city's currency (Bratislava = EUR → €55)
+    await expect(page.locator('.listing-price', { hasText: '55' })).toBeVisible()
     await expect(page.locator('.listing-quantity', { hasText: '100' })).toBeVisible()
     await expect(page.locator('.listing-seller', { hasText: 'Furniture Co' })).toBeVisible()
     await expect(page.locator('.listing-city', { hasText: 'Bratislava' })).toBeVisible()

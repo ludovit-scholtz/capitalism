@@ -66,7 +66,7 @@ public sealed partial class Mutation
         );
     }
 
-    private static void ConfigureStarterFactory(AppDbContext db, Building factory, ProductType product, Guid starterResourceId)
+    private static void ConfigureStarterFactory(AppDbContext db, Building factory, ProductType product, Guid starterResourceId, decimal fxRate = 1m)
     {
         db.BuildingUnits.RemoveRange(factory.Units);
         db.BuildingUnits.AddRange(
@@ -78,15 +78,15 @@ public sealed partial class Mutation
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ResourceTypeId = starterResourceId, PurchaseSource = "OPTIMAL" },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Manufacturing, GridX = 1, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id },
             new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.Storage, GridX = 2, GridY = 0, Level = 1, LinkRight = true },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice, SaleVisibility = "COMPANY" }
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = factory.Id, UnitType = UnitType.B2BSales, GridX = 3, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = decimal.Round(product.BasePrice * fxRate, 2), SaleVisibility = "COMPANY" }
         );
     }
 
-    private static void AddStarterShop(AppDbContext db, Guid companyId, Guid buildingId, ProductType product)
+    private static void AddStarterShop(AppDbContext db, Guid companyId, Guid buildingId, ProductType product, decimal fxRate = 1m)
     {
         db.BuildingUnits.AddRange(
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id, PurchaseSource = "LOCAL", MaxPrice = product.BasePrice * 1.1m, VendorLockCompanyId = companyId },
-            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.PublicSales, GridX = 1, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = product.BasePrice * 1.5m }
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.Purchase, GridX = 0, GridY = 0, Level = 1, LinkRight = true, ProductTypeId = product.Id, PurchaseSource = "LOCAL", MaxPrice = decimal.Round(product.BasePrice * fxRate * 1.1m, 2), VendorLockCompanyId = companyId },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingId, UnitType = UnitType.PublicSales, GridX = 1, GridY = 0, Level = 1, ProductTypeId = product.Id, MinPrice = decimal.Round(product.BasePrice * fxRate * 1.5m, 2) }
         );
     }
 
