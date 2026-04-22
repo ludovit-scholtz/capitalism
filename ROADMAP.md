@@ -103,7 +103,9 @@ It will use real world map. The game will start in single city and later other c
 - When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. 
 - Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
-### Units (0% complete)
+### Units (40% complete)
+
+**Shipped:** Tabbed unit detail layout — clicking any active unit now shows a focused tab bar (Basic Info, Inventory, History, Activity; plus Quick Actions and Market Intelligence for applicable unit types). Public Sales has all 6 tabs including a dedicated Quick Actions tab for fast price changes without entering edit mode. Market Intelligence and Recent Activity are now scoped to their own tabs, reducing visual noise. The same tab pattern applies to Purchase and Manufacturing units.
 
 - When person clicks on the unit, organize different sections to tabs
 - For example public sales unit create tab layout for Basic info, Quick actions, Stored inventory, Movement history, Market Intelligence, Recent Activity. In basic info show some basic unit statistics like the profit similarily as on the building when no unit is selected. In quick actions allow user to efficienty change the selling price, so that when he clicks between the units he can do it very easily. Organize all units to tabs, not just the public sales unit.

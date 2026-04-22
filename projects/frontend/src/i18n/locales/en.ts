@@ -891,6 +891,17 @@ export default {
     sidebarPlaceholderTitle: 'Select a unit',
     sidebarPlaceholderBody: 'Choose a live unit in the grid to inspect its configured item, stored quantity, and value.',
     sidebarPlaceholderBodyEditing: 'Choose an existing unit or empty slot in the planned grid to configure the layout and review build costs.',
+    unitTabs: {
+      basicInfo: 'Basic Info',
+      quickActions: 'Quick Actions',
+      inventory: 'Inventory',
+      history: 'History',
+      marketIntelligence: 'Market',
+      recentActivity: 'Activity',
+      quickActionsHeading: 'Quick Price Update',
+      quickActionsDesc: 'Adjust the selling price for this unit immediately without entering edit mode.',
+      noHistory: 'No resource movement history recorded yet.',
+    },
     overview: {
       title: 'Building Overview',
       subtitle: 'No unit is selected. Review this {type} location and recent financial performance.',

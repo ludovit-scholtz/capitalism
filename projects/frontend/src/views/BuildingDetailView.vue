@@ -788,6 +788,30 @@ const upaMaxEstRevenue = computed(() => unitProductAnalytics.value?.snapshots.re
 // Current configured min price for the selected PUBLIC_SALES unit (0 if not set)
 const currentPublicSalesMinPrice = computed(() => (typeof selectedPublicSalesUnit.value?.minPrice === 'number' ? selectedPublicSalesUnit.value.minPrice : 0))
 
+// ── Unit detail tab state ───────────────────────────────────────────────────
+/** Currently active tab key in the read-only unit detail sidebar. */
+const selectedUnitTab = ref<string>('basicInfo')
+
+/** Ordered list of tabs available for the currently selected unit type. */
+const unitDetailTabs = computed<Array<{ key: string }>>(() => {
+  const unitType = selectedDisplayUnit.value?.unitType
+  if (!unitType || isEditing.value) return []
+  const tabs: Array<{ key: string }> = [{ key: 'basicInfo' }]
+  if (unitType === 'PUBLIC_SALES') tabs.push({ key: 'quickActions' })
+  tabs.push({ key: 'inventory' })
+  tabs.push({ key: 'history' })
+  if (unitType === 'PUBLIC_SALES' || unitType === 'PURCHASE' || unitType === 'MANUFACTURING') {
+    tabs.push({ key: 'marketIntelligence' })
+  }
+  tabs.push({ key: 'recentActivity' })
+  return tabs
+})
+
+/** Reset to Basic Info whenever the user selects a different unit. */
+watch(selectedDisplayUnit, () => {
+  selectedUnitTab.value = 'basicInfo'
+})
+
 let activeBuildingFinancialTimelineRequest = 0
 
 type ExchangeOfferItem = AnnotatedExchangeOffer
@@ -5850,7 +5874,19 @@ watch(
               <h3>{{ t('buildingDetail.unitDetails') }}</h3>
               <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
             </div>
+            <!-- Unit detail tab navigation -->
+            <nav class="unit-detail-tabs" aria-label="Unit detail sections" v-if="unitDetailTabs.length > 0">
+              <button
+                v-for="tab in unitDetailTabs"
+                :key="tab.key"
+                class="unit-tab-btn"
+                :class="{ 'unit-tab-btn--active': selectedUnitTab === tab.key }"
+                @click="selectedUnitTab = tab.key"
+              >{{ t(`buildingDetail.unitTabs.${tab.key}`) }}</button>
+            </nav>
             <div class="unit-detail">
+              <!-- ── Basic Info tab ───────────────────────────────────── -->
+              <template v-if="selectedUnitTab === 'basicInfo'">
               <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
               <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
               <div class="unit-stats">
@@ -5927,6 +5963,68 @@ watch(
               </div>
 
               <!-- Unit Upgrade Panel removed from read-only view; it now lives in edit mode only. -->
+              </template>
+              <!-- ── Quick Actions tab (PUBLIC_SALES only) ──────────── -->
+              <template v-else-if="selectedUnitTab === 'quickActions'">
+                <div class="unit-insight-card" aria-label="Quick Actions">
+                  <h5>{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
+                  <p class="unit-desc">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
+                  <div v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null" class="quick-action-current-price">
+                    <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
+                    <strong class="mi-metric-value">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
+                  </div>
+                  <div aria-label="Quick Price Update">
+                  <!-- Directional impact hint derived from elasticity -->
+                  <div
+                    v-if="publicSalesAnalytics && publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
+                    class="mi-price-impact-hint"
+                    :class="{
+                      'mi-price-impact-raise': quickPriceInput > currentPublicSalesMinPrice,
+                      'mi-price-impact-lower': quickPriceInput < currentPublicSalesMinPrice,
+                    }"
+                  >
+                    <template v-if="quickPriceInput > currentPublicSalesMinPrice">
+                      {{
+                        t('buildingDetail.marketIntelligence.priceUpdate.raisingHint', {
+                          elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
+                        })
+                      }}
+                    </template>
+                    <template v-else-if="quickPriceInput < currentPublicSalesMinPrice">
+                      {{
+                        t('buildingDetail.marketIntelligence.priceUpdate.loweringHint', {
+                          elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
+                        })
+                      }}
+                    </template>
+                  </div>
+                  <div class="mi-price-update-row">
+                    <label class="mi-price-update-label" for="quick-price-input">
+                      {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
+                      <span class="currency-badge">{{ cityCurrencyCode }}</span>
+                    </label>
+                    <input
+                      id="quick-price-input"
+                      type="number"
+                      class="mi-price-input"
+                      :placeholder="selectedPublicSalesUnit?.minPrice?.toString() ?? ''"
+                      :min="0.01"
+                      :step="0.01"
+                      v-model.number="quickPriceInput"
+                    />
+                    <button class="btn btn-primary mi-price-update-btn" :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0" @click="submitQuickPriceUpdate">
+                      {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
+                    </button>
+                  </div>
+                  <p v-if="quickPriceSuccess" class="mi-price-success">
+                    {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
+                  </p>
+                  <p v-if="quickPriceError" class="mi-price-error">{{ quickPriceError }}</p>
+                  </div>
+                </div>
+              </template>
+              <!-- ── Inventory tab ────────────────────────────────────── -->
+              <template v-else-if="selectedUnitTab === 'inventory'">
 
               <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
                 <h5>{{ t('buildingDetail.inventory.title') }}</h5>
@@ -6021,7 +6119,12 @@ watch(
                   </div>
                 </div>
               </div>
-
+              <p v-if="!getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell.x, selectedCell.y))" class="unit-desc">
+                {{ t('buildingDetail.inventory.empty') }}
+              </p>
+              </template>
+              <!-- ── Movement History tab ─────────────────────────────── -->
+              <template v-else-if="selectedUnitTab === 'history'">
               <UnitResourceHistoryPanel
                 v-if="selectedHistoryItemOptions.length > 0"
                 :items="selectedHistoryItemOptions"
@@ -6029,6 +6132,10 @@ watch(
                 :history="selectedUnitResourceHistory"
                 @update:selected-item-key="selectedHistoryItemKey = $event"
               />
+              <p v-else class="unit-desc">{{ t('buildingDetail.unitTabs.noHistory') }}</p>
+              </template>
+              <!-- ── Market Intelligence tab ──────────────────────────── -->
+              <template v-else-if="selectedUnitTab === 'marketIntelligence'">
               <div
                 v-if="
                   selectedPurchaseUnit && 'resourceTypeId' in selectedPurchaseUnit && selectedPurchaseUnit.resourceTypeId && ['EXCHANGE', 'OPTIMAL'].includes(selectedPurchaseUnit.purchaseSource ?? '')
@@ -6505,60 +6612,6 @@ watch(
                       {{ publicSalesAnalytics.actionHint }}
                     </p>
                   </div>
-
-                  <!-- Quick price update -->
-                  <div class="mi-price-update-panel" aria-label="Quick Price Update">
-                    <h6 class="mi-price-update-title">{{ t('buildingDetail.marketIntelligence.priceUpdate.title') }}</h6>
-                    <p class="mi-price-update-desc">{{ t('buildingDetail.marketIntelligence.priceUpdate.desc') }}</p>
-
-                    <!-- Directional impact hint derived from elasticity -->
-                    <div
-                      v-if="publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
-                      class="mi-price-impact-hint"
-                      :class="{
-                        'mi-price-impact-raise': quickPriceInput > currentPublicSalesMinPrice,
-                        'mi-price-impact-lower': quickPriceInput < currentPublicSalesMinPrice,
-                      }"
-                    >
-                      <template v-if="quickPriceInput > currentPublicSalesMinPrice">
-                        {{
-                          t('buildingDetail.marketIntelligence.priceUpdate.raisingHint', {
-                            elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
-                          })
-                        }}
-                      </template>
-                      <template v-else-if="quickPriceInput < currentPublicSalesMinPrice">
-                        {{
-                          t('buildingDetail.marketIntelligence.priceUpdate.loweringHint', {
-                            elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
-                          })
-                        }}
-                      </template>
-                    </div>
-
-                    <div class="mi-price-update-row">
-                      <label class="mi-price-update-label" for="quick-price-input">
-                        {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
-                        <span class="currency-badge">{{ cityCurrencyCode }}</span>
-                      </label>
-                      <input
-                        id="quick-price-input"
-                        type="number"
-                        class="mi-price-input"
-                        :placeholder="selectedPublicSalesUnit?.minPrice?.toString() ?? ''"
-                        :min="0.01"
-                        :step="0.01"
-                        v-model.number="quickPriceInput"
-                      />
-                      <button class="btn btn-primary mi-price-update-btn" :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0" @click="submitQuickPriceUpdate">
-                        {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
-                      </button>
-                    </div>
-                    <p v-if="quickPriceSuccess" class="mi-price-success">
-                      {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
-                    </p>
-                    <p v-if="quickPriceError" class="mi-price-error">{{ quickPriceError }}</p>
-                  </div>
                 </template>
 
                 <p v-else class="config-help">{{ t('buildingDetail.marketIntelligence.loadFailed') }}</p>
@@ -6680,8 +6733,9 @@ watch(
                   <p class="config-help">{{ t('buildingDetail.unitProductAnalytics.noProduct') }}</p>
                 </template>
               </div>
-
-              <!-- Recent Activity feed for all unit types -->
+              </template>
+              <!-- ── Recent Activity tab ─────────────────────────────── -->
+              <template v-else-if="selectedUnitTab === 'recentActivity'">
               <div class="unit-insight-card recent-activity-panel" aria-label="Recent Activity">
                 <h5>{{ t('buildingDetail.recentActivity.title') }}</h5>
                 <p class="config-help">{{ t('buildingDetail.recentActivity.subtitle') }}</p>
@@ -6701,6 +6755,7 @@ watch(
                 </template>
                 <p v-else class="config-help">{{ t('buildingDetail.recentActivity.empty') }}</p>
               </div>
+              </template>
             </div>
           </div>
         </div>
@@ -7020,6 +7075,55 @@ watch(
 .unit-config-header h3 {
   font-size: 1.125rem;
   margin: 0;
+}
+
+/* ── Unit detail tabs ────────────────────────────────────────── */
+.unit-detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 1rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.unit-detail-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.unit-tab-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.6rem 0.85rem;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.unit-tab-btn:hover {
+  color: var(--color-text);
+}
+
+.unit-tab-btn--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* Quick action card inside the Quick Actions tab */
+.quick-action-current-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .unit-detail {
