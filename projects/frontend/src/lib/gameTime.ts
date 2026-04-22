@@ -10,15 +10,18 @@ export function formatInGameTime(currentGameTimeUtc: string, locale: string): st
     return ''
   }
 
-  return new Intl.DateTimeFormat(locale, {
+  const formatted = new Intl.DateTimeFormat(locale, {
     year: 'numeric',
     month: 'short',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
+    hourCycle: 'h23',
     timeZone: 'UTC',
   }).format(gameTime)
+
+  return formatted.replace(/\b24:(\d{2})\b/, '00:$1')
 }
 
 export function computeGameYearFromTick(currentTick: number): number {
