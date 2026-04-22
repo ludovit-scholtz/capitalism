@@ -80,10 +80,15 @@ It will use real world map. The game will start in single city and later other c
 - Add weather forecast to city overview card in the onboarding city picker.
 - Weather-driven demand modifier for seasonal gameplay.
 
-### Banks (10% complete)
+### Banks (35% complete)
 
-- Acquire a Bank button looks strange as it is missing padding
-- Please make a banking onboarding much more user friendly. For example navigate from acquire a bank button directly to the form to create a bank, make sure the user has enough base capital, and allow him to set the borrowing and lending interest rates. When user goes from new building button, and he selects that he wants to create a bank, go to this bank setup form
+**Shipped in this increment:**
+- Fixed "Acquire a Bank" button padding so it matches the surrounding UI quality
+- "Acquire a Bank" button now routes directly to the buy-building form with the Bank type pre-selected (`?type=BANK` query param), removing the extra step of manually selecting bank from the type grid
+- Bank setup section in the buy-building flow now clearly shows the required base capital and whether the company has sufficient funds, with a green ✅ / red ⚠️ capital-check panel
+- Players can now configure their initial deposit (savings) interest rate and lending interest rate directly in the bank setup form before completing the purchase
+- The interest rates (deposit default 3%, lending default 8%) are applied to the bank immediately after purchase via `setBankRates` mutation
+- Invalid bank creation is blocked at the UI level when company cash is below the base capital requirement
 
 ### Audits (0% complete)
 

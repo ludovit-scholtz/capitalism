@@ -24,8 +24,19 @@ const selectedType = ref('')
 const selectedCityId = ref('')
 const buildingName = ref('')
 const submitting = ref(false)
-// Initial deposit for BANK type - defaults to $10M (required to open the bank for business)
-const initialDepositAmount = ref<number | null>(10_000_000)
+// Bank setup fields
+const depositRatePercent = ref<number>(3)
+const lendingRatePercent = ref<number>(8)
+
+const SET_BANK_RATES_MUTATION = `
+  mutation SetBankRates($input: SetBankRatesInput!) {
+    setBankRates(input: $input) {
+      bankBuildingId
+      depositInterestRatePercent
+      lendingInterestRatePercent
+    }
+  }
+`
 
 const INITIATE_BASE_DEPOSIT_MUTATION = `
   mutation InitiateBaseDeposit($bankBuildingId: UUID!) {
@@ -62,6 +73,29 @@ const selectedLot = computed<BuildingLot | null>(() => {
 
 const selectedCityObj = computed(() => cities.value.find((c) => c.id === selectedCityId.value) ?? null)
 
+/** Base capital requirement for the selected city's currency (mirrors backend logic). */
+const bankBaseCapitalRequired = computed<number>(() => {
+  const cc = selectedCityObj.value?.currencyCode?.toUpperCase() ?? 'EUR'
+  switch (cc) {
+    case 'CZK': return 240_000_000
+    case 'GBP': return 8_600_000
+    case 'CNY': return 72_000_000
+    case 'INR': return 835_000_000
+    default:    return 10_000_000
+  }
+})
+
+const companyHasBankCapital = computed<boolean>(() => {
+  if (!selectedCompany.value) return false
+  return selectedCompany.value.cash >= bankBaseCapitalRequired.value
+})
+
+const bankCapitalInsufficientMessage = computed<string>(() =>
+  t('buildings.bankCapitalInsufficient', {
+    amount: formatCurrency(bankBaseCapitalRequired.value),
+  }),
+)
+
 const canSubmit = computed(
   () => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value,
 )
@@ -90,6 +124,12 @@ onMounted(async () => {
     error.value = e instanceof Error ? e.message : 'Failed to load cities'
   } finally {
     loading.value = false
+  }
+
+  // Pre-select building type if passed as query param (e.g. from "Acquire a Bank" button)
+  const typeParam = route.query.type as string | undefined
+  if (typeParam && buildingTypes.includes(typeParam)) {
+    selectedType.value = typeParam
   }
 })
 
@@ -143,6 +183,12 @@ function districtLabel(district: string) {
 async function buyBuilding() {
   if (!canSubmit.value || !selectedCompany.value || !selectedLot.value) return
 
+  // Block bank purchase when company lacks sufficient capital
+  if (selectedType.value === 'BANK' && !companyHasBankCapital.value) {
+    error.value = bankCapitalInsufficientMessage.value
+    return
+  }
+
   submitting.value = true
   error.value = null
 
@@ -165,14 +211,27 @@ async function buyBuilding() {
 
     const buildingId = data.purchaseLot.building.id
 
-    // If buying a bank, automatically initiate the base capital deposit to activate the bank
-    if (selectedType.value === 'BANK' && initialDepositAmount.value && initialDepositAmount.value > 0) {
+    if (selectedType.value === 'BANK') {
+      // Activate the bank with the base capital deposit
       try {
         await gqlRequest(INITIATE_BASE_DEPOSIT_MUTATION, {
           bankBuildingId: buildingId,
         })
       } catch {
         // Non-fatal: bank was purchased; base deposit can be made from the bank management page
+      }
+
+      // Set the configured interest rates
+      try {
+        await gqlRequest(SET_BANK_RATES_MUTATION, {
+          input: {
+            bankBuildingId: buildingId,
+            depositInterestRatePercent: depositRatePercent.value,
+            lendingInterestRatePercent: lendingRatePercent.value,
+          },
+        })
+      } catch {
+        // Non-fatal: rates can be configured on the bank management page
       }
     }
 
@@ -267,22 +326,56 @@ async function buyBuilding() {
             </div>
           </div>
 
-          <!-- Initial deposit field (BANK only) -->
-          <div v-if="selectedType === 'BANK'" class="bank-initial-deposit">
-            <label for="initialDepositAmount" class="deposit-label">
-              {{ t('buildings.initialDepositLabel') }}
-              <span class="optional-hint">({{ t('common.optional') }})</span>
-            </label>
-            <p class="deposit-hint">{{ t('buildings.initialDepositHint') }}</p>
-            <input
-              id="initialDepositAmount"
-              v-model.number="initialDepositAmount"
-              type="number"
-              min="10000000"
-              step="1000000"
-              :placeholder="t('buildings.initialDepositPlaceholder')"
-              class="deposit-input"
-            />
+          <!-- Capital requirements check (BANK only) -->
+          <div v-if="selectedType === 'BANK'" class="bank-capital-check" :class="companyHasBankCapital ? 'capital-ok' : 'capital-warn'">
+            <span class="capital-icon" aria-hidden="true">{{ companyHasBankCapital ? '✅' : '⚠️' }}</span>
+            <div class="capital-body">
+              <span class="capital-label">{{ t('buildings.bankCapitalRequirement') }}:</span>
+              <strong class="capital-amount">{{ formatCurrency(bankBaseCapitalRequired) }}</strong>
+              <span v-if="companyHasBankCapital" class="capital-status capital-status-ok">
+                {{ t('buildings.bankCapitalSufficient') }}
+              </span>
+              <span v-else class="capital-status capital-status-warn">
+                {{ bankCapitalInsufficientMessage }}
+              </span>
+            </div>
+          </div>
+
+          <!-- Interest rate configuration (BANK only) -->
+          <div v-if="selectedType === 'BANK'" class="bank-rates-config">
+            <h4 class="rates-title">{{ t('buildings.bankSetupRatesTitle') }}</h4>
+            <div class="rates-grid">
+              <div class="rate-field">
+                <label for="depositRatePercent" class="rate-label">
+                  {{ t('buildings.bankDepositRateLabel') }}
+                </label>
+                <p class="rate-hint">{{ t('buildings.bankDepositRateHint') }}</p>
+                <input
+                  id="depositRatePercent"
+                  v-model.number="depositRatePercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  class="rate-input"
+                />
+              </div>
+              <div class="rate-field">
+                <label for="lendingRatePercent" class="rate-label">
+                  {{ t('buildings.bankLendingRateLabel') }}
+                </label>
+                <p class="rate-hint">{{ t('buildings.bankLendingRateHint') }}</p>
+                <input
+                  id="lendingRatePercent"
+                  v-model.number="lendingRatePercent"
+                  type="number"
+                  min="0.1"
+                  max="200"
+                  step="0.1"
+                  class="rate-input"
+                />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -335,7 +428,7 @@ async function buyBuilding() {
           <div class="action-bar">
             <button
               class="btn btn-primary btn-lg"
-              :disabled="!canSubmit || submitting"
+              :disabled="!canSubmit || submitting || (selectedType === 'BANK' && !companyHasBankCapital)"
               @click="buyBuilding"
             >
               {{ submitting ? t('common.loading') : t('buildings.buyNow') }}
@@ -659,36 +752,112 @@ async function buyBuilding() {
   gap: 0.25rem;
 }
 
-.bank-initial-deposit {
+.bank-capital-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid;
+}
+
+.bank-capital-check.capital-ok {
+  background: rgba(16, 185, 129, 0.07);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.bank-capital-check.capital-warn {
+  background: rgba(248, 113, 113, 0.07);
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.capital-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.capital-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.capital-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+.capital-amount {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.capital-status {
+  font-size: 0.8125rem;
+}
+
+.capital-status-ok {
+  color: #10b981;
+}
+
+.capital-status-warn {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.bank-rates-config {
   margin-top: 1rem;
   padding: 1rem 1.25rem;
-  background: rgba(16, 185, 129, 0.07);
-  border: 1px solid rgba(16, 185, 129, 0.2);
+  background: rgba(59, 130, 246, 0.05);
+  border: 1px solid rgba(59, 130, 246, 0.2);
   border-radius: var(--radius-md);
 }
 
-.deposit-label {
-  display: block;
-  font-size: 0.9rem;
+.rates-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  margin-bottom: 0.875rem;
+}
+
+.rates-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 600px) {
+  .rates-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rate-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.rate-label {
+  font-size: 0.875rem;
   font-weight: 600;
+}
+
+.rate-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
   margin-bottom: 0.25rem;
 }
 
-.deposit-hint {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.deposit-input {
-  width: 100%;
-  max-width: 320px;
+.rate-input {
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-input-bg, var(--color-surface));
   color: var(--color-text);
   font-size: 0.9rem;
+  width: 100%;
+  max-width: 200px;
 }
 
 .error-message {
