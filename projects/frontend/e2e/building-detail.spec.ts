@@ -1071,6 +1071,7 @@ test.describe('Building detail upgrades', () => {
     const activeSection = getGridSection(page, 'Current Configuration')
     await getGridCell(activeSection, 0, 0).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
+    await clickUnitTab(page, 'Inventory')
 
     // Flush button should be visible for storage units with inventory
     await expect(page.getByRole('button', { name: /Discard All Inventory/i })).toBeVisible()
@@ -1920,6 +1921,7 @@ test.describe('Building detail upgrades', () => {
 
     const activeSection = getGridSection(page, 'Current Configuration')
     await getGridCell(activeSection, 1, 0).click()
+    await clickUnitTab(page, 'History')
 
     const manufacturingHistoryCard = page.locator('.history-card').first()
     await expect(manufacturingHistoryCard.getByText('Movement history')).toBeVisible()
@@ -1934,6 +1936,7 @@ test.describe('Building detail upgrades', () => {
     await expect(manufacturingHistoryCard.locator('.history-summary-stat').filter({ hasText: 'Produced' }).getByText('30')).toBeVisible()
 
     await getGridCell(activeSection, 2, 0).click()
+    await clickUnitTab(page, 'History')
 
     const storageHistoryCard = page.locator('.history-card').first()
     await expect(storageHistoryCard.getByRole('button', { name: 'Wooden Chair', exact: true })).toBeVisible()
@@ -7002,7 +7005,6 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
       .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
       .first()
     await draftSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
-    await clickUnitTab(page, 'Market')
 
     // Config panel opens — verify EXCHANGE source and exchange offers are still shown in edit mode
     await expect(page.getByText('Unit Configuration')).toBeVisible()
@@ -11936,7 +11938,6 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
       .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
       .first()
     await draftSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
-    await clickUnitTab(page, 'Market')
 
     // Config panel opens and exchange offers appear (no blocked offers yet)
     await expect(page.getByText('Unit Configuration')).toBeVisible()
@@ -16130,6 +16131,7 @@ test.describe('Procurement mode configuration', () => {
     // Click on the unit in Current Configuration
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     // Procurement preview card should be visible
     await expect(page.locator('.procurement-preview')).toBeVisible()
@@ -16179,6 +16181,7 @@ test.describe('Procurement mode configuration', () => {
     // Click on the unit in Current Configuration
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     // Procurement preview shows blocked state
     await expect(page.locator('.procurement-preview')).toBeVisible()
@@ -16454,6 +16457,7 @@ test.describe('Sourcing Comparison Panel', () => {
     // Click on the PURCHASE unit in Current Configuration
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     // Sourcing comparison panel should be visible
     await expect(page.locator('.sourcing-comparison')).toBeVisible()
@@ -16486,6 +16490,7 @@ test.describe('Sourcing Comparison Panel', () => {
 
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     // Panel should be visible and show table
     const panel = page.locator('.sourcing-comparison')
@@ -16574,6 +16579,7 @@ test.describe('Sourcing Comparison Panel', () => {
 
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     const panel = page.locator('.sourcing-comparison')
     await expect(panel).toBeVisible()
@@ -16658,6 +16664,7 @@ test.describe('Sourcing Comparison Panel', () => {
 
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     const panel = page.locator('.sourcing-comparison')
     await expect(panel).toBeVisible()
@@ -16697,6 +16704,7 @@ test.describe('Sourcing Comparison Panel', () => {
 
     const currentSection = getGridSection(page, 'Current Configuration')
     await getGridCell(currentSection, 0, 0).click()
+    await clickUnitTab(page, 'Market')
 
     const panel = page.locator('.sourcing-comparison')
     await expect(panel).toBeVisible()
@@ -17768,6 +17776,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
       .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
+    await clickUnitTab(page, 'Market')
 
     // The product analytics panel should be visible
     const analyticsPanel = page.locator('[aria-label="Product Performance Analytics"]')
@@ -17827,6 +17836,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
       .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
+    await clickUnitTab(page, 'Market')
 
     const analyticsPanel = page.locator('[aria-label="Product Performance Analytics"]')
     await expect(analyticsPanel).toBeVisible()
@@ -17872,6 +17882,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
       .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
+    await clickUnitTab(page, 'Market')
 
     const analyticsPanel = page.locator('[aria-label="Product Performance Analytics"]')
     await expect(analyticsPanel).toBeVisible()
@@ -17927,6 +17938,7 @@ test.describe('Manufacturing unit product analytics panel', () => {
       .first()
     await gridSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
+    await clickUnitTab(page, 'Market')
 
     const analyticsPanel = page.locator('[aria-label="Product Performance Analytics"]')
     await expect(analyticsPanel).toBeVisible()
@@ -19539,6 +19551,7 @@ test.describe('Local city currency in building unit config', () => {
     // Click the PUBLIC_SALES unit in the "Current Configuration" (active) grid section
     const activeSection = page.locator('.grid-section').filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1).click()
+    await clickUnitTab(page, 'Market')
 
     // The analytics revenue should be formatted in CZK (Kč or CZK symbol)
     await expect(page.locator('.mi-summary-grid')).toContainText(/CZK|Kč/)
