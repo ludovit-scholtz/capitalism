@@ -987,3 +987,30 @@ DecayMarketingQuality(context);
 ```
 
 **Rule:** Any phase-level operation that should run unconditionally (decay, expiry, interest accrual) must be placed OUTSIDE any early-return or conditional block. Only skip the unconditional operation if the game design explicitly requires it to be conditional.
+
+## `db.Cities.FirstAsync()` without OrderBy — always returns Delhi, not Bratislava
+
+Root-cause of a pre-existing test failure (April 2026, PR #98 currency-aware pricing):
+- `PlaceBuilding_MediaHouse_WithValidMediaType_SetsMediaType` used `db.Cities.FirstAsync()` expecting Bratislava (the affordable EUR starter city).
+- In SQLite, TEXT primary keys are stored in a B-tree ordered by lexicographic UUID string value. The city whose UUID happens to sort first alphabetically is Delhi (INR), not Bratislava.
+- Delhi lots are priced at ~14–18 M INR (FX rate ≈ 90.5). The default company starting cash is 1 000 000. `placeBuilding` failed with `INSUFFICIENT_FUNDS`, returning `data: null`.
+- `WithValidMediaType` was the only test that actually reached lot lookup; all sibling MediaHouse tests check for early-validation errors (`INVALID_MEDIA_TYPE`) and return before any lot is queried, so they were unaffected.
+
+**Rules to prevent recurrence:**
+1. **Never use `db.Cities.FirstAsync()` without an explicit filter in tests.** Always use `db.Cities.FirstAsync(c => c.Name == "Bratislava")` when you want an affordable EUR-based starter city.
+2. **When a test that uses `placeBuilding` fails with `INSUFFICIENT_FUNDS` or `data: null`, the first thing to check is which city is being used.** If the test obtained the city via unfiltered `FirstAsync()`, it is likely using Delhi (INR).
+3. **`db.Cities.OrderBy(c => c.Population).FirstAsync()` also returns Bratislava** (smallest population = 475 000), which is a safe alternative ordering if city name must not be hardcoded.
+4. **The `GetCities` GraphQL query orders by `Population ASC, Name ASC`**, so `cities[0]` from GraphQL is always Bratislava. For tests that need the city via GraphQL, use that query instead of direct EF access.
+
+## Shared-factory Prague lot contamination — isolate tests that assert on ALL lots
+
+Root-cause of a full-suite test failure (April 2026, PR #98 currency-aware pricing):
+- `CityLots_PragueLots_HaveCzkScaledPrices` passed in isolation but failed in the full `GraphQlIntegrationTests` suite.
+- Root cause: `CreateTestLotAsync(pragueId, "FACTORY,MINE", ..., price: 90_000m)` is called by several `FinishOnboarding_PragueCity_*` tests. These create EUR-priced test lots (90 000 EUR) in Prague and persist them in the shared factory database.
+- When `CityLots_PragueLots_HaveCzkScaledPrices` ran, `cityLots(pragueId)` returned ALL Prague lots including these EUR-priced ones. The assertion `price > 1 000 000` then failed.
+- Fix: use `await using var isolatedFactory = new ApiWebApplicationFactory()` so the test runs against a clean database with only properly CZK-scaled lots.
+
+**Rules to prevent recurrence:**
+1. **Any test that asserts on the FULL set of lots for a city (`cityLots(cityId)`) must use an isolated factory** if any other test in the shared factory class creates `BuildingLot` rows in that city via `CreateTestLotAsync`.
+2. **`CreateTestLotAsync` always uses a fixed price (default 75 000, or a caller-supplied value) with `BasePrice = 0`.** This is intentionally EUR-level for affordability. When these lots exist in the shared factory DB for a non-EUR city, they will fail any assertion requiring local-currency prices (e.g., `> 1 000 000 CZK`).
+3. **Tests that query aggregate data (all lots, all orders, all players) from the shared factory are inherently fragile** because other tests add rows. Use isolated factories for such assertions.

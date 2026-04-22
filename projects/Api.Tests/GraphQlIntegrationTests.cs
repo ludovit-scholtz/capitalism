@@ -2631,15 +2631,22 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         // Prague (CZK) lots should have prices several multiples of their EUR counterpart.
         // A factory lot in Bratislava (EUR) is ~95–140 k; the same in Prague should be > 1 M CZK.
-        var citiesResult = await ExecuteGraphQlAsync("{ cities { id name currencyCode } }", null, null);
+        //
+        // Uses an isolated factory to avoid contamination from other tests in the shared factory
+        // that call CreateTestLotAsync() with EUR-level prices (e.g. 75 000 / 90 000) in Prague.
+        // Those EUR-priced test lots would fail the > 1 000 000 CZK assertion.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var citiesResult = await ExecuteGraphQlAsync(isolatedClient, "{ cities { id name currencyCode } }");
         var prague = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
             .First(c => c.GetProperty("name").GetString() == "Prague");
         var pragueId = prague.GetProperty("id").GetString()!;
 
         var lotsResult = await ExecuteGraphQlAsync(
+            isolatedClient,
             "query CityLots($cityId: UUID!) { cityLots(cityId: $cityId) { price basePrice suitableTypes } }",
-            new { cityId = pragueId },
-            null);
+            new { cityId = pragueId });
 
         var lots = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray().ToList();
         Assert.NotEmpty(lots);
@@ -23528,7 +23535,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        // Use Bratislava explicitly — it is the only EUR-currency starter city whose auto-generated
+        // lots are affordable with the default 1 000 000 starting cash.  db.Cities.FirstAsync()
+        // without OrderBy returns the city whose UUID is lexicographically smallest in the SQLite
+        // B-tree, which happens to be Delhi (INR) — lots there cost 14–18 M INR.
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
         var placeResult = await ExecuteGraphQlAsync(
             """
