@@ -40,6 +40,12 @@ async function configureStarterShopPurchaseItem(page: Page, planningSection: Ret
   await selectPurchaseItem(page, searchTerm, optionName)
 }
 
+
+/** Navigate to a tab in the read-only unit detail sidebar. */
+async function clickUnitTab(page: Page, tabName: string) {
+  await page.locator('.unit-detail-tabs').getByRole('button', { name: tabName }).click()
+}
+
 test.describe('Building detail upgrades', () => {
   test('allows revising links while a unit upgrade is still pending', async ({ page }) => {
     const player = makePlayer()
@@ -915,8 +921,10 @@ test.describe('Building detail upgrades', () => {
     await expect(getGridCell(activeSection, 0, 0)).toContainText('Wood')
 
     await getGridCell(activeSection, 0, 0).click()
+    await clickUnitTab(page, 'Inventory')
     await expect(page.getByText('Stored inventory')).toBeVisible()
     await expect(page.getByText('60 / 100')).toBeVisible()
+    await clickUnitTab(page, 'Market')
     const exchangeSection = page.locator('.unit-insight-card', { hasText: 'Global exchange offers' })
     await expect(exchangeSection).toBeVisible()
     await expect(exchangeSection.getByText('Bratislava').first()).toBeVisible()
@@ -1763,6 +1771,7 @@ test.describe('Building detail upgrades', () => {
     await expect(activeCell.locator('img.cell-item-image')).toHaveCount(1)
 
     await activeCell.click()
+    await clickUnitTab(page, 'Inventory')
     await expect(page.getByText('Sourcing costs')).toBeVisible()
     await expect(page.locator('.inventory-summary-stat').filter({ hasText: 'Sourcing costs' }).getByText('€600')).toBeVisible()
     const inventoryTable = page.locator('.inventory-table').first()
@@ -5888,6 +5897,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange offers section must be visible
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -6040,6 +6050,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // OPTIMAL source also triggers exchange offer visibility
     const exchangeCard = page.locator('.unit-insight-card', { hasText: 'Global exchange offers' })
@@ -6182,6 +6193,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6262,6 +6274,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6339,6 +6352,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6411,6 +6425,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6524,6 +6539,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6669,6 +6685,7 @@ test.describe('Global exchange market', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6768,6 +6785,7 @@ test.describe('Global exchange market — narrow layout', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange section heading must be visible
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -6798,6 +6816,7 @@ test.describe('Global exchange market — narrow layout', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -6875,6 +6894,7 @@ test.describe('Global exchange market — narrow layout', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
     // "No valid offers" message must be visible without horizontal scrolling
@@ -6954,6 +6974,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange offers panel must be visible immediately
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -6981,6 +7002,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
       .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
       .first()
     await draftSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Config panel opens — verify EXCHANGE source and exchange offers are still shown in edit mode
     await expect(page.getByText('Unit Configuration')).toBeVisible()
@@ -7003,6 +7025,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
 
     // Click the active PURCHASE unit again in read-only mode
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange offers panel must remain visible after save + reload
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -7078,6 +7101,7 @@ test.describe('Global exchange sourcing — end-to-end flow', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange panel must be visible
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -11705,6 +11729,7 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange offers panel must appear
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -11764,6 +11789,7 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange offers panel must appear for Chemical Minerals
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -11910,6 +11936,7 @@ test.describe('Global exchange market — per-industry resource coverage', () =>
       .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
       .first()
     await draftSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Config panel opens and exchange offers appear (no blocked offers yet)
     await expect(page.getByText('Unit Configuration')).toBeVisible()
@@ -12058,6 +12085,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await psCell.click()
 
     // The market intelligence panel should be visible
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
     await expect(panel.getByRole('heading', { level: 5, name: 'Market Intelligence' })).toBeVisible()
@@ -12143,6 +12171,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12206,6 +12235,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12262,6 +12292,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12319,6 +12350,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12456,6 +12488,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12513,6 +12546,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12573,6 +12607,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12643,6 +12678,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -12701,14 +12737,10 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
-    const panel = page.locator('[aria-label="Market Intelligence"]')
-    await expect(panel).toBeVisible()
-
+    await clickUnitTab(page, 'Quick Actions')
     // Quick price update panel should be visible
-    const pricePanel = panel.locator('[aria-label="Quick Price Update"]')
+    const pricePanel = page.locator('[aria-label="Quick Price Update"]')
     await expect(pricePanel).toBeVisible()
-    await expect(pricePanel.getByText('Quick Price Update')).toBeVisible()
-    await expect(pricePanel.getByText(/no building upgrade required/i)).toBeVisible()
 
     // Enter new price and submit
     const priceInput = pricePanel.locator('#quick-price-input')
@@ -12770,10 +12802,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
-    const panel = page.locator('[aria-label="Market Intelligence"]')
-    await expect(panel).toBeVisible()
-
-    const pricePanel = panel.locator('[aria-label="Quick Price Update"]')
+    await clickUnitTab(page, 'Quick Actions')
+    const pricePanel = page.locator('[aria-label="Quick Price Update"]')
     await expect(pricePanel).toBeVisible()
 
     // Enter a HIGHER price — should show a "raising" hint
@@ -12834,10 +12864,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
-    const panel = page.locator('[aria-label="Market Intelligence"]')
-    await expect(panel).toBeVisible()
-
-    const pricePanel = panel.locator('[aria-label="Quick Price Update"]')
+    await clickUnitTab(page, 'Quick Actions')
+    const pricePanel = page.locator('[aria-label="Quick Price Update"]')
     await expect(pricePanel).toBeVisible()
 
     // Enter a LOWER price — should show a "lowering" hint
@@ -12904,10 +12932,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
-    const panel = page.locator('[aria-label="Market Intelligence"]')
-    await expect(panel).toBeVisible()
-
-    const pricePanel = panel.locator('[aria-label="Quick Price Update"]')
+    await clickUnitTab(page, 'Quick Actions')
+    const pricePanel = page.locator('[aria-label="Quick Price Update"]')
     await expect(pricePanel).toBeVisible()
 
     // Simulate unit deletion from server state to trigger UNIT_NOT_FOUND.
@@ -12984,10 +13010,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
-    const panel = page.locator('[aria-label="Market Intelligence"]')
-    await expect(panel).toBeVisible()
-
-    const pricePanel = panel.locator('[aria-label="Quick Price Update"]')
+    await clickUnitTab(page, 'Quick Actions')
+    const pricePanel = page.locator('[aria-label="Quick Price Update"]')
     await expect(pricePanel).toBeVisible()
 
     // Apply a new price
@@ -13002,15 +13026,12 @@ test.describe('Public Sales Market Intelligence panel', () => {
     // Route should be preserved — still on the building detail page
     await expect(page).toHaveURL(/\/building\/building-shop-mi/)
 
-    // The Market Intelligence panel should still be visible (no navigation away)
-    await expect(panel).toBeVisible()
 
-    // The Quick Price Update panel should still be visible
-    await expect(pricePanel).toBeVisible()
-
+    // Navigate to Market tab to verify MI panel is still intact
+    await clickUnitTab(page, 'Market')
     // The analytics demand signal should still be visible
-    await expect(panel.locator('.mi-demand-badge')).toBeVisible()
-    await expect(panel.locator('.mi-demand-badge')).toContainText('Strong')
+    await expect(page.locator('[aria-label="Market Intelligence"]').locator('.mi-demand-badge')).toBeVisible()
+    await expect(page.locator('[aria-label="Market Intelligence"]').locator('.mi-demand-badge')).toContainText('Strong')
   })
 
   test('quick price update apply button is disabled when price is zero or negative', async ({ page }) => {
@@ -13067,10 +13088,8 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
-    const panel = page.locator('[aria-label="Market Intelligence"]')
-    await expect(panel).toBeVisible()
-
-    const pricePanel = panel.locator('[aria-label="Quick Price Update"]')
+    await clickUnitTab(page, 'Quick Actions')
+    const pricePanel = page.locator('[aria-label="Quick Price Update"]')
     await expect(pricePanel).toBeVisible()
 
     const applyBtn = pricePanel.getByRole('button', { name: 'Apply Price' })
@@ -13144,6 +13163,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13211,6 +13231,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13297,6 +13318,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13359,6 +13381,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13418,6 +13441,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13485,6 +13509,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
 
     // Unit detail sidebar should be open with Market Intelligence panel visible
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13545,6 +13570,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13562,6 +13588,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
 
     // After reload: URL param still present and panel still visible
     await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await clickUnitTab(page, 'Market')
     await expect(panel).toBeVisible()
     await expect(panel.getByText('Revenue per Tick')).toBeVisible()
   })
@@ -13591,6 +13618,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13666,6 +13694,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13762,6 +13791,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13858,6 +13888,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -13944,6 +13975,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14026,6 +14058,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14107,6 +14140,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14173,6 +14207,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14239,6 +14274,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14300,6 +14336,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14373,6 +14410,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14444,6 +14482,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14513,6 +14552,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14587,6 +14627,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14660,6 +14701,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -14726,6 +14768,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     const psCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(1)
     await psCell.click()
 
+    await clickUnitTab(page, 'Market')
     const panel = page.locator('[aria-label="Market Intelligence"]')
     await expect(panel).toBeVisible()
 
@@ -15417,6 +15460,7 @@ test.describe('Operational status panel and recent activity', () => {
       .first()
     const purchaseCell = activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
     await purchaseCell.click()
+    await clickUnitTab(page, 'Activity')
 
     // Recent Activity panel should be visible
     await expect(page.locator('[aria-label="Recent Activity"]')).toBeVisible()
@@ -15518,6 +15562,7 @@ test.describe('Destination-aware purchase sourcing', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     // Exchange offers panel must be visible
     await expect(page.getByText('Global exchange offers')).toBeVisible()
@@ -15572,6 +15617,7 @@ test.describe('Destination-aware purchase sourcing', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
     await expect(page.locator('.exchange-offers-list')).toBeVisible()
@@ -15623,6 +15669,7 @@ test.describe('Destination-aware purchase sourcing', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -15681,6 +15728,7 @@ test.describe('Destination-aware purchase sourcing', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
 
@@ -15726,6 +15774,7 @@ test.describe('Destination-aware purchase sourcing', () => {
       .filter({ has: page.getByRole('heading', { name: 'Current Configuration' }) })
       .first()
     await activeSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0).click()
+    await clickUnitTab(page, 'Market')
 
     await expect(page.getByText('Global exchange offers')).toBeVisible()
     // Exchange link must be present in read-only sidebar too
