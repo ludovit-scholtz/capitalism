@@ -19,17 +19,27 @@ It will use real world map. The game will start in single city and later other c
 - Support light mode and dark mode
 - Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
 
-### Currencies (70% complete)
+### Currencies (90% complete)
 
 - In forex exchange show the fx rate list table
 - ✅ When starting the onboarding process make sure the initial investment is fair for every user in every currency. Onboarding now scales founder contribution and IPO raise by EUR→city FX rate (e.g. Prague company starts with ~15M CZK, not 600k CZK).
 - ✅ Encyclopedia shows product base prices in EUR as a reference anchor via `formatMoney`; city-map lot prices use city `currencyCode`; company settings uses company `currencyCode`.
 - ✅ Property (land lot) prices are expressed in local city currency. `LandService.ComputeBasePrice` applies EUR→cityCurrency FX rate. Prague lots are priced in CZK (~2 M+), Bratislava in EUR. Existing EUR-anchored lots in non-EUR cities are self-healed on the next tick cycle.
 - ✅ `Company.CurrencyCode` field propagated to `CompanySettingsResult` so all company-level monetary displays use the correct local currency.
-- Products in the units are not affected by currency. At the moment when i do chair business, the sale price is 60 kč, while in the new york is $60. The products must have similar prices in every city, but adjusted by the currency.
-- Extend the model where currency is missing and every time do every monetary operations under the currency. Do not mix two currencies together.
-- Make the shipping costs also in similar price range in all cities, but expressed in the local currency.
+- ✅ Products in PUBLIC_SALES units now use FX-normalized base prices for demand/price-index calculations. A Wooden Chair priced at 1 134 CZK in Prague is evaluated against a 1 134 CZK base (EUR 45 × 25.20), not 45 EUR — so the price-index is 1.0 and demand is not suppressed.
+- ✅ Shipping/transit costs from the global exchange are expressed in the destination city's local currency (e.g. Prague factory sees CZK-denominated transit cost). `GlobalExchangeCalculator.ComputeTransitCostPerUnit` and `ComputeExchangePrice` have FX-rate overloads used by `PurchasingPhase` and `Query.Exchange`.
+- ✅ Global exchange UI (`GlobalExchangeView`) now formats all prices in the selected destination city's local currency using `formatMoney` instead of hardcoded `$`.
+- ✅ `Mutation.OnboardingHelpers` sets `MinPrice`/`MaxPrice` on starter units in the city's local currency so early factories have FX-correct purchase caps.
 - ✅ Leaderboard must be expressed in USD currency. Rankings now sort and display by `totalWealthUsd` (all local currencies converted to USD via FX rates). Company breakdown shows local currency for individual components.
+
+**Shipped in this increment (PR #100):**
+- ✅ `FxRateHelper` shared utility with `BuildEurRatesLookupAsync` — loads live rates from DB with fallbacks for CZK (25.20), USD (1.08), GBP (0.86), CNY (7.84), INR (90.50).
+- ✅ `TickContext.EurFxRates` and `GetCityFxRate(city)` — FX rates pre-loaded once per tick and available to all engine phases.
+- ✅ `PublicSalesPhase` — `localBasePrice = product.BasePrice × cityFxRate` before price-index comparison; fixes "chair costs 60 CZK vs $60" cross-city distortion.
+- ✅ `PurchasingPhase.Global` — exchange prices and transit costs computed in destination city currency, ending EUR/local-currency mixing in purchasing ledger entries.
+- ✅ `Query.Exchange (globalExchangeOffers)` — `exchangePricePerUnit`, `transitCostPerUnit`, and `deliveredPricePerUnit` returned in the destination city's local currency.
+- ✅ `GlobalExchangeView.vue` — `formatPrice` now uses `formatMoney(value, selectedCityCurrencyCode, locale)` so Prague shows CZK amounts, New York shows USD, etc.
+- ✅ `Mutation.OnboardingHelpers` (`ConfigureStarterFactory`, `AddStarterShop`) — `MinPrice`/`MaxPrice` scaled to city currency so onboarding factories in non-EUR cities have correct purchase caps.
 
 ### Number formatting (80% complete)
 

@@ -9,6 +9,7 @@ import { useGameStateStore } from '@/stores/gameState'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { buildGlobalExchangeProductQuote } from '@/lib/globalExchangeProductQuotes'
+import { formatMoney } from '@/lib/currencyFormat'
 import { formatInGameTime } from '@/lib/gameTime'
 import type { GlobalExchangeOffer, GlobalExchangeProductListing, GlobalExchangeProductQuote, ResourceType, ProductType } from '@/types'
 
@@ -16,6 +17,7 @@ interface City {
   id: string
   name: string
   countryCode: string
+  currencyCode: string
   latitude: number
   longitude: number
 }
@@ -75,6 +77,7 @@ const CITIES_QUERY = `
       id
       name
       countryCode
+      currencyCode
       latitude
       longitude
     }
@@ -343,8 +346,12 @@ const productRows = computed<ProductRow[]>(() => {
 
 const productRowsEmpty = computed(() => productRows.value.length === 0)
 
+const selectedCityCurrencyCode = computed(
+  () => cities.value.find((c) => c.id === selectedCityId.value)?.currencyCode ?? 'EUR',
+)
+
 function formatPrice(value: number): string {
-  return `$${value.toFixed(2)}`
+  return formatMoney(value, selectedCityCurrencyCode.value, locale.value)
 }
 
 function formatPercent(value: number): string {

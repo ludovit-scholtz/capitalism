@@ -21980,6 +21980,174 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     #endregion
+    // ── Cross-city currency normalization tests (Issue #100) ────────────────────────────────────
+
+    /// <summary>
+    /// GlobalExchangeOffers for Prague (CZK) must return prices in CZK, not EUR.
+    /// Wood base price is 10 EUR; with CZK FX rate ~25.20, Prague exchange price should be > 50 CZK.
+    /// </summary>
+    [Fact]
+    public async Task GlobalExchangeOffers_Prague_ReturnsCzkPrices()
+    {
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var woodId = (await ExecuteGraphQlAsync("{ resourceTypes { id slug } }"))
+            .GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().First(r => r.GetProperty("slug").GetString() == "wood")
+            .GetProperty("id").GetString()!;
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GlobalExchangeOffers($destinationCityId: UUID!, $resourceTypeId: UUID) {
+              globalExchangeOffers(destinationCityId: $destinationCityId, resourceTypeId: $resourceTypeId) {
+                cityName
+                exchangePricePerUnit
+                transitCostPerUnit
+                deliveredPricePerUnit
+              }
+            }
+            """,
+            new { destinationCityId = pragueId, resourceTypeId = woodId });
+
+        var offers = result.GetProperty("data").GetProperty("globalExchangeOffers").EnumerateArray().ToList();
+        Assert.True(offers.Count > 0, "Expected at least one offer for wood in Prague.");
+
+        // Prague local offer (same city, zero transit).
+        var pragueOffer = offers.First(o => o.GetProperty("cityName").GetString() == "Prague");
+        var exchangePrice = pragueOffer.GetProperty("exchangePricePerUnit").GetDecimal();
+
+        // Wood base price 10 EUR × CZK rate ~25.20 × scarcity/rent multipliers ≈ 280–350 CZK.
+        Assert.True(exchangePrice > 50m,
+            $"Prague exchange price {exchangePrice} should be > 50 CZK (FX-normalized, not raw EUR).");
+        Assert.True(exchangePrice < 1_000m,
+            $"Prague exchange price {exchangePrice} should be < 1000 CZK (sanity upper bound).");
+    }
+
+    /// <summary>
+    /// For the same resource, the Prague (CZK) price should be roughly FX-rate multiples of Bratislava (EUR).
+    /// CZK rate ≈ 25.20 so ratio should be in [10, 40].
+    /// </summary>
+    [Fact]
+    public async Task GlobalExchangeOffers_PragueVsBratislava_PricesAreFxNormalized()
+    {
+        var bratislavaId = await GetCityIdByNameAsync("Bratislava");
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var woodId = (await ExecuteGraphQlAsync("{ resourceTypes { id slug } }"))
+            .GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().First(r => r.GetProperty("slug").GetString() == "wood")
+            .GetProperty("id").GetString()!;
+
+        const string query = """
+            query GlobalExchangeOffers($destinationCityId: UUID!, $resourceTypeId: UUID) {
+              globalExchangeOffers(destinationCityId: $destinationCityId, resourceTypeId: $resourceTypeId) {
+                cityName
+                exchangePricePerUnit
+              }
+            }
+            """;
+
+        var eurResult = await ExecuteGraphQlAsync(query, new { destinationCityId = bratislavaId, resourceTypeId = woodId });
+        var czkResult = await ExecuteGraphQlAsync(query, new { destinationCityId = pragueId, resourceTypeId = woodId });
+
+        var eurPrice = eurResult.GetProperty("data").GetProperty("globalExchangeOffers")
+            .EnumerateArray().First(o => o.GetProperty("cityName").GetString() == "Bratislava")
+            .GetProperty("exchangePricePerUnit").GetDecimal();
+
+        var czkPrice = czkResult.GetProperty("data").GetProperty("globalExchangeOffers")
+            .EnumerateArray().First(o => o.GetProperty("cityName").GetString() == "Prague")
+            .GetProperty("exchangePricePerUnit").GetDecimal();
+
+        // CZK rate is ~25.20 → prices should differ by roughly 10–40×.
+        var ratio = czkPrice / eurPrice;
+        Assert.True(ratio > 10m && ratio < 40m,
+            $"Prague/Bratislava price ratio {ratio:F2} should be ~25x (EUR→CZK FX). EUR={eurPrice}, CZK={czkPrice}");
+    }
+
+    /// <summary>
+    /// Transit costs from remote cities to Prague (CZK) must be > 1 CZK, proving
+    /// they are FX-scaled (EUR minimum is 0.05, CZK minimum should be ~1.26).
+    /// </summary>
+    [Fact]
+    public async Task GlobalExchangeOffers_Prague_TransitCostsAreInCzk()
+    {
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var woodId = (await ExecuteGraphQlAsync("{ resourceTypes { id slug } }"))
+            .GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray().First(r => r.GetProperty("slug").GetString() == "wood")
+            .GetProperty("id").GetString()!;
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GlobalExchangeOffers($destinationCityId: UUID!, $resourceTypeId: UUID) {
+              globalExchangeOffers(destinationCityId: $destinationCityId, resourceTypeId: $resourceTypeId) {
+                cityName
+                transitCostPerUnit
+                deliveredPricePerUnit
+                exchangePricePerUnit
+              }
+            }
+            """,
+            new { destinationCityId = pragueId, resourceTypeId = woodId });
+
+        var remoteOffers = result.GetProperty("data").GetProperty("globalExchangeOffers")
+            .EnumerateArray()
+            .Where(o => o.GetProperty("cityName").GetString() != "Prague")
+            .ToList();
+
+        Assert.True(remoteOffers.Count > 0, "Expected remote city offers for Prague.");
+        Assert.All(remoteOffers, offer =>
+        {
+            var transit = offer.GetProperty("transitCostPerUnit").GetDecimal();
+            // Transit cost must be > 1 CZK (well above the raw 0.05 EUR minimum).
+            Assert.True(transit > 1m,
+                $"Transit cost {transit} CZK for {offer.GetProperty("cityName").GetString()} should be > 1 CZK.");
+        });
+    }
+
+    /// <summary>
+    /// PublicSalesPhase price-index calculation uses FX-normalized base price.
+    /// A Wooden Chair with MinPrice = 1134 (CZK equivalent of EUR 45) in Prague
+    /// should have a neutral price-index (1.0) and generate sales.
+    /// </summary>
+    [Fact]
+    public async Task PublicSalesPhase_Prague_CzkPriceYieldsNeutralPriceIndex()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // CZK rate ~25.20; base price 45 EUR → 1134 CZK local base price.
+        const decimal czkFxRate = 25.20m;
+        var localBasePrice = product.BasePrice * czkFxRate; // 45 × 25.20 = 1134
+
+        var player = new Player { Id = Guid.NewGuid(), Email = $"czk-{Guid.NewGuid():N}@t.com", DisplayName = "T", PasswordHash = "h", Role = PlayerRole.Player };
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "CZK Corp", Cash = 5_000_000m };
+        var shop = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = prague.Id, Type = BuildingType.SalesShop, Name = "CZK Shop", Level = 1 };
+        // MinPrice set in CZK (local base price — should yield PriceIndex = 1.0, not 0.0).
+        var salesUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = shop.Id, UnitType = UnitType.PublicSales,
+            GridX = 0, GridY = 0, Level = 3,
+            ProductTypeId = product.Id,
+            MinPrice = localBasePrice  // 1134 CZK — neutral price, should not suppress demand
+        };
+        db.Players.Add(player); db.Companies.Add(company); db.Buildings.Add(shop); db.BuildingUnits.Add(salesUnit);
+        db.Inventories.Add(new Inventory { Id = Guid.NewGuid(), BuildingId = shop.Id, BuildingUnitId = salesUnit.Id, ProductTypeId = product.Id, Quantity = 100m, Quality = 0.7m });
+        await db.SaveChangesAsync();
+
+        var cashBefore = company.Cash;
+        var phases = scope.ServiceProvider.GetServices<ITickPhase>();
+        var processor = new TickProcessor(db, phases, new NullLogger<TickProcessor>());
+        await processor.ProcessTickAsync();
+        await db.Entry(company).ReloadAsync();
+
+        // With a neutral price-index (CZK-normalized price), the company should have made sales.
+        Assert.True(company.Cash > cashBefore,
+            $"Prague company with CZK-normalized MinPrice={localBasePrice} should earn revenue. Cash: {cashBefore} → {company.Cash}");
+    }
+
 }
 
 /// <summary>
@@ -30652,5 +30820,6 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(buildingResult.GetProperty("contentBudgetPerTick").ValueKind == System.Text.Json.JsonValueKind.Null,
             "ContentBudgetPerTick should be null after clearing.");
     }
+
 
 }
