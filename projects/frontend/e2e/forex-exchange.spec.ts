@@ -58,6 +58,65 @@ test.describe('Forex Exchange page', () => {
     await expect(page.getByLabel('Amount')).toBeVisible()
   })
 
+  test('opens with Swap tab active by default and shows the Rate List tab', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await expect(page.getByRole('tab', { name: 'Swap' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: 'Rate List' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Swap' })).toBeVisible()
+  })
+
+  test('shows live rates on the Rate List tab', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.fxRates = [
+      {
+        baseCurrencyCode: 'EUR',
+        quoteCurrencyCode: 'CZK',
+        rate: 25.1234,
+        rateDate: '2026-04-22',
+        source: 'ECB',
+        quoteCurrencySymbol: 'Kč',
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'Rate List' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Live Rate List' })).toBeVisible()
+    await expect(page.locator('.rates-table')).toContainText('EUR/CZK')
+    await expect(page.locator('.rates-table')).toContainText('25.1234')
+  })
+
+  test('supports deep links that preselect the destination currency', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?toCurrency=USD')
+
+    await expect(page.getByRole('tab', { name: 'Swap' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByLabel('You receive')).toHaveValue('USD')
+  })
+
   test('shows validation error when same currency is selected', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -181,6 +240,8 @@ test.describe('Forex Exchange page', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
     await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'History' }).click()
 
     await expect(page.getByText('Recent Trades')).toBeVisible()
     await expect(page.locator('.history-row').first()).toBeVisible()

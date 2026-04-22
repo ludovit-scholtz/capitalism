@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
@@ -15,6 +15,7 @@ import type {
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
@@ -37,6 +38,18 @@ const swapError = ref<string | null>(null)
 const swapLoading = ref(false)
 
 const showConfirm = ref(false)
+
+type ForexTab = 'swap' | 'rates' | 'history' | 'gold'
+
+function parseForexTab(value: unknown): ForexTab {
+  return value === 'rates' || value === 'history' || value === 'gold' ? value : 'swap'
+}
+
+function getInitialTab(): ForexTab {
+  return parseForexTab(route.query.tab)
+}
+
+const activeTab = ref<ForexTab>(getInitialTab())
 
 // Derived list of available currencies (EUR + all quoted currencies)
 const availableCurrencies = computed(() => {
@@ -225,12 +238,38 @@ function formatTick(tick: number): string {
   return tick.toLocaleString()
 }
 
+function applyQueryDefaults() {
+  activeTab.value = parseForexTab(route.query.tab)
+
+  const queryToCurrency = typeof route.query.toCurrency === 'string' ? route.query.toCurrency.toUpperCase() : null
+  if (queryToCurrency && availableCurrencies.value.includes(queryToCurrency)) {
+    toCurrency.value = queryToCurrency
+    if (fromCurrency.value === queryToCurrency) {
+      const preferredSourceCurrency = availableCurrencies.value.find((code) => code !== queryToCurrency)
+      if (preferredSourceCurrency) {
+        fromCurrency.value = preferredSourceCurrency
+      }
+    }
+  }
+}
+
 onMounted(async () => {
   if (!auth.isAuthenticated) {
     router.push('/login')
     return
   }
   await loadData()
+  applyQueryDefaults()
+})
+
+watch(activeTab, async (tab) => {
+  const nextQuery = { ...route.query }
+  if (tab === 'swap') {
+    delete nextQuery.tab
+  } else {
+    nextQuery.tab = tab
+  }
+  await router.replace({ query: nextQuery })
 })
 </script>
 
@@ -252,24 +291,60 @@ onMounted(async () => {
       </div>
 
       <template v-else>
-        <!-- Currency Balances -->
-        <section class="forex-section" aria-label="Currency Balances">
-          <h2 class="section-title">{{ t('forex.balancesTitle') }}</h2>
-          <div v-if="balances.length === 0" class="balances-empty">{{ t('forex.balancesEmpty') }}</div>
-          <div v-else class="balances-grid">
-            <div v-for="b in balances" :key="b.currencyCode" class="balance-card">
-              <span class="balance-symbol">{{ b.currencySymbol }}</span>
-              <span class="balance-code">{{ b.currencyCode }}</span>
-              <span class="balance-amount">{{ formatAmount(b.balance) }}</span>
+        <div class="forex-tabs" role="tablist" :aria-label="t('forex.tabsLabel')">
+          <button
+            role="tab"
+            class="forex-tab"
+            :class="{ active: activeTab === 'swap' }"
+            :aria-selected="activeTab === 'swap'"
+            @click="activeTab = 'swap'"
+          >
+            {{ t('forex.tabSwap') }}
+          </button>
+          <button
+            role="tab"
+            class="forex-tab"
+            :class="{ active: activeTab === 'rates' }"
+            :aria-selected="activeTab === 'rates'"
+            @click="activeTab = 'rates'"
+          >
+            {{ t('forex.tabRateList') }}
+          </button>
+          <button
+            role="tab"
+            class="forex-tab"
+            :class="{ active: activeTab === 'history' }"
+            :aria-selected="activeTab === 'history'"
+            @click="activeTab = 'history'"
+          >
+            {{ t('forex.tabHistory') }}
+          </button>
+          <button
+            role="tab"
+            class="forex-tab"
+            :class="{ active: activeTab === 'gold' }"
+            :aria-selected="activeTab === 'gold'"
+            @click="activeTab = 'gold'"
+          >
+            {{ t('forex.tabGold') }}
+          </button>
+        </div>
+
+        <section v-if="activeTab === 'swap'" class="forex-section" aria-label="Forex Swap">
+          <h2 class="section-title">{{ t('forex.tabSwap') }}</h2>
+
+          <div class="balances-summary">
+            <h3 class="subsection-title">{{ t('forex.balancesTitle') }}</h3>
+            <div v-if="balances.length === 0" class="balances-empty">{{ t('forex.balancesEmpty') }}</div>
+            <div v-else class="balances-grid">
+              <div v-for="b in balances" :key="b.currencyCode" class="balance-card">
+                <span class="balance-symbol">{{ b.currencySymbol }}</span>
+                <span class="balance-code">{{ b.currencyCode }}</span>
+                <span class="balance-amount">{{ formatAmount(b.balance) }}</span>
+              </div>
             </div>
           </div>
-        </section>
 
-        <!-- Swap Form -->
-        <section class="forex-section swap-section" aria-label="Forex Swap">
-          <h2 class="section-title">{{ t('forex.title') }}</h2>
-
-          <!-- Swap result banner -->
           <div v-if="swapResult" class="swap-result-banner" role="status">
             <span class="result-icon">✓</span>
             <span>
@@ -289,7 +364,6 @@ onMounted(async () => {
           </div>
 
           <div class="swap-form">
-            <!-- From currency row -->
             <div class="swap-row">
               <div class="swap-field">
                 <label class="field-label" for="from-currency">{{ t('forex.sourceCurrency') }}</label>
@@ -323,14 +397,12 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Swap icon -->
             <div class="swap-arrow-row">
               <button class="swap-arrow-btn" :title="'Swap currencies'" @click="swapCurrencies" aria-label="Swap currencies">
                 ⇅
               </button>
             </div>
 
-            <!-- To currency row -->
             <div class="swap-row">
               <div class="swap-field">
                 <label class="field-label" for="to-currency">{{ t('forex.targetCurrency') }}</label>
@@ -357,15 +429,12 @@ onMounted(async () => {
               </div>
             </div>
 
-            <!-- Validation error -->
             <div v-if="validationError && amount" class="validation-error" role="alert">
               {{ validationError }}
             </div>
 
-            <!-- Quote error -->
             <div v-if="quoteError" class="swap-error" role="alert">{{ quoteError }}</div>
 
-            <!-- Get Quote button -->
             <div v-if="!showConfirm" class="swap-actions">
               <button
                 class="btn btn-primary"
@@ -377,7 +446,6 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Quote details + confirmation -->
           <div v-if="showConfirm && quote" class="quote-card" role="region" aria-label="Exchange Quote">
             <h3 class="quote-title">{{ t('forex.quoteTitle') }}</h3>
             <table class="quote-table">
@@ -416,8 +484,30 @@ onMounted(async () => {
           </div>
         </section>
 
-        <!-- Trade History -->
-        <section class="forex-section history-section" aria-label="Trade History">
+        <section v-else-if="activeTab === 'rates'" class="forex-section" aria-label="Rate List">
+          <h2 class="section-title">{{ t('forex.rateListTitle') }}</h2>
+          <div v-if="rates.length === 0" class="history-empty">{{ t('forex.rateListEmpty') }}</div>
+          <div v-else class="history-table-wrap">
+            <table class="history-table rates-table">
+              <thead>
+                <tr>
+                  <th>{{ t('forex.rateListPair') }}</th>
+                  <th>{{ t('forex.rate') }}</th>
+                  <th>{{ t('forex.executedAt') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="rateEntry in rates" :key="`${rateEntry.baseCurrencyCode}-${rateEntry.quoteCurrencyCode}`" class="history-row">
+                  <td>{{ rateEntry.baseCurrencyCode }}/{{ rateEntry.quoteCurrencyCode }}</td>
+                  <td class="rate-cell">{{ formatAmount(rateEntry.rate) }}</td>
+                  <td class="tick-cell">{{ rateEntry.rateDate }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section v-else-if="activeTab === 'history'" class="forex-section" aria-label="Trade History">
           <h2 class="section-title">{{ t('forex.historyTitle') }}</h2>
           <div v-if="history.length === 0" class="history-empty">{{ t('forex.historyEmpty') }}</div>
           <div v-else class="history-table-wrap">
@@ -453,8 +543,8 @@ onMounted(async () => {
         </section>
       </template>
 
-      <!-- Gold AMM Section -->
       <GoldAmmSection
+        v-if="!loading && !error && activeTab === 'gold'"
         :available-currencies="availableCurrencies"
         :balances="balances"
         @refresh="loadData"
@@ -485,6 +575,34 @@ onMounted(async () => {
   font-size: 1.05rem;
 }
 
+.forex-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.forex-tab {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.forex-tab.active,
+.forex-tab:hover {
+  background: var(--color-accent, #4f8ef7);
+  border-color: var(--color-accent, #4f8ef7);
+  color: #fff;
+}
+
 .forex-loading,
 .forex-error {
   text-align: center;
@@ -507,6 +625,17 @@ onMounted(async () => {
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid var(--color-border);
+}
+
+.subsection-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.balances-summary {
+  margin-bottom: 1.5rem;
 }
 
 /* Balances */
@@ -837,6 +966,15 @@ onMounted(async () => {
 }
 
 @media (max-width: 640px) {
+  .forex-tabs {
+    gap: 0.5rem;
+  }
+
+  .forex-tab {
+    flex: 1 1 calc(50% - 0.25rem);
+    justify-content: center;
+  }
+
   .swap-row {
     grid-template-columns: 1fr;
   }
