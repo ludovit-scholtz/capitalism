@@ -24,6 +24,13 @@ public sealed class Company
     /// <summary>Available cash balance in game currency.</summary>
     public decimal Cash { get; set; }
 
+    /// <summary>
+    /// ISO 4217 currency code used by this company (e.g. "EUR", "CZK", "USD").
+    /// Derives from the city where the company was founded. Defaults to "EUR".
+    /// </summary>
+    [MaxLength(3)]
+    public string CurrencyCode { get; set; } = "EUR";
+
     /// <summary>Total issued shares used for ownership, exchange pricing, and dividend distribution.</summary>
     public decimal TotalSharesIssued { get; set; } = 10_000m;
 

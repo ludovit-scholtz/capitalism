@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatMoney } from '@/lib/currencyFormat'
 import type { BuildingLot, City } from '@/types'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -43,7 +44,7 @@ const filteredLots = computed(() => {
 const selectedLot = computed(() => props.lots.find((lot) => lot.id === props.selectedLotId) ?? null)
 
 function formatCurrency(value: number): string {
-  return '$' + value.toLocaleString(locale.value)
+  return formatMoney(value, props.city?.currencyCode ?? 'EUR', locale.value)
 }
 
 function formatBuildingType(type: string): string {

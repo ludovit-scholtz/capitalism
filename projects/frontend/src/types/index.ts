@@ -67,6 +67,8 @@ export interface CompanySettings {
   /** 0–1: how much company scale (assets) contributes to overhead */
   assetFactor: number
   assetValue: number
+  /** ISO 4217 currency code for this company's local currency (e.g. "EUR", "CZK", "USD") */
+  currencyCode: string
   citySalarySettings: CompanyCitySalarySetting[]
 }
 
@@ -609,6 +611,8 @@ export interface PlayerRanking {
   playerId: string
   displayName: string
   totalWealth: number
+  /** Total wealth normalized to USD for cross-currency leaderboard comparison */
+  totalWealthUsd: number
   personalCash: number
   sharesValue: number
   companyCount: number
@@ -621,6 +625,10 @@ export interface CompanyRanking {
   playerId: string
   ownerDisplayName: string
   totalWealth: number
+  /** Total wealth normalized to USD for cross-currency leaderboard comparison */
+  totalWealthUsd: number
+  /** ISO 4217 currency code of the company's home currency (e.g. "EUR", "CZK", "USD") */
+  currencyCode: string
   cash: number
   buildingValue: number
   inventoryValue: number
@@ -1674,4 +1682,13 @@ export interface CampaignAnalyticsResult {
   bestPerformingProduct: string | null
   globalRecommendation: string
   rows: CampaignAnalyticsRow[]
+}
+
+/**
+ * EUR-based FX rate entry returned by the `eurFxRates` query.
+ * `rate` = units of this currency per 1 EUR (e.g. 25.20 for CZK, 1.08 for USD).
+ */
+export interface EurFxRate {
+  currencyCode: string
+  rate: number
 }

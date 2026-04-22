@@ -4,9 +4,10 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
+import { formatMoney } from '@/lib/currencyFormat'
 import type { City, BuildingLot, Company, PurchaseLotResult } from '@/types'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
@@ -59,6 +60,8 @@ const selectedLot = computed<BuildingLot | null>(() => {
   return availableLots.value.find((lot) => lot.id === selectedLotId.value) ?? null
 })
 
+const selectedCityObj = computed(() => cities.value.find((c) => c.id === selectedCityId.value) ?? null)
+
 const canSubmit = computed(
   () => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value,
 )
@@ -76,7 +79,7 @@ onMounted(async () => {
   loading.value = true
   try {
     const data = await gqlRequest<{ cities: City[] }>(
-      '{ cities { id name countryCode population } }',
+      '{ cities { id name countryCode currencyCode population } }',
     )
     cities.value = data.cities
 
@@ -124,7 +127,7 @@ watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
 })
 
 function formatCurrency(value: number) {
-  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+  return formatMoney(value, selectedCityObj.value?.currencyCode ?? 'EUR', locale.value)
 }
 
 function formatPopulationIndex(value: number) {

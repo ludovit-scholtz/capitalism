@@ -17,6 +17,13 @@ public sealed class PlayerRanking
     /// </summary>
     public decimal TotalWealth { get; set; }
 
+    /// <summary>
+    /// TotalWealth normalized to USD for fair cross-currency leaderboard ranking.
+    /// Player.PersonalCash (EUR) and share values from companies in various currencies
+    /// are all converted to USD using current FX rates.
+    /// </summary>
+    public decimal TotalWealthUsd { get; set; }
+
     /// <summary>Cash held in the player's personal account.</summary>
     public decimal PersonalCash { get; set; }
 
@@ -42,8 +49,16 @@ public sealed class CompanyRanking
     /// <summary>Owner player display name.</summary>
     public string OwnerDisplayName { get; set; } = string.Empty;
 
-    /// <summary>Total company wealth = Cash + BuildingValue + InventoryValue.</summary>
+    /// <summary>Total company wealth = Cash + BuildingValue + InventoryValue in the company's local currency.</summary>
     public decimal TotalWealth { get; set; }
+
+    /// <summary>
+    /// TotalWealth normalized to USD for fair cross-currency leaderboard comparison.
+    /// </summary>
+    public decimal TotalWealthUsd { get; set; }
+
+    /// <summary>ISO 4217 currency code for this company's local cash (e.g. "EUR", "CZK", "USD").</summary>
+    public string CurrencyCode { get; set; } = "EUR";
 
     /// <summary>Cash on hand for this company.</summary>
     public decimal Cash { get; set; }

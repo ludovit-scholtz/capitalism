@@ -19,24 +19,21 @@ It will use real world map. The game will start in single city and later other c
 - Support light mode and dark mode
 - Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
 
-### Currencies (10% complete)
+### Currencies (70% complete)
 
 - In forex exchange show the fx rate list table
-- When starting the onboarding process make sure the initial investment is fair for every user in every currency. At the moment when i select prague i see starting cash 600000 CZK, and if i select new york i see 600000 USD. The founder contribution must be $200000 but multiplied with the currency for the city they plan to do the business in.
-- The encyclopedia shows currently the base price in USD. Extend encyclopedia to select the currency and show it multiplied by the current currency rate.
+- ✅ When starting the onboarding process make sure the initial investment is fair for every user in every currency. Onboarding now scales founder contribution and IPO raise by EUR→city FX rate (e.g. Prague company starts with ~15M CZK, not 600k CZK).
+- ✅ Encyclopedia shows product base prices in EUR as a reference anchor via `formatMoney`; city-map lot prices use city `currencyCode`; company settings uses company `currencyCode`.
+- ✅ Property (land lot) prices are expressed in local city currency. `LandService.ComputeBasePrice` applies EUR→cityCurrency FX rate. Prague lots are priced in CZK (~2 M+), Bratislava in EUR. Existing EUR-anchored lots in non-EUR cities are self-healed on the next tick cycle.
+- ✅ `Company.CurrencyCode` field propagated to `CompanySettingsResult` so all company-level monetary displays use the correct local currency.
 - Products in the units are not affected by currency. At the moment when i do chair business, the sale price is 60 kč, while in the new york is $60. The products must have similar prices in every city, but adjusted by the currency.
-- Property prices must be expressed in local currency as well.
 - Extend the model where currency is missing and every time do every monetary operations under the currency. Do not mix two currencies together.
 - Make the shipping costs also in similar price range in all cities, but expressed in the local currency.
-- Leaderboard must be expressed in USD currency, make sure the numbers collected in the leaderboard are correctly transformed from the local currencies
+- ✅ Leaderboard must be expressed in USD currency. Rankings now sort and display by `totalWealthUsd` (all local currencies converted to USD via FX rates). Company breakdown shows local currency for individual components.
 
-### Number formatting (0% complete)
+### Number formatting (80% complete)
 
-Create component for unified number and currency formatting which will allow big numbers to be formatted properly. Examples of numbers: $1M = 1000000 USD, 600k Kč = 600000 CZK, 123.456M € = 123456789 EUR, $2.845k = 2845 USD, $123.456B = 123456789012 USD, $12.345T = 12345678901234 USD, $12.345Q = 12345678901234567 USD
-
-Make sure the Intl.NumberFormat is properly used for the number, so in english the . is used as decimal seperator and comma for thousands separator, and in czech language is comma used as the decimal separator and space as the thousands separator. Bind it to the local language selected not the browser language. For english the en-US is used, for slovak sk-SK, for german de-DE.
-
-Use this everywhere where numbers are visible.
+✅ Shared `currencyFormat.ts` utility created with `formatMoney`, `formatCompactMoney`, `formatNumber`, and `formatCompactNumber`. Locale mapping: en → en-US, sk → sk-SK, de → de-DE. Used in OnboardingView, LeaderboardView, and available for all other screens. Unit tests cover compact notation, edge cases (NaN, Infinity, 0, negative), and locale-specific separators.
 
 ### Power plants (30% complete)
 

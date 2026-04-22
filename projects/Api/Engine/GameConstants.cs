@@ -477,4 +477,22 @@ public static class GameConstants
     /// until the year-end tax settlement.
     /// </summary>
     public const decimal PersonalStockSaleTaxRate = 0.15m;
+
+// ── Currency / FX constants ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Minimum EUR-based FX multiplier at which a city is considered "high-rate" and lot prices
+    /// must be expressed in local currency (not EUR).  Values below this are for currencies that
+    /// are near-par with EUR (e.g. USD ~1.08, GBP ~0.86) and whose EUR-anchored prices are already
+    /// in a reasonable local range.  CZK (~25.2), INR (~90), CNY (~7.8) all exceed this threshold.
+    /// </summary>
+    public const decimal HighFxRateThreshold = 1.5m;
+
+    /// <summary>
+    /// Any unowned lot whose <c>BasePrice</c> is below this value in a high-FX-rate city is assumed
+    /// to have been generated before currency-scaling was introduced (EUR-anchored value).
+    /// The lot's price will be self-healed on the next <see cref="LandService.RefreshLandState"/> call.
+    /// 500 000 is safely below the minimum correct CZK lot price (~1.6 M CZK for a mine lot).
+    /// </summary>
+    public const decimal EurAnchoredLotBasePriceThreshold = 500_000m;
 }

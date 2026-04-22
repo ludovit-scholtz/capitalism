@@ -379,6 +379,16 @@ public sealed partial class AppDbInitializer
             {
                 await EnsureColumnAsync(connection, dialect, "Brands", "MarketingQuality", dialect.RequiredDecimalDefaultZero);
             }
+
+            // Ensure Companies.CurrencyCode column exists (added in AddCompanyCurrencyCode migration).
+            if (ShouldRepairSchemaArtifact("20260421182752_AddCompanyCurrencyCode", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "Companies"))
+            {
+                var columnDef = dialect.IsPostgres
+                    ? "character varying(3) NOT NULL DEFAULT 'EUR'"
+                    : "TEXT NOT NULL DEFAULT 'EUR'";
+                await EnsureColumnAsync(connection, dialect, "Companies", "CurrencyCode", columnDef);
+            }
         }
         finally
         {

@@ -116,6 +116,37 @@ public sealed partial class Query
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Returns all current EUR-based FX rates (i.e. "units of quote currency per 1 EUR").
+    /// Used by the frontend to scale monetary values into the city's local currency.
+    /// Public query — no authentication required.
+    /// </summary>
+    public async Task<List<EurFxRate>> GetEurFxRates([Service] AppDbContext db)
+    {
+        var dbRates = await db.FxRates
+            .AsNoTracking()
+            .Where(r => r.BaseCurrencyCode == EurCurrencyCode)
+            .GroupBy(r => r.QuoteCurrencyCode)
+            .Select(g => new
+            {
+                QuoteCurrencyCode = g.Key,
+                Rate = g.OrderByDescending(r => r.RateDate).Select(r => r.Rate).First()
+            })
+            .ToListAsync();
+
+        var result = dbRates
+            .Select(r => new EurFxRate { CurrencyCode = r.QuoteCurrencyCode, Rate = r.Rate })
+            .ToList();
+
+        // Always include EUR→EUR = 1 so the frontend can treat all currencies uniformly
+        if (!result.Any(r => string.Equals(r.CurrencyCode, EurCurrencyCode, StringComparison.OrdinalIgnoreCase)))
+        {
+            result.Insert(0, new EurFxRate { CurrencyCode = EurCurrencyCode, Rate = 1m });
+        }
+
+        return result;
+    }
+
     internal static async Task<decimal> ComputeForexRateAsync(AppDbContext db, string fromCode, string toCode)
     {
         if (fromCode == toCode)

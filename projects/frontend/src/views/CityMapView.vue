@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useGameStateStore } from '@/stores/gameState'
 import { gqlRequest, GraphQLError } from '@/lib/graphql'
 import { formatTickDuration } from '@/lib/gameTime'
+import { formatMoney } from '@/lib/currencyFormat'
 import {
   getLotStatus as lotStatusFromOwnership,
   getLotMarkerColor as markerColorFromStatus,
@@ -136,7 +137,7 @@ function getLotMarkerColor(lot: BuildingLot): string {
 }
 
 function formatCurrency(value: number): string {
-  return '$' + value.toLocaleString(locale.value)
+  return formatMoney(value, city.value?.currencyCode ?? 'EUR', locale.value)
 }
 
 function formatBuildingType(type: string): string {

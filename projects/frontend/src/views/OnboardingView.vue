@@ -21,7 +21,8 @@ import {
 import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTickCountdown } from '@/composables/useTickCountdown'
-import type { BuildingLot, City, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
+import { formatMoney } from '@/lib/currencyFormat'
+import type { BuildingLot, City, EurFxRate, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -198,8 +199,17 @@ const guestDisplayName = ref('')
 
 const industries = ref<string[]>([])
 const cities = ref<City[]>([])
+const eurFxRates = ref<EurFxRate[]>([])
 const products = ref<ProductType[]>([])
 const cityLots = ref<BuildingLot[]>([])
+
+/** FX rate for the currently selected city: units of city currency per 1 EUR. Defaults to 1 (EUR). */
+const cityFxRate = computed<number>(() => {
+  const code = selectedCity.value?.currencyCode ?? 'EUR'
+  if (code === 'EUR') return 1
+  const rate = eurFxRates.value.find((r) => r.currencyCode === code)
+  return rate?.rate ?? 1
+})
 
 const selectedIndustry = ref('')
 const selectedCityId = ref('')
@@ -229,7 +239,10 @@ const starterCompany = computed(() => {
   return auth.player?.companies.find((company) => company.id === companyId) ?? null
 })
 const selectedIpoOption = computed(() => ipoOptions.find((option) => option.raiseTarget === selectedIpoRaiseTarget.value) ?? ipoOptions[0])
-const companyStartingCash = computed(() => FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget)
+/** Company starting cash in the selected city's local currency. */
+const companyStartingCash = computed(() =>
+  Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityFxRate.value),
+)
 const remainingPersonalCash = computed(() => PERSONAL_STARTING_CASH - FOUNDER_CONTRIBUTION)
 const starterCash = computed(() => onboardingCompanyCash.value ?? starterCompany.value?.cash ?? companyStartingCash.value)
 
@@ -581,13 +594,15 @@ onMounted(async () => {
   // Load public data (works for both guests and authenticated users)
   try {
     loading.value = true
-    const [industriesData, citiesData] = await Promise.all([
+    const [industriesData, citiesData, fxRatesData] = await Promise.all([
       gqlRequest<{ starterIndustries: { industries: string[] } }>('{ starterIndustries { industries } }'),
       gqlRequest<{ cities: City[] }>(CITIES_QUERY),
+      gqlRequest<{ eurFxRates: EurFxRate[] }>('{ eurFxRates { currencyCode rate } }'),
     ])
 
     industries.value = industriesData.starterIndustries.industries
     cities.value = citiesData.cities
+    eurFxRates.value = fxRatesData.eurFxRates
 
     restoreProgress()
 
@@ -938,12 +953,7 @@ function getCityResourceName(city: City, index: number): string {
 
 function formatCurrency(value: number, currencyCode?: string): string {
   const code = currencyCode ?? selectedCity.value?.currencyCode ?? 'EUR'
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: code,
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value)
+  return formatMoney(value, code, locale.value)
 }
 
 function formatPercent(value: number): string {
@@ -1170,7 +1180,7 @@ useTickRefresh(async () => {
           </article>
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.founderContribution') }}</span>
-            <strong>{{ formatCurrency(FOUNDER_CONTRIBUTION) }}</strong>
+            <strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityFxRate) }}</strong>
           </article>
           <article class="budget-card">
             <span class="budget-label">{{ t('onboarding.personalCash') }}</span>
@@ -1194,7 +1204,7 @@ useTickRefresh(async () => {
               @click="selectedIpoRaiseTarget = option.raiseTarget"
             >
               <span class="card-title">{{ t(option.titleKey) }}</span>
-              <span class="ipo-metric">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget) }}</span>
+              <span class="ipo-metric">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span>
               <span class="ipo-metric">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
               <span class="ipo-metric">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
               <span class="card-desc">{{ t(option.descriptionKey) }}</span>

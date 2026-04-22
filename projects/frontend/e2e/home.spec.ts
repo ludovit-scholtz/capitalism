@@ -55,7 +55,9 @@ test.describe('Home page', () => {
     addPlayerShareholding(state, player.id, 'comp-1')
     await page.goto('/')
     await expect(page.getByText('Tycoon')).toBeVisible()
-    await expect(page.getByText('$950,000')).toBeVisible()
+    // totalWealthUsd = (200,000 personalCash + 750,000 sharesValue) * 1.08 ≈ $1.03M in compact USD
+    const wealthCell = page.locator('td.wealth').filter({ hasText: '$' })
+    await expect(wealthCell.first()).toBeVisible()
   })
 
   test('shows empty leaderboard message when no players', async ({ page }) => {

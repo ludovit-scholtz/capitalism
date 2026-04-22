@@ -4446,6 +4446,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               ageFactor,
               assetFactor,
               assetValue: companyAssetValue,
+              currencyCode: company.currencyCode ?? 'EUR',
               citySalarySettings: state.cities.map((city) => {
                 const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
                 return {
@@ -4632,6 +4633,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     if (query.includes('rankings') && !query.includes('companyRankings')) {
+      const USD_RATE = 1.08
       const rankings = state.players
         .filter((p) => p.role !== 'ADMIN')
         .map((p) => {
@@ -4651,16 +4653,20 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               .toFixed(2),
           )
 
+          const totalWealth = Number((personalCash + sharesValue).toFixed(2))
+          const totalWealthUsd = Number((totalWealth * USD_RATE).toFixed(2))
+
           return {
             playerId: p.id,
             displayName: p.displayName,
             personalCash,
             sharesValue,
-            totalWealth: Number((personalCash + sharesValue).toFixed(2)),
+            totalWealth,
+            totalWealthUsd,
             companyCount: p.companies.length,
           }
         })
-        .sort((a, b) => b.totalWealth - a.totalWealth)
+        .sort((a, b) => b.totalWealthUsd - a.totalWealthUsd)
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -4669,6 +4675,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     if (query.includes('companyRankings')) {
+      const USD_RATE = 1.08
       const companyRankings = state.players
         .filter((player) => player.role !== 'ADMIN')
         .flatMap((player) =>
@@ -4689,21 +4696,25 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               return sum + (baseValues[building.type] ?? 0) * building.level
             }, 0)
             const inventoryValue = 0
+            const totalWealth = company.cash + buildingValue + inventoryValue
+            const totalWealthUsd = Number((totalWealth * USD_RATE).toFixed(2))
 
             return {
               companyId: company.id,
               companyName: company.name,
               playerId: player.id,
               ownerDisplayName: player.displayName,
+              currencyCode: 'EUR',
               cash: company.cash,
               buildingValue,
               inventoryValue,
-              totalWealth: company.cash + buildingValue + inventoryValue,
+              totalWealth,
+              totalWealthUsd,
               buildingCount: company.buildings.length,
             }
           }),
         )
-        .sort((left, right) => right.totalWealth - left.totalWealth)
+        .sort((left, right) => right.totalWealthUsd - left.totalWealthUsd)
 
       return route.fulfill({
         status: 200,
@@ -5036,6 +5047,19 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { forexTradeHistory: state.forexTradeHistory } }),
+      })
+    }
+
+    if (query.includes('eurFxRates') && !query.includes('executeForexSwap') && !query.includes('forexTradeHistory')) {
+      // Public endpoint — no auth required
+      const eurRates = [
+        { currencyCode: 'EUR', rate: 1 },
+        ...(state.fxRates ?? []).map((r) => ({ currencyCode: r.quoteCurrencyCode, rate: r.rate })),
+      ]
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { eurFxRates: eurRates } }),
       })
     }
 

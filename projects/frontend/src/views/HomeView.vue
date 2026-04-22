@@ -8,6 +8,7 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useGameStateStore } from '@/stores/gameState'
 import { deepEqual } from '@/lib/utils'
 import { formatInGameTime } from '@/lib/gameTime'
+import { formatCompactMoney } from '@/lib/currencyFormat'
 import type { PlayerRanking, GameState } from '@/types'
 
 const { t, locale } = useI18n()
@@ -27,7 +28,7 @@ async function loadHomeData(isRefresh = false) {
   }
   try {
     const [rankData, stateData] = await Promise.all([
-      gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth personalCash sharesValue companyCount } }'),
+      gqlRequest<{ rankings: PlayerRanking[] }>('{ rankings { playerId displayName totalWealth totalWealthUsd personalCash sharesValue companyCount } }'),
       gqlRequest<{ gameState: GameState }>(
         '{ gameState { currentTick lastTickAtUtc tickIntervalSeconds taxCycleTicks taxRate currentGameYear currentGameTimeUtc ticksPerDay ticksPerYear nextTaxTick nextTaxGameTimeUtc nextTaxGameYear } }',
       ),
@@ -126,7 +127,7 @@ useTickRefresh(() => loadHomeData(true))
           <tr v-for="(rank, index) in rankings.slice(0, 5)" :key="rank.playerId">
             <td class="rank-num">{{ index + 1 }}</td>
             <td>{{ rank.displayName }}</td>
-            <td class="wealth">${{ rank.totalWealth.toLocaleString() }}</td>
+            <td class="wealth">{{ formatCompactMoney(rank.totalWealthUsd, 'USD', locale) }}</td>
             <td>{{ rank.companyCount }}</td>
           </tr>
         </tbody>

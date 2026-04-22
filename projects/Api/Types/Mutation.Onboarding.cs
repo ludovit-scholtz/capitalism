@@ -121,12 +121,18 @@ public sealed partial class Mutation
 
         var ipoSelection = ResolveStarterIpoSelection(null);
 
+        // Scale founder contribution and IPO raise to local city currency.
+        var fxRate = await Query.ComputeForexRateAsync(db, "EUR", city.CurrencyCode);
+        var founderContributionLocal = Math.Round(StarterFounderContribution * fxRate, 2);
+        var ipoRaiseLocal = Math.Round(ipoSelection.RaiseTarget * fxRate, 2);
+
         var company = new Company
         {
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = trimmedCompanyName,
-            Cash = StarterFounderContribution + ipoSelection.RaiseTarget,
+            Cash = founderContributionLocal + ipoRaiseLocal,
+            CurrencyCode = city.CurrencyCode,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
@@ -271,12 +277,18 @@ public sealed partial class Mutation
 
         var ipoSelection = ResolveStarterIpoSelection(input.IpoRaiseTarget);
 
+        // Scale founder contribution and IPO raise to local city currency.
+        var fxRate = await Query.ComputeForexRateAsync(db, "EUR", city.CurrencyCode);
+        var founderContributionLocal = Math.Round(StarterFounderContribution * fxRate, 2);
+        var ipoRaiseLocal = Math.Round(ipoSelection.RaiseTarget * fxRate, 2);
+
         var company = new Company
         {
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = trimmedCompanyName,
-            Cash = StarterFounderContribution + ipoSelection.RaiseTarget,
+            Cash = founderContributionLocal + ipoRaiseLocal,
+            CurrencyCode = city.CurrencyCode,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
