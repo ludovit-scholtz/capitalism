@@ -202,11 +202,13 @@ fetchAccountInfo()
             </button>
           </div>
           <p v-if="fundError" class="bba-fund-error" role="alert">{{ fundError }}</p>
-          <p v-if="fundSuccess" class="bba-fund-success" role="status">
-            {{ t('buildingBankAccount.fundSuccess') }}
-          </p>
         </div>
       </details>
+
+      <!-- Fund feedback — rendered outside <details> so it stays visible after panel re-renders -->
+      <p v-if="fundSuccess" class="bba-fund-success" role="status">
+        {{ t('buildingBankAccount.fundSuccess') }}
+      </p>
 
       <!-- Guidance links -->
       <div v-if="isSuspended || hasMissingAccount" class="bba-guidance">

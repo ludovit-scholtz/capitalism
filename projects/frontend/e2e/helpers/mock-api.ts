@@ -6210,7 +6210,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     }
 
     // unitUpgradeInfo query — check precisely to avoid false substring matches
-    if ((query.includes('unitUpgradeInfo') || query.includes('UUI')) && !query.includes('scheduleUnitUpgrade') && !query.includes('ScheduleUnitUpgrade')) {
+    // NOTE: do NOT use query.includes('UUI') here — 'UUI' is a substring of 'UUID', so any
+    // query that uses UUID-typed parameters (e.g. buildingBankAccount) would be falsely matched.
+    if (query.includes('unitUpgradeInfo') && !query.includes('scheduleUnitUpgrade') && !query.includes('ScheduleUnitUpgrade')) {
       const unitId: string = body.variables?.unitId ?? ''
       const override = state.unitUpgradeInfoOverrides[unitId]
       if (override === null) {
