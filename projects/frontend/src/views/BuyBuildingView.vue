@@ -433,14 +433,14 @@ async function buyBuilding() {
               <div class="flex flex-wrap gap-2 mt-1">
                 <RouterLink
                   to="/forex"
-                  class="inline-flex items-center px-4 py-1.5 bg-brand text-white rounded text-sm font-semibold no-underline hover:opacity-90 transition-opacity"
+                  class="btn-guidance-primary inline-flex items-center px-4 py-1.5 bg-brand text-white rounded text-sm font-semibold no-underline hover:opacity-90 transition-opacity"
                 >
                   {{ t('buildings.fundingGapGoToForex') }}
                 </RouterLink>
                 <RouterLink
                   v-if="selectedCompany"
                   :to="`/bank-statement/${selectedCompany.id}`"
-                  class="inline-flex items-center px-4 py-1.5 border border-divider text-muted rounded text-sm font-semibold no-underline hover:bg-card transition-colors"
+                  class="btn-guidance-secondary inline-flex items-center px-4 py-1.5 border border-divider text-muted rounded text-sm font-semibold no-underline hover:bg-card transition-colors"
                 >
                   {{ t('buildings.fundingGapViewStatement') }}
                 </RouterLink>
