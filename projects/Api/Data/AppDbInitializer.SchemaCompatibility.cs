@@ -380,16 +380,6 @@ public sealed partial class AppDbInitializer
                 await EnsureColumnAsync(connection, dialect, "Brands", "MarketingQuality", dialect.RequiredDecimalDefaultZero);
             }
 
-            // Ensure Companies.CurrencyCode column exists (added in AddCompanyCurrencyCode migration).
-            if (ShouldRepairSchemaArtifact("20260421182752_AddCompanyCurrencyCode", pendingMigrations)
-                && await TableExistsAsync(connection, dialect, "Companies"))
-            {
-                var columnDef = dialect.IsPostgres
-                    ? "character varying(3) NOT NULL DEFAULT 'EUR'"
-                    : "TEXT NOT NULL DEFAULT 'EUR'";
-                await EnsureColumnAsync(connection, dialect, "Companies", "CurrencyCode", columnDef);
-            }
-
             // Ensure BankAccounts table and building funding columns exist
             // (added in AddBankAccountsAndBuildingFunding migration).
             if (ShouldRepairSchemaArtifact("20260423025526_AddBankAccountsAndBuildingFunding", pendingMigrations))
@@ -462,6 +452,72 @@ public sealed partial class AppDbInitializer
                     dialect.IsPostgres
                         ? "CREATE INDEX IF NOT EXISTS \"IX_Buildings_BankAccountId\" ON \"Buildings\" (\"BankAccountId\")"
                         : "CREATE INDEX IF NOT EXISTS \"IX_Buildings_BankAccountId\" ON \"Buildings\" (\"BankAccountId\")");
+            }
+
+            if (ShouldRepairSchemaArtifact("20260423221000_RemovePlayerPersonalCash", pendingMigrations)
+                && await TableExistsAsync(connection, dialect, "Players")
+                && await TableExistsAsync(connection, dialect, "BankAccounts"))
+            {
+                await EnsureColumnAsync(connection, dialect, "BankAccounts", "PlayerId", dialect.NullableGuid);
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "BankAccounts",
+                    "IX_BankAccounts_PlayerId_CurrencyCode",
+                    "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_BankAccounts_PlayerId_CurrencyCode\" ON \"BankAccounts\" (\"PlayerId\", \"CurrencyCode\")");
+
+                if (dialect.IsPostgres)
+                {
+                    await EnsurePostgresConstraintAsync(
+                        connection,
+                        "FK_BankAccounts_Players_PlayerId",
+                        "ALTER TABLE \"BankAccounts\" ADD CONSTRAINT \"FK_BankAccounts_Players_PlayerId\" FOREIGN KEY (\"PlayerId\") REFERENCES \"Players\" (\"Id\") ON DELETE SET NULL");
+                }
+
+                if (await ColumnExistsAsync(connection, dialect, "Players", "PersonalCash"))
+                {
+                    await ExecuteNonQueryAsync(
+                        connection,
+                        dialect.IsPostgres
+                            ?
+                                """
+                                INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                SELECT p."Id",
+                                       LPAD((9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id"))::text, 16, '0'),
+                                       'EUR',
+                                       p."PersonalCash",
+                                       NULL,
+                                       FALSE,
+                                       CURRENT_TIMESTAMP,
+                                       p."Id"
+                                FROM "Players" p
+                                WHERE NOT EXISTS (
+                                    SELECT 1
+                                    FROM "BankAccounts" existing
+                                    WHERE existing."PlayerId" = p."Id"
+                                      AND existing."CurrencyCode" = 'EUR'
+                                )
+                                """
+                            :
+                                """
+                                INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                SELECT p."Id",
+                                       printf('%016d', 9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id")),
+                                       'EUR',
+                                       p."PersonalCash",
+                                       NULL,
+                                       0,
+                                       CURRENT_TIMESTAMP,
+                                       p."Id"
+                                FROM "Players" p
+                                WHERE NOT EXISTS (
+                                    SELECT 1
+                                    FROM "BankAccounts" existing
+                                    WHERE existing."PlayerId" = p."Id"
+                                      AND existing."CurrencyCode" = 'EUR'
+                                )
+                                """);
+                }
             }
         }
         finally

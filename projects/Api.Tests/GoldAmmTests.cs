@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Tests.Infrastructure;
 using Api.Types;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.Text;
@@ -77,7 +78,7 @@ public sealed class GoldAmmTests
         if (currencyCode == "EUR")
         {
             var player = await db.Players.FirstAsync(p => p.Id == playerId);
-            player.PersonalCash = amount;
+            await PersonalBankAccountService.SetTrackedGrossCashAsync(db, player, amount);
             await db.SaveChangesAsync();
         }
         else

@@ -12,12 +12,12 @@ public sealed class DividendPhase : ITickPhase
     public string Name => "Dividend";
     public int Order => 1010;
 
-    public Task ProcessAsync(TickContext context)
+    public async Task ProcessAsync(TickContext context)
     {
         var gs = context.GameState;
         if (gs.TaxCycleTicks <= 0 || gs.CurrentTick % gs.TaxCycleTicks != 0)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         var settledGameYear = GameTime.GetGameYear(gs.CurrentTick - 1L);
@@ -91,7 +91,7 @@ public sealed class DividendPhase : ITickPhase
 
                 if (holding.OwnerPlayerId is Guid ownerPlayerId && playersById.TryGetValue(ownerPlayerId, out var player))
                 {
-                    player.PersonalCash += payout;
+                    await PersonalBankAccountService.CreditTrackedGrossCashAsync(context.Db, player, payout);
                 }
                 else if (holding.OwnerCompanyId is Guid ownerCompanyId && companiesById.TryGetValue(ownerCompanyId, out var ownerCompany))
                 {
@@ -144,7 +144,5 @@ public sealed class DividendPhase : ITickPhase
                 RecordedAtUtc = DateTime.UtcNow,
             });
         }
-
-        return Task.CompletedTask;
     }
 }

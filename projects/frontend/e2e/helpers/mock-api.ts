@@ -4541,6 +4541,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const ageFactor = Number(Math.min(ageTicks / (TICKS_PER_YEAR * 2), 1).toFixed(4))
       const assetFactor = Number((maxAssetValue > 0 ? Math.min(companyAssetValue / maxAssetValue, 1) : 0).toFixed(4))
       const overheadRate = Number((0.5 * ageFactor * assetFactor).toFixed(4))
+      const primaryCurrencyCode =
+        company.buildings
+          .map((building) => state.cities.find((city) => city.id === building.cityId)?.currencyCode)
+          .find((currencyCode) => Boolean(currencyCode)) ?? 'EUR'
 
       return route.fulfill({
         status: 200,
@@ -4558,7 +4562,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               ageFactor,
               assetFactor,
               assetValue: companyAssetValue,
-              currencyCode: company.currencyCode ?? 'EUR',
+              currencyCode: primaryCurrencyCode,
               citySalarySettings: state.cities.map((city) => {
                 const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
                 return {
@@ -5670,6 +5674,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('bankInfo') &&
       !q.includes('createDeposit') &&
       !q.includes('withdrawDeposit') &&
+      !q.includes('openBankAccount') &&
+      !q.includes('closeBankAccount') &&
       !q.includes('setBankRates') &&
       !q.includes('initiateBaseDeposit') &&
       // acceptLoan mutation response includes paymentAmount which contains 'me'
@@ -6019,7 +6025,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('createDeposit')) {
+    if (query.includes('openBankAccount') || query.includes('createDeposit')) {
       const input = body.variables?.input ?? {}
       const bank = state.allBanks.find((b) => b.bankBuildingId === input.bankBuildingId)
       const newDeposit: MockBankDeposit = {
@@ -6040,7 +6046,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { createDeposit: newDeposit } }),
+        body: JSON.stringify({ data: { openBankAccount: newDeposit, createDeposit: newDeposit } }),
       })
     }
 
@@ -6057,14 +6063,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('withdrawDeposit')) {
+    if (query.includes('closeBankAccount') || query.includes('withdrawDeposit')) {
       const depositId = body.variables?.input?.depositId
       const deposit = state.myDeposits.find((d) => d.id === depositId)
       if (deposit) deposit.isActive = false
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { withdrawDeposit: deposit ?? null } }),
+        body: JSON.stringify({ data: { closeBankAccount: deposit ?? null, withdrawDeposit: deposit ?? null } }),
       })
     }
 

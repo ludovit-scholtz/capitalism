@@ -54,12 +54,12 @@ public sealed partial class AppDbInitializer(
                 Email = seedOptions.Value.AdminEmail,
                 DisplayName = seedOptions.Value.AdminDisplayName,
                 Role = PlayerRole.Admin,
-                PersonalCash = 200_000m,
                 ActiveAccountType = AccountContextType.Person,
                 CreatedAtUtc = DateTime.UtcNow
             };
             admin.PasswordHash = hasher.HashPassword(admin, seedOptions.Value.AdminPassword);
             dbContext.Players.Add(admin);
+            await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, admin, 200_000m);
         }
 
         if (!await dbContext.GameStates.AnyAsync())
@@ -154,6 +154,9 @@ public sealed partial class AppDbInitializer(
 
         // Ensure one government bank account exists for each unique city currency (idempotent).
         await EnsureGovernmentBankAccountsAsync();
+
+        // Personal money is stored only in settlement bank accounts.
+        await EnsurePlayerSettlementAccountsAsync();
     }
 
     private async Task SeedFxRatesAsync()
@@ -188,12 +191,12 @@ public sealed partial class AppDbInitializer(
             Email = GovEmail,
             DisplayName = "Government",
             Role = PlayerRole.Player,
-            PersonalCash = 0m,
             ActiveAccountType = AccountContextType.Person,
             CreatedAtUtc = DateTime.UtcNow
         };
         govPlayer.PasswordHash = hasher.HashPassword(govPlayer, Guid.NewGuid().ToString());
         dbContext.Players.Add(govPlayer);
+        await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, govPlayer, 0m);
 
         var govCompanyId = CreateDeterministicGuid("company:government");
         var govCompany = new Company
@@ -303,6 +306,18 @@ public sealed partial class AppDbInitializer(
                     CreatedAtUtc = DateTime.UtcNow,
                 });
             }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task EnsurePlayerSettlementAccountsAsync()
+    {
+        var players = await dbContext.Players.ToListAsync();
+
+        foreach (var player in players)
+        {
+            await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, player);
         }
 
         await dbContext.SaveChangesAsync();

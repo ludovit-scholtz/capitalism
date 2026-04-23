@@ -31,7 +31,12 @@ public sealed partial class Query
 
         // Load all companies, buildings, lots, inventories, and shareholdings for share price calculation
         var companies = await db.Companies.ToListAsync();
-        var buildings = await db.Buildings.ToListAsync();
+        var buildings = await db.Buildings
+            .Include(b => b.City)
+            .ToListAsync();
+        var personalCashByPlayerId = await PersonalBankAccountService.GetSettlementBalancesByPlayerIdAsync(
+            db,
+            players.Select(player => player.Id));
         var lots = await db.BuildingLots
             .Where(l => l.OwnerCompanyId.HasValue)
             .ToListAsync();
@@ -42,12 +47,15 @@ public sealed partial class Query
         var shareholdings = await db.Shareholdings.ToListAsync();
 
         var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var companyCurrencyCodeById = companies.ToDictionary(
+            company => company.Id,
+            company => ResolvePrimaryCurrencyCode(company.Id, buildings));
 
         // Load FX rates once for USD normalization.
         // All stored rates are EUR-based (1 EUR = Rate units). EUR→USD = UsdRate.
         var usdRate = await GetEurToUsdRateAsync(db);
         // Company cash currency → EUR rate lookup (EUR per 1 unit of company currency = 1/EurRate)
-        var companyCurrencies = companies.Select(c => c.CurrencyCode).Distinct().ToList();
+        var companyCurrencies = companyCurrencyCodeById.Values.Distinct().ToList();
         var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencies);
 
         // Compute per-company share price in USD (share price is denominated in company currency).
@@ -56,13 +64,14 @@ public sealed partial class Query
             c =>
             {
                 var localPrice = sharePriceByCompany.GetValueOrDefault(c.Id);
-                return ConvertToUsd(localPrice, c.CurrencyCode, eurRatesByCode, usdRate);
+                var currencyCode = companyCurrencyCodeById.GetValueOrDefault(c.Id, "EUR");
+                return ConvertToUsd(localPrice, currencyCode, eurRatesByCode, usdRate);
             });
 
         return players
             .Select(p =>
             {
-                var personalCash = p.PersonalCash;
+                var personalCash = PersonalBankAccountService.GetGrossCash(p, personalCashByPlayerId);
                 var sharesValue = shareholdings
                     .Where(sh => sh.OwnerPlayerId == p.Id && sh.ShareCount > 0m)
                     .Sum(sh => decimal.Round(
@@ -100,6 +109,8 @@ public sealed partial class Query
         var companies = await db.Companies
             .Include(c => c.Buildings)
             .ThenInclude(b => b.Units)
+            .Include(c => c.Buildings)
+            .ThenInclude(b => b.City)
             .Include(c => c.Player)
             .Where(c => c.Player != null && c.Player.Role != PlayerRole.Admin)
             .AsSplitQuery()
@@ -122,7 +133,10 @@ public sealed partial class Query
 
         // Load FX rates once for USD normalization.
         var usdRate = await GetEurToUsdRateAsync(db);
-        var companyCurrencies = companies.Select(c => c.CurrencyCode).Distinct().ToList();
+        var companyCurrencyCodeById = companies.ToDictionary(
+            company => company.Id,
+            company => ResolvePrimaryCurrencyCode(company));
+        var companyCurrencies = companyCurrencyCodeById.Values.Distinct().ToList();
         var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencies);
 
         return companies
@@ -135,6 +149,7 @@ public sealed partial class Query
                         ? inv.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i))
                         : 0m);
                 var totalWealth = c.Cash + buildingValue + inventoryValue;
+                var currencyCode = companyCurrencyCodeById.GetValueOrDefault(c.Id, "EUR");
 
                 return new CompanyRanking
                 {
@@ -143,17 +158,30 @@ public sealed partial class Query
                     PlayerId = c.PlayerId,
                     OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
                     Cash = c.Cash,
-                    CurrencyCode = c.CurrencyCode,
+                    CurrencyCode = currencyCode,
                     BuildingValue = buildingValue,
                     InventoryValue = inventoryValue,
                     TotalWealth = totalWealth,
-                    TotalWealthUsd = Math.Round(ConvertToUsd(totalWealth, c.CurrencyCode, eurRatesByCode, usdRate), 4),
+                    TotalWealthUsd = Math.Round(ConvertToUsd(totalWealth, currencyCode, eurRatesByCode, usdRate), 4),
                     BuildingCount = c.Buildings.Count
                 };
             })
             .OrderByDescending(r => r.TotalWealthUsd)
             .ToList();
     }
+
+    private static string ResolvePrimaryCurrencyCode(Company company) =>
+        company.Buildings
+            .Select(building => building.City?.CurrencyCode)
+            .FirstOrDefault(currencyCode => !string.IsNullOrWhiteSpace(currencyCode))
+        ?? "EUR";
+
+    private static string ResolvePrimaryCurrencyCode(Guid companyId, IEnumerable<Building> buildings) =>
+        buildings
+            .Where(building => building.CompanyId == companyId)
+            .Select(building => building.City?.CurrencyCode)
+            .FirstOrDefault(currencyCode => !string.IsNullOrWhiteSpace(currencyCode))
+        ?? "EUR";
 
     // ── FX normalization helpers ──────────────────────────────────────────────────
 
@@ -420,6 +448,8 @@ public sealed partial class Query
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
         var company = await db.Companies
             .Include(candidate => candidate.CitySalarySettings)
+            .Include(candidate => candidate.Buildings)
+            .ThenInclude(building => building.City)
             .FirstOrDefaultAsync(candidate => candidate.Id == companyId && candidate.PlayerId == userId);
 
         if (company is null)
@@ -475,7 +505,7 @@ public sealed partial class Query
             AgeFactor = ageFactor,
             AssetFactor = assetFactor,
             AssetValue = assetValue,
-            CurrencyCode = company.CurrencyCode,
+            CurrencyCode = ResolvePrimaryCurrencyCode(company),
             CitySalarySettings = cities
                 .Select(city =>
                 {

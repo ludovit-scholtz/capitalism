@@ -200,8 +200,8 @@ const MY_DEPOSITS_QUERY = `
 `
 
 const CREATE_DEPOSIT_MUTATION = `
-  mutation CreateDeposit($input: CreateDepositInput!) {
-    createDeposit(input: $input) {
+  mutation OpenBankAccount($input: OpenBankAccountInput!) {
+    openBankAccount(input: $input) {
       id
       amount
       depositInterestRatePercent
@@ -211,8 +211,8 @@ const CREATE_DEPOSIT_MUTATION = `
 `
 
 const WITHDRAW_DEPOSIT_MUTATION = `
-  mutation WithdrawDeposit($input: WithdrawDepositInput!) {
-    withdrawDeposit(input: $input) {
+  mutation CloseBankAccount($input: CloseBankAccountInput!) {
+    closeBankAccount(input: $input) {
       id
       amount
       isActive

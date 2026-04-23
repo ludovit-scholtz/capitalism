@@ -132,7 +132,9 @@ public class Program
             .AddGraphQLServer()
             .AddAuthorization()
             .AddQueryType<Query>()
-            .AddMutationType<Mutation>();
+            .AddMutationType<Mutation>()
+            .AddTypeExtension<CompanyTypeExtensions>()
+            .AddTypeExtension<PlayerTypeExtensions>();
 
         builder.Services.AddScoped<IMasterGameAdministrationService, MasterGameAdministrationService>();
         builder.Services.AddScoped<GameAdminAuthorizationService>();

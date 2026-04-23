@@ -840,7 +840,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
     ]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
-    await page.getByRole('tab', { name: 'Deposit' }).click()
+    await page.getByRole('tab', { name: 'Accounts' }).click()
 
     await expect(page.getByText('Alpha Bank')).toBeVisible()
     await expect(page.getByText('Beta Bank')).toBeVisible()
@@ -857,7 +857,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
     ]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
-    await page.getByRole('tab', { name: 'Deposit' }).click()
+    await page.getByRole('tab', { name: 'Accounts' }).click()
 
     // Default sort is by deposit rate desc — high rate first
     const firstCard = page.locator('.bank-card').first()
@@ -878,7 +878,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
     ]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
-    await page.getByRole('tab', { name: 'Deposit' }).click()
+    await page.getByRole('tab', { name: 'Accounts' }).click()
 
     // Click Lending Rate sort button
     await page.getByRole('group', { name: 'Sort by' }).getByText('Lending Rate').click()
@@ -895,7 +895,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
     ]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
-    await page.getByRole('tab', { name: 'Deposit' }).click()
+    await page.getByRole('tab', { name: 'Accounts' }).click()
 
     await expect(page.getByText('Bratislava Bank')).toBeVisible()
     await expect(page.getByText('Prague Bank')).toBeVisible()
@@ -915,7 +915,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
     ]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
-    await page.getByRole('tab', { name: 'Deposit' }).click()
+    await page.getByRole('tab', { name: 'Accounts' }).click()
 
     await expect(page.getByText('No Capacity')).toBeVisible()
 
@@ -975,7 +975,7 @@ test.describe('Bank Management — customer view', () => {
     await expect(page.locator('.customer-rate-card.capacity')).toBeVisible()
   })
 
-  test('authenticated customer can make a deposit and see it listed', async ({ page }) => {
+  test('authenticated customer can open a bank account and see it listed', async ({ page }) => {
     const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
     player.companies.push({
       id: 'depositor-co-1',
@@ -1014,8 +1014,8 @@ test.describe('Bank Management — customer view', () => {
 
     await page.goto('/bank/dep-bank-1')
 
-    // New account-style UI: shows "My Deposit Account" heading with empty state
-    await expect(page.getByRole('heading', { name: 'My Deposit Account' })).toBeVisible()
+    // New account-style UI: shows "My Bank Account" heading with empty state
+    await expect(page.getByRole('heading', { name: 'My Bank Account' })).toBeVisible()
 
     // The empty-state deposit form is shown (no existing deposits)
     await page.locator('#customer-deposit-amount').fill('25000')
@@ -1026,7 +1026,7 @@ test.describe('Bank Management — customer view', () => {
     await page.getByRole('button', { name: 'Open Account' }).click()
 
     // Success message
-    await expect(page.getByText('Deposit created successfully.')).toBeVisible()
+    await expect(page.getByText('Bank account opened successfully.')).toBeVisible()
   })
 
   test('unauthenticated visitor sees login prompt in deposit form', async ({ page }) => {
@@ -1055,7 +1055,7 @@ test.describe('Bank Management — customer view', () => {
     await expect(page.locator('.customer-rate-card.deposit')).toBeVisible()
 
     // Deposit form should show login prompt, not the form
-    await expect(page.getByRole('heading', { name: 'Make a Deposit' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Open Bank Account' })).toBeVisible()
     // auth.login key maps to 'Login' — scope to the auth-prompt div to avoid matching the navbar link
     await expect(page.locator('.auth-prompt').getByRole('link', { name: 'Login' })).toBeVisible()
   })

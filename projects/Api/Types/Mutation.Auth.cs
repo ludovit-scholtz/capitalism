@@ -38,7 +38,6 @@ public sealed partial class Mutation
             Email = input.Email,
             DisplayName = input.DisplayName,
             Role = PlayerRole.Player,
-            PersonalCash = 200_000m,
             ActiveAccountType = AccountContextType.Person,
             CreatedAtUtc = DateTime.UtcNow
         };
@@ -47,6 +46,7 @@ public sealed partial class Mutation
         player.PasswordHash = hasher.HashPassword(player, input.Password);
 
         db.Players.Add(player);
+        await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player, 200_000m);
         await db.SaveChangesAsync();
 
         var session = GenerateToken(player, jwtOptions.Value);

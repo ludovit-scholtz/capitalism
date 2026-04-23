@@ -36,6 +36,7 @@ public sealed partial class Mutation
 
         player.IsInvisibleInChat = input.IsInvisibleInChat;
         await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var personalCash = await PersonalBankAccountService.GetGrossCashAsync(db, player, httpContextAccessor.HttpContext.RequestAborted);
 
         return new GameAdminPlayerSummary
         {
@@ -45,7 +46,7 @@ public sealed partial class Mutation
             Role = player.Role,
             IsInvisibleInChat = player.IsInvisibleInChat,
             LastLoginAtUtc = player.LastLoginAtUtc,
-            PersonalCash = player.PersonalCash,
+            PersonalCash = personalCash,
             TotalCompanyCash = player.Companies.Sum(company => company.Cash),
             CompanyCount = player.Companies.Count,
             Companies = player.Companies.Select(company => new GameAdminCompanySummary
@@ -76,6 +77,7 @@ public sealed partial class Mutation
 
         player.Role = input.IsAdmin ? PlayerRole.Admin : PlayerRole.Player;
         await db.SaveChangesAsync(httpContextAccessor.HttpContext.RequestAborted);
+        var personalCash = await PersonalBankAccountService.GetGrossCashAsync(db, player, httpContextAccessor.HttpContext.RequestAborted);
 
         return new GameAdminPlayerSummary
         {
@@ -85,7 +87,7 @@ public sealed partial class Mutation
             Role = player.Role,
             IsInvisibleInChat = player.IsInvisibleInChat,
             LastLoginAtUtc = player.LastLoginAtUtc,
-            PersonalCash = player.PersonalCash,
+            PersonalCash = personalCash,
             TotalCompanyCash = player.Companies.Sum(company => company.Cash),
             CompanyCount = player.Companies.Count,
             Companies = player.Companies.Select(company => new GameAdminCompanySummary

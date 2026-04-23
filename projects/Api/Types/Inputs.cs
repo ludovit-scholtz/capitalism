@@ -524,26 +524,26 @@ public sealed class MergeCompanyInput
     public Guid DestinationCompanyId { get; set; }
 }
 
-/// <summary>Input for creating a cash deposit in a bank building.</summary>
-public sealed class CreateDepositInput
+/// <summary>Input for opening a bank account at a bank building.</summary>
+public sealed class OpenBankAccountInput
 {
-    /// <summary>The bank building to deposit into.</summary>
+    /// <summary>The bank building where the account is opened.</summary>
     public Guid BankBuildingId { get; set; }
 
-    /// <summary>The company making the deposit (must be owned by the authenticated player).</summary>
+    /// <summary>The company opening the account (must be owned by the authenticated player).</summary>
     public Guid DepositorCompanyId { get; set; }
 
-    /// <summary>Amount to deposit (must be >= 1,000).</summary>
+    /// <summary>Initial account balance (must be >= 1,000).</summary>
     public decimal Amount { get; set; }
 }
 
-/// <summary>Input for withdrawing funds from a bank deposit.</summary>
-public sealed class WithdrawDepositInput
+/// <summary>Input for withdrawing from or fully closing a bank account.</summary>
+public sealed class CloseBankAccountInput
 {
-    /// <summary>The deposit to withdraw from.</summary>
+    /// <summary>The account record to withdraw from.</summary>
     public Guid DepositId { get; set; }
 
-    /// <summary>Amount to withdraw. Pass the full deposit amount for a complete withdrawal.</summary>
+    /// <summary>Amount to withdraw. Pass the full balance for a complete account closure.</summary>
     public decimal Amount { get; set; }
 }
 

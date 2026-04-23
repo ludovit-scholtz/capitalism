@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Api.Data;
 using Api.Data.Entities;
+using Api.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,7 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
             cancellationToken);
 
         var changed = false;
+        var createdPlayer = false;
         if (player is null)
         {
             var actorIdClaim = principal.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -41,7 +43,6 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
                 Email = normalizedEmail,
                 DisplayName = displayName,
                 Role = PlayerRole.Player,
-                PersonalCash = 200_000m,
                 ActiveAccountType = AccountContextType.Person,
                 CreatedAtUtc = DateTime.UtcNow,
             };
@@ -49,6 +50,7 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
 
             db.Players.Add(player);
             changed = true;
+            createdPlayer = true;
         }
         else
         {
@@ -65,6 +67,14 @@ public sealed class AuthenticatedPlayerClaimsSyncService(AppDbContext db)
                 player.DisplayName = displayName;
                 changed = true;
             }
+        }
+
+        var settlementAccount = createdPlayer
+            ? await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player, 200_000m, cancellationToken)
+            : await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player, cancellationToken);
+        if (db.Entry(settlementAccount).State == EntityState.Added)
+        {
+            changed = true;
         }
 
         if (changed)

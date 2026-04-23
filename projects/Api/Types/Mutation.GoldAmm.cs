@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -444,7 +445,7 @@ public sealed partial class Mutation
         {
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
                 ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
-            player.PersonalCash -= amount;
+            await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, amount);
         }
         else
         {
@@ -461,7 +462,7 @@ public sealed partial class Mutation
         {
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
                 ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
-            player.PersonalCash += amount;
+            await PersonalBankAccountService.CreditTrackedGrossCashAsync(db, player, amount);
         }
         else
         {

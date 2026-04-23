@@ -6584,7 +6584,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                         var investorId = await GetCurrentPlayerIdAsync(investorToken);
                         var investor = await db.Players.FirstAsync(candidate => candidate.Id == investorId);
-                        investor.PersonalCash = 1m; // only 1 unit of currency
+                    await PersonalBankAccountService.SetTrackedGrossCashAsync(db, investor, 1m); // only 1 unit of currency
                         await db.SaveChangesAsync();
                 }
 
@@ -8117,7 +8117,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.FindAsync(playerId);
             Assert.NotNull(player);
-            player!.PersonalCash = 50m;
+            await PersonalBankAccountService.SetTrackedGrossCashAsync(db, player!, 50m);
             player.PersonalTaxReserve = 100m;
 
             // Set TaxCycleTicks=2 so tick 2 is year-end.
@@ -10930,7 +10930,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
-            player.PersonalCash = 123_456m;
+            await PersonalBankAccountService.SetTrackedGrossCashAsync(db, player, 123_456m);
             await db.SaveChangesAsync();
         }
 
@@ -25684,7 +25684,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task CreateDeposit_Succeeds_TransfersCashAndCreatesRecord()
+    public async Task OpenBankAccount_Succeeds_TransfersCashAndCreatesRecord()
     {
         var bankOwnerEmail = $"bank-owner-dep-{Guid.NewGuid():N}@test.com";
         var depositorEmail = $"depositor-{Guid.NewGuid():N}@test.com";
@@ -25707,8 +25707,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var result = await ExecuteGraphQlAsync(
             """
-            mutation Dep($input: CreateDepositInput!) {
-              createDeposit(input: $input) {
+                        mutation Dep($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) {
                 id
                 amount
                 depositInterestRatePercent
@@ -25721,7 +25721,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 100_000m } },
             depositorToken);
 
-        var data = result.GetProperty("data").GetProperty("createDeposit");
+        var data = result.GetProperty("data").GetProperty("openBankAccount");
         Assert.Equal(100_000m, data.GetProperty("amount").GetDecimal());
         Assert.Equal(5m, data.GetProperty("depositInterestRatePercent").GetDecimal());
         Assert.True(data.GetProperty("isActive").GetBoolean());
@@ -25737,7 +25737,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task CreateDeposit_IntoUninitializedBank_ReturnsError()
+    public async Task OpenBankAccount_IntoUninitializedBank_ReturnsError()
     {
         var depositorEmail = $"dep-uninit-{Guid.NewGuid():N}@test.com";
         var bankOwnerEmail = $"bo-uninit-{Guid.NewGuid():N}@test.com";
@@ -25767,8 +25767,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var result = await ExecuteGraphQlAsync(
             """
-            mutation Dep($input: CreateDepositInput!) {
-              createDeposit(input: $input) { id }
+                        mutation Dep($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) { id }
             }
             """,
             new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 10_000m } },
@@ -25780,7 +25780,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task WithdrawDeposit_Succeeds_ReturnsCashAndClosesDeposit()
+    public async Task CloseBankAccount_Succeeds_ReturnsCashAndClosesDeposit()
     {
         var bankOwnerEmail = $"bank-owner-wd-{Guid.NewGuid():N}@test.com";
         var depositorEmail = $"depositor-wd-{Guid.NewGuid():N}@test.com";
@@ -25818,8 +25818,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var result = await ExecuteGraphQlAsync(
             """
-            mutation Wd($input: WithdrawDepositInput!) {
-              withdrawDeposit(input: $input) {
+                        mutation Wd($input: CloseBankAccountInput!) {
+                            closeBankAccount(input: $input) {
                 id
                 amount
                 isActive
@@ -25829,7 +25829,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { input = new { depositId = deposit.Id.ToString(), amount = 50_000m } },
             depositorToken);
 
-        var data = result.GetProperty("data").GetProperty("withdrawDeposit");
+        var data = result.GetProperty("data").GetProperty("closeBankAccount");
         Assert.Equal(0m, data.GetProperty("amount").GetDecimal());
         Assert.False(data.GetProperty("isActive").GetBoolean());
 
@@ -26419,9 +26419,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task CreateDeposit_Unauthenticated_ReturnsError()
+    public async Task OpenBankAccount_Unauthenticated_ReturnsError()
     {
-        // Unauthenticated requests to createDeposit must be rejected.
+        // Unauthenticated requests to openBankAccount must be rejected.
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var city = await db.Cities.FirstAsync();
@@ -26434,18 +26434,18 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         // Call without a token
         var result = await ExecuteGraphQlAsync(
-            """mutation D($input: CreateDepositInput!) { createDeposit(input: $input) { id } }""",
+            """mutation D($input: OpenBankAccountInput!) { openBankAccount(input: $input) { id } }""",
             new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = co.Id.ToString(), amount = 1000m } },
             token: null);
 
         var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated createDeposit should fail.");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated openBankAccount should fail.");
     }
 
     [Fact]
-    public async Task WithdrawDeposit_Unauthenticated_ReturnsError()
+    public async Task CloseBankAccount_Unauthenticated_ReturnsError()
     {
-        // Unauthenticated requests to withdrawDeposit must be rejected.
+        // Unauthenticated requests to closeBankAccount must be rejected.
         var ownerEmail = $"wd-unauth-{Guid.NewGuid():N}@test.com";
         await RegisterAndGetTokenAsync(ownerEmail, "WDUnauth");
 
@@ -26462,12 +26462,12 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         // Call without a token
         var result = await ExecuteGraphQlAsync(
-            """mutation W($input: WithdrawDepositInput!) { withdrawDeposit(input: $input) { id } }""",
+            """mutation W($input: CloseBankAccountInput!) { closeBankAccount(input: $input) { id } }""",
             new { input = new { depositId = deposit.Id.ToString() } },
             token: null);
 
         var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated withdrawDeposit should fail.");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated closeBankAccount should fail.");
     }
 
     [Fact]

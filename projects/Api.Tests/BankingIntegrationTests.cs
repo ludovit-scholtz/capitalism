@@ -411,10 +411,10 @@ public sealed class BankingIntegrationTests
         Assert.Equal(3.8m, rate); // locks in the interpolation formula
     }
 
-    // ── CreateDeposit reserve-preserving repayment ────────────────────────────
+    // ── OpenBankAccount reserve-preserving repayment ──────────────────────────
 
     /// <summary>
-    /// Proves that CreateDeposit only repays central-bank debt from surplus cash ABOVE the
+    /// Proves that OpenBankAccount only repays central-bank debt from surplus cash ABOVE the
     /// reserve requirement, never draining the bank below its required reserves.
     ///
     /// Scenario:
@@ -426,7 +426,7 @@ public sealed class BankingIntegrationTests
     ///   Old buggy behaviour: repayment = min($500K, $280K) = $280K → bank cash drops to $0 (below reserve!)
     /// </summary>
     [Fact]
-    public async Task CreateDeposit_UnderPressureBank_OnlyRepaysCbDebtFromSurplusCash()
+    public async Task OpenBankAccount_UnderPressureBank_OnlyRepaysCbDebtFromSurplusCash()
     {
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
@@ -466,14 +466,14 @@ public sealed class BankingIntegrationTests
         // Customer deposits $200K
         var result = await ExecuteAsync(client,
             """
-            mutation CD($input: CreateDepositInput!) {
-              createDeposit(input: $input) { id amount }
+                        mutation CD($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) { id amount }
             }
             """,
             new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 200_000m } },
             token: depositorToken);
 
-        var depositData = result.GetProperty("data").GetProperty("createDeposit");
+        var depositData = result.GetProperty("data").GetProperty("openBankAccount");
         Assert.Equal(200_000m, depositData.GetProperty("amount").GetDecimal());
 
         await db.Entry(bankCompany).ReloadAsync();
@@ -497,7 +497,7 @@ public sealed class BankingIntegrationTests
         // Bank cash must be >= reserve requirement (the key invariant)
         var reserveNeeded = bank.TotalDeposits * 0.10m;
         Assert.True(bankCompany.Cash >= reserveNeeded,
-            $"Bank cash ({bankCompany.Cash:C}) must not fall below reserve requirement ({reserveNeeded:C}) after CreateDeposit.");
+            $"Bank cash ({bankCompany.Cash:C}) must not fall below reserve requirement ({reserveNeeded:C}) after OpenBankAccount.");
     }
 
     /// <summary>
@@ -548,8 +548,8 @@ public sealed class BankingIntegrationTests
         // Surplus = 900K - 550K = 350K → repayment = 350K; CB debt after = 650K
         await ExecuteAsync(client,
             """
-            mutation CD($input: CreateDepositInput!) {
-              createDeposit(input: $input) { id }
+                        mutation CD($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) { id }
             }
             """,
             new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 500_000m } },

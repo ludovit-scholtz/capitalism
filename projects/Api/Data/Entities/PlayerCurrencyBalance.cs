@@ -4,7 +4,7 @@ namespace Api.Data.Entities;
 
 /// <summary>
 /// Tracks a player's personal cash balance in a specific non-base currency.
-/// The base currency (EUR) is tracked in <see cref="Player.PersonalCash"/>.
+/// The base currency (EUR) is tracked in the player's settlement bank account.
 /// Non-EUR currencies earned through forex swaps are recorded here.
 /// </summary>
 public sealed class PlayerCurrencyBalance

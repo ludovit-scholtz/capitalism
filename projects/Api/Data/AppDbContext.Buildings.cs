@@ -42,7 +42,9 @@ public sealed partial class AppDbContext
             e.Property(a => a.Balance).HasPrecision(18, 2);
             e.HasIndex(a => a.AccountNumber).IsUnique();
             e.HasIndex(a => new { a.CurrencyCode, a.IsGovernmentAccount });
+            e.HasIndex(a => new { a.PlayerId, a.CurrencyCode }).IsUnique();
             e.HasOne(a => a.Company).WithMany().HasForeignKey(a => a.CompanyId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(a => a.Player).WithMany().HasForeignKey(a => a.PlayerId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<BuildingUnit>(e =>

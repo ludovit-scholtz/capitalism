@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -89,7 +90,7 @@ public sealed partial class Mutation
 
                 if (fromCode == "EUR")
                 {
-                    player.PersonalCash -= input.Amount;
+                    await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, input.Amount);
                 }
                 else
                 {
@@ -122,7 +123,7 @@ public sealed partial class Mutation
                 // ── Personal wallet path (destination) ────────────────────
                 if (toCode == "EUR")
                 {
-                    player.PersonalCash += toAmount;
+                    await PersonalBankAccountService.CreditTrackedGrossCashAsync(db, player, toAmount);
                 }
                 else
                 {

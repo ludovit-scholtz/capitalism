@@ -31,6 +31,10 @@ public sealed partial class Query
 
         var adminActor = players.First(player => player.Id == accessContext.ActorPlayer.Id);
         var effectivePlayer = players.First(player => player.Id == effectiveUserId);
+        var personalCashByPlayerId = await PersonalBankAccountService.GetSettlementBalancesByPlayerIdAsync(
+            db,
+            players.Select(player => player.Id),
+            httpContextAccessor.HttpContext.RequestAborted);
         var effectiveAccountType = principal.GetEffectiveAccountType() ?? effectivePlayer.ActiveAccountType;
         var effectiveCompanyId = principal.GetEffectiveCompanyId() ?? effectivePlayer.ActiveCompanyId;
         var effectiveCompanyName = principal.GetEffectiveCompanyName()
@@ -43,8 +47,8 @@ public sealed partial class Query
             IsRootAdministrator = accessContext.IsRootAdministrator,
             CanAccessAdminDashboard = accessContext.CanAccessAdminDashboard,
             IsImpersonating = accessContext.IsImpersonating,
-            AdminActor = ToGameAdminPlayerSummary(adminActor),
-            EffectivePlayer = ToGameAdminPlayerSummary(effectivePlayer),
+            AdminActor = ToGameAdminPlayerSummary(adminActor, personalCashByPlayerId),
+            EffectivePlayer = ToGameAdminPlayerSummary(effectivePlayer, personalCashByPlayerId),
             EffectiveAccountType = effectiveAccountType,
             EffectiveCompanyId = effectiveCompanyId,
             EffectiveCompanyName = effectiveCompanyName,
@@ -94,13 +98,17 @@ public sealed partial class Query
         var globalAdminGrants = accessContext.IsRootAdministrator
             ? (await masterGameAdministrationService.GetGlobalGameAdminGrantsAsync(accessContext.ActorPlayer.Email, httpContextAccessor.HttpContext.RequestAborted)).ToList()
             : [];
+        var personalCashByPlayerId = await PersonalBankAccountService.GetSettlementBalancesByPlayerIdAsync(
+            db,
+            players.Select(player => player.Id),
+            httpContextAccessor.HttpContext.RequestAborted);
 
         return new GameAdminDashboardResult
         {
             ServerKey = masterServerOptions.Value.ServerKey,
-            TotalPersonalCash = players.Sum(player => player.PersonalCash),
+            TotalPersonalCash = players.Sum(player => PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId)),
             TotalCompanyCash = companies.Sum(company => company.Cash),
-            MoneySupply = players.Sum(player => player.PersonalCash) + companies.Sum(company => company.Cash),
+            MoneySupply = players.Sum(player => PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId)) + companies.Sum(company => company.Cash),
             ExternalMoneyInflowLast100Ticks = recentLedgerEntries
                 .Where(entry => entry.Amount > 0m)
                 .Where(entry => entry.Category is LedgerCategory.Revenue or LedgerCategory.MediaHouseIncome or LedgerCategory.RentIncome)
@@ -110,9 +118,9 @@ public sealed partial class Query
                 .Sum(entry => entry.Amount)),
             InflowSummaries = inflowSummaries,
             ShippingCostSummaries = shippingCostSummaries,
-            MultiAccountAlerts = BuildMultiAccountAlerts(players, companies, loans, shareholdings),
-            Players = players.Select(ToGameAdminPlayerSummary).ToList(),
-            InvisiblePlayers = players.Where(player => player.IsInvisibleInChat).Select(ToGameAdminPlayerSummary).ToList(),
+            MultiAccountAlerts = BuildMultiAccountAlerts(players, companies, loans, shareholdings, personalCashByPlayerId),
+            Players = players.Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
+            InvisiblePlayers = players.Where(player => player.IsInvisibleInChat).Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
             GlobalGameAdminGrants = globalAdminGrants,
             RecentAuditLogs = auditLogs.Select(log => new GameAdminAuditLogRecord
             {
@@ -134,7 +142,9 @@ public sealed partial class Query
         };
     }
 
-    private static GameAdminPlayerSummary ToGameAdminPlayerSummary(Player player)
+    private static GameAdminPlayerSummary ToGameAdminPlayerSummary(
+        Player player,
+        IReadOnlyDictionary<Guid, decimal> personalCashByPlayerId)
     {
         return new GameAdminPlayerSummary
         {
@@ -144,7 +154,7 @@ public sealed partial class Query
             Role = player.Role,
             IsInvisibleInChat = player.IsInvisibleInChat,
             LastLoginAtUtc = player.LastLoginAtUtc,
-            PersonalCash = player.PersonalCash,
+            PersonalCash = PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId),
             TotalCompanyCash = player.Companies.Sum(company => company.Cash),
             CompanyCount = player.Companies.Count,
             Companies = player.Companies
@@ -207,7 +217,8 @@ public sealed partial class Query
         IReadOnlyCollection<Player> players,
         IReadOnlyCollection<Company> companies,
         IReadOnlyCollection<Loan> loans,
-        IReadOnlyCollection<Shareholding> shareholdings)
+        IReadOnlyCollection<Shareholding> shareholdings,
+        IReadOnlyDictionary<Guid, decimal> personalCashByPlayerId)
     {
         var playersById = players.ToDictionary(player => player.Id);
         var companiesById = companies.ToDictionary(company => company.Id);
@@ -237,8 +248,8 @@ public sealed partial class Query
                 ConfidenceScore = confidenceScore,
                 SupportingEntityType = "LOAN",
                 SupportingEntityName = $"{lenderCompany.Name} → {borrowerCompany.Name}",
-                PrimaryPlayer = ToGameAdminPlayerSummary(lenderPlayer),
-                RelatedPlayer = ToGameAdminPlayerSummary(borrowerPlayer),
+                PrimaryPlayer = ToGameAdminPlayerSummary(lenderPlayer, personalCashByPlayerId),
+                RelatedPlayer = ToGameAdminPlayerSummary(borrowerPlayer, personalCashByPlayerId),
             });
         }
 
@@ -279,8 +290,8 @@ public sealed partial class Query
                 ConfidenceScore = Math.Clamp(0.55m + ownershipRatio, 0m, 0.99m),
                 SupportingEntityType = "SHAREHOLDING",
                 SupportingEntityName = $"{targetCompany.Name} ({decimal.Round(ownershipRatio * 100m, 1, MidpointRounding.AwayFromZero)}% stake)",
-                PrimaryPlayer = ToGameAdminPlayerSummary(ownerPlayer),
-                RelatedPlayer = ToGameAdminPlayerSummary(targetPlayer),
+                PrimaryPlayer = ToGameAdminPlayerSummary(ownerPlayer, personalCashByPlayerId),
+                RelatedPlayer = ToGameAdminPlayerSummary(targetPlayer, personalCashByPlayerId),
             });
         }
 

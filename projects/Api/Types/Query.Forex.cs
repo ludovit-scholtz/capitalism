@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -77,7 +78,8 @@ public sealed partial class Query
 
     /// <summary>
     /// Returns all non-zero (and known) currency balances for the authenticated player.
-    /// EUR balance comes from Player.PersonalCash; other currencies from PlayerCurrencyBalance rows.
+    /// EUR balance comes from the player's personal settlement bank account; other currencies still
+    /// come from PlayerCurrencyBalance rows until those legacy balances are migrated.
     /// </summary>
     [Authorize]
     public async Task<List<CurrencyBalanceResult>> GetPlayerCurrencyBalances(
@@ -97,9 +99,11 @@ public sealed partial class Query
             .OrderBy(b => b.CurrencyCode)
             .ToListAsync();
 
+        var eurBalance = await PersonalBankAccountService.GetGrossCashAsync(db, player.Id);
+
         var result = new List<CurrencyBalanceResult>
         {
-            new() { CurrencyCode = EurCurrencyCode, Balance = player.PersonalCash }
+            new() { CurrencyCode = EurCurrencyCode, Balance = eurBalance }
         };
 
         result.AddRange(nonEurBalances.Select(b => new CurrencyBalanceResult
@@ -227,11 +231,7 @@ public sealed partial class Query
     {
         if (currencyCode.ToUpperInvariant() == EurCurrencyCode)
         {
-            return await db.Players
-                .AsNoTracking()
-                .Where(p => p.Id == playerId)
-                .Select(p => p.PersonalCash)
-                .FirstOrDefaultAsync();
+            return await PersonalBankAccountService.GetGrossCashAsync(db, playerId);
         }
 
         return await db.PlayerCurrencyBalances
