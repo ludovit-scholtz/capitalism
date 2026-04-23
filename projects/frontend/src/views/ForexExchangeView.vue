@@ -80,10 +80,15 @@ const toBalances = computed<CurrencyBalance[]>(() => {
   })
 })
 
+/** Helper — find a bank account in myBankAccounts by ID. */
+function findAccountById(id: string): PlayerBankAccountSummary | undefined {
+  return myBankAccounts.value.find((a) => a.id === id)
+}
+
 /** Resolved source currency code — from bank account when available, otherwise manual picker. */
 const resolvedFromCurrency = computed(() => {
   if (hasBankAccounts.value && fromBankAccountId.value) {
-    return myBankAccounts.value.find((a) => a.id === fromBankAccountId.value)?.currencyCode ?? fromCurrency.value
+    return findAccountById(fromBankAccountId.value)?.currencyCode ?? fromCurrency.value
   }
   return fromCurrency.value
 })
@@ -91,14 +96,14 @@ const resolvedFromCurrency = computed(() => {
 /** Resolved destination currency code. */
 const resolvedToCurrency = computed(() => {
   if (hasBankAccounts.value && toBankAccountId.value) {
-    return myBankAccounts.value.find((a) => a.id === toBankAccountId.value)?.currencyCode ?? toCurrency.value
+    return findAccountById(toBankAccountId.value)?.currencyCode ?? toCurrency.value
   }
   return toCurrency.value
 })
 
 const fromBalance = computed(() => {
   if (hasBankAccounts.value && fromBankAccountId.value) {
-    return myBankAccounts.value.find((a) => a.id === fromBankAccountId.value)?.balance ?? 0
+    return findAccountById(fromBankAccountId.value)?.balance ?? 0
   }
   const b = balances.value.find((b) => b.currencyCode === fromCurrency.value)
   return b?.balance ?? 0
@@ -106,7 +111,7 @@ const fromBalance = computed(() => {
 
 const fromSymbol = computed(() => {
   if (hasBankAccounts.value && fromBankAccountId.value) {
-    return myBankAccounts.value.find((a) => a.id === fromBankAccountId.value)?.currencySymbol ?? resolvedFromCurrency.value
+    return findAccountById(fromBankAccountId.value)?.currencySymbol ?? resolvedFromCurrency.value
   }
   if (fromCurrency.value === 'EUR') return '€'
   const r = rates.value.find((r) => r.quoteCurrencyCode === fromCurrency.value)
@@ -115,7 +120,7 @@ const fromSymbol = computed(() => {
 
 const toSymbol = computed(() => {
   if (hasBankAccounts.value && toBankAccountId.value) {
-    return myBankAccounts.value.find((a) => a.id === toBankAccountId.value)?.currencySymbol ?? resolvedToCurrency.value
+    return findAccountById(toBankAccountId.value)?.currencySymbol ?? resolvedToCurrency.value
   }
   if (toCurrency.value === 'EUR') return '€'
   const r = rates.value.find((r) => r.quoteCurrencyCode === toCurrency.value)
