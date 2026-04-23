@@ -224,10 +224,11 @@ test.describe('Buy Building View', () => {
     // Scope to .city-select-grid to avoid matching account-switcher button
     await page.locator('.city-select-grid').getByText('Prague').click()
 
-    // Funding gap warning must be visible
+    // Funding gap warning must be visible with "missing account" message
     const guidance = page.locator('.funding-guidance')
     await expect(guidance).toBeVisible()
     await expect(guidance).toContainText('CZK')
+    await expect(guidance).toContainText(/No CZK account found/i)
 
     // Forex and bank-statement CTAs must be present (scope to guidance panel)
     await expect(guidance.getByRole('link', { name: /Forex Exchange/i })).toBeVisible()
@@ -267,7 +268,75 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
   })
 
-  test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
+  test('shows insufficient-funds warning when CZK balance exists but is below lot total cost', async ({
+    page,
+  }) => {
+    // AC: Expansion flow detects insufficient eligible balance in destination currency.
+    // Factory lot price = 90,000, construction cost = 15,000 → total = 105,000 CZK
+    // Player has only 50,000 CZK → insufficient
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Prague Low Funds Corp',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Player has some CZK but not enough (50,000 < lot 90,000 + construction 15,000 = 105,000)
+    state.playerCurrencyBalances = [{ currencyCode: 'CZK', currencySymbol: 'Kč', balance: 50_000 }]
+    state.buildingLots.push({
+      id: 'lot-prague-factory-cheap',
+      cityId: 'city-pr',
+      name: 'Prague Starter Site',
+      description: 'Affordable industrial plot in Prague.',
+      district: 'Industrial Zone',
+      latitude: 50.085,
+      longitude: 14.445,
+      populationIndex: 0.65,
+      basePrice: 90000,
+      price: 90000,
+      suitableTypes: 'FACTORY',
+      ownerCompanyId: null,
+      buildingId: null,
+      ownerCompany: null,
+      building: null,
+      resourceType: null,
+      materialQuality: null,
+      materialQuantity: null,
+    })
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await page.locator('.city-select-grid').getByText('Prague').click()
+
+    // Select the lot to trigger lot-total comparison
+    await page.locator('.lot-card', { hasText: 'Prague Starter Site' }).click()
+
+    // Must show "insufficient funds" variant (has CZK but not enough)
+    const guidance = page.locator('.funding-guidance')
+    await expect(guidance).toBeVisible()
+    await expect(guidance).toContainText(/Insufficient CZK balance/i)
+
+    // Required vs Available amounts must be shown
+    await expect(guidance.locator('.amount-required')).toBeVisible()
+    await expect(guidance.locator('.amount-available')).toBeVisible()
+    await expect(guidance.locator('.amount-shortfall')).toBeVisible()
+
+    // Buy Now remains disabled
+    await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
+  })
+
+    test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
     // AC: Expansion succeeds once the player is funded in the destination currency.
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',

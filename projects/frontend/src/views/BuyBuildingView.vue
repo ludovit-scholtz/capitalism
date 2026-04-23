@@ -103,13 +103,52 @@ const selectedCityCurrencyCode = computed<string>(
   () => selectedCityObj.value?.currencyCode?.toUpperCase() ?? 'EUR',
 )
 
-/** True when the player has no balance in the selected city's currency (and currency ≠ EUR). */
-const hasFundingGap = computed<boolean>(() => {
-  const cc = selectedCityCurrencyCode.value
-  if (cc === 'EUR') return false
-  const found = playerBalances.value.find((b) => b.currencyCode === cc)
-  return !found || found.balance <= 0
+/** Construction cost by building type, mirroring GameConstants.ConstructionCost on the backend. */
+const CONSTRUCTION_COSTS: Record<string, number> = {
+  MINE: 5_000,
+  FACTORY: 15_000,
+  SALES_SHOP: 8_000,
+  RESEARCH_DEVELOPMENT: 25_000,
+  APARTMENT: 40_000,
+  COMMERCIAL: 20_000,
+  MEDIA_HOUSE: 30_000,
+  BANK: 50_000,
+  EXCHANGE: 60_000,
+  POWER_PLANT: 80_000,
+}
+
+/** Total cost for the current selection: lot asking price + construction cost. */
+const selectedLotTotalCost = computed<number>(() => {
+  if (!selectedLot.value || !selectedType.value) return 0
+  const construction = CONSTRUCTION_COSTS[selectedType.value] ?? 10_000
+  return selectedLot.value.price + construction
 })
+
+/** Player's balance in the destination city currency (0 if none). */
+const availableLocalBalance = computed<number>(() => {
+  const cc = selectedCityCurrencyCode.value
+  if (cc === 'EUR') return 0
+  return playerBalances.value.find((b) => b.currencyCode === cc)?.balance ?? 0
+})
+
+/**
+ * Funding gap type:
+ *  'missing_account' – player has no balance record (or zero) for the destination currency
+ *  'insufficient_funds' – player has some balance but not enough for the selected lot total
+ *  null – no gap (EUR city, or player is sufficiently funded)
+ */
+const fundingGapType = computed<'missing_account' | 'insufficient_funds' | null>(() => {
+  const cc = selectedCityCurrencyCode.value
+  if (cc === 'EUR') return null
+  const balance = availableLocalBalance.value
+  if (balance <= 0) return 'missing_account'
+  // Only check lot-total when a lot is selected; otherwise flag missing account when zero
+  if (selectedLot.value && balance < selectedLotTotalCost.value) return 'insufficient_funds'
+  return null
+})
+
+/** True when any funding gap is present (either missing account or insufficient balance). */
+const hasFundingGap = computed<boolean>(() => fundingGapType.value !== null)
 
 const canSubmit = computed(
   () => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value,
@@ -325,16 +364,45 @@ async function buyBuilding() {
               </div>
             </div>
 
-            <!-- Funding guidance: shown when city currency ≠ EUR and player lacks that currency -->
+            <!-- Funding guidance: shown when city currency ≠ EUR and player lacks that currency or has insufficient funds -->
             <div v-if="selectedCityId && hasFundingGap" class="funding-guidance" role="alert" aria-live="polite">
               <div class="funding-guidance-icon" aria-hidden="true">⚠️</div>
               <div class="funding-guidance-body">
                 <strong class="funding-guidance-title">
-                  {{ t('buildings.fundingGapTitle', { currency: selectedCityCurrencyCode }) }}
+                  <template v-if="fundingGapType === 'missing_account'">
+                    {{ t('buildings.fundingGapTitleMissing', { currency: selectedCityCurrencyCode }) }}
+                  </template>
+                  <template v-else>
+                    {{ t('buildings.fundingGapTitleInsufficient', { currency: selectedCityCurrencyCode }) }}
+                  </template>
                 </strong>
                 <p class="funding-guidance-text">
-                  {{ t('buildings.fundingGapText', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
+                  <template v-if="fundingGapType === 'missing_account'">
+                    {{ t('buildings.fundingGapTextMissing', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
+                  </template>
+                  <template v-else>
+                    {{ t('buildings.fundingGapTextInsufficient', {
+                      city: selectedCityObj?.name ?? '',
+                      currency: selectedCityCurrencyCode,
+                      available: formatCurrency(availableLocalBalance),
+                      required: formatCurrency(selectedLotTotalCost),
+                    }) }}
+                  </template>
                 </p>
+                <div class="funding-guidance-amounts" v-if="fundingGapType === 'insufficient_funds'">
+                  <div class="amount-row">
+                    <span class="amount-label">{{ t('buildings.fundingGapRequired') }}</span>
+                    <strong class="amount-value amount-required">{{ formatCurrency(selectedLotTotalCost) }}</strong>
+                  </div>
+                  <div class="amount-row">
+                    <span class="amount-label">{{ t('buildings.fundingGapAvailable') }}</span>
+                    <strong class="amount-value amount-available">{{ formatCurrency(availableLocalBalance) }}</strong>
+                  </div>
+                  <div class="amount-row amount-shortfall">
+                    <span class="amount-label">{{ t('buildings.fundingGapShortfall') }}</span>
+                    <strong class="amount-value">{{ formatCurrency(selectedLotTotalCost - availableLocalBalance) }}</strong>
+                  </div>
+                </div>
                 <div class="funding-guidance-actions">
                   <RouterLink to="/forex" class="btn-guidance-primary">
                     {{ t('buildings.fundingGapGoToForex') }}
@@ -953,6 +1021,49 @@ async function buyBuilding() {
   font-size: 0.88rem;
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.funding-guidance-amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  margin-top: 0.25rem;
+}
+
+.amount-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.amount-label {
+  color: var(--color-text-secondary);
+}
+
+.amount-value {
+  font-weight: 700;
+}
+
+.amount-required {
+  color: var(--color-text);
+}
+
+.amount-available {
+  color: var(--color-warning, #ff9f43);
+}
+
+.amount-shortfall {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.25rem;
+  margin-top: 0.1rem;
+}
+
+.amount-shortfall .amount-value {
+  color: var(--color-danger, #f87171);
 }
 
 .funding-guidance-actions {
