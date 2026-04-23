@@ -1504,7 +1504,6 @@ export interface GameAdminDashboard {
   recentAuditLogs: GameAdminAuditLog[]
 }
 
-
 /** FX exchange rate summary returned by the fxRates query. EUR-based (1 EUR = rate units of quoteCurrency). */
 export interface FxRate {
   baseCurrencyCode: string

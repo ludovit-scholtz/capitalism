@@ -500,7 +500,8 @@ export default {
     inventoryTooltip: 'Hodnota zásob (miestna mena)',
     stocksTooltip: 'Hodnota akciového portfólia',
     howItWorksTitle: 'Ako sa počíta bohatstvo?',
-    playerHowItWorksBody: 'Bohatstvo hráča je zostatok osobného účtu plus trhová hodnota všetkých akcií, ktoré táto osoba drží. Všetky hodnoty sú prevedené na USD pre spravodlivé porovnanie naprieč mestami.',
+    playerHowItWorksBody:
+      'Bohatstvo hráča je zostatok osobného účtu plus trhová hodnota všetkých akcií, ktoré táto osoba drží. Všetky hodnoty sú prevedené na USD pre spravodlivé porovnanie naprieč mestami.',
     companyHowItWorksBody: 'Bohatstvo spoločnosti je firemná hotovosť plus hodnota budov a zásob. Celková suma je v USD; položky zobrazujú miestnu menu.',
     tick: 'Herný čas',
     tickHint: 'Rebríček sa aktualizuje každý herný tik. Zobrazený čas zodpovedá poslednému datasnímku.',
@@ -1189,8 +1190,7 @@ export default {
       brandAwareness: 'Povedomie o značke',
       brandAwarenessHint: 'Rozpoznateľnosť značky pre tento produkt. Vyššie povedomie podporuje predaj.',
       brandQuality: 'Kvalita značky',
-      brandQualityHint:
-        'Kombinovaná reputácia značky (výskum + marketingová prestíž). Pri maximálnej kvalite zvyšuje dopyt až o 50%. Budujte dlhodobým marketingom a výskumom produktu.',
+      brandQualityHint: 'Kombinovaná reputácia značky (výskum + marketingová prestíž). Pri maximálnej kvalite zvyšuje dopyt až o 50%. Budujte dlhodobým marketingom a výskumom produktu.',
       brandQualityPremium: 'Prémiová',
       brandQualityGrowing: 'Rastúca',
       demandDrivers: {
@@ -1458,7 +1458,8 @@ export default {
     rawMaterialQualityPoor: 'Nízka',
     rawMaterialHint: 'Postavte tu Baňu na ťažbu tejto suroviny a dodávajte ju priamo do výrobného reťazca. Vyššia kvalita znamená lepšiu produkciu za tik.',
     miningDepositSummaryTitle: 'Zhrnutie investície do ložiska',
-    miningInvestmentHint: 'Pozemok s baňou má prémiovú cenu, ktorá odráža strategickú hodnotu ložiska surovín. Bohatšie ložiská s vyššou kvalitou a väčšími zásobami majú výrazne vyššie ceny — ide o dlhodobé priemyselné aktívum.',
+    miningInvestmentHint:
+      'Pozemok s baňou má prémiovú cenu, ktorá odráža strategickú hodnotu ložiska surovín. Bohatšie ložiská s vyššou kvalitou a väčšími zásobami majú výrazne vyššie ceny — ide o dlhodobé priemyselné aktívum.',
     placementGuidanceTitle: 'Odporúčanie pre umiestnenie',
     placementGuidanceSalesShop: 'Hustota obyvateľstva robí toto miesto ideálnym pre maloobchod. Predajňa tu ťaží zo silného záujmu zákazníkov.',
     placementGuidanceFactory: 'Priemyselné zónovanie znižuje prevádzkové náklady. Továreň tu môže fungovať bez obmedzení od okolitých obyvateľov.',
@@ -1884,21 +1885,14 @@ export default {
     currentConditions: 'Aktuálne podmienky',
     forecastBarsLabel: 'Nasledujúcich {count} tikov',
     whyMattersTitle: 'Prečo je to dôležité pre infraštruktúru',
-    whyMattersSolar:
-      'Vysoká slnečná intenzita zvyšuje výkon solárnych elektrární každý tik.',
-    whyMattersWind:
-      'Silný vietor zvyšuje výkon veterných turbín. Plánujte zmluvy pri priaznivej predpovedi.',
-    whyMattersPower:
-      'Nedostatok energie obmedzuje všetky budovy v meste. Nová elektráreň prináša príjmy aj stabilitu.',
+    whyMattersSolar: 'Vysoká slnečná intenzita zvyšuje výkon solárnych elektrární každý tik.',
+    whyMattersWind: 'Silný vietor zvyšuje výkon veterných turbín. Plánujte zmluvy pri priaznivej predpovedi.',
+    whyMattersPower: 'Nedostatok energie obmedzuje všetky budovy v meste. Nová elektráreň prináša príjmy aj stabilitu.',
     planningTitle: 'Energetická bilancia mesta',
-    guidanceBalanced:
-      'Sieť je vyvážená. Nová elektráreň môže zarábať na predaji prebytkov s nízkym rizikom.',
-    guidanceConstrained:
-      'Čiastočný nedostatok. Budovy pracujú so zníženou kapacitou. Elektráreň tu prinesie solídne výnosy.',
-    guidanceCritical:
-      'Kritický nedostatok — väčšina budov je offline. Investícia do elektrárne má v tomto meste najvyššiu návratnosť.',
-    guidanceLegacy:
-      'Zatiaľ žiadne hráčske elektrárne. Budovy bežia na mestskej sieti. Postavte prvú elektráreň a zarábajte.',
+    guidanceBalanced: 'Sieť je vyvážená. Nová elektráreň môže zarábať na predaji prebytkov s nízkym rizikom.',
+    guidanceConstrained: 'Čiastočný nedostatok. Budovy pracujú so zníženou kapacitou. Elektráreň tu prinesie solídne výnosy.',
+    guidanceCritical: 'Kritický nedostatok — väčšina budov je offline. Investícia do elektrárne má v tomto meste najvyššiu návratnosť.',
+    guidanceLegacy: 'Zatiaľ žiadne hráčske elektrárne. Budovy bežia na mestskej sieti. Postavte prvú elektráreň a zarábajte.',
     forecastNow: 'Teraz',
     forecastTickLabel: '+{count}',
   },
@@ -2137,8 +2131,7 @@ export default {
     ratesUpdated: 'Sadzby aktualizované. Nové vklady budú používať aktualizovanú vkladovú sadzbu.',
     baseCapitalRequired: 'Otvorenie banky vyžaduje základný vklad {amount} ({currency}).',
     baseDepositRequired: 'Vyžaduje sa základný vklad kapitálu',
-    baseDepositRequiredBody:
-      'Vaša banková nehnuteľnosť bola nadobudnutá, ale ešte nie je otvorená pre podnikanie. Aktivujte ju vkladom {amount} základného kapitálu z prostriedkov vašej spoločnosti.',
+    baseDepositRequiredBody: 'Vaša banková nehnuteľnosť bola nadobudnutá, ale ešte nie je otvorená pre podnikanie. Aktivujte ju vkladom {amount} základného kapitálu z prostriedkov vašej spoločnosti.',
     makeBaseDeposit: 'Vykonať základný vklad',
     baseDepositSuccess: 'Základný vklad bol úspešný! Vaša banka je teraz otvorená pre podnikanie.',
     localCurrencyNote: 'v miestnej mene mesta.',

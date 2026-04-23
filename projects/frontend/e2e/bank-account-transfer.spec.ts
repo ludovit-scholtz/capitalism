@@ -52,9 +52,7 @@ test.describe('Bank Account Transfer panel', () => {
     const tab = page.getByRole('tab', { name: 'Transfer' })
     await expect(tab).toBeVisible()
     await tab.click()
-    await expect(
-      page.getByRole('heading', { name: 'Transfer Between My Bank Accounts' }),
-    ).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Transfer Between My Bank Accounts' })).toBeVisible()
   })
 
   test('successful same-currency transfer shows confirmation', async ({ page }) => {

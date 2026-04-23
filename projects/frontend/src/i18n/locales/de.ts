@@ -473,7 +473,8 @@ export default {
   leaderboard: {
     eyebrow: 'Wettbewerbliche Rangliste',
     title: 'Vermögensrangliste',
-    subtitle: 'Rankings werden in USD normalisiert für einen fairen stadtübergreifenden Vergleich. Spielerrangliste zeigt persönliches Vermögen (Bargeld + Aktienportfolio). Unternehmensrangliste zeigt Unternehmensvermögen (Bargeld + Gebäude + Lager).',
+    subtitle:
+      'Rankings werden in USD normalisiert für einen fairen stadtübergreifenden Vergleich. Spielerrangliste zeigt persönliches Vermögen (Bargeld + Aktienportfolio). Unternehmensrangliste zeigt Unternehmensvermögen (Bargeld + Gebäude + Lager).',
     loadFailed: 'Rangliste konnte nicht geladen werden',
     tabPlayers: 'Reichste Spieler',
     tabCompanies: 'Reichste Unternehmen',
@@ -500,7 +501,8 @@ export default {
     inventoryTooltip: 'Lagerwert (Lokalwährung)',
     stocksTooltip: 'Aktienportfolio-Wert',
     howItWorksTitle: 'Wie wird das Vermögen berechnet?',
-    playerHowItWorksBody: 'Spielervermögen ist der Saldo des persönlichen Kontos plus der Marktwert aller von dieser Person gehaltenen Aktien. Alle Werte werden in USD umgerechnet für einen fairen stadtübergreifenden Vergleich.',
+    playerHowItWorksBody:
+      'Spielervermögen ist der Saldo des persönlichen Kontos plus der Marktwert aller von dieser Person gehaltenen Aktien. Alle Werte werden in USD umgerechnet für einen fairen stadtübergreifenden Vergleich.',
     companyHowItWorksBody: 'Unternehmensvermögen ist Unternehmensbargeld plus Gebäude- und Lagerwert. Die Gesamtsumme ist in USD; Aufschlüsselung zeigt die Lokalwährung.',
     tick: 'Spielzeit',
     tickHint: 'Rankings werden jeden Spieltick aktualisiert. Die angezeigte Zeit entspricht dem aktuellsten Daten-Snapshot.',
@@ -1192,8 +1194,7 @@ export default {
       brandAwareness: 'Markenbekanntheit',
       brandAwarenessHint: 'Markenbekanntheit für dieses Produkt. Höhere Bekanntheit fördert den Absatz.',
       brandQuality: 'Markenqualität',
-      brandQualityHint:
-        'Kombinierter Markenruf (F&E + Marketing-Prestige). Steigert die Nachfrage bei voller Qualität um bis zu 50%. Aufbau durch langfristiges Marketing und Produktforschung.',
+      brandQualityHint: 'Kombinierter Markenruf (F&E + Marketing-Prestige). Steigert die Nachfrage bei voller Qualität um bis zu 50%. Aufbau durch langfristiges Marketing und Produktforschung.',
       brandQualityPremium: 'Premium',
       brandQualityGrowing: 'Wachsend',
       demandDrivers: {
@@ -1462,7 +1463,8 @@ export default {
     rawMaterialQualityPoor: 'Gering',
     rawMaterialHint: 'Errichten Sie hier eine Mine, um diesen Rohstoff zu fördern und direkt in Ihre Produktionskette einzuspeisen. Höhere Qualität bedeutet besseren Output pro Tick.',
     miningDepositSummaryTitle: 'Investitionszusammenfassung Vorkommen',
-    miningInvestmentHint: 'Minen-Grundstücke werden mit einem Aufschlag bewertet, der den strategischen Wert des Rohstoffvorkommens widerspiegelt. Reichhaltigere Vorkommen mit höherer Qualität und größeren Reserven sind deutlich teurer — es handelt sich um ein langfristiges Industrieanlagegut.',
+    miningInvestmentHint:
+      'Minen-Grundstücke werden mit einem Aufschlag bewertet, der den strategischen Wert des Rohstoffvorkommens widerspiegelt. Reichhaltigere Vorkommen mit höherer Qualität und größeren Reserven sind deutlich teurer — es handelt sich um ein langfristiges Industrieanlagegut.',
     placementGuidanceTitle: 'Platzierungsempfehlung',
     placementGuidanceSalesShop: 'Hohe Bevölkerungsdichte macht diesen Standort ideal für den Einzelhandel. Ein Verkaufsshop profitiert hier von starker Laufkundschaft.',
     placementGuidanceFactory: 'Industriezonierung hält die Betriebskosten niedrig. Eine Fabrik kann hier energieintensive Produktion ohne Einschränkungen betreiben.',
@@ -1891,21 +1893,14 @@ export default {
     currentConditions: 'Aktuelle Bedingungen',
     forecastBarsLabel: 'Nächste {count} Ticks',
     whyMattersTitle: 'Warum das für Infrastruktur wichtig ist',
-    whyMattersSolar:
-      'Hohe Sonneneinstrahlung steigert den Ertrag von Solaranlagen pro Tick.',
-    whyMattersWind:
-      'Starker Wind erhöht die Windturbinen-Leistung. Planen Sie Verträge bei günstigem Forecast.',
-    whyMattersPower:
-      'Stromknappheit schränkt alle Gebäude in der Stadt ein. Ein neues Kraftwerk generiert Einnahmen und stabilisiert den Betrieb.',
+    whyMattersSolar: 'Hohe Sonneneinstrahlung steigert den Ertrag von Solaranlagen pro Tick.',
+    whyMattersWind: 'Starker Wind erhöht die Windturbinen-Leistung. Planen Sie Verträge bei günstigem Forecast.',
+    whyMattersPower: 'Stromknappheit schränkt alle Gebäude in der Stadt ein. Ein neues Kraftwerk generiert Einnahmen und stabilisiert den Betrieb.',
     planningTitle: 'Energiebilanz der Stadt',
-    guidanceBalanced:
-      'Netz ist ausgeglichen. Ein neues Kraftwerk kann Überschusserlöse mit geringem Risiko erzielen.',
-    guidanceConstrained:
-      'Teilweise Knappheit erkannt. Gebäude arbeiten mit reduzierter Kapazität. Ein Kraftwerk hier bringt starke Renditen.',
-    guidanceCritical:
-      'Kritischer Mangel — die meisten Gebäude sind offline. Kraftwerkinvestition hat aktuell den höchsten ROI in dieser Stadt.',
-    guidanceLegacy:
-      'Noch keine Spieler-Kraftwerke. Gebäude laufen über das Stadtverteilnetz. Bauen Sie das erste Kraftwerk und erzielen Sie Einnahmen.',
+    guidanceBalanced: 'Netz ist ausgeglichen. Ein neues Kraftwerk kann Überschusserlöse mit geringem Risiko erzielen.',
+    guidanceConstrained: 'Teilweise Knappheit erkannt. Gebäude arbeiten mit reduzierter Kapazität. Ein Kraftwerk hier bringt starke Renditen.',
+    guidanceCritical: 'Kritischer Mangel — die meisten Gebäude sind offline. Kraftwerkinvestition hat aktuell den höchsten ROI in dieser Stadt.',
+    guidanceLegacy: 'Noch keine Spieler-Kraftwerke. Gebäude laufen über das Stadtverteilnetz. Bauen Sie das erste Kraftwerk und erzielen Sie Einnahmen.',
     forecastNow: 'Jetzt',
     forecastTickLabel: '+{count}',
   },
@@ -2447,7 +2442,8 @@ export default {
   buildingBankAccount: {
     accountLabel: 'Bankkonto:',
     noAccountAssigned: 'Kein Bankkonto zugewiesen',
-    missingAccountAdvisory: 'Diesem Gebäude wurde kein Bankkonto zugewiesen — Betriebskosten werden vom Unternehmenskonto abgebucht. Weisen Sie ein Konto zu, um die gebäudespezifische Finanzverwaltung zu aktivieren.',
+    missingAccountAdvisory:
+      'Diesem Gebäude wurde kein Bankkonto zugewiesen — Betriebskosten werden vom Unternehmenskonto abgebucht. Weisen Sie ein Konto zu, um die gebäudespezifische Finanzverwaltung zu aktivieren.',
     insufficientFunds: 'Gebäude in diesem Tick ausgesetzt: Unzureichende Mittel auf dem Bankkonto (benötigt {amount}). Füllen Sie das Konto auf, um den Betrieb wiederaufzunehmen.',
     fundAccount: 'Bankkonto finanzieren',
     fundHint: 'Mittel vom Unternehmenskonto auf das Bankkonto dieses Gebäudes übertragen, um Betriebskosten zu decken.',

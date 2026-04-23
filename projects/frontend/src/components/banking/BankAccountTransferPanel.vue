@@ -42,9 +42,7 @@ const toAccount = computed(() => findAccount(toAccountId.value))
 const destinationAccounts = computed<PlayerBankAccountSummary[]>(() => {
   const from = fromAccount.value
   if (!from) return []
-  return props.accounts.filter(
-    (a) => a.id !== from.id && a.currencyCode === from.currencyCode,
-  )
+  return props.accounts.filter((a) => a.id !== from.id && a.currencyCode === from.currencyCode)
 })
 
 const validationMessage = computed<string | null>(() => {
@@ -52,8 +50,7 @@ const validationMessage = computed<string | null>(() => {
   if (destinationAccounts.value.length === 0) return t('bankTransfer.noMatchingDestination')
   if (!toAccountId.value) return t('bankTransfer.selectDestination')
   if (fromAccountId.value === toAccountId.value) return t('bankTransfer.sameAccount')
-  if (fromAccount.value && toAccount.value
-    && fromAccount.value.currencyCode !== toAccount.value.currencyCode) {
+  if (fromAccount.value && toAccount.value && fromAccount.value.currencyCode !== toAccount.value.currencyCode) {
     return t('bankTransfer.currencyMismatch')
   }
   if (!amount.value || amount.value <= 0) return t('bankTransfer.invalidAmount')
@@ -89,17 +86,14 @@ async function submitTransfer() {
   errorMessage.value = null
   successResult.value = null
   try {
-    const result = await gqlRequest<{ transferFunds: TransferFundsResult }>(
-      TRANSFER_MUTATION,
-      {
-        input: {
-          fromBankAccountId: fromAccountId.value,
-          toBankAccountId: toAccountId.value,
-          amount: amount.value,
-          description: description.value.trim() || null,
-        },
+    const result = await gqlRequest<{ transferFunds: TransferFundsResult }>(TRANSFER_MUTATION, {
+      input: {
+        fromBankAccountId: fromAccountId.value,
+        toBankAccountId: toAccountId.value,
+        amount: amount.value,
+        description: description.value.trim() || null,
       },
-    )
+    })
     successResult.value = result.transferFunds
     amount.value = null
     description.value = ''
@@ -122,10 +116,7 @@ function onFromChanged(newId: string) {
 </script>
 
 <template>
-  <section
-    class="bg-card border border-divider rounded-xl p-6 mb-6"
-    :aria-label="t('bankTransfer.tabLabel')"
-  >
+  <section class="bg-card border border-divider rounded-xl p-6 mb-6" :aria-label="t('bankTransfer.tabLabel')">
     <h2 class="text-lg font-semibold text-body mb-2 pb-3 border-b border-divider">
       {{ t('bankTransfer.title') }}
     </h2>
@@ -136,13 +127,7 @@ function onFromChanged(newId: string) {
     </div>
 
     <div v-else class="grid gap-4 md:grid-cols-2">
-      <ForexBankAccountSelector
-        :model-value="fromAccountId"
-        :accounts="accounts"
-        :label="t('bankTransfer.fromAccount')"
-        id="bank-transfer-from"
-        @update:model-value="onFromChanged"
-      />
+      <ForexBankAccountSelector :model-value="fromAccountId" :accounts="accounts" :label="t('bankTransfer.fromAccount')" id="bank-transfer-from" @update:model-value="onFromChanged" />
       <ForexBankAccountSelector
         v-model="toAccountId"
         :accounts="destinationAccounts"
@@ -152,10 +137,7 @@ function onFromChanged(newId: string) {
       />
 
       <div class="flex flex-col gap-1.5">
-        <label
-          for="bank-transfer-amount"
-          class="text-xs font-semibold text-muted uppercase tracking-wide"
-        >
+        <label for="bank-transfer-amount" class="text-xs font-semibold text-muted uppercase tracking-wide">
           {{ t('bankTransfer.amount') }}
         </label>
         <input
@@ -169,17 +151,12 @@ function onFromChanged(newId: string) {
         />
         <span v-if="fromAccount" class="text-xs text-muted">
           {{ t('bankTransfer.available') }}:
-          <span class="font-semibold text-body">
-            {{ fromAccount.currencySymbol }}{{ formatAmount(fromAccount.balance) }}
-          </span>
+          <span class="font-semibold text-body"> {{ fromAccount.currencySymbol }}{{ formatAmount(fromAccount.balance) }} </span>
         </span>
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label
-          for="bank-transfer-description"
-          class="text-xs font-semibold text-muted uppercase tracking-wide"
-        >
+        <label for="bank-transfer-description" class="text-xs font-semibold text-muted uppercase tracking-wide">
           {{ t('bankTransfer.description') }}
         </label>
         <input
@@ -193,41 +170,23 @@ function onFromChanged(newId: string) {
       </div>
 
       <div class="md:col-span-2 flex flex-col gap-3">
-        <p
-          v-if="validationMessage"
-          class="text-sm text-caution"
-          role="alert"
-          aria-live="polite"
-        >
+        <p v-if="validationMessage" class="text-sm text-caution" role="alert" aria-live="polite">
           {{ validationMessage }}
         </p>
-        <p
-          v-if="errorMessage"
-          class="text-sm text-bad"
-          role="alert"
-          aria-live="polite"
-        >
+        <p v-if="errorMessage" class="text-sm text-bad" role="alert" aria-live="polite">
           {{ errorMessage }}
         </p>
-        <p
-          v-if="successResult"
-          class="text-sm text-good"
-          role="status"
-          aria-live="polite"
-        >
-          {{ t('bankTransfer.success', {
-            amount: formatAmount(successResult.amount),
-            currency: successResult.currencyCode,
-            from: successResult.fromAccount.companyName,
-            to: successResult.toAccount.companyName,
-          }) }}
+        <p v-if="successResult" class="text-sm text-good" role="status" aria-live="polite">
+          {{
+            t('bankTransfer.success', {
+              amount: formatAmount(successResult.amount),
+              currency: successResult.currencyCode,
+              from: successResult.fromAccount.companyName,
+              to: successResult.toAccount.companyName,
+            })
+          }}
         </p>
-        <button
-          type="button"
-          class="btn btn-primary self-start disabled:opacity-50 disabled:cursor-not-allowed"
-          :disabled="submitting || validationMessage !== null"
-          @click="submitTransfer"
-        >
+        <button type="button" class="btn btn-primary self-start disabled:opacity-50 disabled:cursor-not-allowed" :disabled="submitting || validationMessage !== null" @click="submitTransfer">
           {{ submitting ? t('bankTransfer.submitting') : t('bankTransfer.submit') }}
         </button>
       </div>

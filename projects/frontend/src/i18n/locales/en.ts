@@ -471,7 +471,8 @@ export default {
   leaderboard: {
     eyebrow: 'Competitive Rankings',
     title: 'Wealth Leaderboard',
-    subtitle: 'Rankings are normalized to USD for fair cross-city comparison. Player rankings show personal wealth (cash + stock portfolio). Company rankings show corporate assets (cash + buildings + inventory).',
+    subtitle:
+      'Rankings are normalized to USD for fair cross-city comparison. Player rankings show personal wealth (cash + stock portfolio). Company rankings show corporate assets (cash + buildings + inventory).',
     loadFailed: 'Failed to load leaderboard data',
     tabPlayers: 'Richest Players',
     tabCompanies: 'Richest Companies',
@@ -498,7 +499,8 @@ export default {
     inventoryTooltip: 'Inventory stock value (local currency)',
     stocksTooltip: 'Stock portfolio value',
     howItWorksTitle: 'How is wealth calculated?',
-    playerHowItWorksBody: 'Player wealth equals the personal account cash balance plus the market value of all shares held by that person. All values are converted to USD for fair cross-city comparison.',
+    playerHowItWorksBody:
+      'Player wealth equals the personal account cash balance plus the market value of all shares held by that person. All values are converted to USD for fair cross-city comparison.',
     companyHowItWorksBody: 'Company wealth equals company cash plus building assets and inventory value. The total shown is converted to USD; breakdown figures show the local currency.',
     tick: 'Game Time',
     tickHint: 'Rankings update every game tick. The displayed time is the latest data snapshot.',
@@ -877,7 +879,7 @@ export default {
       PUBLIC_SALES: 'Sells products directly to the public.',
       PRODUCT_QUALITY: 'Researches product quality improvements.',
       BRAND_QUALITY: 'Researches brand quality improvements.',
-      POWER_GENERATION: 'Boosts the plant\'s rated output by +10 MW per level, increasing grid contribution and surplus income potential.',
+      POWER_GENERATION: "Boosts the plant's rated output by +10 MW per level, increasing grid contribution and surplus income potential.",
       BATTERY_STORAGE: 'Provides +5 MW of supply-smoothing buffer per level, reducing shortage fine exposure during low-generation periods.',
     },
     links: 'Links',
@@ -1189,8 +1191,7 @@ export default {
       brandAwareness: 'Brand Awareness',
       brandAwarenessHint: 'Brand recognition for this product. Higher awareness drives more sales.',
       brandQuality: 'Brand Quality',
-      brandQualityHint:
-        'Combined brand reputation (R&D + marketing prestige). Amplifies demand by up to 50% at full quality. Build through sustained marketing and product R&D.',
+      brandQualityHint: 'Combined brand reputation (R&D + marketing prestige). Amplifies demand by up to 50% at full quality. Build through sustained marketing and product R&D.',
       brandQualityPremium: 'Premium',
       brandQualityGrowing: 'Growing',
       demandDrivers: {
@@ -1463,7 +1464,8 @@ export default {
     rawMaterialQualityPoor: 'Poor',
     rawMaterialHint: 'Build a Mine here to extract this resource and feed it directly into your production chain. Higher quality means better output per tick.',
     miningDepositSummaryTitle: 'Deposit Investment Summary',
-    miningInvestmentHint: 'Mine land commands a premium price that reflects the strategic value of the raw material deposit. Richer deposits with higher grade and larger reserves command significantly higher prices — this is a long-term industrial asset.',
+    miningInvestmentHint:
+      'Mine land commands a premium price that reflects the strategic value of the raw material deposit. Richer deposits with higher grade and larger reserves command significantly higher prices — this is a long-term industrial asset.',
     placementGuidanceTitle: 'Placement Guidance',
     placementGuidanceSalesShop: 'High population density makes this an ideal retail location. A Sales Shop here benefits from strong walk-in demand and fast turnover.',
     placementGuidanceFactory: 'Industrial zoning keeps operating costs low. A Factory here can run energy-intensive production without restrictions from nearby residents.',
@@ -1890,21 +1892,14 @@ export default {
     currentConditions: 'Current Conditions',
     forecastBarsLabel: 'Next {count} ticks',
     whyMattersTitle: 'Why This Matters for Infrastructure',
-    whyMattersSolar:
-      'High solar irradiance benefits solar power plants, boosting their effective output each tick.',
-    whyMattersWind:
-      'Strong winds increase wind turbine output. Plan contracts when sustained wind is forecast.',
-    whyMattersPower:
-      'Power shortages constrain all buildings city-wide. A new power plant earns grid income while stabilising operations.',
+    whyMattersSolar: 'High solar irradiance benefits solar power plants, boosting their effective output each tick.',
+    whyMattersWind: 'Strong winds increase wind turbine output. Plan contracts when sustained wind is forecast.',
+    whyMattersPower: 'Power shortages constrain all buildings city-wide. A new power plant earns grid income while stabilising operations.',
     planningTitle: 'City Power Balance',
-    guidanceBalanced:
-      'Grid is balanced. A new power plant investment can earn surplus-sale income with low risk.',
-    guidanceConstrained:
-      'Partial shortage detected. Buildings operate at reduced capacity. A power plant here offers strong returns.',
-    guidanceCritical:
-      'Critical shortage — most buildings are offline. Power plant investment has the highest ROI in this city right now.',
-    guidanceLegacy:
-      'No player power plants yet. Buildings run on the city legacy grid. Build the first plant to earn grid revenue.',
+    guidanceBalanced: 'Grid is balanced. A new power plant investment can earn surplus-sale income with low risk.',
+    guidanceConstrained: 'Partial shortage detected. Buildings operate at reduced capacity. A power plant here offers strong returns.',
+    guidanceCritical: 'Critical shortage — most buildings are offline. Power plant investment has the highest ROI in this city right now.',
+    guidanceLegacy: 'No player power plants yet. Buildings run on the city legacy grid. Build the first plant to earn grid revenue.',
     forecastNow: 'Now',
     forecastTickLabel: '+{count}',
   },
@@ -1944,7 +1939,7 @@ export default {
     units: {
       POWER_GENERATION: {
         label: 'Power Generation',
-        description: 'Boosts the plant\'s rated output by {boost} MW per level, increasing grid contribution and surplus income potential.',
+        description: "Boosts the plant's rated output by {boost} MW per level, increasing grid contribution and surplus income potential.",
       },
       BATTERY_STORAGE: {
         label: 'Battery Storage',
