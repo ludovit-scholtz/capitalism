@@ -370,7 +370,7 @@ async function buyBuilding() {
           <!-- City selection -->
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-semibold">{{ t('buildings.selectCity') }}</label>
-            <div class="flex flex-wrap gap-2">
+            <div class="city-select-grid flex flex-wrap gap-2">
               <button
                 v-for="city in cities"
                 :key="city.id"
@@ -416,15 +416,15 @@ async function buyBuilding() {
               </p>
               <!-- Amount breakdown (insufficient funds only) -->
               <div v-if="fundingGapType === 'insufficient_funds'" class="flex flex-col gap-1 mt-1 p-3 bg-white/[0.04] rounded-md text-sm">
-                <div class="flex justify-between items-center">
+                <div class="amount-required flex justify-between items-center">
                   <span class="text-muted">{{ t('buildings.fundingGapRequired') }}</span>
                   <strong>{{ formatCurrency(selectedLotTotalCost) }}</strong>
                 </div>
-                <div class="flex justify-between items-center">
+                <div class="amount-available flex justify-between items-center">
                   <span class="text-muted">{{ t('buildings.fundingGapAvailable') }}</span>
                   <strong class="text-[var(--color-warning,#ff9f43)]">{{ formatCurrency(availableLocalBalance) }}</strong>
                 </div>
-                <div class="flex justify-between items-center border-t border-divider pt-1 mt-0.5">
+                <div class="amount-shortfall flex justify-between items-center border-t border-divider pt-1 mt-0.5">
                   <span class="text-muted">{{ t('buildings.fundingGapShortfall') }}</span>
                   <strong class="text-bad">{{ formatCurrency(selectedLotTotalCost - availableLocalBalance) }}</strong>
                 </div>
@@ -473,15 +473,15 @@ async function buyBuilding() {
             v-if="selectedType === 'BANK'"
             class="flex items-start gap-3 mt-1 px-5 py-3.5 border rounded-lg"
             :class="companyHasBankCapital
-              ? 'bg-[rgba(16,185,129,0.07)] border-[rgba(16,185,129,0.3)]'
-              : 'bg-[rgba(248,113,113,0.07)] border-[rgba(248,113,113,0.3)]'"
+              ? 'capital-ok bg-[rgba(16,185,129,0.07)] border-[rgba(16,185,129,0.3)]'
+              : 'capital-warn bg-[rgba(248,113,113,0.07)] border-[rgba(248,113,113,0.3)]'"
           >
             <span class="text-xl flex-shrink-0" aria-hidden="true">{{ companyHasBankCapital ? '✅' : '⚠️' }}</span>
             <div class="flex flex-col gap-1">
               <span class="text-[0.8125rem] text-muted">{{ t('buildings.bankCapitalRequirement') }}:</span>
               <strong class="text-base font-bold">{{ formatCurrency(bankBaseCapitalRequired) }}</strong>
-              <span v-if="companyHasBankCapital" class="text-[0.8125rem] text-[#10b981]">{{ t('buildings.bankCapitalSufficient') }}</span>
-              <span v-else class="text-[0.8125rem] text-bad font-semibold">{{ bankCapitalInsufficientMessage }}</span>
+              <span v-if="companyHasBankCapital" class="capital-status-ok text-[0.8125rem] text-[#10b981]">{{ t('buildings.bankCapitalSufficient') }}</span>
+              <span v-else class="capital-status-warn text-[0.8125rem] text-bad font-semibold">{{ bankCapitalInsufficientMessage }}</span>
             </div>
           </div>
 

@@ -588,8 +588,8 @@ async function createCompany() {
                   <span class="text-[1.25rem] font-bold">{{ company.buildings.length }}</span>
                 </span>
                 <span v-if="company.buildings.length > 0 && cityNames[company.buildings[0]?.cityId ?? '']" class="flex flex-col gap-0.5">
-                  <span class="text-[0.6875rem] uppercase tracking-wide text-muted font-semibold">{{ t('dashboard.city') }}</span>
-                  <span class="font-medium text-[0.9375rem]">📍 {{ cityNames[company.buildings[0]!.cityId] }}</span>
+                  <span class="meta-label text-[0.6875rem] uppercase tracking-wide text-muted font-semibold">{{ t('dashboard.city') }}</span>
+                  <span class="city-name font-medium text-[0.9375rem]">📍 {{ cityNames[company.buildings[0]!.cityId] }}</span>
                 </span>
               </div>
             </div>
