@@ -12,10 +12,9 @@ function detectPreferredTheme(): 'dark' | 'light' {
   } catch {
     // localStorage unavailable (e.g., SSR)
   }
-  // Respect OS preference as fallback; game defaults to dark
-  if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-color-scheme: light)').matches) {
-    return 'light'
-  }
+  // Game is intentionally dark-first. Do NOT fall back to prefers-color-scheme
+  // because CI headless browsers default to light, which would break dark-mode
+  // expectations in tests and give new players the wrong initial experience.
   return 'dark'
 }
 
