@@ -59,6 +59,17 @@ const availableCurrencies = computed(() => {
   return Array.from(codes).sort()
 })
 
+/** All tradeable currencies as CurrencyBalance entries (0 balance when not held). Used for "You receive" selector. */
+const toBalances = computed<CurrencyBalance[]>(() => {
+  return availableCurrencies.value.map((code) => {
+    const existing = balances.value.find((b) => b.currencyCode === code)
+    if (existing) return existing
+    const rate = rates.value.find((r) => r.quoteCurrencyCode === code)
+    const symbol = rate?.quoteCurrencySymbol ?? code
+    return { currencyCode: code, currencySymbol: symbol, balance: 0 }
+  })
+})
+
 const fromBalance = computed(() => {
   const b = balances.value.find((b) => b.currencyCode === fromCurrency.value)
   return b?.balance ?? 0
@@ -376,7 +387,7 @@ watch(activeTab, async (tab) => {
               <div class="swap-field">
                 <BankAccountSelector
                   v-model="fromCurrency"
-                  :balances="balances"
+                  :balances="toBalances"
                   :label="t('forex.sourceCurrency')"
                   id="from-currency"
                   @update:model-value="() => { quote = null; showConfirm = false }"
@@ -411,7 +422,7 @@ watch(activeTab, async (tab) => {
               <div class="swap-field">
                 <BankAccountSelector
                   v-model="toCurrency"
-                  :balances="balances"
+                  :balances="toBalances"
                   :label="t('forex.targetCurrency')"
                   id="to-currency"
                   @update:model-value="() => { quote = null; showConfirm = false }"

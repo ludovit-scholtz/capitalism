@@ -1036,3 +1036,15 @@ Root-cause of a full-suite test failure (April 2026, PR #98 currency-aware prici
 1. **Any test that asserts on the FULL set of lots for a city (`cityLots(cityId)`) must use an isolated factory** if any other test in the shared factory class creates `BuildingLot` rows in that city via `CreateTestLotAsync`.
 2. **`CreateTestLotAsync` always uses a fixed price (default 75 000, or a caller-supplied value) with `BasePrice = 0`.** This is intentionally EUR-level for affordability. When these lots exist in the shared factory DB for a non-EUR city, they will fail any assertion requiring local-currency prices (e.g., `> 1 000 000 CZK`).
 3. **Tests that query aggregate data (all lots, all orders, all players) from the shared factory are inherently fragile** because other tests add rows. Use isolated factories for such assertions.
+
+## BankAccountSelector and mobile nav — always support all tradeable currencies and overflow scroll
+
+Root-cause of CI failures (April 2026, PR #114 bank statement review):
+- `BankAccountSelector.vue` was integrated into `ForexExchangeView` but it only rendered `<option>` entries for currencies in the player's `balances` list. The player doesn't have a CZK balance before their first swap, so `selectOption('CZK')` found 0 matching options and timed out.
+- Additionally, the `AppHeader` mobile nav gained a new `Bank Statement` entry. With 14 nav items each ~50px tall, the Chat button was pushed below the 812px mobile viewport. All E2E tests clicking `getByRole('button', { name: 'Chat' })` after opening the mobile menu failed with "element is outside of the viewport".
+
+**Rules to prevent recurrence:**
+1. **When adding a `BankAccountSelector` or any currency/account `<select>`, ensure it always renders options for all available tradeable currencies.** For a "You receive" or "You send" selector backed by exchange rates, compute `toBalances` as a merged list: for every currency in `availableCurrencies`, include the player's actual balance if they have it, or `{ currencyCode, currencySymbol, balance: 0 }` otherwise. Never render only currencies the player currently holds.
+2. **After integrating `BankAccountSelector` into an existing flow (like Forex swap), re-run all existing E2E tests for that flow before pushing.** The `forex-exchange.spec.ts` tests use `selectOption('CZK')` — verify those still work after any component change to the currency selector.
+3. **When a new nav item is added to `AppHeader`, check whether the mobile nav still fits in the 375×812 viewport used by E2E tests.** The mobile nav must have `max-height: calc(100vh - 64px); overflow-y: auto;` so it scrolls instead of overflowing. Add this CSS defensively at first rather than only after it breaks.
+4. **After adding a nav item, always run `chat-navigation.spec.ts` mobile tests locally** to confirm the Chat button is still reachable.

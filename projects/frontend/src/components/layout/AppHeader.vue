@@ -380,6 +380,8 @@ function handleChatToggle() {
     visibility: hidden;
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
   }
 
   .nav-links.nav-open {
