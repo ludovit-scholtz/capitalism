@@ -385,6 +385,13 @@ watch(activeTab, async (tab) => {
           <div class="swap-form">
             <div class="swap-row">
               <div class="swap-field">
+                <!--
+                  Both selectors intentionally use `toBalances` (all tradeable currencies,
+                  including 0-balance entries). This is required so the ⇅ swap button can
+                  reverse EUR→CZK to CZK→EUR even before the player holds any CZK.
+                  The affordability validation (`validationError`) catches a 0-balance source
+                  and shows "Insufficient balance for this swap." before the swap proceeds.
+                -->
                 <BankAccountSelector
                   v-model="fromCurrency"
                   :balances="toBalances"
