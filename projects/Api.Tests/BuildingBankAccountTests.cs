@@ -679,6 +679,305 @@ public sealed class BuildingBankAccountTests
         Assert.Equal(10_000m, bankAccountResult.GetProperty("balance").GetDecimal());
     }
 
+    // ── AssignBuildingBankAccount mutation ────────────────────────────────────
+
+    [Fact]
+    public async Task AssignBuildingBankAccount_WithMatchingCurrency_AssignsAccount()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-assign-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Assign Test Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var account = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "9999888877776666",
+            CurrencyCode = "EUR",
+            Balance = 50_000m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(account);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Assign Target Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BuiltAtUtc = DateTime.UtcNow,
+            // No bank account initially.
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Assign($input: AssignBuildingBankAccountInput!) {
+                assignBuildingBankAccount(input: $input) {
+                    bankAccount {
+                        hasBankAccount
+                        bankAccountId
+                        accountNumber
+                        balance
+                    }
+                }
+            }
+            """,
+            new { input = new { buildingId = building.Id, bankAccountId = account.Id } },
+            token);
+
+        var bankAccount = result.GetProperty("data").GetProperty("assignBuildingBankAccount").GetProperty("bankAccount");
+        Assert.True(bankAccount.GetProperty("hasBankAccount").GetBoolean());
+        Assert.Equal(account.Id.ToString(), bankAccount.GetProperty("bankAccountId").GetString());
+        Assert.Equal("9999888877776666", bankAccount.GetProperty("accountNumber").GetString());
+        Assert.Equal(50_000m, bankAccount.GetProperty("balance").GetDecimal());
+
+        // Verify DB state.
+        await db.Entry(building).ReloadAsync();
+        Assert.Equal(account.Id, building.BankAccountId);
+    }
+
+    [Fact]
+    public async Task AssignBuildingBankAccount_WithWrongCurrency_ReturnsCurrencyMismatchError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-currency-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var cityEur = await db.Cities.FirstAsync(c => c.Name == "Bratislava"); // EUR
+        var cityCzk = await db.Cities.FirstAsync(c => c.CurrencyCode == "CZK");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Currency Mismatch Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        // EUR account.
+        var eurAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234000056780000",
+            CurrencyCode = "EUR",
+            Balance = 10_000m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(eurAccount);
+
+        // Building in CZK city — assigning EUR account should fail.
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = cityCzk.Id,
+            Type = BuildingType.Factory,
+            Name = "CZK Factory",
+            Latitude = cityCzk.Latitude,
+            Longitude = cityCzk.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Assign($input: AssignBuildingBankAccountInput!) {
+                assignBuildingBankAccount(input: $input) {
+                    bankAccount { hasBankAccount }
+                }
+            }
+            """,
+            new { input = new { buildingId = building.Id, bankAccountId = eurAccount.Id } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("CURRENCY_MISMATCH", code);
+    }
+
+    [Fact]
+    public async Task AssignBuildingBankAccount_Unauthenticated_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            mutation Assign($input: AssignBuildingBankAccountInput!) {
+                assignBuildingBankAccount(input: $input) {
+                    bankAccount { hasBankAccount }
+                }
+            }
+            """,
+            new { input = new { buildingId = Guid.NewGuid(), bankAccountId = Guid.NewGuid() } });
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    // ── buildingBankAccount query auth ────────────────────────────────────────
+
+    [Fact]
+    public async Task BuildingBankAccount_Query_Unauthenticated_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query BBA($buildingId: UUID!) {
+                buildingBankAccount(buildingId: $buildingId) {
+                    hasBankAccount
+                }
+            }
+            """,
+            new { buildingId = Guid.NewGuid() });
+
+        Assert.True(result.TryGetProperty("errors", out _));
+    }
+
+    // ── Multi-building isolation ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task OperatingCostPhase_OneBuildingInsufficient_OnlySuspendsThatBuilding()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-multi-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Multi Building Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        // Well-funded account.
+        var richAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1111111111111111",
+            CurrencyCode = "EUR",
+            Balance = 100_000m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        // Empty account.
+        var brokeAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "2222222222222222",
+            CurrencyCode = "EUR",
+            Balance = 0m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.AddRange(richAccount, brokeAccount);
+
+        var buildingOk = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Rich Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BankAccountId = richAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        var buildingBroke = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Broke Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BankAccountId = brokeAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.AddRange(buildingOk, buildingBroke);
+
+        // Both buildings have a manufacturing unit to incur operating costs.
+        db.BuildingUnits.AddRange(
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingOk.Id, UnitType = UnitType.Manufacturing, GridX = 0, GridY = 0, Level = 1 },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = buildingBroke.Id, UnitType = UnitType.Manufacturing, GridX = 0, GridY = 0, Level = 1 }
+        );
+        await db.SaveChangesAsync();
+
+        var processor = CreateTickProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(buildingOk).ReloadAsync();
+        await db.Entry(buildingBroke).ReloadAsync();
+
+        // The well-funded building should NOT be suspended.
+        Assert.False(buildingOk.IsSuspendedForFunds, "Rich factory should not be suspended.");
+
+        // The empty-account building SHOULD be suspended.
+        Assert.True(buildingBroke.IsSuspendedForFunds, "Broke factory should be suspended.");
+        Assert.NotNull(buildingBroke.SuspendedReason);
+        Assert.StartsWith("INSUFFICIENT_FUNDS:", buildingBroke.SuspendedReason);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static async Task<Guid> GetCurrentPlayerIdAsync(HttpClient client, string token)

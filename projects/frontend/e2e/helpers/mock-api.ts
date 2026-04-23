@@ -6450,6 +6450,59 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    // ── Assign building bank account mutation ────────────────────────────────
+    if (query.includes('assignBuildingBankAccount')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { input?: { buildingId?: string; bankAccountId?: string } } | undefined
+      const buildingId = vars?.input?.buildingId ?? ''
+      const bankAccountId = vars?.input?.bankAccountId ?? ''
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const building = player.companies.flatMap((c) => c.buildings).find((b) => b.id === buildingId)
+      if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+
+      // Look up the account from state.buildingBankAccounts by bankAccountId.
+      const matchEntry = Object.entries(state.buildingBankAccounts).find(
+        ([, info]) => info.bankAccountId === bankAccountId,
+      )
+      if (!matchEntry) return routeJsonError('Bank account not found', 'BANK_ACCOUNT_NOT_FOUND')
+
+      const [, acctInfo] = matchEntry
+      const city = state.cities.find((c) => c.id === building.cityId)
+      const cityCurrency = city?.currencyCode ?? 'EUR'
+      if (acctInfo.currencyCode !== cityCurrency)
+        return routeJsonError(
+          `Account currency ${acctInfo.currencyCode} does not match city currency ${cityCurrency}.`,
+          'CURRENCY_MISMATCH',
+        )
+
+      // Reassign the account to this building.
+      state.buildingBankAccounts[buildingId] = { ...acctInfo }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            assignBuildingBankAccount: {
+              bankAccount: {
+                buildingId,
+                buildingName: building.name,
+                cityName: city?.name ?? '',
+                currencyCode: acctInfo.currencyCode,
+                hasBankAccount: true,
+                bankAccountId,
+                accountNumber: acctInfo.accountNumber,
+                balance: acctInfo.balance,
+                isSuspendedForFunds: acctInfo.isSuspendedForFunds,
+                suspendedReason: acctInfo.suspendedReason,
+              },
+            },
+          },
+        }),
+      })
+    }
+
     // ── Create company bank account mutation ─────────────────────────────────
     if (query.includes('createCompanyBankAccount')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
