@@ -2401,4 +2401,20 @@ export default {
     factor_SATURATION: 'Marktsättigung',
     factor_COMPETITION: 'Wettbewerb',
   },
+
+  buildingBankAccount: {
+    accountLabel: 'Bankkonto:',
+    noAccountAssigned: 'Kein Bankkonto zugewiesen',
+    missingAccountAdvisory: 'Diesem Gebäude wurde kein Bankkonto zugewiesen — Betriebskosten werden vom Unternehmenskonto abgebucht. Weisen Sie ein Konto zu, um die gebäudespezifische Finanzverwaltung zu aktivieren.',
+    insufficientFunds: 'Gebäude in diesem Tick ausgesetzt: Unzureichende Mittel auf dem Bankkonto (benötigt {amount}). Füllen Sie das Konto auf, um den Betrieb wiederaufzunehmen.',
+    fundAccount: 'Bankkonto finanzieren',
+    fundHint: 'Mittel vom Unternehmenskonto auf das Bankkonto dieses Gebäudes übertragen, um Betriebskosten zu decken.',
+    amountPlaceholder: 'Betrag ({symbol})',
+    transferBtn: 'Übertragen',
+    fundSuccess: 'Überweisung erfolgreich.',
+    guidance: 'Hilfe benötigt?',
+    guidanceForex: 'Währung wechseln →',
+    guidanceBank: 'Bankverwaltung →',
+    panelTitle: 'Bankkonto',
+  },
 }

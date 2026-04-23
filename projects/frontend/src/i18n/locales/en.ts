@@ -2404,4 +2404,20 @@ export default {
     factor_SATURATION: 'Saturation',
     factor_COMPETITION: 'Competition',
   },
+
+  buildingBankAccount: {
+    accountLabel: 'Bank Account:',
+    noAccountAssigned: 'No bank account assigned',
+    missingAccountAdvisory: 'No bank account assigned to this building — operating costs are using company cash. Assign an account to enable per-building fund management.',
+    insufficientFunds: 'Building suspended this tick: insufficient funds in bank account (needed {amount}). Top up the account to resume operations.',
+    fundAccount: 'Fund Bank Account',
+    fundHint: 'Transfer funds from company cash into this building bank account to cover operating costs.',
+    amountPlaceholder: 'Amount ({symbol})',
+    transferBtn: 'Transfer',
+    fundSuccess: 'Transfer successful.',
+    guidance: 'Need help?',
+    guidanceForex: 'Convert currency →',
+    guidanceBank: 'Bank management →',
+    panelTitle: 'Bank Account',
+  },
 }

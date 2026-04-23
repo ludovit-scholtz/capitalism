@@ -2394,4 +2394,20 @@ export default {
     factor_SATURATION: 'Nasýtenie',
     factor_COMPETITION: 'Konkurencia',
   },
+
+  buildingBankAccount: {
+    accountLabel: 'Bankový účet:',
+    noAccountAssigned: 'Žiadny bankový účet priradený',
+    missingAccountAdvisory: 'Tomuto objektu nebol priradený bankový účet — prevádzkové náklady sa strhávajú z firemnej hotovosti. Priradte účet na aktiváciu správy financií na úrovni objektu.',
+    insufficientFunds: 'Objekt bol pozastavený v tomto tiku: nedostatok prostriedkov na bankovom účte (potrebných {amount}). Doplňte účet pre obnovenie prevádzky.',
+    fundAccount: 'Financovanie bankového účtu',
+    fundHint: 'Presunúť prostriedky z firemnej hotovosti na bankový účet tohto objektu pre krytie prevádzkových nákladov.',
+    amountPlaceholder: 'Suma ({symbol})',
+    transferBtn: 'Prevod',
+    fundSuccess: 'Prevod úspešný.',
+    guidance: 'Potrebujete pomoc?',
+    guidanceForex: 'Prevod meny →',
+    guidanceBank: 'Správa banky →',
+    panelTitle: 'Bankový účet',
+  },
 }

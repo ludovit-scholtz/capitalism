@@ -5,6 +5,10 @@ namespace Api.Engine.Phases;
 
 /// <summary>
 /// Applies per-tick labor and energy costs for active units in powered buildings.
+/// If a building has an assigned bank account, costs are debited from that account and
+/// the building is suspended for the tick when the balance is insufficient.
+/// Buildings without an assigned account fall back to company cash (legacy path) but
+/// receive a MISSING_BANK_ACCOUNT advisory flag so the UI can guide the player.
 /// </summary>
 public sealed class OperatingCostPhase : ITickPhase
 {
@@ -47,6 +51,10 @@ public sealed class OperatingCostPhase : ITickPhase
                 maxCompanyAssetValue,
                 context.CurrentTick);
 
+            // ── Calculate total operating cost for this building ──
+            var totalBuildingCost = 0m;
+            var unitCosts = new List<(BuildingUnit Unit, decimal Labor, decimal Energy)>();
+
             foreach (var unit in units)
             {
                 var baseLaborHours = CompanyEconomyCalculator.GetBaseUnitLaborHours(unit.UnitType, unit.Level) * efficiency;
@@ -66,14 +74,58 @@ public sealed class OperatingCostPhase : ITickPhase
                     2,
                     MidpointRounding.AwayFromZero);
 
-                // While an upgrade is in progress the unit operates at 50% cost (ROADMAP).
                 var upgradeMultiplier = context.UnitsUnderUpgrade.Contains(unit.Id) ? 0.5m : 1m;
                 laborCost = decimal.Round(laborCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
                 energyCost = decimal.Round(energyCost * upgradeMultiplier, 2, MidpointRounding.AwayFromZero);
 
+                totalBuildingCost += laborCost + energyCost;
+                unitCosts.Add((unit, laborCost, energyCost));
+            }
+
+            if (unitCosts.Count == 0)
+            {
+                continue;
+            }
+
+            // ── Bank account check ──
+            BankAccount? bankAccount = building.BankAccountId.HasValue
+                && context.BankAccountsById.TryGetValue(building.BankAccountId.Value, out var ba)
+                ? ba
+                : null;
+
+            if (bankAccount is not null)
+            {
+                // Building has an assigned bank account — enforce funding from it.
+                if (bankAccount.Balance < totalBuildingCost)
+                {
+                    // Insufficient funds: suspend the building for this tick.
+                    building.IsSuspendedForFunds = true;
+                    building.SuspendedReason = $"INSUFFICIENT_FUNDS:{totalBuildingCost:F2}";
+                    continue;
+                }
+
+                // Sufficient funds: debit from the bank account and reset any previous suspension.
+                bankAccount.Balance -= totalBuildingCost;
+                building.IsSuspendedForFunds = false;
+                building.SuspendedReason = null;
+            }
+            else
+            {
+                // No bank account assigned: legacy path — use company cash.
+                // Set advisory flag (not a hard suspension) so the frontend can prompt setup.
+                building.IsSuspendedForFunds = false;
+                building.SuspendedReason = "MISSING_BANK_ACCOUNT";
+            }
+
+            // ── Debit individual unit costs and record ledger entries ──
+            foreach (var (unit, laborCost, energyCost) in unitCosts)
+            {
                 if (laborCost > 0m)
                 {
-                    company.Cash -= laborCost;
+                    if (bankAccount is null)
+                    {
+                        company.Cash -= laborCost;
+                    }
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
                         Id = Guid.NewGuid(),
@@ -90,7 +142,10 @@ public sealed class OperatingCostPhase : ITickPhase
 
                 if (energyCost > 0m)
                 {
-                    company.Cash -= energyCost;
+                    if (bankAccount is null)
+                    {
+                        company.Cash -= energyCost;
+                    }
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
                         Id = Guid.NewGuid(),

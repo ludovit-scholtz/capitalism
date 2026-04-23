@@ -181,6 +181,9 @@ public sealed class TickProcessor(
             }
         }
 
+        // Load bank accounts (needed for OperatingCostPhase fund checks).
+        var bankAccounts = await db.BankAccounts.ToListAsync(ct);
+
         return new TickContext
         {
             Db = db,
@@ -223,6 +226,7 @@ public sealed class TickProcessor(
             UnitsUnderUpgrade = unitsUnderUpgrade,
             ResearchBudgetsByKey = researchBudgets.ToDictionary(rb => (rb.CompanyId, rb.ProductTypeId)),
             WeatherByCity = weatherByCity,
+            BankAccountsById = bankAccounts.ToDictionary(a => a.Id),
         };
     }
 }

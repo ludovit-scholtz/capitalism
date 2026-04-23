@@ -389,6 +389,80 @@ public sealed partial class AppDbInitializer
                     : "TEXT NOT NULL DEFAULT 'EUR'";
                 await EnsureColumnAsync(connection, dialect, "Companies", "CurrencyCode", columnDef);
             }
+
+            // Ensure BankAccounts table and building funding columns exist
+            // (added in AddBankAccountsAndBuildingFunding migration).
+            if (ShouldRepairSchemaArtifact("20260423025526_AddBankAccountsAndBuildingFunding", pendingMigrations))
+            {
+                await EnsureColumnAsync(connection, dialect, "Buildings", "BankAccountId", dialect.NullableGuid);
+                await EnsureColumnAsync(connection, dialect, "Buildings", "IsSuspendedForFunds", dialect.RequiredBooleanDefaultFalse);
+                await EnsureColumnAsync(connection, dialect, "Buildings", "SuspendedReason",
+                    dialect.IsPostgres ? "character varying(200)" : "TEXT");
+
+                if (!await TableExistsAsync(connection, dialect, "BankAccounts"))
+                {
+                    if (dialect.IsPostgres)
+                    {
+                        await ExecuteNonQueryAsync(connection,
+                            """
+                            CREATE TABLE IF NOT EXISTS "BankAccounts" (
+                                "Id" uuid NOT NULL,
+                                "AccountNumber" character varying(16) NOT NULL,
+                                "CurrencyCode" character varying(3) NOT NULL,
+                                "Balance" numeric(18,2) NOT NULL DEFAULT 0,
+                                "CompanyId" uuid NULL,
+                                "IsGovernmentAccount" boolean NOT NULL DEFAULT FALSE,
+                                "CreatedAtUtc" timestamp with time zone NOT NULL,
+                                CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id"),
+                                CONSTRAINT "FK_BankAccounts_Companies_CompanyId" FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE SET NULL
+                            )
+                            """);
+                    }
+                    else
+                    {
+                        await ExecuteNonQueryAsync(connection,
+                            """
+                            CREATE TABLE IF NOT EXISTS "BankAccounts" (
+                                "Id" TEXT NOT NULL,
+                                "AccountNumber" TEXT NOT NULL,
+                                "CurrencyCode" TEXT NOT NULL,
+                                "Balance" TEXT NOT NULL DEFAULT '0',
+                                "CompanyId" TEXT NULL,
+                                "IsGovernmentAccount" INTEGER NOT NULL DEFAULT 0,
+                                "CreatedAtUtc" TEXT NOT NULL,
+                                CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id")
+                            )
+                            """);
+                    }
+                }
+
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "BankAccounts",
+                    "IX_BankAccounts_AccountNumber",
+                    dialect.IsPostgres
+                        ? "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_BankAccounts_AccountNumber\" ON \"BankAccounts\" (\"AccountNumber\")"
+                        : "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_BankAccounts_AccountNumber\" ON \"BankAccounts\" (\"AccountNumber\")");
+
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "BankAccounts",
+                    "IX_BankAccounts_CompanyId",
+                    dialect.IsPostgres
+                        ? "CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_CompanyId\" ON \"BankAccounts\" (\"CompanyId\")"
+                        : "CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_CompanyId\" ON \"BankAccounts\" (\"CompanyId\")");
+
+                await EnsureIndexAsync(
+                    connection,
+                    dialect,
+                    "Buildings",
+                    "IX_Buildings_BankAccountId",
+                    dialect.IsPostgres
+                        ? "CREATE INDEX IF NOT EXISTS \"IX_Buildings_BankAccountId\" ON \"Buildings\" (\"BankAccountId\")"
+                        : "CREATE INDEX IF NOT EXISTS \"IX_Buildings_BankAccountId\" ON \"Buildings\" (\"BankAccountId\")");
+            }
         }
         finally
         {

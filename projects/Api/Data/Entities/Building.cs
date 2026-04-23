@@ -162,6 +162,31 @@ public sealed class Building
     /// </summary>
     public decimal ConstructionCost { get; set; }
 
+    /// <summary>
+    /// The bank account used to fund operating costs (labor, energy) for this building.
+    /// Null means no account has been assigned yet; in that case the tick engine falls back
+    /// to the company cash balance and auto-assigns a government account on the next tick.
+    /// </summary>
+    public Guid? BankAccountId { get; set; }
+
+    /// <summary>Navigation property to the building's assigned bank account.</summary>
+    public BankAccount? BankAccount { get; set; }
+
+    /// <summary>
+    /// True when the building's bank account had insufficient funds to cover operating costs
+    /// on the most recent tick. The building is skipped (all operations suspended) for that tick.
+    /// Reset to false as soon as the next tick finds sufficient funds.
+    /// </summary>
+    public bool IsSuspendedForFunds { get; set; }
+
+    /// <summary>
+    /// Human-readable reason the building is suspended, set alongside <see cref="IsSuspendedForFunds"/>.
+    /// Null when the building is not suspended.
+    /// Values: "MISSING_BANK_ACCOUNT" | "INSUFFICIENT_FUNDS:&lt;amount&gt;" | null.
+    /// </summary>
+    [MaxLength(200)]
+    public string? SuspendedReason { get; set; }
+
     /// <summary>Units installed in this building's 4x4 grid.</summary>
     public ICollection<BuildingUnit> Units { get; set; } = [];
 

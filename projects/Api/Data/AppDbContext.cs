@@ -9,6 +9,9 @@ namespace Api.Data;
 /// </summary>
 public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options)
 {
+    /// <summary>Building-level bank accounts used to fund operating costs.</summary>
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+
     /// <summary>Registered game players.</summary>
     public DbSet<Player> Players => Set<Player>();
 

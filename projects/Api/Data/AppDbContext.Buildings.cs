@@ -24,12 +24,25 @@ public sealed partial class AppDbContext
             e.Property(b => b.LendingInterestRatePercent).HasPrecision(8, 4);
             e.Property(b => b.TotalDeposits).HasPrecision(18, 2);
             e.Property(b => b.ConstructionCost).HasPrecision(18, 2);
+            e.Property(b => b.SuspendedReason).HasMaxLength(200);
             e.HasOne(b => b.Company).WithMany(c => c.Buildings).HasForeignKey(b => b.CompanyId);
             e.HasOne(b => b.City).WithMany(c => c.Buildings).HasForeignKey(b => b.CityId);
+            e.HasOne(b => b.BankAccount).WithMany().HasForeignKey(b => b.BankAccountId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(b => b.PendingConfiguration)
                 .WithOne(plan => plan.Building)
                 .HasForeignKey<BuildingConfigurationPlan>(plan => plan.BuildingId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BankAccount>(e =>
+        {
+            e.HasKey(a => a.Id);
+            e.Property(a => a.AccountNumber).HasMaxLength(16);
+            e.Property(a => a.CurrencyCode).HasMaxLength(3);
+            e.Property(a => a.Balance).HasPrecision(18, 2);
+            e.HasIndex(a => a.AccountNumber).IsUnique();
+            e.HasIndex(a => new { a.CurrencyCode, a.IsGovernmentAccount });
+            e.HasOne(a => a.Company).WithMany().HasForeignKey(a => a.CompanyId).OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<BuildingUnit>(e =>

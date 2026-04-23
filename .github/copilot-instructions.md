@@ -1048,3 +1048,16 @@ Root-cause of CI failures (April 2026, PR #114 bank statement review):
 2. **After integrating `BankAccountSelector` into an existing flow (like Forex swap), re-run all existing E2E tests for that flow before pushing.** The `forex-exchange.spec.ts` tests use `selectOption('CZK')` — verify those still work after any component change to the currency selector.
 3. **When a new nav item is added to `AppHeader`, check whether the mobile nav still fits in the 375×812 viewport used by E2E tests.** The mobile nav must have `max-height: calc(100vh - 64px); overflow-y: auto;` so it scrolls instead of overflowing. Add this CSS defensively at first rather than only after it breaks.
 4. **After adding a nav item, always run `chat-navigation.spec.ts` mobile tests locally** to confirm the Chat button is still reachable.
+
+## Mock-api abbreviation checks — never use abbreviations that are substrings of GraphQL type names
+
+Root-cause of a CI failure (April 2026, PR #enforce-bank-account-guidance):
+- The `unitUpgradeInfo` mock handler used `query.includes('UUI')` as a shorthand check.
+- `'UUID'.includes('UUI') === true` — every GraphQL query that has a `UUID!` parameter (e.g. `buildingBankAccount($buildingId: UUID!)`) was falsely matched by the `unitUpgradeInfo` handler.
+- The `buildingBankAccount` query fell through and received `{ unitUpgradeInfo: ... }` response data, so `result.buildingBankAccount` was `undefined` and the panel rendered empty.
+- All 4 bank-account E2E tests failed with "panel content is empty".
+
+**Rules to prevent recurrence:**
+1. **Never use abbreviations in `query.includes(...)` checks when the abbreviation is a substring of any common GraphQL type name.** `UUID` contains `UUI`, `gameServers` contains `me`, `companyRankings` contains `rankings` — all documented with exclusion guards already.
+2. **Use the full operation name** (e.g. `query.includes('unitUpgradeInfo')`) rather than shortened forms. Abbreviated checks save nothing and cause hard-to-diagnose cross-handler pollution.
+3. **When adding a new mock handler, search for any existing handler whose `query.includes(...)` condition could match the new query's operation name or its parameter types.** Run a quick sanity check: does any existing substring appear inside `operationName` or inside type annotations like `UUID!`, `String!`, `Int!`?
