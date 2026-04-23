@@ -7,9 +7,11 @@ namespace Api.Engine.Phases;
 /// surplus-sale income when the city grid has excess supply, and pay government fines
 /// when the city has a power shortage.
 ///
-/// Income and fines are proportional to each plant's share of total installed capacity
-/// (weather-adjusted raw output). Both amounts are settled through the plant's assigned
-/// bank account when one exists; otherwise company cash is used as a legacy fallback.
+/// Income and fines are proportional to each plant's share of total effective capacity.
+/// Effective capacity = rated output + POWER_GENERATION unit boosts + BATTERY_STORAGE
+/// smoothing buffer (battery represents stored energy dispatched to fill gaps).
+/// Both amounts are settled through the plant's assigned bank account when one exists;
+/// otherwise company cash is used as a legacy fallback.
 ///
 /// Ledger categories:
 ///   GRID_SURPLUS_INCOME – positive amount (income) when supply &gt; demand
@@ -65,6 +67,12 @@ public sealed class PowerGridEconomicsPhase : ITickPhase
                         baseOutput += plantUnits
                             .Where(u => u.UnitType == UnitType.PowerGeneration)
                             .Sum(u => GameConstants.PowerGenerationUnitBoostMwPerLevel * u.Level);
+
+                        // BATTERY_STORAGE smoothing also counts for economics —
+                        // it represents stored energy being dispatched to fill gaps.
+                        baseOutput += plantUnits
+                            .Where(u => u.UnitType == UnitType.BatteryStorage)
+                            .Sum(u => GameConstants.BatterySmoothingMwPerLevel * u.Level);
                     }
 
                     var factor = plant.PowerPlantType switch
