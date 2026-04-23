@@ -242,7 +242,7 @@ test.describe('Funding guidance in Buy Building', () => {
     await page.locator('.city-option').filter({ hasText: 'Bratislava' }).click()
 
     // No funding warning for EUR city
-    await expect(page.locator('.funding-guidance')).not.toBeVisible()
+    await expect(page.locator('.funding-guidance')).toBeHidden()
   })
 
   test('funding guidance has Forex and Bank Statement CTA links', async ({ page }) => {
@@ -303,7 +303,7 @@ test.describe('Funding guidance in Buy Building', () => {
     await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
 
     // Should NOT show funding warning since player has CZK
-    await expect(page.locator('.funding-guidance')).not.toBeVisible()
+    await expect(page.locator('.funding-guidance')).toBeHidden()
   })
 })
 
