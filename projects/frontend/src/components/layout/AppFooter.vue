@@ -6,27 +6,10 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <footer class="app-footer">
-    <div class="container footer-inner">
+  <footer class="bg-card border-t border-divider mt-auto">
+    <div class="container flex items-center justify-between h-12 text-sm text-muted">
       <p>{{ t('common.allRightsReserved', { year: new Date().getFullYear() }) }}</p>
       <LanguageSwitcher />
     </div>
   </footer>
 </template>
-
-<style scoped>
-.app-footer {
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
-  margin-top: auto;
-}
-
-.footer-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-</style>

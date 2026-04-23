@@ -429,80 +429,79 @@ async function createCompany() {
 </script>
 
 <template>
-  <div class="dashboard-view container">
-    <div class="dashboard-header">
+  <div class="container py-8 px-4">
+    <!-- Dashboard header: title + tick clock -->
+    <div class="flex justify-between items-start mb-8 flex-wrap gap-4">
       <div>
-        <h1>{{ t('dashboard.title') }}</h1>
-        <div v-if="auth.player" class="player-info">
-          <span class="player-name">{{ auth.player.displayName }}</span>
-          <span class="player-email">{{ auth.player.email }}</span>
+        <h1 class="text-[1.75rem] font-bold mb-1">{{ t('dashboard.title') }}</h1>
+        <div v-if="auth.player" class="flex items-center gap-3">
+          <span class="font-semibold text-[0.9375rem]">{{ auth.player.displayName }}</span>
+          <span class="text-muted text-[0.8125rem]">{{ auth.player.email }}</span>
         </div>
       </div>
       <div
         v-if="gameState"
-        class="tick-clock-widget"
+        class="tick-clock-widget flex flex-col items-end gap-1 px-4 py-2.5 rounded-lg bg-white/[0.04] border border-divider min-w-[9rem] text-right"
         :aria-label="t('tickClock.sectionTitle')"
         :title="t('tickClock.currentTick', { tick: gameState.currentTick })"
       >
-        <span class="tick-clock-label">{{ t('tickClock.currentTime', { time: formattedGameTime }) }}</span>
-        <span v-if="tickCountdown" class="tick-clock-countdown" role="timer">{{ tickCountdown }}</span>
+        <span class="tick-clock-label text-xs text-muted font-medium tracking-wide">{{ t('tickClock.currentTime', { time: formattedGameTime }) }}</span>
+        <span v-if="tickCountdown" class="tick-clock-countdown text-[0.9375rem] font-bold text-brand tabular-nums" role="timer">{{ tickCountdown }}</span>
       </div>
     </div>
 
-    <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
+    <div v-if="loading" class="text-center py-12 text-muted">{{ t('common.loading') }}</div>
 
-    <div v-else-if="error" class="error-message" role="alert">
+    <div v-else-if="error" class="error-message flex items-center gap-4 p-4 bg-[rgba(248,113,113,0.1)] text-bad rounded" role="alert">
       {{ error }}
       <button class="btn btn-secondary" @click="router.go(0)">{{ t('common.tryAgain') }}</button>
     </div>
 
     <template v-else>
       <!-- Person account mode (no company selected) -->
-      <section v-if="isPersonAccount" class="person-account-panel">
-        <div class="person-account-header">
-          <div>
-            <p class="person-account-eyebrow">{{ t('dashboard.personModeEyebrow') }}</p>
-            <h2>{{ t('dashboard.personModeTitle') }}</h2>
-          </div>
+      <section v-if="isPersonAccount" class="person-account-panel mt-6 p-6 border border-divider rounded-xl bg-card">
+        <div class="mb-1">
+          <p class="text-xs font-bold tracking-widest uppercase text-muted m-0 mb-1.5">{{ t('dashboard.personModeEyebrow') }}</p>
+          <h2 class="text-xl font-bold">{{ t('dashboard.personModeTitle') }}</h2>
         </div>
 
         <!-- Personal-account tab navigation -->
         <DashboardTabNav
           :tabs="personAccountTabs"
           :model-value="personAccountTab"
-          class="person-account-tab-nav"
+          class="mt-1"
           @update:model-value="setPersonAccountTab"
         />
 
         <!-- ── Overview tab ──────────────────────────────────────────── -->
         <div
           v-show="personAccountTab === 'overview'"
-          class="person-account-tab-panel"
+          class="pt-5"
           role="tabpanel"
           :aria-label="t('dashboard.personTabOverview')"
         >
-          <p class="person-account-copy">
+          <p class="text-muted mb-4">
             {{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}
           </p>
 
-          <div class="person-account-metrics">
-            <article class="person-metric-card">
-              <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
-              <strong class="person-metric-value">{{ formatCurrency(auth.player?.personalCash ?? 0, 'EUR') }}</strong>
+          <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))] mb-5">
+            <article class="person-metric-card flex flex-col gap-1.5 p-4 border border-divider rounded-lg bg-card-raised">
+              <span class="text-xs text-muted uppercase tracking-wide">{{ t('dashboard.personalCash') }}</span>
+              <strong class="text-xl">{{ formatCurrency(auth.player?.personalCash ?? 0, 'EUR') }}</strong>
             </article>
-            <article class="person-metric-card">
-              <span class="person-metric-label">{{ t('dashboard.controlledCompanies') }}</span>
-              <strong class="person-metric-value">{{ companies.length }}</strong>
+            <article class="person-metric-card flex flex-col gap-1.5 p-4 border border-divider rounded-lg bg-card-raised">
+              <span class="text-xs text-muted uppercase tracking-wide">{{ t('dashboard.controlledCompanies') }}</span>
+              <strong class="text-xl">{{ companies.length }}</strong>
             </article>
           </div>
 
-          <div v-if="companies.length > 0" class="controlled-companies-panel">
-            <h3>{{ t('dashboard.controlledCompaniesTitle') }}</h3>
-            <div class="controlled-companies-grid">
-              <article v-for="company in companies" :key="company.id" class="controlled-company-card">
+          <div v-if="companies.length > 0" class="mt-4">
+            <h3 class="text-[0.9375rem] font-bold mb-3">{{ t('dashboard.controlledCompaniesTitle') }}</h3>
+            <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
+              <article v-for="company in companies" :key="company.id" class="flex flex-col gap-1 p-4 border border-divider rounded-lg bg-page">
                 <strong>{{ company.name }}</strong>
                 <span>{{ formatCurrency(company.cash, companyLedgers[company.id]?.primaryCurrencyCode ?? 'EUR') }}</span>
-                <small>{{ t('dashboard.switchCompanyHint') }}</small>
+                <small class="text-muted">{{ t('dashboard.switchCompanyHint') }}</small>
               </article>
             </div>
           </div>
@@ -511,22 +510,28 @@ async function createCompany() {
         <!-- ── Create company tab ─────────────────────────────────────── -->
         <div
           v-show="personAccountTab === 'create-company'"
-          class="person-account-tab-panel"
+          class="pt-5"
           role="tabpanel"
           :aria-label="t('dashboard.personTabCreateCompany')"
         >
-          <div class="person-account-actions">
+          <div class="flex flex-col gap-3.5">
             <div>
-              <h3>{{ t('dashboard.createCompanyTitle') }}</h3>
-              <p class="person-account-copy">{{ t('dashboard.createCompanyBody') }}</p>
+              <h3 class="text-[0.9375rem] font-bold mb-1">{{ t('dashboard.createCompanyTitle') }}</h3>
+              <p class="text-muted m-0">{{ t('dashboard.createCompanyBody') }}</p>
             </div>
 
-            <form class="new-company-form" @submit.prevent="createCompany">
-              <label class="new-company-field">
-                <span>{{ t('dashboard.companyNameLabel') }}</span>
-                <input v-model="createCompanyName" type="text" maxlength="200" :placeholder="t('dashboard.companyNamePlaceholder')" />
+            <form class="flex flex-col gap-3" @submit.prevent="createCompany">
+              <label class="flex flex-col gap-1.5">
+                <span class="text-sm font-semibold">{{ t('dashboard.companyNameLabel') }}</span>
+                <input
+                  v-model="createCompanyName"
+                  type="text"
+                  maxlength="200"
+                  :placeholder="t('dashboard.companyNamePlaceholder')"
+                  class="px-3.5 py-3 border border-divider rounded bg-page text-body focus:outline-none focus:border-brand transition-colors"
+                />
               </label>
-              <div class="new-company-buttons">
+              <div class="flex flex-wrap gap-3">
                 <button class="btn btn-primary" type="submit" :disabled="createCompanyLoading">
                   {{ createCompanyLoading ? t('common.loading') : t('dashboard.createCompany') }}
                 </button>
@@ -534,31 +539,31 @@ async function createCompany() {
               </div>
             </form>
 
-            <p v-if="createCompanyMessage" class="person-account-message" role="status">{{ createCompanyMessage }}</p>
-            <p v-if="createCompanyError" class="person-account-error" role="alert">{{ createCompanyError }}</p>
+            <p v-if="createCompanyMessage" class="m-0 p-3 rounded-lg bg-[rgba(34,197,94,0.12)] text-good" role="status">{{ createCompanyMessage }}</p>
+            <p v-if="createCompanyError" class="m-0 p-3 rounded-lg bg-[rgba(248,113,113,0.12)] text-bad" role="alert">{{ createCompanyError }}</p>
           </div>
         </div>
 
         <!-- ── Ledger tab ──────────────────────────────────────────────── -->
         <div
           v-show="personAccountTab === 'ledger'"
-          class="person-account-tab-panel"
+          class="pt-5"
           role="tabpanel"
           :aria-label="t('dashboard.personTabLedger')"
         >
-          <p class="person-account-copy person-account-ledger-intro">
+          <p class="text-muted mb-5">
             {{ t('dashboard.personLedgerTabBody') }}
           </p>
 
-          <div class="person-account-metrics">
-            <article class="person-metric-card">
-              <span class="person-metric-label">{{ t('dashboard.personalCash') }}</span>
-              <strong class="person-metric-value">{{ formatCurrency(auth.player?.personalCash ?? 0, 'EUR') }}</strong>
+          <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))] mb-5">
+            <article class="person-metric-card flex flex-col gap-1.5 p-4 border border-divider rounded-lg bg-card-raised">
+              <span class="text-xs text-muted uppercase tracking-wide">{{ t('dashboard.personalCash') }}</span>
+              <strong class="text-xl">{{ formatCurrency(auth.player?.personalCash ?? 0, 'EUR') }}</strong>
             </article>
           </div>
 
-          <div class="person-account-ledger-link">
-            <RouterLink to="/personal-ledger" class="btn btn-primary btn-ledger">
+          <div class="person-account-ledger-link mb-5">
+            <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5">
               📒 {{ t('dashboard.viewPersonalLedger') }}
             </RouterLink>
           </div>
@@ -566,29 +571,29 @@ async function createCompany() {
       </section>
 
       <!-- Company mode: tabbed dashboard -->
-      <div v-if="visibleCompanies.length > 0" class="companies-section">
-        <div v-for="company in visibleCompanies" :key="company.id" class="company-card">
+      <div v-if="visibleCompanies.length > 0" class="companies-section flex flex-col gap-6">
+        <div v-for="company in visibleCompanies" :key="company.id" class="company-card bg-card border border-divider rounded-xl p-6">
 
           <!-- Always-visible company bar -->
-          <div class="company-header">
+          <div class="company-header flex justify-between items-start max-sm:flex-col max-sm:gap-4 mb-0">
             <div>
-              <h2>{{ company.name }}</h2>
-              <div class="company-meta">
-                <span class="meta-item">
-                  <span class="meta-label">{{ t('dashboard.cash') }}</span>
-                  <span class="cash">{{ formatCurrency(company.cash, companyLedgers[company.id]?.primaryCurrencyCode ?? 'EUR') }}</span>
+              <h2 class="text-[1.25rem] font-bold mb-2">{{ company.name }}</h2>
+              <div class="flex gap-6 flex-wrap">
+                <span class="flex flex-col gap-0.5">
+                  <span class="text-[0.6875rem] uppercase tracking-wide text-muted font-semibold">{{ t('dashboard.cash') }}</span>
+                  <span class="cash text-[1.25rem] font-bold text-good">{{ formatCurrency(company.cash, companyLedgers[company.id]?.primaryCurrencyCode ?? 'EUR') }}</span>
                 </span>
-                <span class="meta-item">
-                  <span class="meta-label">{{ t('dashboard.buildings') }}</span>
-                  <span>{{ company.buildings.length }}</span>
+                <span class="flex flex-col gap-0.5">
+                  <span class="text-[0.6875rem] uppercase tracking-wide text-muted font-semibold">{{ t('dashboard.buildings') }}</span>
+                  <span class="text-[1.25rem] font-bold">{{ company.buildings.length }}</span>
                 </span>
-                <span v-if="company.buildings.length > 0 && cityNames[company.buildings[0]?.cityId ?? '']" class="meta-item">
-                  <span class="meta-label">{{ t('dashboard.city') }}</span>
-                  <span class="city-name">📍 {{ cityNames[company.buildings[0]!.cityId] }}</span>
+                <span v-if="company.buildings.length > 0 && cityNames[company.buildings[0]?.cityId ?? '']" class="flex flex-col gap-0.5">
+                  <span class="meta-label text-[0.6875rem] uppercase tracking-wide text-muted font-semibold">{{ t('dashboard.city') }}</span>
+                  <span class="city-name font-medium text-[0.9375rem]">📍 {{ cityNames[company.buildings[0]!.cityId] }}</span>
                 </span>
               </div>
             </div>
-            <div class="company-actions">
+            <div class="company-actions flex flex-wrap gap-2 items-start">
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
                 {{ t('dashboard.buyBuilding') }}
               </RouterLink>
@@ -604,34 +609,34 @@ async function createCompany() {
           <DashboardTabNav :tabs="tabsForCompany(company)" :model-value="activeTab" @update:model-value="setActiveTab($event as 'overview' | 'buildings' | 'activity' | 'chat' | 'pro')" />
 
           <!-- ── Overview tab ──────────────────────────────────────────── -->
-          <div v-show="activeTab === 'overview'" class="tab-panel" role="tabpanel" aria-label="Overview">
+          <div v-show="activeTab === 'overview'" class="tab-panel pt-5" role="tabpanel" aria-label="Overview">
             <!-- Financial summary and guidance -->
-            <div class="operations-row">
+            <div class="grid grid-cols-2 max-[700px]:grid-cols-1 gap-3 mb-4">
               <FinancialSummaryCard :ledger="companyLedgers[company.id] ?? null" :loading="ledgerLoading" />
               <StarterGuidance :company="company" :revenue="companyLedgers[company.id]?.totalRevenue ?? 0" :net-income="companyLedgers[company.id]?.netIncome ?? 0" />
             </div>
           </div>
 
           <!-- ── Buildings tab ─────────────────────────────────────────── -->
-          <div v-show="activeTab === 'buildings'" class="tab-panel" role="tabpanel" aria-label="Buildings">
-            <div v-if="company.buildings.length === 0" class="no-buildings">
+          <div v-show="activeTab === 'buildings'" class="tab-panel pt-5" role="tabpanel" aria-label="Buildings">
+            <div v-if="company.buildings.length === 0" class="no-buildings text-center p-6 text-muted flex flex-col items-center gap-4">
               <p>{{ t('dashboard.noBuildings') }}</p>
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
                 {{ t('dashboard.buyBuilding') }}
               </RouterLink>
             </div>
 
-            <div v-else class="buildings-grid">
-              <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper">
-                <RouterLink :to="building.type === 'BANK' ? `/bank/${building.id}` : `/building/${building.id}`" class="building-card">
-                  <div class="building-icon">{{ getBuildingIcon(building.type) }}</div>
-                  <div class="building-info">
-                    <span class="building-name">{{ building.name }}</span>
-                    <span class="building-type-label">{{ formatBuildingType(building.type) }}</span>
+            <div v-else class="buildings-grid grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
+              <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper flex flex-col mb-1">
+                <RouterLink :to="building.type === 'BANK' ? `/bank/${building.id}` : `/building/${building.id}`" class="building-card flex items-center gap-3 p-4 bg-page border border-divider rounded-t-lg border-b-0 no-underline text-body transition-all duration-200 hover:border-brand hover:bg-[rgba(0,71,255,0.04)] hover:-translate-y-px">
+                  <div class="text-[1.75rem] flex-shrink-0">{{ getBuildingIcon(building.type) }}</div>
+                  <div class="flex-1 flex flex-col gap-0.5">
+                    <span class="building-name font-semibold text-[0.9375rem]">{{ building.name }}</span>
+                    <span class="building-type-label text-xs text-muted">{{ formatBuildingType(building.type) }}</span>
                   </div>
-                  <div class="building-stats">
-                    <span class="building-level">Lv.{{ building.level }}</span>
-                    <span class="building-units">{{ building.units.length }} units</span>
+                  <div class="flex flex-col items-end gap-0.5">
+                    <span class="bg-brand text-white px-2 py-0.5 rounded text-[0.6875rem] font-bold">Lv.{{ building.level }}</span>
+                    <span class="text-[0.6875rem] text-muted">{{ building.units.length }} units</span>
                     <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
                       {{ building.powerStatus === 'OFFLINE' ? '🔴' : '🟡' }}
                       {{ getBuildingPowerLabel(building.powerStatus) }}
@@ -645,59 +650,64 @@ async function createCompany() {
                   :loading="buildingFinancialsLoading && !buildingFinancials[building.id]"
                   :currency-code="cityCurrencies[building.cityId] ?? 'EUR'"
                 />
-                <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" class="building-supply-chain" />
+                <SupplyChainPanel v-if="building.units.length > 0" :units="building.units" :statuses="buildingUnitStatuses[building.id]" class="mt-3" />
               </div>
             </div>
 
             <!-- City power summary -->
-            <div v-if="company.buildings.length > 0 && company.buildings[0]" class="city-power-row">
+            <div v-if="company.buildings.length > 0 && company.buildings[0]" class="mt-3 flex flex-wrap gap-2">
               <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
                 <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
-                  <span class="power-balance-icon">⚡</span>
-                  <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
-                  <span v-if="cityPowerBalances[cityId].status === 'BALANCED'" class="power-balance-value">
+                  <span class="flex-shrink-0">⚡</span>
+                  <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
+                  <span v-if="cityPowerBalances[cityId].status === 'BALANCED'">
                     {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
                   </span>
-                  <span v-else class="power-balance-warning">
+                  <span v-else>
                     {{ cityPowerBalances[cityId].status === 'CRITICAL' ? t('powerGrid.criticalWarning') : t('powerGrid.shortageWarning') }}
                   </span>
-                  <RouterLink :to="`/city/${cityId}`" class="power-balance-link">{{ t('powerGrid.viewDetails') }}</RouterLink>
+                  <RouterLink :to="`/city/${cityId}`" class="underline text-xs ml-auto">{{ t('powerGrid.viewDetails') }}</RouterLink>
                 </div>
-                <div v-else class="power-balance power-balance--legacy">
-                  <span class="power-balance-icon">⚡</span>
-                  <span class="power-balance-label">{{ t('powerGrid.powerCardTitle') }}</span>
-                  <span class="power-balance-value">{{ t('powerGrid.powerCardNoPower') }}</span>
+                <div v-else class="power-balance power-balance--legacy flex items-center gap-2 px-3 py-2 rounded text-sm">
+                  <span>⚡</span>
+                  <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
+                  <span>{{ t('powerGrid.powerCardNoPower') }}</span>
                 </div>
               </template>
             </div>
           </div>
 
           <!-- ── Activity tab ──────────────────────────────────────────── -->
-          <div v-show="activeTab === 'activity'" class="tab-panel" role="tabpanel" aria-label="Activity">
+          <div v-show="activeTab === 'activity'" class="tab-panel pt-5" role="tabpanel" aria-label="Activity">
             <PendingActionsTimeline :actions="pendingActions" :loading="pendingActionsLoading" :current-tick="gameState?.currentTick ?? null" />
           </div>
 
           <!-- ── Chat tab ──────────────────────────────────────────────── -->
-          <div v-show="activeTab === 'chat'" class="tab-panel" role="tabpanel" aria-label="Chat">
+          <div v-show="activeTab === 'chat'" class="tab-panel pt-5" role="tabpanel" aria-label="Chat">
             <DashboardChatPanel />
           </div>
 
           <!-- ── Pro tab ───────────────────────────────────────────────── -->
-          <div v-show="activeTab === 'pro'" class="tab-panel" role="tabpanel" :aria-label="t('dashboard.tabPro')">
-            <section class="pro-tab-panel" aria-labelledby="pro-tab-title">
+          <div v-show="activeTab === 'pro'" class="tab-panel pt-5" role="tabpanel" :aria-label="t('dashboard.tabPro')">
+            <section class="pro-tab-panel p-6 border border-[rgba(255,109,0,0.35)] rounded-xl bg-gradient-to-br from-[rgba(255,109,0,0.08)] to-[rgba(0,71,255,0.07)]" aria-labelledby="pro-tab-title">
               <!-- Status header -->
-              <div class="pro-status-header">
+              <div class="flex justify-between items-start gap-4 mb-3 max-sm:flex-col">
                 <div>
-                  <span class="pro-eyebrow">{{ t('proAccess.eyebrow') }}</span>
-                  <h2 id="pro-tab-title">{{ t('proAccess.title') }}</h2>
+                  <span class="inline-block mb-1.5 text-xs font-bold tracking-widest uppercase text-[var(--color-tertiary)]">{{ t('proAccess.eyebrow') }}</span>
+                  <h2 id="pro-tab-title" class="m-0 text-[1.35rem] font-bold">{{ t('proAccess.title') }}</h2>
                 </div>
-                <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+                <span
+                  class="startup-pack-status px-3 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase"
+                  :class="auth.isProSubscriber
+                    ? 'bg-[rgba(0,200,83,0.18)] text-[var(--color-secondary)]'
+                    : 'bg-[rgba(248,113,113,0.12)] text-bad'"
+                >
                   {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
                 </span>
               </div>
 
               <!-- Subscription state message -->
-              <p class="pro-state-body">
+              <p class="text-muted mb-6">
                 <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
                   {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
                 </template>
@@ -707,41 +717,25 @@ async function createCompany() {
               </p>
 
               <!-- Benefit cards -->
-              <h3 class="pro-benefits-heading">{{ t('dashboard.proBenefitsHeading') }}</h3>
-              <div class="pro-benefits-grid">
-                <article class="pro-benefit-card">
-                  <span class="pro-benefit-icon" aria-hidden="true">🏭</span>
+              <h3 class="text-base font-bold mb-3.5">{{ t('dashboard.proBenefitsHeading') }}</h3>
+              <div class="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-6">
+                <article v-for="(benefit, i) in [
+                  { icon: '🏭', title: t('dashboard.proBenefitProducts'), body: t('dashboard.proBenefitProductsBody') },
+                  { icon: '📈', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
+                  { icon: '🔓', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
+                  { icon: '⚡', title: t('dashboard.proBenefitPriority'), body: t('dashboard.proBenefitPriorityBody') },
+                ]" :key="i" class="flex gap-3.5 items-start p-4 rounded-lg bg-[rgba(13,17,23,0.32)] border border-[rgba(48,54,61,0.8)]">
+                  <span class="text-2xl flex-shrink-0" aria-hidden="true">{{ benefit.icon }}</span>
                   <div>
-                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitProducts') }}</strong>
-                    <p>{{ t('dashboard.proBenefitProductsBody') }}</p>
-                  </div>
-                </article>
-                <article class="pro-benefit-card">
-                  <span class="pro-benefit-icon" aria-hidden="true">📈</span>
-                  <div>
-                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitAdvanced') }}</strong>
-                    <p>{{ t('dashboard.proBenefitAdvancedBody') }}</p>
-                  </div>
-                </article>
-                <article class="pro-benefit-card">
-                  <span class="pro-benefit-icon" aria-hidden="true">🔓</span>
-                  <div>
-                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitUnlock') }}</strong>
-                    <p>{{ t('dashboard.proBenefitUnlockBody') }}</p>
-                  </div>
-                </article>
-                <article class="pro-benefit-card">
-                  <span class="pro-benefit-icon" aria-hidden="true">⚡</span>
-                  <div>
-                    <strong class="pro-benefit-title">{{ t('dashboard.proBenefitPriority') }}</strong>
-                    <p>{{ t('dashboard.proBenefitPriorityBody') }}</p>
+                    <strong class="block text-[0.9rem] mb-1">{{ benefit.title }}</strong>
+                    <p class="m-0 text-[0.8125rem] text-muted leading-relaxed">{{ benefit.body }}</p>
                   </div>
                 </article>
               </div>
 
               <!-- Portal CTA -->
-              <div class="pro-portal-row">
-                <p class="pro-manage-hint">{{ t('proAccess.manageBody') }}</p>
+              <div class="flex items-center gap-4 flex-wrap max-sm:flex-col max-sm:items-start">
+                <p class="m-0 flex-1 text-muted text-sm">{{ t('proAccess.manageBody') }}</p>
                 <a class="btn btn-primary" :href="masterPortalUrl" target="_blank" rel="noreferrer">
                   {{ t('proAccess.openPortal') }}
                 </a>
@@ -756,583 +750,45 @@ async function createCompany() {
 </template>
 
 <style scoped>
-.dashboard-view {
-  padding: 2rem 1rem;
-}
+/* Test-selector classes preserved for E2E compatibility */
 
-.dashboard-header {
+/* Power balance status chips (used in buildings tab) */
+.power-balance {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 2rem;
-}
-
-.dashboard-header h1 {
-  font-size: 1.75rem;
-  margin-bottom: 0.25rem;
-}
-
-.player-info {
-  display: flex;
-  gap: 0.75rem;
   align-items: center;
-}
-
-.player-name {
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.player-email {
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-}
-
-.tick-clock-widget {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.25rem;
-  padding: 0.625rem 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--color-border);
-  min-width: 9rem;
-  text-align: right;
-}
-
-.tick-clock-label {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  letter-spacing: 0.03em;
-}
-
-.tick-clock-countdown {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  color: var(--color-primary);
-  font-variant-numeric: tabular-nums;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 4rem 1rem;
-}
-
-.empty-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
-}
-
-.empty-state p {
-  margin-bottom: 1.5rem;
-  color: var(--color-text-secondary);
-  font-size: 1.125rem;
-}
-
-.startup-pack-panel {
-  margin-bottom: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid rgba(255, 109, 0, 0.35);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(255, 109, 0, 0.12), rgba(0, 71, 255, 0.1));
-}
-
-.startup-pack-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.startup-pack-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.375rem;
-}
-
-.startup-pack-price {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--color-primary);
-  letter-spacing: -0.02em;
-}
-
-.startup-pack-pro-monthly {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  font-style: italic;
-}
-
-.startup-pack-savings {
-  margin: 0 0 1rem;
-  font-size: 0.8rem;
-  color: var(--color-secondary);
-  font-weight: 600;
-}
-
-.startup-pack-eyebrow {
-  display: inline-block;
-  margin-bottom: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-tertiary);
-}
-
-.startup-pack-header h2 {
-  margin: 0;
-  font-size: 1.35rem;
-}
-
-.startup-pack-status {
-  padding: 0.375rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.startup-pack-status.claimed {
-  background: rgba(0, 200, 83, 0.18);
-  color: var(--color-secondary);
-}
-
-.startup-pack-status.expired {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--color-danger);
-}
-
-.startup-pack-subtitle {
-  margin: 0.75rem 0 1.25rem;
-  color: var(--color-text-secondary);
-}
-
-.startup-pack-benefits {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
-
-.startup-pack-benefit {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(13, 17, 23, 0.32);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-}
-
-.benefit-icon {
-  font-size: 1.5rem;
-}
-
-.startup-pack-benefit p,
-.startup-pack-state p {
-  margin: 0.25rem 0 0;
-  color: var(--color-text-secondary);
-}
-
-.startup-pack-deadline {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 1rem;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(13, 17, 23, 0.32);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-}
-
-.startup-pack-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.startup-pack-message,
-.startup-pack-error {
-  margin: 1rem 0 0;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-}
-
-.startup-pack-message {
-  background: rgba(0, 200, 83, 0.12);
-  color: var(--color-secondary);
-}
-
-.startup-pack-error {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--color-danger);
-}
-
-.startup-pack-free-path {
-  margin-top: 0.875rem;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-}
-
-.startup-pack-context-note {
-  margin-top: 0.875rem;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-}
-
-.startup-pack-state {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-}
-
-.startup-pack-state.success {
-  background: rgba(0, 200, 83, 0.12);
-}
-
-.startup-pack-state.muted {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.btn-lg {
-  padding: 0.75rem 1.75rem;
-  font-size: 1rem;
-}
-
-.person-account-panel {
-  margin-top: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
-
-.person-account-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0;
-}
-
-.person-account-tab-nav {
-  margin-top: 0.25rem;
-}
-
-.person-account-tab-panel {
-  padding-top: 1.25rem;
-}
-
-.person-account-eyebrow {
-  margin: 0 0 0.35rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.person-account-copy {
-  margin: 0 0 1rem;
-  color: var(--color-text-secondary);
-}
-
-.person-account-ledger-intro {
-  margin-bottom: 1.25rem;
-}
-
-.person-account-metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
-}
-
-.person-account-ledger-link {
-  margin-bottom: 1.25rem;
-}
-
-.btn-ledger {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.person-metric-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-hover);
-}
-
-.person-metric-label {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.person-metric-value {
-  font-size: 1.2rem;
-}
-
-.person-account-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
-.new-company-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.new-company-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.new-company-field span {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.new-company-field input {
-  padding: 0.75rem 0.9rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-bg);
-  color: var(--color-text);
-}
-
-.new-company-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.person-account-message,
-.person-account-error {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-}
-
-.person-account-message {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--color-secondary);
-}
-
-.person-account-error {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--color-danger);
-}
-
-.controlled-companies-panel {
-  margin-top: 1rem;
-}
-
-.controlled-companies-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-}
-
-.controlled-company-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-
-.controlled-company-card small {
-  color: var(--color-text-secondary);
-}
-
-.companies-section {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.company-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 1.5rem;
-}
-
-.company-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 0;
-}
-
-.company-actions {
-  display: flex;
-  flex-wrap: wrap;
   gap: 0.5rem;
-  align-items: flex-start;
-}
-
-/* Tab panel container */
-.tab-panel {
-  padding-top: 1.25rem;
-}
-
-.company-header h2 {
-  font-size: 1.25rem;
-  margin-bottom: 0.5rem;
-}
-
-.company-meta {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.meta-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.meta-label {
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-.cash {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-success);
-}
-
-.city-name {
-  font-weight: 500;
-  font-size: 0.9375rem;
-}
-
-.operations-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-@media (max-width: 700px) {
-  .operations-row {
-    grid-template-columns: 1fr;
-  }
-}
-
-.no-buildings {
-  text-align: center;
-  padding: 1.5rem;
-  color: var(--color-text-secondary);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-}
-
-.buildings-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1.25rem;
-}
-
-.building-card-wrapper {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 0.25rem;
-}
-
-.building-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-  border-bottom: none;
-  text-decoration: none;
-  color: var(--color-text);
-  transition: all 0.2s ease;
-}
-
-.building-card:hover {
-  border-color: var(--color-primary);
-  background: rgba(0, 71, 255, 0.04);
-  transform: translateY(-1px);
-  text-decoration: none;
-}
-
-.building-supply-chain {
-  margin-top: 0.75rem;
-}
-
-.building-icon {
-  font-size: 1.75rem;
-  flex-shrink: 0;
-}
-
-.building-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.building-name {
-  font-weight: 600;
-  font-size: 0.9375rem;
-}
-
-.building-type-label {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.building-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.125rem;
-}
-
-.building-level {
-  background: var(--color-primary);
-  color: #fff;
-  padding: 0.125rem 0.5rem;
+  padding: 0.5rem 0.75rem;
   border-radius: var(--radius-sm);
-  font-size: 0.6875rem;
-  font-weight: 700;
+  font-size: 0.8125rem;
+  flex-wrap: wrap;
+  border: 1px solid;
 }
 
-.building-units {
-  font-size: 0.6875rem;
+.power-balance--balanced {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.25);
+  color: var(--color-secondary);
+}
+
+.power-balance--constrained {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #f59e0b;
+}
+
+.power-balance--critical {
+  background: rgba(248, 113, 113, 0.1);
+  border-color: rgba(248, 113, 113, 0.25);
+  color: var(--color-danger);
+}
+
+.power-balance--legacy {
+  background: var(--color-bg-secondary, rgba(0, 0, 0, 0.04));
+  border-color: var(--color-border);
   color: var(--color-text-secondary);
 }
 
-/* Power status badges on building cards */
+/* Power badges on building cards */
 .power-badge {
   font-size: 0.625rem;
   font-weight: 700;
@@ -1354,200 +810,5 @@ async function createCompany() {
 .power-badge--offline {
   background: rgba(248, 113, 113, 0.15);
   color: var(--color-danger);
-}
-
-/* City power balance bar under buildings grid */
-.city-power-row {
-  margin-top: 0.75rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.power-balance {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
-  flex-wrap: wrap;
-}
-
-.power-balance--balanced {
-  background: rgba(34, 197, 94, 0.1);
-  border: 1px solid rgba(34, 197, 94, 0.25);
-  color: var(--color-secondary);
-}
-
-.power-balance--constrained {
-  background: rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  color: #f59e0b;
-}
-
-.power-balance--critical {
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.25);
-  color: var(--color-danger);
-}
-
-.power-balance--legacy {
-  background: var(--color-bg-secondary, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.power-balance-icon {
-  flex-shrink: 0;
-}
-
-.power-balance-label {
-  font-weight: 600;
-}
-
-.power-balance-link {
-  color: inherit;
-  text-decoration: underline;
-  font-size: 0.75rem;
-  margin-left: auto;
-}
-
-.error-message {
-  background: rgba(248, 113, 113, 0.1);
-  color: var(--color-danger);
-  padding: 1rem;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-secondary);
-}
-
-@media (max-width: 640px) {
-  .startup-pack-header {
-    flex-direction: column;
-  }
-
-  .startup-pack-actions {
-    flex-direction: column;
-  }
-
-  .company-header {
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .buildings-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ── Pro subscription tab ──────────────────────────────────────────────── */
-.pro-tab-panel {
-  padding: 1.5rem;
-  border: 1px solid rgba(255, 109, 0, 0.35);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(255, 109, 0, 0.08), rgba(0, 71, 255, 0.07));
-}
-
-.pro-status-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.pro-eyebrow {
-  display: inline-block;
-  margin-bottom: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-tertiary);
-}
-
-.pro-status-header h2 {
-  margin: 0;
-  font-size: 1.35rem;
-}
-
-.pro-state-body {
-  margin: 0 0 1.5rem;
-  color: var(--color-text-secondary);
-}
-
-.pro-benefits-heading {
-  margin: 0 0 0.875rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.pro-benefits-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 0.875rem;
-  margin-bottom: 1.5rem;
-}
-
-.pro-benefit-card {
-  display: flex;
-  gap: 0.875rem;
-  align-items: flex-start;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(13, 17, 23, 0.32);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-}
-
-.pro-benefit-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.pro-benefit-title {
-  display: block;
-  font-size: 0.9rem;
-  margin-bottom: 0.25rem;
-}
-
-.pro-benefit-card p {
-  margin: 0;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.pro-portal-row {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.pro-manage-hint {
-  margin: 0;
-  flex: 1;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-}
-
-@media (max-width: 640px) {
-  .pro-status-header {
-    flex-direction: column;
-  }
-
-  .pro-portal-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
 </style>
