@@ -583,6 +583,20 @@ public sealed class GetForexQuoteInput
 
     /// <summary>Amount in the source currency to swap (must be > 0).</summary>
     public decimal Amount { get; set; }
+
+    /// <summary>
+    /// Optional: ID of the company bank account to debit from.
+    /// When provided, the quote uses this account's balance for affordability checks.
+    /// When null, falls back to the player's personal currency wallet.
+    /// </summary>
+    public Guid? FromBankAccountId { get; set; }
+
+    /// <summary>
+    /// Optional: ID of the company bank account to credit into.
+    /// When provided, the currency of this account must match <see cref="ToCurrencyCode"/>.
+    /// When null, falls back to the player's personal currency wallet.
+    /// </summary>
+    public Guid? ToBankAccountId { get; set; }
 }
 
 /// <summary>Input for executing a forex currency swap.</summary>
@@ -598,6 +612,20 @@ public sealed class ExecuteForexSwapInput
 
     /// <summary>Amount in the source currency to swap (must be > 0).</summary>
     public decimal Amount { get; set; }
+
+    /// <summary>
+    /// Optional: ID of the company bank account to debit from.
+    /// When provided, funds are drawn from this bank account instead of the player's personal EUR/currency wallet.
+    /// The account's <c>CurrencyCode</c> must match <see cref="FromCurrencyCode"/>.
+    /// </summary>
+    public Guid? FromBankAccountId { get; set; }
+
+    /// <summary>
+    /// Optional: ID of the company bank account to credit the swapped amount into.
+    /// When provided, proceeds are deposited into this bank account instead of the player's personal currency wallet.
+    /// The account's <c>CurrencyCode</c> must match <see cref="ToCurrencyCode"/>.
+    /// </summary>
+    public Guid? ToBankAccountId { get; set; }
 }
 
 /// <summary>Input for getting a gold AMM swap quote.</summary>

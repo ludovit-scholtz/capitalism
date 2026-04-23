@@ -102,4 +102,34 @@ public sealed partial class Query
             Balance = a.Balance,
         }).ToList();
     }
+
+    /// <summary>
+    /// Returns all bank accounts across all companies owned by the authenticated player.
+    /// Used to populate source/destination account selectors in the Forex Exchange swap form.
+    /// </summary>
+    [Authorize]
+    public async Task<List<PlayerBankAccountSummary>> MyBankAccounts(
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var accounts = await db.BankAccounts
+            .Include(a => a.Company)
+            .Where(a => a.Company != null && a.Company.PlayerId == userId)
+            .AsNoTracking()
+            .OrderBy(a => a.Company!.Name)
+            .ThenBy(a => a.CurrencyCode)
+            .ToListAsync();
+
+        return accounts.Select(a => new PlayerBankAccountSummary
+        {
+            Id = a.Id,
+            AccountNumber = a.AccountNumber,
+            CurrencyCode = a.CurrencyCode,
+            Balance = a.Balance,
+            CompanyId = a.CompanyId!.Value,
+            CompanyName = a.Company!.Name,
+        }).ToList();
+    }
 }

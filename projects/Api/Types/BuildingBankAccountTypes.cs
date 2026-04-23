@@ -86,3 +86,31 @@ public sealed class CreateCompanyBankAccountResult
     /// <summary>The newly created bank account.</summary>
     public CompanyBankAccountSummary Account { get; set; } = new();
 }
+
+/// <summary>
+/// A bank account owned by one of the player's companies.
+/// Returned by the <c>myBankAccounts</c> query and used to populate forex swap selectors.
+/// </summary>
+public sealed class PlayerBankAccountSummary
+{
+    /// <summary>Unique identifier of the bank account.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>16-digit account number (unique within this game server).</summary>
+    public string AccountNumber { get; set; } = string.Empty;
+
+    /// <summary>ISO 4217 currency code for this account (e.g. "EUR", "CZK").</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+
+    /// <summary>Display symbol for the currency (e.g. "€", "Kč").</summary>
+    public string CurrencySymbol => Mutation.GetCurrencySymbol(CurrencyCode);
+
+    /// <summary>Current balance of the account.</summary>
+    public decimal Balance { get; set; }
+
+    /// <summary>ID of the company that owns this account.</summary>
+    public Guid CompanyId { get; set; }
+
+    /// <summary>Human-readable company name.</summary>
+    public string CompanyName { get; set; } = string.Empty;
+}

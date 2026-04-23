@@ -1001,6 +1001,283 @@ public sealed class GlobalCitiesAndFxRatesTests
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
 
+    [Fact]
+    public async Task MyBankAccounts_ReturnsAllCompanyBankAccounts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"my-ba-query-{Guid.NewGuid():N}@example.com");
+
+        // Create two companies, each with one bank account.
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var compA = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Alpha Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        var compB = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Beta Co",  Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.AddRange(compA, compB);
+
+        var accA = new BankAccount { Id = Guid.NewGuid(), CompanyId = compA.Id, AccountNumber = "1111111111111111", CurrencyCode = "EUR", Balance = 5000m };
+        var accB = new BankAccount { Id = Guid.NewGuid(), CompanyId = compB.Id, AccountNumber = "2222222222222222", CurrencyCode = "CZK", Balance = 80000m };
+        db.BankAccounts.AddRange(accA, accB);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query {
+                myBankAccounts {
+                    id
+                    accountNumber
+                    currencyCode
+                    currencySymbol
+                    balance
+                    companyId
+                    companyName
+                }
+            }
+            """,
+            token: token);
+
+        var accounts = result.GetProperty("data").GetProperty("myBankAccounts");
+        Assert.Equal(JsonValueKind.Array, accounts.ValueKind);
+        Assert.Equal(2, accounts.GetArrayLength());
+
+        var ids = accounts.EnumerateArray().Select(a => Guid.Parse(a.GetProperty("id").GetString()!)).ToHashSet();
+        Assert.Contains(accA.Id, ids);
+        Assert.Contains(accB.Id, ids);
+
+        var eurAcc = accounts.EnumerateArray().First(a => a.GetProperty("currencyCode").GetString() == "EUR");
+        Assert.Equal("€", eurAcc.GetProperty("currencySymbol").GetString());
+        Assert.Equal(5000m, eurAcc.GetProperty("balance").GetDecimal());
+        Assert.Equal("Alpha Co", eurAcc.GetProperty("companyName").GetString());
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_WithBankAccountIds_DebitsAndCreditsCorrectAccounts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"ba-swap-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Swap Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(company);
+
+        var eurAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "3333333333333333", CurrencyCode = "EUR", Balance = 1000m };
+        var czkAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "4444444444444444", CurrencyCode = "CZK", Balance = 0m };
+        db.BankAccounts.AddRange(eurAccount, czkAccount);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) {
+                    tradeId
+                    fromCurrencyCode
+                    toCurrencyCode
+                    fromAmount
+                    toAmount
+                    feeAmount
+                    newFromBalance
+                    newToBalance
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, fromBankAccountId = eurAccount.Id, toBankAccountId = czkAccount.Id } },
+            token);
+
+        var trade = result.GetProperty("data").GetProperty("executeForexSwap");
+        Assert.Equal("EUR", trade.GetProperty("fromCurrencyCode").GetString());
+        Assert.Equal("CZK", trade.GetProperty("toCurrencyCode").GetString());
+        Assert.Equal(100m, trade.GetProperty("fromAmount").GetDecimal());
+        Assert.Equal(1m, trade.GetProperty("feeAmount").GetDecimal());
+        Assert.True(trade.GetProperty("toAmount").GetDecimal() > 0);
+
+        // EUR source account should be reduced by 100.
+        Assert.Equal(900m, trade.GetProperty("newFromBalance").GetDecimal());
+
+        // CZK destination account should match toAmount.
+        var toAmount = trade.GetProperty("toAmount").GetDecimal();
+        Assert.Equal(toAmount, trade.GetProperty("newToBalance").GetDecimal());
+
+        // Verify DB state directly.
+        await using var scope2 = factory.Services.CreateAsyncScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var updatedEur = await db2.BankAccounts.FindAsync(eurAccount.Id);
+        var updatedCzk = await db2.BankAccounts.FindAsync(czkAccount.Id);
+        Assert.Equal(900m, updatedEur!.Balance);
+        Assert.Equal(toAmount, updatedCzk!.Balance);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_FromBankAccount_WrongCurrency_ReturnsCurrencyMismatch()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"ba-mismatch-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Mismatch Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(company);
+
+        // CZK account, but we'll claim it's from EUR
+        var czkAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "5555555555555555", CurrencyCode = "CZK", Balance = 50000m };
+        db.BankAccounts.Add(czkAccount);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { tradeId }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, fromBankAccountId = czkAccount.Id } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("CURRENCY_MISMATCH", code);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_FromBankAccount_InsufficientFunds_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"ba-insuf-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Low Balance Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(company);
+
+        var eurAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "6666666666666666", CurrencyCode = "EUR", Balance = 50m };
+        db.BankAccounts.Add(eurAccount);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { tradeId }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 500m, fromBankAccountId = eurAccount.Id } },
+            token);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_FUNDS", code);
+
+        // Balance must not have changed.
+        await using var scope2 = factory.Services.CreateAsyncScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var acc = await db2.BankAccounts.FindAsync(eurAccount.Id);
+        Assert.Equal(50m, acc!.Balance);
+    }
+
+    [Fact]
+    public async Task ExecuteForexSwap_BankAccountNotOwnedByPlayer_ReturnsError()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+
+        var tokenA = await RegisterAndLoginAsync(client, $"ba-owner-a-{Guid.NewGuid():N}@example.com");
+        var tokenB = await RegisterAndLoginAsync(client, $"ba-owner-b-{Guid.NewGuid():N}@example.com");
+
+        // Player A creates a EUR bank account.
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meA = await ExecuteGraphQlAsync(client, "{ me { id } }", token: tokenA);
+        var playerAId = Guid.Parse(meA.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var compA = new Company { Id = Guid.NewGuid(), PlayerId = playerAId, Name = "Player A Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(compA);
+        var accA = new BankAccount { Id = Guid.NewGuid(), CompanyId = compA.Id, AccountNumber = "7777777777777777", CurrencyCode = "EUR", Balance = 9999m };
+        db.BankAccounts.Add(accA);
+        await db.SaveChangesAsync();
+
+        // Player B tries to swap FROM Player A's account.
+        var meB = await ExecuteGraphQlAsync(client, "{ me { id } }", token: tokenB);
+        var playerBId = Guid.Parse(meB.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+        var player = await db.Players.FindAsync(playerBId);
+        player!.PersonalCash = 1000m;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
+                executeForexSwap(input: $input) { tradeId }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 100m, fromBankAccountId = accA.Id } },
+            tokenB);
+
+        var errors = result.GetProperty("errors");
+        Assert.Equal(JsonValueKind.Array, errors.ValueKind);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ACCOUNT_NOT_FOUND", code);
+    }
+
+    [Fact]
+    public async Task GetForexQuote_WithFromBankAccountId_UsesAccountBalance()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"ba-quote-{Guid.NewGuid():N}@example.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "Quote Co", Cash = 0m, FoundedAtUtc = DateTime.UtcNow, FoundedAtTick = 1 };
+        db.Companies.Add(company);
+        var eurAccount = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "8888888888888888", CurrencyCode = "EUR", Balance = 2500m };
+        db.BankAccounts.Add(eurAccount);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query ForexQuote($input: GetForexQuoteInput!) {
+                forexQuote(input: $input) {
+                    fromAmount
+                    toAmount
+                    feeAmount
+                    availableFromBalance
+                }
+            }
+            """,
+            new { input = new { fromCurrencyCode = "EUR", toCurrencyCode = "CZK", amount = 200m, fromBankAccountId = eurAccount.Id } },
+            token);
+
+        var quote = result.GetProperty("data").GetProperty("forexQuote");
+        Assert.Equal(200m, quote.GetProperty("fromAmount").GetDecimal());
+        Assert.Equal(2500m, quote.GetProperty("availableFromBalance").GetDecimal());
+        Assert.True(quote.GetProperty("toAmount").GetDecimal() > 0);
+    }
+
+
+
     private static async Task<string> RegisterAndLoginAsync(HttpClient client, string email)
     {
         await ExecuteGraphQlAsync(client,

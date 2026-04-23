@@ -9,17 +9,17 @@ namespace Api.Types;
 public sealed partial class Mutation
 {
     /// <summary>
-    /// Executes a forex currency swap on the player's personal account.
-    /// Deducts the source amount (including 1% fee) from the player's balance in the source
-    /// currency and credits the net amount to the player's balance in the target currency.
-    /// A ForexTradeRecord is persisted for auditing.
+    /// Executes a forex currency swap.
     ///
-    /// Concurrency safety: the swap runs inside a Serializable transaction so that two
-    /// concurrent requests cannot both read the same balance and both pass the
-    /// insufficient-funds check.  The player's ConcurrencyToken is refreshed on every
-    /// save so that optimistic concurrency at the EF layer provides a second layer of
-    /// protection: if two overlapping transactions both read the same token value, the
-    /// second SaveChangesAsync will throw DbUpdateConcurrencyException.
+    /// When <c>fromBankAccountId</c> is provided the source funds are drawn from that company bank account;
+    /// otherwise the player's personal currency wallet is used.
+    /// When <c>toBankAccountId</c> is provided the proceeds are deposited into that bank account;
+    /// otherwise the player's personal currency wallet is credited.
+    ///
+    /// A <see cref="ForexTradeRecord"/> is persisted for auditing.
+    ///
+    /// Concurrency safety: runs inside a serializable transaction; the player's ConcurrencyToken
+    /// is refreshed on save so that EF's optimistic-concurrency check fires on racing requests.
     /// </summary>
     [Authorize]
     public async Task<ForexTradeResult> ExecuteForexSwap(
@@ -43,76 +43,109 @@ public sealed partial class Mutation
         ForexTradeRecord tradeRecord;
         try
         {
-            // Wrap the read-check-write sequence in a transaction to keep the balance updates
-            // for both currencies atomic.  Concurrency protection comes from the Player's
-            // ConcurrencyToken (refreshed below), which causes SaveChangesAsync to throw
-            // DbUpdateConcurrencyException if another transaction committed a swap for the
-            // same player between our read and our write.
             await using var tx = await db.Database.BeginTransactionAsync();
 
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
                 ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
-
-            // Re-read balance inside the transaction to get the authoritative snapshot.
-            var currentBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
-
-            if (currentBalance < input.Amount)
-            {
-                throw new GraphQLException(new Error(
-                    string.Format(
-                        "Insufficient balance. You have {0:F2} {1} but tried to swap {2:F2} {1}.",
-                        currentBalance, fromCode, input.Amount),
-                    "INSUFFICIENT_FUNDS"));
-            }
 
             var rate = await Query.ComputeForexRateAsync(db, fromCode, toCode);
             var feeAmount = Math.Round(input.Amount * (1m / 100m), 4);
             var netFromAmount = input.Amount - feeAmount;
             var toAmount = Math.Round(netFromAmount * rate, 4);
 
-            // Deduct from source balance.
-            if (fromCode == "EUR")
+            if (input.FromBankAccountId.HasValue)
             {
-                player.PersonalCash -= input.Amount;
+                // ── Bank-account path (source) ─────────────────────────────
+                var fromAccount = await db.BankAccounts
+                    .Include(a => a.Company)
+                    .FirstOrDefaultAsync(a => a.Id == input.FromBankAccountId.Value && a.Company != null && a.Company.PlayerId == playerId)
+                    ?? throw new GraphQLException(new Error("Source bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+
+                if (!string.Equals(fromAccount.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
+                    throw new GraphQLException(new Error(
+                        $"Source bank account currency ({fromAccount.CurrencyCode}) does not match the requested from-currency ({fromCode}).",
+                        "CURRENCY_MISMATCH"));
+
+                if (fromAccount.Balance < input.Amount)
+                    throw new GraphQLException(new Error(
+                        string.Format(
+                            "Insufficient balance. Account has {0:F2} {1} but tried to swap {2:F2} {1}.",
+                            fromAccount.Balance, fromCode, input.Amount),
+                        "INSUFFICIENT_FUNDS"));
+
+                fromAccount.Balance -= input.Amount;
             }
             else
             {
-                var fromBalance = await db.PlayerCurrencyBalances
-                    .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == fromCode);
+                // ── Personal wallet path (source) ──────────────────────────
+                var currentBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
 
-                if (fromBalance is null)
-                    throw new GraphQLException(new Error("No " + fromCode + " balance found.", "INSUFFICIENT_FUNDS"));
+                if (currentBalance < input.Amount)
+                    throw new GraphQLException(new Error(
+                        string.Format(
+                            "Insufficient balance. You have {0:F2} {1} but tried to swap {2:F2} {1}.",
+                            currentBalance, fromCode, input.Amount),
+                        "INSUFFICIENT_FUNDS"));
 
-                fromBalance.Balance -= input.Amount;
-                fromBalance.UpdatedAtUtc = DateTime.UtcNow;
-            }
-
-            // Credit to target balance.
-            if (toCode == "EUR")
-            {
-                player.PersonalCash += toAmount;
-            }
-            else
-            {
-                var toBalance = await db.PlayerCurrencyBalances
-                    .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == toCode);
-
-                if (toBalance is null)
+                if (fromCode == "EUR")
                 {
-                    toBalance = new PlayerCurrencyBalance
-                    {
-                        Id = Guid.NewGuid(),
-                        PlayerId = playerId,
-                        CurrencyCode = toCode,
-                        Balance = 0m,
-                        CreatedAtUtc = DateTime.UtcNow,
-                        UpdatedAtUtc = DateTime.UtcNow
-                    };
-                    db.PlayerCurrencyBalances.Add(toBalance);
+                    player.PersonalCash -= input.Amount;
                 }
+                else
+                {
+                    var fromBalance = await db.PlayerCurrencyBalances
+                        .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == fromCode)
+                        ?? throw new GraphQLException(new Error("No " + fromCode + " balance found.", "INSUFFICIENT_FUNDS"));
 
-                toBalance.Balance += toAmount;
-                toBalance.UpdatedAtUtc = DateTime.UtcNow;
+                    fromBalance.Balance -= input.Amount;
+                    fromBalance.UpdatedAtUtc = DateTime.UtcNow;
+                }
+            }
+
+            if (input.ToBankAccountId.HasValue)
+            {
+                // ── Bank-account path (destination) ───────────────────────
+                var toAccount = await db.BankAccounts
+                    .Include(a => a.Company)
+                    .FirstOrDefaultAsync(a => a.Id == input.ToBankAccountId.Value && a.Company != null && a.Company.PlayerId == playerId)
+                    ?? throw new GraphQLException(new Error("Destination bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+
+                if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
+                    throw new GraphQLException(new Error(
+                        $"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).",
+                        "CURRENCY_MISMATCH"));
+
+                toAccount.Balance += toAmount;
+            }
+            else
+            {
+                // ── Personal wallet path (destination) ────────────────────
+                if (toCode == "EUR")
+                {
+                    player.PersonalCash += toAmount;
+                }
+                else
+                {
+                    var toBalance = await db.PlayerCurrencyBalances
+                        .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == toCode);
+
+                    if (toBalance is null)
+                    {
+                        toBalance = new PlayerCurrencyBalance
+                        {
+                            Id = Guid.NewGuid(),
+                            PlayerId = playerId,
+                            CurrencyCode = toCode,
+                            Balance = 0m,
+                            CreatedAtUtc = DateTime.UtcNow,
+                            UpdatedAtUtc = DateTime.UtcNow
+                        };
+                        db.PlayerCurrencyBalances.Add(toBalance);
+                    }
+
+                    toBalance.Balance += toAmount;
+                    toBalance.UpdatedAtUtc = DateTime.UtcNow;
+                }
             }
 
             // Refresh the player's ConcurrencyToken so EF's optimistic-concurrency check
@@ -139,14 +172,38 @@ public sealed partial class Mutation
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Two concurrent swaps raced past the balance check; the second one loses.
             throw new GraphQLException(new Error(
                 "A concurrent swap was in progress. Please retry your trade.",
                 "CONCURRENT_SWAP_CONFLICT"));
         }
 
-        var newFromBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
-        var newToBalance = await Query.GetPersonalBalanceAsync(db, playerId, toCode);
+        // Compute post-swap balances for the result.
+        decimal newFromBalance;
+        decimal newToBalance;
+
+        if (input.FromBankAccountId.HasValue)
+        {
+            newFromBalance = await db.BankAccounts
+                .Where(a => a.Id == input.FromBankAccountId.Value)
+                .Select(a => a.Balance)
+                .FirstOrDefaultAsync();
+        }
+        else
+        {
+            newFromBalance = await Query.GetPersonalBalanceAsync(db, playerId, fromCode);
+        }
+
+        if (input.ToBankAccountId.HasValue)
+        {
+            newToBalance = await db.BankAccounts
+                .Where(a => a.Id == input.ToBankAccountId.Value)
+                .Select(a => a.Balance)
+                .FirstOrDefaultAsync();
+        }
+        else
+        {
+            newToBalance = await Query.GetPersonalBalanceAsync(db, playerId, toCode);
+        }
 
         return new ForexTradeResult
         {

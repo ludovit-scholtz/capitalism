@@ -32,7 +32,35 @@ public sealed partial class Query
         var netFromAmount = input.Amount - feeAmount;
         var toAmount = Math.Round(netFromAmount * rate, 4);
 
-        var availableBalance = await GetPersonalBalanceAsync(db, playerId, fromCode);
+        // Determine available balance: prefer bank account when an ID is provided.
+        decimal availableBalance;
+        if (input.FromBankAccountId.HasValue)
+        {
+            var account = await GetOwnedBankAccountAsync(db, input.FromBankAccountId.Value, playerId);
+            if (account is null)
+                throw new GraphQLException(new Error("Source bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+            if (!string.Equals(account.CurrencyCode, fromCode, StringComparison.OrdinalIgnoreCase))
+                throw new GraphQLException(new Error(
+                    $"Source bank account currency ({account.CurrencyCode}) does not match the requested from-currency ({fromCode}).",
+                    "CURRENCY_MISMATCH"));
+            availableBalance = account.Balance;
+        }
+        else
+        {
+            availableBalance = await GetPersonalBalanceAsync(db, playerId, fromCode);
+        }
+
+        // Validate destination account currency when provided.
+        if (input.ToBankAccountId.HasValue)
+        {
+            var toAccount = await GetOwnedBankAccountAsync(db, input.ToBankAccountId.Value, playerId);
+            if (toAccount is null)
+                throw new GraphQLException(new Error("Destination bank account not found or you do not own it.", "ACCOUNT_NOT_FOUND"));
+            if (!string.Equals(toAccount.CurrencyCode, toCode, StringComparison.OrdinalIgnoreCase))
+                throw new GraphQLException(new Error(
+                    $"Destination bank account currency ({toAccount.CurrencyCode}) does not match the requested to-currency ({toCode}).",
+                    "CURRENCY_MISMATCH"));
+        }
 
         return new ForexQuoteResult
         {
@@ -226,5 +254,18 @@ public sealed partial class Query
 
         if (amount <= 0)
             throw new GraphQLException(new Error("Amount must be greater than zero.", "INVALID_AMOUNT"));
+    }
+
+    /// <summary>
+    /// Returns a bank account owned by one of the player's companies, or null if not found / not owned.
+    /// </summary>
+    internal static async Task<Api.Data.Entities.BankAccount?> GetOwnedBankAccountAsync(
+        AppDbContext db,
+        Guid bankAccountId,
+        Guid playerId)
+    {
+        return await db.BankAccounts
+            .Include(a => a.Company)
+            .FirstOrDefaultAsync(a => a.Id == bankAccountId && a.Company != null && a.Company.PlayerId == playerId);
     }
 }

@@ -287,4 +287,181 @@ test.describe('Forex Exchange page', () => {
     await expect(page.locator('a[href="/forex"]')).toHaveCount(1)
     await expect(page.locator('a[href="/forex"]')).toHaveAttribute('title', 'Forex')
   })
+
+  // ── Bank-account-native swap flow ─────────────────────────────────────────
+
+  test('shows bank account selectors when player has company bank accounts', async ({ page }) => {
+    const player = makePlayer()
+    player.personalCash = 0
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'ba-eur-001',
+        accountNumber: '1111111111111111',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 5000,
+        companyId: player.companies[0]?.id ?? 'comp-1',
+        companyName: 'My Corp',
+      },
+      {
+        id: 'ba-czk-001',
+        accountNumber: '2222222222222222',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 80000,
+        companyId: player.companies[0]?.id ?? 'comp-1',
+        companyName: 'My Corp',
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    // Bank account selectors should be visible
+    await expect(page.getByLabel('Source account')).toBeVisible()
+    await expect(page.getByLabel('Destination account')).toBeVisible()
+
+    // The bank-account mode notice should appear
+    await expect(page.locator('.ba-notice')).toBeVisible()
+
+    // The legacy personal balance section should NOT appear when bank accounts are present
+    await expect(page.getByText('Your Currency Balances')).not.toBeVisible()
+  })
+
+  test('successfully completes a bank account swap and shows result', async ({ page }) => {
+    const player = makePlayer()
+    player.personalCash = 0
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    state.myBankAccounts = [
+      {
+        id: 'ba-eur-swap',
+        accountNumber: '3333333333333333',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 10000,
+        companyId,
+        companyName: 'Swap Corp',
+      },
+      {
+        id: 'ba-czk-swap',
+        accountNumber: '4444444444444444',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 0,
+        companyId,
+        companyName: 'Swap Corp',
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    // Select EUR source account and CZK dest account
+    await page.getByLabel('Source account').selectOption('ba-eur-swap')
+    await page.getByLabel('Destination account').selectOption('ba-czk-swap')
+
+    // Enter amount
+    await page.getByLabel('Amount').fill('500')
+
+    // Get quote
+    await page.getByRole('button', { name: 'Get Quote' }).click()
+
+    // Quote card should appear
+    await expect(page.getByRole('region', { name: 'Exchange Quote' })).toBeVisible()
+    await expect(page.getByText('Exchange Quote')).toBeVisible()
+
+    // Confirm the swap
+    await page.getByRole('button', { name: 'Confirm Swap' }).click()
+
+    // Success banner should appear
+    await expect(page.locator('.swap-result-banner')).toBeVisible()
+    await expect(page.locator('.swap-result-banner').getByText('EUR')).toBeVisible()
+    await expect(page.locator('.swap-result-banner').getByText('CZK')).toBeVisible()
+  })
+
+  test('blocks swap when source bank account has insufficient funds', async ({ page }) => {
+    const player = makePlayer()
+    player.personalCash = 0
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    state.myBankAccounts = [
+      {
+        id: 'ba-low-eur',
+        accountNumber: '5555555555555555',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 50,
+        companyId,
+        companyName: 'Low Corp',
+      },
+      {
+        id: 'ba-czk-low',
+        accountNumber: '6666666666666666',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 0,
+        companyId,
+        companyName: 'Low Corp',
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await page.getByLabel('Source account').selectOption('ba-low-eur')
+    await page.getByLabel('Destination account').selectOption('ba-czk-low')
+    await page.getByLabel('Amount').fill('500')
+
+    // Validation error should appear (amount > balance)
+    await expect(page.locator('.validation-error')).toBeVisible()
+    await expect(page.locator('.validation-error')).toContainText('Insufficient balance')
+
+    // Get Quote button should be disabled
+    await expect(page.getByRole('button', { name: 'Get Quote' })).toBeDisabled()
+  })
+
+  test('shows balance of selected source bank account below selector', async ({ page }) => {
+    const player = makePlayer()
+    player.personalCash = 0
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    const companyId = player.companies[0]?.id ?? 'comp-1'
+    state.myBankAccounts = [
+      {
+        id: 'ba-bal-test',
+        accountNumber: '7777777777777777',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 3750.50,
+        companyId,
+        companyName: 'Balance Corp',
+      },
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await page.getByLabel('Source account').selectOption('ba-bal-test')
+
+    // The source bank account selector shows the balance
+    await expect(page.locator('.forex-ba-selector').first().locator('.balance-display')).toBeVisible()
+    await expect(page.locator('.field-hint').filter({ hasText: 'Available balance' })).toBeVisible()
+  })
 })
