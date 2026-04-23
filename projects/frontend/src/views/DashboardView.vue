@@ -632,7 +632,7 @@ async function createCompany() {
                   <div class="text-[1.75rem] flex-shrink-0">{{ getBuildingIcon(building.type) }}</div>
                   <div class="flex-1 flex flex-col gap-0.5">
                     <span class="building-name font-semibold text-[0.9375rem]">{{ building.name }}</span>
-                    <span class="text-xs text-muted">{{ formatBuildingType(building.type) }}</span>
+                    <span class="building-type-label text-xs text-muted">{{ formatBuildingType(building.type) }}</span>
                   </div>
                   <div class="flex flex-col items-end gap-0.5">
                     <span class="bg-brand text-white px-2 py-0.5 rounded text-[0.6875rem] font-bold">Lv.{{ building.level }}</span>
