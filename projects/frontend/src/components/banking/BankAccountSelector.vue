@@ -42,14 +42,16 @@ function onSelect(event: Event) {
 </script>
 
 <template>
-  <div class="bank-account-selector">
-    <label v-if="label" :for="id" class="selector-label">{{ label }}</label>
-    <div class="selector-wrap">
+  <div class="flex flex-col gap-1.5">
+    <label v-if="label" :for="id" class="text-xs font-semibold text-muted uppercase tracking-wide">
+      {{ label }}
+    </label>
+    <div class="relative">
       <select
         :id="id"
         :value="modelValue"
         :disabled="disabled"
-        class="account-select"
+        class="account-select w-full bg-page border border-divider rounded-lg px-3 py-2 pr-8 text-body text-sm font-medium cursor-pointer appearance-none disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:border-brand"
         :aria-label="label || t('bankStatement.accountSelector')"
         @change="onSelect"
       >
@@ -65,87 +67,24 @@ function onSelect(event: Event) {
         </option>
       </select>
     </div>
-    <div v-if="selectedBalance" class="balance-display" aria-live="polite">
-      <span class="balance-symbol">{{ selectedBalance.currencySymbol }}</span>
-      <span class="balance-value">{{ formatAmount(selectedBalance.balance) }}</span>
-      <span class="balance-code">{{ selectedBalance.currencyCode }}</span>
+    <div
+      v-if="selectedBalance"
+      class="inline-flex items-baseline gap-1.5 px-2 py-1 bg-card-raised border border-divider rounded-md w-fit"
+      aria-live="polite"
+    >
+      <span class="font-bold text-brand text-sm">{{ selectedBalance.currencySymbol }}</span>
+      <span class="font-bold text-body text-sm">{{ formatAmount(selectedBalance.balance) }}</span>
+      <span class="text-xs text-muted font-medium">{{ selectedBalance.currencyCode }}</span>
     </div>
   </div>
 </template>
 
 <style scoped>
-.bank-account-selector {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.selector-label {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.selector-wrap {
-  position: relative;
-}
-
+/* Custom dropdown arrow — cannot be expressed as a Tailwind utility */
 .account-select {
-  width: 100%;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.55rem 0.75rem;
-  color: var(--color-text-primary);
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 0.6rem center;
   background-size: 1.1rem;
-  padding-right: 2rem;
-}
-
-.account-select:focus {
-  outline: 2px solid var(--color-accent, #4f8ef7);
-  outline-offset: 1px;
-}
-
-.account-select:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.balance-display {
-  display: flex;
-  align-items: baseline;
-  gap: 0.25rem;
-  padding: 0.3rem 0.5rem;
-  background: var(--color-surface-alt, #1e2a3a);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  width: fit-content;
-}
-
-.balance-symbol {
-  font-weight: 700;
-  color: var(--color-accent, #4f8ef7);
-  font-size: 0.95rem;
-}
-
-.balance-value {
-  font-weight: 700;
-  color: var(--color-text-primary);
-  font-size: 0.95rem;
-}
-
-.balance-code {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  font-weight: 500;
 }
 </style>
