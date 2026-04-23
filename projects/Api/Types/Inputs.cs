@@ -735,3 +735,27 @@ public sealed class CreateCompanyBankAccountInput
     [Required, MaxLength(3)]
     public string CurrencyCode { get; set; } = string.Empty;
 }
+
+/// <summary>
+/// Input for transferring funds between two of the authenticated player's bank accounts.
+/// Both accounts must be owned by companies the player owns and must use the same currency.
+/// Cross-currency transfers must go through the Forex Exchange swap flow.
+/// </summary>
+public sealed class TransferFundsInput
+{
+    /// <summary>Source bank account ID. Must be owned by a company the caller owns.</summary>
+    public Guid FromBankAccountId { get; set; }
+
+    /// <summary>Destination bank account ID. Must be owned by a company the caller owns.</summary>
+    public Guid ToBankAccountId { get; set; }
+
+    /// <summary>
+    /// Amount to transfer in the shared account currency. Must be positive and not exceed
+    /// the source account balance.
+    /// </summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>Optional human-readable description shown on both bank statement entries.</summary>
+    [MaxLength(200)]
+    public string? Description { get; set; }
+}

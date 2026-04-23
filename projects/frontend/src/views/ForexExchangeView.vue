@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
+import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
 import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
 import type {
@@ -47,10 +48,10 @@ const swapLoading = ref(false)
 
 const showConfirm = ref(false)
 
-type ForexTab = 'swap' | 'rates' | 'history' | 'gold'
+type ForexTab = 'swap' | 'transfer' | 'rates' | 'history' | 'gold'
 
 function parseForexTab(value: unknown): ForexTab {
-  return value === 'rates' || value === 'history' || value === 'gold' ? value : 'swap'
+  return value === 'transfer' || value === 'rates' || value === 'history' || value === 'gold' ? value : 'swap'
 }
 
 function getInitialTab(): ForexTab {
@@ -222,6 +223,34 @@ async function loadData() {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * Silently refresh the player's bank account list (no global loading flag) so
+ * the Transfer panel can show updated balances after a successful transfer
+ * without unmounting the panel and losing its success state.
+ */
+async function reloadBankAccountsSilent() {
+  if (!auth.isAuthenticated) return
+  try {
+    const result = await gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(`
+      query {
+        myBankAccounts {
+          id
+          accountNumber
+          currencyCode
+          currencySymbol
+          balance
+          companyId
+          companyName
+        }
+      }
+    `)
+    myBankAccounts.value = result.myBankAccounts ?? []
+  } catch {
+    // Best-effort refresh; on failure the panel keeps stale balances until the
+    // next full reload.
   }
 }
 
@@ -419,6 +448,17 @@ watch(activeTab, async (tab) => {
           @click="activeTab = 'swap'"
         >
           {{ t('forex.tabSwap') }}
+        </button>
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'transfer'"
+          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'transfer'
+            ? 'bg-brand border-brand text-white'
+            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'transfer'"
+        >
+          {{ t('bankTransfer.tabLabel') }}
         </button>
         <button
           role="tab"
@@ -717,6 +757,13 @@ watch(activeTab, async (tab) => {
           </div>
         </div>
       </section>
+
+      <!-- Transfer Tab -->
+      <BankAccountTransferPanel
+        v-else-if="activeTab === 'transfer'"
+        :accounts="myBankAccounts"
+        @transferred="reloadBankAccountsSilent"
+      />
 
       <!-- Rates Tab -->
       <section

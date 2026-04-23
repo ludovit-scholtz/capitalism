@@ -5677,7 +5677,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // campaignAnalytics has companyName/cityName fields that contain 'me' as substring
       !q.includes('campaignAnalytics') &&
       // buildingBankAccount contains 'me' as substring in some serializations
-      !q.includes('buildingBankAccount')
+      !q.includes('buildingBankAccount') &&
+      // transferFunds mutation response includes companyName/currencySymbol/accountNumber which contain 'me' as substring
+      !q.includes('transferFunds')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -6479,6 +6481,45 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               balance: info.balance,
               isSuspendedForFunds: info.isSuspendedForFunds,
               suspendedReason: info.suspendedReason,
+            },
+          },
+        }),
+      })
+    }
+
+    // ── Transfer funds between two of the player's bank accounts ─────────────
+    if (query.includes('transferFunds')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as {
+        input?: { fromBankAccountId?: string; toBankAccountId?: string; amount?: number }
+      } | undefined
+      const fromId = vars?.input?.fromBankAccountId ?? ''
+      const toId = vars?.input?.toBankAccountId ?? ''
+      const amount = vars?.input?.amount ?? 0
+      if (fromId === toId) return routeJsonError('Source and destination must be different.', 'SAME_ACCOUNT')
+      if (amount <= 0) return routeJsonError('Amount must be positive.', 'INVALID_AMOUNT')
+      const fromAcc = state.myBankAccounts.find((a) => a.id === fromId)
+      if (!fromAcc) return routeJsonError('Source bank account not found.', 'FROM_ACCOUNT_NOT_FOUND')
+      const toAcc = state.myBankAccounts.find((a) => a.id === toId)
+      if (!toAcc) return routeJsonError('Destination bank account not found.', 'TO_ACCOUNT_NOT_FOUND')
+      if (fromAcc.currencyCode !== toAcc.currencyCode) {
+        return routeJsonError('Both accounts must use the same currency.', 'CURRENCY_MISMATCH')
+      }
+      if (fromAcc.balance < amount) {
+        return routeJsonError('Insufficient funds in source account.', 'INSUFFICIENT_FUNDS')
+      }
+      fromAcc.balance -= amount
+      toAcc.balance += amount
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            transferFunds: {
+              amount,
+              currencyCode: fromAcc.currencyCode,
+              fromAccount: { ...fromAcc },
+              toAccount: { ...toAcc },
             },
           },
         }),

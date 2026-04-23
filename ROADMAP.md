@@ -36,11 +36,15 @@ It will use real world map. The game will start in single city and later other c
 - Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
 - Create one government bank for each currency
 
-### Currencies and bank accounts (45% complete)
+### Currencies and bank accounts (50% complete)
 
 Change cash flow management completely from the onboarding process, through unit calculations, payments in stock exchange up to the ledger calculation
 
 - The only place where user can have money is in the bank account! First create government bank in every city so that every currency has at least one available bank. Remove DbSet PlayerCurrencyBalances, dbset BankDeposits, from Player object remove PersonalCash, from Company model remove Cash and CurrencyCode. Keep all balances in entity BankAccount. BankDeposits and bank accounts is the same thing. Rename deposits in banks to open the bank account, and ability to transfer funds between the player's bank accounts. Find all other cash occurances and replace it with the use of the bank accounts.
+  - [x] Government bank seeded per city/currency on startup (`AppDbInitializer.EnsureGovernmentBankAccountsAsync`).
+  - [x] Player can transfer funds between two of their own bank accounts in the same currency via the new `transferFunds` GraphQL mutation and the Forex page Transfer tab; both legs are recorded as `BANK_ACCOUNT_TRANSFER_OUT`/`BANK_ACCOUNT_TRANSFER_IN` ledger entries.
+  - [ ] Remove `PlayerCurrencyBalances`, `BankDeposits`, `Player.PersonalCash`, `Company.Cash`, `Company.CurrencyCode`.
+  - [ ] Rename deposit-open/close mutations to "open/close bank account" terminology.
 - Create one government bank for each currency with deposit interest rate 0%, and borrowing interest rate 20%. Create bank account in format 16 random digits where bank accounts must be unique in game server.
 - Currency can be moved only between the bank accounts. Every money transfer must be visible in the ledger and also in the bank statement review. 
 - Create bank statement review where players can see the transfers in their bank accounts.

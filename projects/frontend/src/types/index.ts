@@ -1796,3 +1796,11 @@ export interface AssignBuildingBankAccountResult {
 export interface CreateCompanyBankAccountResult {
   account: CompanyBankAccountSummary
 }
+
+/** Result from the `transferFunds` mutation. */
+export interface TransferFundsResult {
+  amount: number
+  currencyCode: string
+  fromAccount: PlayerBankAccountSummary
+  toAccount: PlayerBankAccountSummary
+}
