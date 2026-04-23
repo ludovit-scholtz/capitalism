@@ -1,12 +1,5 @@
 import { test, expect } from '@playwright/test'
-import {
-  setupMockApi,
-  makePlayer,
-  type MockLoanOffer,
-  type MockLoan,
-  type MockCollateralBuilding,
-  type MockBankInfo,
-} from './helpers/mock-api'
+import { setupMockApi, makePlayer, type MockLoanOffer, type MockLoan, type MockCollateralBuilding, type MockBankInfo } from './helpers/mock-api'
 
 /** Creates a player who owns a BANK building with id 'bank-building-1'. */
 function makeBankOwnerPlayer() {
@@ -141,9 +134,7 @@ test.describe('Loan Marketplace (/loans)', () => {
     await expect(page.locator('.bank-borrow-card').getByText('12.0%')).toBeVisible()
   })
 
-  test('shows login-to-lend CTA for unauthenticated user; Accept Loan is not present', async ({
-    page,
-  }) => {
+  test('shows login-to-lend CTA for unauthenticated user; Accept Loan is not present', async ({ page }) => {
     const state = setupMockApi(page)
     state.allBanks = [makeBankInfoEntry()]
     await page.goto('/loans')
@@ -677,9 +668,7 @@ test.describe('Loan offer display details', () => {
 })
 
 test.describe('Loan Marketplace — tick-refresh stability', () => {
-  test('background tick refresh does not show a loading spinner or blank the bank borrow list', async ({
-    page,
-  }) => {
+  test('background tick refresh does not show a loading spinner or blank the bank borrow list', async ({ page }) => {
     const state = setupMockApi(page)
     state.allBanks = [makeBankInfoEntry({ bankBuildingName: 'Tick Bank', lenderCompanyName: 'Tick Bank' })]
     state.gameState.currentTick = 10
@@ -732,9 +721,7 @@ test.describe('Loan Marketplace — tick-refresh stability', () => {
 })
 
 test.describe('Bank Management — tick-refresh stability', () => {
-  test('background tick refresh does not show a loading spinner or blank the bank management view', async ({
-    page,
-  }) => {
+  test('background tick refresh does not show a loading spinner or blank the bank management view', async ({ page }) => {
     const player = makeBankOwnerPlayer()
     const offer = makeLoanOffer({
       id: 'offer-bank-refresh',
@@ -801,14 +788,7 @@ test.describe('Bank Management — tick-refresh stability', () => {
 })
 
 test.describe('Loan Marketplace — sort and filter banks', () => {
-  function makeBankInfo(
-    id: string,
-    name: string,
-    city: string,
-    depositRate: number,
-    lendingRate: number,
-    available: number,
-  ) {
+  function makeBankInfo(id: string, name: string, city: string, depositRate: number, lendingRate: number, available: number) {
     return {
       bankBuildingId: id,
       bankBuildingName: name,
@@ -834,10 +814,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
 
   test('displays bank list with rates and capacity', async ({ page }) => {
     const state = setupMockApi(page, {})
-    state.allBanks = [
-      makeBankInfo('b1', 'Alpha Bank', 'Bratislava', 5, 10, 1_000_000),
-      makeBankInfo('b2', 'Beta Bank', 'Prague', 3, 8, 2_000_000),
-    ]
+    state.allBanks = [makeBankInfo('b1', 'Alpha Bank', 'Bratislava', 5, 10, 1_000_000), makeBankInfo('b2', 'Beta Bank', 'Prague', 3, 8, 2_000_000)]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
     await page.getByRole('tab', { name: 'Accounts' }).click()
@@ -851,10 +828,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
 
   test('sort by deposit rate changes ordering', async ({ page }) => {
     const state = setupMockApi(page, {})
-    state.allBanks = [
-      makeBankInfo('b1', 'LowRate Bank', 'Bratislava', 3, 10, 1_000_000),
-      makeBankInfo('b2', 'HighRate Bank', 'Prague', 8, 15, 2_000_000),
-    ]
+    state.allBanks = [makeBankInfo('b1', 'LowRate Bank', 'Bratislava', 3, 10, 1_000_000), makeBankInfo('b2', 'HighRate Bank', 'Prague', 8, 15, 2_000_000)]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
     await page.getByRole('tab', { name: 'Accounts' }).click()
@@ -872,10 +846,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
 
   test('sort by lending rate changes ordering', async ({ page }) => {
     const state = setupMockApi(page, {})
-    state.allBanks = [
-      makeBankInfo('b1', 'Cheap Loans', 'Bratislava', 5, 7, 1_000_000),
-      makeBankInfo('b2', 'Expensive Loans', 'Prague', 4, 14, 2_000_000),
-    ]
+    state.allBanks = [makeBankInfo('b1', 'Cheap Loans', 'Bratislava', 5, 7, 1_000_000), makeBankInfo('b2', 'Expensive Loans', 'Prague', 4, 14, 2_000_000)]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
     await page.getByRole('tab', { name: 'Accounts' }).click()
@@ -889,10 +860,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
 
   test('city filter shows only banks in selected city', async ({ page }) => {
     const state = setupMockApi(page, {})
-    state.allBanks = [
-      makeBankInfo('b1', 'Bratislava Bank', 'Bratislava', 5, 10, 1_000_000),
-      makeBankInfo('b2', 'Prague Bank', 'Prague', 5, 10, 2_000_000),
-    ]
+    state.allBanks = [makeBankInfo('b1', 'Bratislava Bank', 'Bratislava', 5, 10, 1_000_000), makeBankInfo('b2', 'Prague Bank', 'Prague', 5, 10, 2_000_000)]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
     await page.getByRole('tab', { name: 'Accounts' }).click()
@@ -909,10 +877,7 @@ test.describe('Loan Marketplace — sort and filter banks', () => {
 
   test('available capacity filter hides banks with no capacity', async ({ page }) => {
     const state = setupMockApi(page, {})
-    state.allBanks = [
-      makeBankInfo('b1', 'Has Capacity', 'Bratislava', 5, 10, 1_000_000),
-      makeBankInfo('b2', 'No Capacity', 'Prague', 5, 10, 0),
-    ]
+    state.allBanks = [makeBankInfo('b1', 'Has Capacity', 'Bratislava', 5, 10, 1_000_000), makeBankInfo('b2', 'No Capacity', 'Prague', 5, 10, 0)]
     await page.goto('/loans')
     // Banks list lives in the Deposit tab
     await page.getByRole('tab', { name: 'Accounts' }).click()
@@ -1415,9 +1380,7 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
     expect(href).not.toMatch(/\/building\/bank-building-1/)
   })
 
-  test('bank management page shows base deposit required UI when not yet activated', async ({
-    page,
-  }) => {
+  test('bank management page shows base deposit required UI when not yet activated', async ({ page }) => {
     const player = makeBankOwnerPlayer()
     // Add the bank to allBanks with baseCapitalDeposited = false to simulate unactivated state
     const state = setupMockApi(page, {

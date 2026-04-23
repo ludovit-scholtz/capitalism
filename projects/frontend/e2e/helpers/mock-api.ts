@@ -4541,10 +4541,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const ageFactor = Number(Math.min(ageTicks / (TICKS_PER_YEAR * 2), 1).toFixed(4))
       const assetFactor = Number((maxAssetValue > 0 ? Math.min(companyAssetValue / maxAssetValue, 1) : 0).toFixed(4))
       const overheadRate = Number((0.5 * ageFactor * assetFactor).toFixed(4))
-      const primaryCurrencyCode =
-        company.buildings
-          .map((building) => state.cities.find((city) => city.id === building.cityId)?.currencyCode)
-          .find((currencyCode) => Boolean(currencyCode)) ?? 'EUR'
+      const primaryCurrencyCode = company.buildings.map((building) => state.cities.find((city) => city.id === building.cityId)?.currencyCode).find((currencyCode) => Boolean(currencyCode)) ?? 'EUR'
 
       return route.fulfill({
         status: 200,

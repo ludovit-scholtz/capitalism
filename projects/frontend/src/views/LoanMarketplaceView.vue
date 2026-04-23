@@ -8,23 +8,8 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type {
-  LoanOfferSummary,
-  LoanSummary,
-  Company,
-  BankDepositSummary,
-  BankInfoSummary,
-  CollateralEligibilitySummary,
-} from '@/types'
-import {
-  formatLoanDuration,
-  computeTotalRepayment,
-  computePaymentAmount,
-  computeTotalPayments,
-  loanStatusClass,
-  formatCurrency,
-  formatPercent,
-} from '@/lib/loanHelpers'
+import type { LoanOfferSummary, LoanSummary, Company, BankDepositSummary, BankInfoSummary, CollateralEligibilitySummary } from '@/types'
+import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, computeTotalPayments, loanStatusClass, formatCurrency, formatPercent } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -230,10 +215,7 @@ async function loadData(isRefresh = false) {
       await auth.fetchMe()
     }
 
-    const [offersResult, banksResult] = await Promise.all([
-      gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY),
-      gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY),
-    ])
+    const [offersResult, banksResult] = await Promise.all([gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY), gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY)])
     const newOffers = offersResult.loanOffers ?? []
     if (!deepEqual(offers.value, newOffers)) {
       offers.value = newOffers
@@ -279,9 +261,7 @@ const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.v
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 
 // Lender eligibility: detect BANK buildings across all companies
-const myBankBuildings = computed(() =>
-  myCompanies.value.flatMap((c) => (c.buildings ?? []).filter((b) => b.type === 'BANK').map((b) => ({ ...b, companyId: c.id }))),
-)
+const myBankBuildings = computed(() => myCompanies.value.flatMap((c) => (c.buildings ?? []).filter((b) => b.type === 'BANK').map((b) => ({ ...b, companyId: c.id }))))
 const hasBankBuilding = computed(() => myBankBuildings.value.length > 0)
 const firstBankBuilding = computed(() => myBankBuildings.value[0] ?? null)
 const firstCompanyId = computed(() => myCompanies.value[0]?.id ?? null)
@@ -339,11 +319,7 @@ function navigateToAcquireBank() {
 }
 
 // Banks sorted for the borrow section: all open banks sorted by lowest lending rate
-const sortedBanksForBorrow = computed(() =>
-  [...allBanks.value]
-    .filter((b) => b.baseCapitalDeposited)
-    .sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent),
-)
+const sortedBanksForBorrow = computed(() => [...allBanks.value].filter((b) => b.baseCapitalDeposited).sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent))
 
 function navigateToManageBank() {
   if (firstBankBuilding.value) {
@@ -383,9 +359,7 @@ const selectedCompanyCash = computed(() => {
   return company?.cash ?? 0
 })
 
-const selectedCollateral = computed(() =>
-  collateralBuildings.value.find((b) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
-)
+const selectedCollateral = computed(() => collateralBuildings.value.find((b) => b.buildingId === selectedCollateralBuildingId.value) ?? null)
 
 const collateralCapacityWarning = computed(() => {
   if (!selectedCollateral.value || principalAmount.value <= 0) return null
@@ -480,20 +454,10 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 
     <!-- Tab switcher -->
     <div class="marketplace-tabs" role="tablist">
-      <button
-        role="tab"
-        :aria-selected="activeTab === 'borrow'"
-        :class="['tab-btn', { 'tab-active': activeTab === 'borrow' }]"
-        @click="activeTab = 'borrow'"
-      >
+      <button role="tab" :aria-selected="activeTab === 'borrow'" :class="['tab-btn', { 'tab-active': activeTab === 'borrow' }]" @click="activeTab = 'borrow'">
         {{ t('bank.borrowTab') }}
       </button>
-      <button
-        role="tab"
-        :aria-selected="activeTab === 'deposit'"
-        :class="['tab-btn', { 'tab-active': activeTab === 'deposit' }]"
-        @click="activeTab = 'deposit'"
-      >
+      <button role="tab" :aria-selected="activeTab === 'deposit'" :class="['tab-btn', { 'tab-active': activeTab === 'deposit' }]" @click="activeTab = 'deposit'">
         {{ t('bank.depositTab') }}
         <span v-if="myDeposits.length > 0" class="tab-badge">{{ myDeposits.length }}</span>
       </button>
@@ -512,135 +476,133 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
     <template v-else>
       <!-- ── BORROW TAB ────────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'borrow'">
-      <!-- Lender action panel: context-aware CTA for offering loans -->
-      <section class="lender-cta-section" aria-label="Lender action">
-        <h2 class="section-title">{{ t('bank.becomeALender') }}</h2>
+        <!-- Lender action panel: context-aware CTA for offering loans -->
+        <section class="lender-cta-section" aria-label="Lender action">
+          <h2 class="section-title">{{ t('bank.becomeALender') }}</h2>
 
-        <!-- Unauthenticated: prompt login -->
-        <div v-if="!auth.isAuthenticated" class="lender-cta-card lender-cta-login">
-          <div class="lender-cta-icon" aria-hidden="true">🏦</div>
-          <div class="lender-cta-body">
-            <h3 class="lender-cta-title">{{ t('bank.loginToLendTitle') }}</h3>
-            <p class="lender-cta-description">{{ t('bank.loginToLendDescription') }}</p>
-          </div>
-          <router-link to="/login" class="btn btn-secondary lender-cta-btn" aria-label="Log in to offer loans">
-            {{ t('bank.loginToLend') }}
-          </router-link>
-        </div>
-
-        <!-- Authenticated, no bank building: acquire CTA -->
-        <div v-else-if="!hasBankBuilding" class="lender-cta-card lender-cta-acquire">
-          <div class="lender-cta-icon" aria-hidden="true">🏦</div>
-          <div class="lender-cta-body">
-            <h3 class="lender-cta-title">{{ t('bank.noBankCTATitle') }}</h3>
-            <p class="lender-cta-description">{{ t('bank.noBankCTADescription') }}</p>
-          </div>
-          <button class="btn btn-primary lender-cta-btn" @click="navigateToAcquireBank" aria-label="Acquire a Bank building">
-            {{ t('bank.acquireBank') }}
-          </button>
-        </div>
-
-        <!-- Authenticated, has bank: manage bank CTA -->
-        <div v-else class="lender-cta-card lender-cta-manage">
-          <div class="lender-cta-icon" aria-hidden="true">🏦</div>
-          <div class="lender-cta-body">
-            <h3 class="lender-cta-title">{{ t('bank.hasBankCTATitle') }}</h3>
-            <p class="lender-cta-description">{{ t('bank.hasBankCTADescription') }}</p>
-            <span class="lender-bank-name">{{ firstBankBuilding?.name }}</span>
-          </div>
-          <button class="btn btn-primary lender-cta-btn" @click="navigateToManageBank">
-            {{ t('bank.manageBank') }}
-          </button>
-        </div>
-      </section>
-
-      <!-- Active loans section (authenticated borrowers) -->
-      <section v-if="auth.isAuthenticated && activeLoans.length > 0" class="my-loans-section">
-        <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
-        <div class="loans-grid">
-          <div v-for="loan in activeLoans" :key="loan.id" class="loan-card" :class="loanStatusClass(loan.status)">
-            <div class="loan-card-header">
-              <span class="lender-name">{{ loan.lenderCompanyName }}</span>
-              <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
-                {{ t(`bank.statusBadge.${loan.status}`) }}
-              </span>
+          <!-- Unauthenticated: prompt login -->
+          <div v-if="!auth.isAuthenticated" class="lender-cta-card lender-cta-login">
+            <div class="lender-cta-icon" aria-hidden="true">🏦</div>
+            <div class="lender-cta-body">
+              <h3 class="lender-cta-title">{{ t('bank.loginToLendTitle') }}</h3>
+              <p class="lender-cta-description">{{ t('bank.loginToLendDescription') }}</p>
             </div>
-            <div class="loan-card-body">
-              <div class="loan-stat">
-                <span class="stat-label">{{ t('bank.remainingPrincipal') }}</span>
-                <span class="stat-value">{{ formatCurrency(loan.remainingPrincipal) }}</span>
-              </div>
-              <div class="loan-stat">
-                <span class="stat-label">{{ t('bank.nextPayment') }}</span>
-                <span class="stat-value">{{ formatCurrency(loan.paymentAmount) }}</span>
-              </div>
-              <div class="loan-stat">
-                <span class="stat-label">{{ t('bank.paymentsMade') }}</span>
-                <span class="stat-value">{{ loan.paymentsMade }} / {{ loan.totalPayments }}</span>
-              </div>
-              <div class="loan-stat">
-                <span class="stat-label">{{ t('bank.interestRate') }}</span>
-                <span class="stat-value">{{ formatPercent(loan.annualInterestRatePercent) }}</span>
-              </div>
-            </div>
-            <div v-if="loan.missedPayments > 0" class="overdue-warning">⚠ {{ loan.missedPayments }} missed payment(s) — penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}</div>
-            <div v-if="loan.collateralBuildingId" class="collateral-badge">
-              🏛 {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
-              <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
-                ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue) }})
-              </span>
-            </div>
+            <router-link to="/login" class="btn btn-secondary lender-cta-btn" aria-label="Log in to offer loans">
+              {{ t('bank.loginToLend') }}
+            </router-link>
           </div>
-        </div>
-      </section>
 
-      <!-- Bank discovery section for borrowers: choose a bank first, then create loan on bank page -->
-      <section class="offers-section">
-        <h2 class="section-title">{{ t('bank.chooseBankToBorrow') }}</h2>
-        <p class="section-subtitle">{{ t('bank.chooseBankToBorrowHint') }}</p>
-        <div v-if="sortedBanksForBorrow.length === 0" class="empty-state">
-          <p>{{ t('bank.noBanksAvailable') }}</p>
-        </div>
-        <div v-else class="banks-for-borrow-grid">
-          <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card">
-            <div class="bank-borrow-card-header">
-              <div class="bank-borrow-identity">
-                <span class="bank-borrow-icon">🏦</span>
-                <div>
-                  <span class="bank-borrow-name">{{ bank.bankBuildingName }}</span>
-                  <span class="bank-borrow-lender">{{ bank.lenderCompanyName }}</span>
-                </div>
-              </div>
-              <div class="bank-borrow-rate">
-                <span class="rate-value">{{ formatPercent(bank.lendingInterestRatePercent) }}</span>
-                <span class="rate-label">{{ t('bank.perYear') }}</span>
-              </div>
+          <!-- Authenticated, no bank building: acquire CTA -->
+          <div v-else-if="!hasBankBuilding" class="lender-cta-card lender-cta-acquire">
+            <div class="lender-cta-icon" aria-hidden="true">🏦</div>
+            <div class="lender-cta-body">
+              <h3 class="lender-cta-title">{{ t('bank.noBankCTATitle') }}</h3>
+              <p class="lender-cta-description">{{ t('bank.noBankCTADescription') }}</p>
             </div>
-            <div class="bank-borrow-stats">
-              <div class="borrow-stat">
-                <span class="stat-label">{{ t('bank.availableCapacity') }}</span>
-                <span class="stat-value" :class="bank.availableLendingCapacity > 0 ? '' : 'stat-zero'">
-                  {{ formatCurrency(bank.availableLendingCapacity) }}
+            <button class="btn btn-primary lender-cta-btn" @click="navigateToAcquireBank" aria-label="Acquire a Bank building">
+              {{ t('bank.acquireBank') }}
+            </button>
+          </div>
+
+          <!-- Authenticated, has bank: manage bank CTA -->
+          <div v-else class="lender-cta-card lender-cta-manage">
+            <div class="lender-cta-icon" aria-hidden="true">🏦</div>
+            <div class="lender-cta-body">
+              <h3 class="lender-cta-title">{{ t('bank.hasBankCTATitle') }}</h3>
+              <p class="lender-cta-description">{{ t('bank.hasBankCTADescription') }}</p>
+              <span class="lender-bank-name">{{ firstBankBuilding?.name }}</span>
+            </div>
+            <button class="btn btn-primary lender-cta-btn" @click="navigateToManageBank">
+              {{ t('bank.manageBank') }}
+            </button>
+          </div>
+        </section>
+
+        <!-- Active loans section (authenticated borrowers) -->
+        <section v-if="auth.isAuthenticated && activeLoans.length > 0" class="my-loans-section">
+          <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
+          <div class="loans-grid">
+            <div v-for="loan in activeLoans" :key="loan.id" class="loan-card" :class="loanStatusClass(loan.status)">
+              <div class="loan-card-header">
+                <span class="lender-name">{{ loan.lenderCompanyName }}</span>
+                <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
+                  {{ t(`bank.statusBadge.${loan.status}`) }}
                 </span>
               </div>
-              <div class="borrow-stat">
-                <span class="stat-label">{{ t('common.city') }}</span>
-                <span class="stat-value">{{ bank.cityName }}</span>
+              <div class="loan-card-body">
+                <div class="loan-stat">
+                  <span class="stat-label">{{ t('bank.remainingPrincipal') }}</span>
+                  <span class="stat-value">{{ formatCurrency(loan.remainingPrincipal) }}</span>
+                </div>
+                <div class="loan-stat">
+                  <span class="stat-label">{{ t('bank.nextPayment') }}</span>
+                  <span class="stat-value">{{ formatCurrency(loan.paymentAmount) }}</span>
+                </div>
+                <div class="loan-stat">
+                  <span class="stat-label">{{ t('bank.paymentsMade') }}</span>
+                  <span class="stat-value">{{ loan.paymentsMade }} / {{ loan.totalPayments }}</span>
+                </div>
+                <div class="loan-stat">
+                  <span class="stat-label">{{ t('bank.interestRate') }}</span>
+                  <span class="stat-value">{{ formatPercent(loan.annualInterestRatePercent) }}</span>
+                </div>
+              </div>
+              <div v-if="loan.missedPayments > 0" class="overdue-warning">⚠ {{ loan.missedPayments }} missed payment(s) — penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}</div>
+              <div v-if="loan.collateralBuildingId" class="collateral-badge">
+                🏛 {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
+                <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue) }}) </span>
               </div>
             </div>
-            <div class="bank-borrow-card-footer">
-              <router-link :to="`/bank/${bank.bankBuildingId}`" class="btn btn-primary btn-sm">
-                {{ t('bank.visitBankToBorrow') }}
-              </router-link>
+          </div>
+        </section>
+
+        <!-- Bank discovery section for borrowers: choose a bank first, then create loan on bank page -->
+        <section class="offers-section">
+          <h2 class="section-title">{{ t('bank.chooseBankToBorrow') }}</h2>
+          <p class="section-subtitle">{{ t('bank.chooseBankToBorrowHint') }}</p>
+          <div v-if="sortedBanksForBorrow.length === 0" class="empty-state">
+            <p>{{ t('bank.noBanksAvailable') }}</p>
+          </div>
+          <div v-else class="banks-for-borrow-grid">
+            <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card">
+              <div class="bank-borrow-card-header">
+                <div class="bank-borrow-identity">
+                  <span class="bank-borrow-icon">🏦</span>
+                  <div>
+                    <span class="bank-borrow-name">{{ bank.bankBuildingName }}</span>
+                    <span class="bank-borrow-lender">{{ bank.lenderCompanyName }}</span>
+                  </div>
+                </div>
+                <div class="bank-borrow-rate">
+                  <span class="rate-value">{{ formatPercent(bank.lendingInterestRatePercent) }}</span>
+                  <span class="rate-label">{{ t('bank.perYear') }}</span>
+                </div>
+              </div>
+              <div class="bank-borrow-stats">
+                <div class="borrow-stat">
+                  <span class="stat-label">{{ t('bank.availableCapacity') }}</span>
+                  <span class="stat-value" :class="bank.availableLendingCapacity > 0 ? '' : 'stat-zero'">
+                    {{ formatCurrency(bank.availableLendingCapacity) }}
+                  </span>
+                </div>
+                <div class="borrow-stat">
+                  <span class="stat-label">{{ t('common.city') }}</span>
+                  <span class="stat-value">{{ bank.cityName }}</span>
+                </div>
+              </div>
+              <div class="bank-borrow-card-footer">
+                <router-link :to="`/bank/${bank.bankBuildingId}`" class="btn btn-primary btn-sm">
+                  {{ t('bank.visitBankToBorrow') }}
+                </router-link>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
-      </div><!-- end borrow tab -->
+        </section>
+      </div>
+      <!-- end borrow tab -->
 
       <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'deposit'" class="deposit-tab">
-
         <!-- My Deposits -->
         <section v-if="auth.isAuthenticated && myDeposits.length > 0" class="my-deposits-section">
           <h2 class="section-title">{{ t('bank.myDeposits') }}</h2>
@@ -664,11 +626,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                   <span class="deposit-stat-value">{{ dep.depositorCompanyName }}</span>
                 </div>
               </div>
-              <button
-                v-if="!dep.isBaseCapital"
-                class="btn btn-secondary btn-sm"
-                @click="withdrawDeposit(dep)"
-              >
+              <button v-if="!dep.isBaseCapital" class="btn btn-secondary btn-sm" @click="withdrawDeposit(dep)">
                 {{ t('bank.withdrawDeposit') }}
               </button>
             </div>
@@ -700,7 +658,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
               <div class="banks-sort" role="group" :aria-label="t('bank.sortBy')">
                 <span class="sort-label">{{ t('bank.sortBy') }}</span>
                 <button
-                  v-for="field in (['depositRate', 'lendingRate', 'capacity', 'city'] as BankSortField[])"
+                  v-for="field in ['depositRate', 'lendingRate', 'capacity', 'city'] as BankSortField[]"
                   :key="field"
                   class="sort-btn"
                   :class="{ 'sort-active': bankSortBy === field }"
@@ -746,24 +704,13 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                   </span>
                 </div>
                 <div class="bank-card-actions">
-                  <button
-                    class="btn btn-secondary btn-sm"
-                    @click="navigateToBank(bank.bankBuildingId)"
-                  >
+                  <button class="btn btn-secondary btn-sm" @click="navigateToBank(bank.bankBuildingId)">
                     {{ t('bank.viewBankDetail') }}
                   </button>
-                  <button
-                    v-if="auth.isAuthenticated && isCompanyAccountActive"
-                    class="btn btn-primary btn-sm bank-deposit-btn"
-                    @click="openDepositModal(bank)"
-                  >
+                  <button v-if="auth.isAuthenticated && isCompanyAccountActive" class="btn btn-primary btn-sm bank-deposit-btn" @click="openDepositModal(bank)">
                     {{ t('bank.makeDeposit') }}
                   </button>
-                  <router-link
-                    v-else-if="!auth.isAuthenticated"
-                    to="/login"
-                    class="btn btn-primary btn-sm"
-                  >
+                  <router-link v-else-if="!auth.isAuthenticated" to="/login" class="btn btn-primary btn-sm">
                     {{ t('auth.login') }}
                   </router-link>
                   <p v-else class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
@@ -772,9 +719,8 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
             </div>
           </template>
         </section>
-
-      </div><!-- end deposit tab -->
-
+      </div>
+      <!-- end deposit tab -->
     </template>
 
     <!-- Accept Loan Modal -->
@@ -846,32 +792,13 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
             <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
             <div v-else class="collateral-list">
               <!-- None option -->
-              <label
-                class="collateral-option"
-                :class="{ selected: selectedCollateralBuildingId === null }"
-              >
-                <input
-                  type="radio"
-                  :value="null"
-                  v-model="selectedCollateralBuildingId"
-                  class="collateral-radio"
-                />
+              <label class="collateral-option" :class="{ selected: selectedCollateralBuildingId === null }">
+                <input type="radio" :value="null" v-model="selectedCollateralBuildingId" class="collateral-radio" />
                 <span class="collateral-option-name">{{ t('bank.collateralNone') }}</span>
               </label>
               <!-- Buildings -->
-              <label
-                v-for="b in collateralBuildings"
-                :key="b.buildingId"
-                class="collateral-option"
-                :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }"
-              >
-                <input
-                  type="radio"
-                  :value="b.buildingId"
-                  v-model="selectedCollateralBuildingId"
-                  :disabled="!b.isEligible"
-                  class="collateral-radio"
-                />
+              <label v-for="b in collateralBuildings" :key="b.buildingId" class="collateral-option" :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }">
+                <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" :disabled="!b.isEligible" class="collateral-radio" />
                 <span class="collateral-option-body">
                   <span class="collateral-option-name">{{ b.buildingName }}</span>
                   <span class="collateral-option-type">{{ b.buildingType }} · Lv{{ b.level }}</span>
@@ -879,9 +806,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                   <span v-else class="collateral-stats">
                     <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
                     <span class="stat-highlight">{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable) }}</span>
-                    <span v-if="b.existingSecuredExposure > 0" class="stat-warn">
-                      {{ t('bank.collateralExistingExposure') }}: {{ formatCurrency(b.existingSecuredExposure) }}
-                    </span>
+                    <span v-if="b.existingSecuredExposure > 0" class="stat-warn"> {{ t('bank.collateralExistingExposure') }}: {{ formatCurrency(b.existingSecuredExposure) }} </span>
                     <span class="stat-capacity">{{ t('bank.collateralRemainingCapacity') }}: {{ formatCurrency(b.remainingBorrowingCapacity) }}</span>
                   </span>
                 </span>
@@ -901,8 +826,9 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                 ></span>
               </span>
               <span class="capacity-bar-label">
-                {{ formatCurrency(principalAmount) }} / {{ formatCurrency(selectedCollateral.maxBorrowable) }}
-                ({{ Math.min(100, Math.round((principalAmount / selectedCollateral.maxBorrowable) * 100)) }}% LTV)
+                {{ formatCurrency(principalAmount) }} / {{ formatCurrency(selectedCollateral.maxBorrowable) }} ({{
+                  Math.min(100, Math.round((principalAmount / selectedCollateral.maxBorrowable) * 100))
+                }}% LTV)
               </span>
             </div>
           </div>
@@ -913,11 +839,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeAcceptModal">{{ t('common.cancel') }}</button>
-          <button
-            class="btn btn-primary"
-            :disabled="acceptLoading || principalAmount <= 0 || !!collateralCapacityWarning"
-            @click="confirmAcceptLoan"
-          >
+          <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0 || !!collateralCapacityWarning" @click="confirmAcceptLoan">
             <span v-if="acceptLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.acceptLoan') }}</span>
           </button>
@@ -945,14 +867,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
           </div>
           <div class="form-group">
             <label for="deposit-amount">{{ t('bank.depositAmount') }}</label>
-            <input
-              id="deposit-amount"
-              v-model.number="depositAmount"
-              type="number"
-              min="1000"
-              step="1000"
-              class="form-input"
-            />
+            <input id="deposit-amount" v-model.number="depositAmount" type="number" min="1000" step="1000" class="form-input" />
             <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
           </div>
           <div v-if="depositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
@@ -960,11 +875,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeDepositModal">{{ t('common.cancel') }}</button>
-          <button
-            class="btn btn-primary"
-            :disabled="depositLoading || depositAmount < 1000"
-            @click="submitDeposit"
-          >
+          <button class="btn btn-primary" :disabled="depositLoading || depositAmount < 1000" @click="submitDeposit">
             <span v-if="depositLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.confirmDeposit') }}</span>
           </button>
@@ -1038,7 +949,9 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
-  transition: box-shadow 0.2s, border-color 0.2s;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1535,7 +1448,9 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .tab-btn.tab-active {
@@ -1629,7 +1544,9 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   font-weight: 600;
 }
 
-.deposit-stat-value.positive { color: #22c55e; }
+.deposit-stat-value.positive {
+  color: #22c55e;
+}
 
 /* Banks grid */
 .banks-list-section {
@@ -1697,8 +1614,12 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   font-weight: 700;
 }
 
-.rate-value.green { color: #22c55e; }
-.rate-value.orange { color: #f59e0b; }
+.rate-value.green {
+  color: #22c55e;
+}
+.rate-value.orange {
+  color: #f59e0b;
+}
 
 .bank-card-capacity {
   display: flex;
@@ -1715,8 +1636,12 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   font-weight: 600;
 }
 
-.capacity-value.positive { color: #22c55e; }
-.capacity-value.zero { color: var(--color-text-muted); }
+.capacity-value.positive {
+  color: #22c55e;
+}
+.capacity-value.zero {
+  color: var(--color-text-muted);
+}
 
 .bank-deposit-btn {
   width: 100%;
@@ -1737,7 +1662,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   justify-content: space-between;
   margin-bottom: 1rem;
   padding: 0.75rem;
-  background: var(--color-surface-hover, rgba(255,255,255,0.04));
+  background: var(--color-surface-hover, rgba(255, 255, 255, 0.04));
   border-radius: 6px;
 }
 
@@ -1799,7 +1724,10 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   color: var(--color-text-secondary);
   font-size: 0.78rem;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .sort-btn:hover {
@@ -1848,7 +1776,9 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
   border-radius: var(--radius-sm);
   cursor: pointer;
   background: var(--color-surface);
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .collateral-option.selected {
