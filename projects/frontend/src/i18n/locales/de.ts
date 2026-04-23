@@ -31,6 +31,10 @@ export default {
   languageSwitcher: {
     label: 'Sprache',
   },
+  themeSwitcher: {
+    switchToDark: 'Zum Dunkelmodus wechseln',
+    switchToLight: 'Zum Hellmodus wechseln',
+  },
   nav: {
     home: 'Startseite',
     dashboard: 'Übersicht',

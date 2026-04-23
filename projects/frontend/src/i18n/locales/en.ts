@@ -31,6 +31,10 @@ export default {
   languageSwitcher: {
     label: 'Language',
   },
+  themeSwitcher: {
+    switchToDark: 'Switch to dark mode',
+    switchToLight: 'Switch to light mode',
+  },
   nav: {
     home: 'Home',
     dashboard: 'Dashboard',

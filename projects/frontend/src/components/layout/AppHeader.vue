@@ -9,6 +9,11 @@ import { useNewsStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import AccountSwitcher from '@/components/layout/AccountSwitcher.vue'
+import ThemeToggle from '@/components/layout/ThemeToggle.vue'
+import { useThemeStore } from '@/stores/theme'
+
+const themeStore = useThemeStore()
+themeStore.init()
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
@@ -240,6 +245,7 @@ function handleChatToggle() {
         <RouterLink v-else to="/login" class="btn btn-primary" :title="t('common.login')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'sign-in-alt']" />
         </RouterLink>
+        <ThemeToggle />
       </div>
     </div>
   </header>

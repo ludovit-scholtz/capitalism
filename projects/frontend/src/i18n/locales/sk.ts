@@ -31,6 +31,10 @@ export default {
   languageSwitcher: {
     label: 'Jazyk',
   },
+  themeSwitcher: {
+    switchToDark: 'Prepnúť na tmavý režim',
+    switchToLight: 'Prepnúť na svetlý režim',
+  },
   nav: {
     home: 'Domov',
     dashboard: 'Prehľad',

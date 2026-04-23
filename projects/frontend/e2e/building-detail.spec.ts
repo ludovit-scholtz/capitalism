@@ -19932,7 +19932,7 @@ test.describe('Power plant analytics panel', () => {
     await page.goto('/building/factory-1')
 
     const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
-    await expect(analyticsPanel).not.toBeVisible()
+    await expect(analyticsPanel).toBeHidden()
   })
 
   test('shows POWER_GENERATION and BATTERY_STORAGE unit types in building grid', async ({ page }) => {
