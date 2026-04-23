@@ -202,6 +202,10 @@ export type MockBuilding = {
   contentValue?: number
   /** Per-tick content spending budget for MEDIA_HOUSE buildings */
   contentBudgetPerTick?: number | null
+  /** True when the building is suspended due to insufficient bank account funds */
+  isSuspendedForFunds?: boolean
+  /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
+  suspendedReason?: string | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }
@@ -820,6 +824,16 @@ export type MockState = {
   }>>
   /** Media houses returned by cityMediaHouses query, keyed by cityId. */
   cityMediaHouses: Record<string, MockCityMediaHouseInfo[]>
+  /** Building bank account info keyed by buildingId. */
+  buildingBankAccounts: Record<string, {
+    hasBankAccount: boolean
+    bankAccountId: string | null
+    accountNumber: string | null
+    balance: number | null
+    isSuspendedForFunds: boolean
+    suspendedReason: string | null
+    currencyCode: string
+  }>
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1936,6 +1950,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     forexTradeHistory: [],
     bankStatementRows: {},
     cityMediaHouses: {},
+    buildingBankAccounts: {},
     ...initial,
   }
 
@@ -5564,7 +5579,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // myCollateralBuildings has buildingName field (ends in 'me')
       !q.includes('myCollateralBuildings') &&
       // campaignAnalytics has companyName/cityName fields that contain 'me' as substring
-      !q.includes('campaignAnalytics')
+      !q.includes('campaignAnalytics') &&
+      // buildingBankAccount contains 'me' as substring in some serializations
+      !q.includes('buildingBankAccount')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -6318,6 +6335,143 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               id: crypto.randomUUID(),
               appliesAtTick: gameState.currentTick + 10,
               totalTicksRequired: 10,
+            },
+          },
+        }),
+      })
+    }
+
+    // ── Building bank account query ──────────────────────────────────────────
+    if (query.includes('buildingBankAccount') && !query.includes('fundBuildingBankAccount') && !query.includes('assignBuildingBankAccount') && !query.includes('createCompanyBankAccount')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { buildingId?: string } | undefined
+      const buildingId = vars?.buildingId ?? ''
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const building = player.companies.flatMap((c) => c.buildings).find((b) => b.id === buildingId)
+      if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+
+      const explicit = state.buildingBankAccounts[buildingId]
+      const city = state.cities.find((c) => c.id === building.cityId)
+      const currencyCode = city?.currencyCode ?? 'EUR'
+
+      const info = explicit ?? {
+        hasBankAccount: false,
+        bankAccountId: null,
+        accountNumber: null,
+        balance: null,
+        isSuspendedForFunds: building.isSuspendedForFunds ?? false,
+        suspendedReason: building.suspendedReason ?? null,
+        currencyCode,
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            buildingBankAccount: {
+              buildingId,
+              buildingName: building.name,
+              cityName: city?.name ?? '',
+              currencyCode: info.currencyCode,
+              hasBankAccount: info.hasBankAccount,
+              bankAccountId: info.bankAccountId,
+              accountNumber: info.accountNumber,
+              balance: info.balance,
+              isSuspendedForFunds: info.isSuspendedForFunds,
+              suspendedReason: info.suspendedReason,
+            },
+          },
+        }),
+      })
+    }
+
+    // ── Fund building bank account mutation ──────────────────────────────────
+    if (query.includes('fundBuildingBankAccount')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { input?: { buildingId?: string; amount?: number } } | undefined
+      const buildingId = vars?.input?.buildingId ?? ''
+      const amount = vars?.input?.amount ?? 0
+      if (amount <= 0) return routeJsonError('Amount must be positive.', 'INVALID_AMOUNT')
+
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const building = player.companies.flatMap((c) => c.buildings).find((b) => b.id === buildingId)
+      if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+      const company = player.companies.find((c) => c.buildings.some((b) => b.id === buildingId))
+      if (!company) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+      if (company.cash < amount) return routeJsonError(`Insufficient company cash. Available: ${company.cash}`, 'INSUFFICIENT_COMPANY_CASH')
+
+      company.cash -= amount
+
+      const city = state.cities.find((c) => c.id === building.cityId)
+      const currencyCode = city?.currencyCode ?? 'EUR'
+      const existing = state.buildingBankAccounts[buildingId]
+      const prev = existing ?? { hasBankAccount: false, bankAccountId: null, accountNumber: null, balance: 0, isSuspendedForFunds: false, suspendedReason: null, currencyCode }
+      const newBalance = (prev.balance ?? 0) + amount
+      const accountNumber = prev.accountNumber ?? String(Math.floor(Math.random() * 1e16)).padStart(16, '0')
+      const accountId = prev.bankAccountId ?? crypto.randomUUID()
+
+      state.buildingBankAccounts[buildingId] = {
+        hasBankAccount: true,
+        bankAccountId: accountId,
+        accountNumber,
+        balance: newBalance,
+        isSuspendedForFunds: false,
+        suspendedReason: null,
+        currencyCode,
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            fundBuildingBankAccount: {
+              bankAccount: {
+                buildingId,
+                buildingName: building.name,
+                cityName: city?.name ?? '',
+                currencyCode,
+                hasBankAccount: true,
+                bankAccountId: accountId,
+                accountNumber,
+                balance: newBalance,
+                isSuspendedForFunds: false,
+                suspendedReason: null,
+              },
+              remainingCompanyCash: company.cash,
+            },
+          },
+        }),
+      })
+    }
+
+    // ── Create company bank account mutation ─────────────────────────────────
+    if (query.includes('createCompanyBankAccount')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { input?: { companyId?: string; currencyCode?: string } } | undefined
+      const companyId = vars?.input?.companyId ?? ''
+      const currencyCode = (vars?.input?.currencyCode ?? 'EUR').toUpperCase()
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const company = player.companies.find((c) => c.id === companyId)
+      if (!company) return routeJsonError('Company not found', 'COMPANY_NOT_FOUND')
+      const accountId = crypto.randomUUID()
+      const accountNumber = String(Math.floor(Math.random() * 1e16)).padStart(16, '0')
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            createCompanyBankAccount: {
+              account: {
+                id: accountId,
+                accountNumber,
+                currencyCode,
+                balance: 0,
+              },
             },
           },
         }),

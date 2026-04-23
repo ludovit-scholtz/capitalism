@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
+import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
 import BuildingFinancialTimelineChart from '@/components/buildings/BuildingFinancialTimelineChart.vue'
 import DiagonalConnector from '@/components/buildings/DiagonalConnector.vue'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
@@ -3595,6 +3596,8 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
             builtAtUtc
             contentValue
             contentBudgetPerTick
+            isSuspendedForFunds
+            suspendedReason
             units {
               id
               buildingId
@@ -6965,6 +6968,18 @@ watch(
                 <RouterLink v-if="buildingOverviewMapRoute" :to="buildingOverviewMapRoute" class="btn btn-secondary btn-sm building-overview-map-link">
                   {{ t('buildingDetail.overview.showOnMap') }}
                 </RouterLink>
+              </div>
+
+              <!-- ── Bank account panel ── -->
+              <div class="unit-insight-card building-bank-account-card">
+                <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
+                <BuildingBankAccountPanel
+                  :building-id="building.id"
+                  :company-id="building.companyId"
+                  :currency-code="cityCurrencyCode"
+                  :loading="loading"
+                  @funded="loadBuilding"
+                />
               </div>
             </div>
           </div>

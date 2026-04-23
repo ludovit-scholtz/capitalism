@@ -151,6 +151,9 @@ public sealed partial class AppDbInitializer(
 
         // Seed government-owned baseline media houses in every city (idempotent).
         await SeedGovernmentMediaHousesAsync();
+
+        // Ensure one government bank account exists for each unique city currency (idempotent).
+        await EnsureGovernmentBankAccountsAsync();
     }
 
     private async Task SeedFxRatesAsync()
@@ -267,6 +270,53 @@ public sealed partial class AppDbInitializer(
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Ensures exactly one government-owned bank account exists for each unique city currency.
+    /// Called at startup to guarantee every city has a default bank for auto-assigning buildings.
+    /// Idempotent: creates only accounts that do not yet exist.
+    /// </summary>
+    private async Task EnsureGovernmentBankAccountsAsync()
+    {
+        var currencies = await dbContext.Cities
+            .Select(c => c.CurrencyCode)
+            .Distinct()
+            .ToListAsync();
+
+        foreach (var currencyCode in currencies)
+        {
+            var exists = await dbContext.BankAccounts
+                .AnyAsync(a => a.CurrencyCode == currencyCode && a.IsGovernmentAccount);
+
+            if (!exists)
+            {
+                var govAccountId = CreateDeterministicGuid($"gov-bank:{currencyCode}");
+                dbContext.BankAccounts.Add(new BankAccount
+                {
+                    Id = govAccountId,
+                    AccountNumber = GenerateDeterministicAccountNumber($"gov-bank:{currencyCode}"),
+                    CurrencyCode = currencyCode,
+                    Balance = 0m,
+                    CompanyId = null,
+                    IsGovernmentAccount = true,
+                    CreatedAtUtc = DateTime.UtcNow,
+                });
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Generates a deterministic 16-digit account number from a seed string.
+    /// The result is always exactly 16 decimal digits, unique per seed within a server.
+    /// </summary>
+    private static string GenerateDeterministicAccountNumber(string seed)
+    {
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(seed));
+        var value = BitConverter.ToUInt64(bytes, 0);
+        return (value % 10_000_000_000_000_000UL).ToString("D16");
     }
 
     private void SeedResources()

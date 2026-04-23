@@ -667,3 +667,43 @@ public sealed class AdminSetPlayerGoldBalanceInput
     [Required]
     public string Note { get; set; } = string.Empty;
 }
+
+/// <summary>Input for funding a building's assigned bank account from company cash.</summary>
+public sealed class FundBuildingBankAccountInput
+{
+    /// <summary>The building whose bank account to fund.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>
+    /// Amount to transfer from company cash into the building's bank account.
+    /// Must be positive and not exceed the company's available cash.
+    /// </summary>
+    public decimal Amount { get; set; }
+}
+
+/// <summary>Input for assigning a different bank account to a building.</summary>
+public sealed class AssignBuildingBankAccountInput
+{
+    /// <summary>The building to update.</summary>
+    public Guid BuildingId { get; set; }
+
+    /// <summary>
+    /// The bank account to assign to this building.
+    /// Must be owned by the building's company and must have the same currency as the building's city.
+    /// </summary>
+    public Guid BankAccountId { get; set; }
+}
+
+/// <summary>Input for creating a new bank account for a company.</summary>
+public sealed class CreateCompanyBankAccountInput
+{
+    /// <summary>The company that will own the new account.</summary>
+    public Guid CompanyId { get; set; }
+
+    /// <summary>
+    /// ISO 4217 currency code for the account (e.g. "EUR", "CZK").
+    /// Must match a city currency available in this game server.
+    /// </summary>
+    [Required, MaxLength(3)]
+    public string CurrencyCode { get; set; } = string.Empty;
+}

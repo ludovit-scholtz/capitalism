@@ -109,6 +109,10 @@ export interface Building {
   contentValue: number
   /** Per-tick content spending configured by the media house owner. Null if not set. */
   contentBudgetPerTick: number | null
+  /** True when the building was suspended on the last tick due to insufficient bank account funds. */
+  isSuspendedForFunds: boolean
+  /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
+  suspendedReason: string | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }
@@ -1719,4 +1723,43 @@ export interface BankStatementResult {
   currentBalance: number
   totalEntries: number
   rows: BankStatementRow[]
+}
+
+/** Bank account info for a building (from the `buildingBankAccount` query). */
+export interface BuildingBankAccountInfo {
+  buildingId: string
+  buildingName: string
+  cityName: string
+  currencyCode: string
+  hasBankAccount: boolean
+  bankAccountId: string | null
+  accountNumber: string | null
+  balance: number | null
+  isSuspendedForFunds: boolean
+  /** null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
+  suspendedReason: string | null
+}
+
+/** A bank account owned by a company (from the `companyBankAccounts` query). */
+export interface CompanyBankAccountSummary {
+  id: string
+  accountNumber: string
+  currencyCode: string
+  balance: number
+}
+
+/** Result from the `fundBuildingBankAccount` mutation. */
+export interface FundBuildingBankAccountResult {
+  bankAccount: BuildingBankAccountInfo
+  remainingCompanyCash: number
+}
+
+/** Result from the `assignBuildingBankAccount` mutation. */
+export interface AssignBuildingBankAccountResult {
+  bankAccount: BuildingBankAccountInfo
+}
+
+/** Result from the `createCompanyBankAccount` mutation. */
+export interface CreateCompanyBankAccountResult {
+  account: CompanyBankAccountSummary
 }

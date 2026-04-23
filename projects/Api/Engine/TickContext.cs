@@ -96,6 +96,13 @@ public sealed partial class TickContext
     /// </summary>
     public Dictionary<Guid, WeatherSnapshot> WeatherByCity { get; init; } = [];
 
+    /// <summary>
+    /// Bank accounts keyed by their ID.
+    /// Pre-loaded by <see cref="TickProcessor"/> to allow the <see cref="Phases.OperatingCostPhase"/>
+    /// to check and debit building bank accounts without extra DB queries per building.
+    /// </summary>
+    public Dictionary<Guid, BankAccount> BankAccountsById { get; init; } = [];
+
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 
