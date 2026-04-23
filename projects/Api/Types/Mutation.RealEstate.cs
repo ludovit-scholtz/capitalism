@@ -128,7 +128,8 @@ public sealed partial class Mutation
             Engine.GameConstants.PowerDemandMw(input.BuildingType, 1),
             DateTime.UtcNow,
             powerPlantType: input.PowerPlantType,
-            applyConstructionDelay: true);
+            applyConstructionDelay: true,
+            validateDestinationCurrency: true);
 
         // Validate and apply media house channel type.
         if (input.BuildingType == BuildingType.MediaHouse)

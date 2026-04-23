@@ -364,7 +364,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         var lot = new BuildingLot
         {
             Id = Guid.NewGuid(), CityId = city.Id, Name = "Power Test Lot", Description = "Test lot",
@@ -406,7 +406,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         var lot = new BuildingLot
         {
             Id = Guid.NewGuid(), CityId = city.Id, Name = "Gas Test Lot", Description = "Test lot",
@@ -661,7 +661,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         var lot = new BuildingLot
         {
             Id = Guid.NewGuid(), CityId = city.Id, Name = "Nuclear Test Lot", Description = "Test lot",

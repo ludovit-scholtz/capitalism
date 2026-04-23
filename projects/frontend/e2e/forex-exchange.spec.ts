@@ -330,7 +330,7 @@ test.describe('Forex Exchange page', () => {
     await expect(page.locator('.ba-notice')).toBeVisible()
 
     // The legacy personal balance section should NOT appear when bank accounts are present
-    await expect(page.getByText('Your Currency Balances')).not.toBeVisible()
+    await expect(page.getByText('Your Currency Balances')).toBeHidden()
   })
 
   test('successfully completes a bank account swap and shows result', async ({ page }) => {
