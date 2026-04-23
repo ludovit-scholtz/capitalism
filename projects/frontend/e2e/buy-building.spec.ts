@@ -194,4 +194,162 @@ test.describe('Buy Building View', () => {
     await page.waitForURL(/\/bank\//)
     await expect(page).toHaveURL(/\/bank\//)
   })
+
+  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({
+    page,
+  }) => {
+    // AC: Expansion flow detects missing destination-currency bank accounts.
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Europe Expansion Corp',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // No CZK balance – player only has EUR
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    // Scope to .city-select-grid to avoid matching account-switcher button
+    await page.locator('.city-select-grid').getByText('Prague').click()
+
+    // Funding gap warning must be visible
+    const guidance = page.locator('.funding-guidance')
+    await expect(guidance).toBeVisible()
+    await expect(guidance).toContainText('CZK')
+
+    // Forex and bank-statement CTAs must be present (scope to guidance panel)
+    await expect(guidance.getByRole('link', { name: /Forex Exchange/i })).toBeVisible()
+    await expect(guidance.getByRole('link', { name: /Bank Statement/i })).toBeVisible()
+  })
+
+  test('Buy Now is disabled when funding gap exists for non-EUR city', async ({ page }) => {
+    // AC: UI blocks the purchase action when the player has no CZK balance.
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Prague Expansion Corp',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // No CZK balance
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await page.locator('.city-select-grid').getByText('Prague').click()
+
+    // Funding gap warning must be shown before any lot selection
+    await expect(page.locator('.funding-guidance')).toBeVisible()
+
+    // Buy Now must be disabled while funding gap persists (hasFundingGap disables regardless of lot)
+    await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
+  })
+
+  test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
+    // AC: Expansion succeeds once the player is funded in the destination currency.
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Prague Funded Corp',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Player has sufficient CZK balance
+    state.playerCurrencyBalances = [{ currencyCode: 'CZK', currencySymbol: 'Kč', balance: 5_000_000 }]
+    // Add a Prague lot so the player can select it
+    state.buildingLots.push({
+      id: 'lot-prague-factory',
+      cityId: 'city-pr',
+      name: 'Prague Factory Site',
+      description: 'Industrial site in Prague.',
+      district: 'Industrial Zone',
+      latitude: 50.08,
+      longitude: 14.44,
+      populationIndex: 0.7,
+      basePrice: 90000,
+      price: 90000,
+      suitableTypes: 'FACTORY',
+      ownerCompanyId: null,
+      buildingId: null,
+      ownerCompany: null,
+      building: null,
+      resourceType: null,
+      materialQuality: null,
+      materialQuantity: null,
+    })
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await page.locator('.city-select-grid').getByText('Prague').click()
+
+    // Funding gap warning must NOT be shown
+    await expect(page.locator('.funding-guidance')).toBeHidden()
+
+    // Select the Prague lot and verify Buy Now is enabled
+    await page.locator('.lot-card', { hasText: 'Prague Factory Site' }).click()
+    await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeEnabled()
+  })
+
+  test('does not show funding gap warning for EUR city (Bratislava)', async ({ page }) => {
+    // AC: Expansion flow does not show a false positive for EUR cities.
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Central Europe Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    // Scope to city-select-grid to avoid matching account-switcher button
+    await page.locator('.city-select-grid').getByText('Bratislava').click()
+
+    // No funding gap warning for EUR city
+    await expect(page.locator('.funding-guidance')).toBeHidden()
+  })
 })

@@ -472,7 +472,7 @@ async function buyBuilding() {
           <div class="action-bar">
             <button
               class="btn btn-primary btn-lg"
-              :disabled="!canSubmit || submitting || (selectedType === 'BANK' && !companyHasBankCapital)"
+              :disabled="!canSubmit || submitting || (selectedType === 'BANK' && !companyHasBankCapital) || hasFundingGap"
               @click="buyBuilding"
             >
               {{ submitting ? t('common.loading') : t('buildings.buyNow') }}

@@ -11492,6 +11492,148 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task PurchaseLot_PragueCity_NoCzkBalance_RejectsMissingCurrencyAccount()
+    {
+        // AC: Purchasing a lot in a non-EUR city (Prague/CZK) without any CZK balance
+        // must be rejected with MISSING_CURRENCY_ACCOUNT.
+        var token = await RegisterAndGetTokenAsync($"prague-no-czk-{Guid.NewGuid():N}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Prague Hopeful Co");
+
+        var pragueId = await GetCityIdByNameAsync("Prague");
+
+        // Create a Prague FACTORY lot
+        var lotId = await CreateTestLotAsync(pragueId, "FACTORY", "Prague Factory Site");
+
+        // Ensure the player has NO CZK balance (onboarding leaves only company.Cash in EUR)
+        var playerId = await GetCurrentPlayerIdAsync(token);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var czk = await db.PlayerCurrencyBalances
+                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            if (czk is not null) db.PlayerCurrencyBalances.Remove(czk);
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { lot { id } }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Prague Factory" } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected an error for missing CZK account");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("MISSING_CURRENCY_ACCOUNT", code);
+    }
+
+    [Fact]
+    public async Task PurchaseLot_PragueCity_InsufficientCzkBalance_RejectsInsufficientLocalCurrencyFunds()
+    {
+        // AC: Purchasing a lot in Prague with a CZK balance that is too small
+        // must be rejected with INSUFFICIENT_LOCAL_CURRENCY_FUNDS.
+        var token = await RegisterAndGetTokenAsync($"prague-low-czk-{Guid.NewGuid():N}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Prague Underfunded Co");
+
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var lotId = await CreateTestLotAsync(pragueId, "FACTORY", "Prague Factory Site", price: 500_000m);
+
+        var playerId = await GetCurrentPlayerIdAsync(token);
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            // Set a tiny CZK balance — far less than the lot price
+            var czk = await db.PlayerCurrencyBalances
+                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            if (czk is null)
+            {
+                db.PlayerCurrencyBalances.Add(new Api.Data.Entities.PlayerCurrencyBalance
+                {
+                    Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = "CZK",
+                    Balance = 100m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                czk.Balance = 100m;
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { lot { id } }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Prague Factory" } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected an error for insufficient CZK");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INSUFFICIENT_LOCAL_CURRENCY_FUNDS", code);
+    }
+
+    [Fact]
+    public async Task PurchaseLot_PragueCity_SufficientCzkBalance_Succeeds()
+    {
+        // AC: Purchasing a lot in Prague with sufficient CZK balance must succeed
+        // and deduct from the player's CZK balance.
+        var token = await RegisterAndGetTokenAsync($"prague-funded-{Guid.NewGuid():N}@test.com");
+        var (companyId, _, _) = await CompleteOnboardingAsync(token, "Prague Funded Co");
+
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var lotId = await CreateTestLotAsync(pragueId, "FACTORY", "Prague Funded Factory", price: 90_000m);
+
+        var playerId = await GetCurrentPlayerIdAsync(token);
+        const decimal czkAmount = 5_000_000m; // Enough to cover lot + construction
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var czk = await db.PlayerCurrencyBalances
+                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            if (czk is null)
+            {
+                db.PlayerCurrencyBalances.Add(new Api.Data.Entities.PlayerCurrencyBalance
+                {
+                    Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = "CZK",
+                    Balance = czkAmount, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
+                });
+            }
+            else
+            {
+                czk.Balance = czkAmount;
+            }
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { lot { id ownerCompanyId } building { id type } }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "FACTORY", buildingName = "Prague Factory" } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Expected success but got errors: {result}");
+        var data = result.GetProperty("data").GetProperty("purchaseLot");
+        Assert.Equal(companyId, data.GetProperty("lot").GetProperty("ownerCompanyId").GetString());
+
+        // Verify CZK balance was reduced
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var czk = await db.PlayerCurrencyBalances
+                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            Assert.NotNull(czk);
+            Assert.True(czk.Balance < czkAmount, "CZK balance should have been reduced after purchase");
+        }
+    }
+
+    [Fact]
     public async Task GetLot_ReturnsSingleLot()
     {
         var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
