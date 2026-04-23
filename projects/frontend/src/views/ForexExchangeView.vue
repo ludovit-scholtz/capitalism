@@ -390,94 +390,132 @@ watch(activeTab, async (tab) => {
 </script>
 
 <template>
-  <main class="forex-page">
-    <div class="container">
-      <div class="forex-hero">
-        <h1 class="forex-title">{{ t('forex.title') }}</h1>
-        <p class="forex-subtitle">{{ t('forex.subtitle') }}</p>
+  <main class="container py-8 pb-16 min-h-[calc(100vh-64px)]">
+    <!-- Hero -->
+    <div class="forex-hero mb-8">
+      <h1 class="text-3xl font-bold text-body mb-1">{{ t('forex.title') }}</h1>
+      <p class="text-muted text-base">{{ t('forex.subtitle') }}</p>
+    </div>
+
+    <div v-if="loading" class="text-center py-12 text-muted">
+      <span>{{ t('common.loading') }}</span>
+    </div>
+
+    <div v-else-if="error" class="text-center py-12 text-muted">
+      <p class="text-bad mb-4">{{ error }}</p>
+      <button class="btn btn-secondary" @click="loadData">{{ t('common.retry') }}</button>
+    </div>
+
+    <template v-else>
+      <!-- Tabs -->
+      <div class="flex flex-wrap gap-3 mb-6" role="tablist" :aria-label="t('forex.tabsLabel')">
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'swap'"
+          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'swap'
+            ? 'bg-brand border-brand text-white'
+            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'swap'"
+        >
+          {{ t('forex.tabSwap') }}
+        </button>
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'rates'"
+          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'rates'
+            ? 'bg-brand border-brand text-white'
+            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'rates'"
+        >
+          {{ t('forex.tabRateList') }}
+        </button>
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'history'"
+          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'history'
+            ? 'bg-brand border-brand text-white'
+            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'history'"
+        >
+          {{ t('forex.tabHistory') }}
+        </button>
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'gold'"
+          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'gold'
+            ? 'bg-brand border-brand text-white'
+            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'gold'"
+        >
+          {{ t('forex.tabGold') }}
+        </button>
       </div>
 
-      <div v-if="loading" class="forex-loading">
-        <span>{{ t('common.loading') }}</span>
-      </div>
+      <!-- Swap Tab -->
+      <section
+        v-if="activeTab === 'swap'"
+        class="bg-card border border-divider rounded-xl p-6 mb-6"
+        aria-label="Forex Swap"
+      >
+        <h2 class="text-lg font-semibold text-body mb-4 pb-3 border-b border-divider">
+          {{ t('forex.tabSwap') }}
+        </h2>
 
-      <div v-else-if="error" class="forex-error">
-        <p>{{ error }}</p>
-        <button class="btn btn-secondary" @click="loadData">{{ t('common.retry') }}</button>
-      </div>
-
-      <template v-else>
-        <div class="forex-tabs" role="tablist" :aria-label="t('forex.tabsLabel')">
-          <button
-            role="tab"
-            class="forex-tab"
-            :class="{ active: activeTab === 'swap' }"
-            :aria-selected="activeTab === 'swap'"
-            @click="activeTab = 'swap'"
+        <!-- Bank account mode notice -->
+        <div
+          v-if="hasBankAccounts"
+          class="ba-notice flex items-center gap-2 bg-card-raised border border-divider rounded-lg px-4 py-2.5 mb-5 text-sm text-muted"
+          role="note"
+        >
+          <span class="text-lg">🏦</span>
+          <span>{{ t('forex.bankAccountMode') }}</span>
+          <RouterLink
+            v-if="auth.player?.companies?.length"
+            :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
+            class="ml-1 text-xs font-semibold text-brand hover:underline"
           >
-            {{ t('forex.tabSwap') }}
-          </button>
-          <button
-            role="tab"
-            class="forex-tab"
-            :class="{ active: activeTab === 'rates' }"
-            :aria-selected="activeTab === 'rates'"
-            @click="activeTab = 'rates'"
-          >
-            {{ t('forex.tabRateList') }}
-          </button>
-          <button
-            role="tab"
-            class="forex-tab"
-            :class="{ active: activeTab === 'history' }"
-            :aria-selected="activeTab === 'history'"
-            @click="activeTab = 'history'"
-          >
-            {{ t('forex.tabHistory') }}
-          </button>
-          <button
-            role="tab"
-            class="forex-tab"
-            :class="{ active: activeTab === 'gold' }"
-            :aria-selected="activeTab === 'gold'"
-            @click="activeTab = 'gold'"
-          >
-            {{ t('forex.tabGold') }}
-          </button>
+            {{ t('forex.viewBankStatement') }} →
+          </RouterLink>
         </div>
 
-        <section v-if="activeTab === 'swap'" class="forex-section" aria-label="Forex Swap">
-          <h2 class="section-title">{{ t('forex.tabSwap') }}</h2>
-
-          <div v-if="hasBankAccounts" class="ba-notice" role="note">
-            <span class="ba-notice-icon">🏦</span>
-            {{ t('forex.bankAccountMode') }}
-            <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="statement-link-inline">
-              {{ t('forex.viewBankStatement') }} →
-            </RouterLink>
+        <!-- Balances summary (non-bank-account mode) -->
+        <div v-if="!hasBankAccounts" class="mb-6">
+          <h3 class="text-sm font-semibold text-muted mb-2">{{ t('forex.balancesTitle') }}</h3>
+          <RouterLink
+            v-if="auth.player?.companies?.length"
+            :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
+            class="statement-link inline-block text-xs font-semibold text-brand hover:underline mb-3"
+          >
+            {{ t('forex.viewBankStatement') }} →
+          </RouterLink>
+          <div v-if="balances.length === 0" class="text-sm text-muted italic">
+            {{ t('forex.balancesEmpty') }}
           </div>
-
-          <div v-if="!hasBankAccounts" class="balances-summary">
-            <h3 class="subsection-title">{{ t('forex.balancesTitle') }}</h3>
-            <RouterLink
-              v-if="auth.player?.companies?.length"
-              :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
-              class="statement-link"
+          <div v-else class="flex flex-wrap gap-3">
+            <div
+              v-for="b in balances"
+              :key="b.currencyCode"
+              class="balance-card flex items-center gap-1.5 bg-card-raised border border-divider rounded-lg px-3 py-2"
             >
-              {{ t('forex.viewBankStatement') }} →
-            </RouterLink>
-            <div v-if="balances.length === 0" class="balances-empty">{{ t('forex.balancesEmpty') }}</div>
-            <div v-else class="balances-grid">
-              <div v-for="b in balances" :key="b.currencyCode" class="balance-card">
-                <span class="balance-symbol">{{ b.currencySymbol }}</span>
-                <span class="balance-code">{{ b.currencyCode }}</span>
-                <span class="balance-amount">{{ formatAmount(b.balance) }}</span>
-              </div>
+              <span class="text-brand font-semibold">{{ b.currencySymbol }}</span>
+              <span class="text-sm font-semibold text-muted">{{ b.currencyCode }}</span>
+              <span class="text-sm font-bold text-body">{{ formatAmount(b.balance) }}</span>
             </div>
           </div>
+        </div>
 
-          <div v-if="swapResult" class="swap-result-banner" role="status">
-            <span class="result-icon">✓</span>
+        <!-- Swap success banner -->
+        <div
+          v-if="swapResult"
+          class="swap-result-banner flex flex-col gap-1.5 px-4 py-3 bg-good/10 border border-good rounded-lg mb-4 text-good font-semibold"
+          role="status"
+        >
+          <div class="flex items-center gap-2">
+            <span>✓</span>
             <span>
               {{
                 t('forex.swapResultDetail', {
@@ -488,693 +526,319 @@ watch(activeTab, async (tab) => {
                 })
               }}
             </span>
-            <div class="swap-result-balances">
-              <span class="balance-tag">{{ swapResult.fromCurrencyCode }}: {{ formatAmount(swapResult.newFromBalance) }}</span>
-              <span class="balance-tag">{{ swapResult.toCurrencyCode }}: {{ formatAmount(swapResult.newToBalance) }}</span>
+          </div>
+          <div class="flex gap-3 text-xs text-muted font-normal">
+            <span class="bg-card-raised border border-divider rounded px-2 py-0.5">
+              {{ swapResult.fromCurrencyCode }}: {{ formatAmount(swapResult.newFromBalance) }}
+            </span>
+            <span class="bg-card-raised border border-divider rounded px-2 py-0.5">
+              {{ swapResult.toCurrencyCode }}: {{ formatAmount(swapResult.newToBalance) }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Swap form -->
+        <div class="flex flex-col gap-4">
+          <!-- From row -->
+          <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
+            <div class="flex flex-col gap-1">
+              <template v-if="hasBankAccounts">
+                <ForexBankAccountSelector
+                  v-model="fromBankAccountId"
+                  :accounts="myBankAccounts"
+                  :label="t('forex.sourceAccount')"
+                  id="from-bank-account"
+                  @update:model-value="() => { quote = null; showConfirm = false }"
+                />
+              </template>
+              <template v-else>
+                <BankAccountSelector
+                  v-model="fromCurrency"
+                  :balances="toBalances"
+                  :label="t('forex.sourceCurrency')"
+                  id="from-currency"
+                  @update:model-value="() => { quote = null; showConfirm = false }"
+                />
+              </template>
+            </div>
+
+            <!-- Amount input -->
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-semibold text-muted uppercase tracking-wide" for="swap-amount">
+                {{ t('forex.amount') }}
+              </label>
+              <div class="flex items-center border border-divider rounded-lg overflow-hidden bg-page">
+                <span class="px-3 py-2.5 bg-card-raised border-r border-divider font-bold text-brand min-w-[2.5rem] text-center text-sm">
+                  {{ fromSymbol }}
+                </span>
+                <input
+                  id="swap-amount"
+                  v-model.number="amount"
+                  type="number"
+                  min="0"
+                  step="any"
+                  :placeholder="t('forex.amountPlaceholder')"
+                  class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
+                  @input="quote = null; showConfirm = false"
+                />
+              </div>
+              <span class="field-hint text-xs text-muted mt-0.5">
+                {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }}
+              </span>
             </div>
           </div>
 
-          <div class="swap-form">
-            <div class="swap-row">
-              <div class="swap-field">
-                <template v-if="hasBankAccounts">
-                  <ForexBankAccountSelector
-                    v-model="fromBankAccountId"
-                    :accounts="myBankAccounts"
-                    :label="t('forex.sourceAccount')"
-                    id="from-bank-account"
-                    @update:model-value="() => { quote = null; showConfirm = false }"
-                  />
-                </template>
-                <template v-else>
-                  <!--
-                    Both selectors intentionally use `toBalances` (all tradeable currencies,
-                    including 0-balance entries). This is required so the ⇅ swap button can
-                    reverse EUR→CZK to CZK→EUR even before the player holds any CZK.
-                    The affordability validation (`validationError`) catches a 0-balance source
-                    and shows "Insufficient balance for this swap." before the swap proceeds.
-                  -->
-                  <BankAccountSelector
-                    v-model="fromCurrency"
-                    :balances="toBalances"
-                    :label="t('forex.sourceCurrency')"
-                    id="from-currency"
-                    @update:model-value="() => { quote = null; showConfirm = false }"
-                  />
-                </template>
-              </div>
-              <div class="swap-field amount-field">
-                <label class="field-label" for="swap-amount">{{ t('forex.amount') }}</label>
-                <div class="input-with-symbol">
-                  <span class="currency-symbol-badge">{{ fromSymbol }}</span>
-                  <input
-                    id="swap-amount"
-                    v-model.number="amount"
-                    type="number"
-                    min="0"
-                    step="any"
-                    :placeholder="t('forex.amountPlaceholder')"
-                    class="amount-input"
-                    @input="quote = null; showConfirm = false"
-                  />
-                </div>
-                <span class="field-hint">{{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }}</span>
-              </div>
+          <!-- Swap direction button -->
+          <div class="flex justify-center">
+            <button
+              class="w-9 h-9 rounded-full bg-card-raised border border-divider text-muted text-lg flex items-center justify-center transition-colors hover:bg-brand hover:text-white hover:border-brand"
+              :title="'Swap currencies'"
+              aria-label="Swap currencies"
+              @click="swapCurrencies"
+            >
+              ⇅
+            </button>
+          </div>
+
+          <!-- To row -->
+          <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
+            <div class="flex flex-col gap-1">
+              <template v-if="hasBankAccounts">
+                <ForexBankAccountSelector
+                  v-model="toBankAccountId"
+                  :accounts="myBankAccounts"
+                  :label="t('forex.destAccount')"
+                  id="to-bank-account"
+                  @update:model-value="() => { quote = null; showConfirm = false }"
+                />
+              </template>
+              <template v-else>
+                <BankAccountSelector
+                  v-model="toCurrency"
+                  :balances="toBalances"
+                  :label="t('forex.targetCurrency')"
+                  id="to-currency"
+                  @update:model-value="() => { quote = null; showConfirm = false }"
+                />
+              </template>
             </div>
 
-            <div class="swap-arrow-row">
-              <button class="swap-arrow-btn" :title="'Swap currencies'" @click="swapCurrencies" aria-label="Swap currencies">
-                ⇅
-              </button>
-            </div>
-
-            <div class="swap-row">
-              <div class="swap-field">
-                <template v-if="hasBankAccounts">
-                  <ForexBankAccountSelector
-                    v-model="toBankAccountId"
-                    :accounts="myBankAccounts"
-                    :label="t('forex.destAccount')"
-                    id="to-bank-account"
-                    @update:model-value="() => { quote = null; showConfirm = false }"
-                  />
-                </template>
-                <template v-else>
-                  <BankAccountSelector
-                    v-model="toCurrency"
-                    :balances="toBalances"
-                    :label="t('forex.targetCurrency')"
-                    id="to-currency"
-                    @update:model-value="() => { quote = null; showConfirm = false }"
-                  />
-                </template>
-              </div>
-              <div class="swap-field amount-field">
-                <label class="field-label">{{ t('forex.youReceive') }}</label>
-                <div class="input-with-symbol">
-                  <span class="currency-symbol-badge">{{ toSymbol }}</span>
-                  <div class="receive-amount">
-                    <span v-if="quote">{{ formatAmount(quote.toAmount) }}</span>
-                    <span v-else class="receive-placeholder">—</span>
-                  </div>
+            <!-- You receive -->
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-semibold text-muted uppercase tracking-wide">
+                {{ t('forex.youReceive') }}
+              </label>
+              <div class="flex items-center border border-divider rounded-lg overflow-hidden bg-page">
+                <span class="px-3 py-2.5 bg-card-raised border-r border-divider font-bold text-brand min-w-[2.5rem] text-center text-sm">
+                  {{ toSymbol }}
+                </span>
+                <div class="flex-1 px-3 py-2.5 text-base font-bold text-good">
+                  <span v-if="quote">{{ formatAmount(quote.toAmount) }}</span>
+                  <span v-else class="text-muted font-normal">—</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div v-if="validationError && amount" class="validation-error" role="alert">
-              {{ validationError }}
-            </div>
+          <!-- Validation / quote errors -->
+          <div
+            v-if="validationError && amount"
+            class="validation-error text-sm text-bad px-3 py-2 bg-bad/10 rounded-md"
+            role="alert"
+          >
+            {{ validationError }}
+          </div>
+          <div
+            v-if="quoteError"
+            class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md"
+            role="alert"
+          >
+            {{ quoteError }}
+          </div>
 
-            <div v-if="quoteError" class="swap-error" role="alert">{{ quoteError }}</div>
+          <!-- Get quote action -->
+          <div v-if="!showConfirm">
+            <button
+              class="btn btn-primary"
+              :disabled="quoteLoading || !!validationError || !amount"
+              @click="fetchQuote"
+            >
+              {{ quoteLoading ? t('common.loading') : t('forex.getQuote') }}
+            </button>
+          </div>
+        </div>
 
-            <div v-if="!showConfirm" class="swap-actions">
-              <button
-                class="btn btn-primary"
-                :disabled="quoteLoading || !!validationError || !amount"
-                @click="fetchQuote"
+        <!-- Quote confirmation card -->
+        <div
+          v-if="showConfirm && quote"
+          class="mt-5 border border-brand rounded-xl p-5 bg-card-raised"
+          role="region"
+          aria-label="Exchange Quote"
+        >
+          <h3 class="text-base font-bold text-body mb-3">{{ t('forex.quoteTitle') }}</h3>
+          <table class="quote-table w-full border-collapse mb-4 text-sm">
+            <tbody>
+              <tr>
+                <td class="py-1.5 text-muted w-2/5">{{ t('forex.rate') }}</td>
+                <td class="py-1.5 font-semibold text-body text-right">
+                  1 {{ quote.fromCurrencyCode }} = {{ formatAmount(quote.rate) }} {{ quote.toCurrencyCode }}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-1.5 text-muted">{{ t('forex.fee') }}</td>
+                <td class="py-1.5 font-semibold text-caution text-right">
+                  {{ quote.fromCurrencySymbol }}{{ formatAmount(quote.feeAmount) }}
+                </td>
+              </tr>
+              <tr>
+                <td class="py-1.5 text-muted">{{ t('forex.youReceive') }}</td>
+                <td class="py-1.5 font-bold text-good text-right text-base">
+                  {{ quote.toCurrencySymbol }}{{ formatAmount(quote.toAmount) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div
+            v-if="swapError"
+            class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md mb-3"
+            role="alert"
+          >
+            {{ swapError }}
+          </div>
+
+          <div class="flex gap-3 justify-end">
+            <button class="btn btn-secondary" :disabled="swapLoading" @click="cancelQuote">
+              {{ t('forex.cancel') }}
+            </button>
+            <button class="btn btn-primary" :disabled="swapLoading" @click="executeSwap">
+              {{ swapLoading ? t('common.loading') : t('forex.confirmSwap') }}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Rates Tab -->
+      <section
+        v-else-if="activeTab === 'rates'"
+        class="bg-card border border-divider rounded-xl p-6 mb-6"
+        aria-label="Rate List"
+      >
+        <h2 class="text-lg font-semibold text-body mb-4 pb-3 border-b border-divider">
+          {{ t('forex.rateListTitle') }}
+        </h2>
+        <div v-if="rates.length === 0" class="text-sm text-muted italic">
+          {{ t('forex.rateListEmpty') }}
+        </div>
+        <div v-else class="overflow-x-auto">
+          <table class="w-full border-collapse text-sm rates-table">
+            <thead>
+              <tr>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.rateListPair') }}
+                </th>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.rate') }}
+                </th>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.executedAt') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="rateEntry in rates"
+                :key="`${rateEntry.baseCurrencyCode}-${rateEntry.quoteCurrencyCode}`"
+                class="history-row"
               >
-                {{ quoteLoading ? t('common.loading') : t('forex.getQuote') }}
-              </button>
-            </div>
-          </div>
+                <td class="px-3 py-2.5 font-semibold text-body align-middle">
+                  {{ rateEntry.baseCurrencyCode }}/{{ rateEntry.quoteCurrencyCode }}
+                </td>
+                <td class="px-3 py-2.5 text-muted align-middle">{{ formatAmount(rateEntry.rate) }}</td>
+                <td class="px-3 py-2.5 text-subtle text-xs align-middle">{{ rateEntry.rateDate }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-          <div v-if="showConfirm && quote" class="quote-card" role="region" aria-label="Exchange Quote">
-            <h3 class="quote-title">{{ t('forex.quoteTitle') }}</h3>
-            <table class="quote-table">
-              <tbody>
-                <tr>
-                  <td class="quote-label">{{ t('forex.rate') }}</td>
-                  <td class="quote-value">
-                    1 {{ quote.fromCurrencyCode }} = {{ formatAmount(quote.rate) }} {{ quote.toCurrencyCode }}
-                  </td>
-                </tr>
-                <tr>
-                  <td class="quote-label">{{ t('forex.fee') }}</td>
-                  <td class="quote-value fee-value">
-                    {{ quote.fromCurrencySymbol }}{{ formatAmount(quote.feeAmount) }}
-                  </td>
-                </tr>
-                <tr class="quote-total-row">
-                  <td class="quote-label">{{ t('forex.youReceive') }}</td>
-                  <td class="quote-value receive-value">
-                    {{ quote.toCurrencySymbol }}{{ formatAmount(quote.toAmount) }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+      <!-- History Tab -->
+      <section
+        v-else-if="activeTab === 'history'"
+        class="bg-card border border-divider rounded-xl p-6 mb-6"
+        aria-label="Trade History"
+      >
+        <h2 class="text-lg font-semibold text-body mb-4 pb-3 border-b border-divider">
+          {{ t('forex.historyTitle') }}
+        </h2>
+        <div v-if="history.length === 0" class="text-sm text-muted italic">
+          {{ t('forex.historyEmpty') }}
+        </div>
+        <div v-else class="overflow-x-auto">
+          <table class="w-full border-collapse text-sm">
+            <thead>
+              <tr>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.fromAmount') }}
+                </th>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.toAmount') }}
+                </th>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.rate') }}
+                </th>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.feeAmount') }}
+                </th>
+                <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                  {{ t('forex.executedAt') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="entry in history" :key="entry.id" class="history-row">
+                <td class="px-3 py-2.5 align-middle">
+                  <span class="font-bold text-brand mr-0.5">{{ entry.fromCurrencySymbol }}</span>
+                  {{ formatAmount(entry.fromAmount) }}
+                  <span class="text-xs text-muted ml-1">{{ entry.fromCurrencyCode }}</span>
+                </td>
+                <td class="px-3 py-2.5 align-middle">
+                  <span class="font-bold text-brand mr-0.5">{{ entry.toCurrencySymbol }}</span>
+                  {{ formatAmount(entry.toAmount) }}
+                  <span class="text-xs text-muted ml-1">{{ entry.toCurrencyCode }}</span>
+                </td>
+                <td class="px-3 py-2.5 text-muted align-middle">{{ formatAmount(entry.rate) }}</td>
+                <td class="px-3 py-2.5 text-caution align-middle">
+                  {{ entry.fromCurrencySymbol }}{{ formatAmount(entry.feeAmount) }}
+                </td>
+                <td class="px-3 py-2.5 text-subtle text-xs align-middle">
+                  {{ formatTick(entry.executedAtTick) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </template>
 
-            <div v-if="swapError" class="swap-error" role="alert">{{ swapError }}</div>
-
-            <div class="confirm-actions">
-              <button class="btn btn-secondary" :disabled="swapLoading" @click="cancelQuote">
-                {{ t('forex.cancel') }}
-              </button>
-              <button class="btn btn-primary" :disabled="swapLoading" @click="executeSwap">
-                {{ swapLoading ? t('common.loading') : t('forex.confirmSwap') }}
-              </button>
-            </div>
-          </div>
-        </section>
-
-        <section v-else-if="activeTab === 'rates'" class="forex-section" aria-label="Rate List">
-          <h2 class="section-title">{{ t('forex.rateListTitle') }}</h2>
-          <div v-if="rates.length === 0" class="history-empty">{{ t('forex.rateListEmpty') }}</div>
-          <div v-else class="history-table-wrap">
-            <table class="history-table rates-table">
-              <thead>
-                <tr>
-                  <th>{{ t('forex.rateListPair') }}</th>
-                  <th>{{ t('forex.rate') }}</th>
-                  <th>{{ t('forex.executedAt') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="rateEntry in rates" :key="`${rateEntry.baseCurrencyCode}-${rateEntry.quoteCurrencyCode}`" class="history-row">
-                  <td>{{ rateEntry.baseCurrencyCode }}/{{ rateEntry.quoteCurrencyCode }}</td>
-                  <td class="rate-cell">{{ formatAmount(rateEntry.rate) }}</td>
-                  <td class="tick-cell">{{ rateEntry.rateDate }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section v-else-if="activeTab === 'history'" class="forex-section" aria-label="Trade History">
-          <h2 class="section-title">{{ t('forex.historyTitle') }}</h2>
-          <div v-if="history.length === 0" class="history-empty">{{ t('forex.historyEmpty') }}</div>
-          <div v-else class="history-table-wrap">
-            <table class="history-table">
-              <thead>
-                <tr>
-                  <th>{{ t('forex.fromAmount') }}</th>
-                  <th>{{ t('forex.toAmount') }}</th>
-                  <th>{{ t('forex.rate') }}</th>
-                  <th>{{ t('forex.feeAmount') }}</th>
-                  <th>{{ t('forex.executedAt') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="entry in history" :key="entry.id" class="history-row">
-                  <td>
-                    <span class="currency-badge">{{ entry.fromCurrencySymbol }}</span>
-                    {{ formatAmount(entry.fromAmount) }}
-                    <span class="currency-code">{{ entry.fromCurrencyCode }}</span>
-                  </td>
-                  <td>
-                    <span class="currency-badge">{{ entry.toCurrencySymbol }}</span>
-                    {{ formatAmount(entry.toAmount) }}
-                    <span class="currency-code">{{ entry.toCurrencyCode }}</span>
-                  </td>
-                  <td class="rate-cell">{{ formatAmount(entry.rate) }}</td>
-                  <td class="fee-cell">{{ entry.fromCurrencySymbol }}{{ formatAmount(entry.feeAmount) }}</td>
-                  <td class="tick-cell">{{ formatTick(entry.executedAtTick) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-      </template>
-
-      <GoldAmmSection
-        v-if="!loading && !error && activeTab === 'gold'"
-        :available-currencies="availableCurrencies"
-        :balances="balances"
-        @refresh="loadData"
-      />
-    </div>
+    <GoldAmmSection
+      v-if="!loading && !error && activeTab === 'gold'"
+      :available-currencies="availableCurrencies"
+      :balances="balances"
+      @refresh="loadData"
+    />
   </main>
 </template>
 
 <style scoped>
-.forex-page {
-  padding: 2rem 0 4rem;
-  min-height: calc(100vh - 64px);
-}
-
-.forex-hero {
-  margin-bottom: 2rem;
-}
-
-.forex-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  margin-bottom: 0.5rem;
-}
-
-.forex-subtitle {
-  color: var(--color-text-muted);
-  font-size: 1.05rem;
-}
-
-.forex-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.forex-tab {
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  border-radius: 999px;
-  padding: 0.55rem 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease,
-    border-color 0.15s ease;
-}
-
-.forex-tab.active,
-.forex-tab:hover {
-  background: var(--color-accent, #4f8ef7);
-  border-color: var(--color-accent, #4f8ef7);
-  color: #fff;
-}
-
-.forex-loading,
-.forex-error {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-muted);
-}
-
-.forex-section {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.section-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.subsection-title {
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.balances-summary {
-  margin-bottom: 1.5rem;
-}
-
-.statement-link {
-  display: inline-block;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-accent, #4f8ef7);
-  text-decoration: none;
-  margin-bottom: 0.6rem;
-}
-
-.statement-link:hover {
-  text-decoration: underline;
-}
-
-.ba-notice {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  background: var(--color-surface-alt, #1e2a3a);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.65rem 1rem;
-  margin-bottom: 1.25rem;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-}
-
-.ba-notice-icon {
-  font-size: 1.1rem;
-}
-
-.statement-link-inline {
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--color-accent, #4f8ef7);
-  text-decoration: none;
-  margin-left: 0.25rem;
-}
-
-.statement-link-inline:hover {
-  text-decoration: underline;
-}
-
-/* Balances */
-.balances-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.balance-card {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  background: var(--color-surface-alt, var(--color-surface));
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.6rem 1rem;
-}
-
-.balance-symbol {
-  font-size: 1.1rem;
-  color: var(--color-accent, #4f8ef7);
-}
-
-.balance-code {
-  font-weight: 600;
-  color: var(--color-text-secondary);
-}
-
-.balance-amount {
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.balances-empty,
-.history-empty {
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-/* Swap form */
-.swap-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.swap-row {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 1rem;
-  align-items: end;
-}
-
-.swap-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.field-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.currency-select {
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.6rem 0.75rem;
-  color: var(--color-text-primary);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.currency-select:focus {
-  outline: 2px solid var(--color-accent, #4f8ef7);
-}
-
-.input-with-symbol {
-  display: flex;
-  align-items: center;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  overflow: hidden;
-  background: var(--color-bg);
-}
-
-.currency-symbol-badge {
-  padding: 0.6rem 0.75rem;
-  background: var(--color-surface-alt, #1e2a3a);
-  font-weight: 700;
-  color: var(--color-accent, #4f8ef7);
-  border-right: 1px solid var(--color-border);
-  min-width: 2.5rem;
-  text-align: center;
-}
-
-.amount-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  padding: 0.6rem 0.75rem;
-  color: var(--color-text-primary);
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.amount-input:focus {
-  outline: none;
-}
-
-.receive-amount {
-  flex: 1;
-  padding: 0.6rem 0.75rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-success, #28c76f);
-}
-
-.receive-placeholder {
-  color: var(--color-text-muted);
-  font-weight: 400;
-}
-
-.field-hint {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-}
-
-.swap-arrow-row {
-  display: flex;
-  justify-content: center;
-}
-
-.swap-arrow-btn {
-  background: var(--color-surface-alt, #1e2a3a);
-  border: 1px solid var(--color-border);
-  border-radius: 50%;
-  width: 2.2rem;
-  height: 2.2rem;
-  font-size: 1.2rem;
-  cursor: pointer;
-  color: var(--color-text-secondary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-
-.swap-arrow-btn:hover {
-  background: var(--color-accent, #4f8ef7);
-  color: #fff;
-}
-
-.swap-actions {
-  display: flex;
-  justify-content: flex-start;
-  margin-top: 0.5rem;
-}
-
-.validation-error {
-  color: var(--color-error, #ea5455);
-  font-size: 0.88rem;
-  padding: 0.5rem;
-  background: rgba(234, 84, 85, 0.08);
-  border-radius: 6px;
-}
-
-.swap-error {
-  color: var(--color-error, #ea5455);
-  font-size: 0.88rem;
-  padding: 0.5rem;
-  background: rgba(234, 84, 85, 0.08);
-  border-radius: 6px;
-  margin-top: 0.5rem;
-}
-
-/* Quote card */
-.quote-card {
-  margin-top: 1.25rem;
-  border: 1px solid var(--color-accent, #4f8ef7);
-  border-radius: 10px;
-  padding: 1.25rem;
-  background: var(--color-surface-alt, #1a2332);
-}
-
-.quote-title {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  margin-bottom: 0.75rem;
-}
-
-.quote-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 1rem;
-}
-
-.quote-table td {
-  padding: 0.4rem 0.5rem;
-  font-size: 0.95rem;
-}
-
-.quote-label {
-  color: var(--color-text-secondary);
-  width: 40%;
-}
-
-.quote-value {
-  font-weight: 600;
-  color: var(--color-text-primary);
-  text-align: right;
-}
-
-.fee-value {
-  color: var(--color-warning, #ff9f43);
-}
-
-.quote-total-row .quote-value.receive-value {
-  font-size: 1.1rem;
-  color: var(--color-success, #28c76f);
-}
-
-.confirm-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 0.5rem;
-}
-
-/* Swap result */
-.swap-result-banner {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  padding: 0.85rem 1rem;
-  background: rgba(40, 199, 111, 0.1);
-  border: 1px solid var(--color-success, #28c76f);
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  color: var(--color-success, #28c76f);
-  font-weight: 600;
-}
-
-.result-icon {
-  font-size: 1.1rem;
-}
-
-.swap-result-balances {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  font-weight: 400;
-}
-
-.balance-tag {
-  background: var(--color-surface-alt, #1e2a3a);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 0.15rem 0.5rem;
-}
-
-/* Trade history */
-.history-table-wrap {
-  overflow-x: auto;
-}
-
-.history-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.history-table th {
-  text-align: left;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  border-bottom: 1px solid var(--color-border);
-}
-
+/* Table row hover — cannot target child <td> elements with Tailwind parent-hover */
 .history-row td {
-  padding: 0.6rem 0.75rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
 }
-
 .history-row:last-child td {
   border-bottom: none;
 }
-
 .history-row:hover td {
-  background: var(--color-surface-alt, #1e2a3a);
-}
-
-.currency-badge {
-  font-weight: 700;
-  color: var(--color-accent, #4f8ef7);
-  margin-right: 0.15rem;
-}
-
-.currency-code {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  margin-left: 0.25rem;
-}
-
-.rate-cell {
-  color: var(--color-text-secondary);
-}
-
-.fee-cell {
-  color: var(--color-warning, #ff9f43);
-}
-
-.tick-cell {
-  color: var(--color-text-muted);
-  font-size: 0.85rem;
-}
-
-@media (max-width: 640px) {
-  .forex-tabs {
-    gap: 0.5rem;
-  }
-
-  .forex-tab {
-    flex: 1 1 calc(50% - 0.25rem);
-    justify-content: center;
-  }
-
-  .swap-row {
-    grid-template-columns: 1fr;
-  }
-
-  .balances-grid {
-    gap: 0.5rem;
-  }
+  background: var(--color-surface-raised);
 }
 </style>

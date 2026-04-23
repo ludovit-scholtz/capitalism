@@ -177,19 +177,22 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
 </script>
 
 <template>
-  <main class="bank-statement-page container">
-    <div class="statement-hero">
-      <h1 class="statement-title">🏦 {{ t('bankStatement.title') }}</h1>
-      <p class="statement-subtitle">{{ t('bankStatement.subtitle') }}</p>
+  <main class="container py-8 pb-16 min-h-[calc(100vh-64px)]">
+    <!-- Hero -->
+    <div class="mb-6">
+      <h1 class="text-3xl font-bold text-body mb-1">🏦 {{ t('bankStatement.title') }}</h1>
+      <p class="text-muted text-base">{{ t('bankStatement.subtitle') }}</p>
     </div>
 
     <!-- Company selector -->
-    <div v-if="companies.length > 1" class="company-selector-row">
-      <label for="company-select" class="company-label">{{ t('bankStatement.selectCompany') }}</label>
+    <div v-if="companies.length > 1" class="flex items-center gap-3 mb-4">
+      <label for="company-select" class="text-sm font-semibold text-muted whitespace-nowrap">
+        {{ t('bankStatement.selectCompany') }}
+      </label>
       <select
         id="company-select"
         :value="companyId"
-        class="company-select"
+        class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
         @change="(e) => router.push(`/bank-statement/${(e.target as HTMLSelectElement).value}`)"
       >
         <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -197,9 +200,15 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
     </div>
 
     <!-- Limit selector -->
-    <div class="limit-row">
-      <label for="limit-select" class="limit-label">{{ t('bankStatement.showEntries') }}</label>
-      <select id="limit-select" v-model.number="limit" class="limit-select">
+    <div class="flex items-center gap-3 mb-6">
+      <label for="limit-select" class="text-sm font-semibold text-muted whitespace-nowrap">
+        {{ t('bankStatement.showEntries') }}
+      </label>
+      <select
+        id="limit-select"
+        v-model.number="limit"
+        class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
+      >
         <option :value="20">20</option>
         <option :value="50">50</option>
         <option :value="100">100</option>
@@ -208,51 +217,73 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
     </div>
 
     <!-- Loading / error -->
-    <div v-if="loading" class="state-message" role="status">{{ t('common.loading') }}</div>
-    <div v-else-if="error" class="state-message state-error" role="alert">{{ error }}</div>
+    <div v-if="loading" class="state-message text-center py-12 text-muted" role="status">
+      {{ t('common.loading') }}
+    </div>
+    <div v-else-if="error" class="state-message text-center py-12 text-bad" role="alert">
+      {{ error }}
+    </div>
 
     <template v-else-if="statement">
-      <!-- Summary header -->
-      <div class="account-summary-card" aria-label="Account summary">
-        <div class="summary-company">
-          <span class="company-icon">🏢</span>
-          <span class="company-name">{{ statement.companyName }}</span>
+      <!-- Account summary card -->
+      <div
+        class="flex flex-wrap items-center gap-6 bg-card border border-divider rounded-xl px-6 py-4 mb-6"
+        aria-label="Account summary"
+      >
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🏢</span>
+          <span class="text-lg font-bold text-body">{{ statement.companyName }}</span>
         </div>
-        <div class="summary-balance-block">
-          <span class="balance-label">{{ t('bankStatement.currentBalance') }}</span>
+        <div class="flex flex-col gap-0 ml-auto sm:ml-auto">
+          <span class="text-xs font-semibold text-muted uppercase tracking-wide">
+            {{ t('bankStatement.currentBalance') }}
+          </span>
           <span
-            class="balance-amount"
-            :class="statement.currentBalance >= 0 ? 'balance-positive' : 'balance-negative'"
+            class="balance-amount text-2xl font-extrabold"
+            :class="statement.currentBalance >= 0 ? 'text-good' : 'text-bad'"
           >
             {{ formatBalance(statement.currentBalance, statement.currencyCode) }}
           </span>
         </div>
-        <div class="summary-meta">
-          <span class="meta-item">{{ t('bankStatement.totalEntries') }}: {{ statement.totalEntries }}</span>
-          <span class="meta-item">{{ t('bankStatement.currency') }}: {{ statement.currencyCode }}</span>
+        <div class="flex gap-4 text-xs text-muted">
+          <span>{{ t('bankStatement.totalEntries') }}: {{ statement.totalEntries }}</span>
+          <span>{{ t('bankStatement.currency') }}: {{ statement.currencyCode }}</span>
         </div>
       </div>
 
       <!-- Transaction table -->
-      <div class="statement-table-wrap">
-        <table class="statement-table" aria-label="Bank statement transactions">
+      <div class="overflow-x-auto border border-divider rounded-xl">
+        <table class="statement-table w-full border-collapse text-sm" aria-label="Bank statement transactions">
           <thead>
             <tr>
-              <th class="col-date">{{ t('bankStatement.columns.date') }}</th>
-              <th class="col-tick">{{ t('bankStatement.columns.tick') }}</th>
-              <th class="col-description">{{ t('bankStatement.columns.description') }}</th>
-              <th class="col-category">{{ t('bankStatement.columns.category') }}</th>
-              <th class="col-debit">{{ t('bankStatement.columns.debit') }}</th>
-              <th class="col-credit">{{ t('bankStatement.columns.credit') }}</th>
-              <th class="col-balance">{{ t('bankStatement.columns.balance') }}</th>
+              <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card whitespace-nowrap hidden sm:table-cell">
+                {{ t('bankStatement.columns.date') }}
+              </th>
+              <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card whitespace-nowrap hidden sm:table-cell">
+                {{ t('bankStatement.columns.tick') }}
+              </th>
+              <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
+                {{ t('bankStatement.columns.description') }}
+              </th>
+              <th class="text-left px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
+                {{ t('bankStatement.columns.category') }}
+              </th>
+              <th class="text-right px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
+                {{ t('bankStatement.columns.debit') }}
+              </th>
+              <th class="text-right px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card">
+                {{ t('bankStatement.columns.credit') }}
+              </th>
+              <th class="text-right px-3 py-2.5 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider bg-card whitespace-nowrap">
+                {{ t('bankStatement.columns.balance') }}
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-if="statement.rows.length === 0"
-              class="empty-row"
-            >
-              <td colspan="7" class="empty-cell">{{ t('bankStatement.noTransactions') }}</td>
+            <tr v-if="statement.rows.length === 0">
+              <td colspan="7" class="text-center text-muted italic py-8 px-4">
+                {{ t('bankStatement.noTransactions') }}
+              </td>
             </tr>
             <tr
               v-for="row in statement.rows"
@@ -260,335 +291,84 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
               class="statement-row"
               :class="row.amount >= 0 ? 'row-credit' : 'row-debit'"
             >
-              <td class="col-date">{{ formatDate(row.recordedAtUtc) }}</td>
-              <td class="col-tick tick-badge">{{ row.recordedAtTick }}</td>
-              <td class="col-description">
-                <div class="description-main">{{ row.description || '—' }}</div>
-                <div v-if="row.buildingName" class="description-sub">🏭 {{ row.buildingName }}</div>
+              <td class="px-3 py-2.5 text-muted text-xs whitespace-nowrap align-middle hidden sm:table-cell">
+                {{ formatDate(row.recordedAtUtc) }}
               </td>
-              <td class="col-category">
-                <span class="category-badge">{{ categoryLabel(row.category) }}</span>
+              <td class="px-3 py-2.5 text-muted text-xs tabular-nums align-middle hidden sm:table-cell">
+                {{ row.recordedAtTick }}
               </td>
-              <td class="col-debit debit-cell">
+              <td class="px-3 py-2.5 align-middle max-w-[280px]">
+                <div class="text-body font-medium">{{ row.description || '—' }}</div>
+                <div v-if="row.buildingName" class="description-sub text-xs text-muted mt-0.5">
+                  🏭 {{ row.buildingName }}
+                </div>
+              </td>
+              <td class="px-3 py-2.5 align-middle">
+                <span class="inline-block text-xs font-semibold text-muted bg-card-raised border border-divider rounded px-1.5 py-0.5 whitespace-nowrap">
+                  {{ categoryLabel(row.category) }}
+                </span>
+              </td>
+              <td class="debit-cell px-3 py-2.5 text-right text-bad font-semibold align-middle">
                 <span v-if="row.amount < 0">
                   {{ statement.currencySymbol }}{{ formatAmount(row.amount) }}
                 </span>
-                <span v-else class="empty-cell-dash">—</span>
+                <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
-              <td class="col-credit credit-cell">
+              <td class="credit-cell px-3 py-2.5 text-right text-good font-semibold align-middle">
                 <span v-if="row.amount >= 0">
                   {{ statement.currencySymbol }}{{ formatAmount(row.amount) }}
                 </span>
-                <span v-else class="empty-cell-dash">—</span>
+                <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
-              <td class="col-balance balance-cell">
-                <span :class="row.runningBalance >= 0 ? 'balance-positive' : 'balance-negative'">
+              <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle">
+                <span :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
                   {{ statement.currencySymbol }}{{ formatAmount(row.runningBalance) }}
                 </span>
-                <span class="direction-icon">{{ categoryIcon(row.category) }}</span>
+                <span class="text-xs text-muted ml-0.5">{{ categoryIcon(row.category) }}</span>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div v-if="hasMore" class="load-more-hint">
+      <div v-if="hasMore" class="flex items-center gap-2 mt-4 text-sm text-muted">
         {{ t('bankStatement.showingFirst', { count: totalShown, total: statement.totalEntries }) }}
-        <button class="btn-link" @click="limit = 200">{{ t('bankStatement.showAll') }}</button>
+        <button
+          class="bg-transparent border-0 text-brand text-sm cursor-pointer underline font-semibold hover:opacity-80"
+          @click="limit = 200"
+        >
+          {{ t('bankStatement.showAll') }}
+        </button>
       </div>
     </template>
   </main>
 </template>
 
 <style scoped>
-.bank-statement-page {
-  padding: 2rem 0 4rem;
-  min-height: calc(100vh - 64px);
+/* Custom dropdown arrow for selectors */
+.selector-select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%236b7280'%3E%3Cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1.1rem;
+  padding-right: 2rem;
+  appearance: none;
 }
 
-.statement-hero {
-  margin-bottom: 1.5rem;
-}
-
-.statement-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-  margin-bottom: 0.4rem;
-}
-
-.statement-subtitle {
-  color: var(--color-text-muted);
-  font-size: 1.05rem;
-}
-
-.company-selector-row,
-.limit-row {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.company-label,
-.limit-label {
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  white-space: nowrap;
-}
-
-.company-select,
-.limit-select {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 0.5rem 0.75rem;
-  color: var(--color-text-primary);
-  font-size: 0.9rem;
-  cursor: pointer;
-}
-
-.company-select:focus,
-.limit-select:focus {
-  outline: 2px solid var(--color-accent, #4f8ef7);
-}
-
-.state-message {
-  text-align: center;
-  padding: 3rem;
-  color: var(--color-text-muted);
-}
-
-.state-error {
-  color: var(--color-error, #ea5455);
-}
-
-/* Account summary */
-.account-summary-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 1.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.summary-company {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.company-icon {
-  font-size: 1.4rem;
-}
-
-.company-name {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.summary-balance-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  margin-left: auto;
-}
-
-.balance-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-}
-
-.balance-amount {
-  font-size: 1.5rem;
-  font-weight: 800;
-}
-
-.balance-positive {
-  color: var(--color-success, #28c76f);
-}
-
-.balance-negative {
-  color: var(--color-error, #ea5455);
-}
-
-.summary-meta {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.82rem;
-  color: var(--color-text-muted);
-}
-
-/* Table */
-.statement-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg, 12px);
-}
-
-.statement-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.statement-table th {
-  text-align: left;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-text-muted);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
-  white-space: nowrap;
-}
-
+/* Table row hover and subtle row tinting */
 .statement-row td {
-  padding: 0.7rem 0.85rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
 }
-
 .statement-row:last-child td {
   border-bottom: none;
 }
-
 .row-credit {
-  background: rgba(40, 199, 111, 0.02);
+  background: rgba(34, 197, 94, 0.02);
 }
-
 .row-debit {
-  background: rgba(234, 84, 85, 0.02);
+  background: rgba(248, 113, 113, 0.02);
 }
-
 .statement-row:hover td {
-  background: var(--color-surface-alt, #1e2a3a);
-}
-
-.col-date {
-  white-space: nowrap;
-  color: var(--color-text-muted);
-  font-size: 0.83rem;
-}
-
-.tick-badge {
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.col-description {
-  max-width: 280px;
-}
-
-.description-main {
-  color: var(--color-text-primary);
-  font-weight: 500;
-}
-
-.description-sub {
-  font-size: 0.78rem;
-  color: var(--color-text-muted);
-  margin-top: 0.15rem;
-}
-
-.category-badge {
-  display: inline-block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  background: var(--color-surface-alt, #1e2a3a);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 0.1rem 0.4rem;
-  white-space: nowrap;
-}
-
-.debit-cell {
-  color: var(--color-error, #ea5455);
-  font-weight: 600;
-  text-align: right;
-}
-
-.credit-cell {
-  color: var(--color-success, #28c76f);
-  font-weight: 600;
-  text-align: right;
-}
-
-.balance-cell {
-  text-align: right;
-  white-space: nowrap;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.empty-cell-dash {
-  color: var(--color-text-muted);
-}
-
-.empty-cell {
-  text-align: center;
-  color: var(--color-text-muted);
-  font-style: italic;
-  padding: 2rem;
-}
-
-.direction-icon {
-  font-size: 0.7rem;
-  margin-left: 0.2rem;
-  color: var(--color-text-muted);
-}
-
-/* Load more */
-.load-more-hint {
-  margin-top: 1rem;
-  font-size: 0.85rem;
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.btn-link {
-  background: none;
-  border: none;
-  color: var(--color-accent, #4f8ef7);
-  font-size: 0.85rem;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: underline;
-  font-weight: 600;
-}
-
-.btn-link:hover {
-  opacity: 0.8;
-}
-
-@media (max-width: 640px) {
-  .col-tick,
-  .col-date {
-    display: none;
-  }
-
-  .account-summary-card {
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .summary-balance-block {
-    margin-left: 0;
-  }
+  background: var(--color-surface-raised);
 }
 </style>
