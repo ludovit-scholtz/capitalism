@@ -1692,3 +1692,31 @@ export interface EurFxRate {
   currencyCode: string
   rate: number
 }
+
+// ── Bank Statement types ──────────────────────────────────────────────────────
+
+/** A single row in a company bank statement (maps to one LedgerEntry). */
+export interface BankStatementRow {
+  id: string
+  recordedAtTick: number
+  recordedAtUtc: string
+  description: string
+  category: string
+  /** Positive = credit (income), negative = debit (expense). */
+  amount: number
+  /** Running account balance after this entry. */
+  runningBalance: number
+  buildingId: string | null
+  buildingName: string | null
+}
+
+/** Top-level result from the `bankStatement` query. */
+export interface BankStatementResult {
+  companyId: string
+  companyName: string
+  currencyCode: string
+  currencySymbol: string
+  currentBalance: number
+  totalEntries: number
+  rows: BankStatementRow[]
+}

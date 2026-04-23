@@ -30879,5 +30879,292 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             "ContentBudgetPerTick should be null after clearing.");
     }
 
+    // ── Bank Statement Review ─────────────────────────────────────────────────
+
+    private const string BankStatementQuery = """
+        query BankStatement($companyId: UUID!, $limit: Int) {
+          bankStatement(companyId: $companyId, limit: $limit) {
+            companyId
+            companyName
+            currencyCode
+            currentBalance
+            totalEntries
+            rows {
+              id
+              recordedAtTick
+              description
+              category
+              amount
+              runningBalance
+              buildingId
+              buildingName
+            }
+          }
+        }
+        """;
+
+    [Fact]
+    public async Task BankStatement_EmptyCompany_ReturnsZeroBalanceAndEmptyRows()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-empty@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Empty Bank Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = company.Id, limit = (int?)50 }, token);
+
+        var stmt = result.GetProperty("data").GetProperty("bankStatement");
+        Assert.Equal(company.Id.ToString(), stmt.GetProperty("companyId").GetString());
+        Assert.Equal("Empty Bank Co", stmt.GetProperty("companyName").GetString());
+        Assert.Equal(0, stmt.GetProperty("currentBalance").GetDecimal());
+        Assert.Equal(0, stmt.GetProperty("totalEntries").GetInt32());
+        Assert.Equal(0, stmt.GetProperty("rows").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task BankStatement_WithEntries_ReturnsRowsNewestFirstAndCorrectRunningBalance()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-entries@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Create company directly to get a stable ID
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Statement Test Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        // Seed three entries in chronological order
+        db.LedgerEntries.AddRange(
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Revenue,
+                Description = "First sale",
+                Amount = 1000m,
+                RecordedAtTick = 1,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-3),
+            },
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.LaborCost,
+                Description = "Worker wages",
+                Amount = -250m,
+                RecordedAtTick = 2,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+            },
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.PropertyPurchase,
+                Description = "Land purchase",
+                Amount = -300m,
+                RecordedAtTick = 3,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+            });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = company.Id, limit = (int?)50 }, token);
+
+        var stmt = result.GetProperty("data").GetProperty("bankStatement");
+
+        // Net balance: 1000 - 250 - 300 = 450
+        Assert.Equal(450m, stmt.GetProperty("currentBalance").GetDecimal());
+        Assert.Equal(3, stmt.GetProperty("totalEntries").GetInt32());
+        Assert.Equal(3, stmt.GetProperty("rows").GetArrayLength());
+
+        var rows = stmt.GetProperty("rows");
+        // Rows are newest-first: tick 3, tick 2, tick 1
+        Assert.Equal(3, rows[0].GetProperty("recordedAtTick").GetInt64());
+        Assert.Equal(2, rows[1].GetProperty("recordedAtTick").GetInt64());
+        Assert.Equal(1, rows[2].GetProperty("recordedAtTick").GetInt64());
+
+        // Running balances (cumulative in chronological order)
+        // Tick 1: 1000, Tick 2: 750, Tick 3: 450
+        Assert.Equal(450m, rows[0].GetProperty("runningBalance").GetDecimal());
+        Assert.Equal(750m, rows[1].GetProperty("runningBalance").GetDecimal());
+        Assert.Equal(1000m, rows[2].GetProperty("runningBalance").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BankStatement_Unauthenticated_ReturnsError()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = Guid.NewGuid(), limit = (int?)50 });
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Expected an error for unauthenticated bankStatement query.");
+    }
+
+    [Fact]
+    public async Task BankStatement_WrongCompany_ReturnsCompanyNotFoundError()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-wrong@example.com");
+
+        // Use a random Guid — no such company exists for this player
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = Guid.NewGuid(), limit = (int?)50 }, token);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Expected COMPANY_NOT_FOUND error.");
+        var errorCode = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("COMPANY_NOT_FOUND", errorCode);
+    }
+
+    [Fact]
+    public async Task BankStatement_LimitIsRespected_ReturnsAtMostLimitRows()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-limit@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Limit Test Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        // Seed 10 entries
+        for (var i = 0; i < 10; i++)
+        {
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Revenue,
+                Description = $"Sale #{i + 1}",
+                Amount = 100m,
+                RecordedAtTick = i + 1,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-10 + i),
+            });
+        }
+        await db.SaveChangesAsync();
+
+        // Request only 3
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = company.Id, limit = 3 }, token);
+
+        var stmt = result.GetProperty("data").GetProperty("bankStatement");
+        Assert.Equal(10, stmt.GetProperty("totalEntries").GetInt32()); // total count unaffected
+        Assert.Equal(3, stmt.GetProperty("rows").GetArrayLength());   // only 3 rows returned
+    }
+
+    [Fact]
+    public async Task BankStatement_CreditAndDebitAmounts_CategoriesAreCorrect()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-categ@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Category Test Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        db.LedgerEntries.AddRange(
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Revenue,
+                Description = "Product sold",
+                Amount = 500m,
+                RecordedAtTick = 1,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-2),
+            },
+            new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Tax,
+                Description = "Annual tax",
+                Amount = -150m,
+                RecordedAtTick = 2,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+            });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = company.Id, limit = (int?)50 }, token);
+
+        var rows = result.GetProperty("data").GetProperty("bankStatement").GetProperty("rows");
+        Assert.Equal(2, rows.GetArrayLength());
+
+        // Newest-first: TAX entry first (tick 2), then REVENUE (tick 1)
+        Assert.Equal("TAX", rows[0].GetProperty("category").GetString());
+        Assert.Equal(-150m, rows[0].GetProperty("amount").GetDecimal());
+
+        Assert.Equal("REVENUE", rows[1].GetProperty("category").GetString());
+        Assert.Equal(500m, rows[1].GetProperty("amount").GetDecimal());
+    }
+
+    // Helper: gets current player ID using an isolated factory and token
+    private static async Task<Guid> GetCurrentPlayerIdAsync(ApiWebApplicationFactory factory, string token)
+    {
+        var client = factory.CreateClient();
+        var result = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+        return Guid.Parse(result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+    }
 
 }

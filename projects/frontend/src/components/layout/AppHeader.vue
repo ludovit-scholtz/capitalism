@@ -88,6 +88,9 @@ function handleChatToggle() {
         <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.forex') }}</span>
         </RouterLink>
+        <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
+        </RouterLink>
         <RouterLink v-if="auth.isAuthenticated" to="/marketing-analytics" :title="t('nav.campaignAnalytics')" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
         </RouterLink>
@@ -377,6 +380,8 @@ function handleChatToggle() {
     visibility: hidden;
     transition: all 0.3s ease;
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    max-height: calc(100vh - 64px);
+    overflow-y: auto;
   }
 
   .nav-links.nav-open {

@@ -29,7 +29,7 @@ It will use real world map. The game will start in single city and later other c
 - Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
 - Create one government bank for each currency
 
-### Currencies and bank accounts (0% complete)
+### Currencies and bank accounts (25% complete)
 
 Change cash flow management completely from the onboarding process, through unit calculations, payments in stock exchange up to the ledger calculation
 

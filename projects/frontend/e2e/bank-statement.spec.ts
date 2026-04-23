@@ -1,0 +1,330 @@
+import { test, expect } from '@playwright/test'
+import { setupMockApi, makePlayer } from './helpers/mock-api'
+
+const COMPANY_ID = 'company-test-1'
+
+function makePlayerWithCompany() {
+  const player = makePlayer()
+  player.companies = [
+    {
+      id: COMPANY_ID,
+      playerId: player.id,
+      name: 'Test Trading Co.',
+      cash: 200000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      foundedAtTick: 1,
+      buildings: [],
+    },
+  ]
+  player.activeAccountType = 'COMPANY'
+  player.activeCompanyId = COMPANY_ID
+  return player
+}
+
+// ── Bank Statement Review page ────────────────────────────────────────────────
+
+test.describe('Bank Statement Review', () => {
+  test('redirects unauthenticated users to /login', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/bank-statement/some-company-id')
+    await page.waitForURL(/\/login/)
+    await expect(page).toHaveURL(/\/login/)
+  })
+
+  test('shows bank statement title and company name for authenticated player', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.bankStatementRows[COMPANY_ID] = []
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${COMPANY_ID}`)
+
+    await expect(page.getByRole('heading', { name: 'Bank Statement Review' })).toBeVisible()
+    await expect(page.getByText('Review all financial transactions')).toBeVisible()
+  })
+
+  test('shows empty state when no transactions', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.bankStatementRows[COMPANY_ID] = []
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${COMPANY_ID}`)
+
+    await expect(page.getByText('No transactions found for this account.')).toBeVisible()
+  })
+
+  test('shows transaction rows with credit and debit columns', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const now = new Date().toISOString()
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-1',
+        recordedAtTick: 10,
+        recordedAtUtc: now,
+        description: 'Product sales revenue',
+        category: 'REVENUE',
+        amount: 5000,
+        runningBalance: 205000,
+        buildingId: null,
+        buildingName: null,
+      },
+      {
+        id: 'row-2',
+        recordedAtTick: 9,
+        recordedAtUtc: now,
+        description: 'Material purchase',
+        category: 'PURCHASING_COST',
+        amount: -1500,
+        runningBalance: 200000,
+        buildingId: 'building-1',
+        buildingName: 'My Factory',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${COMPANY_ID}`)
+
+    // Check table is visible
+    const table = page.locator('.statement-table')
+    await expect(table).toBeVisible()
+
+    const rows = table.locator('.statement-row')
+    await expect(rows).toHaveCount(2)
+
+    // Credit row (first - highest tick shown first / newest first ordering)
+    const creditRow = rows.first()
+    await expect(creditRow.locator('.credit-cell')).toContainText('5,000.00')
+    await expect(creditRow.locator('.debit-cell .empty-cell-dash')).toBeVisible()
+
+    // Debit row
+    const debitRow = rows.nth(1)
+    await expect(debitRow.locator('.debit-cell')).toContainText('1,500.00')
+    await expect(debitRow.locator('.credit-cell .empty-cell-dash')).toBeVisible()
+  })
+
+  test('shows account summary with company name and balance', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-1',
+        recordedAtTick: 1,
+        recordedAtUtc: new Date().toISOString(),
+        description: 'Initial funding',
+        category: 'REVENUE',
+        amount: 100000,
+        runningBalance: 100000,
+        buildingId: null,
+        buildingName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${COMPANY_ID}`)
+
+    const summary = page.locator('[aria-label="Account summary"]')
+    await expect(summary).toBeVisible()
+    await expect(summary.getByText('Test Trading Co.')).toBeVisible()
+    await expect(summary.locator('.balance-amount')).toContainText('100,000')
+  })
+
+  test('shows building name sub-label when present', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-1',
+        recordedAtTick: 5,
+        recordedAtUtc: new Date().toISOString(),
+        description: 'Labor costs',
+        category: 'LABOR_COST',
+        amount: -800,
+        runningBalance: 199200,
+        buildingId: 'bld-1',
+        buildingName: 'Central Factory',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${COMPANY_ID}`)
+
+    await expect(page.locator('.description-sub').filter({ hasText: 'Central Factory' })).toBeVisible()
+  })
+})
+
+// ── Funding guidance in Buy Building ──────────────────────────────────────────
+
+test.describe('Funding guidance in Buy Building', () => {
+  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({
+    page,
+  }) => {
+    const player = makePlayerWithCompany()
+    player.personalCash = 500000
+    player.companies[0]!.cash = 500000
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // No CZK balance — only EUR
+    state.playerCurrencyBalances = []
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/buy-building/${COMPANY_ID}`)
+
+    // Select a building type first
+    await page.locator('.type-card').first().click()
+
+    // Select Prague
+    await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
+
+    // Funding guidance should appear
+    const guidance = page.locator('.funding-guidance')
+    await expect(guidance).toBeVisible()
+    await expect(guidance).toContainText('CZK')
+  })
+
+  test('does not show funding gap warning for EUR city (Bratislava)', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.playerCurrencyBalances = []
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/buy-building/${COMPANY_ID}`)
+
+    // Select a building type
+    await page.locator('.type-card').first().click()
+
+    // Select Bratislava (EUR city)
+    await page.locator('.city-option').filter({ hasText: 'Bratislava' }).click()
+
+    // No funding warning for EUR city
+    await expect(page.locator('.funding-guidance')).toBeHidden()
+  })
+
+  test('funding guidance has Forex and Bank Statement CTA links', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    player.personalCash = 500000
+    player.companies[0]!.cash = 500000
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.playerCurrencyBalances = []
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/buy-building/${COMPANY_ID}`)
+
+    // Select a building type
+    await page.locator('.type-card').first().click()
+
+    // Select Prague
+    await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
+
+    const guidance = page.locator('.funding-guidance')
+    await expect(guidance).toBeVisible()
+
+    // Forex CTA link
+    const forexLink = guidance.locator('.btn-guidance-primary')
+    await expect(forexLink).toBeVisible()
+    await expect(forexLink).toHaveAttribute('href', '/forex')
+
+    // Bank statement link
+    const stmtLink = guidance.locator('.btn-guidance-secondary')
+    await expect(stmtLink).toBeVisible()
+    await expect(stmtLink).toHaveAttribute('href', `/bank-statement/${COMPANY_ID}`)
+  })
+
+  test('does not show funding gap when player has sufficient CZK balance', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Player has CZK balance
+    state.playerCurrencyBalances = [{ currencyCode: 'CZK', currencySymbol: 'Kč', balance: 50000 }]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/buy-building/${COMPANY_ID}`)
+
+    // Select a building type
+    await page.locator('.type-card').first().click()
+
+    // Select Prague
+    await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
+
+    // Should NOT show funding warning since player has CZK
+    await expect(page.locator('.funding-guidance')).toBeHidden()
+  })
+})
+
+// ── Forex page bank statement link ────────────────────────────────────────────
+
+test.describe('Forex page bank statement link', () => {
+  test('shows View Bank Statement link in balances section', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/forex')
+
+    const stmtLink = page.locator('.statement-link')
+    await expect(stmtLink).toBeVisible()
+    await expect(stmtLink).toContainText('View Bank Statement')
+  })
+})

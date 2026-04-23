@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
+import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
 import type {
   FxRate,
   ForexQuote,
@@ -56,6 +57,17 @@ const availableCurrencies = computed(() => {
   const codes = new Set<string>(['EUR'])
   rates.value.forEach((r) => codes.add(r.quoteCurrencyCode))
   return Array.from(codes).sort()
+})
+
+/** All tradeable currencies as CurrencyBalance entries (0 balance when not held). Used for "You receive" selector. */
+const toBalances = computed<CurrencyBalance[]>(() => {
+  return availableCurrencies.value.map((code) => {
+    const existing = balances.value.find((b) => b.currencyCode === code)
+    if (existing) return existing
+    const rate = rates.value.find((r) => r.quoteCurrencyCode === code)
+    const symbol = rate?.quoteCurrencySymbol ?? code
+    return { currencyCode: code, currencySymbol: symbol, balance: 0 }
+  })
 })
 
 const fromBalance = computed(() => {
@@ -335,6 +347,13 @@ watch(activeTab, async (tab) => {
 
           <div class="balances-summary">
             <h3 class="subsection-title">{{ t('forex.balancesTitle') }}</h3>
+            <RouterLink
+              v-if="auth.player?.companies?.length"
+              :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
+              class="statement-link"
+            >
+              {{ t('forex.viewBankStatement') }} →
+            </RouterLink>
             <div v-if="balances.length === 0" class="balances-empty">{{ t('forex.balancesEmpty') }}</div>
             <div v-else class="balances-grid">
               <div v-for="b in balances" :key="b.currencyCode" class="balance-card">
@@ -366,17 +385,20 @@ watch(activeTab, async (tab) => {
           <div class="swap-form">
             <div class="swap-row">
               <div class="swap-field">
-                <label class="field-label" for="from-currency">{{ t('forex.sourceCurrency') }}</label>
-                <select
-                  id="from-currency"
+                <!--
+                  Both selectors intentionally use `toBalances` (all tradeable currencies,
+                  including 0-balance entries). This is required so the ⇅ swap button can
+                  reverse EUR→CZK to CZK→EUR even before the player holds any CZK.
+                  The affordability validation (`validationError`) catches a 0-balance source
+                  and shows "Insufficient balance for this swap." before the swap proceeds.
+                -->
+                <BankAccountSelector
                   v-model="fromCurrency"
-                  class="currency-select"
-                  @change="quote = null; showConfirm = false"
-                >
-                  <option v-for="code in availableCurrencies" :key="code" :value="code">
-                    {{ code }}
-                  </option>
-                </select>
+                  :balances="toBalances"
+                  :label="t('forex.sourceCurrency')"
+                  id="from-currency"
+                  @update:model-value="() => { quote = null; showConfirm = false }"
+                />
               </div>
               <div class="swap-field amount-field">
                 <label class="field-label" for="swap-amount">{{ t('forex.amount') }}</label>
@@ -405,17 +427,13 @@ watch(activeTab, async (tab) => {
 
             <div class="swap-row">
               <div class="swap-field">
-                <label class="field-label" for="to-currency">{{ t('forex.targetCurrency') }}</label>
-                <select
-                  id="to-currency"
+                <BankAccountSelector
                   v-model="toCurrency"
-                  class="currency-select"
-                  @change="quote = null; showConfirm = false"
-                >
-                  <option v-for="code in availableCurrencies" :key="code" :value="code">
-                    {{ code }}
-                  </option>
-                </select>
+                  :balances="toBalances"
+                  :label="t('forex.targetCurrency')"
+                  id="to-currency"
+                  @update:model-value="() => { quote = null; showConfirm = false }"
+                />
               </div>
               <div class="swap-field amount-field">
                 <label class="field-label">{{ t('forex.youReceive') }}</label>
@@ -636,6 +654,19 @@ watch(activeTab, async (tab) => {
 
 .balances-summary {
   margin-bottom: 1.5rem;
+}
+
+.statement-link {
+  display: inline-block;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-accent, #4f8ef7);
+  text-decoration: none;
+  margin-bottom: 0.6rem;
+}
+
+.statement-link:hover {
+  text-decoration: underline;
 }
 
 /* Balances */
