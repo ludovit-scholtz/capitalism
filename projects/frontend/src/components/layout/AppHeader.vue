@@ -58,54 +58,122 @@ function handleChatToggle() {
 </script>
 
 <template>
-  <header class="app-header">
-    <div class="container header-inner">
-      <RouterLink to="/" class="logo" @click="closeMenu">
+  <header class="app-header bg-card border-b border-divider sticky top-0 z-[100] backdrop-blur-sm">
+    <div class="container flex items-center gap-8 h-16">
+      <!-- Logo -->
+      <RouterLink to="/" class="logo-link shrink-0" @click="closeMenu">
         <span class="logo-text">CAPITALISM V</span>
       </RouterLink>
-      <button class="menu-toggle" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
+
+      <!-- Mobile menu toggle -->
+      <button
+        class="menu-toggle ml-auto md:hidden text-muted hover:text-body p-2 rounded-md transition-colors"
+        @click="toggleMenu"
+        :aria-expanded="isMenuOpen"
+        aria-label="Toggle navigation menu"
+      >
         <font-awesome-icon :icon="['fas', 'bars']" />
       </button>
-      <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
-        <RouterLink to="/" :title="t('nav.home')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'home']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.home') }}</span>
+
+      <!-- Navigation links -->
+      <nav
+        class="nav-links"
+        :class="{ 'nav-open': isMenuOpen }"
+      >
+        <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.home') }}</span>
         </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.dashboard') }}</span>
+        <RouterLink
+          v-if="auth.isAuthenticated"
+          to="/dashboard"
+          :title="t('nav.dashboard')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.dashboard') }}</span>
         </RouterLink>
-        <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.leaderboard') }}</span>
+        <RouterLink
+          to="/leaderboard"
+          :title="t('nav.leaderboard')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.leaderboard') }}</span>
         </RouterLink>
-        <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'book']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.encyclopedia') }}</span>
+        <RouterLink
+          to="/encyclopedia"
+          :title="t('nav.encyclopedia')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.encyclopedia') }}</span>
         </RouterLink>
-        <RouterLink to="/exchange" :title="t('nav.exchange')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.exchange') }}</span>
+        <RouterLink
+          to="/exchange"
+          :title="t('nav.exchange')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.exchange') }}</span>
         </RouterLink>
-        <RouterLink to="/stocks" :title="t('nav.stocks')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.stocks') }}</span>
+        <RouterLink to="/stocks" :title="t('nav.stocks')" class="nav-link" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.stocks') }}</span>
         </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.forex') }}</span>
+        <RouterLink
+          v-if="auth.isAuthenticated"
+          to="/forex"
+          :title="t('nav.forex')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.forex') }}</span>
         </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
+        <RouterLink
+          v-if="auth.isAuthenticated"
+          to="/bank-statement"
+          :title="t('nav.bankStatement')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
         </RouterLink>
-        <RouterLink v-if="auth.isAuthenticated" to="/marketing-analytics" :title="t('nav.campaignAnalytics')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
+        <RouterLink
+          v-if="auth.isAuthenticated"
+          to="/marketing-analytics"
+          :title="t('nav.campaignAnalytics')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
         </RouterLink>
-        <RouterLink to="/banking" :title="t('nav.banking')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.banking') }}</span>
+        <RouterLink to="/banking" :title="t('nav.banking')" class="nav-link" @click="closeMenu">
+          <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.banking') }}</span>
         </RouterLink>
-        <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link-with-badge" @click="closeMenu">
+        <RouterLink
+          to="/news"
+          :title="t('nav.news')"
+          :aria-label="t('nav.news')"
+          class="nav-link nav-link-badge-host"
+          @click="closeMenu"
+        >
           <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.news') }}</span>
-          <span v-if="showUnreadBadge" class="news-badge">{{ unreadCount }}</span>
+          <span v-if="showUnreadBadge" class="nav-badge nav-badge-news news-badge">{{ unreadCount }}</span>
         </RouterLink>
         <button
           v-if="auth.isAuthenticated"
-          class="nav-chat-btn nav-link-with-badge"
-          :class="{ 'nav-chat-btn-active': isChatOpen }"
+          class="nav-link nav-chat-btn nav-link-badge-host"
+          :class="{ 'nav-link-active': isChatOpen }"
           :title="t('nav.chat')"
           :aria-label="t('nav.chat')"
           :aria-pressed="isChatOpen"
@@ -113,20 +181,47 @@ function handleChatToggle() {
         >
           <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.chat') }}</span>
-          <span v-if="chatUnreadCount > 0" class="chat-badge">{{ chatUnreadCount }}</span>
+          <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{
+            chatUnreadCount
+          }}</span>
         </button>
-        <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" @click="closeMenu">
-          <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" /> <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
+        <RouterLink
+          v-if="session?.canAccessAdminDashboard"
+          to="/admin"
+          :title="t('nav.admin')"
+          :aria-label="t('nav.admin')"
+          class="nav-link"
+          @click="closeMenu"
+        >
+          <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
+          <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
         </RouterLink>
       </nav>
-      <div class="header-actions">
-        <div v-if="gameState && formattedGameTime" class="game-time-chip" :title="t('nav.gameTime')">
-          <span class="game-time-label">{{ t('nav.gameTime') }}</span>
-          <span class="game-time-value">{{ formattedGameTime }}</span>
+
+      <!-- Right-side actions -->
+      <div class="header-actions flex items-center gap-3 shrink-0">
+        <!-- In-game time chip -->
+        <div
+          v-if="gameState && formattedGameTime"
+          class="game-time-chip hidden sm:flex flex-col items-end gap-0.5 px-3 py-1.5 border border-divider rounded-md"
+          :title="t('nav.gameTime')"
+        >
+          <span class="text-[0.6875rem] text-muted uppercase tracking-wider">{{
+            t('nav.gameTime')
+          }}</span>
+          <span class="text-[0.8125rem] text-body tabular-nums whitespace-nowrap">{{
+            formattedGameTime
+          }}</span>
         </div>
-        <div v-if="impersonationLabel" class="impersonation-chip">
+
+        <!-- Impersonation chip -->
+        <div
+          v-if="impersonationLabel"
+          class="impersonation-chip hidden sm:block max-w-[17rem] px-3 py-1.5 rounded-full border border-[rgba(255,138,0,0.5)] bg-[rgba(255,138,0,0.14)] text-[#ffd7a3] text-[0.72rem] leading-tight"
+        >
           {{ impersonationLabel }}
         </div>
+
         <template v-if="auth.isAuthenticated">
           <AccountSwitcher @switched="closeMenu" />
           <button
@@ -151,67 +246,17 @@ function handleChatToggle() {
 </template>
 
 <style scoped>
-.app-header {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  backdrop-filter: blur(8px);
-}
-
-.header-inner {
+/* ── Logo ──────────────────────────────────────────────────────────────────── */
+.logo-link {
   display: flex;
   align-items: center;
-  gap: 2rem;
-  height: 64px;
-}
-
-.menu-toggle {
-  display: none;
-  background: none;
-  border: none;
-  color: var(--color-text-secondary);
-  font-size: 1.25rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  transition: background-color 0.15s;
-}
-
-.menu-toggle:hover {
-  background: var(--color-surface-hover);
-  color: var(--color-text);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  font-size: 1.25rem;
-  color: var(--color-text);
   text-decoration: none;
-  letter-spacing: -0.02em;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    'Segoe UI',
-    Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Open Sans',
-    'Helvetica Neue',
-    sans-serif;
-}
-
-.logo-icon {
-  font-size: 1.5rem;
 }
 
 .logo-text {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   background: linear-gradient(135deg, gold, orange);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -219,15 +264,17 @@ function handleChatToggle() {
   border-top: 1px solid gold;
   border-bottom: 1px solid gold;
   white-space: nowrap;
+  font-family: system-ui, -apple-system, sans-serif;
 }
 
+/* ── Navigation links ─────────────────────────────────────────────────────── */
 .nav-links {
   display: flex;
   gap: 1.5rem;
   flex: 1;
 }
 
-.nav-links a {
+.nav-link {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--color-text-secondary);
@@ -235,61 +282,21 @@ function handleChatToggle() {
   transition: color 0.15s;
   position: relative;
   padding-bottom: 2px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.nav-links a svg {
-  font-size: 1.25rem;
-}
-
-.nav-link-with-badge {
-  position: relative;
-}
-
-.news-badge {
-  position: absolute;
-  top: -0.45rem;
-  right: -0.55rem;
-  min-width: 1.2rem;
-  height: 1.2rem;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #ff8a00, #ff3d00);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 700;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 0.3rem;
-  box-shadow: 0 8px 20px rgba(255, 97, 0, 0.35);
-}
-
-/* Chat toggle button — mirrors the nav-link appearance */
-.nav-chat-btn {
   background: none;
   border: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 0;
-  padding-bottom: 2px;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.5rem;
-  width: max-content;
-  transition: color 0.15s;
+  padding-inline: 0;
 }
 
-.nav-chat-btn svg {
+.nav-link svg {
   font-size: 1.25rem;
 }
 
-.nav-chat-btn::after {
+/* Underline indicator — slides in on hover / active */
+.nav-link::after {
   content: '';
   position: absolute;
   bottom: -2px;
@@ -302,24 +309,31 @@ function handleChatToggle() {
   transition: transform 0.15s;
 }
 
-.nav-chat-btn:hover,
-.nav-chat-btn-active {
+.nav-link:hover,
+.nav-link.router-link-active,
+.nav-link.nav-link-active {
   color: var(--color-text);
+  text-decoration: none;
 }
 
-.nav-chat-btn:hover::after,
-.nav-chat-btn-active::after {
+.nav-link.router-link-active::after,
+.nav-link:hover::after,
+.nav-link.nav-link-active::after {
   transform: scaleX(1);
 }
 
-.chat-badge {
+/* ── Notification badges ──────────────────────────────────────────────────── */
+.nav-link-badge-host {
+  position: relative;
+}
+
+.nav-badge {
   position: absolute;
   top: -0.45rem;
   right: -0.55rem;
   min-width: 1.2rem;
   height: 1.2rem;
   border-radius: 999px;
-  background: linear-gradient(135deg, #2196f3, #1565c0);
   color: white;
   font-size: 0.65rem;
   font-weight: 700;
@@ -327,39 +341,27 @@ function handleChatToggle() {
   align-items: center;
   justify-content: center;
   padding: 0 0.3rem;
+}
+
+.nav-badge-news {
+  background: linear-gradient(135deg, #ff8a00, #ff3d00);
+  box-shadow: 0 4px 12px rgba(255, 97, 0, 0.35);
+}
+
+.nav-badge-chat {
+  background: linear-gradient(135deg, #2196f3, #1565c0);
   box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
 }
 
-.nav-links a::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: var(--color-primary);
-  border-radius: 1px;
-  transform: scaleX(0);
-  transition: transform 0.15s;
+/* ── Mobile hamburger ─────────────────────────────────────────────────────── */
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.25rem;
 }
 
-.nav-links a:hover,
-.nav-links a.router-link-active {
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-.nav-links a.router-link-active::after,
-.nav-links a:hover::after {
-  transform: scaleX(1);
-}
-
-/* Mobile responsive styles */
 @media (max-width: 768px) {
-  .header-inner {
-    gap: 1rem;
-  }
-
   .menu-toggle {
     display: block;
     order: 2;
@@ -390,23 +392,7 @@ function handleChatToggle() {
     visibility: visible;
   }
 
-  .nav-links a {
-    padding: 1rem 2rem;
-    justify-content: flex-start;
-    gap: 0.75rem;
-    font-size: 1rem;
-  }
-
-  .nav-links a svg {
-    font-size: 1.5rem;
-  }
-
-  .nav-links a::after {
-    display: none;
-  }
-
-  /* Mobile: chat button looks like a nav link item */
-  .nav-chat-btn {
+  .nav-link {
     padding: 1rem 2rem;
     justify-content: flex-start;
     gap: 0.75rem;
@@ -414,11 +400,11 @@ function handleChatToggle() {
     width: 100%;
   }
 
-  .nav-chat-btn svg {
+  .nav-link svg {
     font-size: 1.5rem;
   }
 
-  .nav-chat-btn::after {
+  .nav-link::after {
     display: none;
   }
 
@@ -427,81 +413,10 @@ function handleChatToggle() {
   }
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.impersonation-chip {
-  max-width: 17rem;
-  padding: 0.45rem 0.7rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 138, 0, 0.5);
-  background: rgba(255, 138, 0, 0.14);
-  color: #ffd7a3;
-  font-size: 0.72rem;
-  line-height: 1.2;
-}
-
-.game-time-chip {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.1rem;
-  padding: 0.45rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-hover);
-}
-
-.game-time-label {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.game-time-value {
-  font-size: 0.8125rem;
-  color: var(--color-text);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.btn-ghost:hover {
-  background: var(--color-surface-raised);
-  color: var(--color-text);
-  text-decoration: none;
-}
-
 @media (max-width: 640px) {
-  .header-inner {
-    gap: 1rem;
-  }
-
-  .nav-links {
-    gap: 0.75rem;
-  }
-
-  .game-time-chip {
-    display: none;
-  }
-
-  .impersonation-chip {
-    display: none;
+  .header-actions {
+    gap: 0.5rem;
   }
 }
 </style>
+

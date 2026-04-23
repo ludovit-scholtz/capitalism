@@ -16,13 +16,17 @@ It will use real world map. The game will start in single city and later other c
 - Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
 - Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
 
-### Tailwind migration (0% complete)
+### Tailwind migration (25% complete)
 
-- Update all pages to use the tailwind as primary stying method
-- Minimize the css usage
-- Make sure all components are properly readable and has contrast between the text and background
-- Support light mode and dark mode
-- Create design patterns and stick to them, update copilot instructions to follow the same design principles and use highly professional approach
+- [x] Tailwind v4 theme foundation: `@theme inline` in `main.css` maps all game design tokens (bg-card, text-muted, border-divider, bg-brand, text-good, etc.) to CSS custom properties, enabling clean utility-first styling across all migrated components
+- [x] Full light-mode / dark-mode support: CSS variables switch on `[data-theme='light']` and `prefers-color-scheme: light`; dark remains the game default
+- [x] Application shell migrated: `App.vue`, `AppHeader.vue`, `AppFooter.vue` — sticky header, offline/update banners, footer, nav links, notification badges, game-time chip, and mobile menu all use Tailwind utilities
+- [x] `LoginView.vue` migrated: auth card, form fields, error alert, toggle button — clean Tailwind-first form layout
+- [x] `HomeView.vue` migrated: hero section, status cards grid, leaderboard table — responsive Tailwind layout with accessible contrast
+- [ ] Migrate remaining high-traffic views to Tailwind (DashboardView, OnboardingView, BuyBuildingView, BuildingDetailView)
+- [ ] Update remaining components (cards, tables, badges, form controls) to use Tailwind utilities
+- [ ] Add `data-theme` toggle in UI (light/dark mode switcher)
+- [ ] Update copilot instructions with Tailwind design patterns
 
 ### Government company
 

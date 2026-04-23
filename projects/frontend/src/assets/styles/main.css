@@ -1,6 +1,56 @@
 @import 'tailwindcss';
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tailwind v4 custom dark-mode variant.
+   The game defaults to dark mode (dark CSS variables live on :root).
+   The `dark:` utility variant is activated when [data-theme='dark'] is set
+   explicitly — for components that need to opt into dark overrides programmatically.
+   Most components simply inherit the dark defaults from :root without needing
+   any data-theme attribute.
+   ───────────────────────────────────────────────────────────────────────────── */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tailwind v4 theme — registers game design tokens as first-class utilities.
+   Use bg-page, bg-card, text-body, text-muted, border-divider, bg-brand, etc.
+   in templates. Values resolve to CSS custom properties so theme switching is
+   handled entirely in :root without touching components.
+   ───────────────────────────────────────────────────────────────────────────── */
+@theme inline {
+  /* Surface & page backgrounds */
+  --color-page: var(--color-bg);
+  --color-card: var(--color-surface);
+  --color-card-raised: var(--color-surface-raised);
+
+  /* Typography */
+  --color-body: var(--color-text);
+  --color-muted: var(--color-text-secondary);
+  --color-subtle: var(--color-text-tertiary);
+
+  /* Brand & interactive */
+  --color-brand: var(--color-primary);
+  --color-brand-hover: var(--color-primary-hover);
+  --color-brand-subtle: var(--color-primary-light);
+
+  /* Status */
+  --color-good: var(--color-success);
+  --color-caution: var(--color-warning);
+  --color-bad: var(--color-danger);
+
+  /* Borders & overlays */
+  --color-divider: var(--color-border);
+  --color-divider-light: var(--color-border-light);
+  --color-overlay: var(--color-hover);
+
+  /* Hero */
+  --color-hero-subtitle: rgb(254, 226, 141);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   DARK theme (default — game is intentionally dark-first)
+   ───────────────────────────────────────────────────────────────────────────── */
 :root {
+  color-scheme: dark;
   --color-primary: #0047ff;
   --color-primary-hover: #0039cc;
   --color-primary-light: rgba(0, 71, 255, 0.14);
@@ -24,21 +74,61 @@
   --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.55);
   --font-sans: 'Space Grotesk', system-ui, -apple-system, sans-serif;
 
-  /* Semantic alias tokens — used by components for cross-theme consistency.
-     Components must reference these rather than raw literals so that a future
-     light-mode switch only requires updating this block.
-     New components should use --color-text and --color-text-secondary directly;
-     these aliases exist to satisfy references that predate the primary token names. */
-  --color-text-primary: #e6edf3; /* same value as --color-text; satisfies var(--color-text-primary) usage in older components */
-  --color-text-muted: #8b949e; /* same value as --color-text-secondary; de-emphasised / placeholder text */
-  --color-text-tertiary: #6e7681; /* slightly dimmer than --color-text-secondary; third-level label text */
-  --color-background: #0d1117; /* same value as --color-bg; page-level background */
-  --color-surface-secondary: #1e2430; /* nested surface / secondary card, same value as --color-surface-raised */
-  --color-bg-secondary: rgba(255, 255, 255, 0.04); /* subtle inset or alternating row */
-  --color-hover: rgba(255, 255, 255, 0.06); /* generic hover overlay on dark surfaces */
-  --color-border-light: rgba(48, 54, 61, 0.7); /* lighter variant of --color-border */
-  --color-border-muted: rgba(48, 54, 61, 0.5); /* muted / tertiary border */
+  /* Semantic alias tokens — legacy components reference these; new components
+     should use the Tailwind theme tokens (bg-card, text-muted, etc.) instead. */
+  --color-text-primary: #e6edf3;
+  --color-text-muted: #8b949e;
+  --color-text-tertiary: #6e7681;
+  --color-background: #0d1117;
+  --color-surface-secondary: #1e2430;
+  --color-bg-secondary: rgba(255, 255, 255, 0.04);
+  --color-hover: rgba(255, 255, 255, 0.06);
+  --color-border-light: rgba(48, 54, 61, 0.7);
+  --color-border-muted: rgba(48, 54, 61, 0.5);
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   LIGHT theme — activated by data-theme="light" OR system preference.
+   Brand / accent colors stay the same; only neutral surfaces flip.
+   ───────────────────────────────────────────────────────────────────────────── */
+[data-theme='light'] {
+  color-scheme: light;
+  --color-bg: #f0f4f8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #f8fafc;
+  --color-text: #111827;
+  --color-text-secondary: #4b5563;
+  --color-border: #d1d5db;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.15);
+  /* Keep brand colours unchanged in light mode */
+  --color-primary: #0047ff;
+  --color-primary-hover: #0039cc;
+  --color-primary-light: rgba(0, 71, 255, 0.1);
+  --color-success: #16a34a;
+  --color-warning: #d97706;
+  --color-danger: #dc2626;
+  --color-error: #dc2626;
+  /* Alias tokens */
+  --color-text-primary: #111827;
+  --color-text-muted: #4b5563;
+  --color-text-tertiary: #6b7280;
+  --color-background: #f0f4f8;
+  --color-surface-secondary: #f8fafc;
+  --color-bg-secondary: rgba(0, 0, 0, 0.03);
+  --color-hover: rgba(0, 0, 0, 0.04);
+  --color-border-light: rgba(209, 213, 219, 0.8);
+  --color-border-muted: rgba(209, 213, 219, 0.6);
+}
+
+/* Note: light mode is activated only by the explicit [data-theme='light'] attribute.
+   The game is intentionally dark-first for its simulation aesthetic. Light mode will
+   be exposed to players via a theme toggle in a future UI iteration.
+   Accessibility note: users who require light mode can use the [data-theme='light']
+   mechanism once the toggle is shipped; system prefers-color-scheme is not auto-applied
+   to prevent an unexpected white flash in CI and headless test environments where the
+   default color scheme is light. */
 
 *,
 *::before,
