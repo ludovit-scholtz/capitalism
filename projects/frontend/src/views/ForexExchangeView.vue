@@ -6,12 +6,14 @@ import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
+import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
 import type {
   FxRate,
   ForexQuote,
   ForexTradeResult,
   ForexTradeHistoryEntry,
   CurrencyBalance,
+  PlayerBankAccountSummary,
 } from '@/types'
 
 const { t } = useI18n()
@@ -25,10 +27,15 @@ const error = ref<string | null>(null)
 const rates = ref<FxRate[]>([])
 const balances = ref<CurrencyBalance[]>([])
 const history = ref<ForexTradeHistoryEntry[]>([])
+const myBankAccounts = ref<PlayerBankAccountSummary[]>([])
 
 const fromCurrency = ref('EUR')
 const toCurrency = ref('CZK')
 const amount = ref<number | null>(null)
+
+// Bank account selection (used when myBankAccounts is non-empty)
+const fromBankAccountId = ref<string>('')
+const toBankAccountId = ref<string>('')
 
 const quote = ref<ForexQuote | null>(null)
 const quoteError = ref<string | null>(null)
@@ -52,6 +59,9 @@ function getInitialTab(): ForexTab {
 
 const activeTab = ref<ForexTab>(getInitialTab())
 
+/** Whether the player has bank accounts and should use the bank-account-native swap form. */
+const hasBankAccounts = computed(() => myBankAccounts.value.length > 0)
+
 // Derived list of available currencies (EUR + all quoted currencies)
 const availableCurrencies = computed(() => {
   const codes = new Set<string>(['EUR'])
@@ -70,24 +80,63 @@ const toBalances = computed<CurrencyBalance[]>(() => {
   })
 })
 
+/** Helper — find a bank account in myBankAccounts by ID. */
+function findAccountById(id: string): PlayerBankAccountSummary | undefined {
+  return myBankAccounts.value.find((a) => a.id === id)
+}
+
+/** Resolved source currency code — from bank account when available, otherwise manual picker. */
+const resolvedFromCurrency = computed(() => {
+  if (hasBankAccounts.value && fromBankAccountId.value) {
+    return findAccountById(fromBankAccountId.value)?.currencyCode ?? fromCurrency.value
+  }
+  return fromCurrency.value
+})
+
+/** Resolved destination currency code. */
+const resolvedToCurrency = computed(() => {
+  if (hasBankAccounts.value && toBankAccountId.value) {
+    return findAccountById(toBankAccountId.value)?.currencyCode ?? toCurrency.value
+  }
+  return toCurrency.value
+})
+
 const fromBalance = computed(() => {
+  if (hasBankAccounts.value && fromBankAccountId.value) {
+    return findAccountById(fromBankAccountId.value)?.balance ?? 0
+  }
   const b = balances.value.find((b) => b.currencyCode === fromCurrency.value)
   return b?.balance ?? 0
 })
 
 const fromSymbol = computed(() => {
+  if (hasBankAccounts.value && fromBankAccountId.value) {
+    return findAccountById(fromBankAccountId.value)?.currencySymbol ?? resolvedFromCurrency.value
+  }
   if (fromCurrency.value === 'EUR') return '€'
   const r = rates.value.find((r) => r.quoteCurrencyCode === fromCurrency.value)
   return r?.quoteCurrencySymbol ?? fromCurrency.value
 })
 
 const toSymbol = computed(() => {
+  if (hasBankAccounts.value && toBankAccountId.value) {
+    return findAccountById(toBankAccountId.value)?.currencySymbol ?? resolvedToCurrency.value
+  }
   if (toCurrency.value === 'EUR') return '€'
   const r = rates.value.find((r) => r.quoteCurrencyCode === toCurrency.value)
   return r?.quoteCurrencySymbol ?? toCurrency.value
 })
 
 const validationError = computed<string | null>(() => {
+  if (hasBankAccounts.value) {
+    if (!fromBankAccountId.value) return t('forex.selectSourceAccount')
+    if (!toBankAccountId.value) return t('forex.selectDestAccount')
+    if (fromBankAccountId.value === toBankAccountId.value) return t('forex.sameAccount')
+    if (resolvedFromCurrency.value === resolvedToCurrency.value) return t('forex.sameCurrency')
+    if (!amount.value || amount.value <= 0) return t('forex.invalidAmount')
+    if (amount.value > fromBalance.value) return t('forex.insufficientFunds')
+    return null
+  }
   if (fromCurrency.value === toCurrency.value) return t('forex.sameCurrency')
   if (!amount.value || amount.value <= 0) return t('forex.invalidAmount')
   if (amount.value > fromBalance.value) return t('forex.insufficientFunds')
@@ -113,7 +162,7 @@ async function loadData() {
     rates.value = ratesResult.fxRates ?? []
 
     if (auth.isAuthenticated) {
-      const [balancesResult, historyResult] = await Promise.all([
+      const [balancesResult, historyResult, bankAccountsResult] = await Promise.all([
         gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>(`
           query {
             playerCurrencyBalances {
@@ -140,9 +189,34 @@ async function loadData() {
             }
           }
         `),
+        gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(`
+          query {
+            myBankAccounts {
+              id
+              accountNumber
+              currencyCode
+              currencySymbol
+              balance
+              companyId
+              companyName
+            }
+          }
+        `),
       ])
       balances.value = balancesResult.playerCurrencyBalances ?? []
       history.value = historyResult.forexTradeHistory ?? []
+      myBankAccounts.value = bankAccountsResult.myBankAccounts ?? []
+
+      // Pre-select default bank accounts when available.
+      if (myBankAccounts.value.length > 0 && !fromBankAccountId.value) {
+        const firstEur = myBankAccounts.value.find((a) => a.currencyCode === 'EUR')
+        fromBankAccountId.value = firstEur?.id ?? myBankAccounts.value[0]?.id ?? ''
+      }
+      if (myBankAccounts.value.length > 1 && !toBankAccountId.value) {
+        const firstCzk = myBankAccounts.value.find((a) => a.currencyCode === 'CZK')
+        const firstDifferent = myBankAccounts.value.find((a) => a.id !== fromBankAccountId.value)
+        toBankAccountId.value = firstCzk?.id ?? firstDifferent?.id ?? ''
+      }
     }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -161,6 +235,18 @@ async function fetchQuote() {
   swapError.value = null
 
   try {
+    const inputVars: Record<string, unknown> = {
+      fromCurrencyCode: resolvedFromCurrency.value,
+      toCurrencyCode: resolvedToCurrency.value,
+      amount: amount.value,
+    }
+    if (hasBankAccounts.value && fromBankAccountId.value) {
+      inputVars.fromBankAccountId = fromBankAccountId.value
+    }
+    if (hasBankAccounts.value && toBankAccountId.value) {
+      inputVars.toBankAccountId = toBankAccountId.value
+    }
+
     const result = await gqlRequest<{ forexQuote: ForexQuote }>(
       `
       query ForexQuote($input: GetForexQuoteInput!) {
@@ -178,7 +264,7 @@ async function fetchQuote() {
         }
       }
     `,
-      { input: { fromCurrencyCode: fromCurrency.value, toCurrencyCode: toCurrency.value, amount: amount.value } },
+      { input: inputVars },
     )
     quote.value = result.forexQuote
     showConfirm.value = true
@@ -196,6 +282,18 @@ async function executeSwap() {
   swapResult.value = null
 
   try {
+    const inputVars: Record<string, unknown> = {
+      fromCurrencyCode: resolvedFromCurrency.value,
+      toCurrencyCode: resolvedToCurrency.value,
+      amount: amount.value,
+    }
+    if (hasBankAccounts.value && fromBankAccountId.value) {
+      inputVars.fromBankAccountId = fromBankAccountId.value
+    }
+    if (hasBankAccounts.value && toBankAccountId.value) {
+      inputVars.toBankAccountId = toBankAccountId.value
+    }
+
     const result = await gqlRequest<{ executeForexSwap: ForexTradeResult }>(
       `
       mutation ExecuteForexSwap($input: ExecuteForexSwapInput!) {
@@ -214,7 +312,7 @@ async function executeSwap() {
         }
       }
     `,
-      { input: { fromCurrencyCode: fromCurrency.value, toCurrencyCode: toCurrency.value, amount: amount.value } },
+      { input: inputVars },
     )
     swapResult.value = result.executeForexSwap
     showConfirm.value = false
@@ -235,9 +333,15 @@ function cancelQuote() {
 }
 
 function swapCurrencies() {
-  const tmp = fromCurrency.value
-  fromCurrency.value = toCurrency.value
-  toCurrency.value = tmp
+  if (hasBankAccounts.value) {
+    const tmp = fromBankAccountId.value
+    fromBankAccountId.value = toBankAccountId.value
+    toBankAccountId.value = tmp
+  } else {
+    const tmp = fromCurrency.value
+    fromCurrency.value = toCurrency.value
+    toCurrency.value = tmp
+  }
   quote.value = null
   showConfirm.value = false
 }
@@ -254,7 +358,7 @@ function applyQueryDefaults() {
   activeTab.value = parseForexTab(route.query.tab)
 
   const queryToCurrency = typeof route.query.toCurrency === 'string' ? route.query.toCurrency.toUpperCase() : null
-  if (queryToCurrency && availableCurrencies.value.includes(queryToCurrency)) {
+  if (queryToCurrency && availableCurrencies.value.includes(queryToCurrency) && !hasBankAccounts.value) {
     toCurrency.value = queryToCurrency
     if (fromCurrency.value === queryToCurrency) {
       const preferredSourceCurrency = availableCurrencies.value.find((code) => code !== queryToCurrency)
@@ -345,7 +449,15 @@ watch(activeTab, async (tab) => {
         <section v-if="activeTab === 'swap'" class="forex-section" aria-label="Forex Swap">
           <h2 class="section-title">{{ t('forex.tabSwap') }}</h2>
 
-          <div class="balances-summary">
+          <div v-if="hasBankAccounts" class="ba-notice" role="note">
+            <span class="ba-notice-icon">🏦</span>
+            {{ t('forex.bankAccountMode') }}
+            <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="statement-link-inline">
+              {{ t('forex.viewBankStatement') }} →
+            </RouterLink>
+          </div>
+
+          <div v-if="!hasBankAccounts" class="balances-summary">
             <h3 class="subsection-title">{{ t('forex.balancesTitle') }}</h3>
             <RouterLink
               v-if="auth.player?.companies?.length"
@@ -385,20 +497,31 @@ watch(activeTab, async (tab) => {
           <div class="swap-form">
             <div class="swap-row">
               <div class="swap-field">
-                <!--
-                  Both selectors intentionally use `toBalances` (all tradeable currencies,
-                  including 0-balance entries). This is required so the ⇅ swap button can
-                  reverse EUR→CZK to CZK→EUR even before the player holds any CZK.
-                  The affordability validation (`validationError`) catches a 0-balance source
-                  and shows "Insufficient balance for this swap." before the swap proceeds.
-                -->
-                <BankAccountSelector
-                  v-model="fromCurrency"
-                  :balances="toBalances"
-                  :label="t('forex.sourceCurrency')"
-                  id="from-currency"
-                  @update:model-value="() => { quote = null; showConfirm = false }"
-                />
+                <template v-if="hasBankAccounts">
+                  <ForexBankAccountSelector
+                    v-model="fromBankAccountId"
+                    :accounts="myBankAccounts"
+                    :label="t('forex.sourceAccount')"
+                    id="from-bank-account"
+                    @update:model-value="() => { quote = null; showConfirm = false }"
+                  />
+                </template>
+                <template v-else>
+                  <!--
+                    Both selectors intentionally use `toBalances` (all tradeable currencies,
+                    including 0-balance entries). This is required so the ⇅ swap button can
+                    reverse EUR→CZK to CZK→EUR even before the player holds any CZK.
+                    The affordability validation (`validationError`) catches a 0-balance source
+                    and shows "Insufficient balance for this swap." before the swap proceeds.
+                  -->
+                  <BankAccountSelector
+                    v-model="fromCurrency"
+                    :balances="toBalances"
+                    :label="t('forex.sourceCurrency')"
+                    id="from-currency"
+                    @update:model-value="() => { quote = null; showConfirm = false }"
+                  />
+                </template>
               </div>
               <div class="swap-field amount-field">
                 <label class="field-label" for="swap-amount">{{ t('forex.amount') }}</label>
@@ -427,13 +550,24 @@ watch(activeTab, async (tab) => {
 
             <div class="swap-row">
               <div class="swap-field">
-                <BankAccountSelector
-                  v-model="toCurrency"
-                  :balances="toBalances"
-                  :label="t('forex.targetCurrency')"
-                  id="to-currency"
-                  @update:model-value="() => { quote = null; showConfirm = false }"
-                />
+                <template v-if="hasBankAccounts">
+                  <ForexBankAccountSelector
+                    v-model="toBankAccountId"
+                    :accounts="myBankAccounts"
+                    :label="t('forex.destAccount')"
+                    id="to-bank-account"
+                    @update:model-value="() => { quote = null; showConfirm = false }"
+                  />
+                </template>
+                <template v-else>
+                  <BankAccountSelector
+                    v-model="toCurrency"
+                    :balances="toBalances"
+                    :label="t('forex.targetCurrency')"
+                    id="to-currency"
+                    @update:model-value="() => { quote = null; showConfirm = false }"
+                  />
+                </template>
               </div>
               <div class="swap-field amount-field">
                 <label class="field-label">{{ t('forex.youReceive') }}</label>
@@ -666,6 +800,35 @@ watch(activeTab, async (tab) => {
 }
 
 .statement-link:hover {
+  text-decoration: underline;
+}
+
+.ba-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-surface-alt, #1e2a3a);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 0.65rem 1rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.ba-notice-icon {
+  font-size: 1.1rem;
+}
+
+.statement-link-inline {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-accent, #4f8ef7);
+  text-decoration: none;
+  margin-left: 0.25rem;
+}
+
+.statement-link-inline:hover {
   text-decoration: underline;
 }
 

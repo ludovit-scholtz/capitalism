@@ -834,6 +834,16 @@ export type MockState = {
     suspendedReason: string | null
     currencyCode: string
   }>
+  /** Player's company bank accounts returned by the myBankAccounts query. */
+  myBankAccounts: Array<{
+    id: string
+    accountNumber: string
+    currencyCode: string
+    currencySymbol: string
+    balance: number
+    companyId: string
+    companyName: string
+  }>
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -1951,6 +1961,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     bankStatementRows: {},
     cityMediaHouses: {},
     buildingBankAccounts: {},
+    myBankAccounts: [],
     ...initial,
   }
 
@@ -5037,9 +5048,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     // Forex exchange handlers
     if (query.includes('forexQuote') && !query.includes('executeForexSwap')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
-      const vars = body.variables?.input as { fromCurrencyCode: string; toCurrencyCode: string; amount: number } | undefined
+      const vars = body.variables?.input as { fromCurrencyCode: string; toCurrencyCode: string; amount: number; fromBankAccountId?: string; toBankAccountId?: string } | undefined
       const player = state.players.find((p) => p.id === state.currentUserId)
-      const availableBalance = player ? player.personalCash : 0
+      let availableBalance: number
+      if (vars?.fromBankAccountId) {
+        const acc = state.myBankAccounts.find((a) => a.id === vars.fromBankAccountId)
+        availableBalance = acc?.balance ?? 0
+      } else {
+        availableBalance = player ? player.personalCash : 0
+      }
       const feeAmount = Math.round((vars?.amount ?? 0) * 0.01 * 10000) / 10000
       const netAmount = (vars?.amount ?? 0) - feeAmount
       const fromRate = state.fxRates.find((r) => r.quoteCurrencyCode === vars?.fromCurrencyCode)
@@ -5085,6 +5102,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('myBankAccounts') && !query.includes('executeForexSwap')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myBankAccounts: state.myBankAccounts } }),
+      })
+    }
+
     if (query.includes('forexTradeHistory') && !query.includes('executeForexSwap')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       return route.fulfill({
@@ -5106,15 +5132,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('executeForexSwap')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
-      const vars = body.variables?.input as { fromCurrencyCode: string; toCurrencyCode: string; amount: number } | undefined
+      const vars = body.variables?.input as { fromCurrencyCode: string; toCurrencyCode: string; amount: number; fromBankAccountId?: string; toBankAccountId?: string } | undefined
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (!player) return routeJsonError('Player not found', 'PLAYER_NOT_FOUND')
       const fromCode = vars?.fromCurrencyCode ?? 'EUR'
       const toCode = vars?.toCurrencyCode ?? 'CZK'
       const amount = vars?.amount ?? 0
 
-      // Check balance
-      const availableBalance = fromCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)?.balance ?? 0)
+      // Check balance from bank account or personal wallet
+      let availableBalance: number
+      if (vars?.fromBankAccountId) {
+        const acc = state.myBankAccounts.find((a) => a.id === vars.fromBankAccountId)
+        if (!acc) return routeJsonError('Source bank account not found or you do not own it.', 'ACCOUNT_NOT_FOUND')
+        if (acc.currencyCode !== fromCode) return routeJsonError(`Source bank account currency (${acc.currencyCode}) does not match the requested from-currency (${fromCode}).`, 'CURRENCY_MISMATCH')
+        availableBalance = acc.balance
+      } else {
+        availableBalance = fromCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)?.balance ?? 0)
+      }
       if (amount > availableBalance) return routeJsonError('Insufficient balance.', 'INSUFFICIENT_FUNDS')
 
       const feeAmount = Math.round(amount * 0.01 * 10000) / 10000
@@ -5127,13 +5161,20 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const toAmount = Math.round(netAmount * rate * 10000) / 10000
 
       // Update balances
-      if (fromCode === 'EUR') {
+      if (vars?.fromBankAccountId) {
+        const acc = state.myBankAccounts.find((a) => a.id === vars.fromBankAccountId)
+        if (acc) acc.balance -= amount
+      } else if (fromCode === 'EUR') {
         player.personalCash -= amount
       } else {
         const bal = state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)
         if (bal) bal.balance -= amount
       }
-      if (toCode === 'EUR') {
+
+      if (vars?.toBankAccountId) {
+        const toAcc = state.myBankAccounts.find((a) => a.id === vars.toBankAccountId)
+        if (toAcc) toAcc.balance += toAmount
+      } else if (toCode === 'EUR') {
         player.personalCash += toAmount
       } else {
         let toBal = state.playerCurrencyBalances.find((b) => b.currencyCode === toCode)
@@ -5163,8 +5204,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       state.forexTradeHistory.unshift(tradeEntry)
 
-      const newFromBalance = fromCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)?.balance ?? 0)
-      const newToBalance = toCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === toCode)?.balance ?? 0)
+      let newFromBalance: number
+      if (vars?.fromBankAccountId) {
+        newFromBalance = state.myBankAccounts.find((a) => a.id === vars.fromBankAccountId)?.balance ?? 0
+      } else {
+        newFromBalance = fromCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === fromCode)?.balance ?? 0)
+      }
+      let newToBalance: number
+      if (vars?.toBankAccountId) {
+        newToBalance = state.myBankAccounts.find((a) => a.id === vars.toBankAccountId)?.balance ?? 0
+      } else {
+        newToBalance = toCode === 'EUR' ? player.personalCash : (state.playerCurrencyBalances.find((b) => b.currencyCode === toCode)?.balance ?? 0)
+      }
 
       return route.fulfill({
         status: 200,
