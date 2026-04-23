@@ -142,6 +142,7 @@ public class Program
         builder.Services.AddScoped<TickProcessor>();
         builder.Services.AddScoped<ITickPhase, WeatherUpdatePhase>();
         builder.Services.AddScoped<ITickPhase, PowerDistributionPhase>();
+        builder.Services.AddScoped<ITickPhase, PowerGridEconomicsPhase>();
         builder.Services.AddScoped<ITickPhase, ConstructionPhase>();
         builder.Services.AddScoped<ITickPhase, BuildingUpgradePhase>();
         builder.Services.AddScoped<ITickPhase, LandMarketPhase>();

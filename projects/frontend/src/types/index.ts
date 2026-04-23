@@ -801,6 +801,28 @@ export interface BuildingFinancialTimeline {
   timeline: BuildingFinancialTickSnapshot[]
 }
 
+export interface PowerPlantTickSnapshot {
+  tick: number
+  surplusIncome: number
+  gridFine: number
+  operatingCosts: number
+  netProfit: number
+}
+
+export interface PowerPlantAnalytics {
+  buildingId: string
+  buildingName: string
+  plantType: string
+  currentOutputMw: number
+  dataFromTick: number
+  dataToTick: number
+  totalSurplusIncome: number
+  totalGridFines: number
+  totalOperatingCosts: number
+  totalNetProfit: number
+  timeline: PowerPlantTickSnapshot[]
+}
+
 export interface LedgerEntryResult {
   id: string
   category: string
