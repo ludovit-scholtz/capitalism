@@ -66,7 +66,7 @@ Change cash flow management completely from the onboarding process, through unit
 - Everywhere where the currency is displayed, for example in the units, use the number formatting component
 - Add to the title the original number to be formatted and currency after it
 
-### Power plants (30% complete)
+### Power plants (65% complete)
 
 - Create the powerplant units and implement them on frontend as well
 - Implement everything mentioned in the power plant section below

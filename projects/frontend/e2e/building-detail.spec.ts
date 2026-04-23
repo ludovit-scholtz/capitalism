@@ -19774,3 +19774,229 @@ test.describe('Media house management panel', () => {
     await expect(effectivenessSection.locator('.mh-channel-mult-value').first()).toContainText('×2.0')
   })
 })
+
+// ── Power plant analytics panel tests ────────────────────────────────────────
+
+test.describe('Power plant analytics panel', () => {
+  function makePowerPlantBuilding(overrides: Partial<MockBuilding> = {}): MockBuilding {
+    return {
+      id: 'pp-building-1',
+      companyId: 'company-1',
+      cityId: 'city-ba',
+      type: 'POWER_PLANT',
+      name: 'Coal Power Station',
+      latitude: 48.15,
+      longitude: 17.11,
+      level: 1,
+      powerConsumption: 0,
+      powerOutput: 50,
+      powerPlantType: 'COAL',
+      powerStatus: 'POWERED',
+      isForSale: false,
+      builtAtUtc: '2026-01-01T00:00:00Z',
+      pendingConfiguration: null,
+      units: [],
+      ...overrides,
+    }
+  }
+
+  test('shows power plant analytics panel for POWER_PLANT buildings', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding()],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+    await expect(analyticsPanel.getByText('⚡ Power Plant P&L')).toBeVisible()
+  })
+
+  test('displays P&L summary metrics in analytics panel', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding()],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Should show all four metric labels
+    await expect(analyticsPanel.getByText('Surplus Income', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Grid Fines', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Operating Costs', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Net Profit', { exact: true })).toBeVisible()
+  })
+
+  test('shows unit guide cards for POWER_GENERATION and BATTERY_STORAGE', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding()],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Unit guide cards
+    await expect(analyticsPanel.getByText('Power Generation')).toBeVisible()
+    await expect(analyticsPanel.getByText('Battery Storage')).toBeVisible()
+  })
+
+  test('does not show analytics panel for non-power-plant buildings', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Furniture Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          {
+            id: 'factory-1',
+            companyId: 'company-1',
+            cityId: 'city-ba',
+            type: 'FACTORY',
+            name: 'Furniture Factory',
+            latitude: 48.15,
+            longitude: 17.11,
+            level: 1,
+            powerConsumption: 5,
+            isForSale: false,
+            builtAtUtc: '2026-01-01T00:00:00Z',
+            pendingConfiguration: null,
+            units: [],
+          },
+        ],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/factory-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).not.toBeVisible()
+  })
+
+  test('shows POWER_GENERATION and BATTERY_STORAGE unit types in building grid', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [
+          makePowerPlantBuilding({
+            units: [
+              {
+                id: 'u-pg-1',
+                buildingId: 'pp-building-1',
+                unitType: 'POWER_GENERATION',
+                gridX: 0,
+                gridY: 0,
+                level: 1,
+                linkUp: false,
+                linkDown: false,
+                linkLeft: false,
+                linkRight: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+              },
+              {
+                id: 'u-bs-1',
+                buildingId: 'pp-building-1',
+                unitType: 'BATTERY_STORAGE',
+                gridX: 1,
+                gridY: 0,
+                level: 1,
+                linkUp: false,
+                linkDown: false,
+                linkLeft: false,
+                linkRight: false,
+                linkUpLeft: false,
+                linkUpRight: false,
+                linkDownLeft: false,
+                linkDownRight: false,
+              },
+            ],
+          }),
+        ],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    // Unit type labels should appear in the current layout section
+    await expect(page.locator('.cell-type', { hasText: 'Power Generation' }).first()).toBeVisible()
+    await expect(page.locator('.cell-type', { hasText: 'Battery Storage' }).first()).toBeVisible()
+  })
+})

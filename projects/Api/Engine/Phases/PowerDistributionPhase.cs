@@ -11,10 +11,9 @@ namespace Api.Engine.Phases;
 /// power plants benefits the whole city but must still compete for prime lots.
 ///
 /// Balance rules (per city, applied once per tick before production phases):
-///   - Supply = sum of PowerOutput across all POWER_PLANT buildings in the city
-///             (using GameConstants.DefaultPowerOutputMw if PowerOutput is null).
-///   - Demand = sum of PowerConsumption across all non-power-plant buildings in the city
-///             (using GameConstants.PowerDemandMw(type, level) if PowerConsumption is 0).
+///   - Supply = sum of each plant's effective output (base + POWER_GENERATION unit boosts,
+///             scaled by weather for SOLAR/WIND) + BATTERY_STORAGE smoothing buffer.
+///   - Demand = sum of PowerConsumption across all non-power-plant buildings in the city.
 ///   - If supply &gt;= demand:          all consumer buildings → POWERED.
 ///   - If supply &gt;= 50% of demand:   all consumer buildings → CONSTRAINED.
 ///   - If supply &lt; 50% of demand:    all consumer buildings → OFFLINE.
@@ -63,14 +62,23 @@ public sealed class PowerDistributionPhase : ITickPhase
 
             // Total supply from all power plants in this city.
             // SOLAR and WIND plants have their output scaled by the current weather factor.
+            // POWER_GENERATION units boost the rated output; BATTERY_STORAGE adds smoothing.
             var cityId = cityGroup.Key;
             context.WeatherByCity.TryGetValue(cityId, out var weather);
 
-            var totalSupplyMw = powerPlants.Sum(plant =>
+            var totalRawSupplyMw = powerPlants.Sum(plant =>
             {
                 var baseOutput = plant.PowerOutput > 0m
                     ? plant.PowerOutput.Value
                     : GameConstants.DefaultPowerOutputMw(plant.PowerPlantType);
+
+                // Apply POWER_GENERATION unit boosts (before weather scaling).
+                if (context.UnitsByBuilding.TryGetValue(plant.Id, out var plantUnits))
+                {
+                    baseOutput += plantUnits
+                        .Where(u => u.UnitType == UnitType.PowerGeneration)
+                        .Sum(u => GameConstants.PowerGenerationUnitBoostMwPerLevel * u.Level);
+                }
 
                 var factor = plant.PowerPlantType switch
                 {
@@ -81,6 +89,19 @@ public sealed class PowerDistributionPhase : ITickPhase
                 return baseOutput * factor;
             });
 
+            // BATTERY_STORAGE units add a smoothing buffer to effective supply,
+            // reducing exposure to constrained/offline transitions during partial shortages.
+            var batteryBufferMw = powerPlants.Sum(plant =>
+            {
+                if (!context.UnitsByBuilding.TryGetValue(plant.Id, out var plantUnits))
+                    return 0m;
+                return plantUnits
+                    .Where(u => u.UnitType == UnitType.BatteryStorage)
+                    .Sum(u => GameConstants.BatterySmoothingMwPerLevel * u.Level);
+            });
+
+            var totalEffectiveSupplyMw = totalRawSupplyMw + batteryBufferMw;
+
             // Total demand from all consuming buildings in this city.
             // PowerConsumption == 0 means the building predates the power system
             // and operates without explicit power requirements (legacy/grandfathered).
@@ -88,11 +109,11 @@ public sealed class PowerDistributionPhase : ITickPhase
 
             // Determine city-wide power status.
             string cityStatus;
-            if (totalDemandMw == 0m || totalSupplyMw >= totalDemandMw)
+            if (totalDemandMw == 0m || totalEffectiveSupplyMw >= totalDemandMw)
             {
                 cityStatus = PowerStatus.Powered;
             }
-            else if (totalSupplyMw >= totalDemandMw * 0.5m)
+            else if (totalEffectiveSupplyMw >= totalDemandMw * 0.5m)
             {
                 cityStatus = PowerStatus.Constrained;
             }

@@ -136,6 +136,7 @@ public sealed partial class Query
         LedgerCategory.Revenue,
         LedgerCategory.MediaHouseIncome,
         LedgerCategory.RentIncome,
+        LedgerCategory.GridSurplusIncome,
     ];
 
     private static readonly HashSet<string> BuildingFinancialCostCategories =
@@ -145,6 +146,7 @@ public sealed partial class Query
         LedgerCategory.EnergyCost,
         LedgerCategory.Marketing,
         LedgerCategory.DiscardedResources,
+        LedgerCategory.GridFine,
     ];
 
     /// <summary>

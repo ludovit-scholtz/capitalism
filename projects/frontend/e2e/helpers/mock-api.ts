@@ -4307,7 +4307,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('buildingFinancialTimeline')) {
+    if (query.includes('buildingFinancialTimeline') && !query.includes('powerPlantAnalytics')) {
       const buildingId = body.variables?.buildingId
       const limit = Number(body.variables?.limit ?? 100)
       const buildingFinancialTimeline = buildMockBuildingFinancialTimeline(state, buildingId, limit)
@@ -4316,6 +4316,51 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { buildingFinancialTimeline } }),
+      })
+    }
+
+    if (query.includes('powerPlantAnalytics')) {
+      const buildingId = body.variables?.buildingId
+      const limit = Number(body.variables?.limit ?? 100)
+      const building = state.players
+        .flatMap((p) => p.companies)
+        .flatMap((c) => c.buildings)
+        .find((b) => b.id === buildingId)
+
+      if (!building) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Building not found', extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+        })
+      }
+
+      const dataToTick = state.gameState.currentTick
+      const dataFromTick = Math.max(0, dataToTick - (limit - 1))
+      const powerPlantAnalytics = {
+        buildingId: building.id,
+        buildingName: building.name,
+        plantType: building.powerPlantType ?? 'COAL',
+        currentOutputMw: building.powerOutput ?? 50,
+        dataFromTick,
+        dataToTick,
+        totalSurplusIncome: 225,
+        totalGridFines: 0,
+        totalOperatingCosts: 12,
+        totalNetProfit: 213,
+        timeline: Array.from({ length: Math.min(limit, 5) }, (_, i) => ({
+          tick: dataToTick - 4 + i,
+          surplusIncome: 45,
+          gridFine: 0,
+          operatingCosts: 2.4,
+          netProfit: 42.6,
+        })),
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { powerPlantAnalytics } }),
       })
     }
 

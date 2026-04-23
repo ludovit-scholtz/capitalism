@@ -62,4 +62,8 @@ public static class LedgerCategory
     public const string DepositInterestReceived = "DEPOSIT_INTEREST_RECEIVED";
     public const string CentralBankBorrow = "CENTRAL_BANK_BORROW";
     public const string CentralBankRepay = "CENTRAL_BANK_REPAY";
+    /// <summary>Income earned by a power plant operator when city supply exceeds demand.</summary>
+    public const string GridSurplusIncome = "GRID_SURPLUS_INCOME";
+    /// <summary>Fine charged to a power plant operator when city supply falls below demand.</summary>
+    public const string GridFine = "GRID_FINE";
 }

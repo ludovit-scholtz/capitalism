@@ -278,6 +278,34 @@ public static class GameConstants
     /// </summary>
     public const decimal ConstrainedEfficiencyFactor = 0.5m;
 
+    // ── Power plant unit constants ────────────────────────────────────────────
+
+    /// <summary>
+    /// Additional MW output per level of a POWER_GENERATION unit installed in a power plant.
+    /// A Level 1 unit adds 10 MW to the plant's rated output before weather scaling.
+    /// </summary>
+    public const decimal PowerGenerationUnitBoostMwPerLevel = 10m;
+
+    /// <summary>
+    /// MW of effective supply smoothing provided per level of a BATTERY_STORAGE unit.
+    /// Battery units reduce the effective shortage seen by the grid fine calculator.
+    /// </summary>
+    public const decimal BatterySmoothingMwPerLevel = 5m;
+
+    // ── Grid economics constants ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Revenue earned per MW of surplus power delivered to the grid per tick.
+    /// Paid proportionally to each plant's share of installed capacity.
+    /// </summary>
+    public const decimal GridSurplusIncomePerMwTick = 5m;
+
+    /// <summary>
+    /// Government fine per MW of power shortage per tick.
+    /// Charged proportionally to each operator's share of installed capacity.
+    /// </summary>
+    public const decimal GridFinePerMwTick = 8m;
+
     // ── Market trend constants ────────────────────────────────────────────────
 
     /// <summary>
@@ -371,17 +399,19 @@ public static class GameConstants
     {
         decimal baseCost = unitType switch
         {
-            Data.Entities.UnitType.Mining         => 5_000m,
-            Data.Entities.UnitType.Storage        => 2_000m,
-            Data.Entities.UnitType.Manufacturing  => 8_000m,
-            Data.Entities.UnitType.Purchase       => 3_000m,
-            Data.Entities.UnitType.PublicSales    => 6_000m,
-            Data.Entities.UnitType.B2BSales       => 4_000m,
-            Data.Entities.UnitType.ProductQuality => 10_000m,
-            Data.Entities.UnitType.BrandQuality   => 10_000m,
-            Data.Entities.UnitType.Marketing      => 5_000m,
-            Data.Entities.UnitType.Branding       => 5_000m,
-            _                                     => 4_000m
+            Data.Entities.UnitType.Mining           => 5_000m,
+            Data.Entities.UnitType.Storage          => 2_000m,
+            Data.Entities.UnitType.Manufacturing    => 8_000m,
+            Data.Entities.UnitType.Purchase         => 3_000m,
+            Data.Entities.UnitType.PublicSales      => 6_000m,
+            Data.Entities.UnitType.B2BSales         => 4_000m,
+            Data.Entities.UnitType.ProductQuality   => 10_000m,
+            Data.Entities.UnitType.BrandQuality     => 10_000m,
+            Data.Entities.UnitType.Marketing        => 5_000m,
+            Data.Entities.UnitType.Branding         => 5_000m,
+            Data.Entities.UnitType.PowerGeneration  => 15_000m,
+            Data.Entities.UnitType.BatteryStorage   => 12_000m,
+            _                                       => 4_000m
         };
         // Each subsequent level costs 5× more: L1→L2 = base, L2→L3 = 5×base, L3→L4 = 25×base
         return baseCost * (decimal)Math.Pow(5, Math.Max(currentLevel - 1, 0));
@@ -390,43 +420,49 @@ public static class GameConstants
     /// <summary>Returns true when the given unit type supports level upgrades.</summary>
     public static bool IsUpgradableUnitType(string unitType) => unitType switch
     {
-        Data.Entities.UnitType.Mining         => true,
-        Data.Entities.UnitType.Storage        => true,
-        Data.Entities.UnitType.Manufacturing  => true,
-        Data.Entities.UnitType.Purchase       => true,
-        Data.Entities.UnitType.PublicSales    => true,
-        Data.Entities.UnitType.B2BSales       => true,
-        Data.Entities.UnitType.ProductQuality => true,
-        Data.Entities.UnitType.BrandQuality   => true,
-        _                                     => false
+        Data.Entities.UnitType.Mining           => true,
+        Data.Entities.UnitType.Storage          => true,
+        Data.Entities.UnitType.Manufacturing    => true,
+        Data.Entities.UnitType.Purchase         => true,
+        Data.Entities.UnitType.PublicSales      => true,
+        Data.Entities.UnitType.B2BSales         => true,
+        Data.Entities.UnitType.ProductQuality   => true,
+        Data.Entities.UnitType.BrandQuality     => true,
+        Data.Entities.UnitType.PowerGeneration  => true,
+        Data.Entities.UnitType.BatteryStorage   => true,
+        _                                       => false
     };
 
     /// <summary>Returns the primary stat value for a unit type at the given level (for UI display).</summary>
     public static decimal GetUnitStat(string unitType, int level) => unitType switch
     {
-        Data.Entities.UnitType.Mining         => MiningRate(level),
-        Data.Entities.UnitType.Storage        => StorageUnitHoldingCapacity(level),
-        Data.Entities.UnitType.Manufacturing  => ManufacturingBatches(level),
-        Data.Entities.UnitType.Purchase       => PurchaseCapacity(level),
-        Data.Entities.UnitType.PublicSales    => SalesCapacity(level),
-        Data.Entities.UnitType.B2BSales       => SalesCapacity(level),
-        Data.Entities.UnitType.ProductQuality => ResearchQualityRate(level) * 1000m,
-        Data.Entities.UnitType.BrandQuality   => ResearchEfficiencyRate(level) * 1000m,
-        _                                     => (decimal)level
+        Data.Entities.UnitType.Mining           => MiningRate(level),
+        Data.Entities.UnitType.Storage          => StorageUnitHoldingCapacity(level),
+        Data.Entities.UnitType.Manufacturing    => ManufacturingBatches(level),
+        Data.Entities.UnitType.Purchase         => PurchaseCapacity(level),
+        Data.Entities.UnitType.PublicSales      => SalesCapacity(level),
+        Data.Entities.UnitType.B2BSales         => SalesCapacity(level),
+        Data.Entities.UnitType.ProductQuality   => ResearchQualityRate(level) * 1000m,
+        Data.Entities.UnitType.BrandQuality     => ResearchEfficiencyRate(level) * 1000m,
+        Data.Entities.UnitType.PowerGeneration  => PowerGenerationUnitBoostMwPerLevel * level,
+        Data.Entities.UnitType.BatteryStorage   => BatterySmoothingMwPerLevel * level,
+        _                                       => (decimal)level
     };
 
     /// <summary>Returns a human-readable label for the primary stat of the given unit type.</summary>
     public static string GetUnitStatLabel(string unitType) => unitType switch
     {
-        Data.Entities.UnitType.Mining         => "units/tick",
-        Data.Entities.UnitType.Storage        => "capacity",
-        Data.Entities.UnitType.Manufacturing  => "batches/tick",
-        Data.Entities.UnitType.Purchase       => "units/tick",
-        Data.Entities.UnitType.PublicSales    => "units/tick",
-        Data.Entities.UnitType.B2BSales       => "units/tick",
-        Data.Entities.UnitType.ProductQuality => "quality‰/tick",
-        Data.Entities.UnitType.BrandQuality   => "efficiency‰/tick",
-        _                                     => "level"
+        Data.Entities.UnitType.Mining           => "units/tick",
+        Data.Entities.UnitType.Storage          => "capacity",
+        Data.Entities.UnitType.Manufacturing    => "batches/tick",
+        Data.Entities.UnitType.Purchase         => "units/tick",
+        Data.Entities.UnitType.PublicSales      => "units/tick",
+        Data.Entities.UnitType.B2BSales         => "units/tick",
+        Data.Entities.UnitType.ProductQuality   => "quality‰/tick",
+        Data.Entities.UnitType.BrandQuality     => "efficiency‰/tick",
+        Data.Entities.UnitType.PowerGeneration  => "MW output boost",
+        Data.Entities.UnitType.BatteryStorage   => "MW buffer",
+        _                                       => "level"
     };
 
     // ── Construction constants ────────────────────────────────────────────────

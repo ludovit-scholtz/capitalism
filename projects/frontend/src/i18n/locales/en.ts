@@ -863,6 +863,8 @@ export default {
       PUBLIC_SALES: 'Public Sales',
       PRODUCT_QUALITY: 'Product Quality',
       BRAND_QUALITY: 'Brand Quality',
+      POWER_GENERATION: 'Power Generation',
+      BATTERY_STORAGE: 'Battery Storage',
     },
     unitDescriptions: {
       MINING: 'Produces raw materials from the mine.',
@@ -875,6 +877,8 @@ export default {
       PUBLIC_SALES: 'Sells products directly to the public.',
       PRODUCT_QUALITY: 'Researches product quality improvements.',
       BRAND_QUALITY: 'Researches brand quality improvements.',
+      POWER_GENERATION: 'Boosts the plant\'s rated output by +10 MW per level, increasing grid contribution and surplus income potential.',
+      BATTERY_STORAGE: 'Provides +5 MW of supply-smoothing buffer per level, reducing shortage fine exposure during low-generation periods.',
     },
     links: 'Links',
     linkUp: 'Up',
@@ -1926,6 +1930,27 @@ export default {
     noForecast: 'Weather forecast not yet available for this city.',
     renewableBadge: 'Renewable — weather-variable',
     fuelBadge: 'Fuel-based — constant output',
+    analytics: {
+      panelTitle: '⚡ Power Plant P&L',
+      surplusIncome: 'Surplus Income',
+      gridFine: 'Grid Fines',
+      operatingCosts: 'Operating Costs',
+      netProfit: 'Net Profit',
+      tickWindow: 'Ticks {start}–{end}',
+      noData: 'No grid economics data yet. Economics are recorded each tick once the city has both power plants and consumers.',
+      surplusHint: 'Earned when city supply exceeds demand. Rate: {rate}/MW/tick.',
+      fineHint: 'Charged when city supply falls short of demand. Rate: {rate}/MW/tick.',
+    },
+    units: {
+      POWER_GENERATION: {
+        label: 'Power Generation',
+        description: 'Boosts the plant\'s rated output by {boost} MW per level, increasing grid contribution and surplus income potential.',
+      },
+      BATTERY_STORAGE: {
+        label: 'Battery Storage',
+        description: 'Provides {buffer} MW of supply-smoothing buffer per level, reducing exposure to shortage fines during low-generation periods.',
+      },
+    },
   },
   property: {
     panelTitle: 'Property Management',
@@ -1977,6 +2002,8 @@ export default {
       MARKETING: 'Marketing',
       PRODUCT_QUALITY: 'Quality R&D',
       BRAND_QUALITY: 'Brand R&D',
+      POWER_GENERATION: 'Power Gen',
+      BATTERY_STORAGE: 'Battery',
     },
   },
   financialSummary: {

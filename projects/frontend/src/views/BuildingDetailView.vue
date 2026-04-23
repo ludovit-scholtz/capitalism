@@ -69,6 +69,7 @@ import type {
   City,
   Company,
   GlobalExchangeOffer,
+  PowerPlantAnalytics,
   ProcurementPreview,
   ProductType,
   PublicSalesAnalytics,
@@ -268,6 +269,10 @@ const recentActivity = ref<BuildingRecentActivityEvent[]>([])
 const recentActivityLoading = ref(false)
 const buildingFinancialTimeline = ref<BuildingFinancialTimeline | null>(null)
 const buildingFinancialTimelineLoading = ref(false)
+
+// Power plant analytics state
+const powerPlantAnalytics = ref<PowerPlantAnalytics | null>(null)
+const powerPlantAnalyticsLoading = ref(false)
 
 // R&D research progress state
 const researchBrands = ref<ResearchBrandState[]>([])
@@ -814,6 +819,7 @@ watch(selectedDisplayUnit, () => {
 })
 
 let activeBuildingFinancialTimelineRequest = 0
+let activePowerPlantAnalyticsRequest = 0
 
 type ExchangeOfferItem = AnnotatedExchangeOffer
 
@@ -3554,6 +3560,55 @@ async function loadBuildingFinancialTimeline(buildingId: string, isRefresh = fal
   }
 }
 
+async function loadPowerPlantAnalytics(buildingId: string, isRefresh = false) {
+  if (!auth.token) {
+    powerPlantAnalytics.value = null
+    powerPlantAnalyticsLoading.value = false
+    return
+  }
+
+  const requestId = ++activePowerPlantAnalyticsRequest
+  if (!isRefresh || powerPlantAnalytics.value == null) {
+    powerPlantAnalyticsLoading.value = true
+  }
+
+  try {
+    const data = await gqlRequest<{ powerPlantAnalytics: PowerPlantAnalytics }>(
+      `query PowerPlantAnalytics($buildingId: UUID!, $limit: Int) {
+        powerPlantAnalytics(buildingId: $buildingId, limit: $limit) {
+          buildingId
+          buildingName
+          plantType
+          currentOutputMw
+          dataFromTick
+          dataToTick
+          totalSurplusIncome
+          totalGridFines
+          totalOperatingCosts
+          totalNetProfit
+          timeline {
+            tick
+            surplusIncome
+            gridFine
+            operatingCosts
+            netProfit
+          }
+        }
+      }`,
+      { buildingId, limit: 100 },
+    )
+    if (requestId !== activePowerPlantAnalyticsRequest) return
+    powerPlantAnalytics.value = data.powerPlantAnalytics
+  } catch {
+    if (requestId !== activePowerPlantAnalyticsRequest) return
+    if (!isRefresh) powerPlantAnalytics.value = null
+  } finally {
+    if (requestId === activePowerPlantAnalyticsRequest) {
+      powerPlantAnalyticsLoading.value = false
+    }
+  }
+}
+
 async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
   const requestId = ++activeBuildingLoadRequest
   const shouldShowLoading = !building.value
@@ -3797,6 +3852,9 @@ async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
     void loadUnitOperationalStatuses(buildingId.value)
     void loadRecentActivity(buildingId.value)
     void loadBuildingFinancialTimeline(buildingId.value)
+    if (building.value?.type === 'POWER_PLANT') {
+      void loadPowerPlantAnalytics(buildingId.value)
+    }
   } catch (reason: unknown) {
     if (requestId !== activeBuildingLoadRequest) {
       return
@@ -3887,6 +3945,9 @@ useTickRefresh(async () => {
   void loadUnitOperationalStatuses(buildingId.value)
   void loadRecentActivity(buildingId.value)
   void loadBuildingFinancialTimeline(buildingId.value, true)
+  if (building.value?.type === 'POWER_PLANT') {
+    void loadPowerPlantAnalytics(buildingId.value, true)
+  }
 })
 
 watch(
@@ -4413,6 +4474,98 @@ watch(
             {{ t(warning.key, warning.params || {}) }}
           </li>
         </ul>
+      </div>
+
+      <!-- Power Plant analytics panel: POWER_PLANT buildings -->
+      <div v-if="building.type === 'POWER_PLANT'" class="power-plant-analytics-panel" role="region" aria-label="power plant analytics">
+        <div class="power-plant-analytics-header">
+          <h2 class="power-plant-analytics-title">{{ t('powerPlant.analytics.panelTitle') }}</h2>
+          <span class="meta-pill" style="font-size: 0.8rem">
+            {{ building.powerOutput != null ? building.powerOutput : '' }} MW
+            · {{ building.powerPlantType ?? '—' }}
+          </span>
+        </div>
+
+        <div v-if="powerPlantAnalyticsLoading" class="ppa-loading">{{ t('common.loading') }}</div>
+
+        <template v-else-if="powerPlantAnalytics">
+          <p class="ppa-tick-window config-help">
+            {{ t('powerPlant.analytics.tickWindow', { start: powerPlantAnalytics.dataFromTick, end: powerPlantAnalytics.dataToTick }) }}
+          </p>
+
+          <div class="ppa-summary-grid">
+            <div class="ppa-metric">
+              <span class="ppa-metric-label" :title="t('powerPlant.analytics.surplusHint', { rate: 5 })">
+                {{ t('powerPlant.analytics.surplusIncome') }}
+              </span>
+              <strong class="ppa-metric-value ppa-income">{{ formatCurrency(powerPlantAnalytics.totalSurplusIncome) }}</strong>
+            </div>
+            <div class="ppa-metric">
+              <span class="ppa-metric-label" :title="t('powerPlant.analytics.fineHint', { rate: 8 })">
+                {{ t('powerPlant.analytics.gridFine') }}
+              </span>
+              <strong class="ppa-metric-value ppa-fine">{{ formatCurrency(powerPlantAnalytics.totalGridFines) }}</strong>
+            </div>
+            <div class="ppa-metric">
+              <span class="ppa-metric-label">{{ t('powerPlant.analytics.operatingCosts') }}</span>
+              <strong class="ppa-metric-value ppa-cost">{{ formatCurrency(powerPlantAnalytics.totalOperatingCosts) }}</strong>
+            </div>
+            <div class="ppa-metric">
+              <span class="ppa-metric-label">{{ t('powerPlant.analytics.netProfit') }}</span>
+              <strong
+                class="ppa-metric-value"
+                :class="{
+                  'building-profit-positive-text': powerPlantAnalytics.totalNetProfit >= 0,
+                  'building-profit-negative-text': powerPlantAnalytics.totalNetProfit < 0,
+                }"
+              >
+                {{ formatCurrency(powerPlantAnalytics.totalNetProfit) }}
+              </strong>
+            </div>
+          </div>
+
+          <!-- Per-tick P&L bar chart -->
+          <div v-if="powerPlantAnalytics.timeline.some(s => s.surplusIncome > 0 || s.gridFine > 0 || s.operatingCosts > 0)" class="ppa-chart" role="img" :aria-label="t('powerPlant.analytics.panelTitle')">
+            <div
+              v-for="snap in powerPlantAnalytics.timeline"
+              :key="snap.tick"
+              class="ppa-bar-group"
+              :title="`Tick ${snap.tick}: +${formatCurrency(snap.surplusIncome)} income, -${formatCurrency(snap.gridFine + snap.operatingCosts)} costs`"
+            >
+              <div
+                v-if="snap.surplusIncome > 0"
+                class="ppa-bar ppa-bar-income"
+                :style="{ height: `${Math.min(Math.round((snap.surplusIncome / (Math.max(...powerPlantAnalytics.timeline.map(s => Math.max(s.surplusIncome, s.gridFine + s.operatingCosts))) || 1)) * 50), 50)}px` }"
+              />
+              <div
+                v-if="snap.gridFine + snap.operatingCosts > 0"
+                class="ppa-bar ppa-bar-cost"
+                :style="{ height: `${Math.min(Math.round(((snap.gridFine + snap.operatingCosts) / (Math.max(...powerPlantAnalytics.timeline.map(s => Math.max(s.surplusIncome, s.gridFine + s.operatingCosts))) || 1)) * 50), 50)}px` }"
+              />
+            </div>
+          </div>
+          <p v-else class="ppa-empty-state">{{ t('powerPlant.analytics.noData') }}</p>
+        </template>
+
+        <p v-else class="ppa-empty-state">{{ t('powerPlant.analytics.noData') }}</p>
+
+        <!-- Unit description cards for POWER_GENERATION and BATTERY_STORAGE -->
+        <div class="ppa-unit-guide">
+          <div class="ppa-unit-card">
+            <span class="ppa-unit-icon">⚡</span>
+            <div>
+              <strong>{{ t('powerPlant.units.POWER_GENERATION.label') }}</strong>
+              <p class="ppa-unit-desc">{{ t('powerPlant.units.POWER_GENERATION.description', { boost: 10 }) }}</p>
+            </div>
+          </div>
+          <div class="ppa-unit-card">
+            <span class="ppa-unit-icon">🔋</span>
+            <div>
+              <strong>{{ t('powerPlant.units.BATTERY_STORAGE.label') }}</strong>
+              <p class="ppa-unit-desc">{{ t('powerPlant.units.BATTERY_STORAGE.description', { buffer: 5 }) }}</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- R&D Research Progress panel: RESEARCH_DEVELOPMENT buildings -->
@@ -9465,6 +9618,141 @@ watch(
   border-radius: var(--radius-md, 8px);
   padding: 1.25rem;
   margin-bottom: 1rem;
+}
+
+/* Power plant analytics panel */
+.power-plant-analytics-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.power-plant-analytics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.power-plant-analytics-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.ppa-tick-window {
+  margin-bottom: 0.75rem;
+}
+
+.ppa-loading {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  padding: 0.5rem 0;
+}
+
+.ppa-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+@media (min-width: 640px) {
+  .ppa-summary-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.ppa-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ppa-metric-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  cursor: default;
+}
+
+.ppa-metric-value {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.ppa-income { color: var(--color-success, #22c55e); }
+.ppa-fine { color: var(--color-error, #ef4444); }
+.ppa-cost { color: var(--color-text-secondary); }
+
+.ppa-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 56px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+  border-radius: 4px;
+}
+
+.ppa-bar-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  flex: 1;
+  min-width: 2px;
+}
+
+.ppa-bar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 2px 2px 0 0;
+}
+
+.ppa-bar-income {
+  background: var(--color-success, #22c55e);
+  opacity: 0.8;
+}
+
+.ppa-bar-cost {
+  background: var(--color-error, #ef4444);
+  opacity: 0.7;
+}
+
+.ppa-empty-state {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  padding: 0.5rem 0;
+}
+
+.ppa-unit-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.ppa-unit-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.ppa-unit-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.ppa-unit-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0.25rem 0 0;
 }
 
 .research-progress-header {

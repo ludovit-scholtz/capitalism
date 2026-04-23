@@ -104,6 +104,32 @@ public sealed class BuildingFinancialTickSnapshot
     public decimal Profit { get; set; }
 }
 
+/// <summary>Per-tick P&amp;L analytics for a power plant building.</summary>
+public sealed class PowerPlantAnalytics
+{
+    public Guid BuildingId { get; set; }
+    public string BuildingName { get; set; } = string.Empty;
+    public string PlantType { get; set; } = string.Empty;
+    public decimal CurrentOutputMw { get; set; }
+    public long DataFromTick { get; set; }
+    public long DataToTick { get; set; }
+    public decimal TotalSurplusIncome { get; set; }
+    public decimal TotalGridFines { get; set; }
+    public decimal TotalOperatingCosts { get; set; }
+    public decimal TotalNetProfit { get; set; }
+    public List<PowerPlantTickSnapshot> Timeline { get; set; } = [];
+}
+
+/// <summary>Per-tick snapshot for the power plant P&amp;L timeline.</summary>
+public sealed class PowerPlantTickSnapshot
+{
+    public long Tick { get; set; }
+    public decimal SurplusIncome { get; set; }
+    public decimal GridFine { get; set; }
+    public decimal OperatingCosts { get; set; }
+    public decimal NetProfit { get; set; }
+}
+
 public sealed class LedgerEntryResult
 {
     public Guid Id { get; set; }

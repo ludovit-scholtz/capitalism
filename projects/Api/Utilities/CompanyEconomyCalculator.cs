@@ -88,6 +88,8 @@ public static class CompanyEconomyCalculator
             UnitType.PublicSales => 0.7m,
             UnitType.ProductQuality => 0.55m,
             UnitType.BrandQuality => 0.55m,
+            UnitType.PowerGeneration => 0.4m,
+            UnitType.BatteryStorage => 0.2m,
             _ => 0m,
         };
 
@@ -109,6 +111,8 @@ public static class CompanyEconomyCalculator
             UnitType.PublicSales => 0.12m,
             UnitType.ProductQuality => 0.09m,
             UnitType.BrandQuality => 0.09m,
+            UnitType.PowerGeneration => 0.05m,
+            UnitType.BatteryStorage => 0.03m,
             _ => 0m,
         };
 

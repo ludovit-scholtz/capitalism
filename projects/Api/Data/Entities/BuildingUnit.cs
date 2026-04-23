@@ -24,6 +24,7 @@ public sealed class BuildingUnit
     /// Factory: PURCHASE, MANUFACTURING, BRANDING, STORAGE, B2B_SALES
     /// Sales Shop: PURCHASE, MARKETING, STORAGE, PUBLIC_SALES
     /// R&amp;D: PRODUCT_QUALITY, BRAND_QUALITY
+    /// Power Plant: POWER_GENERATION, BATTERY_STORAGE
     /// </summary>
     [Required, MaxLength(30)]
     public string UnitType { get; set; } = string.Empty;
@@ -139,4 +140,11 @@ public static class UnitType
     // R&D units
     public const string ProductQuality = "PRODUCT_QUALITY";
     public const string BrandQuality = "BRAND_QUALITY";
+
+    // Power plant units
+    /// <summary>Boosts the plant's rated output by PowerGenerationUnitBoostMwPerLevel per level.</summary>
+    public const string PowerGeneration = "POWER_GENERATION";
+
+    /// <summary>Provides a smoothing buffer that partially offsets grid shortage penalties.</summary>
+    public const string BatteryStorage = "BATTERY_STORAGE";
 }
