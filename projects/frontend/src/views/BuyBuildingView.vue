@@ -303,134 +303,164 @@ async function buyBuilding() {
 </script>
 
 <template>
-  <div class="buy-building-view container">
-    <div class="page-nav">
-      <RouterLink to="/dashboard" class="back-link">
+  <div class="container py-8 px-4 max-w-4xl">
+    <!-- Back nav -->
+    <div class="mb-6">
+      <RouterLink
+        to="/dashboard"
+        class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-brand no-underline transition-colors"
+      >
         <span>←</span> {{ t('buildingDetail.backToDashboard') }}
       </RouterLink>
     </div>
 
-    <div class="buy-card">
-      <h1>{{ t('buildings.title') }}</h1>
+    <!-- Main card -->
+    <div class="bg-card border border-divider rounded-xl p-8">
+      <h1 class="text-2xl font-bold mb-6">{{ t('buildings.title') }}</h1>
 
-      <div v-if="error" class="error-message" role="alert">{{ error }}</div>
+      <!-- Error alert -->
+      <div
+        v-if="error"
+        class="flex items-start gap-3 p-3 mb-5 bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad rounded-lg text-sm"
+        role="alert"
+      >
+        {{ error }}
+      </div>
 
-      <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
+      <!-- Loading -->
+      <div v-if="loading" class="text-center py-8 text-muted">{{ t('common.loading') }}</div>
 
       <template v-else>
-        <div class="form-section">
-          <h2>{{ t('buildings.selectType') }}</h2>
-          <div class="type-grid">
+        <!-- Step 1: Building type -->
+        <div class="mb-8">
+          <h2 class="text-lg font-semibold mb-3">{{ t('buildings.selectType') }}</h2>
+          <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
             <button
               v-for="bType in buildingTypes"
               :key="bType"
-              class="type-card"
+              class="type-card flex flex-col items-center gap-1.5 py-5 px-3 border-2 border-divider rounded-lg bg-page cursor-pointer transition-all duration-200 text-body text-center hover:border-brand hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               :class="{ selected: selectedType === bType }"
               @click="selectedType = bType"
             >
-              <span class="type-icon">{{ t(`buildings.typeIcons.${bType}`) }}</span>
-              <span class="type-name">{{ t(`buildings.types.${bType}`) }}</span>
-              <span class="type-desc">{{ t(`buildings.typeDescriptions.${bType}`) }}</span>
+              <span class="text-3xl leading-none">{{ t(`buildings.typeIcons.${bType}`) }}</span>
+              <span class="font-bold text-sm">{{ t(`buildings.types.${bType}`) }}</span>
+              <span class="text-[0.6875rem] text-muted leading-snug">{{ t(`buildings.typeDescriptions.${bType}`) }}</span>
             </button>
           </div>
         </div>
 
-        <div v-if="selectedType" class="form-section">
-          <div class="form-row">
-            <div class="form-group">
-              <label for="buildingName">{{ t('buildings.buildingName') }} <span class="optional-hint">({{ t('common.optional') }})</span></label>
-              <input
-                id="buildingName"
-                v-model="buildingName"
-                type="text"
-                maxlength="200"
-                :placeholder="t('buildings.buildingNamePlaceholder')"
-              />
-            </div>
+        <!-- Step 2: Name + City (shown after type is selected) -->
+        <div v-if="selectedType" class="mb-8 flex flex-col gap-4">
+          <!-- Building name -->
+          <div class="flex flex-col gap-1.5">
+            <label for="buildingName" class="text-sm font-semibold">
+              {{ t('buildings.buildingName') }}
+              <span class="font-normal text-muted ml-1">({{ t('common.optional') }})</span>
+            </label>
+            <input
+              id="buildingName"
+              v-model="buildingName"
+              type="text"
+              maxlength="200"
+              :placeholder="t('buildings.buildingNamePlaceholder')"
+              class="w-full px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base placeholder:text-muted focus:outline-none focus:border-brand focus:shadow-[0_0_0_3px_rgba(0,71,255,0.15)] transition-colors"
+            />
+          </div>
 
-            <div class="form-group">
-              <label for="city">{{ t('buildings.selectCity') }}</label>
-              <div class="city-select-grid">
-                <button
-                  v-for="city in cities"
-                  :key="city.id"
-                  class="city-option"
-                  :class="{ selected: selectedCityId === city.id }"
-                  @click="selectedCityId = city.id"
+          <!-- City selection -->
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm font-semibold">{{ t('buildings.selectCity') }}</label>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="city in cities"
+                :key="city.id"
+                class="city-option inline-flex items-center gap-1.5 px-4 py-2 border-2 border-divider rounded-lg bg-page text-body cursor-pointer transition-all hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                :class="{ selected: selectedCityId === city.id }"
+                @click="selectedCityId = city.id"
+              >
+                <span class="font-semibold text-sm">{{ city.name }}</span>
+                <span class="text-xs text-muted">{{ city.countryCode }}</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Funding gap alert -->
+          <div
+            v-if="selectedCityId && hasFundingGap"
+            class="funding-guidance flex gap-3 p-4 bg-[rgba(255,159,67,0.08)] border border-[var(--color-warning,#ff9f43)] rounded-xl mt-1"
+            role="alert"
+            aria-live="polite"
+          >
+            <span class="text-xl flex-shrink-0" aria-hidden="true">⚠️</span>
+            <div class="flex-1 flex flex-col gap-1.5">
+              <strong class="text-[0.95rem] font-bold text-[var(--color-warning,#ff9f43)]">
+                <template v-if="fundingGapType === 'missing_account'">
+                  {{ t('buildings.fundingGapTitleMissing', { currency: selectedCityCurrencyCode }) }}
+                </template>
+                <template v-else>
+                  {{ t('buildings.fundingGapTitleInsufficient', { currency: selectedCityCurrencyCode }) }}
+                </template>
+              </strong>
+              <p class="text-sm text-muted m-0">
+                <template v-if="fundingGapType === 'missing_account'">
+                  {{ t('buildings.fundingGapTextMissing', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
+                </template>
+                <template v-else>
+                  {{ t('buildings.fundingGapTextInsufficient', {
+                    city: selectedCityObj?.name ?? '',
+                    currency: selectedCityCurrencyCode,
+                    available: formatCurrency(availableLocalBalance),
+                    required: formatCurrency(selectedLotTotalCost),
+                  }) }}
+                </template>
+              </p>
+              <!-- Amount breakdown (insufficient funds only) -->
+              <div v-if="fundingGapType === 'insufficient_funds'" class="flex flex-col gap-1 mt-1 p-3 bg-white/[0.04] rounded-md text-sm">
+                <div class="flex justify-between items-center">
+                  <span class="text-muted">{{ t('buildings.fundingGapRequired') }}</span>
+                  <strong>{{ formatCurrency(selectedLotTotalCost) }}</strong>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-muted">{{ t('buildings.fundingGapAvailable') }}</span>
+                  <strong class="text-[var(--color-warning,#ff9f43)]">{{ formatCurrency(availableLocalBalance) }}</strong>
+                </div>
+                <div class="flex justify-between items-center border-t border-divider pt-1 mt-0.5">
+                  <span class="text-muted">{{ t('buildings.fundingGapShortfall') }}</span>
+                  <strong class="text-bad">{{ formatCurrency(selectedLotTotalCost - availableLocalBalance) }}</strong>
+                </div>
+              </div>
+              <!-- CTA buttons -->
+              <div class="flex flex-wrap gap-2 mt-1">
+                <RouterLink
+                  to="/forex"
+                  class="inline-flex items-center px-4 py-1.5 bg-brand text-white rounded text-sm font-semibold no-underline hover:opacity-90 transition-opacity"
                 >
-                  <span class="city-name">{{ city.name }}</span>
-                  <span class="city-country">{{ city.countryCode }}</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Funding guidance: shown when city currency ≠ EUR and player lacks that currency or has insufficient funds -->
-            <div v-if="selectedCityId && hasFundingGap" class="funding-guidance" role="alert" aria-live="polite">
-              <div class="funding-guidance-icon" aria-hidden="true">⚠️</div>
-              <div class="funding-guidance-body">
-                <strong class="funding-guidance-title">
-                  <template v-if="fundingGapType === 'missing_account'">
-                    {{ t('buildings.fundingGapTitleMissing', { currency: selectedCityCurrencyCode }) }}
-                  </template>
-                  <template v-else>
-                    {{ t('buildings.fundingGapTitleInsufficient', { currency: selectedCityCurrencyCode }) }}
-                  </template>
-                </strong>
-                <p class="funding-guidance-text">
-                  <template v-if="fundingGapType === 'missing_account'">
-                    {{ t('buildings.fundingGapTextMissing', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
-                  </template>
-                  <template v-else>
-                    {{ t('buildings.fundingGapTextInsufficient', {
-                      city: selectedCityObj?.name ?? '',
-                      currency: selectedCityCurrencyCode,
-                      available: formatCurrency(availableLocalBalance),
-                      required: formatCurrency(selectedLotTotalCost),
-                    }) }}
-                  </template>
-                </p>
-                <div class="funding-guidance-amounts" v-if="fundingGapType === 'insufficient_funds'">
-                  <div class="amount-row">
-                    <span class="amount-label">{{ t('buildings.fundingGapRequired') }}</span>
-                    <strong class="amount-value amount-required">{{ formatCurrency(selectedLotTotalCost) }}</strong>
-                  </div>
-                  <div class="amount-row">
-                    <span class="amount-label">{{ t('buildings.fundingGapAvailable') }}</span>
-                    <strong class="amount-value amount-available">{{ formatCurrency(availableLocalBalance) }}</strong>
-                  </div>
-                  <div class="amount-row amount-shortfall">
-                    <span class="amount-label">{{ t('buildings.fundingGapShortfall') }}</span>
-                    <strong class="amount-value">{{ formatCurrency(selectedLotTotalCost - availableLocalBalance) }}</strong>
-                  </div>
-                </div>
-                <div class="funding-guidance-actions">
-                  <RouterLink to="/forex" class="btn-guidance-primary">
-                    {{ t('buildings.fundingGapGoToForex') }}
-                  </RouterLink>
-                  <RouterLink
-                    v-if="selectedCompany"
-                    :to="`/bank-statement/${selectedCompany.id}`"
-                    class="btn-guidance-secondary"
-                  >
-                    {{ t('buildings.fundingGapViewStatement') }}
-                  </RouterLink>
-                </div>
+                  {{ t('buildings.fundingGapGoToForex') }}
+                </RouterLink>
+                <RouterLink
+                  v-if="selectedCompany"
+                  :to="`/bank-statement/${selectedCompany.id}`"
+                  class="inline-flex items-center px-4 py-1.5 border border-divider text-muted rounded text-sm font-semibold no-underline hover:bg-card transition-colors"
+                >
+                  {{ t('buildings.fundingGapViewStatement') }}
+                </RouterLink>
               </div>
             </div>
           </div>
 
-          <div v-if="selectedCompany" class="company-banner">
-            <span>{{ selectedCompany.name }}</span>
-            <strong>{{ formatCurrency(selectedCompany.cash) }}</strong>
+          <!-- Company balance banner -->
+          <div v-if="selectedCompany" class="flex justify-between items-center mt-1 px-4 py-3 border border-divider rounded-lg bg-page">
+            <span class="font-medium">{{ selectedCompany.name }}</span>
+            <strong class="text-good">{{ formatCurrency(selectedCompany.cash) }}</strong>
           </div>
 
-          <!-- Bank setup info and optional initial deposit -->
-          <div v-if="selectedType === 'BANK'" class="bank-setup-info">
-            <div class="bank-setup-icon">🏦</div>
-            <div class="bank-setup-content">
-              <h3>{{ t('buildings.bankSetupTitle') }}</h3>
-              <p>{{ t('buildings.bankSetupDescription') }}</p>
-              <ul>
+          <!-- BANK: setup info -->
+          <div v-if="selectedType === 'BANK'" class="flex gap-4 mt-1 p-5 bg-[rgba(59,130,246,0.08)] border border-[rgba(59,130,246,0.25)] rounded-lg">
+            <span class="text-3xl flex-shrink-0">🏦</span>
+            <div class="flex-1">
+              <h3 class="text-[0.9375rem] font-bold mb-1.5">{{ t('buildings.bankSetupTitle') }}</h3>
+              <p class="text-sm text-muted mb-2">{{ t('buildings.bankSetupDescription') }}</p>
+              <ul class="m-0 pl-5 text-[0.8125rem] text-muted flex flex-col gap-1 list-disc">
                 <li>{{ t('buildings.bankSetupStep1') }}</li>
                 <li>{{ t('buildings.bankSetupStep2') }}</li>
                 <li>{{ t('buildings.bankSetupStep3') }}</li>
@@ -438,108 +468,106 @@ async function buyBuilding() {
             </div>
           </div>
 
-          <!-- Capital requirements check (BANK only) -->
-          <div v-if="selectedType === 'BANK'" class="bank-capital-check" :class="companyHasBankCapital ? 'capital-ok' : 'capital-warn'">
-            <span class="capital-icon" aria-hidden="true">{{ companyHasBankCapital ? '✅' : '⚠️' }}</span>
-            <div class="capital-body">
-              <span class="capital-label">{{ t('buildings.bankCapitalRequirement') }}:</span>
-              <strong class="capital-amount">{{ formatCurrency(bankBaseCapitalRequired) }}</strong>
-              <span v-if="companyHasBankCapital" class="capital-status capital-status-ok">
-                {{ t('buildings.bankCapitalSufficient') }}
-              </span>
-              <span v-else class="capital-status capital-status-warn">
-                {{ bankCapitalInsufficientMessage }}
-              </span>
+          <!-- BANK: capital requirements check -->
+          <div
+            v-if="selectedType === 'BANK'"
+            class="flex items-start gap-3 mt-1 px-5 py-3.5 border rounded-lg"
+            :class="companyHasBankCapital
+              ? 'bg-[rgba(16,185,129,0.07)] border-[rgba(16,185,129,0.3)]'
+              : 'bg-[rgba(248,113,113,0.07)] border-[rgba(248,113,113,0.3)]'"
+          >
+            <span class="text-xl flex-shrink-0" aria-hidden="true">{{ companyHasBankCapital ? '✅' : '⚠️' }}</span>
+            <div class="flex flex-col gap-1">
+              <span class="text-[0.8125rem] text-muted">{{ t('buildings.bankCapitalRequirement') }}:</span>
+              <strong class="text-base font-bold">{{ formatCurrency(bankBaseCapitalRequired) }}</strong>
+              <span v-if="companyHasBankCapital" class="text-[0.8125rem] text-[#10b981]">{{ t('buildings.bankCapitalSufficient') }}</span>
+              <span v-else class="text-[0.8125rem] text-bad font-semibold">{{ bankCapitalInsufficientMessage }}</span>
             </div>
           </div>
 
-          <!-- Interest rate configuration (BANK only) -->
-          <div v-if="selectedType === 'BANK'" class="bank-rates-config">
-            <h4 class="rates-title">{{ t('buildings.bankSetupRatesTitle') }}</h4>
-            <div class="rates-grid">
-              <div class="rate-field">
-                <label for="depositRatePercent" class="rate-label">
-                  {{ t('buildings.bankDepositRateLabel') }}
-                </label>
-                <p class="rate-hint">{{ t('buildings.bankDepositRateHint') }}</p>
+          <!-- BANK: interest rate config -->
+          <div v-if="selectedType === 'BANK'" class="mt-1 p-5 bg-[rgba(59,130,246,0.05)] border border-[rgba(59,130,246,0.2)] rounded-lg">
+            <h4 class="text-[0.9375rem] font-bold mb-3.5">{{ t('buildings.bankSetupRatesTitle') }}</h4>
+            <div class="grid grid-cols-2 max-sm:grid-cols-1 gap-4">
+              <div class="flex flex-col gap-1">
+                <label for="depositRatePercent" class="text-sm font-semibold">{{ t('buildings.bankDepositRateLabel') }}</label>
+                <p class="text-xs text-muted mb-1 m-0">{{ t('buildings.bankDepositRateHint') }}</p>
                 <input
                   id="depositRatePercent"
                   v-model.number="depositRatePercent"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  class="rate-input"
+                  type="number" min="0" max="100" step="0.1"
+                  class="px-3 py-2 border border-divider rounded bg-card text-body text-[0.9rem] w-full max-w-[200px] focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
-              <div class="rate-field">
-                <label for="lendingRatePercent" class="rate-label">
-                  {{ t('buildings.bankLendingRateLabel') }}
-                </label>
-                <p class="rate-hint">{{ t('buildings.bankLendingRateHint') }}</p>
+              <div class="flex flex-col gap-1">
+                <label for="lendingRatePercent" class="text-sm font-semibold">{{ t('buildings.bankLendingRateLabel') }}</label>
+                <p class="text-xs text-muted mb-1 m-0">{{ t('buildings.bankLendingRateHint') }}</p>
                 <input
                   id="lendingRatePercent"
                   v-model.number="lendingRatePercent"
-                  type="number"
-                  min="0.1"
-                  max="200"
-                  step="0.1"
-                  class="rate-input"
+                  type="number" min="0.1" max="200" step="0.1"
+                  class="px-3 py-2 border border-divider rounded bg-card text-body text-[0.9rem] w-full max-w-[200px] focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
             </div>
           </div>
         </div>
 
-        <div v-if="selectedType && selectedCityId" class="form-section">
-          <div class="section-header">
-            <h2>{{ t('buildings.selectLand') }}</h2>
-            <span v-if="lotsLoading" class="loading-inline">{{ t('common.loading') }}</span>
+        <!-- Step 3: Land selection (shown after type + city are chosen) -->
+        <div v-if="selectedType && selectedCityId" class="mb-8">
+          <div class="flex items-center justify-between gap-4 mb-3">
+            <h2 class="text-lg font-semibold">{{ t('buildings.selectLand') }}</h2>
+            <span v-if="lotsLoading" class="text-[0.8125rem] text-muted">{{ t('common.loading') }}</span>
           </div>
 
-          <div v-if="!lotsLoading && availableLots.length === 0" class="empty-state">
+          <!-- Empty state -->
+          <div
+            v-if="!lotsLoading && availableLots.length === 0"
+            class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm"
+          >
             {{ t('buildings.noAvailableLand') }}
           </div>
 
-          <div v-else class="lot-grid">
+          <!-- Lot grid -->
+          <div v-else class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
             <button
               v-for="lot in availableLots"
               :key="lot.id"
-              class="lot-card"
+              class="lot-card flex flex-col gap-2 p-4 border-2 border-divider rounded-lg bg-page text-body text-left cursor-pointer transition-all duration-200 hover:border-brand hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               :class="{ selected: selectedLotId === lot.id }"
               @click="selectedLotId = lot.id"
             >
-              <div class="lot-card-header">
-                <span class="lot-name">{{ lot.name }}</span>
-                <span class="lot-price">{{ formatCurrency(lot.price) }}</span>
+              <div class="flex justify-between items-baseline gap-4">
+                <span class="font-bold">{{ lot.name }}</span>
+                <span class="text-sm font-bold text-good shrink-0">{{ formatCurrency(lot.price) }}</span>
               </div>
-              <span class="lot-district">{{ districtLabel(lot.district) }}</span>
-              <span class="lot-meta">
+              <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
+              <span class="text-[0.8125rem] text-muted">
                 {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }}
               </span>
-              <span class="lot-meta">
+              <span class="text-[0.8125rem] text-muted">
                 {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }}
               </span>
             </button>
           </div>
 
-          <div v-if="selectedLot" class="selected-lot-panel">
+          <!-- Selected lot summary -->
+          <div v-if="selectedLot" class="flex flex-col gap-2 mt-4 p-4 border border-divider rounded-lg bg-page">
             <div>
-              <span class="selected-lot-label">{{ t('buildings.selectedLand') }}</span>
+              <span class="text-[0.8125rem] text-muted mr-1.5">{{ t('buildings.selectedLand') }}</span>
               <strong>{{ selectedLot.name }}</strong>
             </div>
-            <div class="selected-lot-stats">
+            <div class="flex flex-wrap gap-4 text-sm text-muted">
               <span>{{ districtLabel(selectedLot.district) }}</span>
-              <span>{{ t('buildings.askingPrice') }}: {{ formatCurrency(selectedLot.price) }}</span>
-              <span>
-                {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}
-              </span>
+              <span>{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong></span>
+              <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
             </div>
           </div>
 
-          <div class="action-bar">
+          <!-- CTA -->
+          <div class="flex justify-end mt-6">
             <button
-              class="btn btn-primary btn-lg"
+              class="btn btn-primary px-8 py-3 text-base font-semibold rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               :disabled="!canSubmit || submitting || (selectedType === 'BANK' && !companyHasBankCapital) || hasFundingGap"
               @click="buyBuilding"
             >
@@ -553,174 +581,11 @@ async function buyBuilding() {
 </template>
 
 <style scoped>
-.buy-building-view {
-  padding: 2rem 1rem;
-  max-width: 900px;
-}
-
-.page-nav {
-  margin-bottom: 1.5rem;
-}
-
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  transition: color 0.15s;
-}
-
-.back-link:hover {
-  color: var(--color-primary);
-  text-decoration: none;
-}
-
-.buy-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 2rem;
-}
-
-.buy-card h1 {
-  font-size: 1.5rem;
-  margin-bottom: 1.5rem;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.form-section {
-  margin-bottom: 2rem;
-}
-
-.form-section h2 {
-  font-size: 1.125rem;
-  margin-bottom: 1rem;
-}
-
-.type-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 0.75rem;
-}
-
-.type-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 1.25rem 0.75rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: var(--color-text);
-  text-align: center;
-}
-
-.type-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
-}
-
+/* Test-selector + interactive state styles that Tailwind JIT cannot express as variants */
 .type-card.selected {
   border-color: var(--color-primary);
   background: rgba(0, 71, 255, 0.08);
   box-shadow: 0 0 0 1px var(--color-primary);
-}
-
-.type-icon {
-  font-size: 2rem;
-}
-
-.type-name {
-  font-weight: 700;
-  font-size: 0.875rem;
-}
-
-.type-desc {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary);
-  line-height: 1.3;
-}
-
-.form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.form-group input {
-  padding: 0.75rem 1rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 1rem;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.15);
-}
-
-.form-group input::placeholder {
-  color: var(--color-text-secondary);
-}
-
-.city-select-grid {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.company-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 1rem;
-  padding: 0.875rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-
-.city-option {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: var(--color-text);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.city-option:hover {
-  border-color: var(--color-primary);
 }
 
 .city-option.selected {
@@ -728,389 +593,9 @@ async function buyBuilding() {
   background: rgba(0, 71, 255, 0.08);
 }
 
-.city-name {
-  font-weight: 600;
-  font-size: 0.875rem;
-}
-
-.city-country {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.lot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 0.75rem;
-}
-
-.lot-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: var(--color-text);
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-}
-
-.lot-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-1px);
-}
-
 .lot-card.selected {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 1px var(--color-primary);
   background: rgba(0, 71, 255, 0.08);
-}
-
-.lot-card-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: baseline;
-}
-
-.lot-name {
-  font-weight: 700;
-}
-
-.lot-price {
-  font-size: 0.875rem;
-  font-weight: 700;
-}
-
-.lot-district,
-.lot-meta,
-.loading-inline,
-.selected-lot-label {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-
-.selected-lot-panel,
-.empty-state {
-  margin-top: 1rem;
-  padding: 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-}
-
-.selected-lot-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.selected-lot-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  font-size: 0.875rem;
-}
-
-.action-bar {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-}
-
-.btn-lg {
-  padding: 0.75rem 2rem;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.bank-setup-info {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
-  background: rgba(59, 130, 246, 0.08);
-  border: 1px solid rgba(59, 130, 246, 0.25);
-  border-radius: var(--radius-md);
-}
-
-.bank-setup-icon {
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-
-.bank-setup-content h3 {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  margin-bottom: 0.375rem;
-}
-
-.bank-setup-content p {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.5rem;
-}
-
-.bank-setup-content ul {
-  margin: 0;
-  padding-left: 1.25rem;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.bank-capital-check {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  padding: 0.875rem 1.25rem;
-  border-radius: var(--radius-md);
-  border: 1px solid;
-}
-
-.bank-capital-check.capital-ok {
-  background: rgba(16, 185, 129, 0.07);
-  border-color: rgba(16, 185, 129, 0.3);
-}
-
-.bank-capital-check.capital-warn {
-  background: rgba(248, 113, 113, 0.07);
-  border-color: rgba(248, 113, 113, 0.3);
-}
-
-.capital-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.capital-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.capital-label {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-
-.capital-amount {
-  font-size: 1rem;
-  font-weight: 700;
-}
-
-.capital-status {
-  font-size: 0.8125rem;
-}
-
-.capital-status-ok {
-  color: #10b981;
-}
-
-.capital-status-warn {
-  color: var(--color-danger);
-  font-weight: 600;
-}
-
-.bank-rates-config {
-  margin-top: 1rem;
-  padding: 1rem 1.25rem;
-  background: rgba(59, 130, 246, 0.05);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: var(--radius-md);
-}
-
-.rates-title {
-  font-size: 0.9375rem;
-  font-weight: 700;
-  margin-bottom: 0.875rem;
-}
-
-.rates-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1rem;
-}
-
-@media (max-width: 600px) {
-  .rates-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.rate-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.rate-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.rate-hint {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.25rem;
-}
-
-.rate-input {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-input-bg, var(--color-surface));
-  color: var(--color-text);
-  font-size: 0.9rem;
-  width: 100%;
-  max-width: 200px;
-}
-
-.error-message {
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.3);
-  color: var(--color-danger);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-}
-
-.loading {
-  text-align: center;
-  padding: 2rem;
-  color: var(--color-text-secondary);
-}
-
-/* Funding guidance banner */
-.funding-guidance {
-  display: flex;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  background: rgba(255, 159, 67, 0.08);
-  border: 1px solid var(--color-warning, #ff9f43);
-  border-radius: 10px;
-  margin-top: 0.75rem;
-}
-
-.funding-guidance-icon {
-  font-size: 1.3rem;
-  flex-shrink: 0;
-}
-
-.funding-guidance-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.funding-guidance-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-warning, #ff9f43);
-}
-
-.funding-guidance-text {
-  font-size: 0.88rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.funding-guidance-amounts {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
-  margin-top: 0.25rem;
-}
-
-.amount-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
-}
-
-.amount-label {
-  color: var(--color-text-secondary);
-}
-
-.amount-value {
-  font-weight: 700;
-}
-
-.amount-required {
-  color: var(--color-text);
-}
-
-.amount-available {
-  color: var(--color-warning, #ff9f43);
-}
-
-.amount-shortfall {
-  border-top: 1px solid var(--color-border);
-  padding-top: 0.25rem;
-  margin-top: 0.1rem;
-}
-
-.amount-shortfall .amount-value {
-  color: var(--color-danger, #f87171);
-}
-
-.funding-guidance-actions {
-  display: flex;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-  margin-top: 0.3rem;
-}
-
-.btn-guidance-primary {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.45rem 1rem;
-  background: var(--color-accent, #4f8ef7);
-  color: #fff;
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: opacity 0.15s;
-}
-
-.btn-guidance-primary:hover {
-  opacity: 0.88;
-}
-
-.btn-guidance-secondary {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.45rem 1rem;
-  background: transparent;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 0.15s;
-}
-
-.btn-guidance-secondary:hover {
-  background: var(--color-surface-alt, #1e2a3a);
-}
-
-@media (max-width: 640px) {
-  .type-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 </style>
