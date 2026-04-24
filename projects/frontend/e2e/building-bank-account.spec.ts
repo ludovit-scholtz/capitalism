@@ -124,6 +124,83 @@ test.describe('Building bank account panel', () => {
     await expect(page.locator('.bba-account-number code')).toContainText('1234567890123456')
   })
 
+  test('assigns an existing company bank account to a building', async ({ page }) => {
+    const player = makePlayer()
+    const companyId = 'company-bba-assign'
+    const buildingId = 'building-bba-assign'
+
+    player.companies.push(makeTestCompanyWithBuilding(player.id, companyId, buildingId))
+
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'acc-company-eur',
+        accountNumber: '2222333344445555',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 32000,
+        companyId,
+        companyName: 'Bank Account Test Co',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/building/${buildingId}`)
+
+    await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.building-bank-account-panel')).toContainText(/no bank account assigned/i)
+    await expect(page.locator('.bba-account-select')).toHaveValue('acc-company-eur')
+
+    await page.getByRole('button', { name: /assign account/i }).click()
+
+    await expect(page.locator('.bba-manage-success')).toContainText(/assignment updated/i)
+    await expect(page.locator('.bba-account-number code')).toContainText('2222333344445555')
+  })
+
+  test('creates and assigns a company bank account when no matching currency account exists', async ({ page }) => {
+    const player = makePlayer()
+    const companyId = 'company-bba-create-assign'
+    const buildingId = 'building-bba-create-assign'
+
+    player.companies.push(makeTestCompanyWithBuilding(player.id, companyId, buildingId))
+
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/building/${buildingId}`)
+
+    await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('.building-bank-account-panel')).toContainText(/no bank account assigned/i)
+    await expect(page.getByRole('button', { name: /create eur account and assign/i })).toBeVisible()
+
+    await page.getByRole('button', { name: /create eur account and assign/i }).click()
+
+    await expect(page.locator('.bba-manage-success')).toContainText(/created and assigned/i)
+    await expect(page.locator('.bba-account-number code')).toBeVisible()
+  })
+
   test('shows insufficient-funds danger alert with guidance links', async ({ page }) => {
     const player = makePlayer()
     const companyId = 'company-bba-suspended'

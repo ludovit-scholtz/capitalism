@@ -234,6 +234,7 @@ public sealed partial class Mutation
         };
 
         db.Buildings.Add(building);
+        await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(db, building, lot.City?.CurrencyCode);
         lot.OwnerCompanyId = company.Id;
         lot.BuildingId = building.Id;
         lot.ConcurrencyToken = Guid.NewGuid();

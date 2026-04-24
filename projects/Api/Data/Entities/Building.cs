@@ -165,8 +165,8 @@ public sealed class Building
 
     /// <summary>
     /// The bank account used to fund operating costs (labor, energy) for this building.
-    /// Null means no account has been assigned yet; in that case the tick engine falls back
-    /// to the company cash balance and auto-assigns a government account on the next tick.
+    /// Null means no account has been assigned yet; provisioning paths should assign a
+    /// company-owned account in the building city currency before the building starts operating.
     /// </summary>
     public Guid? BankAccountId { get; set; }
 

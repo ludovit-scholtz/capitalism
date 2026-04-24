@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Cryptography;
@@ -16,8 +17,8 @@ public sealed partial class Mutation
 {
     /// <summary>
     /// Transfers money from the company's cash into the building's assigned bank account.
-    /// If the building has no bank account yet, one is automatically created for the
-    /// company in the city's currency before the transfer.
+    /// If the building has no bank account yet, it is assigned the company's account in
+    /// the building city's currency before the transfer.
     /// </summary>
     [Authorize]
     public async Task<FundBuildingBankAccountResult> FundBuildingBankAccount(
@@ -62,28 +63,16 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Auto-create a bank account if the building doesn't have one yet.
-        if (building.BankAccount is null)
-        {
-            var currencyCode = building.City?.CurrencyCode ?? "EUR";
-            var newAccount = new BankAccount
-            {
-                Id = Guid.NewGuid(),
-                AccountNumber = GenerateRandomAccountNumber(),
-                CurrencyCode = currencyCode,
-                Balance = 0m,
-                CompanyId = company.Id,
-                IsGovernmentAccount = false,
-                CreatedAtUtc = DateTime.UtcNow,
-            };
-            db.BankAccounts.Add(newAccount);
-            building.BankAccountId = newAccount.Id;
-            building.BankAccount = newAccount;
-        }
+        var bankAccount = building.BankAccount
+            ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
+                db,
+                building,
+                building.City?.CurrencyCode,
+                httpContextAccessor.HttpContext!.RequestAborted);
 
         // Transfer money.
         company.Cash -= input.Amount;
-        building.BankAccount.Balance += input.Amount;
+        bankAccount.Balance += input.Amount;
 
         // Clear any suspension that was due to insufficient funds.
         if (building.SuspendedReason?.StartsWith("INSUFFICIENT_FUNDS", StringComparison.Ordinal) == true)

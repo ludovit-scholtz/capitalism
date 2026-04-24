@@ -229,7 +229,7 @@ const { locale, building, loading, isEditing, buildingFinancialTimeline, buildin
           :company-id="building?.companyId ?? ''"
           :currency-code="cityCurrencyCode"
           :loading="loading"
-          @funded="loadBuilding"
+          @updated="loadBuilding"
         />
       </div>
     </div>
@@ -237,3 +237,5 @@ const { locale, building, loading, isEditing, buildingFinancialTimeline, buildin
 </div>
 
 </template>
+
+<style scoped src="./BuildingSidebar.shared.css"></style>

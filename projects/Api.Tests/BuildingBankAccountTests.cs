@@ -1,11 +1,13 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Api.Configuration;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 
 namespace Api.Tests;
 
@@ -362,6 +364,123 @@ public sealed class BuildingBankAccountTests
         Assert.True(result.TryGetProperty("errors", out var errors));
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
         Assert.Equal("DUPLICATE_BANK_ACCOUNT", code);
+    }
+
+    [Fact]
+    public async Task PlaceBuilding_AssignsCompanyCurrencyBankAccount()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-place-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Placement Funding Co",
+            Cash = 10_000_000m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}",
+            new { i = new { companyId = company.Id, cityId = city.Id, type = "FACTORY", name = "Provisioned Factory" } },
+            token);
+
+        var buildingId = Guid.Parse(result.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString()!);
+
+        var building = await db.Buildings.AsNoTracking().FirstAsync(candidate => candidate.Id == buildingId);
+        Assert.NotNull(building.BankAccountId);
+
+        var account = await db.BankAccounts.AsNoTracking().FirstAsync(candidate => candidate.Id == building.BankAccountId);
+        Assert.Equal(company.Id, account.CompanyId);
+        Assert.Equal(city.CurrencyCode, account.CurrencyCode);
+    }
+
+    [Fact]
+    public async Task AppDbInitializer_AssignsSharedCompanyCurrencyAccountToExistingBuildingsWithoutAccounts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-init-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Initializer Funding Co",
+            Cash = 250_000m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+
+        var buildingA = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Legacy Factory A",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 5,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+
+        var buildingB = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.SalesShop,
+            Name = "Legacy Shop B",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 3,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+
+        db.Companies.Add(company);
+        db.Buildings.AddRange(buildingA, buildingB);
+        await db.SaveChangesAsync();
+
+        var initializer = new AppDbInitializer(
+            db,
+            Options.Create(new SeedDataOptions
+            {
+                AdminEmail = "admin@building-bank-account-tests.local",
+                AdminDisplayName = "Building Bank Account Test Admin",
+                AdminPassword = "TestPassword123!"
+            }),
+            TestHelpers.CreateFallbackNbsService());
+
+        await initializer.InitializeAsync();
+
+        await db.Entry(buildingA).ReloadAsync();
+        await db.Entry(buildingB).ReloadAsync();
+
+        Assert.NotNull(buildingA.BankAccountId);
+        Assert.Equal(buildingA.BankAccountId, buildingB.BankAccountId);
+
+        var account = await db.BankAccounts.AsNoTracking().FirstAsync(candidate => candidate.Id == buildingA.BankAccountId);
+        Assert.Equal(company.Id, account.CompanyId);
+        Assert.Equal(city.CurrencyCode, account.CurrencyCode);
     }
 
     // ── Operating cost suspension ─────────────────────────────────────────────

@@ -162,6 +162,10 @@ public sealed partial class AppDbInitializer(
 
         // Personal money is stored only in settlement bank accounts.
         await EnsurePlayerSettlementAccountsAsync();
+
+        // Existing buildings created before bank-account provisioning must be linked to
+        // a company-owned account in their city currency on startup.
+        await EnsureBuildingBankAccountsAsync();
     }
 
     private async Task SeedFxRatesAsync()
@@ -413,6 +417,29 @@ public sealed partial class AppDbInitializer(
         foreach (var player in players)
         {
             await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, player);
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task EnsureBuildingBankAccountsAsync()
+    {
+        var buildingsMissingAccounts = await dbContext.Buildings
+            .Include(building => building.City)
+            .Where(building => building.BankAccountId == null)
+            .ToListAsync();
+
+        if (buildingsMissingAccounts.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var building in buildingsMissingAccounts)
+        {
+            await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
+                dbContext,
+                building,
+                building.City?.CurrencyCode);
         }
 
         await dbContext.SaveChangesAsync();

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { provide } from 'vue'
+import { computed, provide } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useBuildingDetail, BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
@@ -31,6 +31,17 @@ const {
   formatTickDuration, formatGameTickTime,
   applyStarterLayout, applyShopStarterLayout, cancelPlan,
 } = bd
+
+const showEditingSidebar = computed(() => Boolean(bd.selectedCell.value && bd.isEditing.value))
+const showReadonlySidebar = computed(() => {
+  const selectedCell = bd.selectedCell.value
+  if (!selectedCell || bd.isEditing.value) {
+    return false
+  }
+
+  return Boolean(bd.getUnitAtFrom(bd.activeUnits.value, selectedCell.x, selectedCell.y))
+})
+const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showReadonlySidebar.value)
 </script>
 
 <template>
@@ -144,9 +155,9 @@ const {
 
       <div class="main-content">
         <BuildingUnitGrid />
-        <BuildingEditingSidebar v-if="bd.selectedCell && bd.isEditing" />
-        <BuildingReadonlySidebar v-else-if="bd.selectedCell && !bd.isEditing && bd.getUnitAtFrom(bd.activeUnits.value, bd.selectedCell.value?.x ?? 0, bd.selectedCell.value?.y ?? 0)" />
-        <BuildingOverviewSidebar v-else />
+        <BuildingEditingSidebar v-if="showEditingSidebar" />
+        <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
+        <BuildingOverviewSidebar v-if="showOverviewSidebar" />
       </div>
     </template>
   </div>

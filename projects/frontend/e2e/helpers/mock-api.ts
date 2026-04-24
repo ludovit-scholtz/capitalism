@@ -2907,7 +2907,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('CreateCompany')) {
+    if (query.includes('CreateCompany') && !query.includes('CreateCompanyBankAccount') && !query.includes('createCompanyBankAccount')) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (!player) {
@@ -5388,7 +5388,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('gameAdminSession')) {
+    if (
+      query.includes('gameAdminSession') &&
+      !query.includes('buildingBankAccount') &&
+      !query.includes('assignBuildingBankAccount') &&
+      !query.includes('createCompanyBankAccount')
+    ) {
       return routeJson({ gameAdminSession: buildGameAdminSession() })
     }
 
@@ -6451,6 +6456,46 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    // ── Company bank accounts query ─────────────────────────────────────────
+    if (query.includes('companyBankAccounts')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as { companyId?: string } | undefined
+      const companyId = vars?.companyId ?? ''
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const company = player.companies.find((candidate) => candidate.id === companyId)
+      if (!company) return routeJsonError('Company not found', 'COMPANY_NOT_FOUND')
+
+      const explicitAccounts = company.buildings
+        .map((building) => state.buildingBankAccounts[building.id])
+        .filter((account): account is NonNullable<typeof account> => Boolean(account?.hasBankAccount && account.bankAccountId && account.accountNumber))
+        .map((account) => ({
+          id: account.bankAccountId!,
+          accountNumber: account.accountNumber!,
+          currencyCode: account.currencyCode,
+          balance: account.balance ?? 0,
+        }))
+
+      const playerAccounts = state.myBankAccounts
+        .filter((account) => account.companyId === companyId)
+        .map((account) => ({
+          id: account.id,
+          accountNumber: account.accountNumber,
+          currencyCode: account.currencyCode,
+          balance: account.balance,
+        }))
+
+      const companyBankAccounts = [...playerAccounts, ...explicitAccounts].filter(
+        (account, index, accounts) => accounts.findIndex((candidate) => candidate.id === account.id) === index,
+      )
+
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { companyBankAccounts } }),
+      })
+    }
+
     // ── Building bank account query ──────────────────────────────────────────
     if (query.includes('buildingBankAccount') && !query.includes('fundBuildingBankAccount') && !query.includes('assignBuildingBankAccount') && !query.includes('createCompanyBankAccount')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
@@ -6609,12 +6654,24 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!player) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
       const building = player.companies.flatMap((c) => c.buildings).find((b) => b.id === buildingId)
       if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
+      const company = player.companies.find((candidate) => candidate.buildings.some((candidateBuilding) => candidateBuilding.id === buildingId))
+      if (!company) return routeJsonError('Company not found', 'COMPANY_NOT_FOUND')
 
-      // Look up the account from state.buildingBankAccounts by bankAccountId.
-      const matchEntry = Object.entries(state.buildingBankAccounts).find(([, info]) => info.bankAccountId === bankAccountId)
-      if (!matchEntry) return routeJsonError('Bank account not found', 'BANK_ACCOUNT_NOT_FOUND')
+      const playerAccount = state.myBankAccounts.find((account) => account.id === bankAccountId && account.companyId === company.id)
+      const acctInfo = playerAccount
+        ? {
+            hasBankAccount: true,
+            bankAccountId: playerAccount.id,
+            accountNumber: playerAccount.accountNumber,
+            balance: playerAccount.balance,
+            isSuspendedForFunds: false,
+            suspendedReason: null,
+            currencyCode: playerAccount.currencyCode,
+          }
+        : Object.entries(state.buildingBankAccounts).find(([, info]) => info.bankAccountId === bankAccountId)?.[1]
 
-      const [, acctInfo] = matchEntry
+      if (!acctInfo) return routeJsonError('Bank account not found', 'BANK_ACCOUNT_NOT_FOUND')
+
       const city = state.cities.find((c) => c.id === building.cityId)
       const cityCurrency = city?.currencyCode ?? 'EUR'
       if (acctInfo.currencyCode !== cityCurrency) return routeJsonError(`Account currency ${acctInfo.currencyCode} does not match city currency ${cityCurrency}.`, 'CURRENCY_MISMATCH')
@@ -6658,6 +6715,18 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!company) return routeJsonError('Company not found', 'COMPANY_NOT_FOUND')
       const accountId = crypto.randomUUID()
       const accountNumber = String(Math.floor(Math.random() * 1e16)).padStart(16, '0')
+      const currencySymbol = currencyCode === 'EUR'
+        ? '€'
+        : (state.fxRates.find((rate) => rate.quoteCurrencyCode === currencyCode)?.quoteCurrencySymbol ?? currencyCode)
+      state.myBankAccounts.push({
+        id: accountId,
+        accountNumber,
+        currencyCode,
+        currencySymbol,
+        balance: 0,
+        companyId: company.id,
+        companyName: company.name,
+      })
       return route.fulfill({
         status: 200,
         contentType: 'application/json',

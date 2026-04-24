@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
-import type { BuildingBankAccountInfo } from '@/types'
+import type { BuildingBankAccountInfo, CompanyBankAccountSummary } from '@/types'
 
 interface Props {
   buildingId: string
@@ -15,20 +15,25 @@ interface Props {
 
 const props = defineProps<Props>()
 const emit = defineEmits<{
-  (e: 'funded'): void
+  (e: 'updated'): void
 }>()
 
 const { t, locale } = useI18n()
 
-// ── Bank account data ──
 const accountInfo = ref<BuildingBankAccountInfo | null>(null)
+const companyAccounts = ref<CompanyBankAccountSummary[]>([])
 const accountLoading = ref(false)
+const accountsLoading = ref(false)
 const fundAmount = ref<number | null>(null)
 const fundLoading = ref(false)
 const fundError = ref<string | null>(null)
 const fundSuccess = ref(false)
+const selectedBankAccountId = ref<string | null>(null)
+const assignmentLoading = ref(false)
+const createLoading = ref(false)
+const assignmentError = ref<string | null>(null)
+const assignmentSuccess = ref<string | null>(null)
 
-// ── Computed ──
 const currencySymbol = computed(() => {
   const code = props.currencyCode ?? accountInfo.value?.currencyCode ?? 'EUR'
   try {
@@ -60,6 +65,15 @@ const hasMissingAccount = computed(() => accountInfo.value?.suspendedReason === 
 const hasInsufficientFunds = computed(
   () => accountInfo.value?.suspendedReason?.startsWith('INSUFFICIENT_FUNDS:') === true,
 )
+const availableCompanyAccounts = computed(() => {
+  const currencyCode = (props.currencyCode ?? accountInfo.value?.currencyCode ?? 'EUR').toUpperCase()
+  return companyAccounts.value.filter((account) => account.currencyCode.toUpperCase() === currencyCode)
+})
+const canAssignSelectedAccount = computed(
+  () => Boolean(selectedBankAccountId.value) && selectedBankAccountId.value !== accountInfo.value?.bankAccountId,
+)
+const canCreateCompanyAccount = computed(() => availableCompanyAccounts.value.length === 0)
+const accountSelectId = computed(() => `building-bank-account-select-${props.buildingId}`)
 
 function formatCurrency(value: number): string {
   try {
@@ -74,7 +88,40 @@ function formatCurrency(value: number): string {
   }
 }
 
-// ── Data fetching ──
+function formatAccountOption(account: CompanyBankAccountSummary): string {
+  return `${account.accountNumber} - ${formatCurrency(account.balance)}`
+}
+
+function buildAssignedAccountInfo(bankAccountId: string): BuildingBankAccountInfo | null {
+  const companyAccount = companyAccounts.value.find((account) => account.id === bankAccountId)
+  if (!companyAccount) {
+    return null
+  }
+
+  return {
+    buildingId: props.buildingId,
+    buildingName: accountInfo.value?.buildingName ?? '',
+    cityName: accountInfo.value?.cityName ?? '',
+    currencyCode: companyAccount.currencyCode,
+    hasBankAccount: true,
+    bankAccountId: companyAccount.id,
+    accountNumber: companyAccount.accountNumber,
+    balance: companyAccount.balance,
+    isSuspendedForFunds: false,
+    suspendedReason: null,
+  }
+}
+
+function syncSelectedAccount() {
+  const assignedBankAccountId = accountInfo.value?.bankAccountId
+  if (assignedBankAccountId && availableCompanyAccounts.value.some((account) => account.id === assignedBankAccountId)) {
+    selectedBankAccountId.value = assignedBankAccountId
+    return
+  }
+
+  selectedBankAccountId.value = availableCompanyAccounts.value[0]?.id ?? null
+}
+
 async function fetchAccountInfo() {
   if (!props.buildingId) return
   accountLoading.value = true
@@ -97,18 +144,95 @@ async function fetchAccountInfo() {
       { buildingId: props.buildingId },
     )
     accountInfo.value = result.buildingBankAccount
+  } catch {
+    accountInfo.value = null
   } finally {
     accountLoading.value = false
   }
 }
 
-// ── Actions ──
+async function fetchCompanyAccounts() {
+  if (!props.companyId) {
+    companyAccounts.value = []
+    selectedBankAccountId.value = null
+    return
+  }
+
+  accountsLoading.value = true
+  try {
+    const result = await gqlRequest<{ companyBankAccounts: CompanyBankAccountSummary[] }>(
+      `query CompanyBankAccounts($companyId: UUID!) {
+        companyBankAccounts(companyId: $companyId) {
+          id
+          accountNumber
+          currencyCode
+          balance
+        }
+      }`,
+      { companyId: props.companyId },
+    )
+    companyAccounts.value = result.companyBankAccounts ?? []
+  } catch {
+    companyAccounts.value = []
+  } finally {
+    accountsLoading.value = false
+  }
+}
+
+async function refreshPanel() {
+  await Promise.all([fetchAccountInfo(), fetchCompanyAccounts()])
+  syncSelectedAccount()
+}
+
+async function assignBankAccount(bankAccountId: string, successMessage: string) {
+  assignmentLoading.value = true
+  assignmentError.value = null
+  assignmentSuccess.value = null
+  try {
+    const result = await gqlRequest<{ assignBuildingBankAccount: { bankAccount: BuildingBankAccountInfo } }>(
+      `mutation AssignBuildingBankAccount($input: AssignBuildingBankAccountInput!) {
+        assignBuildingBankAccount(input: $input) {
+          bankAccount {
+            buildingId
+            buildingName
+            cityName
+            currencyCode
+            hasBankAccount
+            bankAccountId
+            accountNumber
+            balance
+            isSuspendedForFunds
+            suspendedReason
+          }
+        }
+      }`,
+      { input: { buildingId: props.buildingId, bankAccountId } },
+    )
+    const nextAccountInfo = result.assignBuildingBankAccount?.bankAccount ?? buildAssignedAccountInfo(bankAccountId)
+    if (!nextAccountInfo) {
+      throw new Error(t('common.unknownError'))
+    }
+
+    accountInfo.value = nextAccountInfo
+    assignmentSuccess.value = successMessage
+    await fetchCompanyAccounts()
+    syncSelectedAccount()
+    emit('updated')
+  } catch (error: unknown) {
+    assignmentError.value = error instanceof Error ? error.message : t('common.unknownError')
+  } finally {
+    assignmentLoading.value = false
+  }
+}
+
 async function fundAccount() {
   if (!fundAmount.value || fundAmount.value <= 0) return
   fundLoading.value = true
   fundError.value = null
   fundSuccess.value = false
   try {
+    assignmentError.value = null
+    assignmentSuccess.value = null
     await gqlRequest(
       `mutation FundBuildingBankAccount($input: FundBuildingBankAccountInput!) {
         fundBuildingBankAccount(input: $input) {
@@ -125,29 +249,74 @@ async function fundAccount() {
     )
     fundSuccess.value = true
     fundAmount.value = null
-    await fetchAccountInfo()
-    emit('funded')
-  } catch (e: unknown) {
-    fundError.value = e instanceof Error ? e.message : t('common.unknownError')
+    await refreshPanel()
+    emit('updated')
+  } catch (error: unknown) {
+    fundError.value = error instanceof Error ? error.message : t('common.unknownError')
   } finally {
     fundLoading.value = false
   }
 }
 
-// Load on mount
-fetchAccountInfo()
+async function assignSelectedAccount() {
+  if (!selectedBankAccountId.value || !canAssignSelectedAccount.value) {
+    return
+  }
+
+  await assignBankAccount(selectedBankAccountId.value, t('buildingBankAccount.assignSuccess'))
+}
+
+async function createAndAssignCompanyAccount() {
+  if (!props.companyId || !props.currencyCode) {
+    return
+  }
+
+  createLoading.value = true
+  assignmentError.value = null
+  assignmentSuccess.value = null
+  try {
+    const result = await gqlRequest<{ createCompanyBankAccount: { account: CompanyBankAccountSummary } }>(
+      `mutation CreateCompanyBankAccount($input: CreateCompanyBankAccountInput!) {
+        createCompanyBankAccount(input: $input) {
+          account {
+            id
+            accountNumber
+            currencyCode
+            balance
+          }
+        }
+      }`,
+      { input: { companyId: props.companyId, currencyCode: props.currencyCode } },
+    )
+
+    const createdAccount = result.createCompanyBankAccount.account
+    companyAccounts.value = [...companyAccounts.value, createdAccount]
+    selectedBankAccountId.value = createdAccount.id
+    await assignBankAccount(createdAccount.id, t('buildingBankAccount.createSuccess'))
+  } catch (error: unknown) {
+    assignmentError.value = error instanceof Error ? error.message : t('common.unknownError')
+  } finally {
+    createLoading.value = false
+  }
+}
+
+watch(
+  () => [props.buildingId, props.companyId, props.currencyCode],
+  () => {
+    void refreshPanel()
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <div class="building-bank-account-panel" :class="{ loading: accountLoading || props.loading }">
-    <!-- Loading skeleton -->
     <div v-if="accountLoading" class="bba-skeleton">
       <div class="bba-skeleton-row"></div>
       <div class="bba-skeleton-row bba-skeleton-row-sm"></div>
     </div>
 
     <template v-else-if="accountInfo">
-      <!-- Suspension/warning banner -->
       <div
         v-if="isSuspended || hasMissingAccount"
         class="bba-alert"
@@ -159,7 +328,6 @@ fetchAccountInfo()
         <span class="bba-alert-message">{{ suspensionLabel }}</span>
       </div>
 
-      <!-- Account info row -->
       <div class="bba-info-row">
         <span v-if="accountInfo.hasBankAccount" class="bba-account-number">
           {{ t('buildingBankAccount.accountLabel') }}
@@ -174,7 +342,47 @@ fetchAccountInfo()
         </span>
       </div>
 
-      <!-- Fund transfer panel -->
+      <div class="bba-manage-panel">
+        <p class="bba-manage-title">{{ t('buildingBankAccount.assignmentTitle') }}</p>
+        <p class="bba-manage-hint">{{ t('buildingBankAccount.assignmentHint', { currency: props.currencyCode }) }}</p>
+
+        <div v-if="availableCompanyAccounts.length > 0" class="bba-assign-form">
+          <label class="bba-manage-label" :for="accountSelectId">{{ t('buildingBankAccount.accountSelectLabel') }}</label>
+          <div class="bba-assign-controls">
+            <select
+              :id="accountSelectId"
+              v-model="selectedBankAccountId"
+              class="bba-account-select"
+              :disabled="accountsLoading || assignmentLoading || createLoading"
+            >
+              <option v-for="account in availableCompanyAccounts" :key="account.id" :value="account.id">
+                {{ formatAccountOption(account) }}
+              </option>
+            </select>
+            <button
+              class="btn btn-secondary btn-sm"
+              :disabled="!canAssignSelectedAccount || assignmentLoading || createLoading"
+              @click="assignSelectedAccount"
+            >
+              {{ assignmentLoading ? t('common.loading') : t('buildingBankAccount.assignBtn') }}
+            </button>
+          </div>
+        </div>
+        <p v-else class="bba-manage-empty">{{ t('buildingBankAccount.noCompanyAccountAvailable', { currency: props.currencyCode }) }}</p>
+
+        <button
+          v-if="canCreateCompanyAccount"
+          class="btn btn-secondary btn-sm bba-create-btn"
+          :disabled="createLoading || assignmentLoading"
+          @click="createAndAssignCompanyAccount"
+        >
+          {{ createLoading ? t('common.loading') : t('buildingBankAccount.createBtn', { currency: props.currencyCode }) }}
+        </button>
+
+        <p v-if="assignmentError" class="bba-manage-error" role="alert">{{ assignmentError }}</p>
+        <p v-if="assignmentSuccess" class="bba-manage-success" role="status">{{ assignmentSuccess }}</p>
+      </div>
+
       <details class="bba-fund-panel">
         <summary class="bba-fund-summary">
           {{ t('buildingBankAccount.fundAccount') }}
@@ -205,12 +413,10 @@ fetchAccountInfo()
         </div>
       </details>
 
-      <!-- Fund feedback — rendered outside <details> so it stays visible after panel re-renders -->
       <p v-if="fundSuccess" class="bba-fund-success" role="status">
         {{ t('buildingBankAccount.fundSuccess') }}
       </p>
 
-      <!-- Guidance links -->
       <div v-if="isSuspended || hasMissingAccount" class="bba-guidance">
         <span class="bba-guidance-label">{{ t('buildingBankAccount.guidance') }}</span>
         <router-link to="/forex" class="bba-guidance-link">
@@ -238,7 +444,6 @@ fetchAccountInfo()
   opacity: 0.6;
 }
 
-/* Skeleton */
 .bba-skeleton {
   display: flex;
   flex-direction: column;
@@ -263,7 +468,6 @@ fetchAccountInfo()
   50% { opacity: 0.5; }
 }
 
-/* Alerts */
 .bba-alert {
   display: flex;
   align-items: flex-start;
@@ -295,7 +499,6 @@ fetchAccountInfo()
   flex: 1;
 }
 
-/* Info row */
 .bba-info-row {
   display: flex;
   align-items: center;
@@ -334,7 +537,70 @@ fetchAccountInfo()
   color: #f59e0b;
 }
 
-/* Fund panel */
+.bba-manage-panel {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border, #2d3447);
+}
+
+.bba-manage-title {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #f3f5f8);
+}
+
+.bba-manage-hint,
+.bba-manage-empty,
+.bba-manage-label {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #8b95a8);
+}
+
+.bba-manage-label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.bba-assign-form {
+  margin-top: 10px;
+}
+
+.bba-assign-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bba-account-select {
+  flex: 1 1 240px;
+  min-height: 36px;
+  border: 1px solid var(--color-border, #2d3447);
+  border-radius: 6px;
+  background: var(--color-surface-3, #2a3040);
+  color: var(--color-text-primary, #f3f5f8);
+  padding: 0 10px;
+}
+
+.bba-create-btn {
+  margin-top: 10px;
+}
+
+.bba-manage-error,
+.bba-manage-success {
+  margin: 8px 0 0;
+  font-size: 0.8125rem;
+}
+
+.bba-manage-error {
+  color: #ef4444;
+}
+
+.bba-manage-success {
+  color: #34d399;
+}
+
 .bba-fund-panel {
   margin-top: 10px;
 }
@@ -378,7 +644,8 @@ fetchAccountInfo()
   font-size: 0.9rem;
 }
 
-.bba-fund-input:focus {
+.bba-fund-input:focus,
+.bba-account-select:focus {
   outline: 2px solid var(--color-accent, #6366f1);
   outline-offset: -2px;
 }
@@ -395,7 +662,6 @@ fetchAccountInfo()
   margin-top: 6px;
 }
 
-/* Guidance */
 .bba-guidance {
   display: flex;
   align-items: center;

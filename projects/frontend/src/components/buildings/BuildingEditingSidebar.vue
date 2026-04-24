@@ -759,3 +759,5 @@ const { locale, building, isEditing, selectedCell, showUnitPicker, resourceTypes
 </div>
 
 </template>
+
+<style scoped src="./BuildingSidebar.shared.css"></style>

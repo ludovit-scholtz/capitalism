@@ -906,3 +906,5 @@ const { locale, building, selectedCell, exchangeOffersLoading, exchangeSortBy, p
 
 </div>
 </template>
+
+<style scoped src="./BuildingSidebar.shared.css"></style>
