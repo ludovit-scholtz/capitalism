@@ -1076,26 +1076,26 @@ useTickRefresh(async () => {
 </script>
 
 <template>
-  <div class="onboarding-view">
-    <div class="onboarding-container container">
-      <div v-if="step < 4" class="onboarding-header">
-        <h1>{{ t('onboarding.title') }}</h1>
-        <p class="subtitle">{{ t('onboarding.subtitle') }}</p>
+  <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4">
+    <div class="container max-w-[1120px]">
+      <div v-if="step < 4" class="text-center mb-8">
+        <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
+        <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
       </div>
 
-      <div v-if="step < 5" class="progress-bar">
+      <div v-if="step < 5" class="flex items-start mb-10 px-4">
         <div class="progress-segment" :class="{ active: step >= 1, done: step > 1 }">
-          <div class="progress-step"><span v-if="step > 1" class="check-icon">✓</span><span v-else>1</span></div>
+          <div class="progress-step"><span v-if="step > 1" class="check-icon text-lg">✓</span><span v-else>1</span></div>
           <span class="progress-label">{{ t('onboarding.step1Title') }}</span>
         </div>
         <div class="progress-line" :class="{ active: step > 1 }"></div>
         <div class="progress-segment" :class="{ active: step >= 2, done: step > 2 }">
-          <div class="progress-step"><span v-if="step > 2" class="check-icon">✓</span><span v-else>2</span></div>
+          <div class="progress-step"><span v-if="step > 2" class="check-icon text-lg">✓</span><span v-else>2</span></div>
           <span class="progress-label">{{ t('onboarding.step2Title') }}</span>
         </div>
         <div class="progress-line" :class="{ active: step > 2 }"></div>
         <div class="progress-segment" :class="{ active: step >= 3, done: step > 3 }">
-          <div class="progress-step"><span v-if="step > 3" class="check-icon">✓</span><span v-else>3</span></div>
+          <div class="progress-step"><span v-if="step > 3" class="check-icon text-lg">✓</span><span v-else>3</span></div>
           <span class="progress-label">{{ t('onboarding.step3Title') }}</span>
         </div>
         <div class="progress-line" :class="{ active: step > 3 }"></div>
@@ -1105,95 +1105,90 @@ useTickRefresh(async () => {
         </div>
       </div>
 
-      <div v-if="error" class="error-message" role="alert">{{ error }}</div>
+      <div v-if="error" class="bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad px-4 py-3 rounded-lg text-sm mb-4" role="alert">{{ error }}</div>
 
-      <div v-if="step === 1" class="step-content">
-        <div class="step-header">
-          <h2>{{ t('onboarding.step1Title') }}</h2>
-          <p class="step-desc">{{ t('onboarding.step1Desc') }}</p>
+      <div v-if="step === 1" class="step-content bg-card border border-divider rounded-xl p-8">
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
         </div>
-        <div class="industry-grid">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
           <button v-for="ind in industries" :key="ind" class="industry-card" :class="{ selected: selectedIndustry === ind }" @click="selectedIndustry = ind">
-            <span class="card-icon">{{ industryIcons[ind] || '🏭' }}</span>
-            <span class="card-title">{{ formatIndustry(ind) }}</span>
+            <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span>
+            <span class="font-bold text-base">{{ formatIndustry(ind) }}</span>
             <span class="card-first-product">{{ t(industryFirstProductKeys[ind] || '') }}</span>
-            <span class="card-desc">{{ t(industryDescKeys[ind] || '') }}</span>
-            <span class="card-why">{{ t(industryWhyKeys[ind] || '') }}</span>
+            <span class="card-desc text-[0.8125rem] text-muted leading-snug">{{ t(industryDescKeys[ind] || '') }}</span>
+            <span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
           </button>
         </div>
-        <div class="step-actions">
+        <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-primary btn-lg" :disabled="!canProceedStep1" @click="nextStep">
-            {{ t('common.next') }}
-            <span class="btn-arrow">→</span>
+            {{ t('common.next') }} <span class="ml-1">→</span>
           </button>
         </div>
       </div>
 
-      <div v-if="step === 2" class="step-content">
-        <div class="step-header">
-          <h2>{{ t('onboarding.step2Title') }}</h2>
-          <p class="step-desc">{{ t('onboarding.step2Desc') }}</p>
+      <div v-if="step === 2" class="step-content bg-card border border-divider rounded-xl p-8">
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
         </div>
-        <div class="city-grid">
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
           <button v-for="city in cities" :key="city.id" class="city-card" :class="{ selected: selectedCityId === city.id }" @click="selectedCityId = city.id">
-            <div class="city-header">
-              <span class="card-icon">🏙️</span>
-              <span class="card-title">{{ city.name }}</span>
+            <div class="flex items-center gap-2">
+              <span class="text-2xl">🏙️</span>
+              <span class="font-bold text-base">{{ city.name }}</span>
             </div>
-            <div class="city-meta">
-              <span class="city-country">{{ city.countryCode }}</span>
-              <span v-if="city.currencyCode" class="city-currency">{{ city.currencyCode }}</span>
-              <span class="city-pop">{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
+            <div class="flex gap-3 text-[0.8125rem] text-muted">
+              <span class="bg-card-raised px-2 py-0.5 rounded font-semibold text-xs">{{ city.countryCode }}</span>
+              <span v-if="city.currencyCode" class="city-currency bg-brand px-2 py-0.5 rounded font-semibold text-xs text-white">{{ city.currencyCode }}</span>
+              <span>{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
             </div>
-            <div class="city-resources">
-              <span class="resource-label">{{ t('onboarding.resources') }}:</span>
-              <span v-for="(resource, index) in city.resources" :key="index" class="resource-badge">
+            <div class="flex flex-wrap gap-1.5 items-center">
+              <span class="text-xs text-muted">{{ t('onboarding.resources') }}:</span>
+              <span v-for="(resource, index) in city.resources" :key="index" class="bg-[rgba(0,200,83,0.1)] text-[var(--color-secondary)] px-2 py-0.5 rounded-full text-[0.6875rem] font-medium">
                 {{ getCityResourceName(city, index) }}
               </span>
             </div>
           </button>
         </div>
-        <div class="step-actions">
-          <button class="btn btn-secondary" @click="prevStep">
-            <span class="btn-arrow">←</span>
-            {{ t('common.back') }}
-          </button>
+        <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
           <button class="btn btn-primary btn-lg" :disabled="!canProceedStep2" @click="nextStep">
-            {{ t('common.next') }}
-            <span class="btn-arrow">→</span>
+            {{ t('common.next') }} <span class="ml-1">→</span>
           </button>
         </div>
       </div>
 
-      <div v-if="step === 3" class="step-content step-content-wide">
-        <div class="step-header">
-          <h2>{{ t('onboarding.step3Title') }}</h2>
-          <p class="step-desc">{{ t('onboarding.step3Desc') }}</p>
+      <div v-if="step === 3" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+        <div>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
         </div>
 
-        <div class="budget-grid">
-          <article class="budget-card">
-            <span class="budget-label">{{ t('onboarding.startingCash') }}</span>
+        <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.startingCash') }}</span>
             <strong>{{ formatCurrency(companyStartingCash) }}</strong>
           </article>
-          <article class="budget-card">
-            <span class="budget-label">{{ t('onboarding.founderContribution') }}</span>
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span>
             <strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityFxRate) }}</strong>
           </article>
-          <article class="budget-card">
-            <span class="budget-label">{{ t('onboarding.personalCash') }}</span>
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span>
             <strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
           </article>
-          <article class="budget-card" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
-            <span class="budget-label">{{ t('onboarding.cashAfterPurchase') }}</span>
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
+            <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span>
             <strong>{{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
           </article>
         </div>
 
-        <div class="form-group">
-          <span class="form-section-title">{{ t('onboarding.ipoTitle') }}</span>
-          <p class="ipo-copy">{{ t('onboarding.ipoDesc') }}</p>
-          <div class="ipo-grid">
+        <div class="flex flex-col gap-2">
+          <span class="text-sm font-semibold">{{ t('onboarding.ipoTitle') }}</span>
+          <p class="text-muted text-[0.8125rem] m-0">{{ t('onboarding.ipoDesc') }}</p>
+          <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
             <button
               v-for="option in ipoOptions"
               :key="option.raiseTarget"
@@ -1201,31 +1196,31 @@ useTickRefresh(async () => {
               :class="{ selected: selectedIpoRaiseTarget === option.raiseTarget }"
               @click="selectedIpoRaiseTarget = option.raiseTarget"
             >
-              <span class="card-title">{{ t(option.titleKey) }}</span>
-              <span class="ipo-metric">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span>
-              <span class="ipo-metric">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
-              <span class="ipo-metric">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
-              <span class="card-desc">{{ t(option.descriptionKey) }}</span>
+              <span class="font-bold text-sm">{{ t(option.titleKey) }}</span>
+              <span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span>
+              <span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
+              <span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
+              <span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>
             </button>
           </div>
         </div>
 
-        <div class="form-group compact">
-          <label for="companyName">{{ t('onboarding.companyName') }}</label>
-          <input id="companyName" v-model="companyName" type="text" required maxlength="200" :placeholder="t('onboarding.companyNamePlaceholder')" />
+        <div class="flex flex-col gap-2 max-w-[420px]">
+          <label for="companyName" class="text-sm font-semibold">{{ t('onboarding.companyName') }}</label>
+          <input id="companyName" v-model="companyName" type="text" required maxlength="200" :placeholder="t('onboarding.companyNamePlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand focus:ring-2 focus:ring-[rgba(0,71,255,0.15)]" />
         </div>
 
-        <div class="guidance-panel">
-          <h3>{{ t('onboarding.factoryGuideTitle') }}</h3>
-          <p>{{ t('onboarding.factoryGuideBody') }}</p>
-          <ul>
+        <div class="bg-card-raised border border-divider rounded-lg p-4">
+          <h3 class="font-semibold text-sm mb-2">{{ t('onboarding.factoryGuideTitle') }}</h3>
+          <p class="text-muted text-sm m-0">{{ t('onboarding.factoryGuideBody') }}</p>
+          <ul class="mt-3 pl-4 flex flex-col gap-1.5 text-sm text-muted">
             <li>{{ t('onboarding.factoryGuideHint1') }}</li>
             <li>{{ t('onboarding.factoryGuideHint2') }}</li>
             <li>{{ t('onboarding.factoryGuideHint3') }}</li>
           </ul>
         </div>
 
-        <p v-if="availableFactoryLots.length === 0" class="empty-state-message">
+        <p v-if="availableFactoryLots.length === 0" class="empty-state-message text-muted text-sm m-0">
           {{ t('onboarding.noFactoryLots') }}
         </p>
         <OnboardingLotSelector
@@ -1239,27 +1234,24 @@ useTickRefresh(async () => {
           :city="selectedCity"
         />
 
-        <div class="step-actions">
-          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">
-            <span class="btn-arrow">←</span>
-            {{ t('common.back') }}
-          </button>
+        <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button>
           <button class="btn btn-primary btn-lg" :disabled="!canProceedStep3 || loading" @click="startOnboardingCompany">
             {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }}
-            <span v-if="!loading" class="btn-arrow">🏭</span>
+            <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
       </div>
 
-      <div v-if="step === 4" class="step-content step-content-wide">
-        <div class="step-header">
-          <h2>{{ t('onboarding.step4Title') }}</h2>
-          <p class="step-desc">{{ t('onboarding.step4Desc') }}</p>
+      <div v-if="step === 4" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+        <div>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step4Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step4Desc') }}</p>
         </div>
 
-        <div class="resume-banner" role="status">
+        <div class="bg-card-raised border border-divider rounded-lg p-4" role="status">
           <strong>{{ t('onboarding.factoryPurchasedTitle') }}</strong>
-          <span>
+          <span class="text-muted ml-1">
             {{
               t('onboarding.factoryPurchasedBody', {
                 lot: selectedFactoryLot?.name ?? '',
@@ -1269,37 +1261,37 @@ useTickRefresh(async () => {
           </span>
         </div>
 
-        <div class="budget-grid">
-          <article class="budget-card">
-            <span class="budget-label">{{ t('onboarding.availableCash') }}</span>
+        <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.availableCash') }}</span>
             <strong>{{ formatCurrency(starterCash) }}</strong>
           </article>
-          <article class="budget-card" :class="{ warning: !!selectedShopLot && starterCash < selectedShopLot.price }">
-            <span class="budget-label">{{ t('onboarding.cashAfterPurchase') }}</span>
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedShopLot && starterCash < selectedShopLot.price }">
+            <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span>
             <strong>{{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
           </article>
         </div>
 
-        <div class="guidance-panel">
-          <h3>{{ t('onboarding.shopGuideTitle') }}</h3>
-          <p>{{ t('onboarding.shopGuideBody') }}</p>
+        <div class="bg-card-raised border border-divider rounded-lg p-4">
+          <h3 class="font-semibold text-sm mb-2">{{ t('onboarding.shopGuideTitle') }}</h3>
+          <p class="text-muted text-sm m-0">{{ t('onboarding.shopGuideBody') }}</p>
         </div>
 
-        <div class="form-group">
-          <span class="form-section-title">{{ t('onboarding.selectProduct') }}</span>
-          <p class="catalog-note">
+        <div class="flex flex-col gap-2">
+          <span class="text-sm font-semibold">{{ t('onboarding.selectProduct') }}</span>
+          <p class="text-muted text-xs m-0">
             {{ auth.isProSubscriber ? t('onboarding.proCatalogUnlocked') : t('onboarding.proCatalogNote') }}
           </p>
-          <div class="product-grid">
+          <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
             <button v-for="prod in sortedProducts" :key="prod.id" class="product-card" :class="{ selected: selectedProductId === prod.id }" @click="selectedProductId = prod.id">
-              <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="product-image" />
-              <span class="card-title">{{ getProductName(prod) }}</span>
-              <span class="product-price">{{ formatCurrency(prod.basePrice) }}{{ t('onboarding.perUnit') }}</span>
-              <span class="product-craft">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
-              <span class="card-desc">{{ getProductDescription(prod) }}</span>
-              <div class="product-recipe">
-                <span class="recipe-label">{{ t('onboarding.requires') }}:</span>
-                <span v-for="(recipe, index) in prod.recipes" :key="index" class="recipe-item">
+              <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" />
+              <span class="font-bold text-base">{{ getProductName(prod) }}</span>
+              <span class="text-[1.125rem] font-bold text-[var(--color-secondary)]">{{ formatCurrency(prod.basePrice) }}{{ t('onboarding.perUnit') }}</span>
+              <span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
+              <span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
+              <div class="flex flex-col gap-1 text-xs text-muted">
+                <span class="font-medium">{{ t('onboarding.requires') }}:</span>
+                <span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium">
                   {{ getRecipeIngredientLabel(prod, index) }}
                 </span>
               </div>
@@ -1307,7 +1299,7 @@ useTickRefresh(async () => {
           </div>
         </div>
 
-        <p v-if="availableShopLots.length === 0" class="empty-state-message">
+        <p v-if="availableShopLots.length === 0" class="empty-state-message text-muted text-sm m-0">
           {{ t('onboarding.noShopLots') }}
         </p>
         <OnboardingLotSelector
@@ -1321,12 +1313,12 @@ useTickRefresh(async () => {
           :city="selectedCity"
         />
 
-        <div v-if="canShowStep4Summary" class="summary">
-          <div class="summary-header">
-            <span class="summary-icon">📋</span>
-            <h3>{{ t('onboarding.summary') }}</h3>
+        <div v-if="canShowStep4Summary" class="summary bg-card-raised border border-divider rounded-lg p-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-xl">📋</span>
+            <h3 class="font-semibold text-base m-0">{{ t('onboarding.summary') }}</h3>
           </div>
-          <p>
+          <p class="text-muted text-sm m-0">
             {{
               t('onboarding.shopSummaryText', {
                 company: companyName,
@@ -1335,144 +1327,144 @@ useTickRefresh(async () => {
               })
             }}
           </p>
-          <div class="summary-details">
-            <div class="summary-item">
-              <span class="summary-label">🏭</span>
+          <div class="flex flex-col gap-1.5 mt-3">
+            <div class="flex items-center gap-2 text-[0.8125rem] px-2 py-1.5 bg-card rounded">
+              <span>🏭</span>
               <span>{{ selectedFactoryLot?.name }} — {{ t(`cityMap.districts.${selectedFactoryLot?.district}`) }}</span>
             </div>
-            <div class="summary-item">
-              <span class="summary-label">🏪</span>
+            <div class="flex items-center gap-2 text-[0.8125rem] px-2 py-1.5 bg-card rounded">
+              <span>🏪</span>
               <span>{{ selectedShopLot?.name }} — {{ t(`cityMap.districts.${selectedShopLot?.district}`) }}</span>
             </div>
-            <div class="summary-item">
-              <span class="summary-label">📦</span>
+            <div class="flex items-center gap-2 text-[0.8125rem] px-2 py-1.5 bg-card rounded">
+              <span>📦</span>
               <span>{{ selectedProduct ? getProductName(selectedProduct) : '' }}</span>
             </div>
           </div>
         </div>
 
-        <div class="step-actions">
+        <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-primary btn-lg" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
             {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }}
-            <span v-if="!loading" class="btn-arrow">🏪</span>
+            <span v-if="!loading" class="ml-1">🏪</span>
           </button>
         </div>
       </div>
 
-      <div v-if="step === 5 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)" class="step-content completion-step">
-        <div class="completion-hero">
-          <h2 class="completion-title">{{ t(isGuestMode ? 'onboarding.guestCompletionTitle' : 'onboarding.completionTitle') }}</h2>
-          <p class="completion-desc">{{ t(isGuestMode ? 'onboarding.guestCompletionDesc' : 'onboarding.completionDesc') }}</p>
+      <div v-if="step === 5 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)" class="step-content completion-step bg-card border border-divider rounded-xl p-8 flex flex-col gap-6 text-center">
+        <div>
+          <h2 class="completion-title text-[1.75rem] font-bold mb-3 bg-gradient-to-br from-[var(--color-secondary)] to-brand bg-clip-text text-transparent">{{ t(isGuestMode ? 'onboarding.guestCompletionTitle' : 'onboarding.completionTitle') }}</h2>
+          <p class="text-muted mx-auto max-w-[480px] leading-relaxed">{{ t(isGuestMode ? 'onboarding.guestCompletionDesc' : 'onboarding.completionDesc') }}</p>
         </div>
 
         <!-- Guest mode: show simulated achievements and save-progress form -->
-        <div v-if="isGuestMode" class="completion-achievements">
-          <div v-if="selectedCity" class="achievement-item">
-            <span class="achievement-icon">🌍</span>
-            <div class="achievement-text">
-              <strong>{{ selectedCity.name }}</strong>
-              <span>{{ t('onboarding.completionCity') }}</span>
+        <div v-if="isGuestMode" class="completion-achievements grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 text-left">
+          <div v-if="selectedCity" class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">🌍</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ selectedCity.name }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionCity') }}</span>
             </div>
           </div>
-          <div v-if="selectedIndustry" class="achievement-item">
-            <span class="achievement-icon">🏭</span>
-            <div class="achievement-text">
-              <strong>{{ formatIndustry(selectedIndustry) }}</strong>
-              <span>{{ t('onboarding.completionIndustry') }}</span>
+          <div v-if="selectedIndustry" class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">🏭</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ formatIndustry(selectedIndustry) }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionIndustry') }}</span>
             </div>
           </div>
-          <div class="achievement-item">
-            <span class="achievement-icon">🏢</span>
-            <div class="achievement-text">
-              <strong>{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong>
-              <span>{{ t('onboarding.completionFactory') }}</span>
+          <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">🏢</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionFactory') }}</span>
             </div>
           </div>
-          <div class="achievement-item">
-            <span class="achievement-icon">🏪</span>
-            <div class="achievement-text">
-              <strong>{{ selectedShopLot?.name || t('onboarding.guestShopPlaceholder') }}</strong>
-              <span>{{ t('onboarding.completionShop') }}</span>
+          <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">🏪</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ selectedShopLot?.name || t('onboarding.guestShopPlaceholder') }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionShop') }}</span>
             </div>
           </div>
-          <div v-if="selectedProduct" class="achievement-item">
-            <span class="achievement-icon">📦</span>
-            <div class="achievement-text">
-              <strong>{{ getProductName(selectedProduct) }}</strong>
-              <span>{{ t('onboarding.completionProduct', { product: getProductName(selectedProduct) }) }}</span>
+          <div v-if="selectedProduct" class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">📦</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ getProductName(selectedProduct) }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionProduct', { product: getProductName(selectedProduct) }) }}</span>
             </div>
           </div>
-          <div class="achievement-item">
-            <span class="achievement-icon">💰</span>
-            <div class="achievement-text">
-              <strong>{{ formatCurrency(onboardingCompanyCash ?? companyStartingCash) }}</strong>
-              <span>{{ t('onboarding.completionCapital', { amount: formatCurrency(onboardingCompanyCash ?? companyStartingCash) }) }}</span>
+          <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">💰</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ formatCurrency(onboardingCompanyCash ?? companyStartingCash) }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(onboardingCompanyCash ?? companyStartingCash) }) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Guest factory layout preview (ROADMAP: "Wizard will show them the factory layout") -->
-        <div v-if="isGuestMode && guestFactoryLayout" class="factory-layout-panel" aria-label="Factory layout">
-          <h3>{{ t('onboarding.factoryLayoutTitle') }}</h3>
-          <p>{{ t('onboarding.factoryLayoutGuestDesc') }}</p>
-          <div class="unit-chain">
+        <!-- Guest factory layout preview -->
+        <div v-if="isGuestMode && guestFactoryLayout" class="factory-layout-panel bg-card border border-divider rounded-xl p-5 text-left" aria-label="Factory layout">
+          <h3 class="text-base font-semibold mb-1">{{ t('onboarding.factoryLayoutTitle') }}</h3>
+          <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.factoryLayoutGuestDesc') }}</p>
+          <div class="unit-chain flex items-center flex-wrap gap-1.5">
             <template v-for="(unit, index) in guestFactoryLayout" :key="unit.unitType">
-              <div class="unit-chain-step">
-                <span class="unit-chain-icon">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
-                <span class="unit-chain-label">{{ getUnitTypeLabel(unit.unitType) }}</span>
+              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
+                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < guestFactoryLayout.length - 1" class="unit-chain-arrow" aria-hidden="true">→</span>
+              <span v-if="index < guestFactoryLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span>
             </template>
           </div>
         </div>
 
         <!-- Guest shop layout preview -->
-        <div v-if="isGuestMode && guestShopLayout" class="factory-layout-panel factory-layout-shop" aria-label="Sales shop layout">
-          <h3>{{ t('onboarding.shopLayoutTitle') }}</h3>
-          <p>{{ t('onboarding.shopLayoutGuestDesc') }}</p>
-          <div class="unit-chain">
+        <div v-if="isGuestMode && guestShopLayout" class="factory-layout-panel factory-layout-shop bg-card border border-[rgba(34,197,94,0.4)] rounded-xl p-5 text-left" aria-label="Sales shop layout">
+          <h3 class="text-base font-semibold mb-1">{{ t('onboarding.shopLayoutTitle') }}</h3>
+          <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.shopLayoutGuestDesc') }}</p>
+          <div class="unit-chain flex items-center flex-wrap gap-1.5">
             <template v-for="(unit, index) in guestShopLayout" :key="unit.unitType">
-              <div class="unit-chain-step">
-                <span class="unit-chain-icon">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
-                <span class="unit-chain-label">{{ getUnitTypeLabel(unit.unitType) }}</span>
+              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
+                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < guestShopLayout.length - 1" class="unit-chain-arrow" aria-hidden="true">→</span>
+              <span v-if="index < guestShopLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span>
             </template>
           </div>
         </div>
 
         <!-- Guest mode tick countdown -->
-        <div v-if="isGuestMode && gameState" class="guest-tick-panel">
-          <span class="configure-step-icon">⏱</span>
+        <div v-if="isGuestMode && gameState" class="guest-tick-panel flex gap-3 items-start bg-page border border-divider rounded-lg p-4 text-sm text-muted text-left">
+          <span class="text-2xl shrink-0">⏱</span>
           <div>
-            <strong>{{ t('onboarding.configureStepTick') }}</strong>
-            <p>{{ t('onboarding.configureStepTickDesc') }}</p>
-            <p class="tick-status">{{ t('onboarding.configureStepTickStatus', { time: formatGameTickTime(gameState.currentTick, locale) }) }}</p>
-            <p v-if="tickCountdown" class="tick-countdown" role="timer">{{ tickCountdown }}</p>
+            <strong class="block mb-1 text-body">{{ t('onboarding.configureStepTick') }}</strong>
+            <p class="m-0">{{ t('onboarding.configureStepTickDesc') }}</p>
+            <p class="tick-status m-0">{{ t('onboarding.configureStepTickStatus', { time: formatGameTickTime(gameState.currentTick, locale) }) }}</p>
+            <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good" role="timer">{{ tickCountdown }}</p>
           </div>
         </div>
 
         <!-- Guest simulated profit preview -->
-        <div v-if="isGuestMode && simulatedProfit" class="guest-profit-preview" role="region" aria-label="Simulated first profit">
-          <div class="profit-preview-header">
-            <span class="profit-preview-icon">📈</span>
+        <div v-if="isGuestMode && simulatedProfit" class="guest-profit-preview bg-gradient-to-br from-[rgba(0,200,83,0.08)] to-[rgba(0,71,255,0.04)] border border-[rgba(0,200,83,0.4)] rounded-xl p-5 flex flex-col gap-4 text-left" role="region" aria-label="Simulated first profit">
+          <div class="flex gap-3 items-start">
+            <span class="text-2xl shrink-0">📈</span>
             <div>
-              <strong>{{ t('onboarding.guestProfitPreviewTitle') }}</strong>
-              <p>{{ t('onboarding.guestProfitPreviewDesc') }}</p>
+              <strong class="block mb-1 text-body">{{ t('onboarding.guestProfitPreviewTitle') }}</strong>
+              <p class="text-sm text-muted m-0">{{ t('onboarding.guestProfitPreviewDesc') }}</p>
             </div>
           </div>
-          <div class="profit-preview-stats">
-            <div class="profit-stat">
-              <span class="profit-stat-label">{{ t('onboarding.guestProfitRevenue') }}</span>
-              <span class="profit-stat-value profit-stat-revenue">{{ formatCurrency(simulatedProfit.revenue) }}</span>
+          <div class="flex flex-col gap-2 border-t border-[rgba(0,200,83,0.25)] pt-3">
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-muted">{{ t('onboarding.guestProfitRevenue') }}</span>
+              <span class="profit-stat-revenue">{{ formatCurrency(simulatedProfit.revenue) }}</span>
             </div>
-            <div class="profit-stat">
-              <span class="profit-stat-label">{{ t('onboarding.guestProfitCost') }}</span>
-              <span class="profit-stat-value profit-stat-cost">-{{ formatCurrency(simulatedProfit.cost) }}</span>
+            <div class="flex justify-between items-center text-sm">
+              <span class="text-muted">{{ t('onboarding.guestProfitCost') }}</span>
+              <span>-{{ formatCurrency(simulatedProfit.cost) }}</span>
             </div>
-            <div class="profit-stat profit-stat-net">
-              <span class="profit-stat-label">{{ t('onboarding.guestProfitNet') }}</span>
-              <span class="profit-stat-value" :class="simulatedProfit.profit >= 0 ? 'profit-stat-positive' : 'profit-stat-negative'">
+            <div class="flex justify-between items-center text-sm font-semibold border-t border-[rgba(0,200,83,0.25)] pt-2">
+              <span class="text-muted">{{ t('onboarding.guestProfitNet') }}</span>
+              <span :class="simulatedProfit.profit >= 0 ? 'text-good' : 'text-bad'">
                 {{ simulatedProfit.profit >= 0 ? '+' : '' }}{{ formatCurrency(simulatedProfit.profit) }}
               </span>
             </div>
@@ -1480,12 +1472,12 @@ useTickRefresh(async () => {
         </div>
 
         <!-- Guest pricing explanation -->
-        <div v-if="isGuestMode && selectedProduct && guestConfiguredShopPrice" class="guest-price-panel" role="region" aria-label="Configured sale price">
-          <div class="price-panel-header">
-            <span class="price-panel-icon">💲</span>
+        <div v-if="isGuestMode && selectedProduct && guestConfiguredShopPrice" class="guest-price-panel bg-gradient-to-br from-[rgba(0,71,255,0.06)] to-[rgba(0,200,83,0.04)] border border-[rgba(0,71,255,0.3)] rounded-xl p-5 flex flex-col gap-3 text-left" role="region" aria-label="Configured sale price">
+          <div class="flex gap-3 items-start">
+            <span class="text-2xl shrink-0">💲</span>
             <div>
-              <strong>{{ t('onboarding.guestPriceTitle') }}</strong>
-              <p>
+              <strong class="block mb-1 text-body">{{ t('onboarding.guestPriceTitle') }}</strong>
+              <p class="text-sm text-muted m-0">
                 {{
                   t('onboarding.guestPriceDesc', {
                     product: getProductName(selectedProduct),
@@ -1496,133 +1488,127 @@ useTickRefresh(async () => {
               </p>
             </div>
           </div>
-          <p class="price-panel-tip">{{ t('onboarding.guestPriceTip') }}</p>
+          <p class="price-panel-tip text-xs text-muted border-t border-[rgba(0,71,255,0.15)] pt-2 m-0 italic">{{ t('onboarding.guestPriceTip') }}</p>
         </div>
 
         <!-- Guest save-progress section -->
-        <section v-if="isGuestMode" class="guest-save-progress" aria-labelledby="guest-save-title">
-          <div class="guest-save-header">
-            <span class="guest-save-icon">🔐</span>
+        <section v-if="isGuestMode" class="guest-save-progress bg-gradient-to-br from-[rgba(0,71,255,0.06)] to-[rgba(0,200,83,0.04)] border-2 border-brand rounded-xl p-7 flex flex-col gap-5 text-left" aria-labelledby="guest-save-title">
+          <div class="flex gap-4 items-start">
+            <span class="text-3xl shrink-0">🔐</span>
             <div>
-              <h3 id="guest-save-title">{{ t('onboarding.guestSaveTitle') }}</h3>
-              <p class="guest-save-subtitle">{{ t('onboarding.guestSaveSubtitle') }}</p>
+              <h3 id="guest-save-title" class="text-xl font-semibold text-brand mb-1 m-0">{{ t('onboarding.guestSaveTitle') }}</h3>
+              <p class="text-sm text-muted m-0">{{ t('onboarding.guestSaveSubtitle') }}</p>
             </div>
           </div>
 
-          <ul class="guest-keeps-list" aria-label="What you keep when you save">
-            <li>
-              ✅ <strong>{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong> — {{ t('onboarding.guestSaveKeepsCompany') }}
-            </li>
-            <li v-if="selectedCity">
-              ✅ <strong>{{ selectedCity.name }}</strong> — {{ t('onboarding.guestSaveKeepsCity') }}
-            </li>
-            <li v-if="selectedProduct">
-              ✅ <strong>{{ getProductName(selectedProduct) }}</strong> — {{ t('onboarding.guestSaveKeepsProduct') }}
-            </li>
+          <ul class="guest-keeps-list list-none p-0 m-0 flex flex-col gap-1.5 text-sm text-muted" aria-label="What you keep when you save">
+            <li>✅ <strong class="text-body">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong> — {{ t('onboarding.guestSaveKeepsCompany') }}</li>
+            <li v-if="selectedCity">✅ <strong class="text-body">{{ selectedCity.name }}</strong> — {{ t('onboarding.guestSaveKeepsCity') }}</li>
+            <li v-if="selectedProduct">✅ <strong class="text-body">{{ getProductName(selectedProduct) }}</strong> — {{ t('onboarding.guestSaveKeepsProduct') }}</li>
             <li>✅ {{ t('onboarding.guestSaveKeepsSetup') }}</li>
           </ul>
 
-          <div class="guest-auth-toggle">
-            <button class="btn-tab" :class="{ active: guestAuthMode === 'register' }" @click="guestAuthMode = 'register'">{{ t('onboarding.guestRegister') }}</button>
-            <button class="btn-tab" :class="{ active: guestAuthMode === 'login' }" @click="guestAuthMode = 'login'">{{ t('onboarding.guestLogin') }}</button>
+          <div class="guest-auth-toggle flex border-2 border-divider rounded-lg overflow-hidden w-fit">
+            <button class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors" :class="{ active: guestAuthMode === 'register' }" @click="guestAuthMode = 'register'">{{ t('onboarding.guestRegister') }}</button>
+            <button class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors" :class="{ active: guestAuthMode === 'login' }" @click="guestAuthMode = 'login'">{{ t('onboarding.guestLogin') }}</button>
           </div>
 
-          <div class="guest-auth-form">
-            <div class="form-group compact">
-              <label for="guestEmail">{{ t('auth.email') }}</label>
-              <input id="guestEmail" v-model="guestEmail" type="email" autocomplete="email" :placeholder="t('auth.emailPlaceholder')" />
+          <div class="flex flex-col gap-3 max-w-[420px]">
+            <div class="flex flex-col gap-1.5">
+              <label for="guestEmail" class="text-sm font-semibold">{{ t('auth.email') }}</label>
+              <input id="guestEmail" v-model="guestEmail" type="email" autocomplete="email" :placeholder="t('auth.emailPlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand" />
             </div>
-            <div v-if="guestAuthMode === 'register'" class="form-group compact">
-              <label for="guestDisplayName">{{ t('auth.displayName') }}</label>
-              <input id="guestDisplayName" v-model="guestDisplayName" type="text" autocomplete="name" :placeholder="companyName || t('auth.displayNamePlaceholder')" />
+            <div v-if="guestAuthMode === 'register'" class="flex flex-col gap-1.5">
+              <label for="guestDisplayName" class="text-sm font-semibold">{{ t('auth.displayName') }}</label>
+              <input id="guestDisplayName" v-model="guestDisplayName" type="text" autocomplete="name" :placeholder="companyName || t('auth.displayNamePlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand" />
             </div>
-            <div class="form-group compact">
-              <label for="guestPassword">{{ t('auth.password') }}</label>
-              <input id="guestPassword" v-model="guestPassword" type="password" autocomplete="current-password" :placeholder="t('auth.passwordPlaceholder')" />
+            <div class="flex flex-col gap-1.5">
+              <label for="guestPassword" class="text-sm font-semibold">{{ t('auth.password') }}</label>
+              <input id="guestPassword" v-model="guestPassword" type="password" autocomplete="current-password" :placeholder="t('auth.passwordPlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand" />
             </div>
 
-            <p v-if="guestSaveError" class="error-inline" role="alert">{{ guestSaveError }}</p>
+            <p v-if="guestSaveError" class="text-bad text-sm m-0" role="alert">{{ guestSaveError }}</p>
 
-            <button class="btn btn-primary btn-lg btn-full" :disabled="guestSaveLoading" @click="saveGuestProgress">
+            <button class="btn btn-primary btn-lg w-full justify-center" :disabled="guestSaveLoading" @click="saveGuestProgress">
               {{ guestSaveLoading ? t('common.loading') : t('onboarding.guestSaveCta') }}
-              <span v-if="!guestSaveLoading" class="btn-arrow">💾</span>
+              <span v-if="!guestSaveLoading" class="ml-1">💾</span>
             </button>
           </div>
         </section>
 
-        <div v-if="completionResult" class="completion-achievements">
-          <div class="achievement-item">
-            <span class="achievement-icon">🏭</span>
-            <div class="achievement-text">
-              <strong>{{ completionResult.factory.name }}</strong>
-              <span>{{ t('onboarding.completionFactory') }}</span>
+        <div v-if="completionResult" class="completion-achievements grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 text-left">
+          <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">🏭</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ completionResult.factory.name }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionFactory') }}</span>
             </div>
           </div>
-          <div class="achievement-item">
-            <span class="achievement-icon">🏪</span>
-            <div class="achievement-text">
-              <strong>{{ completionResult.salesShop.name }}</strong>
-              <span>{{ t('onboarding.completionShop') }}</span>
+          <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">🏪</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ completionResult.salesShop.name }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionShop') }}</span>
             </div>
           </div>
-          <div class="achievement-item">
-            <span class="achievement-icon">📦</span>
-            <div class="achievement-text">
-              <strong>{{ completionResult.selectedProduct.name }}</strong>
-              <span>{{ t('onboarding.completionProduct', { product: completionResult.selectedProduct.name }) }}</span>
+          <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">📦</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ completionResult.selectedProduct.name }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionProduct', { product: completionResult.selectedProduct.name }) }}</span>
             </div>
           </div>
-          <div class="achievement-item">
-            <span class="achievement-icon">💰</span>
-            <div class="achievement-text">
-              <strong>{{ formatCurrency(completionResult.company.cash) }}</strong>
-              <span>{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash) }) }}</span>
+          <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
+            <span class="text-2xl shrink-0">💰</span>
+            <div class="flex flex-col gap-1">
+              <strong class="text-sm">{{ formatCurrency(completionResult.company.cash) }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash) }) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Authenticated factory layout display (ROADMAP: "Wizard will show them the factory layout") -->
-        <div v-if="completionFactoryUnits" class="factory-layout-panel" aria-label="Factory layout">
-          <h3>{{ t('onboarding.factoryLayoutTitle') }}</h3>
-          <p>{{ t('onboarding.factoryLayoutDesc') }}</p>
-          <div class="unit-chain">
+        <!-- Authenticated factory layout display -->
+        <div v-if="completionFactoryUnits" class="factory-layout-panel bg-card border border-divider rounded-xl p-5 text-left" aria-label="Factory layout">
+          <h3 class="text-base font-semibold mb-1">{{ t('onboarding.factoryLayoutTitle') }}</h3>
+          <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.factoryLayoutDesc') }}</p>
+          <div class="unit-chain flex items-center flex-wrap gap-1.5">
             <template v-for="(unit, index) in completionFactoryUnits" :key="unit.id">
-              <div class="unit-chain-step">
-                <span class="unit-chain-icon">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
-                <span class="unit-chain-label">{{ getUnitTypeLabel(unit.unitType) }}</span>
+              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
+                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < completionFactoryUnits.length - 1" class="unit-chain-arrow" aria-hidden="true">→</span>
+              <span v-if="index < completionFactoryUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span>
             </template>
           </div>
         </div>
 
         <!-- Authenticated shop layout display -->
-        <div v-if="completionShopUnits" class="factory-layout-panel factory-layout-shop" aria-label="Sales shop layout">
-          <h3>{{ t('onboarding.shopLayoutTitle') }}</h3>
-          <p>{{ t('onboarding.shopLayoutDesc') }}</p>
-          <div class="unit-chain">
+        <div v-if="completionShopUnits" class="factory-layout-panel factory-layout-shop bg-card border border-[rgba(34,197,94,0.4)] rounded-xl p-5 text-left" aria-label="Sales shop layout">
+          <h3 class="text-base font-semibold mb-1">{{ t('onboarding.shopLayoutTitle') }}</h3>
+          <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.shopLayoutDesc') }}</p>
+          <div class="unit-chain flex items-center flex-wrap gap-1.5">
             <template v-for="(unit, index) in completionShopUnits" :key="unit.id">
-              <div class="unit-chain-step">
-                <span class="unit-chain-icon">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
-                <span class="unit-chain-label">{{ getUnitTypeLabel(unit.unitType) }}</span>
+              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span>
+                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < completionShopUnits.length - 1" class="unit-chain-arrow" aria-hidden="true">→</span>
+              <span v-if="index < completionShopUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span>
             </template>
           </div>
         </div>
 
-        <section v-if="!isGuestMode" class="startup-pack-panel" aria-labelledby="startup-pack-title">
-          <div class="startup-pack-header">
+        <section v-if="!isGuestMode" class="startup-pack-panel text-left border border-[rgba(255,109,0,0.35)] rounded-xl p-6 bg-gradient-to-br from-[rgba(255,109,0,0.12)] to-[rgba(0,71,255,0.1)]" aria-labelledby="startup-pack-title">
+          <div class="flex justify-between items-start gap-4">
             <div>
-              <span class="startup-pack-eyebrow">{{ t('proAccess.eyebrow') }}</span>
-              <h3 id="startup-pack-title">{{ t('proAccess.title') }}</h3>
+              <span class="startup-pack-eyebrow inline-block mb-1.5 text-xs font-bold tracking-widest uppercase text-[var(--color-tertiary)]">{{ t('proAccess.eyebrow') }}</span>
+              <h3 id="startup-pack-title" class="text-xl font-semibold m-0">{{ t('proAccess.title') }}</h3>
             </div>
-            <span class="startup-pack-status" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+            <span class="startup-pack-status px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
               {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
             </span>
           </div>
 
-          <p class="startup-pack-subtitle">
+          <p class="text-muted text-sm mt-3 mb-5">
             <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
               {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
             </template>
@@ -1630,81 +1616,78 @@ useTickRefresh(async () => {
               {{ t('proAccess.inactiveBody') }}
             </template>
           </p>
-          <p class="startup-pack-free-path">{{ t('proAccess.manageBody') }}</p>
+          <p class="text-muted text-sm mb-4">{{ t('proAccess.manageBody') }}</p>
 
-          <div class="startup-pack-actions">
+          <div class="flex flex-wrap gap-3">
             <a class="btn btn-primary btn-lg" :href="masterPortalUrl" target="_blank" rel="noreferrer">
               {{ t('proAccess.openPortal') }}
             </a>
           </div>
         </section>
 
-        <section v-if="!isGuestMode && !milestoneCompleted" class="configure-guide" aria-labelledby="configure-guide-title">
-          <h3 id="configure-guide-title">{{ t('onboarding.configureShopTitle') }}</h3>
-          <p class="configure-guide-desc">{{ t('onboarding.configureShopDesc') }}</p>
+        <section v-if="!isGuestMode && !milestoneCompleted" class="configure-guide bg-card border border-divider rounded-xl p-6 text-left" aria-labelledby="configure-guide-title">
+          <h3 id="configure-guide-title" class="text-xl font-semibold text-brand mb-2">{{ t('onboarding.configureShopTitle') }}</h3>
+          <p class="text-muted text-sm mb-5">{{ t('onboarding.configureShopDesc') }}</p>
 
-          <div class="configure-steps">
-            <article class="configure-step">
-              <span class="configure-step-icon">💰</span>
-              <div class="configure-step-body">
-                <strong>{{ t('onboarding.configureStepCash') }}</strong>
-                <p>{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash) }) }}</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
+              <span class="text-2xl shrink-0">💰</span>
+              <div>
+                <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepCash') }}</strong>
+                <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash) }) }}</p>
               </div>
             </article>
 
-            <article class="configure-step">
-              <span class="configure-step-icon">💲</span>
-              <div class="configure-step-body">
-                <strong>{{ t('onboarding.configureStepPrice') }}</strong>
-                <p>
+            <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
+              <span class="text-2xl shrink-0">💲</span>
+              <div>
+                <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPrice') }}</strong>
+                <p class="text-muted text-xs m-0">
                   {{
                     configureGuideBasePrice === null
                       ? t('onboarding.configureStepPriceDesc')
-                      : t('onboarding.configureStepPriceDescWithPrice', {
-                          price: formatCurrency(configureGuideBasePrice),
-                        })
+                      : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice) })
                   }}
                 </p>
               </div>
             </article>
 
-            <article class="configure-step">
-              <span class="configure-step-icon">🌐</span>
-              <div class="configure-step-body">
-                <strong>{{ t('onboarding.configureStepPublicSales') }}</strong>
-                <p>{{ t('onboarding.configureStepPublicSalesDesc') }}</p>
+            <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
+              <span class="text-2xl shrink-0">🌐</span>
+              <div>
+                <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPublicSales') }}</strong>
+                <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepPublicSalesDesc') }}</p>
               </div>
             </article>
 
-            <article class="configure-step">
-              <span class="configure-step-icon">⏱</span>
-              <div class="configure-step-body">
-                <strong>{{ t('onboarding.configureStepTick') }}</strong>
-                <p>{{ t('onboarding.configureStepTickDesc') }}</p>
-                <ol class="next-tick-process-list">
+            <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
+              <span class="text-2xl shrink-0">⏱</span>
+              <div>
+                <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepTick') }}</strong>
+                <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepTickDesc') }}</p>
+                <ol class="next-tick-process-list mt-2 ml-5 p-0 text-[0.85rem] text-muted flex flex-col gap-1">
                   <li>{{ t('onboarding.nextTickProcessStep1') }}</li>
                   <li>{{ t('onboarding.nextTickProcessStep2') }}</li>
                   <li>{{ t('onboarding.nextTickProcessStep3') }}</li>
                 </ol>
-                <p v-if="gameState" class="tick-status">
+                <p v-if="gameState" class="tick-status text-muted text-xs m-0 mt-1">
                   {{ t('onboarding.configureStepTickStatus', { time: formatGameTickTime(gameState.currentTick, locale) }) }}
                 </p>
-                <p v-if="tickCountdown" class="tick-countdown" role="timer">{{ tickCountdown }}</p>
+                <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good text-sm" role="timer">{{ tickCountdown }}</p>
               </div>
             </article>
           </div>
 
-          <div class="configure-cta">
+          <div class="flex justify-center mb-6">
             <RouterLink v-if="shopBuildingId" :to="'/building/' + shopBuildingId" class="btn btn-primary btn-lg">
-              {{ t('onboarding.configureShopCta') }}
-              <span class="btn-arrow">🏪</span>
+              {{ t('onboarding.configureShopCta') }} <span class="ml-1">🏪</span>
             </RouterLink>
           </div>
 
-          <!-- Mission readiness status: shows blockers or "awaiting first sale" state -->
+          <!-- Mission readiness status -->
           <div
             v-if="firstSaleMission"
-            class="mission-status"
+            class="mission-status border rounded-lg p-4 flex flex-col gap-3 mb-2"
             :class="{
               'mission-status--blocking': firstSaleMission.phase === 'CONFIGURE_SHOP',
               'mission-status--awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE',
@@ -1712,13 +1695,11 @@ useTickRefresh(async () => {
             role="status"
             aria-label="Business readiness"
           >
-            <div class="mission-status-header">
-              <span class="mission-status-icon">
-                {{ firstSaleMission.phase === 'AWAITING_FIRST_SALE' ? '⏳' : '⚠️' }}
-              </span>
-              <strong>{{ t('onboarding.missionStatusTitle') }}</strong>
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-lg">{{ firstSaleMission.phase === 'AWAITING_FIRST_SALE' ? '⏳' : '⚠️' }}</span>
+              <strong class="text-sm">{{ t('onboarding.missionStatusTitle') }}</strong>
               <span
-                class="mission-phase-badge"
+                class="mission-phase-badge text-xs font-semibold px-2 py-0.5 rounded-full ml-auto"
                 :class="{
                   'badge-configure': firstSaleMission.phase === 'CONFIGURE_SHOP',
                   'badge-awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE',
@@ -1727,105 +1708,92 @@ useTickRefresh(async () => {
                 {{ firstSaleMission.phase === 'CONFIGURE_SHOP' ? t('onboarding.missionPhaseConfigureShop') : t('onboarding.missionPhaseAwaiting') }}
               </span>
             </div>
-            <ul v-if="firstSaleMission.blockers.length > 0" class="mission-blockers">
-              <li v-for="blocker in firstSaleMission.blockers" :key="blocker" class="mission-blocker">
+            <ul v-if="firstSaleMission.blockers.length > 0" class="mission-blockers m-0 pl-5 text-sm text-muted flex flex-col gap-1">
+              <li v-for="blocker in firstSaleMission.blockers" :key="blocker" class="text-caution">
                 {{ blockerMessage(blocker) }}
               </li>
             </ul>
-            <p v-else class="mission-awaiting-desc">
-              {{ t('onboarding.configureStepTickDesc') }}
-            </p>
+            <p v-else class="m-0 text-sm text-muted">{{ t('onboarding.configureStepTickDesc') }}</p>
           </div>
 
-          <div class="milestone-complete">
-            <p class="milestone-complete-hint">{{ t('onboarding.milestoneCompleteHint') }}</p>
+          <div class="border-t border-divider pt-5 flex flex-col items-center gap-3 text-center">
+            <p class="text-sm text-muted m-0">{{ t('onboarding.milestoneCompleteHint') }}</p>
             <button class="btn btn-secondary" :disabled="milestoneLoading" @click="markMilestoneComplete">
               {{ milestoneLoading ? t('common.loading') : t('onboarding.milestoneCompleteCta') }}
-              <span v-if="!milestoneLoading" class="btn-arrow">✓</span>
+              <span v-if="!milestoneLoading" class="ml-1">✓</span>
             </button>
-            <p v-if="milestoneError" class="milestone-error" role="alert">{{ milestoneError }}</p>
+            <p v-if="milestoneError" class="milestone-error text-bad text-sm m-0" role="alert">{{ milestoneError }}</p>
           </div>
         </section>
 
         <!-- Business live panel: shown after marking milestone complete -->
-        <section v-if="!isGuestMode && milestoneCompleted" class="business-live-panel" aria-labelledby="business-live-title">
-          <div class="business-live-header">
-            <span class="business-live-icon">🎉</span>
+        <section v-if="!isGuestMode && milestoneCompleted" class="business-live-panel bg-gradient-to-br from-[rgba(0,200,83,0.08)] to-[rgba(0,71,255,0.04)] border border-[rgba(0,200,83,0.4)] rounded-xl p-6 flex flex-col gap-5 text-left" aria-labelledby="business-live-title">
+          <div class="flex gap-4 items-start">
+            <span class="text-3xl shrink-0">🎉</span>
             <div>
-              <h3 id="business-live-title">{{ t('onboarding.businessLiveTitle') }}</h3>
-              <p>{{ t('onboarding.businessLiveDesc') }}</p>
+              <h3 id="business-live-title" class="text-lg font-semibold m-0 mb-1">{{ t('onboarding.businessLiveTitle') }}</h3>
+              <p class="text-sm text-muted m-0">{{ t('onboarding.businessLiveDesc') }}</p>
             </div>
           </div>
 
-          <!-- First-sale celebration: concrete business feedback -->
-          <div v-if="firstSaleMission && firstSaleMission.firstSaleRevenue !== null" class="first-sale-celebration" role="region" aria-label="First sale details">
-            <h4>{{ t('onboarding.firstSaleCelebrationTitle') }}</h4>
-            <p>{{ t('onboarding.firstSaleCelebrationDesc') }}</p>
-            <dl class="first-sale-stats">
-              <div v-if="firstSaleMission.firstSaleProductName" class="first-sale-stat">
-                <dt>{{ t('onboarding.firstSaleCelebrationProduct') }}</dt>
-                <dd>{{ firstSaleMission.firstSaleProductName }}</dd>
+          <!-- First-sale celebration -->
+          <div v-if="firstSaleMission && firstSaleMission.firstSaleRevenue !== null" class="first-sale-celebration bg-[rgba(0,200,83,0.08)] border border-[rgba(0,200,83,0.3)] rounded-xl p-4 flex flex-col gap-3" role="region" aria-label="First sale details">
+            <h4 class="font-bold text-base m-0">{{ t('onboarding.firstSaleCelebrationTitle') }}</h4>
+            <p class="text-sm text-muted m-0">{{ t('onboarding.firstSaleCelebrationDesc') }}</p>
+            <dl class="grid grid-cols-2 gap-2 m-0 max-sm:grid-cols-1">
+              <div v-if="firstSaleMission.firstSaleProductName" class="flex flex-col gap-0.5">
+                <dt class="text-xs text-muted font-medium">{{ t('onboarding.firstSaleCelebrationProduct') }}</dt>
+                <dd class="m-0 text-[0.95rem] font-semibold">{{ firstSaleMission.firstSaleProductName }}</dd>
               </div>
-              <div v-if="firstSaleMission.firstSaleRevenue !== null" class="first-sale-stat">
-                <dt>{{ t('onboarding.firstSaleCelebrationRevenue') }}</dt>
-                <dd class="first-sale-revenue">{{ formatCurrency(firstSaleMission.firstSaleRevenue) }}</dd>
+              <div v-if="firstSaleMission.firstSaleRevenue !== null" class="flex flex-col gap-0.5">
+                <dt class="text-xs text-muted font-medium">{{ t('onboarding.firstSaleCelebrationRevenue') }}</dt>
+                <dd class="m-0 text-lg font-semibold text-good">{{ formatCurrency(firstSaleMission.firstSaleRevenue) }}</dd>
               </div>
-              <div v-if="firstSaleMission.firstSaleQuantity !== null" class="first-sale-stat">
-                <dt>{{ t('onboarding.firstSaleCelebrationQuantity') }}</dt>
-                <dd>{{ firstSaleMission.firstSaleQuantity }}</dd>
+              <div v-if="firstSaleMission.firstSaleQuantity !== null" class="flex flex-col gap-0.5">
+                <dt class="text-xs text-muted font-medium">{{ t('onboarding.firstSaleCelebrationQuantity') }}</dt>
+                <dd class="m-0 text-[0.95rem] font-semibold">{{ firstSaleMission.firstSaleQuantity }}</dd>
               </div>
-              <div v-if="firstSaleMission.firstSalePricePerUnit !== null" class="first-sale-stat">
-                <dt>{{ t('onboarding.firstSaleCelebrationPrice') }}</dt>
-                <dd>{{ formatCurrency(firstSaleMission.firstSalePricePerUnit) }}</dd>
+              <div v-if="firstSaleMission.firstSalePricePerUnit !== null" class="flex flex-col gap-0.5">
+                <dt class="text-xs text-muted font-medium">{{ t('onboarding.firstSaleCelebrationPrice') }}</dt>
+                <dd class="m-0 text-[0.95rem] font-semibold">{{ formatCurrency(firstSaleMission.firstSalePricePerUnit) }}</dd>
               </div>
-              <div v-if="firstSaleMission.firstSaleTick !== null" class="first-sale-stat">
-                <dt>{{ t('onboarding.firstSaleCelebrationTick') }}</dt>
-                <dd :title="'tick #' + firstSaleMission.firstSaleTick">{{ formatGameTickTime(firstSaleMission.firstSaleTick, locale) }}</dd>
+              <div v-if="firstSaleMission.firstSaleTick !== null" class="flex flex-col gap-0.5">
+                <dt class="text-xs text-muted font-medium">{{ t('onboarding.firstSaleCelebrationTick') }}</dt>
+                <dd class="m-0 text-[0.95rem] font-semibold" :title="'tick #' + firstSaleMission.firstSaleTick">{{ formatGameTickTime(firstSaleMission.firstSaleTick, locale) }}</dd>
               </div>
             </dl>
           </div>
 
-          <div v-if="gameState" class="business-live-tick">
-            <p class="tick-status" :title="'tick #' + gameState.currentTick">{{ t('onboarding.businessLiveTickInfo', { time: formatGameTickTime(gameState.currentTick, locale) }) }}</p>
-            <p v-if="tickCountdown" class="tick-countdown" role="timer">{{ tickCountdown }}</p>
+          <div v-if="gameState" class="flex flex-col gap-1">
+            <p class="tick-status text-sm text-muted m-0" :title="'tick #' + gameState.currentTick">{{ t('onboarding.businessLiveTickInfo', { time: formatGameTickTime(gameState.currentTick, locale) }) }}</p>
+            <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good" role="timer">{{ tickCountdown }}</p>
           </div>
 
-          <div class="business-live-process">
-            <h4>{{ t('onboarding.nextTickProcessTitle') }}</h4>
-            <ol class="next-tick-process-list">
+          <div>
+            <h4 class="text-sm font-semibold mb-2 m-0">{{ t('onboarding.nextTickProcessTitle') }}</h4>
+            <ol class="next-tick-process-list ml-5 p-0 text-sm text-muted flex flex-col gap-1">
               <li>{{ t('onboarding.nextTickProcessStep1') }}</li>
               <li>{{ t('onboarding.nextTickProcessStep2') }}</li>
               <li>{{ t('onboarding.nextTickProcessStep3') }}</li>
             </ol>
           </div>
 
-          <div class="business-live-actions">
+          <div class="flex gap-3 items-center flex-wrap">
             <button class="btn btn-primary btn-lg" @click="navigateToDashboard">
               {{ firstSaleMission?.firstSaleRevenue !== null ? t('onboarding.firstSaleCelebrationCta') : t('onboarding.businessLiveDashboardCta') }}
-              <span class="btn-arrow">→</span>
+              <span class="ml-1">→</span>
             </button>
-            <RouterLink to="/leaderboard" class="btn btn-secondary">
-              {{ t('onboarding.completionViewLeaderboard') }}
-            </RouterLink>
-            <RouterLink to="/encyclopedia" class="btn btn-secondary encyclopedia-link">
-              {{ t('onboarding.completionBrowseEncyclopedia') }}
-            </RouterLink>
+            <RouterLink to="/leaderboard" class="btn btn-secondary">{{ t('onboarding.completionViewLeaderboard') }}</RouterLink>
+            <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('onboarding.completionBrowseEncyclopedia') }}</RouterLink>
           </div>
         </section>
 
-        <div v-if="!isGuestMode && !milestoneCompleted" class="completion-next">
-          <h3>{{ t('onboarding.completionNextSteps') }}</h3>
-          <div class="completion-actions">
-            <RouterLink to="/dashboard" class="btn btn-secondary">
-              {{ t('onboarding.completionGoDashboard') }}
-              <span class="btn-arrow">→</span>
-            </RouterLink>
-            <RouterLink to="/leaderboard" class="btn btn-secondary">
-              {{ t('onboarding.completionViewLeaderboard') }}
-            </RouterLink>
-            <RouterLink to="/encyclopedia" class="btn btn-secondary encyclopedia-link">
-              {{ t('onboarding.completionBrowseEncyclopedia') }}
-            </RouterLink>
+        <div v-if="!isGuestMode && !milestoneCompleted" class="mt-4">
+          <h3 class="text-lg font-semibold mb-4 text-muted">{{ t('onboarding.completionNextSteps') }}</h3>
+          <div class="flex gap-4 justify-center flex-wrap">
+            <RouterLink to="/dashboard" class="btn btn-secondary">{{ t('onboarding.completionGoDashboard') }} →</RouterLink>
+            <RouterLink to="/leaderboard" class="btn btn-secondary">{{ t('onboarding.completionViewLeaderboard') }}</RouterLink>
+            <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('onboarding.completionBrowseEncyclopedia') }}</RouterLink>
           </div>
         </div>
       </div>
@@ -1834,42 +1802,7 @@ useTickRefresh(async () => {
 </template>
 
 <style scoped>
-.onboarding-view {
-  min-height: calc(100vh - 112px);
-  background: linear-gradient(180deg, var(--color-bg) 0%, rgba(0, 71, 255, 0.04) 100%);
-  padding: 2rem 1rem;
-}
-
-.onboarding-container {
-  max-width: 1120px;
-}
-
-.onboarding-header {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.onboarding-header h1 {
-  font-size: 2rem;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.5rem;
-}
-
-.subtitle {
-  color: var(--color-text-secondary);
-  font-size: 1rem;
-}
-
-.progress-bar {
-  display: flex;
-  align-items: flex-start;
-  margin-bottom: 2.5rem;
-  padding: 0 1rem;
-}
-
+/* Progress bar — state variants only; layout uses Tailwind */
 .progress-segment {
   display: flex;
   flex-direction: column;
@@ -1907,10 +1840,6 @@ useTickRefresh(async () => {
   box-shadow: 0 0 12px rgba(0, 200, 83, 0.3);
 }
 
-.check-icon {
-  font-size: 1.125rem;
-}
-
 .progress-label {
   font-size: 0.6875rem;
   color: var(--color-text-secondary);
@@ -1936,53 +1865,7 @@ useTickRefresh(async () => {
   background: linear-gradient(90deg, var(--color-success), var(--color-primary));
 }
 
-.step-content {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: 2rem;
-}
-
-.step-content-wide {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.step-header {
-  margin-bottom: 0.5rem;
-}
-
-.step-header h2 {
-  font-size: 1.375rem;
-  margin-bottom: 0.375rem;
-}
-
-.step-desc {
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-}
-
-.industry-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.city-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
+/* Card selection states — used by .industry-card, .city-card, .product-card, .ipo-card */
 .industry-card,
 .city-card,
 .product-card {
@@ -1999,6 +1882,10 @@ useTickRefresh(async () => {
   text-align: center;
 }
 
+.city-card {
+  text-align: left;
+}
+
 .industry-card:hover,
 .city-card:hover,
 .product-card:hover {
@@ -2012,25 +1899,7 @@ useTickRefresh(async () => {
 .product-card.selected {
   border-color: var(--color-primary);
   background: rgba(0, 71, 255, 0.08);
-  box-shadow:
-    0 0 0 1px var(--color-primary),
-    0 4px 16px rgba(0, 71, 255, 0.15);
-}
-
-.card-icon {
-  font-size: 2.5rem;
-  line-height: 1;
-}
-
-.card-title {
-  font-weight: 700;
-  font-size: 1rem;
-}
-
-.card-desc {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  line-height: 1.4;
+  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 16px rgba(0, 71, 255, 0.15);
 }
 
 .card-first-product {
@@ -2041,149 +1910,6 @@ useTickRefresh(async () => {
   border-radius: var(--radius-sm, 4px);
   padding: 0.2rem 0.5rem;
   display: inline-block;
-}
-
-.card-why {
-  font-size: 0.6875rem;
-  color: var(--color-text-muted, var(--color-text-secondary));
-  font-style: italic;
-  line-height: 1.3;
-}
-
-.city-card {
-  text-align: left;
-}
-
-.city-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.city-meta {
-  display: flex;
-  gap: 0.75rem;
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-
-.city-country {
-  background: var(--color-surface-raised);
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.city-currency {
-  background: var(--color-accent, #3b82f6);
-  color: #fff;
-  padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-sm);
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.city-resources {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.375rem;
-  align-items: center;
-}
-
-.resource-label {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.resource-badge {
-  background: rgba(0, 200, 83, 0.1);
-  color: var(--color-secondary);
-  padding: 0.125rem 0.5rem;
-  border-radius: 9999px;
-  font-size: 0.6875rem;
-  font-weight: 500;
-}
-
-.product-image {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-}
-
-.product-price {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--color-secondary);
-}
-
-.product-craft,
-.catalog-note {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.product-recipe {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-}
-
-.recipe-label {
-  font-weight: 500;
-}
-
-.recipe-item {
-  color: var(--color-tertiary);
-  font-weight: 500;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group.compact {
-  max-width: 420px;
-}
-
-.form-group label,
-.form-section-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.form-group input {
-  padding: 0.75rem 1rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: var(--color-text);
-  font-size: 1rem;
-}
-
-.form-group input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(0, 71, 255, 0.15);
-}
-
-.ipo-copy {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.8125rem;
-}
-
-.ipo-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
 }
 
 .ipo-card {
@@ -2208,329 +1934,15 @@ useTickRefresh(async () => {
 .ipo-card.selected {
   border-color: var(--color-primary);
   background: rgba(0, 71, 255, 0.08);
-  box-shadow:
-    0 0 0 1px var(--color-primary),
-    0 4px 16px rgba(0, 71, 255, 0.15);
+  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 16px rgba(0, 71, 255, 0.15);
 }
 
-.ipo-metric {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-}
-
-.guidance-panel,
-.resume-banner,
-.summary {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
-}
-
-.guidance-panel h3,
-.resume-banner strong,
-.summary h3 {
-  margin: 0 0 0.5rem;
-}
-
-.guidance-panel p,
-.guidance-panel ul,
-.resume-banner span,
-.summary p,
-.empty-state-message {
-  margin: 0;
-  color: var(--color-text-secondary);
-}
-
-.guidance-panel ul {
-  padding-left: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-top: 0.75rem;
-}
-
-.budget-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
-}
-
-.budget-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-}
-
+/* Budget warning state */
 .budget-card.warning strong {
   color: var(--color-tertiary);
 }
 
-.budget-label {
-  color: var(--color-text-secondary);
-  font-size: 0.8rem;
-}
-
-.summary-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.summary-icon {
-  font-size: 1.25rem;
-}
-
-.summary-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-  margin-top: 0.75rem;
-}
-
-.summary-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.8125rem;
-  padding: 0.375rem 0.5rem;
-  background: var(--color-surface);
-  border-radius: var(--radius-sm);
-}
-
-.summary-label {
-  font-size: 1rem;
-}
-
-.step-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-  margin-top: 0.5rem;
-}
-
-.btn-lg {
-  padding: 0.75rem 1.75rem;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.btn-arrow {
-  margin-left: 0.25rem;
-}
-
-.error-message {
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.3);
-  color: var(--color-danger);
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
-  margin-bottom: 1rem;
-}
-
-.completion-step {
-  text-align: center;
-  padding: 2rem;
-}
-
-.completion-hero {
-  margin-bottom: 2rem;
-}
-
-.completion-title {
-  font-size: 1.75rem;
-  background: linear-gradient(135deg, var(--color-secondary), var(--color-primary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.75rem;
-}
-
-.completion-desc {
-  color: var(--color-text-secondary);
-  font-size: 1rem;
-  max-width: 480px;
-  margin: 0 auto;
-  line-height: 1.6;
-}
-
-.completion-achievements {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
-  text-align: left;
-}
-
-.achievement-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.75rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  padding: 1rem;
-}
-
-.achievement-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.achievement-text {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.achievement-text strong {
-  color: var(--color-text-primary);
-  font-size: 0.9rem;
-}
-
-.achievement-text span {
-  color: var(--color-text-secondary);
-  font-size: 0.8rem;
-}
-
-/* Factory layout panel — ROADMAP: "Wizard will show them the factory layout" */
-.factory-layout-panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  padding: 1.25rem 1.5rem;
-  margin-bottom: 1.5rem;
-  text-align: left;
-}
-
-.factory-layout-panel h3 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin: 0 0 0.4rem;
-}
-
-.factory-layout-panel p {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  margin: 0 0 0.9rem;
-}
-
-.factory-layout-shop {
-  border-color: rgba(var(--color-success-rgb, 72, 199, 142), 0.4);
-}
-
-.unit-chain {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-}
-
-.unit-chain-step {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.2rem;
-  background: var(--color-background);
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  min-width: 80px;
-}
-
-.unit-chain-icon {
-  font-size: 1.25rem;
-}
-
-.unit-chain-label {
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--color-text-primary);
-  text-align: center;
-}
-
-.unit-chain-arrow {
-  font-size: 1rem;
-  color: var(--color-text-secondary);
-  padding: 0 0.1rem;
-  align-self: center;
-}
-
-.startup-pack-panel {
-  margin-bottom: 1.5rem;
-  padding: 1.5rem;
-  border: 1px solid rgba(255, 109, 0, 0.35);
-  border-radius: var(--radius-lg);
-  background: linear-gradient(135deg, rgba(255, 109, 0, 0.12), rgba(0, 71, 255, 0.1));
-  text-align: left;
-}
-
-.startup-pack-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.startup-pack-header-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.375rem;
-}
-
-.startup-pack-price {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--color-primary);
-  letter-spacing: -0.02em;
-}
-
-.startup-pack-pro-monthly {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  font-style: italic;
-}
-
-.startup-pack-savings {
-  margin: 0 0 1rem;
-  font-size: 0.8rem;
-  color: var(--color-secondary);
-  font-weight: 600;
-}
-
-.startup-pack-eyebrow {
-  display: inline-block;
-  margin-bottom: 0.375rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-tertiary);
-}
-
-.startup-pack-header h3 {
-  margin: 0;
-  font-size: 1.35rem;
-}
-
-.startup-pack-status {
-  padding: 0.375rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
+/* Startup pack status badges */
 .startup-pack-status.claimed {
   background: rgba(0, 200, 83, 0.18);
   color: var(--color-secondary);
@@ -2541,242 +1953,15 @@ useTickRefresh(async () => {
   color: var(--color-danger);
 }
 
-.startup-pack-subtitle {
-  margin: 0.75rem 0 1.25rem;
-  color: var(--color-text-secondary);
-}
-
-.startup-pack-benefits {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 1rem;
-}
-
-.startup-pack-benefit {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(13, 17, 23, 0.32);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-}
-
-.benefit-icon {
-  font-size: 1.5rem;
-}
-
-.startup-pack-benefit p,
-.startup-pack-state p {
-  margin: 0.25rem 0 0;
-  color: var(--color-text-secondary);
-}
-
-.startup-pack-deadline {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin-top: 1.25rem;
-  padding: 1rem;
-  border-radius: var(--radius-md);
-  background: rgba(13, 17, 23, 0.32);
-  border: 1px solid rgba(48, 54, 61, 0.8);
-}
-
-.startup-pack-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 1rem;
-}
-
-.startup-pack-message,
-.startup-pack-error {
-  margin: 1rem 0 0;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-md);
-}
-
-.startup-pack-message {
-  background: rgba(0, 200, 83, 0.12);
-  color: var(--color-secondary);
-}
-
-.startup-pack-error {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--color-danger);
-}
-
-.startup-pack-free-path {
-  margin-top: 0.875rem;
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-}
-
-.startup-pack-state {
-  padding: 1rem;
-  border-radius: var(--radius-md);
-}
-
-.startup-pack-state.success {
-  background: rgba(0, 200, 83, 0.12);
-}
-
-.startup-pack-state.muted {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.completion-next {
-  margin-top: 1.5rem;
-}
-
-.completion-next h3 {
-  font-size: 1.1rem;
-  margin-bottom: 1rem;
-  color: var(--color-text-secondary);
-}
-
-.completion-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.configure-guide {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 1.5rem;
-  margin-top: 1.5rem;
-}
-
-.configure-guide h3 {
-  font-size: 1.2rem;
-  margin-bottom: 0.5rem;
-  color: var(--color-primary);
-}
-
-.configure-guide-desc {
-  color: var(--color-text-secondary);
-  font-size: 0.95rem;
-  margin-bottom: 1.25rem;
-}
-
-.configure-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-
-.configure-step {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.configure-step-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.configure-step-body strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.95rem;
-}
-
-.configure-step-body p {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.configure-step-body p + p {
-  margin-top: 0.5rem;
-}
-
-.tick-status {
-  font-size: 0.85rem !important;
-}
-
-.tick-countdown {
-  color: var(--color-secondary) !important;
-  font-weight: 600;
-  font-size: 0.9rem !important;
-}
-
-.configure-cta {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 1.5rem;
-}
-
-.milestone-complete {
-  border-top: 1px solid var(--color-border);
-  padding-top: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  text-align: center;
-}
-
-.milestone-complete-hint {
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.milestone-error {
-  font-size: 0.9rem;
-  color: var(--color-error, #ff4757);
-  margin: 0;
-}
-
-/* Mission readiness status panel */
-.mission-status {
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 0.5rem;
-}
-
+/* Mission status variants */
 .mission-status--blocking {
-  border-color: rgba(255, 149, 0, 0.5);
+  border-color: rgba(255, 149, 0, 0.5) !important;
   background: rgba(255, 149, 0, 0.05);
 }
 
 .mission-status--awaiting {
-  border-color: rgba(0, 122, 255, 0.4);
+  border-color: rgba(0, 122, 255, 0.4) !important;
   background: rgba(0, 122, 255, 0.04);
-}
-
-.mission-status-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.mission-status-icon {
-  font-size: 1.1rem;
-}
-
-.mission-phase-badge {
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 0.2rem 0.5rem;
-  border-radius: 999px;
-  margin-left: auto;
 }
 
 .badge-configure {
@@ -2789,413 +1974,15 @@ useTickRefresh(async () => {
   color: var(--color-primary, #007aff);
 }
 
-.mission-blockers {
-  margin: 0;
-  padding: 0 0 0 1.25rem;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.mission-blocker {
-  color: var(--color-warning, #ff9500);
-}
-
-.mission-awaiting-desc {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-}
-
-/* First-sale celebration stats inside business-live-panel */
-.first-sale-celebration {
-  background: rgba(0, 200, 83, 0.08);
-  border: 1px solid rgba(0, 200, 83, 0.3);
-  border-radius: 10px;
-  padding: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.first-sale-celebration h4 {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.first-sale-celebration > p {
-  margin: 0;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-}
-
-.first-sale-stats {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.5rem 1rem;
-  margin: 0;
-}
-
-@media (max-width: 480px) {
-  .first-sale-stats {
-    grid-template-columns: 1fr;
-  }
-}
-
-.first-sale-stat {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-}
-
-.first-sale-stat dt {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-}
-
-.first-sale-stat dd {
-  margin: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.first-sale-revenue {
-  color: var(--color-success, #00c853);
-  font-size: 1.1rem;
-}
-
-/* Next-tick process list inside configure-step */
-.next-tick-process-list {
-  margin: 0.5rem 0 0 1.25rem;
-  padding: 0;
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-/* Business live panel: shown after marking milestone complete */
-.business-live-panel {
-  background: linear-gradient(135deg, rgba(0, 200, 83, 0.08) 0%, rgba(0, 71, 255, 0.04) 100%);
-  border: 1px solid rgba(0, 200, 83, 0.4);
-  border-radius: 12px;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.business-live-header {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.business-live-icon {
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-
-.business-live-header h3 {
-  margin: 0 0 0.4rem;
-  color: var(--color-text);
-  font-size: 1.1rem;
-}
-
-.business-live-header p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-}
-
-.business-live-tick {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.business-live-process h4 {
-  margin: 0 0 0.5rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.business-live-actions {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-/* Guest mode styles */
-.guest-tick-panel {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 1rem;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-}
-
-.guest-tick-panel .configure-step-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.guest-tick-panel strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--color-text);
-}
-
-/* Guest simulated profit preview */
-.guest-profit-preview {
-  background: linear-gradient(135deg, rgba(0, 200, 83, 0.08) 0%, rgba(0, 71, 255, 0.04) 100%);
-  border: 1px solid rgba(0, 200, 83, 0.4);
-  border-radius: 10px;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.profit-preview-header {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.profit-preview-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.profit-preview-header strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--color-text);
-}
-
-.profit-preview-header p {
-  font-size: 0.85rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.profit-preview-stats {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  border-top: 1px solid rgba(0, 200, 83, 0.25);
-  padding-top: 0.75rem;
-}
-
-.profit-stat {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.9rem;
-}
-
-.profit-stat-net {
-  border-top: 1px solid rgba(0, 200, 83, 0.25);
-  padding-top: 0.5rem;
-  font-weight: 600;
-}
-
-.profit-stat-label {
-  color: var(--color-text-secondary);
-}
-
-.profit-stat-value {
-  font-weight: 500;
-}
-
-.profit-stat-revenue {
-  color: var(--color-text);
-}
-
-.profit-stat-cost {
-  color: var(--color-text-secondary);
-}
-
-.profit-stat-positive {
-  color: #22c55e;
-}
-
-.profit-stat-negative {
-  color: var(--color-error, #ff4757);
-}
-
-.guest-price-panel {
-  background: linear-gradient(135deg, rgba(0, 71, 255, 0.06) 0%, rgba(0, 200, 83, 0.04) 100%);
-  border: 1px solid rgba(0, 71, 255, 0.3);
-  border-radius: 10px;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.price-panel-header {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.price-panel-icon {
-  font-size: 1.5rem;
-  flex-shrink: 0;
-}
-
-.price-panel-header strong {
-  display: block;
-  margin-bottom: 0.25rem;
-  color: var(--color-text);
-}
-
-.price-panel-header p {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.price-panel-tip {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary);
-  border-top: 1px solid rgba(0, 71, 255, 0.15);
-  padding-top: 0.5rem;
-  margin: 0;
-  font-style: italic;
-}
-
-.guest-save-progress {
-  background: linear-gradient(135deg, rgba(0, 71, 255, 0.06) 0%, rgba(0, 200, 83, 0.04) 100%);
-  border: 2px solid var(--color-primary);
-  border-radius: 12px;
-  padding: 1.75rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.guest-save-header {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.guest-save-icon {
-  font-size: 2rem;
-  flex-shrink: 0;
-}
-
-.guest-save-header h3 {
-  margin: 0 0 0.375rem;
-  font-size: 1.25rem;
-  color: var(--color-primary);
-}
-
-.guest-save-subtitle {
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-  margin: 0;
-}
-
-.guest-keeps-list {
-  list-style: none;
-  padding: 0;
-  margin: 0.75rem 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-}
-
-.guest-keeps-list li strong {
-  color: var(--color-text-primary);
-}
-
-.guest-auth-toggle {
-  display: flex;
-  gap: 0;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  width: fit-content;
-}
-
-.btn-tab {
-  padding: 0.5rem 1.25rem;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  transition: all 0.2s ease;
-}
-
+/* Auth tab toggle */
 .btn-tab.active {
   background: var(--color-primary);
   color: #fff;
 }
 
-.guest-auth-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 420px;
-}
-
-.btn-full {
-  width: 100%;
-  justify-content: center;
-}
-
-.error-inline {
-  color: var(--color-error, #ff4757);
-  font-size: 0.875rem;
-  margin: 0;
-}
-
 @media (max-width: 640px) {
-  .industry-grid,
-  .city-grid,
-  .ipo-grid,
-  .product-grid,
-  .budget-grid,
-  .configure-steps {
-    grid-template-columns: 1fr;
-  }
-
   .progress-label {
     display: none;
-  }
-
-  .step-content {
-    padding: 1.25rem;
-  }
-
-  .step-actions,
-  .startup-pack-actions {
-    flex-direction: column;
-  }
-
-  .startup-pack-header {
-    flex-direction: column;
   }
 }
 </style>

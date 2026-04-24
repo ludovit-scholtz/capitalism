@@ -123,12 +123,11 @@
 }
 
 /* Note: light mode is activated only by the explicit [data-theme='light'] attribute.
-   The game is intentionally dark-first for its simulation aesthetic. Light mode will
-   be exposed to players via a theme toggle in a future UI iteration.
-   Accessibility note: users who require light mode can use the [data-theme='light']
-   mechanism once the toggle is shipped; system prefers-color-scheme is not auto-applied
-   to prevent an unexpected white flash in CI and headless test environments where the
-   default color scheme is light. */
+   The game is intentionally dark-first for its simulation aesthetic. The theme toggle
+   (ThemeToggle.vue + useThemeStore) lets players switch to light mode; the choice
+   persists in localStorage under 'app_theme'. System prefers-color-scheme is
+   intentionally NOT used to prevent unexpected light-mode flashes in CI and headless
+   test environments where the system default color scheme is light. */
 
 *,
 *::before,

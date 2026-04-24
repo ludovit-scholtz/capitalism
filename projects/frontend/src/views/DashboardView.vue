@@ -127,16 +127,21 @@ function getBuildingPowerLabel(powerStatus: string): string {
 
 /** Returns the CSS class for a power status badge. */
 function powerStatusClass(status: string): string {
-  if (status === 'CONSTRAINED') return 'power-badge power-badge--constrained'
-  if (status === 'OFFLINE') return 'power-badge power-badge--offline'
-  return 'power-badge power-badge--powered'
+  const base = 'power-badge text-[0.625rem] font-bold px-1.5 py-0.5 rounded whitespace-nowrap'
+  if (status === 'CONSTRAINED') return `${base} power-badge--constrained bg-amber-400/20 text-amber-400`
+  if (status === 'OFFLINE') return `${base} power-badge--offline bg-red-400/15 text-[var(--color-danger)]`
+  return `${base} power-badge--powered bg-green-500/15 text-[var(--color-secondary)]`
 }
 
 /** Returns the CSS class for the city power balance status. */
 function powerBalanceClass(status: string): string {
-  if (status === 'CRITICAL') return 'power-balance power-balance--critical'
-  if (status === 'CONSTRAINED') return 'power-balance power-balance--constrained'
-  return 'power-balance power-balance--balanced'
+  const base =
+    'power-balance flex items-center gap-2 px-3 py-2 rounded text-[0.8125rem] flex-wrap border'
+  if (status === 'CRITICAL')
+    return `${base} power-balance--critical bg-red-400/10 border-red-400/25 text-[var(--color-danger)]`
+  if (status === 'CONSTRAINED')
+    return `${base} power-balance--constrained bg-amber-400/15 border-amber-400/30 text-amber-400`
+  return `${base} power-balance--balanced bg-green-500/10 border-green-500/25 text-[var(--color-secondary)]`
 }
 
 async function loadDashboardData() {
@@ -668,7 +673,7 @@ async function createCompany() {
                   </span>
                   <RouterLink :to="`/city/${cityId}`" class="underline text-xs ml-auto">{{ t('powerGrid.viewDetails') }}</RouterLink>
                 </div>
-                <div v-else class="power-balance power-balance--legacy flex items-center gap-2 px-3 py-2 rounded text-sm">
+                <div v-else class="power-balance power-balance--legacy flex items-center gap-2 px-3 py-2 rounded text-sm border border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)]">
                   <span>⚡</span>
                   <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
                   <span>{{ t('powerGrid.powerCardNoPower') }}</span>
@@ -749,66 +754,3 @@ async function createCompany() {
   </div>
 </template>
 
-<style scoped>
-/* Test-selector classes preserved for E2E compatibility */
-
-/* Power balance status chips (used in buildings tab) */
-.power-balance {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border-radius: var(--radius-sm);
-  font-size: 0.8125rem;
-  flex-wrap: wrap;
-  border: 1px solid;
-}
-
-.power-balance--balanced {
-  background: rgba(34, 197, 94, 0.1);
-  border-color: rgba(34, 197, 94, 0.25);
-  color: var(--color-secondary);
-}
-
-.power-balance--constrained {
-  background: rgba(251, 191, 36, 0.15);
-  border-color: rgba(251, 191, 36, 0.3);
-  color: #f59e0b;
-}
-
-.power-balance--critical {
-  background: rgba(248, 113, 113, 0.1);
-  border-color: rgba(248, 113, 113, 0.25);
-  color: var(--color-danger);
-}
-
-.power-balance--legacy {
-  background: var(--color-bg-secondary, rgba(0, 0, 0, 0.04));
-  border-color: var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-/* Power badges on building cards */
-.power-badge {
-  font-size: 0.625rem;
-  font-weight: 700;
-  padding: 0.125rem 0.375rem;
-  border-radius: var(--radius-sm);
-  white-space: nowrap;
-}
-
-.power-badge--powered {
-  background: rgba(34, 197, 94, 0.15);
-  color: var(--color-secondary);
-}
-
-.power-badge--constrained {
-  background: rgba(251, 191, 36, 0.2);
-  color: #f59e0b;
-}
-
-.power-badge--offline {
-  background: rgba(248, 113, 113, 0.15);
-  color: var(--color-danger);
-}
-</style>

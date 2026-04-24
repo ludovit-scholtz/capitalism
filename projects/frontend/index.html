@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" href="/favicon.ico" />
@@ -13,6 +13,19 @@
       href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap"
       rel="stylesheet"
     />
+    <!-- Prevent flash of wrong theme: apply stored preference before Vue hydrates.
+         The game is dark-first; system prefers-color-scheme is intentionally ignored
+         so headless CI and new players always start in dark mode.
+         Only an explicit 'light' value in localStorage switches to light. -->
+    <script>
+      ;(function () {
+        try {
+          var stored = localStorage.getItem('app_theme')
+          var theme = stored === 'light' ? 'light' : 'dark'
+          document.documentElement.setAttribute('data-theme', theme)
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="app"><!--ssr-outlet--></div>

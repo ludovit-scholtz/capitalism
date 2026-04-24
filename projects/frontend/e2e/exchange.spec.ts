@@ -1,6 +1,13 @@
 import { test, expect } from '@playwright/test'
 import { setupMockApi, makeDefaultCities, makeDefaultResources, makePlayer } from './helpers/mock-api'
 
+/** Parses a quality range string like "45% – 72%" and returns the band width. */
+function parseQualityRange(text: string | null): number {
+  if (!text) return 0
+  const parts = text.split('–').map((s) => parseFloat(s.replace('%', '').trim()))
+  return Math.abs((parts[1] ?? 0) - (parts[0] ?? 0))
+}
+
 // ── Exchange browsing surface ─────────────────────────────────────────────────
 
 test.describe('Global Exchange page', () => {
@@ -1425,14 +1432,8 @@ test.describe('Global Exchange — quality variability bands', () => {
     const chemRangeText = await chemBraCard.locator('.quality-range').textContent()
 
     // Parse the ranges
-    const parseRange = (text: string | null): number => {
-      if (!text) return 0
-      const parts = text.split('–').map((s) => parseFloat(s.replace('%', '').trim()))
-      return Math.abs((parts[1] ?? 0) - (parts[0] ?? 0))
-    }
-
-    const woodBandWidth = parseRange(woodRangeText)
-    const chemBandWidth = parseRange(chemRangeText)
+    const woodBandWidth = parseQualityRange(woodRangeText)
+    const chemBandWidth = parseQualityRange(chemRangeText)
 
     // Higher abundance → narrower band (more predictable quality)
     expect(chemBandWidth).toBeGreaterThan(woodBandWidth)

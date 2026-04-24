@@ -1156,19 +1156,13 @@ const estimatedCustomerTotalPayments = computed(() => {
             <div class="account-actions" v-if="myAccountBalance > 0">
               <button
                 class="btn btn-secondary btn-sm"
-                @click="
-                  showTopUpForm = !showTopUpForm
-                  showWithdrawForm = false
-                "
+                @click="showTopUpForm = !showTopUpForm; showWithdrawForm = false"
               >
                 {{ showTopUpForm ? t('common.cancel') : t('bank.addFunds') }}
               </button>
               <button
                 class="btn btn-outline btn-sm"
-                @click="
-                  showWithdrawForm = !showWithdrawForm
-                  showTopUpForm = false
-                "
+                @click="showWithdrawForm = !showWithdrawForm; showTopUpForm = false"
               >
                 {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
               </button>

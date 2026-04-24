@@ -1061,3 +1061,31 @@ Root-cause of a CI failure (April 2026, PR #enforce-bank-account-guidance):
 1. **Never use abbreviations in `query.includes(...)` checks when the abbreviation is a substring of any common GraphQL type name.** `UUID` contains `UUI`, `gameServers` contains `me`, `companyRankings` contains `rankings` — all documented with exclusion guards already.
 2. **Use the full operation name** (e.g. `query.includes('unitUpgradeInfo')`) rather than shortened forms. Abbreviated checks save nothing and cause hard-to-diagnose cross-handler pollution.
 3. **When adding a new mock handler, search for any existing handler whose `query.includes(...)` condition could match the new query's operation name or its parameter types.** Run a quick sanity check: does any existing substring appear inside `operationName` or inside type annotations like `UUID!`, `String!`, `Int!`?
+
+## Tailwind CSS migration — preserve all E2E selector classes, never break dark-mode defaults
+
+Root-cause of CI failures (April 2026, PR #128 Tailwind migration):
+- `OnboardingView.vue` was migrated from 1,366 lines of scoped CSS to Tailwind utilities. During migration, 13 CSS classes used exclusively as Playwright locator hooks (`.check-icon`, `.budget-grid`, `.summary`, `.empty-state-message`, `.city-currency`, `.unit-chain-arrow`, `.unit-chain-icon`, `.business-live-panel`, `.first-sale-celebration`, `.next-tick-process-list`, `.mission-blockers`, `.milestone-error`, `.card-desc`, `.card-why`) were removed from the template because the scoped styles that styled them were deleted. 55 E2E tests failed.
+- `theme.ts` `detectPreferredTheme()` checked `window.matchMedia('(prefers-color-scheme: light)')` as a fallback. In CI headless Chromium the OS preference is `light`, so Vue hydration called `init()`, which overwrote the HTML-level `data-theme="dark"` with `light`. 2 theme-contrast tests failed.
+
+**Rules to prevent recurrence:**
+1. **Before committing any Tailwind CSS migration, grep all E2E spec files for CSS class selectors used as Playwright locators (`locator('.<class>')`) and verify each one is still present in the migrated template.** The command: `grep -oP "locator\('\.[a-z][a-z0-9-]+'\)" e2e/*.spec.ts | grep -oP '\.[a-z][a-z0-9-]+'` extracts all hook classes. Each must appear in the Vue template as a literal class string.
+2. **E2E hook classes are NOT styling classes — they must be preserved even when the scoped CSS that styled them is deleted.** When migrating a component to Tailwind, keep any class that appears as a Playwright locator selector as a no-op class (e.g. `class="check-icon"`) alongside the new Tailwind utilities.
+3. **The game is dark-first. Never add `prefers-color-scheme` to `detectPreferredTheme()`.** CI headless browsers report `light` as the system preference. Only an explicit `localStorage.getItem('app_theme') === 'light'` should activate light mode. The inline `<script>` in `index.html` already implements this correctly — the Pinia store's `init()` must match the same logic.
+4. **After migrating any view to Tailwind, run the full targeted E2E spec** (`CI=true npx playwright test --project=chromium e2e/<spec>.ts`) before `report_progress`. Running only the build check (`npm run build`) is insufficient — Tailwind builds fine even when hook classes are missing.
+5. **When adding theme toggle functionality, always add E2E tests that verify:** toggle is visible, clicking toggles `data-theme`, preference persists in `localStorage`, stored preference is respected on reload, and light/dark token values are correct.
+
+## Multi-line inline Vue event handlers — always use semicolons or arrow functions
+
+Root-cause of CI build failures (April 2026, PR #128 — after merging main):
+- `ForexExchangeView.vue` had `@input="\n  quote = null\n  showConfirm = false\n"` — two statements separated by a newline with no semicolon.
+- `BankManagementView.vue` had the same pattern in two `@click` handlers.
+- Vite/Rollup's JavaScript parser treats the newline as an implicit statement terminator within the attribute value and then fails with `Error parsing JavaScript expression: Unexpected token, expected ","` at the second statement's position.
+- These views built fine in older Vite versions but broke after Vite was upgraded; the pattern was always non-standard.
+
+**Rules to prevent recurrence:**
+1. **Never write multi-statement inline event handlers with bare newlines as separators.** Vue attribute values are parsed as JavaScript expressions; newlines are NOT statement terminators inside an attribute string.
+2. **For two or more statements in an inline handler, use semicolons:** `@input="quote = null; showConfirm = false"`.
+3. **For three or more statements, use an arrow function:** `@click="() => { a = 1; b = 2; c = 3 }"`.
+4. **After any merge that brings in new Vue files from `main`, grep for the pattern** `grep -rn '@[a-z]*="$' src/ --include='*.vue'` and verify every match is either an arrow-function body (`() => {`) or a single statement. Multi-line multi-statement handlers without semicolons must be fixed before committing.
+5. **Add dark-mode regression E2E tests for every view whose build syntax is fixed.** If a view was broken and is now fixed, prove it renders correctly in both themes with at least two Playwright assertions (dark background token + heading visible).

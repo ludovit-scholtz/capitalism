@@ -16,20 +16,23 @@ It will use real world map. The game will start in single city and later other c
 - Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
 - Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
 
-### Tailwind migration (45% complete)
+### Tailwind migration (80% complete)
 
 - [x] Tailwind v4 theme foundation: `@theme inline` in `main.css` maps all game design tokens (bg-card, text-muted, border-divider, bg-brand, text-good, etc.) to CSS custom properties, enabling clean utility-first styling across all migrated components
-- [x] Full light-mode / dark-mode support: CSS variables switch on `[data-theme='light']` and `prefers-color-scheme: light`; dark remains the game default
+- [x] Full light-mode / dark-mode support: CSS variables switch on `[data-theme='light']`; dark remains the game default (system `prefers-color-scheme` is intentionally ignored so new players and CI always start in dark mode)
 - [x] Application shell migrated: `App.vue`, `AppHeader.vue`, `AppFooter.vue` — sticky header, offline/update banners, footer, nav links, notification badges, game-time chip, and mobile menu all use Tailwind utilities
 - [x] `LoginView.vue` migrated: auth card, form fields, error alert, toggle button — clean Tailwind-first form layout
 - [x] `HomeView.vue` migrated: hero section, status cards grid, leaderboard table — responsive Tailwind layout with accessible contrast
 - [x] FX exchange migrated: `ForexExchangeView.vue` — tabs, swap form with currency selectors + amount input, quote confirmation card, rates table, history table all use Tailwind utilities; responsive grid layout for source/destination rows
 - [x] Banking flows migrated: `BankAccountSelector.vue`, `ForexBankAccountSelector.vue` — unified selector pattern with balance display chip; `BankStatementView.vue` — account summary card, transaction table with debit/credit/balance columns, responsive column hiding on mobile
 - [x] Gold AMM migrated: `GoldAmmSection.vue` — gold balance gradient card, swap/liquidity/create-pool sections, quote table, pool position panels — all use Tailwind utilities; removed 330-line scoped style block
-- [ ] Migrate remaining high-traffic views to Tailwind (DashboardView, OnboardingView, BuyBuildingView, BuildingDetailView)
+- [x] `OnboardingView.vue` migrated: all wizard steps (industry, city, factory lot, product/shop lot, completion), guest mode, achievement panels, configure guide, mission status, and business-live panel — scoped CSS reduced from 1,366 → 176 lines (87% reduction); all E2E selector hook classes preserved
+- [x] `DashboardView.vue` migrated: power-balance/power-badge scoped CSS block replaced with Tailwind utilities; semantic E2E class hooks (.power-balance--balanced/constrained/critical/legacy, .power-badge--powered/constrained/offline) preserved
+- [x] `BuyBuildingView.vue` migrated: selected-state scoped CSS block (`.type-card.selected`, `.city-option.selected`, `.lot-card.selected`) replaced with Tailwind utilities in `:class` bindings; all E2E class hooks preserved
+- [x] Add `data-theme` toggle in UI: `ThemeToggle.vue` (moon/sun icon button) integrated into `AppHeader` for all users; `useThemeStore` (Pinia) persists choice in `localStorage`; flash-of-wrong-theme prevented by inline script in `index.html`
+- [x] Update copilot instructions with Tailwind design patterns (dark-mode regression prevention, E2E selector class preservation)
+- [ ] Migrate remaining high-traffic views to Tailwind (BuildingDetailView)
 - [ ] Update remaining components (cards, tables, badges, form controls) to use Tailwind utilities
-- [ ] Add `data-theme` toggle in UI (light/dark mode switcher)
-- [ ] Update copilot instructions with Tailwind design patterns
 
 ### Government company
 
