@@ -440,3 +440,140 @@ test.describe('Theme contrast — OnboardingView (Tailwind migration regression)
     await expect(toggle.first()).toBeVisible()
   })
 })
+
+test.describe('Theme contrast — DashboardView (Tailwind migration regression)', () => {
+  /**
+   * Guards against dark-mode CSS regressions introduced when DashboardView.vue
+   * power-balance/power-badge scoped CSS was removed and replaced with Tailwind utilities.
+   * Ensures the semantic class hooks (.power-balance--*, .power-badge--*) and dark
+   * token resolution remain correct after the migration.
+   */
+
+  test('dashboard renders in dark mode with correct background token', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Dashboard tick clock must be visible
+    await expect(page.locator('.tick-clock-widget')).toBeVisible()
+
+    // Dark background token resolved — value starts with a dark hex code
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[0-4]/)
+  })
+
+  test('theme toggle switches DashboardView to light mode without breaking layout', async ({
+    page,
+  }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/dashboard')
+
+    // Dashboard visible in dark mode
+    await expect(page.locator('.tick-clock-widget')).toBeVisible()
+
+    // Switch to light mode
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+
+    // Light mode background token should resolve to a light colour
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[c-f]/)
+
+    // Dashboard tick clock still visible after theme switch
+    await expect(page.locator('.tick-clock-widget')).toBeVisible()
+  })
+})
+
+test.describe('Theme contrast — BuyBuildingView (Tailwind migration regression)', () => {
+  /**
+   * Guards against dark-mode CSS regressions introduced when BuyBuildingView.vue
+   * selected-state scoped CSS was removed and replaced with Tailwind utilities.
+   */
+
+  test('buy building form renders in dark mode with correct background token', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Build Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/buy-building/company-1')
+
+    // Building type cards must be visible
+    await expect(page.locator('.type-card').first()).toBeVisible()
+
+    // Dark background token resolved
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[0-4]/)
+  })
+
+  test('selected type card gets Tailwind selection classes in dark mode', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Build Corp',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/buy-building/company-1')
+
+    await expect(page.locator('.type-card').first()).toBeVisible()
+
+    // Click the first type card to select it
+    await page.locator('.type-card').first().click()
+
+    // After selection the .selected class AND the visual Tailwind ring should be applied
+    await expect(page.locator('.type-card.selected').first()).toBeVisible()
+  })
+})

@@ -339,7 +339,7 @@ async function buyBuilding() {
               v-for="bType in buildingTypes"
               :key="bType"
               class="type-card flex flex-col items-center gap-1.5 py-5 px-3 border-2 border-divider rounded-lg bg-page cursor-pointer transition-all duration-200 text-body text-center hover:border-brand hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              :class="{ selected: selectedType === bType }"
+              :class="selectedType === bType ? 'selected border-brand bg-[rgba(0,71,255,0.08)] ring-1 ring-brand' : ''"
               @click="selectedType = bType"
             >
               <span class="text-3xl leading-none">{{ t(`buildings.typeIcons.${bType}`) }}</span>
@@ -375,7 +375,7 @@ async function buyBuilding() {
                 v-for="city in cities"
                 :key="city.id"
                 class="city-option inline-flex items-center gap-1.5 px-4 py-2 border-2 border-divider rounded-lg bg-page text-body cursor-pointer transition-all hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                :class="{ selected: selectedCityId === city.id }"
+                :class="selectedCityId === city.id ? 'selected border-brand bg-[rgba(0,71,255,0.08)]' : ''"
                 @click="selectedCityId = city.id"
               >
                 <span class="font-semibold text-sm">{{ city.name }}</span>
@@ -534,7 +534,7 @@ async function buyBuilding() {
               v-for="lot in availableLots"
               :key="lot.id"
               class="lot-card flex flex-col gap-2 p-4 border-2 border-divider rounded-lg bg-page text-body text-left cursor-pointer transition-all duration-200 hover:border-brand hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-              :class="{ selected: selectedLotId === lot.id }"
+              :class="selectedLotId === lot.id ? 'selected border-brand ring-1 ring-brand bg-[rgba(0,71,255,0.08)]' : ''"
               @click="selectedLotId = lot.id"
             >
               <div class="flex justify-between items-baseline gap-4">
@@ -580,22 +580,3 @@ async function buyBuilding() {
   </div>
 </template>
 
-<style scoped>
-/* Test-selector + interactive state styles that Tailwind JIT cannot express as variants */
-.type-card.selected {
-  border-color: var(--color-primary);
-  background: rgba(0, 71, 255, 0.08);
-  box-shadow: 0 0 0 1px var(--color-primary);
-}
-
-.city-option.selected {
-  border-color: var(--color-primary);
-  background: rgba(0, 71, 255, 0.08);
-}
-
-.lot-card.selected {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
-  background: rgba(0, 71, 255, 0.08);
-}
-</style>
