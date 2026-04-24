@@ -11509,9 +11509,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var czk = await db.PlayerCurrencyBalances
-                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
-            if (czk is not null) db.PlayerCurrencyBalances.Remove(czk);
+            var czk = await db.BankAccounts
+                .FirstOrDefaultAsync(account => account.PlayerId == playerId && account.CurrencyCode == "CZK");
+            if (czk is not null) db.BankAccounts.Remove(czk);
             await db.SaveChangesAsync();
         }
 
@@ -11545,20 +11545,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             // Set a tiny CZK balance — far less than the lot price
-            var czk = await db.PlayerCurrencyBalances
-                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
-            if (czk is null)
-            {
-                db.PlayerCurrencyBalances.Add(new Api.Data.Entities.PlayerCurrencyBalance
-                {
-                    Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = "CZK",
-                    Balance = 100m, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                czk.Balance = 100m;
-            }
+            var czk = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, playerId, "CZK");
+            czk.Balance = 100m;
             await db.SaveChangesAsync();
         }
 
@@ -11592,20 +11580,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var czk = await db.PlayerCurrencyBalances
-                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
-            if (czk is null)
-            {
-                db.PlayerCurrencyBalances.Add(new Api.Data.Entities.PlayerCurrencyBalance
-                {
-                    Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = "CZK",
-                    Balance = czkAmount, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                czk.Balance = czkAmount;
-            }
+            var czk = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, playerId, "CZK");
+            czk.Balance = czkAmount;
             await db.SaveChangesAsync();
         }
 
@@ -11626,8 +11602,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var czk = await db.PlayerCurrencyBalances
-                .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            var czk = await db.BankAccounts
+                .FirstOrDefaultAsync(account => account.PlayerId == playerId && account.CurrencyCode == "CZK");
             Assert.NotNull(czk);
             Assert.True(czk.Balance < czkAmount, "CZK balance should have been reduced after purchase");
         }
@@ -25800,20 +25776,22 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var bank = CreateTestBank(db, bankCompany, city.Id, 20_050_000m);
 
-        var deposit = new Api.Data.Entities.BankDeposit
+        var deposit = new Api.Data.Entities.BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depositorCompany.Id,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = depositorCompany.Id,
-            Amount = 50_000m,
+            Balance = 50_000m,
             DepositInterestRatePercent = 5m,
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = 1L,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
             TotalInterestPaid = 0m,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(deposit);
+        db.BankAccounts.Add(deposit);
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
@@ -25972,19 +25950,21 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         };
         db.Buildings.Add(bank);
 
-        var deposit = new Api.Data.Entities.BankDeposit
+        var deposit = new Api.Data.Entities.BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depositorCompany.Id,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = depositorCompany.Id,
-            Amount = 100_000m,
+            Balance = 100_000m,
             DepositInterestRatePercent = 3650m, // 3650% / TicksPerYear (8760) = ~0.4167 per tick per unit, times 100k = ~41.67 per tick
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = 1L,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(deposit);
+        db.BankAccounts.Add(deposit);
         await db.SaveChangesAsync();
 
         // Process one tick via TickProcessor
@@ -26031,19 +26011,21 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         };
         db.Buildings.Add(bank);
 
-        var originalDeposit = new Api.Data.Entities.BankDeposit
+        var originalDeposit = new Api.Data.Entities.BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depCo.Id,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = depCo.Id,
-            Amount = 50_000m,
+            Balance = 50_000m,
             DepositInterestRatePercent = 5m,
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = 1L,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(originalDeposit);
+        db.BankAccounts.Add(originalDeposit);
         await db.SaveChangesAsync();
 
         // Act: top-up the deposit
@@ -26072,7 +26054,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         // Original deposit must NOT have been mutated — still $50k
         await db.Entry(originalDeposit).ReloadAsync();
-        Assert.Equal(50_000m, originalDeposit.Amount);
+        Assert.Equal(50_000m, originalDeposit.Balance);
 
         // Bank.TotalDeposits must have grown by $30k
         await db.Entry(bank).ReloadAsync();
@@ -26083,8 +26065,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(470_000m, depCo.Cash);
 
         // Two active non-base-capital deposits from this company now exist
-        var allDeposits = await db.BankDeposits
-            .Where(d => d.BankBuildingId == bank.Id && d.DepositorCompanyId == depCo.Id && d.IsActive && !d.IsBaseCapital)
+        var allDeposits = await db.BankAccounts
+            .Where(d => d.BankBuildingId == bank.Id && d.CompanyId == depCo.Id && d.ClosedAtUtc == null && !d.IsBaseCapitalDeposit)
             .ToListAsync();
         Assert.Equal(2, allDeposits.Count);
     }
@@ -26122,19 +26104,21 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         };
         db.Buildings.Add(bank);
 
-        var originalDeposit = new Api.Data.Entities.BankDeposit
+        var originalDeposit = new Api.Data.Entities.BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depCo.Id,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = depCo.Id,
-            Amount = 50_000m,
+            Balance = 50_000m,
             DepositInterestRatePercent = 5m, // Original deposit got 5%
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = 1L,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(originalDeposit);
+        db.BankAccounts.Add(originalDeposit);
         await db.SaveChangesAsync();
 
         // Act: top-up at a time when the bank rate is 2%
@@ -26201,13 +26185,21 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Original deposit at tick 1
         var gameState = await db.GameStates.FirstAsync();
         gameState.CurrentTick = 1L;
-        var origDeposit = new Api.Data.Entities.BankDeposit
+        var origDeposit = new Api.Data.Entities.BankAccount
         {
-            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = depCo.Id,
-            Amount = originalAmount, DepositInterestRatePercent = ratePercent,
-            IsBaseCapital = false, IsActive = true, DepositedAtTick = 1L, DepositedAtUtc = DateTime.UtcNow,
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depCo.Id,
+            BankBuildingId = bank.Id,
+            Balance = originalAmount,
+            DepositInterestRatePercent = ratePercent,
+            IsBaseCapitalDeposit = false,
+            DepositedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(origDeposit);
+        db.BankAccounts.Add(origDeposit);
         await db.SaveChangesAsync();
 
         var tickProcessor = scope.ServiceProvider.GetRequiredService<Api.Engine.TickProcessor>();
@@ -26222,13 +26214,21 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Phase 2: add top-up deposit at the current tick
         await db.Entry(gameState).ReloadAsync();
         var topUpTick = gameState.CurrentTick;
-        var topUpDeposit = new Api.Data.Entities.BankDeposit
+        var topUpDeposit = new Api.Data.Entities.BankAccount
         {
-            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = depCo.Id,
-            Amount = topUpAmount, DepositInterestRatePercent = ratePercent,
-            IsBaseCapital = false, IsActive = true, DepositedAtTick = topUpTick, DepositedAtUtc = DateTime.UtcNow,
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depCo.Id,
+            BankBuildingId = bank.Id,
+            Balance = topUpAmount,
+            DepositInterestRatePercent = ratePercent,
+            IsBaseCapitalDeposit = false,
+            DepositedAtTick = topUpTick,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(topUpDeposit);
+        db.BankAccounts.Add(topUpDeposit);
         await db.SaveChangesAsync();
 
         // Phase 3: process 5 more ticks (both deposits earning interest)
@@ -26456,8 +26456,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"WDUnCo-{Guid.NewGuid():N}", Cash = 1_000_000m };
         db.Companies.Add(co);
         var bank = CreateTestBank(db, co, city.Id);
-        var deposit = new Api.Data.Entities.BankDeposit { Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = co.Id, Amount = 50_000m, DepositInterestRatePercent = 5m, DepositedAtTick = 1L, DepositedAtUtc = DateTime.UtcNow, IsActive = true };
-        db.BankDeposits.Add(deposit);
+        var deposit = new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), AccountNumber = Guid.NewGuid().ToString("N")[..16], CurrencyCode = city.CurrencyCode, CompanyId = co.Id, BankBuildingId = bank.Id, Balance = 50_000m, DepositInterestRatePercent = 5m, DepositedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow, IsGovernmentAccount = false };
+        db.BankAccounts.Add(deposit);
         await db.SaveChangesAsync();
 
         // Call without a token
@@ -26585,11 +26585,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(bank.BaseCapitalDeposited);
 
         // Verify base-capital deposit record was created
-        var deposit = await db.BankDeposits.FirstOrDefaultAsync(d => d.BankBuildingId == bank.Id && d.IsBaseCapital);
+        var deposit = await db.BankAccounts.FirstOrDefaultAsync(d => d.BankBuildingId == bank.Id && d.IsBaseCapitalDeposit);
         Assert.NotNull(deposit);
-        Assert.Equal(10_000_000m, deposit!.Amount);
+        Assert.Equal(10_000_000m, deposit!.Balance);
         Assert.Equal(0m, deposit.DepositInterestRatePercent);
-        Assert.True(deposit.IsActive);
+        Assert.Null(deposit.ClosedAtUtc);
     }
 
     [Fact]

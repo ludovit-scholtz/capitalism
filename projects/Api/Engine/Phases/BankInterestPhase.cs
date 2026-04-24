@@ -31,8 +31,8 @@ public sealed class BankInterestPhase : ITickPhase
     public async Task ProcessAsync(TickContext context)
     {
         // Load all active deposits grouped by bank building.
-        var deposits = await context.Db.BankDeposits
-            .Where(d => d.IsActive && d.Amount > 0m)
+        var deposits = await context.Db.BankAccounts
+            .Where(d => d.BankBuildingId != null && d.ClosedAtUtc == null && d.Balance > 0m)
             .Include(d => d.BankBuilding)
             .ToListAsync();
 
@@ -53,7 +53,7 @@ public sealed class BankInterestPhase : ITickPhase
 
         // Group deposits by bank building for efficient per-bank cash checks.
         var depositsByBank = deposits
-            .GroupBy(d => d.BankBuildingId)
+            .GroupBy(d => d.BankBuildingId!.Value)
             .ToDictionary(g => g.Key, g => g.ToList());
 
         foreach (var (bankBuildingId, bankDeposits) in depositsByBank)
@@ -68,16 +68,16 @@ public sealed class BankInterestPhase : ITickPhase
             {
                 // Skip all deposits from the bank's own company — the founder/owner does not
                 // earn deposit interest on their own bank (base-capital or otherwise).
-                if (deposit.DepositorCompanyId == bank.CompanyId)
+                if (deposit.CompanyId == bank.CompanyId)
                     continue;
 
-                if (!context.CompaniesById.TryGetValue(deposit.DepositorCompanyId, out var depositor))
+                if (!deposit.CompanyId.HasValue || !context.CompaniesById.TryGetValue(deposit.CompanyId.Value, out var depositor))
                     continue;
 
                 // Per-tick interest = annual_rate% * amount / TicksPerYear
-                var annualRate = deposit.DepositInterestRatePercent / 100m;
+                var annualRate = (deposit.DepositInterestRatePercent ?? 0m) / 100m;
                 var interestThisTick = decimal.Round(
-                    deposit.Amount * annualRate / GameConstants.TicksPerYear,
+                    deposit.Balance * annualRate / GameConstants.TicksPerYear,
                     4,
                     MidpointRounding.AwayFromZero);
 

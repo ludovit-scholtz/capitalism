@@ -441,47 +441,15 @@ public sealed partial class Mutation
 
     private static async Task DeductFiat(AppDbContext db, Guid playerId, string currencyCode, decimal amount)
     {
-        if (currencyCode == "EUR")
-        {
-            var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
-                ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
-            await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, amount);
-        }
-        else
-        {
-            var bal = await db.PlayerCurrencyBalances.FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == currencyCode)
-                ?? throw new GraphQLException(new Error($"No {currencyCode} balance found.", "INSUFFICIENT_FUNDS"));
-            bal.Balance -= amount;
-            bal.UpdatedAtUtc = DateTime.UtcNow;
-        }
+        var bal = await PersonalBankAccountService.GetTrackedAccountAsync(db, playerId, currencyCode)
+            ?? throw new GraphQLException(new Error($"No {currencyCode} balance found.", "INSUFFICIENT_FUNDS"));
+
+        bal.Balance -= amount;
     }
 
     private static async Task CreditFiat(AppDbContext db, Guid playerId, string currencyCode, decimal amount)
     {
-        if (currencyCode == "EUR")
-        {
-            var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
-                ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
-            await PersonalBankAccountService.CreditTrackedGrossCashAsync(db, player, amount);
-        }
-        else
-        {
-            var bal = await db.PlayerCurrencyBalances.FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == currencyCode);
-            if (bal == null)
-            {
-                bal = new PlayerCurrencyBalance
-                {
-                    Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = currencyCode,
-                    Balance = amount, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-                };
-                db.PlayerCurrencyBalances.Add(bal);
-            }
-            else
-            {
-                bal.Balance += amount;
-                bal.UpdatedAtUtc = DateTime.UtcNow;
-            }
-        }
+        await PersonalBankAccountService.CreditTrackedBalanceAsync(db, playerId, currencyCode, amount);
     }
 
     private static async Task DeductGold(AppDbContext db, Guid playerId, decimal amount)

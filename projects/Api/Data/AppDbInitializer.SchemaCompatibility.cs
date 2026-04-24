@@ -246,85 +246,6 @@ public sealed partial class AppDbInitializer
                 }
             }
 
-            // Ensure PlayerCurrencyBalances table exists (added in AddForexExchangeMvp migration).
-            if (ShouldRepairSchemaArtifact("20260420110000_AddForexExchangeMvp", pendingMigrations)
-                && !await TableExistsAsync(connection, dialect, "PlayerCurrencyBalances"))
-            {
-                if (dialect.IsPostgres)
-                {
-                    await ExecuteNonQueryAsync(connection,
-                        """
-                        CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
-                            "Id" uuid NOT NULL,
-                            "PlayerId" uuid NOT NULL,
-                            "CurrencyCode" character varying(3) NOT NULL,
-                            "Balance" numeric(18,4) NOT NULL DEFAULT 0,
-                            "CreatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
-                            "UpdatedAtUtc" timestamp with time zone NOT NULL DEFAULT now(),
-                            CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id"),
-                            CONSTRAINT "FK_PlayerCurrencyBalances_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
-                        )
-                        """);
-                    await ExecuteNonQueryAsync(connection,
-                        "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PlayerCurrencyBalances_PlayerId_CurrencyCode\" ON \"PlayerCurrencyBalances\" (\"PlayerId\", \"CurrencyCode\")");
-
-                    // Add the non-negative balance check constraint idempotently.
-                    await ExecuteNonQueryAsync(connection,
-                        """
-                        DO $$
-                        BEGIN
-                            IF NOT EXISTS (
-                                SELECT 1 FROM pg_constraint
-                                WHERE conname = 'CK_PlayerCurrencyBalances_Balance_NonNegative'
-                            ) THEN
-                                ALTER TABLE "PlayerCurrencyBalances"
-                                    ADD CONSTRAINT "CK_PlayerCurrencyBalances_Balance_NonNegative" CHECK ("Balance" >= 0);
-                            END IF;
-                        END;
-                        $$;
-                        """);
-                }
-                else
-                {
-                    await ExecuteNonQueryAsync(connection,
-                        """
-                        CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
-                            "Id" TEXT NOT NULL,
-                            "PlayerId" TEXT NOT NULL,
-                            "CurrencyCode" TEXT NOT NULL,
-                            "Balance" TEXT NOT NULL DEFAULT '0',
-                            "CreatedAtUtc" TEXT NOT NULL,
-                            "UpdatedAtUtc" TEXT NOT NULL,
-                            CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id"),
-                            CONSTRAINT "FK_PlayerCurrencyBalances_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
-                        )
-                        """);
-                }
-            }
-
-            // Ensure the non-negative balance constraint exists even when the
-            // PlayerCurrencyBalances table was already present before this migration ran
-            // (e.g. databases created by the initial AddForexExchangeMvp migration before
-            // AddForexBalanceNonNegativeConstraint was added to the history).
-            if (dialect.IsPostgres
-                && ShouldRepairSchemaArtifact("20260420130000_AddForexBalanceNonNegativeConstraint", pendingMigrations))
-            {
-                await ExecuteNonQueryAsync(connection,
-                    """
-                    DO $$
-                    BEGIN
-                        IF NOT EXISTS (
-                            SELECT 1 FROM pg_constraint
-                            WHERE conname = 'CK_PlayerCurrencyBalances_Balance_NonNegative'
-                        ) THEN
-                            ALTER TABLE "PlayerCurrencyBalances"
-                                ADD CONSTRAINT "CK_PlayerCurrencyBalances_Balance_NonNegative" CHECK ("Balance" >= 0);
-                        END IF;
-                    END;
-                    $$;
-                    """);
-            }
-
             // Ensure ForexTradeRecords table exists (added in AddForexExchangeMvp migration).
             if (ShouldRepairSchemaArtifact("20260420110000_AddForexExchangeMvp", pendingMigrations)
                 && !await TableExistsAsync(connection, dialect, "ForexTradeRecords"))
@@ -519,6 +440,176 @@ public sealed partial class AppDbInitializer
                                 """);
                 }
             }
+
+                        if (ShouldRepairSchemaArtifact("20260424084149_RemovePlayerCurrencyBalances", pendingMigrations)
+                                && await TableExistsAsync(connection, dialect, "PlayerCurrencyBalances")
+                                && await TableExistsAsync(connection, dialect, "BankAccounts"))
+                        {
+                                await ExecuteNonQueryAsync(
+                                        connection,
+                                        dialect.IsPostgres
+                                                ?
+                                                        """
+                                                        UPDATE "BankAccounts" AS existing
+                                                        SET "Balance" = existing."Balance" + legacy."Balance"
+                                                        FROM "PlayerCurrencyBalances" AS legacy
+                                                        WHERE existing."PlayerId" = legacy."PlayerId"
+                                                            AND existing."CurrencyCode" = legacy."CurrencyCode";
+
+                                                        INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                                        SELECT legacy."Id",
+                                                                     LPAD((9100000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."PlayerId", legacy."CurrencyCode"))::text, 16, '0'),
+                                                                     legacy."CurrencyCode",
+                                                                     legacy."Balance",
+                                                                     NULL,
+                                                                     FALSE,
+                                                                     legacy."CreatedAtUtc",
+                                                                     legacy."PlayerId"
+                                                        FROM "PlayerCurrencyBalances" AS legacy
+                                                        WHERE NOT EXISTS (
+                                                                SELECT 1
+                                                                FROM "BankAccounts" AS existing
+                                                                WHERE existing."PlayerId" = legacy."PlayerId"
+                                                                    AND existing."CurrencyCode" = legacy."CurrencyCode"
+                                                        );
+
+                                                        DROP TABLE IF EXISTS "PlayerCurrencyBalances";
+                                                        """
+                                                :
+                                                        """
+                                                        UPDATE "BankAccounts"
+                                                        SET "Balance" = "Balance" + (
+                                                                SELECT legacy."Balance"
+                                                                FROM "PlayerCurrencyBalances" AS legacy
+                                                                WHERE legacy."PlayerId" = "BankAccounts"."PlayerId"
+                                                                    AND legacy."CurrencyCode" = "BankAccounts"."CurrencyCode"
+                                                        )
+                                                        WHERE "PlayerId" IS NOT NULL
+                                                            AND EXISTS (
+                                                                    SELECT 1
+                                                                    FROM "PlayerCurrencyBalances" AS legacy
+                                                                    WHERE legacy."PlayerId" = "BankAccounts"."PlayerId"
+                                                                        AND legacy."CurrencyCode" = "BankAccounts"."CurrencyCode"
+                                                            );
+
+                                                        INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                                        SELECT legacy."Id",
+                                                                     printf('%016d', 9100000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."PlayerId", legacy."CurrencyCode")),
+                                                                     legacy."CurrencyCode",
+                                                                     legacy."Balance",
+                                                                     NULL,
+                                                                     0,
+                                                                     legacy."CreatedAtUtc",
+                                                                     legacy."PlayerId"
+                                                        FROM "PlayerCurrencyBalances" AS legacy
+                                                        WHERE NOT EXISTS (
+                                                                SELECT 1
+                                                                FROM "BankAccounts" AS existing
+                                                                WHERE existing."PlayerId" = legacy."PlayerId"
+                                                                    AND existing."CurrencyCode" = legacy."CurrencyCode"
+                                                        );
+
+                                                        DROP TABLE IF EXISTS "PlayerCurrencyBalances";
+                                                        """);
+                        }
+
+                        if (ShouldRepairSchemaArtifact("20260424091612_RemoveBankDeposits", pendingMigrations)
+                            && await TableExistsAsync(connection, dialect, "BankAccounts"))
+                        {
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "BankBuildingId", dialect.NullableGuid);
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "DepositInterestRatePercent", dialect.NullableInterestRate);
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "DepositedAtTick", dialect.IsPostgres ? "bigint" : "INTEGER");
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "ClosedAtTick", dialect.IsPostgres ? "bigint" : "INTEGER");
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "ClosedAtUtc", dialect.IsPostgres ? "timestamp with time zone" : "TEXT");
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "IsBaseCapitalDeposit", dialect.RequiredBooleanDefaultFalse);
+                            await EnsureColumnAsync(connection, dialect, "BankAccounts", "TotalInterestPaid", dialect.RequiredDecimal4DefaultZero);
+
+                            await EnsureIndexAsync(
+                                connection,
+                                dialect,
+                                "BankAccounts",
+                                "IX_BankAccounts_BankBuildingId_ClosedAtUtc",
+                                "CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_BankBuildingId_ClosedAtUtc\" ON \"BankAccounts\" (\"BankBuildingId\", \"ClosedAtUtc\")");
+                            await EnsureIndexAsync(
+                                connection,
+                                dialect,
+                                "BankAccounts",
+                                "IX_BankAccounts_CompanyId_BankBuildingId_ClosedAtUtc",
+                                "CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_CompanyId_BankBuildingId_ClosedAtUtc\" ON \"BankAccounts\" (\"CompanyId\", \"BankBuildingId\", \"ClosedAtUtc\")");
+
+                            if (dialect.IsPostgres)
+                            {
+                                await EnsurePostgresConstraintAsync(
+                                    connection,
+                                    "FK_BankAccounts_Buildings_BankBuildingId",
+                                    "ALTER TABLE \"BankAccounts\" ADD CONSTRAINT \"FK_BankAccounts_Buildings_BankBuildingId\" FOREIGN KEY (\"BankBuildingId\") REFERENCES \"Buildings\" (\"Id\") ON DELETE CASCADE");
+                            }
+
+                            if (await TableExistsAsync(connection, dialect, "BankDeposits"))
+                            {
+                                await ExecuteNonQueryAsync(
+                                    connection,
+                                    dialect.IsPostgres
+                                        ?
+                                            """
+                                            INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId", "BankBuildingId", "DepositInterestRatePercent", "DepositedAtTick", "IsBaseCapitalDeposit", "ClosedAtTick", "ClosedAtUtc", "TotalInterestPaid")
+                                            SELECT legacy."Id",
+                                                   LPAD((9200000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."Id"))::text, 16, '0'),
+                                                   city."CurrencyCode",
+                                                   legacy."Amount",
+                                                   legacy."DepositorCompanyId",
+                                                   FALSE,
+                                                   legacy."DepositedAtUtc",
+                                                   NULL,
+                                                   legacy."BankBuildingId",
+                                                   legacy."DepositInterestRatePercent",
+                                                   legacy."DepositedAtTick",
+                                                   legacy."IsBaseCapital",
+                                                   legacy."WithdrawnAtTick",
+                                                   legacy."WithdrawnAtUtc",
+                                                   legacy."TotalInterestPaid"
+                                            FROM "BankDeposits" AS legacy
+                                            INNER JOIN "Buildings" AS bank ON bank."Id" = legacy."BankBuildingId"
+                                            INNER JOIN "Cities" AS city ON city."Id" = bank."CityId"
+                                            WHERE NOT EXISTS (
+                                                SELECT 1
+                                                FROM "BankAccounts" AS existing
+                                                WHERE existing."Id" = legacy."Id"
+                                            );
+
+                                            DROP TABLE IF EXISTS "BankDeposits";
+                                            """
+                                        :
+                                            """
+                                            INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId", "BankBuildingId", "DepositInterestRatePercent", "DepositedAtTick", "IsBaseCapitalDeposit", "ClosedAtTick", "ClosedAtUtc", "TotalInterestPaid")
+                                            SELECT legacy."Id",
+                                                   printf('%016d', 9200000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."Id")),
+                                                   city."CurrencyCode",
+                                                   legacy."Amount",
+                                                   legacy."DepositorCompanyId",
+                                                   0,
+                                                   legacy."DepositedAtUtc",
+                                                   NULL,
+                                                   legacy."BankBuildingId",
+                                                   legacy."DepositInterestRatePercent",
+                                                   legacy."DepositedAtTick",
+                                                   legacy."IsBaseCapital",
+                                                   legacy."WithdrawnAtTick",
+                                                   legacy."WithdrawnAtUtc",
+                                                   legacy."TotalInterestPaid"
+                                            FROM "BankDeposits" AS legacy
+                                            INNER JOIN "Buildings" AS bank ON bank."Id" = legacy."BankBuildingId"
+                                            INNER JOIN "Cities" AS city ON city."Id" = bank."CityId"
+                                            WHERE NOT EXISTS (
+                                                SELECT 1
+                                                FROM "BankAccounts" AS existing
+                                                WHERE existing."Id" = legacy."Id"
+                                            );
+
+                                            DROP TABLE IF EXISTS "BankDeposits";
+                                            """);
+                            }
+                        }
         }
         finally
         {

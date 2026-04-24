@@ -108,10 +108,10 @@ public sealed partial class Query
         var inventoryValue = inventories.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i));
 
         // Active deposits placed by this company appear as assets on the balance sheet
-        var totalDepositsPlaced = await db.BankDeposits
+        var totalDepositsPlaced = await db.BankAccounts
             .AsNoTracking()
-            .Where(d => d.DepositorCompanyId == companyId && d.IsActive)
-            .SumAsync(d => (decimal?)d.Amount) ?? 0m;
+            .Where(d => d.CompanyId == companyId && d.BankBuildingId != null && d.ClosedAtUtc == null)
+            .SumAsync(d => (decimal?)d.Balance) ?? 0m;
 
         var buildingSummaries = entries
             .Where(e => e.BuildingId.HasValue)

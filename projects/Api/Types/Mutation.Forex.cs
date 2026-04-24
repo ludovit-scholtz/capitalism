@@ -94,12 +94,10 @@ public sealed partial class Mutation
                 }
                 else
                 {
-                    var fromBalance = await db.PlayerCurrencyBalances
-                        .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == fromCode)
+                    var fromBalance = await PersonalBankAccountService.GetTrackedAccountAsync(db, playerId, fromCode)
                         ?? throw new GraphQLException(new Error("No " + fromCode + " balance found.", "INSUFFICIENT_FUNDS"));
 
                     fromBalance.Balance -= input.Amount;
-                    fromBalance.UpdatedAtUtc = DateTime.UtcNow;
                 }
             }
 
@@ -127,25 +125,8 @@ public sealed partial class Mutation
                 }
                 else
                 {
-                    var toBalance = await db.PlayerCurrencyBalances
-                        .FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == toCode);
-
-                    if (toBalance is null)
-                    {
-                        toBalance = new PlayerCurrencyBalance
-                        {
-                            Id = Guid.NewGuid(),
-                            PlayerId = playerId,
-                            CurrencyCode = toCode,
-                            Balance = 0m,
-                            CreatedAtUtc = DateTime.UtcNow,
-                            UpdatedAtUtc = DateTime.UtcNow
-                        };
-                        db.PlayerCurrencyBalances.Add(toBalance);
-                    }
-
+                    var toBalance = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, playerId, toCode);
                     toBalance.Balance += toAmount;
-                    toBalance.UpdatedAtUtc = DateTime.UtcNow;
                 }
             }
 

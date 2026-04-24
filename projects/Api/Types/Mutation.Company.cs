@@ -238,22 +238,24 @@ public sealed partial class Mutation
             building.DepositInterestRatePercent = 3m;   // 3% deposit rate
             building.LendingInterestRatePercent = 8m;   // 8% lending rate
 
-            // Create the base-capital deposit record
-            var baseDeposit = new Data.Entities.BankDeposit
+            // Create the base-capital deposit account
+            var baseDeposit = new Data.Entities.BankAccount
             {
                 Id = Guid.NewGuid(),
+                AccountNumber = Guid.NewGuid().ToString("N")[..16],
+                CurrencyCode = city.CurrencyCode,
+                CompanyId = company.Id,
                 BankBuildingId = building.Id,
-                DepositorCompanyId = company.Id,
-                Amount = Mutation.BankBaseCapitalRequirement,
+                Balance = Mutation.BankBaseCapitalRequirement,
                 DepositInterestRatePercent = 0m, // No interest on own base capital
-                IsBaseCapital = true,
-                IsActive = true,
+                IsBaseCapitalDeposit = true,
                 DepositedAtTick = currentTick,
-                DepositedAtUtc = DateTime.UtcNow,
+                CreatedAtUtc = DateTime.UtcNow,
                 TotalInterestPaid = 0m,
+                IsGovernmentAccount = false,
             };
 
-            db.BankDeposits.Add(baseDeposit);
+            db.BankAccounts.Add(baseDeposit);
 
             // The base capital is already in the company's cash; it just gets "locked" into the bank
             // (the company IS the bank, so no cash transfer needed — TotalDeposits increases)

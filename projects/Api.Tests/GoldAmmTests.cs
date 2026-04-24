@@ -75,30 +75,9 @@ public sealed class GoldAmmTests
 
     private static async Task SetFiatBalanceAsync(AppDbContext db, Guid playerId, string currencyCode, decimal amount)
     {
-        if (currencyCode == "EUR")
-        {
-            var player = await db.Players.FirstAsync(p => p.Id == playerId);
-            await PersonalBankAccountService.SetTrackedGrossCashAsync(db, player, amount);
-            await db.SaveChangesAsync();
-        }
-        else
-        {
-            var existing = await db.PlayerCurrencyBalances.FirstOrDefaultAsync(b => b.PlayerId == playerId && b.CurrencyCode == currencyCode);
-            if (existing == null)
-            {
-                db.PlayerCurrencyBalances.Add(new PlayerCurrencyBalance
-                {
-                    Id = Guid.NewGuid(), PlayerId = playerId, CurrencyCode = currencyCode,
-                    Balance = amount, CreatedAtUtc = DateTime.UtcNow, UpdatedAtUtc = DateTime.UtcNow
-                });
-            }
-            else
-            {
-                existing.Balance = amount;
-                existing.UpdatedAtUtc = DateTime.UtcNow;
-            }
-            await db.SaveChangesAsync();
-        }
+        var account = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, playerId, currencyCode);
+        account.Balance = amount;
+        await db.SaveChangesAsync();
     }
 
     private static string? GetError(JsonElement result)

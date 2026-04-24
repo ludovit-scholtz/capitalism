@@ -251,6 +251,7 @@ public sealed class BankingIntegrationTests
 
         // Seed bank with zero cash — cannot pay any deposit interest
         var (_, bankCompany, bank) = SeedBank(db, suffix: "illiquid", companyCash: 0m, deposits: 10_000_000m);
+        var bankCity = await db.Cities.FirstAsync(c => c.Id == bank.CityId);
 
         // Seed a customer depositor
         var customerPlayer = new Player { Id = Guid.NewGuid(), Email = $"cust-{Guid.NewGuid():N}@test.com", DisplayName = "Customer", PasswordHash = "h", Role = PlayerRole.Player };
@@ -258,19 +259,21 @@ public sealed class BankingIntegrationTests
         var customerCompany = new Company { Id = Guid.NewGuid(), PlayerId = customerPlayer.Id, Name = "Customer Corp", Cash = 0m };
         db.Companies.Add(customerCompany);
 
-        var deposit = new BankDeposit
+        var deposit = new BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = bankCity.CurrencyCode,
+            CompanyId = customerCompany.Id,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = customerCompany.Id,
-            Amount = 1_000_000m,
+            Balance = 1_000_000m,
             DepositInterestRatePercent = 3m, // 3% p.a.
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = 1,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(deposit);
+        db.BankAccounts.Add(deposit);
         await db.SaveChangesAsync();
 
         var processor = await CreateProcessorAsync(scope);
@@ -727,24 +730,40 @@ public sealed class BankingIntegrationTests
         db.Buildings.Add(bank);
 
         // Founder deposit (base capital) — this deposit must NOT earn interest
-        var founderDeposit = new BankDeposit
+        var founderDeposit = new BankAccount
         {
-            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = bankCompany.Id,
-            Amount = 10_000_000m, TotalInterestPaid = 0m, IsBaseCapital = true,
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = bankCompany.Id,
+            BankBuildingId = bank.Id,
+            Balance = 10_000_000m,
+            TotalInterestPaid = 0m,
+            IsBaseCapitalDeposit = true,
             DepositInterestRatePercent = bank.DepositInterestRatePercent ?? 10m,
-            DepositedAtTick = gs.CurrentTick, DepositedAtUtc = DateTime.UtcNow,
+            DepositedAtTick = gs.CurrentTick,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
         // External deposit — this one SHOULD earn interest
-        var externalDeposit = new BankDeposit
+        var externalDeposit = new BankAccount
         {
-            Id = Guid.NewGuid(), BankBuildingId = bank.Id, DepositorCompanyId = externalCompany.Id,
-            Amount = 1_000_000m, TotalInterestPaid = 0m, IsBaseCapital = false,
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = externalCompany.Id,
+            BankBuildingId = bank.Id,
+            Balance = 1_000_000m,
+            TotalInterestPaid = 0m,
+            IsBaseCapitalDeposit = false,
             DepositInterestRatePercent = bank.DepositInterestRatePercent ?? 10m,
-            DepositedAtTick = gs.CurrentTick, DepositedAtUtc = DateTime.UtcNow,
+            DepositedAtTick = gs.CurrentTick,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.AddRange(founderDeposit, externalDeposit);
+        db.BankAccounts.AddRange(founderDeposit, externalDeposit);
 
-        bank.TotalDeposits = founderDeposit.Amount + externalDeposit.Amount;
+        bank.TotalDeposits = founderDeposit.Balance + externalDeposit.Balance;
         bank.BaseCapitalDeposited = true;
         await db.SaveChangesAsync();
 

@@ -17,6 +17,10 @@ public sealed class DatabaseMigrationBootstrapTests
     private const string PreCompanyCurrencyRemovalMigration = "20260423025526_AddBankAccountsAndBuildingFunding";
     private const string PrePlayerPersonalCashRemovalMigration = "20260423205443_RemoveCompanyCurrencyCode";
     private const string RemovePlayerPersonalCashMigration = "20260423221000_RemovePlayerPersonalCash";
+    private const string PrePlayerCurrencyBalanceRemovalMigration = "20260423221000_RemovePlayerPersonalCash";
+    private const string RemovePlayerCurrencyBalancesMigration = "20260424084149_RemovePlayerCurrencyBalances";
+    private const string PreBankDepositRemovalMigration = "20260423221000_RemovePlayerPersonalCash";
+    private const string RemoveBankDepositsMigration = "20260424091612_RemoveBankDeposits";
 
     [Fact]
     public void ShouldRepairSchemaArtifact_SkipsPendingPostgresNativeMigration()
@@ -68,6 +72,56 @@ public sealed class DatabaseMigrationBootstrapTests
     {
         var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
             RemovePlayerPersonalCashMigration,
+            new HashSet<string>(StringComparer.Ordinal));
+
+        Assert.True(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_SkipsPendingPlayerCurrencyBalancesRemovalMigration()
+    {
+        var pendingMigrations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            RemovePlayerCurrencyBalancesMigration
+        };
+
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            RemovePlayerCurrencyBalancesMigration,
+            pendingMigrations);
+
+        Assert.False(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_AllowsCompletedPlayerCurrencyBalancesRemovalRepair()
+    {
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            RemovePlayerCurrencyBalancesMigration,
+            new HashSet<string>(StringComparer.Ordinal));
+
+        Assert.True(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_SkipsPendingBankDepositsRemovalMigration()
+    {
+        var pendingMigrations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            RemoveBankDepositsMigration
+        };
+
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            RemoveBankDepositsMigration,
+            pendingMigrations);
+
+        Assert.False(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_AllowsCompletedBankDepositsRemovalRepair()
+    {
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            RemoveBankDepositsMigration,
             new HashSet<string>(StringComparer.Ordinal));
 
         Assert.True(shouldRepair);
@@ -338,6 +392,297 @@ public sealed class DatabaseMigrationBootstrapTests
         }
     }
 
+    [Fact]
+    public async Task StartupWithLegacyDatabaseMissingHistory_BackfillsPlayerCurrencyBalancesIntoPlayerBankAccounts()
+    {
+        var dbPath = CreateDatabasePath();
+        var playerId = Guid.NewGuid();
+        const string currencyCode = "CZK";
+        const decimal expectedBalance = 123_456.78m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PrePlayerCurrencyBalanceRemovalMigration);
+                await SeedLegacyPlayerCurrencyBalanceAsync(legacyCtx, playerId, currencyCode, expectedBalance);
+                await DropMigrationHistoryAsync(legacyCtx);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                await CreateInitializer(upgradeCtx).InitializeAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertPlayerTrackedBalanceAsync(verifyCtx, playerId, currencyCode, expectedBalance);
+            await AssertTableMissingAsync(verifyCtx, "PlayerCurrencyBalances");
+            await AssertMigrationHistoryCountAsync(verifyCtx, verifyCtx.Database.GetMigrations().Count());
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task StartupWithMisbaselinedDatabase_BackfillsPlayerCurrencyBalancesIntoPlayerBankAccounts()
+    {
+        var dbPath = CreateDatabasePath();
+        var playerId = Guid.NewGuid();
+        const string currencyCode = "USD";
+        const decimal expectedBalance = 4_567.89m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PrePlayerCurrencyBalanceRemovalMigration);
+                await SeedLegacyPlayerCurrencyBalanceAsync(legacyCtx, playerId, currencyCode, expectedBalance);
+                await ReplaceMigrationHistoryWithCurrentHeadAsync(legacyCtx);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                await CreateInitializer(upgradeCtx).InitializeAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertPlayerTrackedBalanceAsync(verifyCtx, playerId, currencyCode, expectedBalance);
+            await AssertTableMissingAsync(verifyCtx, "PlayerCurrencyBalances");
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeFromPreRemovalSchema_MovesPlayerCurrencyBalancesIntoPlayerBankAccountsAndDropsTable()
+    {
+        var dbPath = CreateDatabasePath();
+        var playerId = Guid.NewGuid();
+        const string currencyCode = "GBP";
+        const decimal expectedBalance = 7_654.32m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+            var migrationOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
+                .Options;
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PrePlayerCurrencyBalanceRemovalMigration);
+                await SeedLegacyPlayerCurrencyBalanceAsync(legacyCtx, playerId, currencyCode, expectedBalance);
+                await AssertTableExistsAsync(legacyCtx, "PlayerCurrencyBalances");
+            }
+
+            await using (var upgradeCtx = new AppDbContext(migrationOptions))
+            {
+                await upgradeCtx.Database.MigrateAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertTableMissingAsync(verifyCtx, "PlayerCurrencyBalances");
+            await AssertPlayerTrackedBalanceAsync(verifyCtx, playerId, currencyCode, expectedBalance);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task StartupWithLegacyDatabaseMissingHistory_BackfillsBankDepositsIntoBankAccountsAndDropsTable()
+    {
+        var dbPath = CreateDatabasePath();
+        const decimal expectedBalance = 654_321.98m;
+        const decimal expectedRate = 4.25m;
+        const long depositedAtTick = 73;
+        const decimal expectedInterestPaid = 123.45m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            Guid depositId;
+            Guid depositorCompanyId;
+            Guid bankBuildingId;
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PreBankDepositRemovalMigration);
+                (depositId, depositorCompanyId, bankBuildingId) = await SeedLegacyBankDepositAsync(
+                    legacyCtx,
+                    currencyCode: "CZK",
+                    amount: expectedBalance,
+                    depositInterestRatePercent: expectedRate,
+                    isBaseCapital: false,
+                    depositedAtTick: depositedAtTick,
+                    withdrawnAtTick: null,
+                    totalInterestPaid: expectedInterestPaid);
+                await DropMigrationHistoryAsync(legacyCtx);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                await CreateInitializer(upgradeCtx).InitializeAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertMigratedBankDepositAccountAsync(
+                verifyCtx,
+                depositId,
+                depositorCompanyId,
+                bankBuildingId,
+                expectedCurrencyCode: "CZK",
+                expectedBalance: expectedBalance,
+                expectedInterestRatePercent: expectedRate,
+                expectedIsBaseCapital: false,
+                expectedDepositedAtTick: depositedAtTick,
+                expectedClosedAtTick: null,
+                expectedClosedAtUtc: null,
+                expectedInterestPaid: expectedInterestPaid);
+            await AssertTableMissingAsync(verifyCtx, "BankDeposits");
+            await AssertMigrationHistoryCountAsync(verifyCtx, verifyCtx.Database.GetMigrations().Count());
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task StartupWithMisbaselinedDatabase_BackfillsBankDepositsIntoBankAccountsAndDropsTable()
+    {
+        var dbPath = CreateDatabasePath();
+        const decimal expectedBalance = 9_999.11m;
+        const decimal expectedRate = 3.5m;
+        const long depositedAtTick = 12;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            Guid depositId;
+            Guid depositorCompanyId;
+            Guid bankBuildingId;
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PreBankDepositRemovalMigration);
+                (depositId, depositorCompanyId, bankBuildingId) = await SeedLegacyBankDepositAsync(
+                    legacyCtx,
+                    currencyCode: "USD",
+                    amount: expectedBalance,
+                    depositInterestRatePercent: expectedRate,
+                    isBaseCapital: true,
+                    depositedAtTick: depositedAtTick,
+                    withdrawnAtTick: null,
+                    totalInterestPaid: 0m);
+                await ReplaceMigrationHistoryWithCurrentHeadAsync(legacyCtx);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                await CreateInitializer(upgradeCtx).InitializeAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertMigratedBankDepositAccountAsync(
+                verifyCtx,
+                depositId,
+                depositorCompanyId,
+                bankBuildingId,
+                expectedCurrencyCode: "USD",
+                expectedBalance: expectedBalance,
+                expectedInterestRatePercent: expectedRate,
+                expectedIsBaseCapital: true,
+                expectedDepositedAtTick: depositedAtTick,
+                expectedClosedAtTick: null,
+                expectedClosedAtUtc: null,
+                expectedInterestPaid: 0m);
+            await AssertTableMissingAsync(verifyCtx, "BankDeposits");
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeFromPreRemovalSchema_MovesBankDepositsIntoBankAccountsAndDropsTable()
+    {
+        var dbPath = CreateDatabasePath();
+        const decimal expectedBalance = 44_001.25m;
+        const decimal expectedRate = 2.75m;
+        const long depositedAtTick = 188;
+        const long withdrawnAtTick = 222;
+        var withdrawnAtUtc = new DateTime(2026, 04, 24, 9, 30, 0, DateTimeKind.Utc);
+        const decimal expectedInterestPaid = 88.12m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+            var migrationOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
+                .Options;
+
+            Guid depositId;
+            Guid depositorCompanyId;
+            Guid bankBuildingId;
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PreBankDepositRemovalMigration);
+                (depositId, depositorCompanyId, bankBuildingId) = await SeedLegacyBankDepositAsync(
+                    legacyCtx,
+                    currencyCode: "GBP",
+                    amount: expectedBalance,
+                    depositInterestRatePercent: expectedRate,
+                    isBaseCapital: false,
+                    depositedAtTick: depositedAtTick,
+                    withdrawnAtTick: withdrawnAtTick,
+                    withdrawnAtUtc: withdrawnAtUtc,
+                    totalInterestPaid: expectedInterestPaid);
+                await AssertTableExistsAsync(legacyCtx, "BankDeposits");
+            }
+
+            await using (var upgradeCtx = new AppDbContext(migrationOptions))
+            {
+                await upgradeCtx.Database.MigrateAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertTableMissingAsync(verifyCtx, "BankDeposits");
+            await AssertMigratedBankDepositAccountAsync(
+                verifyCtx,
+                depositId,
+                depositorCompanyId,
+                bankBuildingId,
+                expectedCurrencyCode: "GBP",
+                expectedBalance: expectedBalance,
+                expectedInterestRatePercent: expectedRate,
+                expectedIsBaseCapital: false,
+                expectedDepositedAtTick: depositedAtTick,
+                expectedClosedAtTick: withdrawnAtTick,
+                expectedClosedAtUtc: withdrawnAtUtc,
+                expectedInterestPaid: expectedInterestPaid);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
     private static DbContextOptions<AppDbContext> CreateOptions(string dbPath) =>
         new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlite($"Data Source={dbPath}")
@@ -408,10 +753,16 @@ public sealed class DatabaseMigrationBootstrapTests
         await AssertColumnExistsAsync(dbContext, "Buildings", "TotalDeposits");
         await AssertColumnExistsAsync(dbContext, "Buildings", "CentralBankDebt");
 
-        await AssertTableExistsAsync(dbContext, "BankDeposits");
-        await AssertColumnExistsAsync(dbContext, "BankDeposits", "TotalInterestPaid");
-        await AssertIndexExistsAsync(dbContext, "BankDeposits", "IX_BankDeposits_BankBuildingId_IsActive");
-        await AssertIndexExistsAsync(dbContext, "BankDeposits", "IX_BankDeposits_DepositorCompanyId_IsActive");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "BankBuildingId");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "DepositInterestRatePercent");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "DepositedAtTick");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "ClosedAtTick");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "ClosedAtUtc");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "IsBaseCapitalDeposit");
+        await AssertColumnExistsAsync(dbContext, "BankAccounts", "TotalInterestPaid");
+        await AssertIndexExistsAsync(dbContext, "BankAccounts", "IX_BankAccounts_BankBuildingId_ClosedAtUtc");
+        await AssertIndexExistsAsync(dbContext, "BankAccounts", "IX_BankAccounts_CompanyId_BankBuildingId_ClosedAtUtc");
+        await AssertTableMissingAsync(dbContext, "BankDeposits");
 
         await AssertColumnExistsAsync(dbContext, "BuildingUnits", "IndustryCategory");
         await AssertColumnExistsAsync(dbContext, "BuildingConfigurationPlanUnits", "IndustryCategory");
@@ -451,6 +802,16 @@ public sealed class DatabaseMigrationBootstrapTests
         Assert.Equal(0, exists);
     }
 
+    private static async Task AssertTableMissingAsync(AppDbContext dbContext, string tableName)
+    {
+        var exists = await ExecuteScalarLongAsync(
+            dbContext,
+            "SELECT COUNT(1) FROM sqlite_master WHERE type = 'table' AND name = @tableName",
+            ("@tableName", tableName));
+
+        Assert.Equal(0, exists);
+    }
+
     private static async Task AssertIndexExistsAsync(AppDbContext dbContext, string tableName, string indexName)
     {
         var exists = await ExecuteScalarLongAsync(
@@ -478,6 +839,16 @@ public sealed class DatabaseMigrationBootstrapTests
         Assert.Equal(expectedBalance, actualBalance);
     }
 
+    private static async Task AssertPlayerTrackedBalanceAsync(AppDbContext dbContext, Guid playerId, string currencyCode, decimal expectedBalance)
+    {
+        var actualBalance = await dbContext.BankAccounts
+            .Where(account => account.PlayerId == playerId && account.CurrencyCode == currencyCode)
+            .Select(account => account.Balance)
+            .SingleAsync();
+
+        Assert.Equal(expectedBalance, actualBalance);
+    }
+
     private static async Task SeedLegacyPlayerPersonalCashAsync(AppDbContext dbContext, Guid playerId, decimal personalCash)
     {
         dbContext.Players.Add(new Player
@@ -494,6 +865,161 @@ public sealed class DatabaseMigrationBootstrapTests
 
         await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"UPDATE \"Players\" SET \"PersonalCash\" = {personalCash} WHERE \"Id\" = {playerId}");
+    }
+
+    private static async Task SeedLegacyPlayerCurrencyBalanceAsync(AppDbContext dbContext, Guid playerId, string currencyCode, decimal balance)
+    {
+        dbContext.Players.Add(new Player
+        {
+            Id = playerId,
+            Email = $"legacy-fx-{playerId:N}@migration-test.local",
+            DisplayName = "Legacy Forex Balance Player",
+            PasswordHash = "seeded-hash",
+            Role = PlayerRole.Player,
+            ActiveAccountType = AccountContextType.Person,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
+                "Id" TEXT NOT NULL,
+                "PlayerId" TEXT NOT NULL,
+                "CurrencyCode" TEXT NOT NULL,
+                "Balance" TEXT NOT NULL DEFAULT '0',
+                "CreatedAtUtc" TEXT NOT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_PlayerCurrencyBalances_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
+            )
+            """);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PlayerCurrencyBalances_PlayerId_CurrencyCode\" ON \"PlayerCurrencyBalances\" (\"PlayerId\", \"CurrencyCode\")");
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO \"PlayerCurrencyBalances\" (\"Id\", \"PlayerId\", \"CurrencyCode\", \"Balance\", \"CreatedAtUtc\", \"UpdatedAtUtc\") VALUES ({Guid.NewGuid()}, {playerId}, {currencyCode}, {balance}, {DateTime.UtcNow}, {DateTime.UtcNow})");
+    }
+
+    private static async Task<(Guid DepositId, Guid DepositorCompanyId, Guid BankBuildingId)> SeedLegacyBankDepositAsync(
+        AppDbContext dbContext,
+        string currencyCode,
+        decimal amount,
+        decimal depositInterestRatePercent,
+        bool isBaseCapital,
+        long depositedAtTick,
+        long? withdrawnAtTick,
+        DateTime? withdrawnAtUtc = null,
+        decimal totalInterestPaid = 0m)
+    {
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"legacy-bank-{Guid.NewGuid():N}@migration-test.local",
+            DisplayName = "Legacy Bank Deposit Player",
+            PasswordHash = "seeded-hash",
+            Role = PlayerRole.Player,
+            ActiveAccountType = AccountContextType.Person,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+
+        var cities = new[]
+        {
+            new City { Id = Guid.NewGuid(), Name = "Bratislava", CountryCode = "SK", CurrencyCode = "EUR", Latitude = 48.1486, Longitude = 17.1077, Population = 475_000, AverageRentPerSqm = 14m, BaseSalaryPerManhour = 18m },
+            new City { Id = Guid.NewGuid(), Name = "Prague", CountryCode = "CZ", CurrencyCode = "CZK", Latitude = 50.0755, Longitude = 14.4378, Population = 1_350_000, AverageRentPerSqm = 18m, BaseSalaryPerManhour = 22m },
+            new City { Id = Guid.NewGuid(), Name = "Vienna", CountryCode = "AT", CurrencyCode = "EUR", Latitude = 48.2082, Longitude = 16.3738, Population = 1_900_000, AverageRentPerSqm = 22m, BaseSalaryPerManhour = 28m },
+            new City { Id = Guid.NewGuid(), Name = "New York", CountryCode = "US", CurrencyCode = "USD", Latitude = 40.7128, Longitude = -74.0060, Population = 8_336_000, AverageRentPerSqm = 55m, BaseSalaryPerManhour = 35m },
+            new City { Id = Guid.NewGuid(), Name = "London", CountryCode = "GB", CurrencyCode = "GBP", Latitude = 51.5074, Longitude = -0.1278, Population = 8_982_000, AverageRentPerSqm = 62m, BaseSalaryPerManhour = 32m },
+            new City { Id = Guid.NewGuid(), Name = "Beijing", CountryCode = "CN", CurrencyCode = "CNY", Latitude = 39.9042, Longitude = 116.4074, Population = 21_540_000, AverageRentPerSqm = 30m, BaseSalaryPerManhour = 20m },
+            new City { Id = Guid.NewGuid(), Name = "Delhi", CountryCode = "IN", CurrencyCode = "INR", Latitude = 28.6139, Longitude = 77.2090, Population = 32_000_000, AverageRentPerSqm = 8m, BaseSalaryPerManhour = 6m },
+        };
+        var city = cities.First(c => c.CurrencyCode == currencyCode);
+
+        var bankCompany = new Company
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Legacy Bank {currencyCode}",
+            PlayerId = player.Id,
+            FoundedAtTick = 1,
+            FoundedAtUtc = DateTime.UtcNow,
+        };
+
+        var depositorCompany = new Company
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Legacy Depositor {currencyCode}",
+            PlayerId = player.Id,
+            FoundedAtTick = 1,
+            FoundedAtUtc = DateTime.UtcNow,
+        };
+
+        var bankBuilding = new Building
+        {
+            Id = Guid.NewGuid(),
+            Name = $"Legacy Bank Building {currencyCode}",
+            Type = BuildingType.Bank,
+            CompanyId = bankCompany.Id,
+            CityId = city.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+            TotalAreaSqm = 100m,
+        };
+
+        dbContext.Add(player);
+        dbContext.AddRange(cities);
+        dbContext.AddRange(bankCompany, depositorCompany, bankBuilding);
+        await dbContext.SaveChangesAsync();
+
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
+                "Id" TEXT NOT NULL,
+                "PlayerId" TEXT NOT NULL,
+                "CurrencyCode" TEXT NOT NULL,
+                "Balance" TEXT NOT NULL DEFAULT '0',
+                "CreatedAtUtc" TEXT NOT NULL,
+                "UpdatedAtUtc" TEXT NOT NULL,
+                CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id"),
+                CONSTRAINT "FK_PlayerCurrencyBalances_Players_PlayerId" FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE CASCADE
+            )
+            """);
+        await dbContext.Database.ExecuteSqlRawAsync(
+            "CREATE UNIQUE INDEX IF NOT EXISTS \"IX_PlayerCurrencyBalances_PlayerId_CurrencyCode\" ON \"PlayerCurrencyBalances\" (\"PlayerId\", \"CurrencyCode\")");
+
+        var depositId = Guid.NewGuid();
+        var depositedAtUtc = new DateTime(2026, 04, 24, 8, 0, 0, DateTimeKind.Utc);
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"INSERT INTO \"BankDeposits\" (\"Id\", \"BankBuildingId\", \"DepositorCompanyId\", \"Amount\", \"DepositInterestRatePercent\", \"IsBaseCapital\", \"IsActive\", \"DepositedAtTick\", \"DepositedAtUtc\", \"WithdrawnAtTick\", \"WithdrawnAtUtc\", \"TotalInterestPaid\") VALUES ({depositId}, {bankBuilding.Id}, {depositorCompany.Id}, {amount}, {depositInterestRatePercent}, {isBaseCapital}, {withdrawnAtUtc is null}, {depositedAtTick}, {depositedAtUtc}, {withdrawnAtTick}, {withdrawnAtUtc}, {totalInterestPaid})");
+
+        return (depositId, depositorCompany.Id, bankBuilding.Id);
+    }
+
+    private static async Task AssertMigratedBankDepositAccountAsync(
+        AppDbContext dbContext,
+        Guid depositId,
+        Guid expectedCompanyId,
+        Guid expectedBankBuildingId,
+        string expectedCurrencyCode,
+        decimal expectedBalance,
+        decimal expectedInterestRatePercent,
+        bool expectedIsBaseCapital,
+        long expectedDepositedAtTick,
+        long? expectedClosedAtTick,
+        DateTime? expectedClosedAtUtc,
+        decimal expectedInterestPaid)
+    {
+        var migratedAccount = await dbContext.BankAccounts.SingleAsync(account => account.Id == depositId);
+
+        Assert.Equal(expectedCompanyId, migratedAccount.CompanyId);
+        Assert.Equal(expectedBankBuildingId, migratedAccount.BankBuildingId);
+        Assert.Equal(expectedCurrencyCode, migratedAccount.CurrencyCode);
+        Assert.Equal(expectedBalance, migratedAccount.Balance);
+        Assert.Equal(expectedInterestRatePercent, migratedAccount.DepositInterestRatePercent);
+        Assert.Equal(expectedIsBaseCapital, migratedAccount.IsBaseCapitalDeposit);
+        Assert.Equal(expectedDepositedAtTick, migratedAccount.DepositedAtTick);
+        Assert.Equal(expectedClosedAtTick, migratedAccount.ClosedAtTick);
+        Assert.Equal(expectedClosedAtUtc, migratedAccount.ClosedAtUtc);
+        Assert.Equal(expectedInterestPaid, migratedAccount.TotalInterestPaid);
     }
 
     private static async Task<long> ExecuteScalarLongAsync(

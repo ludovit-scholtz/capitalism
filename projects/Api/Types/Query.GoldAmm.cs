@@ -236,7 +236,7 @@ public sealed partial class Query
 
     /// <summary>
     /// Returns the player's available fiat for spending/swapping.
-    /// Pool-committed fiat is already deducted from PersonalCash/PlayerCurrencyBalance at deposit time,
+    /// Pool-committed fiat is already deducted from the player's tracked bank-account balances at deposit time,
     /// so the wallet balance IS the available amount — no additional "blocked" subtraction needed.
     /// </summary>
     internal static Task<decimal> GetAvailableFiatAsync(AppDbContext db, Guid playerId, string currencyCode)

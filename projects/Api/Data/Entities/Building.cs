@@ -122,7 +122,8 @@ public sealed class Building
     public decimal? LendingInterestRatePercent { get; set; }
 
     /// <summary>
-    /// Cached total of active deposits in this bank (sum of BankDeposit.Amount where IsActive = true).
+    /// Cached total of active deposit-account balances in this bank.
+    /// Summed from BankAccount.Balance where BankBuildingId matches and ClosedAtUtc is null.
     /// Updated on each deposit/withdrawal mutation. Only meaningful for BANK buildings.
     /// </summary>
     public decimal TotalDeposits { get; set; }

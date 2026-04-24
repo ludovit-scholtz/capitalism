@@ -100,15 +100,18 @@ public sealed partial class Query
             .Select(c => c.Id)
             .ToListAsync();
 
-        var deposits = await db.BankDeposits
+        var deposits = await db.BankAccounts
             .Include(d => d.BankBuilding)
-            .ThenInclude(b => b.City)
-            .Include(d => d.DepositorCompany)
-            .Where(d => companyIds.Contains(d.DepositorCompanyId) && d.IsActive)
+            .ThenInclude(b => b!.City)
+            .Include(d => d.Company)
+            .Where(d => d.BankBuildingId != null
+                && d.CompanyId != null
+                && companyIds.Contains(d.CompanyId.Value)
+                && d.ClosedAtUtc == null)
             .AsNoTracking()
             .ToListAsync();
 
-        return deposits.Select(d => Mutation.MapToDepositSummary(d, d.BankBuilding, d.DepositorCompany)).ToList();
+        return deposits.Select(d => Mutation.MapToDepositSummary(d, d.BankBuilding!, d.Company!)).ToList();
     }
 
     /// <summary>
@@ -137,12 +140,12 @@ public sealed partial class Query
                     .Build());
         }
 
-        var deposits = await db.BankDeposits
-            .Include(d => d.DepositorCompany)
-            .Where(d => d.BankBuildingId == bankBuildingId && d.IsActive)
+        var deposits = await db.BankAccounts
+            .Include(d => d.Company)
+            .Where(d => d.BankBuildingId == bankBuildingId && d.ClosedAtUtc == null)
             .AsNoTracking()
             .ToListAsync();
 
-        return deposits.Select(d => Mutation.MapToDepositSummary(d, bank, d.DepositorCompany)).ToList();
+        return deposits.Select(d => Mutation.MapToDepositSummary(d, bank, d.Company!)).ToList();
     }
 }

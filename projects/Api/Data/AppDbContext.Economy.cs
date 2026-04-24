@@ -190,18 +190,6 @@ public sealed partial class AppDbContext
             e.HasIndex(l => l.NextPaymentTick);
         });
 
-        modelBuilder.Entity<BankDeposit>(e =>
-        {
-            e.HasKey(d => d.Id);
-            e.Property(d => d.Amount).HasPrecision(18, 2);
-            e.Property(d => d.DepositInterestRatePercent).HasPrecision(8, 4);
-            e.Property(d => d.TotalInterestPaid).HasPrecision(18, 4);
-            e.HasOne(d => d.BankBuilding).WithMany().HasForeignKey(d => d.BankBuildingId).OnDelete(DeleteBehavior.Cascade);
-            e.HasOne(d => d.DepositorCompany).WithMany().HasForeignKey(d => d.DepositorCompanyId).OnDelete(DeleteBehavior.Restrict);
-            e.HasIndex(d => new { d.BankBuildingId, d.IsActive });
-            e.HasIndex(d => new { d.DepositorCompanyId, d.IsActive });
-        });
-
         modelBuilder.Entity<FxRate>(e =>
         {
             e.HasKey(r => r.Id);
@@ -226,19 +214,6 @@ public sealed partial class AppDbContext
             e.HasIndex(log => log.RecordedAtUtc);
             e.HasIndex(log => log.AdminActorPlayerId);
             e.HasIndex(log => log.EffectivePlayerId);
-        });
-
-        modelBuilder.Entity<PlayerCurrencyBalance>(e =>
-        {
-            e.HasKey(b => b.Id);
-            e.Property(b => b.CurrencyCode).HasMaxLength(3);
-            e.Property(b => b.Balance).HasPrecision(18, 4);
-            e.HasOne(b => b.Player).WithMany().HasForeignKey(b => b.PlayerId).OnDelete(DeleteBehavior.Cascade);
-            // One row per player per currency
-            e.HasIndex(b => new { b.PlayerId, b.CurrencyCode }).IsUnique();
-            // Persistence-layer safety net: balance can never go negative
-            e.ToTable("PlayerCurrencyBalances", t =>
-                t.HasCheckConstraint("CK_PlayerCurrencyBalances_Balance_NonNegative", "\"Balance\" >= 0"));
         });
 
         modelBuilder.Entity<ForexTradeRecord>(e =>

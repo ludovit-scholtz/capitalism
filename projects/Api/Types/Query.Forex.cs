@@ -77,9 +77,8 @@ public sealed partial class Query
     }
 
     /// <summary>
-    /// Returns all non-zero (and known) currency balances for the authenticated player.
-    /// EUR balance comes from the player's personal settlement bank account; other currencies still
-    /// come from PlayerCurrencyBalance rows until those legacy balances are migrated.
+    /// Returns all non-zero currency balances for the authenticated player.
+    /// Player-owned bank accounts are now the canonical source of truth for every currency.
     /// </summary>
     [Authorize]
     public async Task<List<CurrencyBalanceResult>> GetPlayerCurrencyBalances(
@@ -93,10 +92,12 @@ public sealed partial class Query
             .FirstOrDefaultAsync(p => p.Id == playerId)
             ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
 
-        var nonEurBalances = await db.PlayerCurrencyBalances
+        var nonEurBalances = await db.BankAccounts
             .AsNoTracking()
-            .Where(b => b.PlayerId == playerId && b.Balance > 0)
-            .OrderBy(b => b.CurrencyCode)
+            .Where(account => account.PlayerId == playerId
+                && account.CurrencyCode != EurCurrencyCode
+                && account.Balance > 0)
+            .OrderBy(account => account.CurrencyCode)
             .ToListAsync();
 
         var eurBalance = await PersonalBankAccountService.GetGrossCashAsync(db, player.Id);
@@ -228,18 +229,7 @@ public sealed partial class Query
     }
 
     internal static async Task<decimal> GetPersonalBalanceAsync(AppDbContext db, Guid playerId, string currencyCode)
-    {
-        if (currencyCode.ToUpperInvariant() == EurCurrencyCode)
-        {
-            return await PersonalBankAccountService.GetGrossCashAsync(db, playerId);
-        }
-
-        return await db.PlayerCurrencyBalances
-            .AsNoTracking()
-            .Where(b => b.PlayerId == playerId && b.CurrencyCode == currencyCode.ToUpperInvariant())
-            .Select(b => b.Balance)
-            .FirstOrDefaultAsync();
-    }
+        => await PersonalBankAccountService.GetTrackedBalanceAsync(db, playerId, currencyCode);
 
     internal static void ValidateForexInput(string fromCode, string toCode, decimal amount)
     {

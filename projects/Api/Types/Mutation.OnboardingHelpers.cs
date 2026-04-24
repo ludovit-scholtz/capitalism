@@ -163,9 +163,8 @@ public sealed partial class Mutation
 
         if (requiresCurrencyBalance)
         {
-            // Non-EUR city: validate and deduct from the player's currency balance.
-            var playerBalance = await db.PlayerCurrencyBalances
-                .FirstOrDefaultAsync(b => b.PlayerId == company.PlayerId && b.CurrencyCode == cityCurrencyCode);
+            // Non-EUR city: validate and deduct from the player's local-currency bank account.
+            var playerBalance = await PersonalBankAccountService.GetTrackedAccountAsync(db, company.PlayerId, cityCurrencyCode);
 
             if (playerBalance is null)
             {

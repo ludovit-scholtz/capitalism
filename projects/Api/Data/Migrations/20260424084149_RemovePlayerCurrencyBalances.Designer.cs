@@ -3,6 +3,7 @@ using System;
 using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260424084149_RemovePlayerCurrencyBalances")]
+    partial class RemovePlayerCurrencyBalances
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -108,15 +111,6 @@ namespace Api.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");
 
-                    b.Property<Guid?>("BankBuildingId")
-                        .HasColumnType("uuid");
-
-                    b.Property<long?>("ClosedAtTick")
-                        .HasColumnType("bigint");
-
-                    b.Property<DateTime?>("ClosedAtUtc")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<Guid?>("CompanyId")
                         .HasColumnType("uuid");
 
@@ -128,41 +122,76 @@ namespace Api.Data.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
-                    b.Property<decimal?>("DepositInterestRatePercent")
-                        .HasPrecision(8, 4)
-                        .HasColumnType("numeric(8,4)");
-
-                    b.Property<long?>("DepositedAtTick")
-                        .HasColumnType("bigint");
-
-                    b.Property<bool>("IsBaseCapitalDeposit")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsGovernmentAccount")
                         .HasColumnType("boolean");
 
                     b.Property<Guid?>("PlayerId")
                         .HasColumnType("uuid");
 
-                    b.Property<decimal>("TotalInterestPaid")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AccountNumber")
                         .IsUnique();
 
-                    b.HasIndex("BankBuildingId", "ClosedAtUtc");
+                    b.HasIndex("CompanyId");
 
                     b.HasIndex("CurrencyCode", "IsGovernmentAccount");
 
                     b.HasIndex("PlayerId", "CurrencyCode")
                         .IsUnique();
 
-                    b.HasIndex("CompanyId", "BankBuildingId", "ClosedAtUtc");
-
                     b.ToTable("BankAccounts");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.BankDeposit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
+                    b.Property<Guid>("BankBuildingId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("DepositInterestRatePercent")
+                        .HasPrecision(8, 4)
+                        .HasColumnType("numeric(8,4)");
+
+                    b.Property<long>("DepositedAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("DepositedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DepositorCompanyId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsBaseCapital")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal>("TotalInterestPaid")
+                        .HasPrecision(18, 4)
+                        .HasColumnType("numeric(18,4)");
+
+                    b.Property<long?>("WithdrawnAtTick")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime?>("WithdrawnAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BankBuildingId", "IsActive");
+
+                    b.HasIndex("DepositorCompanyId", "IsActive");
+
+                    b.ToTable("BankDeposits");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.Brand", b =>
@@ -2048,11 +2077,6 @@ namespace Api.Data.Migrations
 
             modelBuilder.Entity("Api.Data.Entities.BankAccount", b =>
                 {
-                    b.HasOne("Api.Data.Entities.Building", "BankBuilding")
-                        .WithMany()
-                        .HasForeignKey("BankBuildingId")
-                        .OnDelete(DeleteBehavior.Cascade);
-
                     b.HasOne("Api.Data.Entities.Company", "Company")
                         .WithMany()
                         .HasForeignKey("CompanyId")
@@ -2063,11 +2087,28 @@ namespace Api.Data.Migrations
                         .HasForeignKey("PlayerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.Navigation("BankBuilding");
-
                     b.Navigation("Company");
 
                     b.Navigation("Player");
+                });
+
+            modelBuilder.Entity("Api.Data.Entities.BankDeposit", b =>
+                {
+                    b.HasOne("Api.Data.Entities.Building", "BankBuilding")
+                        .WithMany()
+                        .HasForeignKey("BankBuildingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Api.Data.Entities.Company", "DepositorCompany")
+                        .WithMany()
+                        .HasForeignKey("DepositorCompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BankBuilding");
+
+                    b.Navigation("DepositorCompany");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.Brand", b =>

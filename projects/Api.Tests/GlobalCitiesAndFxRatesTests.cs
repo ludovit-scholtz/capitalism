@@ -950,11 +950,8 @@ public sealed class GlobalCitiesAndFxRatesTests
     [Fact]
     public async Task ExecuteForexSwap_CheckConstraint_DatabaseEnforcesNonNegativeBalance()
     {
-        // Directly write a negative balance to PlayerCurrencyBalances at the EF layer and
-        // confirm SaveChangesAsync throws for PostgreSQL (constraint violation) or that
-        // the application guard already prevents negative values.
-        // This test verifies the integrity guarantee rather than the DB constraint itself
-        // (the SQLite test database does not enforce CHECK constraints added via ALTER TABLE).
+        // Seed a small tracked CZK bank-account balance and confirm the application guard
+        // rejects an overdraft swap, leaving the player-owned bank account unchanged.
         await using var factory = new ApiWebApplicationFactory();
         var client = factory.CreateClient();
 
@@ -966,16 +963,8 @@ public sealed class GlobalCitiesAndFxRatesTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            // Seed a CZK balance so we can attempt a swap that would produce a negative result.
-            db.PlayerCurrencyBalances.Add(new PlayerCurrencyBalance
-            {
-                Id = Guid.NewGuid(),
-                PlayerId = playerId,
-                CurrencyCode = "CZK",
-                Balance = 50m,
-                CreatedAtUtc = DateTime.UtcNow,
-                UpdatedAtUtc = DateTime.UtcNow
-            });
+            var czkAccount = await PersonalBankAccountService.EnsureTrackedAccountAsync(db, playerId, "CZK");
+            czkAccount.Balance = 50m;
             await db.SaveChangesAsync();
         }
 
@@ -1000,8 +989,8 @@ public sealed class GlobalCitiesAndFxRatesTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var bal = await db.PlayerCurrencyBalances
-                .SingleAsync(b => b.PlayerId == playerId && b.CurrencyCode == "CZK");
+            var bal = await db.BankAccounts
+                .SingleAsync(account => account.PlayerId == playerId && account.CurrencyCode == "CZK");
             Assert.Equal(50m, bal.Balance);
         }
     }

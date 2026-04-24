@@ -93,9 +93,6 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Active and historical loans between companies.</summary>
     public DbSet<Loan> Loans => Set<Loan>();
 
-    /// <summary>Cash deposits placed by companies into bank buildings.</summary>
-    public DbSet<BankDeposit> BankDeposits => Set<BankDeposit>();
-
     /// <summary>Audit trail for administrator actions performed while impersonating players.</summary>
     public DbSet<AdminActionAuditLog> AdminActionAuditLogs => Set<AdminActionAuditLog>();
 
@@ -110,9 +107,6 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
 
     /// <summary>Persisted foreign exchange rates fetched from the NBS daily CSV feed.</summary>
     public DbSet<FxRate> FxRates => Set<FxRate>();
-
-    /// <summary>Per-player multi-currency balance wallets (non-EUR currencies).</summary>
-    public DbSet<PlayerCurrencyBalance> PlayerCurrencyBalances => Set<PlayerCurrencyBalance>();
 
     /// <summary>Completed forex currency swap audit trail.</summary>
     public DbSet<ForexTradeRecord> ForexTradeRecords => Set<ForexTradeRecord>();

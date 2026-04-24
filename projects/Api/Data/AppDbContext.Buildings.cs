@@ -40,11 +40,16 @@ public sealed partial class AppDbContext
             e.Property(a => a.AccountNumber).HasMaxLength(16);
             e.Property(a => a.CurrencyCode).HasMaxLength(3);
             e.Property(a => a.Balance).HasPrecision(18, 2);
+            e.Property(a => a.DepositInterestRatePercent).HasPrecision(8, 4);
+            e.Property(a => a.TotalInterestPaid).HasPrecision(18, 4);
             e.HasIndex(a => a.AccountNumber).IsUnique();
             e.HasIndex(a => new { a.CurrencyCode, a.IsGovernmentAccount });
             e.HasIndex(a => new { a.PlayerId, a.CurrencyCode }).IsUnique();
+            e.HasIndex(a => new { a.BankBuildingId, a.ClosedAtUtc });
+            e.HasIndex(a => new { a.CompanyId, a.BankBuildingId, a.ClosedAtUtc });
             e.HasOne(a => a.Company).WithMany().HasForeignKey(a => a.CompanyId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(a => a.Player).WithMany().HasForeignKey(a => a.PlayerId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(a => a.BankBuilding).WithMany().HasForeignKey(a => a.BankBuildingId).OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<BuildingUnit>(e =>

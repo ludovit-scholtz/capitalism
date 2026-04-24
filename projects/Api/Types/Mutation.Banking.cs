@@ -4,7 +4,6 @@ using Api.Engine;
 using Api.Security;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
-using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 
 namespace Api.Types;
 
@@ -180,21 +179,23 @@ public sealed partial class Mutation
             }
         }
 
-        var deposit = new BankDeposit
+        var deposit = new BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = GenerateRandomAccountNumber(),
+            CurrencyCode = cityCurrencyCode,
+            CompanyId = depositorCompany.Id,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = depositorCompany.Id,
-            Amount = input.Amount,
+            Balance = input.Amount,
             DepositInterestRatePercent = depositRate,
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = currentTick,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
             TotalInterestPaid = 0m,
+            IsGovernmentAccount = false,
         };
 
-        db.BankDeposits.Add(deposit);
+        db.BankAccounts.Add(deposit);
 
         // Ledger: depositor makes deposit
         db.LedgerEntries.Add(new LedgerEntry
@@ -228,11 +229,11 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var deposit = await db.BankDeposits
-            .Include(d => d.DepositorCompany)
+        var deposit = await db.BankAccounts
+            .Include(d => d.Company)
             .Include(d => d.BankBuilding)
-            .ThenInclude(b => b.Company)
-            .FirstOrDefaultAsync(d => d.Id == input.DepositId && d.IsActive);
+            .ThenInclude(b => b!.Company)
+            .FirstOrDefaultAsync(d => d.Id == input.DepositId && d.BankBuildingId != null && d.ClosedAtUtc == null);
 
         if (deposit is null)
         {
@@ -243,7 +244,8 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (deposit.DepositorCompany.PlayerId != userId)
+        var depositorCompany = deposit.Company;
+        if (depositorCompany?.PlayerId != userId)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -252,7 +254,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (deposit.IsBaseCapital)
+        if (deposit.IsBaseCapitalDeposit)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -261,18 +263,18 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (input.Amount <= 0m || input.Amount > deposit.Amount)
+        if (input.Amount <= 0m || input.Amount > deposit.Balance)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage($"Withdrawal amount must be between $1 and the deposit balance of {deposit.Amount:C0}.")
+                    .SetMessage($"Withdrawal amount must be between $1 and the deposit balance of {deposit.Balance:C0}.")
                     .SetCode("INVALID_AMOUNT")
                     .Build());
         }
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
-        var bank = deposit.BankBuilding;
-        var bankCompany = bank.Company;
+        var bank = deposit.BankBuilding!;
+        var bankCompany = bank.Company!;
 
         // Determine actual payout: if bank lacks cash, central bank covers the shortfall
         var payout = input.Amount;
@@ -286,23 +288,22 @@ public sealed partial class Mutation
             // Central bank injects the shortfall directly — bank owes it back
             bank.CentralBankDebt += centralBankCoverage;
         }
-        deposit.DepositorCompany.Cash += payout;
+        depositorCompany.Cash += payout;
         bank.TotalDeposits -= input.Amount;
-        deposit.Amount -= input.Amount;
+        deposit.Balance -= input.Amount;
 
-        var isFullyWithdrawn = deposit.Amount <= 0m;
+        var isFullyWithdrawn = deposit.Balance <= 0m;
         if (isFullyWithdrawn)
         {
-            deposit.IsActive = false;
-            deposit.WithdrawnAtTick = currentTick;
-            deposit.WithdrawnAtUtc = DateTime.UtcNow;
+            deposit.ClosedAtTick = currentTick;
+            deposit.ClosedAtUtc = DateTime.UtcNow;
         }
 
         // Ledger: depositor receives withdrawal
         db.LedgerEntries.Add(new LedgerEntry
         {
             Id = Guid.NewGuid(),
-            CompanyId = deposit.DepositorCompanyId,
+            CompanyId = deposit.CompanyId!.Value,
             BuildingId = bank.Id,
             Category = LedgerCategory.DepositWithdrawn,
             Description = $"Withdrawal from {bank.Name}",
@@ -329,7 +330,7 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
-        return MapToDepositSummary(deposit, bank, deposit.DepositorCompany);
+        return MapToDepositSummary(deposit, bank, depositorCompany);
     }
 
     /// <summary>
@@ -344,11 +345,11 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var deposit = await db.BankDeposits
-            .Include(d => d.DepositorCompany)
+        var deposit = await db.BankAccounts
+            .Include(d => d.Company)
             .Include(d => d.BankBuilding)
-            .ThenInclude(b => b.Company)
-            .FirstOrDefaultAsync(d => d.Id == input.DepositId && d.IsActive);
+            .ThenInclude(b => b!.Company)
+            .FirstOrDefaultAsync(d => d.Id == input.DepositId && d.BankBuildingId != null && d.ClosedAtUtc == null);
 
         if (deposit is null)
         {
@@ -359,7 +360,8 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (deposit.DepositorCompany.PlayerId != userId)
+        var depositorCompany = deposit.Company;
+        if (depositorCompany?.PlayerId != userId)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -377,7 +379,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (deposit.DepositorCompany.Cash < input.Amount)
+        if (depositorCompany.Cash < input.Amount)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -387,11 +389,11 @@ public sealed partial class Mutation
         }
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
-        var bank = deposit.BankBuilding;
+        var bank = deposit.BankBuilding!;
 
         // Transfer cash: depositor -> bank
-        deposit.DepositorCompany.Cash -= input.Amount;
-        bank.Company.Cash += input.Amount;
+        depositorCompany.Cash -= input.Amount;
+        bank.Company!.Cash += input.Amount;
         bank.TotalDeposits += input.Amount;
 
         // Create a NEW deposit record for this top-up tranche.
@@ -400,20 +402,22 @@ public sealed partial class Mutation
         // retroactive-yield exploit where funds added at tick T could appear to have earned
         // interest since the original deposit date, and prevents locking in old rates.
         var currentRate = bank.DepositInterestRatePercent ?? 0m;
-        var topUpDeposit = new BankDeposit
+        var topUpDeposit = new BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = GenerateRandomAccountNumber(),
+            CurrencyCode = deposit.CurrencyCode,
+            CompanyId = deposit.CompanyId,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = deposit.DepositorCompanyId,
-            Amount = input.Amount,
+            Balance = input.Amount,
             DepositInterestRatePercent = currentRate,
-            IsBaseCapital = false,
-            IsActive = true,
+            IsBaseCapitalDeposit = false,
             DepositedAtTick = currentTick,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
             TotalInterestPaid = 0m,
+            IsGovernmentAccount = false,
         };
-        db.BankDeposits.Add(topUpDeposit);
+        db.BankAccounts.Add(topUpDeposit);
 
         // Auto-repay central-bank debt from surplus (same logic as CreateDeposit)
         if (bank.CentralBankDebt > 0m)
@@ -442,7 +446,7 @@ public sealed partial class Mutation
         db.LedgerEntries.Add(new LedgerEntry
         {
             Id = Guid.NewGuid(),
-            CompanyId = deposit.DepositorCompanyId,
+            CompanyId = deposit.CompanyId!.Value,
             BuildingId = bank.Id,
             Category = LedgerCategory.DepositMade,
             Description = $"Top-up deposit into {bank.Name} at {currentRate}% p.a.",
@@ -453,7 +457,7 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
-        return MapToDepositSummary(topUpDeposit, bank, deposit.DepositorCompany);
+        return MapToDepositSummary(topUpDeposit, bank, depositorCompany);
     }
 
     // ── Bank Rate Configuration ───────────────────────────────────────────────
@@ -575,21 +579,23 @@ public sealed partial class Mutation
         bank.LendingInterestRatePercent ??= 8m;    // 8% lending rate
 
         // Create the permanent base-capital deposit record (not withdrawable)
-        var deposit = new BankDeposit
+        var deposit = new BankAccount
         {
             Id = Guid.NewGuid(),
+            AccountNumber = GenerateRandomAccountNumber(),
+            CurrencyCode = cityCurrencyCode,
+            CompanyId = bank.CompanyId,
             BankBuildingId = bank.Id,
-            DepositorCompanyId = bank.CompanyId,
-            Amount = baseCapitalRequired,
+            Balance = baseCapitalRequired,
             DepositInterestRatePercent = 0m, // Owner's own base capital earns no interest
-            IsBaseCapital = true,
-            IsActive = true,
+            IsBaseCapitalDeposit = true,
             DepositedAtTick = currentTick,
-            DepositedAtUtc = DateTime.UtcNow,
+            CreatedAtUtc = DateTime.UtcNow,
             TotalInterestPaid = 0m,
+            IsGovernmentAccount = false,
         };
 
-        db.BankDeposits.Add(deposit);
+        db.BankAccounts.Add(deposit);
 
         // Ledger: record the base capital transfer as an operating expense for the company
         db.LedgerEntries.Add(new LedgerEntry
@@ -611,21 +617,21 @@ public sealed partial class Mutation
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    internal static BankDepositSummary MapToDepositSummary(BankDeposit d, Building bank, Company depositor) => new()
+    internal static BankDepositSummary MapToDepositSummary(BankAccount d, Building bank, Company depositor) => new()
     {
         Id = d.Id,
-        BankBuildingId = d.BankBuildingId,
+        BankBuildingId = d.BankBuildingId!.Value,
         BankBuildingName = bank.Name,
-        DepositorCompanyId = d.DepositorCompanyId,
+        DepositorCompanyId = d.CompanyId ?? Guid.Empty,
         DepositorCompanyName = depositor.Name,
-        Amount = d.Amount,
-        DepositInterestRatePercent = d.DepositInterestRatePercent,
-        IsBaseCapital = d.IsBaseCapital,
-        IsActive = d.IsActive,
-        DepositedAtTick = d.DepositedAtTick,
-        DepositedAtUtc = d.DepositedAtUtc,
-        WithdrawnAtTick = d.WithdrawnAtTick,
-        WithdrawnAtUtc = d.WithdrawnAtUtc,
+        Amount = d.Balance,
+        DepositInterestRatePercent = d.DepositInterestRatePercent ?? 0m,
+        IsBaseCapital = d.IsBaseCapitalDeposit,
+        IsActive = d.ClosedAtUtc is null,
+        DepositedAtTick = d.DepositedAtTick ?? 0L,
+        DepositedAtUtc = d.CreatedAtUtc,
+        WithdrawnAtTick = d.ClosedAtTick,
+        WithdrawnAtUtc = d.ClosedAtUtc,
         TotalInterestPaid = d.TotalInterestPaid,
         CityCurrencyCode = bank.City?.CurrencyCode ?? "EUR",
     };

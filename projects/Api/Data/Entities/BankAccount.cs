@@ -31,11 +31,21 @@ public sealed class BankAccount
     /// <summary>
     /// The company that owns this account.
     /// Null for player-owned or government-owned accounts.
+    /// Deposit accounts held at a specific bank building also use this ownership field.
     /// </summary>
     public Guid? CompanyId { get; set; }
 
     /// <summary>Navigation property to the owning company.</summary>
     public Company? Company { get; set; }
+
+    /// <summary>
+    /// The bank building where this deposit account is held.
+    /// Null for normal company treasury accounts, player accounts, and government accounts.
+    /// </summary>
+    public Guid? BankBuildingId { get; set; }
+
+    /// <summary>Navigation property to the bank building holding this deposit account.</summary>
+    public Building? BankBuilding { get; set; }
 
     /// <summary>
     /// The player that owns this account directly.
@@ -52,6 +62,41 @@ public sealed class BankAccount
     /// New buildings without an assigned account are linked to the government account for their city.
     /// </summary>
     public bool IsGovernmentAccount { get; set; }
+
+    /// <summary>
+    /// Snapshotted annual deposit interest rate (%) for deposit accounts held at a bank building.
+    /// Null for normal treasury, player, and government accounts.
+    /// </summary>
+    public decimal? DepositInterestRatePercent { get; set; }
+
+    /// <summary>
+    /// Whether this deposit account represents the bank's own base capital.
+    /// </summary>
+    public bool IsBaseCapitalDeposit { get; set; }
+
+    /// <summary>
+    /// Tick when this deposit account was opened.
+    /// Null for non-deposit accounts.
+    /// </summary>
+    public long? DepositedAtTick { get; set; }
+
+    /// <summary>
+    /// Tick when this deposit account was closed.
+    /// Null while the deposit is active or for non-deposit accounts.
+    /// </summary>
+    public long? ClosedAtTick { get; set; }
+
+    /// <summary>
+    /// UTC timestamp when this deposit account was closed.
+    /// Null while the deposit is active or for non-deposit accounts.
+    /// </summary>
+    public DateTime? ClosedAtUtc { get; set; }
+
+    /// <summary>
+    /// Cumulative interest paid out over the life of this deposit account.
+    /// Always zero for non-deposit accounts.
+    /// </summary>
+    public decimal TotalInterestPaid { get; set; }
 
     /// <summary>UTC timestamp when this account was created.</summary>
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
