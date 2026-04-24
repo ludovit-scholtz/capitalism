@@ -321,9 +321,7 @@ test.describe('Bank Statement Review', () => {
 // ── Funding guidance in Buy Building ──────────────────────────────────────────
 
 test.describe('Funding guidance in Buy Building', () => {
-  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({
-    page,
-  }) => {
+  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({ page }) => {
     const player = makePlayerWithCompany()
     player.personalCash = 500000
     player.companies[0]!.cash = 500000

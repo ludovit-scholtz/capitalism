@@ -43,9 +43,7 @@ const accounts = ref<PlayerBankAccountSummary[]>([])
 const pageSize = ref(50)
 const page = ref(1)
 
-const selectedAccount = computed<PlayerBankAccountSummary | null>(
-  () => accounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null,
-)
+const selectedAccount = computed<PlayerBankAccountSummary | null>(() => accounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null)
 
 const BANK_STATEMENT_QUERY = `
   query BankStatement($companyId: UUID!, $limit: Int, $offset: Int) {
@@ -90,14 +88,11 @@ async function loadStatement() {
   loading.value = true
   error.value = null
   try {
-    const result = await gqlRequest<{ bankStatement: BankStatementResult }>(
-      BANK_STATEMENT_QUERY,
-      {
-        companyId: selectedAccount.value.companyId,
-        limit: pageSize.value,
-        offset: (page.value - 1) * pageSize.value,
-      },
-    )
+    const result = await gqlRequest<{ bankStatement: BankStatementResult }>(BANK_STATEMENT_QUERY, {
+      companyId: selectedAccount.value.companyId,
+      limit: pageSize.value,
+      offset: (page.value - 1) * pageSize.value,
+    })
     statement.value = result.bankStatement
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -229,7 +224,27 @@ function categoryLabel(cat: string): string {
 
 function categoryIcon(cat: string): string {
   if (['REVENUE', 'MEDIA_HOUSE_INCOME', 'RENT_INCOME', 'DEPOSIT_INTEREST_RECEIVED', 'LOAN_INTEREST_INCOME', 'STOCK_SALE'].includes(cat)) return '+'
-  if (['PURCHASING_COST', 'LABOR_COST', 'ENERGY_COST', 'PROPERTY_PURCHASE', 'CONSTRUCTION_COST', 'UNIT_UPGRADE', 'MARKETING', 'SHIPPING_COST', 'TAX', 'DIVIDEND', 'LOAN_ORIGINATION', 'LOAN_INTEREST_EXPENSE', 'LOAN_PENALTY', 'DEPOSIT_MADE', 'MEDIA_HOUSE_CONTENT', 'STOCK_PURCHASE'].includes(cat)) return '−'
+  if (
+    [
+      'PURCHASING_COST',
+      'LABOR_COST',
+      'ENERGY_COST',
+      'PROPERTY_PURCHASE',
+      'CONSTRUCTION_COST',
+      'UNIT_UPGRADE',
+      'MARKETING',
+      'SHIPPING_COST',
+      'TAX',
+      'DIVIDEND',
+      'LOAN_ORIGINATION',
+      'LOAN_INTEREST_EXPENSE',
+      'LOAN_PENALTY',
+      'DEPOSIT_MADE',
+      'MEDIA_HOUSE_CONTENT',
+      'STOCK_PURCHASE',
+    ].includes(cat)
+  )
+    return '−'
   return ''
 }
 
@@ -317,27 +332,19 @@ function goToNextPage() {
 
     <template v-else-if="statement">
       <!-- Account summary card -->
-      <div
-        class="flex flex-wrap items-center gap-6 bg-card border border-divider rounded-xl px-6 py-4 mb-6"
-        aria-label="Account summary"
-      >
+      <div class="flex flex-wrap items-center gap-6 bg-card border border-divider rounded-xl px-6 py-4 mb-6" aria-label="Account summary">
         <div class="flex items-center gap-2">
           <span class="text-2xl">🏢</span>
           <div class="flex flex-col gap-0.5">
             <span class="text-lg font-bold text-body">{{ selectedAccount?.companyName ?? statement.companyName }}</span>
-            <span v-if="selectedAccount" class="text-xs text-muted">
-              {{ t('bankStatement.accountNumber') }}: {{ selectedAccount.accountNumber }}
-            </span>
+            <span v-if="selectedAccount" class="text-xs text-muted"> {{ t('bankStatement.accountNumber') }}: {{ selectedAccount.accountNumber }} </span>
           </div>
         </div>
         <div class="flex flex-col gap-0 ml-auto sm:ml-auto">
           <span class="text-xs font-semibold text-muted uppercase tracking-wide">
             {{ t('bankStatement.currentBalance') }}
           </span>
-          <span
-            class="balance-amount text-2xl font-extrabold"
-            :class="selectedAccountBalance >= 0 ? 'text-good' : 'text-bad'"
-          >
+          <span class="balance-amount text-2xl font-extrabold" :class="selectedAccountBalance >= 0 ? 'text-good' : 'text-bad'">
             {{ formatBalance(selectedAccountBalance, selectedAccount?.currencyCode ?? statement.currencyCode) }}
           </span>
         </div>
@@ -381,12 +388,7 @@ function goToNextPage() {
                 {{ t('bankStatement.noTransactions') }}
               </td>
             </tr>
-            <tr
-              v-for="row in statement.rows"
-              :key="row.id"
-              class="statement-row"
-              :class="row.amount >= 0 ? 'row-credit' : 'row-debit'"
-            >
+            <tr v-for="row in statement.rows" :key="row.id" class="statement-row" :class="row.amount >= 0 ? 'row-credit' : 'row-debit'">
               <td class="px-3 py-2.5 text-muted text-xs whitespace-nowrap align-middle hidden sm:table-cell">
                 {{ formatDate(row.recordedAtUtc) }}
               </td>
@@ -395,9 +397,7 @@ function goToNextPage() {
               </td>
               <td class="px-3 py-2.5 align-middle max-w-[280px]">
                 <div class="text-body font-medium">{{ row.description || '—' }}</div>
-                <div v-if="row.buildingName" class="description-sub text-xs text-muted mt-0.5">
-                  🏭 {{ row.buildingName }}
-                </div>
+                <div v-if="row.buildingName" class="description-sub text-xs text-muted mt-0.5">🏭 {{ row.buildingName }}</div>
               </td>
               <td class="px-3 py-2.5 align-middle">
                 <span class="inline-block text-xs font-semibold text-muted bg-card-raised border border-divider rounded px-1.5 py-0.5 whitespace-nowrap">
@@ -405,21 +405,15 @@ function goToNextPage() {
                 </span>
               </td>
               <td class="debit-cell px-3 py-2.5 text-right text-bad font-semibold align-middle">
-                <span v-if="row.amount < 0">
-                  {{ statement.currencySymbol }}{{ formatAmount(row.amount) }}
-                </span>
+                <span v-if="row.amount < 0"> {{ statement.currencySymbol }}{{ formatAmount(row.amount) }} </span>
                 <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
               <td class="credit-cell px-3 py-2.5 text-right text-good font-semibold align-middle">
-                <span v-if="row.amount >= 0">
-                  {{ statement.currencySymbol }}{{ formatAmount(row.amount) }}
-                </span>
+                <span v-if="row.amount >= 0"> {{ statement.currencySymbol }}{{ formatAmount(row.amount) }} </span>
                 <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
               <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle">
-                <span :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
-                  {{ statement.currencySymbol }}{{ formatAmount(row.runningBalance) }}
-                </span>
+                <span :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'"> {{ statement.currencySymbol }}{{ formatAmount(row.runningBalance) }} </span>
                 <span class="text-xs text-muted ml-0.5">{{ categoryIcon(row.category) }}</span>
               </td>
             </tr>
@@ -431,18 +425,10 @@ function goToNextPage() {
         <span>{{ t('bankStatement.showingFirst', { count: totalShown, total: statement.totalEntries }) }}</span>
         <div class="flex items-center gap-3">
           <span>{{ t('bankStatement.pageSummary', { page, total: totalPages }) }}</span>
-          <button
-            class="pagination-btn"
-            :disabled="!hasPreviousPage"
-            @click="goToPreviousPage"
-          >
+          <button class="pagination-btn" :disabled="!hasPreviousPage" @click="goToPreviousPage">
             {{ t('bankStatement.previousPage') }}
           </button>
-          <button
-            class="pagination-btn"
-            :disabled="!hasNextPage"
-            @click="goToNextPage"
-          >
+          <button class="pagination-btn" :disabled="!hasNextPage" @click="goToNextPage">
             {{ t('bankStatement.nextPage') }}
           </button>
         </div>
