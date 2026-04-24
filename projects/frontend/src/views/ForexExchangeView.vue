@@ -412,10 +412,10 @@ watch(activeTab, async (tab) => {
 </script>
 
 <template>
-  <main class="container min-h-[calc(100vh-64px)] py-8 pb-16">
-    <div class="flex flex-col gap-8">
+  <main class="container min-h-[calc(100vh-64px)] pb-16 pt-6 lg:pb-20 lg:pt-8">
+    <div class="mx-auto flex max-w-6xl flex-col gap-10 lg:gap-12">
       <!-- Hero -->
-      <div class="forex-hero flex flex-col gap-1">
+      <div class="forex-hero rounded-2xl border border-divider bg-card px-6 py-6 shadow-sm sm:px-8 sm:py-7">
         <h1 class="text-3xl font-bold text-body">{{ t('forex.title') }}</h1>
         <p class="text-base text-muted">{{ t('forex.subtitle') }}</p>
       </div>
@@ -430,9 +430,9 @@ watch(activeTab, async (tab) => {
       </div>
 
       <template v-else>
-        <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-8">
           <!-- Tabs -->
-          <div class="flex flex-wrap gap-3" role="tablist" :aria-label="t('forex.tabsLabel')">
+          <div class="flex flex-wrap gap-4" role="tablist" :aria-label="t('forex.tabsLabel')">
             <button
               role="tab"
               :aria-selected="activeTab === 'swap'"
@@ -481,7 +481,7 @@ watch(activeTab, async (tab) => {
           </div>
 
           <!-- Swap Tab -->
-          <section v-if="activeTab === 'swap'" class="space-y-6 rounded-xl border border-divider bg-card p-6" aria-label="Forex Swap">
+          <section v-if="activeTab === 'swap'" class="space-y-6 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Forex Swap">
             <h2 class="border-b border-divider pb-3 text-lg font-semibold text-body">
               {{ t('forex.tabSwap') }}
             </h2>
@@ -549,12 +549,7 @@ watch(activeTab, async (tab) => {
                       :accounts="myBankAccounts"
                       :label="t('forex.sourceAccount')"
                       id="from-bank-account"
-                      @update:model-value="
-                        () => {
-                          quote = null
-                          showConfirm = false
-                        }
-                      "
+                      @update:model-value="() => { quote = null; showConfirm = false }"
                     />
                   </template>
                   <template v-else>
@@ -563,12 +558,7 @@ watch(activeTab, async (tab) => {
                       :balances="toBalances"
                       :label="t('forex.sourceCurrency')"
                       id="from-currency"
-                      @update:model-value="
-                        () => {
-                          quote = null
-                          showConfirm = false
-                        }
-                      "
+                      @update:model-value="() => { quote = null; showConfirm = false }"
                     />
                   </template>
                 </div>
@@ -590,10 +580,7 @@ watch(activeTab, async (tab) => {
                       step="any"
                       :placeholder="t('forex.amountPlaceholder')"
                       class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
-                      @input="
-                        quote = null
-                        showConfirm = false
-                      "
+                      @input="quote = null; showConfirm = false"
                     />
                   </div>
                   <span class="field-hint text-xs text-muted mt-0.5"> {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }} </span>
@@ -621,12 +608,7 @@ watch(activeTab, async (tab) => {
                       :accounts="myBankAccounts"
                       :label="t('forex.destAccount')"
                       id="to-bank-account"
-                      @update:model-value="
-                        () => {
-                          quote = null
-                          showConfirm = false
-                        }
-                      "
+                      @update:model-value="() => { quote = null; showConfirm = false }"
                     />
                   </template>
                   <template v-else>
@@ -635,12 +617,7 @@ watch(activeTab, async (tab) => {
                       :balances="toBalances"
                       :label="t('forex.targetCurrency')"
                       id="to-currency"
-                      @update:model-value="
-                        () => {
-                          quote = null
-                          showConfirm = false
-                        }
-                      "
+                      @update:model-value="() => { quote = null; showConfirm = false }"
                     />
                   </template>
                 </div>
@@ -679,7 +656,7 @@ watch(activeTab, async (tab) => {
             </div>
 
             <!-- Quote confirmation card -->
-            <div v-if="showConfirm && quote" class="space-y-4 rounded-xl border border-brand bg-card-raised p-5" role="region" aria-label="Exchange Quote">
+            <div v-if="showConfirm && quote" class="space-y-4 rounded-2xl border border-brand bg-card-raised p-6 sm:p-7" role="region" aria-label="Exchange Quote">
               <h3 class="text-base font-bold text-body">{{ t('forex.quoteTitle') }}</h3>
               <table class="quote-table w-full border-collapse text-sm">
                 <tbody>
@@ -717,7 +694,7 @@ watch(activeTab, async (tab) => {
           <BankAccountTransferPanel v-else-if="activeTab === 'transfer'" :accounts="myBankAccounts" @transferred="reloadBankAccountsSilent" />
 
           <!-- Rates Tab -->
-          <section v-else-if="activeTab === 'rates'" class="space-y-4 rounded-xl border border-divider bg-card p-6" aria-label="Rate List">
+          <section v-else-if="activeTab === 'rates'" class="space-y-4 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Rate List">
             <h2 class="border-b border-divider pb-3 text-lg font-semibold text-body">
               {{ t('forex.rateListTitle') }}
             </h2>
@@ -751,7 +728,7 @@ watch(activeTab, async (tab) => {
           </section>
 
           <!-- History Tab -->
-          <section v-else-if="activeTab === 'history'" class="space-y-4 rounded-xl border border-divider bg-card p-6" aria-label="Trade History">
+          <section v-else-if="activeTab === 'history'" class="space-y-4 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Trade History">
             <h2 class="border-b border-divider pb-3 text-lg font-semibold text-body">
               {{ t('forex.historyTitle') }}
             </h2>

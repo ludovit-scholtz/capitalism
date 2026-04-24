@@ -1089,6 +1089,22 @@ Root-cause of a design regression (April 2026, Home/Login/Forex spacing after Ta
 4. **If a Tailwind migration removes a scoped CSS spacing rule, replace that spacing in the template in the same commit.** Do not rely on browser default margins because the global reset removes them.
 5. **After migrating any landing, auth, or finance page, run the narrow page-level validation that can catch visual collapse** (`npm run lint`, `npm run build`, and the targeted Playwright spec for that page when one exists).
 
+## Frontend spacing system — follow the shared design pattern document
+
+Root-cause of repeated visual regressions (April 2026, landing/auth/forex spacing review):
+- The frontend had Tailwind tokens and a global reset, but no shared page-shell or table-spacing contract.
+- Each migrated view guessed its own `pt-*`, `gap-*`, and table gutter values, so pages repeatedly shipped with missing top clearance, weak section rhythm, and cramped table headers.
+- The fix is now documented in `projects/frontend/docs/design-patterns.md`, which defines the default 8px spacing rhythm, page shell, hero, card, and data-table patterns.
+
+**Rules to prevent recurrence:**
+1. **For any new or migrated frontend page, read and follow `projects/frontend/docs/design-patterns.md` first.** Treat it as the default contract for page shells, cards, heroes, forms, and tables.
+2. **Use the 8px spacing rhythm consistently.** Default to Tailwind values that map cleanly to the scale: `gap-2/3/4/6/8/10/12`, `px-4/6/8`, `py-4/5/6/8/10/12/16/20`.
+3. **Every page under the sticky header must create explicit top breathing room.** The default page shell is `pt-6 lg:pt-8` with `pb-16 lg:pb-20` and an inner stack of `gap-10 lg:gap-12`.
+4. **Let the parent own layout rhythm.** Do not rebuild page spacing with scattered child `mb-*` and `mt-*` utilities when a parent `gap-*` or section shell can express the structure more clearly.
+5. **Primary data tables must live inside a table shell with wide gutters.** Default primary-table header/cell spacing is `px-8 py-5`; the first column must never visually touch the card edge.
+6. **Hero and lead sections must be visually separated blocks.** They must not touch the header or the next section; use a dedicated shell, larger vertical padding, and clear CTA spacing.
+7. **When a UI looks technically correct but still feels cramped, make an optical adjustment within the spacing scale instead of inventing arbitrary values.** Increase section separation before increasing tiny internal padding.
+
 ## Vue scoped-style extraction — never leave child visuals in a parent `<style scoped>` block
 
 Root-cause of a design regression (April 2026, commit `e98acf480601054f251cb66c22441777e1063d82` / building-detail Tailwind migration):

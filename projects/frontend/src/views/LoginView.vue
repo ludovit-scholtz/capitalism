@@ -30,9 +30,9 @@ async function handleSubmit() {
 </script>
 
 <template>
-  <main class="container py-10">
-    <section class="mx-auto flex min-h-[calc(100vh-128px)] max-w-md items-center justify-center">
-      <div class="flex w-full flex-col gap-6 rounded-xl border border-divider bg-card p-8 shadow-md sm:p-10">
+  <main class="container pb-16 pt-6 lg:pb-20 lg:pt-8">
+    <section class="mx-auto flex min-h-[calc(100vh-64px-5rem)] max-w-md items-center justify-center py-4 lg:py-6">
+      <div class="flex w-full flex-col gap-6 rounded-2xl border border-divider bg-card p-6 shadow-lg sm:p-8 lg:p-10">
         <h1 class="text-2xl font-bold text-body">
           {{ isRegister ? t('auth.registerTitle') : t('auth.loginTitle') }}
         </h1>
