@@ -433,51 +433,51 @@ watch(activeTab, async (tab) => {
         <div class="flex flex-col gap-6">
           <!-- Tabs -->
           <div class="flex flex-wrap gap-3" role="tablist" :aria-label="t('forex.tabsLabel')">
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'swap'"
-          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'swap' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
-          @click="activeTab = 'swap'"
-        >
-          {{ t('forex.tabSwap') }}
-        </button>
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'transfer'"
-          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'transfer' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
-          @click="activeTab = 'transfer'"
-        >
-          {{ t('bankTransfer.tabLabel') }}
-        </button>
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'rates'"
-          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'rates' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
-          @click="activeTab = 'rates'"
-        >
-          {{ t('forex.tabRateList') }}
-        </button>
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'history'"
-          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'history' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
-          @click="activeTab = 'history'"
-        >
-          {{ t('forex.tabHistory') }}
-        </button>
-        <button
-          role="tab"
-          :aria-selected="activeTab === 'gold'"
-          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'gold' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
-          @click="activeTab = 'gold'"
-        >
-          {{ t('forex.tabGold') }}
-        </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'swap'"
+              class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+              :class="activeTab === 'swap' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+              @click="activeTab = 'swap'"
+            >
+              {{ t('forex.tabSwap') }}
+            </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'transfer'"
+              class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+              :class="activeTab === 'transfer' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+              @click="activeTab = 'transfer'"
+            >
+              {{ t('bankTransfer.tabLabel') }}
+            </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'rates'"
+              class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+              :class="activeTab === 'rates' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+              @click="activeTab = 'rates'"
+            >
+              {{ t('forex.tabRateList') }}
+            </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'history'"
+              class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+              :class="activeTab === 'history' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+              @click="activeTab = 'history'"
+            >
+              {{ t('forex.tabHistory') }}
+            </button>
+            <button
+              role="tab"
+              :aria-selected="activeTab === 'gold'"
+              class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+              :class="activeTab === 'gold' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+              @click="activeTab = 'gold'"
+            >
+              {{ t('forex.tabGold') }}
+            </button>
           </div>
 
           <!-- Swap Tab -->
@@ -540,139 +540,142 @@ watch(activeTab, async (tab) => {
 
             <!-- Swap form -->
             <div class="flex flex-col gap-4">
-          <!-- From row -->
-          <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
-            <div class="flex flex-col gap-1">
-              <template v-if="hasBankAccounts">
-                <ForexBankAccountSelector
-                  v-model="fromBankAccountId"
-                  :accounts="myBankAccounts"
-                  :label="t('forex.sourceAccount')"
-                  id="from-bank-account"
-                  @update:model-value="
-                    () => {
-                      quote = null
-                      showConfirm = false
-                    }
-                  "
-                />
-              </template>
-              <template v-else>
-                <BankAccountSelector
-                  v-model="fromCurrency"
-                  :balances="toBalances"
-                  :label="t('forex.sourceCurrency')"
-                  id="from-currency"
-                  @update:model-value="
-                    () => {
-                      quote = null
-                      showConfirm = false
-                    }
-                  "
-                />
-              </template>
-            </div>
+              <!-- From row -->
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
+                <div class="flex flex-col gap-1">
+                  <template v-if="hasBankAccounts">
+                    <ForexBankAccountSelector
+                      v-model="fromBankAccountId"
+                      :accounts="myBankAccounts"
+                      :label="t('forex.sourceAccount')"
+                      id="from-bank-account"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
+                    />
+                  </template>
+                  <template v-else>
+                    <BankAccountSelector
+                      v-model="fromCurrency"
+                      :balances="toBalances"
+                      :label="t('forex.sourceCurrency')"
+                      id="from-currency"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
+                    />
+                  </template>
+                </div>
 
-            <!-- Amount input -->
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-semibold text-muted uppercase tracking-wide" for="swap-amount">
-                {{ t('forex.amount') }}
-              </label>
-              <div class="flex items-center border border-divider rounded-lg overflow-hidden bg-page">
-                <span class="px-3 py-2.5 bg-card-raised border-r border-divider font-bold text-brand min-w-10 text-center text-sm">
-                  {{ fromSymbol }}
-                </span>
-                <input
-                  id="swap-amount"
-                  v-model.number="amount"
-                  type="number"
-                  min="0"
-                  step="any"
-                  :placeholder="t('forex.amountPlaceholder')"
-                  class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
-                  @input="quote = null; showConfirm = false"
-                />
-              </div>
-              <span class="field-hint text-xs text-muted mt-0.5"> {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }} </span>
-            </div>
-          </div>
-
-          <!-- Swap direction button -->
-          <div class="flex justify-center">
-            <button
-              class="w-9 h-9 rounded-full bg-card-raised border border-divider text-muted text-lg flex items-center justify-center transition-colors hover:bg-brand hover:text-white hover:border-brand"
-              :title="'Swap currencies'"
-              aria-label="Swap currencies"
-              @click="swapCurrencies"
-            >
-              ⇅
-            </button>
-          </div>
-
-          <!-- To row -->
-          <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
-            <div class="flex flex-col gap-1">
-              <template v-if="hasBankAccounts">
-                <ForexBankAccountSelector
-                  v-model="toBankAccountId"
-                  :accounts="myBankAccounts"
-                  :label="t('forex.destAccount')"
-                  id="to-bank-account"
-                  @update:model-value="
-                    () => {
-                      quote = null
-                      showConfirm = false
-                    }
-                  "
-                />
-              </template>
-              <template v-else>
-                <BankAccountSelector
-                  v-model="toCurrency"
-                  :balances="toBalances"
-                  :label="t('forex.targetCurrency')"
-                  id="to-currency"
-                  @update:model-value="
-                    () => {
-                      quote = null
-                      showConfirm = false
-                    }
-                  "
-                />
-              </template>
-            </div>
-
-            <!-- You receive -->
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-semibold text-muted uppercase tracking-wide">
-                {{ t('forex.youReceive') }}
-              </label>
-              <div class="flex items-center border border-divider rounded-lg overflow-hidden bg-page">
-                <span class="px-3 py-2.5 bg-card-raised border-r border-divider font-bold text-brand min-w-10 text-center text-sm">
-                  {{ toSymbol }}
-                </span>
-                <div class="flex-1 px-3 py-2.5 text-base font-bold text-good">
-                  <span v-if="quote">{{ formatAmount(quote.toAmount) }}</span>
-                  <span v-else class="text-muted font-normal">—</span>
+                <!-- Amount input -->
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-semibold text-muted uppercase tracking-wide" for="swap-amount">
+                    {{ t('forex.amount') }}
+                  </label>
+                  <div class="flex items-center border border-divider rounded-lg overflow-hidden bg-page">
+                    <span class="px-3 py-2.5 bg-card-raised border-r border-divider font-bold text-brand min-w-10 text-center text-sm">
+                      {{ fromSymbol }}
+                    </span>
+                    <input
+                      id="swap-amount"
+                      v-model.number="amount"
+                      type="number"
+                      min="0"
+                      step="any"
+                      :placeholder="t('forex.amountPlaceholder')"
+                      class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
+                      @input="
+                        quote = null
+                        showConfirm = false
+                      "
+                    />
+                  </div>
+                  <span class="field-hint text-xs text-muted mt-0.5"> {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }} </span>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Validation / quote errors -->
-          <div v-if="validationError && amount" class="validation-error text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
-            {{ validationError }}
-          </div>
-          <div v-if="quoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
-            {{ quoteError }}
-          </div>
+              <!-- Swap direction button -->
+              <div class="flex justify-center">
+                <button
+                  class="w-9 h-9 rounded-full bg-card-raised border border-divider text-muted text-lg flex items-center justify-center transition-colors hover:bg-brand hover:text-white hover:border-brand"
+                  :title="'Swap currencies'"
+                  aria-label="Swap currencies"
+                  @click="swapCurrencies"
+                >
+                  ⇅
+                </button>
+              </div>
 
-          <!-- Get quote action -->
-          <div v-if="!showConfirm">
-            <button class="btn btn-primary" :disabled="quoteLoading || !!validationError || !amount" @click="fetchQuote">
-              {{ quoteLoading ? t('common.loading') : t('forex.getQuote') }}
-            </button>
-          </div>
+              <!-- To row -->
+              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
+                <div class="flex flex-col gap-1">
+                  <template v-if="hasBankAccounts">
+                    <ForexBankAccountSelector
+                      v-model="toBankAccountId"
+                      :accounts="myBankAccounts"
+                      :label="t('forex.destAccount')"
+                      id="to-bank-account"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
+                    />
+                  </template>
+                  <template v-else>
+                    <BankAccountSelector
+                      v-model="toCurrency"
+                      :balances="toBalances"
+                      :label="t('forex.targetCurrency')"
+                      id="to-currency"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
+                    />
+                  </template>
+                </div>
+
+                <!-- You receive -->
+                <div class="flex flex-col gap-1">
+                  <label class="text-xs font-semibold text-muted uppercase tracking-wide">
+                    {{ t('forex.youReceive') }}
+                  </label>
+                  <div class="flex items-center border border-divider rounded-lg overflow-hidden bg-page">
+                    <span class="px-3 py-2.5 bg-card-raised border-r border-divider font-bold text-brand min-w-10 text-center text-sm">
+                      {{ toSymbol }}
+                    </span>
+                    <div class="flex-1 px-3 py-2.5 text-base font-bold text-good">
+                      <span v-if="quote">{{ formatAmount(quote.toAmount) }}</span>
+                      <span v-else class="text-muted font-normal">—</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Validation / quote errors -->
+              <div v-if="validationError && amount" class="validation-error text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
+                {{ validationError }}
+              </div>
+              <div v-if="quoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
+                {{ quoteError }}
+              </div>
+
+              <!-- Get quote action -->
+              <div v-if="!showConfirm">
+                <button class="btn btn-primary" :disabled="quoteLoading || !!validationError || !amount" @click="fetchQuote">
+                  {{ quoteLoading ? t('common.loading') : t('forex.getQuote') }}
+                </button>
+              </div>
             </div>
 
             <!-- Quote confirmation card -->

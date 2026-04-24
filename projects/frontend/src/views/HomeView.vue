@@ -18,9 +18,7 @@ const { gameState } = storeToRefs(gameStateStore)
 
 const rankings = ref<PlayerRanking[]>([])
 const loading = ref(true)
-const formattedGameTime = computed(() =>
-  gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : '',
-)
+const formattedGameTime = computed(() => (gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : ''))
 
 async function loadHomeData(isRefresh = false) {
   if (!isRefresh) {
@@ -81,11 +79,7 @@ useTickRefresh(() => loadHomeData(true))
           <RouterLink v-if="!auth.isAuthenticated" to="/onboarding" class="btn btn-primary">
             {{ t('home.getStarted') }}
           </RouterLink>
-          <RouterLink
-            v-else-if="auth.player && !auth.player.onboardingCompletedAtUtc"
-            to="/onboarding"
-            class="btn btn-primary"
-          >
+          <RouterLink v-else-if="auth.player && !auth.player.onboardingCompletedAtUtc" to="/onboarding" class="btn btn-primary">
             {{ t('home.startOnboarding') }}
           </RouterLink>
           <RouterLink v-else to="/dashboard" class="btn btn-primary">
@@ -99,25 +93,16 @@ useTickRefresh(() => loadHomeData(true))
       <!-- Game Status Cards -->
       <section v-if="gameState">
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div
-            class="bg-card border border-divider rounded-lg p-5 text-center"
-            :title="t('home.currentTick', { tick: gameState.currentTick })"
-          >
-            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{
-              t('home.currentTime')
-            }}</span>
+          <div class="bg-card border border-divider rounded-lg p-5 text-center" :title="t('home.currentTick', { tick: gameState.currentTick })">
+            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.currentTime') }}</span>
             <span class="text-2xl font-bold text-body">{{ formattedGameTime }}</span>
           </div>
           <div class="bg-card border border-divider rounded-lg p-5 text-center">
-            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{
-              t('home.taxRate')
-            }}</span>
+            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.taxRate') }}</span>
             <span class="text-2xl font-bold text-body">{{ gameState.taxRate }}%</span>
           </div>
           <div class="bg-card border border-divider rounded-lg p-5 text-center">
-            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{
-              t('home.activePlayers')
-            }}</span>
+            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.activePlayers') }}</span>
             <span class="text-2xl font-bold text-body">{{ rankings.length }}</span>
           </div>
         </div>
@@ -140,34 +125,20 @@ useTickRefresh(() => loadHomeData(true))
           <table class="w-full border-collapse">
             <thead>
               <tr>
-                <th
-                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-                >
-                  #
-                </th>
-                <th
-                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-                >
+                <th class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider">#</th>
+                <th class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider">
                   {{ t('home.playerName') }}
                 </th>
-                <th
-                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-                >
+                <th class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider">
                   {{ t('home.wealth') }}
                 </th>
-                <th
-                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-                >
+                <th class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider">
                   {{ t('home.companies') }}
                 </th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="(rank, index) in rankings.slice(0, 5)"
-                :key="rank.playerId"
-                class="hover:bg-overlay transition-colors"
-              >
+              <tr v-for="(rank, index) in rankings.slice(0, 5)" :key="rank.playerId" class="hover:bg-overlay transition-colors">
                 <td class="px-4 py-3 font-bold text-brand border-b border-divider">
                   {{ index + 1 }}
                 </td>
@@ -197,6 +168,9 @@ useTickRefresh(() => loadHomeData(true))
   background-clip: text;
   font-weight: 800;
   text-transform: uppercase;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 </style>
