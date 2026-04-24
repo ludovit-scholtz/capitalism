@@ -129,14 +129,6 @@
    intentionally NOT used to prevent unexpected light-mode flashes in CI and headless
    test environments where the system default color scheme is light. */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
 body {
   font-family: var(--font-sans);
   background: var(--color-bg);
@@ -165,9 +157,7 @@ img {
 }
 
 .container {
-  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
 }
 
 .btn {

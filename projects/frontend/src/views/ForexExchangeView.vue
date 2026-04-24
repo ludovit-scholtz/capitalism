@@ -590,10 +590,6 @@ watch(activeTab, async (tab) => {
                       step="any"
                       :placeholder="t('forex.amountPlaceholder')"
                       class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
-                      @input="
-                        quote = null
-                        showConfirm = false
-                      "
                     />
                   </div>
                   <span class="field-hint text-xs text-muted mt-0.5"> {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }} </span>

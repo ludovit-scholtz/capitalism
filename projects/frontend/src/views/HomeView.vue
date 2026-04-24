@@ -59,9 +59,9 @@ useTickRefresh(() => loadHomeData(true))
 </script>
 
 <template>
-  <div class="container flex flex-col gap-12 pb-20 pt-6 lg:gap-14 lg:pb-24 lg:pt-8">
+  <div class="flex flex-col mb-8">
     <!-- Hero Section -->
-    <section class="relative overflow-hidden rounded-[28px] border border-divider shadow-lg">
+    <section class="relative overflow-hidden border border-divider shadow-lg">
       <!-- Background video + overlay -->
       <div class="absolute inset-0 -z-10">
         <div class="absolute inset-0 bg-[rgba(13,17,23,0.6)] z-10"></div>
@@ -88,7 +88,8 @@ useTickRefresh(() => loadHomeData(true))
         </div>
       </div>
     </section>
-
+  </div>
+  <div class="container flex flex-col gap-12 pb-20 pt-6 lg:gap-14 lg:pb-24 lg:pt-8">
     <!-- Game Status Cards -->
     <section v-if="gameState" class="grid grid-cols-1 gap-5 sm:grid-cols-3 lg:gap-6">
       <div class="rounded-2xl border border-divider bg-card px-6 py-6 text-center shadow-sm" :title="t('home.currentTick', { tick: gameState.currentTick })">

@@ -71,58 +71,29 @@ function handleChatToggle() {
       </RouterLink>
 
       <!-- Mobile menu toggle -->
-      <button
-        class="menu-toggle ml-auto md:hidden text-muted hover:text-body p-2 rounded-md transition-colors"
-        @click="toggleMenu"
-        :aria-expanded="isMenuOpen"
-        aria-label="Toggle navigation menu"
-      >
+      <button class="menu-toggle ml-auto md:hidden text-muted hover:text-body p-2 rounded-md transition-colors" @click="toggleMenu" :aria-expanded="isMenuOpen" aria-label="Toggle navigation menu">
         <font-awesome-icon :icon="['fas', 'bars']" />
       </button>
 
       <!-- Navigation links -->
-      <nav
-        class="nav-links"
-        :class="{ 'nav-open': isMenuOpen }"
-      >
+      <nav class="nav-links" :class="{ 'nav-open': isMenuOpen }">
         <RouterLink to="/" :title="t('nav.home')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'home']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.home') }}</span>
         </RouterLink>
-        <RouterLink
-          v-if="auth.isAuthenticated"
-          to="/dashboard"
-          :title="t('nav.dashboard')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink v-if="auth.isAuthenticated" to="/dashboard" :title="t('nav.dashboard')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'tachometer-alt']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.dashboard') }}</span>
         </RouterLink>
-        <RouterLink
-          to="/leaderboard"
-          :title="t('nav.leaderboard')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink to="/leaderboard" :title="t('nav.leaderboard')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'trophy']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.leaderboard') }}</span>
         </RouterLink>
-        <RouterLink
-          to="/encyclopedia"
-          :title="t('nav.encyclopedia')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink to="/encyclopedia" :title="t('nav.encyclopedia')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'book']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.encyclopedia') }}</span>
         </RouterLink>
-        <RouterLink
-          to="/exchange"
-          :title="t('nav.exchange')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink to="/exchange" :title="t('nav.exchange')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'chart-bar']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.exchange') }}</span>
         </RouterLink>
@@ -130,33 +101,15 @@ function handleChatToggle() {
           <font-awesome-icon :icon="['fas', 'wallet']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.stocks') }}</span>
         </RouterLink>
-        <RouterLink
-          v-if="auth.isAuthenticated"
-          to="/forex"
-          :title="t('nav.forex')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink v-if="auth.isAuthenticated" to="/forex" :title="t('nav.forex')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'coins']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.forex') }}</span>
         </RouterLink>
-        <RouterLink
-          v-if="auth.isAuthenticated"
-          to="/bank-statement"
-          :title="t('nav.bankStatement')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink v-if="auth.isAuthenticated" to="/bank-statement" :title="t('nav.bankStatement')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'file-invoice-dollar']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.bankStatement') }}</span>
         </RouterLink>
-        <RouterLink
-          v-if="auth.isAuthenticated"
-          to="/marketing-analytics"
-          :title="t('nav.campaignAnalytics')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink v-if="auth.isAuthenticated" to="/marketing-analytics" :title="t('nav.campaignAnalytics')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'bullhorn']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.campaignAnalytics') }}</span>
         </RouterLink>
@@ -164,13 +117,7 @@ function handleChatToggle() {
           <font-awesome-icon :icon="['fas', 'landmark']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.banking') }}</span>
         </RouterLink>
-        <RouterLink
-          to="/news"
-          :title="t('nav.news')"
-          :aria-label="t('nav.news')"
-          class="nav-link nav-link-badge-host"
-          @click="closeMenu"
-        >
+        <RouterLink to="/news" :title="t('nav.news')" :aria-label="t('nav.news')" class="nav-link nav-link-badge-host" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'newspaper']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.news') }}</span>
           <span v-if="showUnreadBadge" class="nav-badge nav-badge-news news-badge">{{ unreadCount }}</span>
@@ -186,18 +133,9 @@ function handleChatToggle() {
         >
           <font-awesome-icon :icon="['fas', 'comments']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.chat') }}</span>
-          <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{
-            chatUnreadCount
-          }}</span>
+          <span v-if="chatUnreadCount > 0" class="nav-badge nav-badge-chat chat-badge">{{ chatUnreadCount }}</span>
         </button>
-        <RouterLink
-          v-if="session?.canAccessAdminDashboard"
-          to="/admin"
-          :title="t('nav.admin')"
-          :aria-label="t('nav.admin')"
-          class="nav-link"
-          @click="closeMenu"
-        >
+        <RouterLink v-if="session?.canAccessAdminDashboard" to="/admin" :title="t('nav.admin')" :aria-label="t('nav.admin')" class="nav-link" @click="closeMenu">
           <font-awesome-icon :icon="['fas', 'shield-halved']" class="mr-2" />
           <span class="inline-block md:hidden">{{ t('nav.admin') }}</span>
         </RouterLink>
@@ -206,17 +144,9 @@ function handleChatToggle() {
       <!-- Right-side actions -->
       <div class="header-actions flex items-center gap-3 shrink-0">
         <!-- In-game time chip -->
-        <div
-          v-if="gameState && formattedGameTime"
-          class="game-time-chip hidden sm:flex flex-col items-end gap-0.5 px-3 py-1.5 border border-divider rounded-md"
-          :title="t('nav.gameTime')"
-        >
-          <span class="text-[0.6875rem] text-muted uppercase tracking-wider">{{
-            t('nav.gameTime')
-          }}</span>
-          <span class="text-[0.8125rem] text-body tabular-nums whitespace-nowrap">{{
-            formattedGameTime
-          }}</span>
+        <div v-if="gameState && formattedGameTime" class="game-time-chip hidden sm:flex flex-col items-end gap-0.5 px-3 py-1.5 border border-divider rounded-md" :title="t('nav.gameTime')">
+          <span class="text-[0.6875rem] text-muted uppercase tracking-wider">{{ t('nav.gameTime') }}</span>
+          <span class="text-[0.8125rem] text-body tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
         </div>
 
         <!-- Impersonation chip -->
@@ -270,7 +200,10 @@ function handleChatToggle() {
   border-top: 1px solid gold;
   border-bottom: 1px solid gold;
   white-space: nowrap;
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family:
+    system-ui,
+    -apple-system,
+    sans-serif;
 }
 
 /* ── Navigation links ─────────────────────────────────────────────────────── */
@@ -320,12 +253,6 @@ function handleChatToggle() {
 .nav-link.nav-link-active {
   color: var(--color-text);
   text-decoration: none;
-}
-
-.nav-link.router-link-active::after,
-.nav-link:hover::after,
-.nav-link.nav-link-active::after {
-  transform: scaleX(1);
 }
 
 /* ── Notification badges ──────────────────────────────────────────────────── */
@@ -425,4 +352,3 @@ function handleChatToggle() {
   }
 }
 </style>
-
