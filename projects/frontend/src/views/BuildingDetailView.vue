@@ -22,14 +22,26 @@ const bd = useBuildingDetail()
 provide(BUILDING_DETAIL_KEY, bd)
 
 const {
-  building, loading, error,
-  configWarnings, showStarterSetupBanner, showSalesShopStarterBanner,
-  isUpgradeInProgress, cancellingPlan, cancelPlanError,
-  allUnitsUnderUpgrade, lockedConfiguredProducts, lockedConfiguredProductNames,
-  pendingConfiguration, remainingUpgradeTicks,
+  building,
+  loading,
+  error,
+  configWarnings,
+  showStarterSetupBanner,
+  showSalesShopStarterBanner,
+  isUpgradeInProgress,
+  cancellingPlan,
+  cancelPlanError,
+  allUnitsUnderUpgrade,
+  lockedConfiguredProducts,
+  lockedConfiguredProductNames,
+  pendingConfiguration,
+  remainingUpgradeTicks,
   isEditing,
-  formatTickDuration, formatGameTickTime,
-  applyStarterLayout, applyShopStarterLayout, cancelPlan,
+  formatTickDuration,
+  formatGameTickTime,
+  applyStarterLayout,
+  applyShopStarterLayout,
+  cancelPlan,
 } = bd
 
 const showEditingSidebar = computed(() => Boolean(bd.selectedCell.value && bd.isEditing.value))
@@ -294,7 +306,9 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
   color: var(--color-text-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .unit-tab-btn:hover {
@@ -1712,10 +1726,18 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
   color: var(--color-text);
 }
 
-.mh-content-value { color: #60a5fa; }
-.mh-budget-active { color: #34d399; }
-.mh-budget-none { color: var(--color-text-secondary); }
-.mh-efficiency { color: #a78bfa; }
+.mh-content-value {
+  color: #60a5fa;
+}
+.mh-budget-active {
+  color: #34d399;
+}
+.mh-budget-none {
+  color: var(--color-text-secondary);
+}
+.mh-efficiency {
+  color: #a78bfa;
+}
 
 .media-house-section-title {
   font-size: 0.9rem;
@@ -1779,8 +1801,12 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
   transition: width 0.3s;
 }
 
-.mh-bar-own { background: #818cf8; }
-.mh-bar-gov { background: #4b5563; }
+.mh-bar-own {
+  background: #818cf8;
+}
+.mh-bar-gov {
+  background: #4b5563;
+}
 
 .mh-competitor-pct {
   font-size: 0.8rem;
@@ -2706,9 +2732,15 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
   font-weight: 600;
 }
 
-.ppa-income { color: var(--color-success, #22c55e); }
-.ppa-fine { color: var(--color-error, #ef4444); }
-.ppa-cost { color: var(--color-text-secondary); }
+.ppa-income {
+  color: var(--color-success, #22c55e);
+}
+.ppa-fine {
+  color: var(--color-error, #ef4444);
+}
+.ppa-cost {
+  color: var(--color-text-secondary);
+}
 
 .ppa-chart {
   display: flex;
@@ -4304,7 +4336,7 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
   letter-spacing: 0.04em;
   padding: 0.1rem 0.35rem;
   border-radius: 0.25rem;
-  background: var(--color-surface-hover, rgba(0,0,0,0.06));
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.06));
   border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
   vertical-align: middle;
@@ -4329,12 +4361,14 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 }
 
 .media-house-option:hover:not(.mh-disabled) {
   border-color: var(--color-primary, #4caf50);
-  background: var(--color-surface-hover, rgba(0,0,0,0.04));
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.04));
 }
 
 .media-house-option.selected {
@@ -4375,7 +4409,7 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
 }
 
 .mh-type-badge {
-  background: var(--color-surface-hover, rgba(0,0,0,0.06));
+  background: var(--color-surface-hover, rgba(0, 0, 0, 0.06));
   border: 1px solid var(--color-border);
   color: var(--color-text-secondary);
 }

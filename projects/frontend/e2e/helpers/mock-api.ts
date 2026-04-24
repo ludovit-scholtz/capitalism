@@ -5388,12 +5388,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (
-      query.includes('gameAdminSession') &&
-      !query.includes('buildingBankAccount') &&
-      !query.includes('assignBuildingBankAccount') &&
-      !query.includes('createCompanyBankAccount')
-    ) {
+    if (query.includes('gameAdminSession') && !query.includes('buildingBankAccount') && !query.includes('assignBuildingBankAccount') && !query.includes('createCompanyBankAccount')) {
       return routeJson({ gameAdminSession: buildGameAdminSession() })
     }
 
@@ -6485,9 +6480,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           balance: account.balance,
         }))
 
-      const companyBankAccounts = [...playerAccounts, ...explicitAccounts].filter(
-        (account, index, accounts) => accounts.findIndex((candidate) => candidate.id === account.id) === index,
-      )
+      const companyBankAccounts = [...playerAccounts, ...explicitAccounts].filter((account, index, accounts) => accounts.findIndex((candidate) => candidate.id === account.id) === index)
 
       return route.fulfill({
         status: 200,
@@ -6715,9 +6708,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!company) return routeJsonError('Company not found', 'COMPANY_NOT_FOUND')
       const accountId = crypto.randomUUID()
       const accountNumber = String(Math.floor(Math.random() * 1e16)).padStart(16, '0')
-      const currencySymbol = currencyCode === 'EUR'
-        ? '€'
-        : (state.fxRates.find((rate) => rate.quoteCurrencyCode === currencyCode)?.quoteCurrencySymbol ?? currencyCode)
+      const currencySymbol = currencyCode === 'EUR' ? '€' : (state.fxRates.find((rate) => rate.quoteCurrencyCode === currencyCode)?.quoteCurrencySymbol ?? currencyCode)
       state.myBankAccounts.push({
         id: accountId,
         accountNumber,

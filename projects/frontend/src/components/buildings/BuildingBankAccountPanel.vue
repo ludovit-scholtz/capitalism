@@ -62,16 +62,12 @@ const suspensionLabel = computed(() => {
 
 const isSuspended = computed(() => accountInfo.value?.isSuspendedForFunds === true)
 const hasMissingAccount = computed(() => accountInfo.value?.suspendedReason === 'MISSING_BANK_ACCOUNT')
-const hasInsufficientFunds = computed(
-  () => accountInfo.value?.suspendedReason?.startsWith('INSUFFICIENT_FUNDS:') === true,
-)
+const hasInsufficientFunds = computed(() => accountInfo.value?.suspendedReason?.startsWith('INSUFFICIENT_FUNDS:') === true)
 const availableCompanyAccounts = computed(() => {
   const currencyCode = (props.currencyCode ?? accountInfo.value?.currencyCode ?? 'EUR').toUpperCase()
   return companyAccounts.value.filter((account) => account.currencyCode.toUpperCase() === currencyCode)
 })
-const canAssignSelectedAccount = computed(
-  () => Boolean(selectedBankAccountId.value) && selectedBankAccountId.value !== accountInfo.value?.bankAccountId,
-)
+const canAssignSelectedAccount = computed(() => Boolean(selectedBankAccountId.value) && selectedBankAccountId.value !== accountInfo.value?.bankAccountId)
 const canCreateCompanyAccount = computed(() => availableCompanyAccounts.value.length === 0)
 const accountSelectId = computed(() => `building-bank-account-select-${props.buildingId}`)
 
@@ -317,13 +313,7 @@ watch(
     </div>
 
     <template v-else-if="accountInfo">
-      <div
-        v-if="isSuspended || hasMissingAccount"
-        class="bba-alert"
-        :class="{ 'bba-alert-warning': hasMissingAccount, 'bba-alert-danger': hasInsufficientFunds }"
-        role="alert"
-        aria-live="polite"
-      >
+      <div v-if="isSuspended || hasMissingAccount" class="bba-alert" :class="{ 'bba-alert-warning': hasMissingAccount, 'bba-alert-danger': hasInsufficientFunds }" role="alert" aria-live="polite">
         <span class="bba-alert-icon">{{ hasInsufficientFunds ? '⚠️' : '💡' }}</span>
         <span class="bba-alert-message">{{ suspensionLabel }}</span>
       </div>
@@ -349,33 +339,19 @@ watch(
         <div v-if="availableCompanyAccounts.length > 0" class="bba-assign-form">
           <label class="bba-manage-label" :for="accountSelectId">{{ t('buildingBankAccount.accountSelectLabel') }}</label>
           <div class="bba-assign-controls">
-            <select
-              :id="accountSelectId"
-              v-model="selectedBankAccountId"
-              class="bba-account-select"
-              :disabled="accountsLoading || assignmentLoading || createLoading"
-            >
+            <select :id="accountSelectId" v-model="selectedBankAccountId" class="bba-account-select" :disabled="accountsLoading || assignmentLoading || createLoading">
               <option v-for="account in availableCompanyAccounts" :key="account.id" :value="account.id">
                 {{ formatAccountOption(account) }}
               </option>
             </select>
-            <button
-              class="btn btn-secondary btn-sm"
-              :disabled="!canAssignSelectedAccount || assignmentLoading || createLoading"
-              @click="assignSelectedAccount"
-            >
+            <button class="btn btn-secondary btn-sm" :disabled="!canAssignSelectedAccount || assignmentLoading || createLoading" @click="assignSelectedAccount">
               {{ assignmentLoading ? t('common.loading') : t('buildingBankAccount.assignBtn') }}
             </button>
           </div>
         </div>
         <p v-else class="bba-manage-empty">{{ t('buildingBankAccount.noCompanyAccountAvailable', { currency: props.currencyCode }) }}</p>
 
-        <button
-          v-if="canCreateCompanyAccount"
-          class="btn btn-secondary btn-sm bba-create-btn"
-          :disabled="createLoading || assignmentLoading"
-          @click="createAndAssignCompanyAccount"
-        >
+        <button v-if="canCreateCompanyAccount" class="btn btn-secondary btn-sm bba-create-btn" :disabled="createLoading || assignmentLoading" @click="createAndAssignCompanyAccount">
           {{ createLoading ? t('common.loading') : t('buildingBankAccount.createBtn', { currency: props.currencyCode }) }}
         </button>
 
@@ -401,11 +377,7 @@ watch(
               :placeholder="t('buildingBankAccount.amountPlaceholder', { symbol: currencySymbol })"
               :disabled="fundLoading"
             />
-            <button
-              class="btn btn-primary btn-sm"
-              :disabled="!fundAmount || fundAmount <= 0 || fundLoading"
-              @click="fundAccount"
-            >
+            <button class="btn btn-primary btn-sm" :disabled="!fundAmount || fundAmount <= 0 || fundLoading" @click="fundAccount">
               {{ fundLoading ? t('common.loading') : t('buildingBankAccount.transferBtn') }}
             </button>
           </div>
@@ -464,8 +436,13 @@ watch(
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 .bba-alert {
