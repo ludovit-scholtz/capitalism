@@ -5,7 +5,7 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
-const { locale, building, currentTick, showRentDialog, rentSaveError, openRentDialog, closeRentDialog, saveRentPerSqm, formatCurrency, formatTickDuration } = bd
+const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent, rentSaveError, openRentDialog, closeRentDialog, saveRentPerSqm, formatCurrency, formatTickDuration } = bd
 </script>
 
 <template>

@@ -27,7 +27,7 @@ const {
   isUpgradeInProgress, cancellingPlan, cancelPlanError,
   allUnitsUnderUpgrade, lockedConfiguredProducts, lockedConfiguredProductNames,
   pendingConfiguration, remainingUpgradeTicks,
-  isEditing, selectedCell, activeUnits, getUnitAtFrom,
+  isEditing,
   formatTickDuration, formatGameTickTime,
   applyStarterLayout, applyShopStarterLayout, cancelPlan,
 } = bd
@@ -145,7 +145,7 @@ const {
       <div class="main-content">
         <BuildingUnitGrid />
         <BuildingEditingSidebar v-if="bd.selectedCell && bd.isEditing" />
-        <BuildingReadonlySidebar v-else-if="bd.selectedCell && !bd.isEditing && bd.getUnitAtFrom(bd.activeUnits, bd.selectedCell!.x, bd.selectedCell!.y)" />
+        <BuildingReadonlySidebar v-else-if="bd.selectedCell && !bd.isEditing && bd.getUnitAtFrom(bd.activeUnits.value, bd.selectedCell.value?.x ?? 0, bd.selectedCell.value?.y ?? 0)" />
         <BuildingOverviewSidebar v-else />
       </div>
     </template>

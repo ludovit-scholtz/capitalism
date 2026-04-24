@@ -155,7 +155,7 @@ const { locale, building, loading, isEditing, buildingFinancialTimeline, buildin
     </div>
     <div v-else class="unit-detail building-overview-detail">
       <p class="building-overview-name">{{ building?.name }}</p>
-      <p class="unit-desc">{{ t('buildingDetail.overview.subtitle', { type: formatBuildingType(building?.type) }) }}</p>
+      <p class="unit-desc">{{ t('buildingDetail.overview.subtitle', { type: formatBuildingType(building?.type ?? '') }) }}</p>
 
       <div class="unit-insight-card building-financial-card">
         <h5>{{ t('buildingDetail.overview.statsTitle') }}</h5>
@@ -225,8 +225,8 @@ const { locale, building, loading, isEditing, buildingFinancialTimeline, buildin
       <div class="unit-insight-card building-bank-account-card">
         <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
         <BuildingBankAccountPanel
-          :building-id="building?.id"
-          :company-id="building?.companyId"
+          :building-id="building?.id ?? ''"
+          :company-id="building?.companyId ?? ''"
           :currency-code="cityCurrencyCode"
           :loading="loading"
           @funded="loadBuilding"

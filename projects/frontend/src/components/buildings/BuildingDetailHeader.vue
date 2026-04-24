@@ -12,7 +12,7 @@ const { building, showSaleDialog, salePrice, savingSale, openSaleDialog, closeSa
 <div class="building-header">
   <div class="building-title">
     <h1>{{ building?.name }}</h1>
-    <span class="building-type-badge">{{ formatBuildingType(building?.type) }}</span>
+    <span class="building-type-badge">{{ formatBuildingType(building?.type ?? '') }}</span>
   </div>
   <div class="building-meta">
     <span class="meta-pill">
