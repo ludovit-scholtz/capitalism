@@ -574,3 +574,115 @@ test.describe('Theme contrast — BuyBuildingView (Tailwind migration regression
     await expect(page.locator('.type-card.selected').first()).toBeVisible()
   })
 })
+
+// ── ForexExchangeView dark-mode regression (build-error fix coverage) ─────────
+
+test.describe('Theme contrast — ForexExchangeView (build-fix regression)', () => {
+  /**
+   * ForexExchangeView.vue had a multi-line @input handler without semicolons
+   * that caused a vite build failure. These tests guard against CSS/dark-mode
+   * regressions in the view that was fixed.
+   */
+
+  test('forex exchange renders in dark mode with correct background token', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    // The main page heading must be visible (scoped within .forex-hero to avoid strict-mode ambiguity)
+    await expect(page.locator('.forex-hero').getByRole('heading', { name: 'Forex Exchange' })).toBeVisible()
+
+    // Dark background token must resolve to a dark colour
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[0-4]/)
+  })
+
+  test('theme toggle switches ForexExchangeView to light mode without breaking layout', async ({
+    page,
+  }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    // Click the dark→light toggle
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+
+    // The heading must still be visible after the theme switch
+    await expect(page.locator('.forex-hero').getByRole('heading', { name: 'Forex Exchange' })).toBeVisible()
+
+    // Confirm the theme attribute flipped
+    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+    expect(theme).toBe('light')
+  })
+})
+
+// ── BankManagementView dark-mode regression (build-error fix coverage) ────────
+
+test.describe('Theme contrast — BankManagementView (build-fix regression)', () => {
+  /**
+   * BankManagementView.vue had two multi-line @click handlers without semicolons
+   * that caused a vite build failure. These tests guard against CSS/dark-mode
+   * regressions in the view that was fixed.
+   */
+
+  test('bank management page renders in dark mode with correct background token', async ({
+    page,
+  }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    // The page must render without blank screen (heading or main content visible)
+    await expect(page.locator('main, .page-content, h1, h2').first()).toBeVisible()
+
+    // Dark background token must resolve to a dark colour
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[0-4]/)
+  })
+
+  test('theme toggle switches BankManagementView to light mode without breaking layout', async ({
+    page,
+  }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token: string) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    // Click the dark→light toggle
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+
+    // The page must still render after theme switch
+    await expect(page.locator('main, .page-content, h1, h2').first()).toBeVisible()
+
+    // Confirm the theme attribute flipped
+    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+    expect(theme).toBe('light')
+  })
+})
