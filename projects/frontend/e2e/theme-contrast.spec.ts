@@ -263,3 +263,110 @@ test.describe('Theme contrast — Dashboard power badges', () => {
     await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   })
 })
+
+test.describe('Theme toggle — dark/light mode switching', () => {
+  test('theme toggle button is visible in header for unauthenticated visitors', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/')
+
+    // The toggle should be in the header and accessible
+    const toggleBtn = page.getByRole('button', { name: /Switch to light mode/i })
+    await expect(toggleBtn).toBeVisible()
+  })
+
+  test('theme toggle button is visible in header for authenticated players', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await authenticateViaLocalStorage(`token-${player.id}`)(page)
+    await page.goto('/dashboard')
+
+    const toggleBtn = page.getByRole('button', { name: /Switch to light mode/i })
+    await expect(toggleBtn).toBeVisible()
+  })
+
+  test('clicking toggle switches app to light mode', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/')
+
+    // App starts in dark mode
+    const htmlThemeBefore = await page.evaluate(() =>
+      document.documentElement.getAttribute('data-theme'),
+    )
+    expect(htmlThemeBefore).toBe('dark')
+
+    // Click the toggle
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+
+    // App should now be in light mode
+    const htmlThemeAfter = await page.evaluate(() =>
+      document.documentElement.getAttribute('data-theme'),
+    )
+    expect(htmlThemeAfter).toBe('light')
+
+    // Button should now show "Switch to dark mode"
+    await expect(page.getByRole('button', { name: /Switch to dark mode/i })).toBeVisible()
+  })
+
+  test('clicking toggle twice returns to dark mode', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/')
+
+    // dark → light
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+    // light → dark
+    await page.getByRole('button', { name: /Switch to dark mode/i }).click()
+
+    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+    expect(theme).toBe('dark')
+    await expect(page.getByRole('button', { name: /Switch to light mode/i })).toBeVisible()
+  })
+
+  test('theme preference persists in localStorage after toggle', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/')
+
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+
+    const stored = await page.evaluate(() => localStorage.getItem('app_theme'))
+    expect(stored).toBe('light')
+  })
+
+  test('stored light preference is respected on page reload', async ({ page }) => {
+    setupMockApi(page)
+    // Pre-set light preference before page load
+    await page.addInitScript(() => localStorage.setItem('app_theme', 'light'))
+    await page.goto('/')
+
+    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+    expect(theme).toBe('light')
+    // Background token should be a light color (#f...)
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[c-f]/)
+  })
+
+  test('light mode text token is dark (readable on light background)', async ({ page }) => {
+    setupMockApi(page)
+    await page.addInitScript(() => localStorage.setItem('app_theme', 'light'))
+    await page.goto('/')
+
+    const textColor = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim(),
+    )
+    // Dark text on light bg: #111827 → first hex digit is 1
+    expect(textColor.toLowerCase()).toMatch(/^#[0-4]/)
+  })
+
+  test('dark mode is the default when no localStorage preference exists', async ({ page }) => {
+    setupMockApi(page)
+    // Explicitly clear any stored preference to simulate a new visitor
+    await page.addInitScript(() => localStorage.removeItem('app_theme'))
+    await page.goto('/')
+
+    const theme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'))
+    expect(theme).toBe('dark')
+  })
+})
