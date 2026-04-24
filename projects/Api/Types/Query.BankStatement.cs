@@ -23,6 +23,7 @@ public sealed partial class Query
     public async Task<BankStatementResult> GetBankStatement(
         Guid companyId,
         int? limit,
+        int? offset,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -35,6 +36,7 @@ public sealed partial class Query
             ?? throw new GraphQLException(new Error("Company not found or you do not own it.", "COMPANY_NOT_FOUND"));
 
         var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
+    var pageOffset = Math.Max(offset ?? 0, 0);
 
         // Load all entries to compute an accurate running balance (newest-first for display).
         var allEntries = await db.LedgerEntries
@@ -58,6 +60,7 @@ public sealed partial class Query
         var pagedEntries = allEntries
             .OrderByDescending(e => e.RecordedAtTick)
             .ThenByDescending(e => e.RecordedAtUtc)
+            .Skip(pageOffset)
             .Take(pageSize)
             .ToList();
 

@@ -115,16 +115,14 @@ const MY_LOANS_QUERY = `
 
 const MY_COMPANIES_QUERY = `
   {
-    me {
-      companies {
+    myCompanies {
+      id
+      name
+      cash
+      buildings {
         id
+        type
         name
-        cash
-        buildings {
-          id
-          type
-          name
-        }
       }
     }
   }
@@ -228,14 +226,14 @@ async function loadData(isRefresh = false) {
     if (auth.isAuthenticated) {
       const [loansResult, companiesResult, depositsResult] = await Promise.all([
         gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY),
-        gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY),
+        gqlRequest<{ myCompanies: Company[] }>(MY_COMPANIES_QUERY),
         gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY),
       ])
       const newLoans = loansResult.myLoans ?? []
       if (!deepEqual(myLoans.value, newLoans)) {
         myLoans.value = newLoans
       }
-      myCompanies.value = companiesResult.me?.companies ?? []
+      myCompanies.value = companiesResult.myCompanies ?? []
       const newDeposits = depositsResult.myDeposits ?? []
       if (!deepEqual(myDeposits.value, newDeposits)) {
         myDeposits.value = newDeposits

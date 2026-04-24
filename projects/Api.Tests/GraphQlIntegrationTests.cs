@@ -26419,6 +26419,67 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task InitializeAsync_SeedsGovernmentBanksForEveryCity_AndAllBanksListsThem()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var cities = await db.Cities
+            .AsNoTracking()
+            .OrderBy(city => city.Name)
+            .ToListAsync();
+
+        var governmentBanks = await db.Buildings
+            .AsNoTracking()
+            .Where(building => building.Type == Api.Data.Entities.BuildingType.Bank && building.IsGovernmentOwned)
+            .OrderBy(building => building.Name)
+            .ToListAsync();
+
+        Assert.Equal(cities.Count, governmentBanks.Count);
+
+        foreach (var city in cities)
+        {
+            var seededBank = governmentBanks.SingleOrDefault(bank => bank.CityId == city.Id);
+            Assert.NotNull(seededBank);
+            Assert.Equal(0m, seededBank!.DepositInterestRatePercent);
+            Assert.Equal(20m, seededBank.LendingInterestRatePercent);
+            Assert.True(seededBank.BaseCapitalDeposited);
+            Assert.True(seededBank.TotalDeposits > 0m);
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query {
+              allBanks {
+                bankBuildingName
+                cityName
+                lenderCompanyName
+                depositInterestRatePercent
+                lendingInterestRatePercent
+                baseCapitalDeposited
+              }
+            }
+            """);
+
+        var listedBanks = result.GetProperty("data").GetProperty("allBanks").EnumerateArray().ToList();
+        Assert.True(listedBanks.Count >= cities.Count, "Expected seeded government banks to be visible through allBanks.");
+
+        foreach (var city in cities)
+        {
+            var listedBank = listedBanks.SingleOrDefault(bank => bank.GetProperty("cityName").GetString() == city.Name
+                && bank.GetProperty("lenderCompanyName").GetString() == "Government");
+            Assert.True(listedBank.ValueKind != JsonValueKind.Undefined, $"Expected a seeded government bank for {city.Name}.");
+            Assert.Equal(0m, listedBank.GetProperty("depositInterestRatePercent").GetDecimal());
+            Assert.Equal(20m, listedBank.GetProperty("lendingInterestRatePercent").GetDecimal());
+            Assert.True(listedBank.GetProperty("baseCapitalDeposited").GetBoolean());
+        }
+    }
+
+    [Fact]
     public async Task OpenBankAccount_Unauthenticated_ReturnsError()
     {
         // Unauthenticated requests to openBankAccount must be rejected.
@@ -31024,8 +31085,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     // ── Bank Statement Review ─────────────────────────────────────────────────
 
     private const string BankStatementQuery = """
-        query BankStatement($companyId: UUID!, $limit: Int) {
-          bankStatement(companyId: $companyId, limit: $limit) {
+                query BankStatement($companyId: UUID!, $limit: Int, $offset: Int) {
+                    bankStatement(companyId: $companyId, limit: $limit, offset: $offset) {
             companyId
             companyName
             currencyCode
@@ -31070,7 +31131,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
-            new { companyId = company.Id, limit = (int?)50 }, token);
+            new { companyId = company.Id, limit = (int?)50, offset = (int?)null }, token);
 
         var stmt = result.GetProperty("data").GetProperty("bankStatement");
         Assert.Equal(company.Id.ToString(), stmt.GetProperty("companyId").GetString());
@@ -31140,7 +31201,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
-            new { companyId = company.Id, limit = (int?)50 }, token);
+            new { companyId = company.Id, limit = (int?)50, offset = (int?)null }, token);
 
         var stmt = result.GetProperty("data").GetProperty("bankStatement");
 
@@ -31169,7 +31230,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var client = isolated.CreateClient();
 
         var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
-            new { companyId = Guid.NewGuid(), limit = (int?)50 });
+            new { companyId = Guid.NewGuid(), limit = (int?)50, offset = (int?)null });
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Expected an error for unauthenticated bankStatement query.");
@@ -31184,7 +31245,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         // Use a random Guid — no such company exists for this player
         var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
-            new { companyId = Guid.NewGuid(), limit = (int?)50 }, token);
+            new { companyId = Guid.NewGuid(), limit = (int?)50, offset = (int?)null }, token);
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0, "Expected COMPANY_NOT_FOUND error.");
@@ -31233,7 +31294,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         // Request only 3
         var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
-            new { companyId = company.Id, limit = 3 }, token);
+            new { companyId = company.Id, limit = 3, offset = (int?)null }, token);
 
         var stmt = result.GetProperty("data").GetProperty("bankStatement");
         Assert.Equal(10, stmt.GetProperty("totalEntries").GetInt32()); // total count unaffected
@@ -31288,7 +31349,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
-            new { companyId = company.Id, limit = (int?)50 }, token);
+            new { companyId = company.Id, limit = (int?)50, offset = (int?)null }, token);
 
         var rows = result.GetProperty("data").GetProperty("bankStatement").GetProperty("rows");
         Assert.Equal(2, rows.GetArrayLength());
@@ -31299,6 +31360,54 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         Assert.Equal("REVENUE", rows[1].GetProperty("category").GetString());
         Assert.Equal(500m, rows[1].GetProperty("amount").GetDecimal());
+    }
+
+    [Fact]
+    public async Task BankStatement_OffsetIsRespected_ReturnsNextPageRows()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-offset@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Offset Test Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        for (var i = 0; i < 6; i++)
+        {
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Revenue,
+                Description = $"Sale #{i + 1}",
+                Amount = 100m,
+                RecordedAtTick = i + 1,
+                RecordedAtUtc = DateTime.UtcNow.AddMinutes(-6 + i),
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(client, BankStatementQuery,
+            new { companyId = company.Id, limit = 2, offset = 2 }, token);
+
+        var rows = result.GetProperty("data").GetProperty("bankStatement").GetProperty("rows");
+        Assert.Equal(2, rows.GetArrayLength());
+        Assert.Equal(4, rows[0].GetProperty("recordedAtTick").GetInt64());
+        Assert.Equal(3, rows[1].GetProperty("recordedAtTick").GetInt64());
     }
 
     // Helper: gets current player ID using an isolated factory and token

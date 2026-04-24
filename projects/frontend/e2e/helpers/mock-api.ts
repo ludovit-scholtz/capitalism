@@ -5294,15 +5294,16 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('bankStatement') && !query.includes('executeForexSwap')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
-      const vars = body.variables as { companyId?: string; limit?: number } | undefined
+      const vars = body.variables as { companyId?: string; limit?: number; offset?: number } | undefined
       const companyId = vars?.companyId ?? ''
       const limit = vars?.limit ?? 50
+      const offset = vars?.offset ?? 0
       const player = state.players.find((p) => p.id === state.currentUserId)
       if (!player) return routeJsonError('Player not found', 'PLAYER_NOT_FOUND')
       const company = player.companies.find((c) => c.id === companyId)
       if (!company) return routeJsonError('Company not found or you do not own it.', 'COMPANY_NOT_FOUND')
       const allRows = state.bankStatementRows[companyId] ?? []
-      const rows = allRows.slice(0, limit)
+      const rows = allRows.slice(offset, offset + limit)
       const currentBalance = allRows.reduce((sum, r) => sum + r.amount, 0)
       return route.fulfill({
         status: 200,

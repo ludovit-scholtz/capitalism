@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test'
 import { setupMockApi, makePlayer } from './helpers/mock-api'
 
 const COMPANY_ID = 'company-test-1'
+const COMPANY_ID_2 = 'company-test-2'
+const ACCOUNT_ID = 'account-test-1'
+const ACCOUNT_ID_2 = 'account-test-2'
 
 function makePlayerWithCompany() {
   const player = makePlayer()
@@ -21,6 +24,43 @@ function makePlayerWithCompany() {
   return player
 }
 
+function seedBankAccounts(state: ReturnType<typeof setupMockApi>, playerId: string) {
+  state.myBankAccounts = [
+    {
+      id: ACCOUNT_ID,
+      accountNumber: '1111222233334444',
+      currencyCode: 'EUR',
+      currencySymbol: '€',
+      balance: 100000,
+      companyId: COMPANY_ID,
+      companyName: 'Test Trading Co.',
+    },
+    {
+      id: ACCOUNT_ID_2,
+      accountNumber: '5555666677778888',
+      currencyCode: 'CZK',
+      currencySymbol: 'Kč',
+      balance: 250000,
+      companyId: COMPANY_ID_2,
+      companyName: 'Prague Imports',
+    },
+  ]
+
+  const companyTwo = {
+    id: COMPANY_ID_2,
+    playerId,
+    name: 'Prague Imports',
+    cash: 150000,
+    foundedAtUtc: '2026-01-02T00:00:00Z',
+    foundedAtTick: 2,
+    buildings: [],
+  }
+
+  if (!state.players[0]?.companies.find((company) => company.id === COMPANY_ID_2)) {
+    state.players[0]?.companies.push(companyTwo)
+  }
+}
+
 // ── Bank Statement Review page ────────────────────────────────────────────────
 
 test.describe('Bank Statement Review', () => {
@@ -36,6 +76,7 @@ test.describe('Bank Statement Review', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
     state.bankStatementRows[COMPANY_ID] = []
 
     await page.addInitScript((token) => {
@@ -47,6 +88,7 @@ test.describe('Bank Statement Review', () => {
 
     await expect(page.getByRole('heading', { name: 'Bank Statement Review' })).toBeVisible()
     await expect(page.getByText('Review all financial transactions')).toBeVisible()
+    await expect(page.locator('#account-select')).toHaveValue(ACCOUNT_ID)
   })
 
   test('shows empty state when no transactions', async ({ page }) => {
@@ -54,6 +96,7 @@ test.describe('Bank Statement Review', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
     state.bankStatementRows[COMPANY_ID] = []
 
     await page.addInitScript((token) => {
@@ -71,6 +114,7 @@ test.describe('Bank Statement Review', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
 
     const now = new Date().toISOString()
     state.bankStatementRows[COMPANY_ID] = [
@@ -103,7 +147,7 @@ test.describe('Bank Statement Review', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
 
-    await page.goto(`/bank-statement/${COMPANY_ID}`)
+    await page.goto(`/bank-statement/${ACCOUNT_ID}`)
 
     // Check table is visible
     const table = page.locator('.statement-table')
@@ -128,6 +172,7 @@ test.describe('Bank Statement Review', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
 
     state.bankStatementRows[COMPANY_ID] = [
       {
@@ -148,11 +193,12 @@ test.describe('Bank Statement Review', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
 
-    await page.goto(`/bank-statement/${COMPANY_ID}`)
+    await page.goto(`/bank-statement/${ACCOUNT_ID}`)
 
     const summary = page.locator('[aria-label="Account summary"]')
     await expect(summary).toBeVisible()
     await expect(summary.getByText('Test Trading Co.')).toBeVisible()
+    await expect(summary.getByText('Account number: 1111222233334444')).toBeVisible()
     await expect(summary.locator('.balance-amount')).toContainText('100,000')
   })
 
@@ -161,6 +207,7 @@ test.describe('Bank Statement Review', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
 
     state.bankStatementRows[COMPANY_ID] = [
       {
@@ -181,9 +228,93 @@ test.describe('Bank Statement Review', () => {
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
     }, `token-${player.id}`)
 
-    await page.goto(`/bank-statement/${COMPANY_ID}`)
+    await page.goto(`/bank-statement/${ACCOUNT_ID}`)
 
     await expect(page.locator('.description-sub').filter({ hasText: 'Central Factory' })).toBeVisible()
+  })
+
+  test('lists all bank accounts and switches between them', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-1',
+        recordedAtTick: 12,
+        recordedAtUtc: new Date().toISOString(),
+        description: 'Factory income',
+        category: 'REVENUE',
+        amount: 3000,
+        runningBalance: 3000,
+        buildingId: null,
+        buildingName: null,
+      },
+    ]
+    state.bankStatementRows[COMPANY_ID_2] = [
+      {
+        id: 'row-2',
+        recordedAtTick: 18,
+        recordedAtUtc: new Date().toISOString(),
+        description: 'Prague export sale',
+        category: 'REVENUE',
+        amount: 9000,
+        runningBalance: 9000,
+        buildingId: null,
+        buildingName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${COMPANY_ID}`)
+
+    const selector = page.locator('#account-select')
+    await expect(selector).toHaveValue(ACCOUNT_ID)
+    await selector.selectOption(ACCOUNT_ID_2)
+    await expect(page).toHaveURL(/\/bank-statement\/account-test-2/)
+    await expect(page.locator('[aria-label="Account summary"]')).toContainText('Prague Imports')
+    await expect(page.locator('[aria-label="Account summary"]')).toContainText('5555666677778888')
+    await expect(page.locator('.statement-row').first()).toContainText('Prague export sale')
+  })
+
+  test('paginates bank statement rows', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
+    state.bankStatementRows[COMPANY_ID] = Array.from({ length: 60 }, (_, index) => ({
+      id: `row-${index + 1}`,
+      recordedAtTick: 60 - index,
+      recordedAtUtc: new Date(Date.now() - index * 60000).toISOString(),
+      description: `Statement row ${index + 1}`,
+      category: 'REVENUE',
+      amount: 100,
+      runningBalance: (60 - index) * 100,
+      buildingId: null,
+      buildingName: null,
+    }))
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${ACCOUNT_ID}`)
+
+    await expect(page.locator('.statement-row')).toHaveCount(50)
+    await expect(page.getByText('Page 1 of 2')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Next' }).click()
+
+    await expect(page.locator('.statement-row')).toHaveCount(10)
+    await expect(page.getByText('Page 2 of 2')).toBeVisible()
+    await expect(page.locator('.statement-row').first()).toContainText('Statement row 51')
   })
 })
 

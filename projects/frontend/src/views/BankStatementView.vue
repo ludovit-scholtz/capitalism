@@ -5,13 +5,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { formatMoney } from '@/lib/currencyFormat'
+import type { PlayerBankAccountSummary } from '@/types'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 
-const companyId = computed(() => route.params.companyId as string)
+const routeAccountOrCompanyId = computed(() => route.params.companyId as string)
 
 interface BankStatementRow {
   id: string
@@ -35,21 +36,20 @@ interface BankStatementResult {
   rows: BankStatementRow[]
 }
 
-interface Company {
-  id: string
-  name: string
-  cash: number
-}
-
 const loading = ref(true)
 const error = ref<string | null>(null)
 const statement = ref<BankStatementResult | null>(null)
-const companies = ref<Company[]>([])
-const limit = ref(50)
+const accounts = ref<PlayerBankAccountSummary[]>([])
+const pageSize = ref(50)
+const page = ref(1)
+
+const selectedAccount = computed<PlayerBankAccountSummary | null>(
+  () => accounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null,
+)
 
 const BANK_STATEMENT_QUERY = `
-  query BankStatement($companyId: UUID!, $limit: Int) {
-    bankStatement(companyId: $companyId, limit: $limit) {
+  query BankStatement($companyId: UUID!, $limit: Int, $offset: Int) {
+    bankStatement(companyId: $companyId, limit: $limit, offset: $offset) {
       companyId
       companyName
       currencyCode
@@ -71,14 +71,32 @@ const BANK_STATEMENT_QUERY = `
   }
 `
 
+const MY_BANK_ACCOUNTS_QUERY = `
+  {
+    myBankAccounts {
+      id
+      accountNumber
+      currencyCode
+      currencySymbol
+      balance
+      companyId
+      companyName
+    }
+  }
+`
+
 async function loadStatement() {
-  if (!companyId.value) return
+  if (!selectedAccount.value) return
   loading.value = true
   error.value = null
   try {
     const result = await gqlRequest<{ bankStatement: BankStatementResult }>(
       BANK_STATEMENT_QUERY,
-      { companyId: companyId.value, limit: limit.value },
+      {
+        companyId: selectedAccount.value.companyId,
+        limit: pageSize.value,
+        offset: (page.value - 1) * pageSize.value,
+      },
     )
     statement.value = result.bankStatement
   } catch (e: unknown) {
@@ -86,6 +104,36 @@ async function loadStatement() {
   } finally {
     loading.value = false
   }
+}
+
+async function loadAccounts() {
+  const result = await gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(MY_BANK_ACCOUNTS_QUERY)
+  accounts.value = result.myBankAccounts ?? []
+}
+
+async function syncRouteToAccount() {
+  if (accounts.value.length === 0) {
+    statement.value = null
+    loading.value = false
+    return false
+  }
+
+  const routeId = routeAccountOrCompanyId.value
+  const matchingAccount = accounts.value.find((account) => account.id === routeId)
+  if (matchingAccount) {
+    return true
+  }
+
+  const firstAccountForCompany = accounts.value.find((account) => account.companyId === routeId)
+  const fallbackAccount = firstAccountForCompany ?? accounts.value[0] ?? null
+  if (!fallbackAccount) {
+    statement.value = null
+    loading.value = false
+    return false
+  }
+
+  await router.replace(`/bank-statement/${fallbackAccount.id}`)
+  return false
 }
 
 onMounted(async () => {
@@ -96,20 +144,33 @@ onMounted(async () => {
   if (!auth.player) {
     await auth.fetchMe()
   }
-  companies.value = (auth.player?.companies ?? []) as Company[]
-  if (!companyId.value && companies.value.length > 0) {
-    const firstCompany = companies.value[0]
-    if (firstCompany) router.replace(`/bank-statement/${firstCompany.id}`)
+
+  await loadAccounts()
+  if (!(await syncRouteToAccount())) {
     return
   }
+
   await loadStatement()
 })
 
-watch(companyId, (id) => {
-  if (id) loadStatement()
+watch(routeAccountOrCompanyId, async (id, previousId) => {
+  if (!id || id === previousId) return
+  page.value = 1
+  if (selectedAccount.value) {
+    await loadStatement()
+  }
 })
 
-watch(limit, () => loadStatement())
+watch(pageSize, async (value, previousValue) => {
+  if (value === previousValue) return
+  page.value = 1
+  await loadStatement()
+})
+
+watch(page, async (value, previousValue) => {
+  if (value === previousValue) return
+  await loadStatement()
+})
 
 function formatAmount(val: number): string {
   return new Intl.NumberFormat(locale.value, {
@@ -173,7 +234,32 @@ function categoryIcon(cat: string): string {
 }
 
 const totalShown = computed(() => statement.value?.rows.length ?? 0)
-const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown.value)
+const totalPages = computed(() => Math.max(1, Math.ceil((statement.value?.totalEntries ?? 0) / pageSize.value)))
+const hasPreviousPage = computed(() => page.value > 1)
+const hasNextPage = computed(() => page.value < totalPages.value)
+const selectedAccountBalance = computed(() => selectedAccount.value?.balance ?? 0)
+
+function goToAccount(accountId: string) {
+  router.push(`/bank-statement/${accountId}`)
+}
+
+function onAccountChange(event: Event) {
+  const accountId = (event.target as HTMLSelectElement | null)?.value
+  if (!accountId) return
+  goToAccount(accountId)
+}
+
+function goToPreviousPage() {
+  if (hasPreviousPage.value) {
+    page.value -= 1
+  }
+}
+
+function goToNextPage() {
+  if (hasNextPage.value) {
+    page.value += 1
+  }
+}
 </script>
 
 <template>
@@ -184,18 +270,20 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
       <p class="text-muted text-base">{{ t('bankStatement.subtitle') }}</p>
     </div>
 
-    <!-- Company selector -->
-    <div v-if="companies.length > 1" class="flex items-center gap-3 mb-4">
-      <label for="company-select" class="text-sm font-semibold text-muted whitespace-nowrap">
-        {{ t('bankStatement.selectCompany') }}
+    <!-- Account selector -->
+    <div v-if="accounts.length > 0" class="flex flex-col gap-3 mb-4 lg:flex-row lg:items-center">
+      <label for="account-select" class="text-sm font-semibold text-muted whitespace-nowrap">
+        {{ t('bankStatement.selectAccount') }}
       </label>
       <select
-        id="company-select"
-        :value="companyId"
+        id="account-select"
+        :value="selectedAccount?.id ?? ''"
         class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
-        @change="(e) => router.push(`/bank-statement/${(e.target as HTMLSelectElement).value}`)"
+        @change="onAccountChange"
       >
-        <option v-for="c in companies" :key="c.id" :value="c.id">{{ c.name }}</option>
+        <option v-for="account in accounts" :key="account.id" :value="account.id">
+          {{ account.companyName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ account.currencySymbol }}{{ formatAmount(account.balance) }}
+        </option>
       </select>
     </div>
 
@@ -206,7 +294,7 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
       </label>
       <select
         id="limit-select"
-        v-model.number="limit"
+        v-model.number="pageSize"
         class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
       >
         <option :value="20">20</option>
@@ -223,6 +311,9 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
     <div v-else-if="error" class="state-message text-center py-12 text-bad" role="alert">
       {{ error }}
     </div>
+    <div v-else-if="accounts.length === 0" class="state-message text-center py-12 text-muted" role="status">
+      {{ t('bankStatement.noOwnedAccounts') }}
+    </div>
 
     <template v-else-if="statement">
       <!-- Account summary card -->
@@ -232,7 +323,12 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
       >
         <div class="flex items-center gap-2">
           <span class="text-2xl">🏢</span>
-          <span class="text-lg font-bold text-body">{{ statement.companyName }}</span>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-lg font-bold text-body">{{ selectedAccount?.companyName ?? statement.companyName }}</span>
+            <span v-if="selectedAccount" class="text-xs text-muted">
+              {{ t('bankStatement.accountNumber') }}: {{ selectedAccount.accountNumber }}
+            </span>
+          </div>
         </div>
         <div class="flex flex-col gap-0 ml-auto sm:ml-auto">
           <span class="text-xs font-semibold text-muted uppercase tracking-wide">
@@ -240,14 +336,14 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
           </span>
           <span
             class="balance-amount text-2xl font-extrabold"
-            :class="statement.currentBalance >= 0 ? 'text-good' : 'text-bad'"
+            :class="selectedAccountBalance >= 0 ? 'text-good' : 'text-bad'"
           >
-            {{ formatBalance(statement.currentBalance, statement.currencyCode) }}
+            {{ formatBalance(selectedAccountBalance, selectedAccount?.currencyCode ?? statement.currencyCode) }}
           </span>
         </div>
         <div class="flex gap-4 text-xs text-muted">
           <span>{{ t('bankStatement.totalEntries') }}: {{ statement.totalEntries }}</span>
-          <span>{{ t('bankStatement.currency') }}: {{ statement.currencyCode }}</span>
+          <span>{{ t('bankStatement.currency') }}: {{ selectedAccount?.currencyCode ?? statement.currencyCode }}</span>
         </div>
       </div>
 
@@ -331,14 +427,25 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
         </table>
       </div>
 
-      <div v-if="hasMore" class="flex items-center gap-2 mt-4 text-sm text-muted">
-        {{ t('bankStatement.showingFirst', { count: totalShown, total: statement.totalEntries }) }}
-        <button
-          class="bg-transparent border-0 text-brand text-sm cursor-pointer underline font-semibold hover:opacity-80"
-          @click="limit = 200"
-        >
-          {{ t('bankStatement.showAll') }}
-        </button>
+      <div class="flex flex-col gap-3 mt-4 sm:flex-row sm:items-center sm:justify-between text-sm text-muted">
+        <span>{{ t('bankStatement.showingFirst', { count: totalShown, total: statement.totalEntries }) }}</span>
+        <div class="flex items-center gap-3">
+          <span>{{ t('bankStatement.pageSummary', { page, total: totalPages }) }}</span>
+          <button
+            class="pagination-btn"
+            :disabled="!hasPreviousPage"
+            @click="goToPreviousPage"
+          >
+            {{ t('bankStatement.previousPage') }}
+          </button>
+          <button
+            class="pagination-btn"
+            :disabled="!hasNextPage"
+            @click="goToNextPage"
+          >
+            {{ t('bankStatement.nextPage') }}
+          </button>
+        </div>
       </div>
     </template>
   </main>
@@ -370,5 +477,20 @@ const hasMore = computed(() => (statement.value?.totalEntries ?? 0) > totalShown
 }
 .statement-row:hover td {
   background: var(--color-surface-raised);
+}
+
+.pagination-btn {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.8rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

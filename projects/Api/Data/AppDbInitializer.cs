@@ -1,6 +1,7 @@
 using Api.Configuration;
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Types;
 using Api.Utilities;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -152,6 +153,10 @@ public sealed partial class AppDbInitializer(
         // Seed government-owned baseline media houses in every city (idempotent).
         await SeedGovernmentMediaHousesAsync();
 
+        // Seed one government bank building in every city so each local market has
+        // an immediately visible default bank on the public banking page.
+        await EnsureGovernmentBankBuildingsAsync();
+
         // Ensure one government bank account exists for each unique city currency (idempotent).
         await EnsureGovernmentBankAccountsAsync();
 
@@ -168,46 +173,14 @@ public sealed partial class AppDbInitializer(
 
     /// <summary>
     /// Seeds one government-owned media house of each type (NEWSPAPER, RADIO, TV) in every city.
-    /// Idempotent: checks for the sentinel government player before inserting.
+    /// Idempotent: ensures the government actor exists, then inserts only missing outlets.
     /// Government outlets provide a baseline media market from day one so players always have
     /// something to route their marketing budgets through.
     /// </summary>
     private async Task SeedGovernmentMediaHousesAsync()
     {
-        const string GovEmail = "government@capitalism.game";
-
-        // Idempotency guard: if the government player already exists we assume all
-        // dependent rows (company + media houses) have already been seeded.
-        if (await dbContext.Players.AnyAsync(p => p.Email == GovEmail))
-        {
-            return;
-        }
-
-        var hasher = new PasswordHasher<Player>();
-        var govPlayerId = CreateDeterministicGuid("player:government");
-        var govPlayer = new Player
-        {
-            Id = govPlayerId,
-            Email = GovEmail,
-            DisplayName = "Government",
-            Role = PlayerRole.Player,
-            ActiveAccountType = AccountContextType.Person,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        govPlayer.PasswordHash = hasher.HashPassword(govPlayer, Guid.NewGuid().ToString());
-        dbContext.Players.Add(govPlayer);
-        await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, govPlayer, 0m);
-
-        var govCompanyId = CreateDeterministicGuid("company:government");
-        var govCompany = new Company
-        {
-            Id = govCompanyId,
-            PlayerId = govPlayerId,
-            Name = "Government",
-            Cash = 0m,
-            FoundedAtUtc = DateTime.UtcNow,
-        };
-        dbContext.Companies.Add(govCompany);
+        var (_, govCompany) = await EnsureGovernmentActorAsync();
+        var govCompanyId = govCompany.Id;
 
         var cities = await dbContext.Cities.ToListAsync();
 
@@ -218,61 +191,183 @@ public sealed partial class AppDbInitializer(
         foreach (var city in cities)
         {
             // NEWSPAPER
-            dbContext.Buildings.Add(new Building
+            var newspaperId = CreateDeterministicGuid($"gov-media:{city.Id}:newspaper");
+            if (!await dbContext.Buildings.AnyAsync(b => b.Id == newspaperId))
             {
-                Id = CreateDeterministicGuid($"gov-media:{city.Id}:newspaper"),
-                CompanyId = govCompanyId,
-                CityId = city.Id,
-                Type = BuildingType.MediaHouse,
-                Name = $"{city.Name} Gazette",
-                Latitude = city.Latitude,
-                Longitude = city.Longitude,
-                Level = 1,
-                MediaType = Entities.MediaType.Newspaper,
-                ContentValue = InitialContentValue,
-                IsGovernmentOwned = true,
-                PowerStatus = Entities.PowerStatus.Powered,
-                BuiltAtUtc = DateTime.UtcNow
-            });
+                dbContext.Buildings.Add(new Building
+                {
+                    Id = newspaperId,
+                    CompanyId = govCompanyId,
+                    CityId = city.Id,
+                    Type = BuildingType.MediaHouse,
+                    Name = $"{city.Name} Gazette",
+                    Latitude = city.Latitude,
+                    Longitude = city.Longitude,
+                    Level = 1,
+                    MediaType = Entities.MediaType.Newspaper,
+                    ContentValue = InitialContentValue,
+                    IsGovernmentOwned = true,
+                    PowerStatus = Entities.PowerStatus.Powered,
+                    BuiltAtUtc = DateTime.UtcNow
+                });
+            }
 
             // RADIO
-            dbContext.Buildings.Add(new Building
+            var radioId = CreateDeterministicGuid($"gov-media:{city.Id}:radio");
+            if (!await dbContext.Buildings.AnyAsync(b => b.Id == radioId))
             {
-                Id = CreateDeterministicGuid($"gov-media:{city.Id}:radio"),
-                CompanyId = govCompanyId,
-                CityId = city.Id,
-                Type = BuildingType.MediaHouse,
-                Name = $"{city.Name} Radio",
-                Latitude = city.Latitude,
-                Longitude = city.Longitude,
-                Level = 1,
-                MediaType = Entities.MediaType.Radio,
-                ContentValue = InitialContentValue,
-                IsGovernmentOwned = true,
-                PowerStatus = Entities.PowerStatus.Powered,
-                BuiltAtUtc = DateTime.UtcNow
-            });
+                dbContext.Buildings.Add(new Building
+                {
+                    Id = radioId,
+                    CompanyId = govCompanyId,
+                    CityId = city.Id,
+                    Type = BuildingType.MediaHouse,
+                    Name = $"{city.Name} Radio",
+                    Latitude = city.Latitude,
+                    Longitude = city.Longitude,
+                    Level = 1,
+                    MediaType = Entities.MediaType.Radio,
+                    ContentValue = InitialContentValue,
+                    IsGovernmentOwned = true,
+                    PowerStatus = Entities.PowerStatus.Powered,
+                    BuiltAtUtc = DateTime.UtcNow
+                });
+            }
 
             // TV
-            dbContext.Buildings.Add(new Building
+            var tvId = CreateDeterministicGuid($"gov-media:{city.Id}:tv");
+            if (!await dbContext.Buildings.AnyAsync(b => b.Id == tvId))
             {
-                Id = CreateDeterministicGuid($"gov-media:{city.Id}:tv"),
-                CompanyId = govCompanyId,
-                CityId = city.Id,
-                Type = BuildingType.MediaHouse,
-                Name = $"{city.Name} TV",
-                Latitude = city.Latitude,
-                Longitude = city.Longitude,
-                Level = 1,
-                MediaType = Entities.MediaType.Tv,
-                ContentValue = InitialContentValue,
-                IsGovernmentOwned = true,
-                PowerStatus = Entities.PowerStatus.Powered,
-                BuiltAtUtc = DateTime.UtcNow
-            });
+                dbContext.Buildings.Add(new Building
+                {
+                    Id = tvId,
+                    CompanyId = govCompanyId,
+                    CityId = city.Id,
+                    Type = BuildingType.MediaHouse,
+                    Name = $"{city.Name} TV",
+                    Latitude = city.Latitude,
+                    Longitude = city.Longitude,
+                    Level = 1,
+                    MediaType = Entities.MediaType.Tv,
+                    ContentValue = InitialContentValue,
+                    IsGovernmentOwned = true,
+                    PowerStatus = Entities.PowerStatus.Powered,
+                    BuiltAtUtc = DateTime.UtcNow
+                });
+            }
         }
 
         await dbContext.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Seeds one government-owned bank building in every city with baseline public rates.
+    /// These banks are immediately visible on the public banking page after restart.
+    /// </summary>
+    private async Task EnsureGovernmentBankBuildingsAsync()
+    {
+        var (_, govCompany) = await EnsureGovernmentActorAsync();
+        var currentTick = await dbContext.GameStates
+            .AsNoTracking()
+            .Select(state => state.CurrentTick)
+            .FirstOrDefaultAsync();
+        var cities = await dbContext.Cities.AsNoTracking().ToListAsync();
+
+        foreach (var city in cities)
+        {
+            var bankId = CreateDeterministicGuid($"gov-bank-building:{city.Id}");
+            var baseCapitalRequirement = Mutation.GetBaseCapitalRequirement(city.CurrencyCode ?? "EUR");
+
+            if (!await dbContext.Buildings.AnyAsync(b => b.Id == bankId))
+            {
+                dbContext.Buildings.Add(new Building
+                {
+                    Id = bankId,
+                    CompanyId = govCompany.Id,
+                    CityId = city.Id,
+                    Type = BuildingType.Bank,
+                    Name = $"{city.Name} Government Bank",
+                    Latitude = city.Latitude,
+                    Longitude = city.Longitude,
+                    Level = 1,
+                    DepositInterestRatePercent = 0m,
+                    LendingInterestRatePercent = 20m,
+                    TotalDeposits = baseCapitalRequirement,
+                    BaseCapitalDeposited = true,
+                    IsGovernmentOwned = true,
+                    PowerStatus = Entities.PowerStatus.Powered,
+                    BuiltAtUtc = DateTime.UtcNow,
+                });
+
+                govCompany.Cash += baseCapitalRequirement;
+            }
+
+            var baseDepositId = CreateDeterministicGuid($"gov-bank-base-deposit:{city.Id}");
+            if (!await dbContext.BankAccounts.AnyAsync(a => a.Id == baseDepositId))
+            {
+                dbContext.BankAccounts.Add(new BankAccount
+                {
+                    Id = baseDepositId,
+                    AccountNumber = GenerateDeterministicAccountNumber($"gov-bank-base-deposit:{city.Id}"),
+                    CurrencyCode = city.CurrencyCode ?? "EUR",
+                    CompanyId = govCompany.Id,
+                    BankBuildingId = bankId,
+                    Balance = baseCapitalRequirement,
+                    DepositInterestRatePercent = 0m,
+                    IsBaseCapitalDeposit = true,
+                    DepositedAtTick = currentTick,
+                    CreatedAtUtc = DateTime.UtcNow,
+                    TotalInterestPaid = 0m,
+                    IsGovernmentAccount = false,
+                });
+            }
+        }
+
+        await dbContext.SaveChangesAsync();
+    }
+
+    private async Task<(Player Player, Company Company)> EnsureGovernmentActorAsync()
+    {
+        const string GovEmail = "government@capitalism.game";
+        const string GovDisplayName = "Government";
+
+        var govPlayer = await dbContext.Players
+            .FirstOrDefaultAsync(player => player.Email == GovEmail);
+
+        if (govPlayer is null)
+        {
+            var hasher = new PasswordHasher<Player>();
+            govPlayer = new Player
+            {
+                Id = CreateDeterministicGuid("player:government"),
+                Email = GovEmail,
+                DisplayName = GovDisplayName,
+                Role = PlayerRole.Player,
+                ActiveAccountType = AccountContextType.Person,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            govPlayer.PasswordHash = hasher.HashPassword(govPlayer, Guid.NewGuid().ToString());
+            dbContext.Players.Add(govPlayer);
+            await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, govPlayer, 0m);
+        }
+
+        var govCompany = await dbContext.Companies
+            .FirstOrDefaultAsync(company => company.PlayerId == govPlayer.Id && company.Name == GovDisplayName);
+
+        if (govCompany is null)
+        {
+            govCompany = new Company
+            {
+                Id = CreateDeterministicGuid("company:government"),
+                PlayerId = govPlayer.Id,
+                Name = GovDisplayName,
+                Cash = 0m,
+                FoundedAtUtc = DateTime.UtcNow,
+            };
+            dbContext.Companies.Add(govCompany);
+        }
+
+        return (govPlayer, govCompany);
     }
 
     /// <summary>
