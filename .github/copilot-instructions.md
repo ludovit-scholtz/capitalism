@@ -1075,6 +1075,20 @@ Root-cause of CI failures (April 2026, PR #128 Tailwind migration):
 4. **After migrating any view to Tailwind, run the full targeted E2E spec** (`CI=true npx playwright test --project=chromium e2e/<spec>.ts`) before `report_progress`. Running only the build check (`npm run build`) is insufficient — Tailwind builds fine even when hook classes are missing.
 5. **When adding theme toggle functionality, always add E2E tests that verify:** toggle is visible, clicking toggles `data-theme`, preference persists in `localStorage`, stored preference is respected on reload, and light/dark token values are correct.
 
+## Tailwind layout spacing — the global reset removes semantic margins
+
+Root-cause of a design regression (April 2026, Home/Login/Forex spacing after Tailwind migration):
+- `projects/frontend/src/assets/styles/main.css` resets all elements with `margin: 0` and `padding: 0`.
+- Migrated views still depended on leftover element-level margins or removed scoped CSS spacing, so stacked sections visually collapsed and cards looked glued together.
+- `HomeView.vue`, `LoginView.vue`, and `ForexExchangeView.vue` needed their page rhythm rebuilt from parent-owned Tailwind layout utilities instead of ad hoc CSS spacing.
+
+**Rules to prevent recurrence:**
+1. **When migrating a page to Tailwind in this repository, assume every semantic element has zero default spacing.** Recreate vertical rhythm explicitly with parent-owned `flex flex-col gap-*`, `grid gap-*`, `space-y-*`, and section `py-*` utilities.
+2. **Prefer structural Tailwind spacing on the parent wrapper over scattered child `mt-*` / `mb-*` utilities or custom CSS margins.** Use child margins only for true one-off exceptions.
+3. **For stacked cards or panels, make both layers explicit:** sibling sections need a parent `gap-*` / `space-y-*`, and each card needs its own `rounded-* border border-divider bg-card p-*` container.
+4. **If a Tailwind migration removes a scoped CSS spacing rule, replace that spacing in the template in the same commit.** Do not rely on browser default margins because the global reset removes them.
+5. **After migrating any landing, auth, or finance page, run the narrow page-level validation that can catch visual collapse** (`npm run lint`, `npm run build`, and the targeted Playwright spec for that page when one exists).
+
 ## Vue scoped-style extraction — never leave child visuals in a parent `<style scoped>` block
 
 Root-cause of a design regression (April 2026, commit `e98acf480601054f251cb66c22441777e1063d82` / building-detail Tailwind migration):

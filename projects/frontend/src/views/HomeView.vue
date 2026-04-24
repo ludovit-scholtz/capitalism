@@ -61,7 +61,7 @@ useTickRefresh(() => loadHomeData(true))
 </script>
 
 <template>
-  <div>
+  <div class="pb-16">
     <!-- Hero Section -->
     <section class="relative border-b border-divider overflow-hidden py-20 pb-16">
       <!-- Background video + overlay -->
@@ -72,12 +72,12 @@ useTickRefresh(() => loadHomeData(true))
         </video>
       </div>
 
-      <div class="container hero-content text-center relative z-20">
+      <div class="container relative z-20 flex flex-col items-center gap-4 text-center">
         <h1 class="hero-title">{{ t('home.heroTitle') }}</h1>
-        <p class="text-lg max-w-xl mx-auto mb-8 text-[var(--color-hero-subtitle)]">
+        <p class="max-w-xl text-lg text-(--color-hero-subtitle)">
           {{ t('home.heroDescription') }}
         </p>
-        <div class="flex justify-center gap-4">
+        <div class="mt-2 flex flex-wrap justify-center gap-4">
           <RouterLink v-if="!auth.isAuthenticated" to="/onboarding" class="btn btn-primary">
             {{ t('home.getStarted') }}
           </RouterLink>
@@ -95,90 +95,94 @@ useTickRefresh(() => loadHomeData(true))
       </div>
     </section>
 
-    <!-- Game Status Cards -->
-    <section v-if="gameState" class="container py-8">
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div
-          class="bg-card border border-divider rounded-lg p-5 text-center"
-          :title="t('home.currentTick', { tick: gameState.currentTick })"
-        >
-          <span class="block text-xs text-muted uppercase tracking-wide mb-2">{{
-            t('home.currentTime')
-          }}</span>
-          <span class="text-2xl font-bold text-body">{{ formattedGameTime }}</span>
-        </div>
-        <div class="bg-card border border-divider rounded-lg p-5 text-center">
-          <span class="block text-xs text-muted uppercase tracking-wide mb-2">{{
-            t('home.taxRate')
-          }}</span>
-          <span class="text-2xl font-bold text-body">{{ gameState.taxRate }}%</span>
-        </div>
-        <div class="bg-card border border-divider rounded-lg p-5 text-center">
-          <span class="block text-xs text-muted uppercase tracking-wide mb-2">{{
-            t('home.activePlayers')
-          }}</span>
-          <span class="text-2xl font-bold text-body">{{ rankings.length }}</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- Leaderboard -->
-    <section class="container pb-16 pt-2">
-      <div class="flex items-center justify-between mb-4 gap-4">
-        <h2 class="text-2xl font-bold text-body">{{ t('home.leaderboard') }}</h2>
-        <RouterLink to="/leaderboard" class="btn btn-secondary text-sm whitespace-nowrap">
-          {{ t('home.viewFullLeaderboard') }}
-        </RouterLink>
-      </div>
-
-      <div v-if="loading" class="text-center py-8 text-muted">{{ t('common.loading') }}</div>
-      <div v-else-if="rankings.length === 0" class="text-center py-8 text-muted">
-        {{ t('home.noPlayers') }}
-      </div>
-      <table v-else class="w-full border-collapse">
-        <thead>
-          <tr>
-            <th
-              class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-            >
-              #
-            </th>
-            <th
-              class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-            >
-              {{ t('home.playerName') }}
-            </th>
-            <th
-              class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-            >
-              {{ t('home.wealth') }}
-            </th>
-            <th
-              class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
-            >
-              {{ t('home.companies') }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(rank, index) in rankings.slice(0, 5)"
-            :key="rank.playerId"
-            class="hover:bg-[var(--color-hover)] transition-colors"
+    <div class="container flex flex-col gap-8 py-8">
+      <!-- Game Status Cards -->
+      <section v-if="gameState">
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div
+            class="bg-card border border-divider rounded-lg p-5 text-center"
+            :title="t('home.currentTick', { tick: gameState.currentTick })"
           >
-            <td class="px-4 py-3 font-bold text-brand border-b border-divider">
-              {{ index + 1 }}
-            </td>
-            <td class="px-4 py-3 text-body border-b border-divider">{{ rank.displayName }}</td>
-            <!-- wealth class kept for E2E test selector backward compatibility -->
-            <td class="px-4 py-3 font-semibold text-good wealth border-b border-divider">
-              {{ formatCompactMoney(rank.totalWealthUsd, 'USD', locale) }}
-            </td>
-            <td class="px-4 py-3 text-body border-b border-divider">{{ rank.companyCount }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{
+              t('home.currentTime')
+            }}</span>
+            <span class="text-2xl font-bold text-body">{{ formattedGameTime }}</span>
+          </div>
+          <div class="bg-card border border-divider rounded-lg p-5 text-center">
+            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{
+              t('home.taxRate')
+            }}</span>
+            <span class="text-2xl font-bold text-body">{{ gameState.taxRate }}%</span>
+          </div>
+          <div class="bg-card border border-divider rounded-lg p-5 text-center">
+            <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{
+              t('home.activePlayers')
+            }}</span>
+            <span class="text-2xl font-bold text-body">{{ rankings.length }}</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Leaderboard -->
+      <section class="flex flex-col gap-4">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <h2 class="text-2xl font-bold text-body">{{ t('home.leaderboard') }}</h2>
+          <RouterLink to="/leaderboard" class="btn btn-secondary text-sm whitespace-nowrap">
+            {{ t('home.viewFullLeaderboard') }}
+          </RouterLink>
+        </div>
+
+        <div v-if="loading" class="text-center py-8 text-muted">{{ t('common.loading') }}</div>
+        <div v-else-if="rankings.length === 0" class="text-center py-8 text-muted">
+          {{ t('home.noPlayers') }}
+        </div>
+        <div v-else class="overflow-x-auto rounded-xl border border-divider bg-card">
+          <table class="w-full border-collapse">
+            <thead>
+              <tr>
+                <th
+                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
+                >
+                  #
+                </th>
+                <th
+                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
+                >
+                  {{ t('home.playerName') }}
+                </th>
+                <th
+                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
+                >
+                  {{ t('home.wealth') }}
+                </th>
+                <th
+                  class="text-left px-4 py-3 text-xs text-muted font-semibold uppercase border-b border-divider"
+                >
+                  {{ t('home.companies') }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(rank, index) in rankings.slice(0, 5)"
+                :key="rank.playerId"
+                class="hover:bg-overlay transition-colors"
+              >
+                <td class="px-4 py-3 font-bold text-brand border-b border-divider">
+                  {{ index + 1 }}
+                </td>
+                <td class="px-4 py-3 text-body border-b border-divider">{{ rank.displayName }}</td>
+                <!-- wealth class kept for E2E test selector backward compatibility -->
+                <td class="px-4 py-3 font-semibold text-good wealth border-b border-divider">
+                  {{ formatCompactMoney(rank.totalWealthUsd, 'USD', locale) }}
+                </td>
+                <td class="px-4 py-3 text-body border-b border-divider">{{ rank.companyCount }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -191,13 +195,8 @@ useTickRefresh(() => loadHomeData(true))
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 1rem;
   font-weight: 800;
   text-transform: uppercase;
   font-family: system-ui, -apple-system, sans-serif;
-}
-
-.hero-content {
-  position: relative;
 }
 </style>
