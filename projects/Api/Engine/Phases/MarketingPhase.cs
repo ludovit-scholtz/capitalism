@@ -1,4 +1,5 @@
 using Api.Data.Entities;
+using Api.Utilities;
 
 namespace Api.Engine.Phases;
 
@@ -67,7 +68,9 @@ public sealed class MarketingPhase : ITickPhase
     {
         if (unit.Budget is null || unit.Budget <= 0m) return;
 
-        var budget = Math.Min(unit.Budget.Value, company.Cash);
+        var fundingAccount = context.GetBuildingFundingAccount(building);
+        var availableBudget = fundingAccount?.Balance ?? 0m;
+        var budget = Math.Min(unit.Budget.Value, availableBudget);
         if (budget <= 0m) return;
 
         // Find product types in linked PUBLIC_SALES units to target.
@@ -114,7 +117,7 @@ public sealed class MarketingPhase : ITickPhase
             }
         }
 
-        company.Cash -= budget;
+        fundingAccount!.Balance -= budget;
 
         context.Db.LedgerEntries.Add(new LedgerEntry
         {
@@ -134,7 +137,11 @@ public sealed class MarketingPhase : ITickPhase
             && context.CompaniesById.TryGetValue(mediaHouse.CompanyId, out var mediaOwner)
             && mediaOwner.Id != company.Id)
         {
-            mediaOwner.Cash += budget;
+            var mediaFundingAccount = context.GetBuildingFundingAccount(mediaHouse);
+            if (mediaFundingAccount is not null)
+            {
+                mediaFundingAccount.Balance += budget;
+            }
             context.Db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
@@ -153,7 +160,7 @@ public sealed class MarketingPhase : ITickPhase
         foreach (var productId in productIds)
         {
             var productName = context.ProductTypesById.TryGetValue(productId, out var pt) ? pt.Name : "Product";
-            var brand = context.GetOrCreateBrand(building.CompanyId, productId, $"{company.Cash:F0} – {productName}");
+            var brand = context.GetOrCreateBrand(building.CompanyId, productId, $"{context.GetCompanyBankBalance(company.Id):F0} – {productName}");
 
             // Apply marketing efficiency multiplier from BRAND_QUALITY R&D.
             // This is the causal chain: R&D → higher efficiency → marketing budget produces more awareness.

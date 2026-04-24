@@ -35,8 +35,6 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = input.Name,
-            Cash = 1_000_000m // Starting capital
-            ,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = DateTime.UtcNow,
@@ -44,6 +42,12 @@ public sealed partial class Mutation
         };
 
         db.Companies.Add(company);
+        var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+            db,
+            company.Id,
+            "EUR",
+            httpContextAccessor.HttpContext!.RequestAborted);
+        fundingAccount.Balance += 1_000_000m;
         db.Shareholdings.Add(new Shareholding
         {
             Id = Guid.NewGuid(),
@@ -225,11 +229,17 @@ public sealed partial class Mutation
         // Bank buildings require a $10,000,000 base-capital deposit.
         if (input.Type == BuildingType.Bank)
         {
-            if (company.Cash < BankBaseCapitalRequirement)
+            var baseCapitalFundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+                db,
+                company.Id,
+                city.CurrencyCode,
+                httpContextAccessor.HttpContext!.RequestAborted);
+
+            if (baseCapitalFundingAccount.Balance < BankBaseCapitalRequirement)
             {
                 throw new GraphQLException(
                     ErrorBuilder.New()
-                        .SetMessage($"Opening a bank requires a base capital deposit of ${BankBaseCapitalRequirement:N0}. Your company has {company.Cash:C0}.")
+                        .SetMessage($"Opening a bank requires a base capital deposit of ${BankBaseCapitalRequirement:N0}. Your company bank accounts currently hold {baseCapitalFundingAccount.Balance:C0} in {city.CurrencyCode}.")
                         .SetCode("INSUFFICIENT_FUNDS")
                         .Build());
             }
@@ -257,8 +267,7 @@ public sealed partial class Mutation
 
             db.BankAccounts.Add(baseDeposit);
 
-            // The base capital is already in the company's cash; it just gets "locked" into the bank
-            // (the company IS the bank, so no cash transfer needed — TotalDeposits increases)
+            baseCapitalFundingAccount.Balance -= Mutation.BankBaseCapitalRequirement;
             building.TotalDeposits = Mutation.BankBaseCapitalRequirement;
             building.BaseCapitalDeposited = true;
         }
@@ -307,7 +316,9 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var companies = await db.Companies.ToListAsync();
+        var companies = await db.Companies
+            .Include(company => company.BankAccounts)
+            .ToListAsync();
         var targetCompany = companies.FirstOrDefault(company => company.Id == input.CompanyId.Value)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
@@ -420,7 +431,7 @@ public sealed partial class Mutation
         if (taxableIncome > 0m && taxRate > 0m)
         {
             var taxAmount = decimal.Round(taxableIncome * taxRate, 2, MidpointRounding.AwayFromZero);
-            targetCompany.Cash -= taxAmount;
+            CompanyBankingService.TryDebit(targetCompany.BankAccounts, taxAmount);
             db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
@@ -471,20 +482,24 @@ public sealed partial class Mutation
             }
         }
 
-        // Transfer target company's remaining cash to destination
-        var cashTransferred = Math.Max(targetCompany.Cash, 0m);
-        destinationCompany.Cash += cashTransferred;
+        var transferredBalances = targetCompany.BankAccounts.Sum(account => Math.Max(account.Balance, 0m));
+        foreach (var account in targetCompany.BankAccounts)
+        {
+            account.CompanyId = destinationCompany.Id;
+            destinationCompany.BankAccounts.Add(account);
+        }
+        targetCompany.BankAccounts.Clear();
 
         // Record the merger as a ledger entry on destination
-        if (cashTransferred > 0m)
+        if (transferredBalances > 0m)
         {
             db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
                 CompanyId = destinationCompany.Id,
                 Category = LedgerCategory.Other,
-                Description = $"Merger: cash received from {targetCompany.Name}",
-                Amount = cashTransferred,
+                Description = $"Merger: bank-account balances received from {targetCompany.Name}",
+                Amount = transferredBalances,
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = DateTime.UtcNow,
             });
@@ -524,7 +539,7 @@ public sealed partial class Mutation
             DestinationCompanyId = destinationCompany.Id,
             DestinationCompanyName = destinationCompany.Name,
             AbsorbedCompanyName = absorbedName,
-            CashTransferred = cashTransferred,
+            CashTransferred = transferredBalances,
             BuildingsTransferred = buildingsTransferred,
         };
     }

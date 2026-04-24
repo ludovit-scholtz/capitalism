@@ -195,6 +195,7 @@ public sealed class ManufacturingPhase : ITickPhase
         if (context.CompaniesById.TryGetValue(building.CompanyId, out var company)
             && context.CitiesById.TryGetValue(building.CityId, out var city))
         {
+            var fundingAccount = context.GetBuildingFundingAccount(building);
             var salarySettings = context.CitySalarySettingsByCompany.GetValueOrDefault(company.Id, []);
             var salaryMultiplier = CompanyEconomyCalculator.GetSalaryMultiplier(salarySettings, city.Id);
             var hourlyWage = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, salaryMultiplier);
@@ -216,7 +217,10 @@ public sealed class ManufacturingPhase : ITickPhase
 
             if (laborCost > 0m)
             {
-                company.Cash -= laborCost;
+                if (fundingAccount is not null)
+                {
+                    fundingAccount.Balance -= laborCost;
+                }
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
                     Id = Guid.NewGuid(),
@@ -234,7 +238,10 @@ public sealed class ManufacturingPhase : ITickPhase
 
             if (energyCost > 0m)
             {
-                company.Cash -= energyCost;
+                if (fundingAccount is not null)
+                {
+                    fundingAccount.Balance -= energyCost;
+                }
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
                     Id = Guid.NewGuid(),

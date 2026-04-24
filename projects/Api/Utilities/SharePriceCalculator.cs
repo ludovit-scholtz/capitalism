@@ -46,7 +46,7 @@ public static class SharePriceCalculator
 
         return companies.ToDictionary(
             company => company.Id,
-            company => company.Cash
+            company => CompanyBankingService.GetTotalBalance(company)
                 + buildingValueByCompany.GetValueOrDefault(company.Id)
                 + landValueByCompany.GetValueOrDefault(company.Id)
                 + inventoryValueByCompany.GetValueOrDefault(company.Id));

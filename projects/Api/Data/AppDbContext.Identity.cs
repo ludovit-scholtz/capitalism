@@ -48,10 +48,13 @@ public sealed partial class AppDbContext
         {
             e.HasKey(c => c.Id);
             e.Property(c => c.Name).HasMaxLength(200);
-            e.Property(c => c.Cash).HasPrecision(18, 2);
             e.Property(c => c.TotalSharesIssued).HasPrecision(18, 4);
             e.Property(c => c.DividendPayoutRatio).HasPrecision(8, 4);
             e.HasOne(c => c.Player).WithMany(p => p.Companies).HasForeignKey(c => c.PlayerId);
+            e.HasMany(c => c.BankAccounts)
+                .WithOne(account => account.Company)
+                .HasForeignKey(account => account.CompanyId)
+                .OnDelete(DeleteBehavior.SetNull);
             e.HasMany(c => c.CitySalarySettings)
                 .WithOne(setting => setting.Company)
                 .HasForeignKey(setting => setting.CompanyId)

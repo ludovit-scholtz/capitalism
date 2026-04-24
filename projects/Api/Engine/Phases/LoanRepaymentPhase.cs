@@ -1,5 +1,6 @@
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Engine.Phases;
@@ -117,11 +118,11 @@ public sealed class LoanRepaymentPhase : ITickPhase
     {
         var ticksPerPayment = loan.TotalPayments > 0 ? loan.DurationTicks / loan.TotalPayments : loan.DurationTicks;
 
-        if (borrower.Cash >= totalPayment)
+        if (context.GetCompanyBankBalance(borrower.Id) >= totalPayment)
         {
             // Successful payment.
-            borrower.Cash -= totalPayment;
-            lender.Cash += totalPayment;
+            CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(borrower.Id), totalPayment);
+            CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, null, out _);
             loan.RemainingPrincipal = Math.Max(0m, loan.RemainingPrincipal - principalPayment);
             loan.PaymentsMade++;
             loan.NextPaymentTick = paymentTick + ticksPerPayment;

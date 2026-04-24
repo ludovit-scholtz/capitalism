@@ -136,6 +136,10 @@ public static partial class BuildingConfigurationService
             .Include(plan => plan.Units)
             .Include(plan => plan.Removals)
             .Include(plan => plan.Building)
+            .ThenInclude(building => building.City)
+            .Include(plan => plan.Building)
+            .ThenInclude(building => building.BankAccount)
+            .Include(plan => plan.Building)
             .ThenInclude(building => building.Company)
             .Include(plan => plan.Building)
             .ThenInclude(building => building.Units)
@@ -175,8 +179,13 @@ public static partial class BuildingConfigurationService
                 .ToList();
 
             var totalActivationCost = costfulDueUnits.Sum(entry => entry.Cost);
+            var fundingAccount = plan.Building.BankAccount
+                ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
+                    db,
+                    plan.Building,
+                    plan.Building.City?.CurrencyCode);
 
-            if (totalActivationCost > 0m && plan.Building.Company.Cash < totalActivationCost)
+            if (totalActivationCost > 0m && fundingAccount.Balance < totalActivationCost)
             {
                 foreach (var entry in costfulDueUnits)
                 {
@@ -188,7 +197,7 @@ public static partial class BuildingConfigurationService
             }
             else if (totalActivationCost > 0m)
             {
-                plan.Building.Company.Cash -= totalActivationCost;
+                fundingAccount.Balance -= totalActivationCost;
             }
 
             foreach (var pendingUnit in dueUnits)

@@ -50,7 +50,11 @@ public sealed class RentPhase : ITickPhase
 
             if (rentIncome > 0m)
             {
-                company.Cash += rentIncome;
+                var fundingAccount = context.GetBuildingFundingAccount(building);
+                if (fundingAccount is not null)
+                {
+                    fundingAccount.Balance += rentIncome;
+                }
 
                 // Record rent income in the ledger.
                 context.Db.LedgerEntries.Add(new LedgerEntry

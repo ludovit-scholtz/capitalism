@@ -30,7 +30,9 @@ public sealed partial class Query
             .ToListAsync();
 
         // Load all companies, buildings, lots, inventories, and shareholdings for share price calculation
-        var companies = await db.Companies.ToListAsync();
+        var companies = await db.Companies
+            .Include(company => company.BankAccounts)
+            .ToListAsync();
         var buildings = await db.Buildings
             .Include(b => b.City)
             .ToListAsync();
@@ -107,6 +109,7 @@ public sealed partial class Query
     public async Task<List<CompanyRanking>> GetCompanyRankings([Service] AppDbContext db)
     {
         var companies = await db.Companies
+            .Include(c => c.BankAccounts)
             .Include(c => c.Buildings)
             .ThenInclude(b => b.Units)
             .Include(c => c.Buildings)
@@ -148,7 +151,8 @@ public sealed partial class Query
                     .Sum(b => inventoryByBuilding.TryGetValue(b.Id, out var inv)
                         ? inv.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i))
                         : 0m);
-                var totalWealth = c.Cash + buildingValue + inventoryValue;
+                var companyCash = CompanyBankingService.GetTotalBalance(c);
+                var totalWealth = companyCash + buildingValue + inventoryValue;
                 var currencyCode = companyCurrencyCodeById.GetValueOrDefault(c.Id, "EUR");
 
                 return new CompanyRanking
@@ -157,7 +161,7 @@ public sealed partial class Query
                     CompanyName = c.Name,
                     PlayerId = c.PlayerId,
                     OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
-                    Cash = c.Cash,
+                    Cash = companyCash,
                     CurrencyCode = currencyCode,
                     BuildingValue = buildingValue,
                     InventoryValue = inventoryValue,
@@ -461,6 +465,7 @@ public sealed partial class Query
             .OrderBy(city => city.Name)
             .ToListAsync();
         var allCompanies = await db.Companies
+            .Include(candidate => candidate.BankAccounts)
             .Include(candidate => candidate.Buildings)
             .ToListAsync();
         var allOwnedLots = await db.BuildingLots
@@ -497,7 +502,7 @@ public sealed partial class Query
         {
             CompanyId = company.Id,
             CompanyName = company.Name,
-            Cash = company.Cash,
+            Cash = CompanyBankingService.GetTotalBalance(company),
             TotalSharesIssued = company.TotalSharesIssued,
             DividendPayoutRatio = company.DividendPayoutRatio,
             FoundedAtTick = company.FoundedAtTick,

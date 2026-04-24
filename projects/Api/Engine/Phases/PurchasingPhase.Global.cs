@@ -18,6 +18,7 @@ public sealed partial class PurchasingPhase
         Building building,
         BuildingUnit unit,
         Company company,
+        BankAccount? fundingAccount,
         Guid resourceId,
         decimal maxAmountToBuy,
         decimal maxPrice,
@@ -72,17 +73,21 @@ public sealed partial class PurchasingPhase
 
         var amountToBuy = maxAmountToBuy;
         var totalCost = amountToBuy * bestOffer.deliveredPrice;
+        var availableBalance = fundingAccount?.Balance ?? 0m;
 
-        if (company.Cash < totalCost)
+        if (availableBalance < totalCost)
         {
-            amountToBuy = company.Cash / bestOffer.deliveredPrice;
+            amountToBuy = availableBalance / bestOffer.deliveredPrice;
             amountToBuy = Math.Floor(amountToBuy * 10000m) / 10000m;
             totalCost = amountToBuy * bestOffer.deliveredPrice;
         }
 
         if (amountToBuy <= 0m) return (0m, 0m, 0m);
 
-        company.Cash -= totalCost;
+        if (fundingAccount is not null)
+        {
+            fundingAccount.Balance -= totalCost;
+        }
         var purchasingCost = amountToBuy * bestOffer.exchangePrice;
         var shippingCost = amountToBuy * bestOffer.transitCost;
 

@@ -27,6 +27,7 @@ public sealed partial class Query
 
         var company = await db.Companies
             .AsNoTracking()
+            .Include(c => c.BankAccounts)
             .Include(c => c.Buildings).ThenInclude(b => b.City)
             .FirstOrDefaultAsync(c => c.Id == companyId && c.PlayerId == userId);
 
@@ -112,6 +113,7 @@ public sealed partial class Query
             .AsNoTracking()
             .Where(d => d.CompanyId == companyId && d.BankBuildingId != null && d.ClosedAtUtc == null)
             .SumAsync(d => (decimal?)d.Balance) ?? 0m;
+        var currentCash = CompanyBankingService.GetTotalBalance(company);
 
         var buildingSummaries = entries
             .Where(e => e.BuildingId.HasValue)
@@ -159,7 +161,7 @@ public sealed partial class Query
             CompanyName = company.Name,
             GameYear = selectedGameYear,
             IsCurrentGameYear = isCurrentYear,
-            CurrentCash = company.Cash,
+            CurrentCash = currentCash,
             PrimaryCurrencyCode = primaryCurrencyCode,
             HasMixedCurrencies = buildingCurrencies.Count > 1,
             TotalRevenue = totalRevenue,
@@ -189,7 +191,7 @@ public sealed partial class Query
             BuildingValue = buildingValue,
             InventoryValue = inventoryValue,
             TotalDepositsPlaced = totalDepositsPlaced,
-            TotalAssets = company.Cash + propertyValue + buildingValue + inventoryValue + totalDepositsPlaced,
+            TotalAssets = currentCash + propertyValue + buildingValue + inventoryValue,
             CashFromOperations = totalRevenue + totalDepositInterestReceived + totalLoanInterestIncome
                 - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
                 - totalMarketingCosts - totalDepositInterestPaid - totalLoanInterestExpense,
@@ -338,7 +340,7 @@ public sealed partial class Query
             .Where(lot => lot.OwnerCompanyId == company.Id)
             .Sum(WealthCalculator.GetLandValue);
 
-        return company.Cash + company.Buildings.Sum(WealthCalculator.GetBuildingValue) + lotValue + allInventories
+        return CompanyBankingService.GetTotalBalance(company) + company.Buildings.Sum(WealthCalculator.GetBuildingValue) + lotValue + allInventories
             .Where(inventory => buildingIds.Contains(inventory.BuildingId))
             .Sum(inventory => inventory.Quantity * WealthCalculator.GetItemBasePrice(inventory));
     }

@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Data.Entities;
+using Api.Utilities;
 using HotChocolate;
 using HotChocolate.Types;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,14 @@ namespace Api.Types;
 [ExtendObjectType<Company>]
 public sealed class CompanyTypeExtensions
 {
+    public async Task<decimal> GetCash(
+        [Parent] Company company,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        return await CompanyBankingService.GetTotalBalanceAsync(db, company.Id, cancellationToken);
+    }
+
     public async Task<string> GetCurrencyCode(
         [Parent] Company company,
         [Service] AppDbContext db)

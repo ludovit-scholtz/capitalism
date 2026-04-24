@@ -58,7 +58,7 @@ public sealed class DividendPhase : ITickPhase
             }
 
             var targetPool = decimal.Round(postTaxIncome * company.DividendPayoutRatio, 4, MidpointRounding.AwayFromZero);
-            var dividendPool = Math.Min(company.Cash, targetPool);
+            var dividendPool = Math.Min(context.GetCompanyBankBalance(company.Id), targetPool);
             if (dividendPool <= 0m)
             {
                 continue;
@@ -95,7 +95,10 @@ public sealed class DividendPhase : ITickPhase
                 }
                 else if (holding.OwnerCompanyId is Guid ownerCompanyId && companiesById.TryGetValue(ownerCompanyId, out var ownerCompany))
                 {
-                    ownerCompany.Cash += payout;
+                    if (!CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(ownerCompanyId), payout, null, out _))
+                    {
+                        continue;
+                    }
                 }
                 else
                 {
@@ -131,7 +134,7 @@ public sealed class DividendPhase : ITickPhase
                 continue;
             }
 
-            company.Cash -= totalPaid;
+            CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(company.Id), totalPaid);
 
             context.Db.LedgerEntries.Add(new LedgerEntry
             {

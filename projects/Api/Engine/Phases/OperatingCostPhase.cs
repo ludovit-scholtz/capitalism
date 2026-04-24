@@ -88,33 +88,30 @@ public sealed class OperatingCostPhase : ITickPhase
             }
 
             // ── Bank account check ──
+            var hasAssignedAccount = building.BankAccountId.HasValue;
             BankAccount? bankAccount = building.BankAccountId.HasValue
                 && context.BankAccountsById.TryGetValue(building.BankAccountId.Value, out var ba)
                 ? ba
-                : null;
+                : context.GetBuildingFundingAccount(building);
 
             if (bankAccount is not null)
             {
-                // Building has an assigned bank account — enforce funding from it.
                 if (bankAccount.Balance < totalBuildingCost)
                 {
-                    // Insufficient funds: suspend the building for this tick.
                     building.IsSuspendedForFunds = true;
                     building.SuspendedReason = $"INSUFFICIENT_FUNDS:{totalBuildingCost:F2}";
                     continue;
                 }
 
-                // Sufficient funds: debit from the bank account and reset any previous suspension.
                 bankAccount.Balance -= totalBuildingCost;
                 building.IsSuspendedForFunds = false;
-                building.SuspendedReason = null;
+                building.SuspendedReason = hasAssignedAccount ? null : "MISSING_BANK_ACCOUNT";
             }
             else
             {
-                // No bank account assigned: legacy path — use company cash.
-                // Set advisory flag (not a hard suspension) so the frontend can prompt setup.
-                building.IsSuspendedForFunds = false;
+                building.IsSuspendedForFunds = true;
                 building.SuspendedReason = "MISSING_BANK_ACCOUNT";
+                continue;
             }
 
             // ── Debit individual unit costs and record ledger entries ──
@@ -122,10 +119,6 @@ public sealed class OperatingCostPhase : ITickPhase
             {
                 if (laborCost > 0m)
                 {
-                    if (bankAccount is null)
-                    {
-                        company.Cash -= laborCost;
-                    }
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
                         Id = Guid.NewGuid(),
@@ -142,10 +135,6 @@ public sealed class OperatingCostPhase : ITickPhase
 
                 if (energyCost > 0m)
                 {
-                    if (bankAccount is null)
-                    {
-                        company.Cash -= energyCost;
-                    }
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
                         Id = Guid.NewGuid(),

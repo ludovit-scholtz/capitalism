@@ -27,6 +27,7 @@ public sealed partial class Mutation
         await gameAdminAuthorizationService.RequireAdminDashboardAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
         var player = await db.Players
             .Include(candidate => candidate.Companies)
+            .ThenInclude(company => company.BankAccounts)
             .FirstOrDefaultAsync(candidate => candidate.Id == input.PlayerId, httpContextAccessor.HttpContext.RequestAborted)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
@@ -47,13 +48,13 @@ public sealed partial class Mutation
             IsInvisibleInChat = player.IsInvisibleInChat,
             LastLoginAtUtc = player.LastLoginAtUtc,
             PersonalCash = personalCash,
-            TotalCompanyCash = player.Companies.Sum(company => company.Cash),
+            TotalCompanyCash = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
             CompanyCount = player.Companies.Count,
             Companies = player.Companies.Select(company => new GameAdminCompanySummary
             {
                 Id = company.Id,
                 Name = company.Name,
-                Cash = company.Cash,
+                Cash = CompanyBankingService.GetTotalBalance(company),
             }).ToList(),
         };
     }
@@ -68,6 +69,7 @@ public sealed partial class Mutation
         await gameAdminAuthorizationService.RequireRootAccessAsync(db, httpContextAccessor.HttpContext!.User, httpContextAccessor.HttpContext.RequestAborted);
         var player = await db.Players
             .Include(candidate => candidate.Companies)
+            .ThenInclude(company => company.BankAccounts)
             .FirstOrDefaultAsync(candidate => candidate.Id == input.PlayerId, httpContextAccessor.HttpContext.RequestAborted)
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
@@ -88,13 +90,13 @@ public sealed partial class Mutation
             IsInvisibleInChat = player.IsInvisibleInChat,
             LastLoginAtUtc = player.LastLoginAtUtc,
             PersonalCash = personalCash,
-            TotalCompanyCash = player.Companies.Sum(company => company.Cash),
+            TotalCompanyCash = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
             CompanyCount = player.Companies.Count,
             Companies = player.Companies.Select(company => new GameAdminCompanySummary
             {
                 Id = company.Id,
                 Name = company.Name,
-                Cash = company.Cash,
+                Cash = CompanyBankingService.GetTotalBalance(company),
             }).ToList(),
         };
     }

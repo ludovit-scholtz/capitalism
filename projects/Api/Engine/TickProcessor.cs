@@ -93,7 +93,7 @@ public sealed class TickProcessor(
     private async Task<TickContext> BuildContextAsync(GameState gameState, CancellationToken ct)
     {
         // Bulk-load all data needed by every phase.
-        // EF Core change-tracking is required for entities we modify (Company.Cash,
+        // EF Core change-tracking is required for entities we modify (BankAccount.Balance,
         // Inventory.Quantity, Brand, Building, ExchangeOrder, GameState).
 
         // AsSplitQuery prevents EF Core from generating a single SQL query with a Cartesian

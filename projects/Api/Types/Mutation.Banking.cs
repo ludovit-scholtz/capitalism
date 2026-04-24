@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -135,7 +136,18 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (depositorCompany.Cash < input.Amount)
+        var sourceAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            depositorCompany.Id,
+            cityCurrencyCode,
+            cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
+        var bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            bank.CompanyId,
+            cityCurrencyCode,
+            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
+
+        if (sourceAccount.Balance < input.Amount)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -146,9 +158,9 @@ public sealed partial class Mutation
 
         var depositRate = bank.DepositInterestRatePercent ?? 0m;
 
-        // Transfer cash: depositor company -> bank company
-        depositorCompany.Cash -= input.Amount;
-        bank.Company.Cash += input.Amount;
+        // Transfer cash: depositor company -> bank company liquidity account
+        sourceAccount.Balance -= input.Amount;
+        bankLiquidityAccount.Balance += input.Amount;
         bank.TotalDeposits += input.Amount;
 
         // Auto-repay central-bank debt only from surplus cash above the reserve requirement.
@@ -159,11 +171,12 @@ public sealed partial class Mutation
         if (bank.CentralBankDebt > 0m)
         {
             var reserveNeeded = bank.TotalDeposits * ReserveRatio;
-            var surplusCash = bank.Company.Cash - reserveNeeded;
+            var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bank.CompanyId, httpContextAccessor.HttpContext.RequestAborted);
+            var surplusCash = CompanyBankingService.GetTotalBalance(bankAccounts) - reserveNeeded;
             var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
             if (repayment > 0m)
             {
-                bank.Company.Cash -= repayment;
+                CompanyBankingService.TryDebit(bankAccounts, repayment, cityCurrencyCode);
                 bank.CentralBankDebt -= repayment;
                 db.LedgerEntries.Add(new LedgerEntry
                 {
@@ -278,17 +291,24 @@ public sealed partial class Mutation
 
         // Determine actual payout: if bank lacks cash, central bank covers the shortfall
         var payout = input.Amount;
-        var actualBankPay = Math.Min(payout, Math.Max(0m, bankCompany.Cash));
+        var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bankCompany.Id, httpContextAccessor.HttpContext!.RequestAborted);
+        var actualBankPay = Math.Min(payout, Math.Max(0m, CompanyBankingService.GetTotalBalance(bankAccounts)));
         var centralBankCoverage = payout - actualBankPay;
+        var destinationAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            depositorCompany.Id,
+            deposit.CurrencyCode,
+            deposit.Id,
+            httpContextAccessor.HttpContext.RequestAborted);
 
         // Transfer cash back to depositor
-        bankCompany.Cash -= actualBankPay;
+        CompanyBankingService.TryDebit(bankAccounts, actualBankPay, deposit.CurrencyCode);
         if (centralBankCoverage > 0m)
         {
             // Central bank injects the shortfall directly — bank owes it back
             bank.CentralBankDebt += centralBankCoverage;
         }
-        depositorCompany.Cash += payout;
+        destinationAccount.Balance += payout;
         bank.TotalDeposits -= input.Amount;
         deposit.Balance -= input.Amount;
 
@@ -379,7 +399,20 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (depositorCompany.Cash < input.Amount)
+        var sourceAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            depositorCompany.Id,
+            deposit.CurrencyCode,
+            deposit.Id,
+            httpContextAccessor.HttpContext!.RequestAborted);
+
+        var bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            deposit.BankBuilding?.CompanyId ?? throw new Exception("Company id not found"),
+            deposit.CurrencyCode,
+            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
+
+        if (sourceAccount.Balance < input.Amount)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -391,9 +424,9 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
         var bank = deposit.BankBuilding!;
 
-        // Transfer cash: depositor -> bank
-        depositorCompany.Cash -= input.Amount;
-        bank.Company!.Cash += input.Amount;
+        // Transfer cash: depositor -> bank liquidity account
+        sourceAccount.Balance -= input.Amount;
+        bankLiquidityAccount.Balance += input.Amount;
         bank.TotalDeposits += input.Amount;
 
         // Create a NEW deposit record for this top-up tranche.
@@ -423,11 +456,12 @@ public sealed partial class Mutation
         if (bank.CentralBankDebt > 0m)
         {
             var reserveNeeded = bank.TotalDeposits * ReserveRatio;
-            var surplusCash = bank.Company.Cash - reserveNeeded;
+            var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bank.CompanyId, httpContextAccessor.HttpContext.RequestAborted);
+            var surplusCash = CompanyBankingService.GetTotalBalance(bankAccounts) - reserveNeeded;
             var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
             if (repayment > 0m)
             {
-                bank.Company.Cash -= repayment;
+                CompanyBankingService.TryDebit(bankAccounts, repayment, deposit.CurrencyCode);
                 bank.CentralBankDebt -= repayment;
                 db.LedgerEntries.Add(new LedgerEntry
                 {
@@ -558,7 +592,13 @@ public sealed partial class Mutation
         var baseCapitalRequired = GetBaseCapitalRequirement(cityCurrencyCode);
         var currencySymbol = GetCurrencySymbol(cityCurrencyCode);
 
-        if (bank.Company.Cash < baseCapitalRequired)
+        var fundingAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            bank.CompanyId,
+            cityCurrencyCode,
+            cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
+
+        if (fundingAccount.Balance < baseCapitalRequired)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -569,8 +609,8 @@ public sealed partial class Mutation
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
 
-        // Transfer cash from owning company into the bank
-        bank.Company.Cash -= baseCapitalRequired;
+        // Transfer cash from owning company into the bank base-capital account
+        fundingAccount.Balance -= baseCapitalRequired;
         bank.TotalDeposits += baseCapitalRequired;
         bank.BaseCapitalDeposited = true;
 
@@ -653,7 +693,9 @@ public sealed partial class Mutation
 
         // ── Liquidity calculation ─────────────────────────────────────────────
         var reserveRequirement = bank.TotalDeposits * ReserveRatio;
-        var availableCash = company?.Cash ?? 0m;
+        var availableCash = company is null
+            ? 0m
+            : await CompanyBankingService.GetTotalBalanceAsync(db, company.Id);
         var reserveShortfall = Math.Max(0m, reserveRequirement - availableCash);
         var centralBankRate = ComputeCentralBankRate(db);
 

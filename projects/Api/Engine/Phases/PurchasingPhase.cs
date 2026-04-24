@@ -61,6 +61,11 @@ public sealed partial class PurchasingPhase : ITickPhase
         var maxPrice = unit.MaxPrice ?? decimal.MaxValue;
         var minQuality = unit.MinQuality ?? 0m;
         var purchaseSource = unit.PurchaseSource ?? "OPTIMAL";
+        var fundingAccount = context.GetBuildingFundingAccount(building);
+        if (fundingAccount is null)
+        {
+            return;
+        }
         var itemWeightPerUnit = GlobalExchangeCalculator.ComputeItemWeightPerUnit(
             resourceId,
             productId,
@@ -122,10 +127,10 @@ public sealed partial class PurchasingPhase : ITickPhase
                 var shippingCost = fill * transitCostPerUnit;
                 var totalDeliveredCost = goodsCost + shippingCost;
 
-                if (company.Cash < totalDeliveredCost)
+                if (fundingAccount.Balance < totalDeliveredCost)
                 {
                     var deliveredPricePerUnit = order.PricePerUnit + transitCostPerUnit;
-                    fill = company.Cash / deliveredPricePerUnit;
+                    fill = fundingAccount.Balance / deliveredPricePerUnit;
                     fill = Math.Floor(fill * 10000m) / 10000m;
                     goodsCost = fill * order.PricePerUnit;
                     shippingCost = fill * transitCostPerUnit;
@@ -137,7 +142,7 @@ public sealed partial class PurchasingPhase : ITickPhase
                 order.RemainingQuantity -= fill;
                 if (order.RemainingQuantity <= 0m) order.IsActive = false;
 
-                company.Cash -= totalDeliveredCost;
+                fundingAccount.Balance -= totalDeliveredCost;
 
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
@@ -173,8 +178,11 @@ public sealed partial class PurchasingPhase : ITickPhase
                 }
 
                 // Credit selling company.
-                if (context.CompaniesById.TryGetValue(order.CompanyId, out var seller))
-                    seller.Cash += goodsCost;
+                var sellerAccount = context.GetBuildingFundingAccount(exchangeBuilding);
+                if (sellerAccount is not null)
+                {
+                    sellerAccount.Balance += goodsCost;
+                }
 
                 totalBought += fill;
                 totalSourcingCost += totalDeliveredCost;
@@ -210,9 +218,9 @@ public sealed partial class PurchasingPhase : ITickPhase
                 decimal goodsCost = fill * supply.PricePerUnit;
                 decimal shippingCost = fill * supply.TransitCostPerUnit;
                 decimal deliveredCost = goodsCost + shippingCost;
-                if (company.Cash < shippingCost)
+                if (fundingAccount.Balance < shippingCost)
                 {
-                    fill = company.Cash / Math.Max(supply.TransitCostPerUnit, 0.0001m);
+                    fill = fundingAccount.Balance / Math.Max(supply.TransitCostPerUnit, 0.0001m);
                     fill = Math.Floor(fill * 10000m) / 10000m;
                     goodsCost = fill * supply.PricePerUnit;
                     shippingCost = fill * supply.TransitCostPerUnit;
@@ -221,9 +229,9 @@ public sealed partial class PurchasingPhase : ITickPhase
 
                 if (!sellerIsSameCompany)
                 {
-                    if (company.Cash < deliveredCost)
+                    if (fundingAccount.Balance < deliveredCost)
                     {
-                        fill = company.Cash / supply.DeliveredPricePerUnit;
+                        fill = fundingAccount.Balance / supply.DeliveredPricePerUnit;
                         fill = Math.Floor(fill * 10000m) / 10000m;
                         goodsCost = fill * supply.PricePerUnit;
                         shippingCost = fill * supply.TransitCostPerUnit;
@@ -281,7 +289,7 @@ public sealed partial class PurchasingPhase : ITickPhase
 
                     if (shippingCost > 0m)
                     {
-                        company.Cash -= shippingCost;
+                        fundingAccount.Balance -= shippingCost;
                         context.Db.LedgerEntries.Add(new LedgerEntry
                         {
                             Id = Guid.NewGuid(),
@@ -305,10 +313,13 @@ public sealed partial class PurchasingPhase : ITickPhase
                     goodsCost = withdrawn.Quantity * supply.PricePerUnit;
                     shippingCost = withdrawn.Quantity * supply.TransitCostPerUnit;
                     deliveredCost = goodsCost + shippingCost;
-                    company.Cash -= deliveredCost;
+                    fundingAccount.Balance -= deliveredCost;
 
-                    if (context.CompaniesById.TryGetValue(supply.Building.CompanyId, out var seller))
-                        seller.Cash += goodsCost;
+                    var sellerAccount = context.GetBuildingFundingAccount(supply.Building);
+                    if (sellerAccount is not null)
+                    {
+                        sellerAccount.Balance += goodsCost;
+                    }
 
                     context.Db.LedgerEntries.Add(new LedgerEntry
                     {
@@ -357,7 +368,7 @@ public sealed partial class PurchasingPhase : ITickPhase
         {
             var remaining = maxBuy - totalBought;
             var (globalBought, globalQuality, globalCost) = BuyFromGlobalExchange(
-                context, building, unit, company, resourceId.Value,
+                context, building, unit, company, fundingAccount, resourceId.Value,
                 remaining, maxPrice, minQuality);
 
             if (globalBought > 0m)

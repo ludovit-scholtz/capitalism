@@ -67,6 +67,7 @@ public sealed partial class Mutation
         var totalValue = decimal.Round(askPrice * shareCount, 4, MidpointRounding.AwayFromZero);
         var currentTick = await GetCurrentTickAsync(db);
         decimal? personalCashAfterTrade = null;
+        decimal? companyCashAfterTrade = null;
 
         if (account.Company is null)
         {
@@ -95,7 +96,8 @@ public sealed partial class Mutation
         }
         else
         {
-            if (account.Company.Cash < totalValue)
+            var companyAccounts = await LoadActiveCompanyBankAccountsAsync(db, account.Company.Id, httpContextAccessor.HttpContext!.RequestAborted);
+            if (CompanyBankingService.GetTotalBalance(companyAccounts) < totalValue)
             {
                 throw new GraphQLException(
                     ErrorBuilder.New()
@@ -104,7 +106,8 @@ public sealed partial class Mutation
                         .Build());
             }
 
-            account.Company.Cash -= totalValue;
+            CompanyBankingService.TryDebit(companyAccounts, totalValue);
+            companyCashAfterTrade = CompanyBankingService.GetTotalBalance(companyAccounts);
             AddCompanyLedgerEntry(
                 db,
                 account.Company,
@@ -135,7 +138,7 @@ public sealed partial class Mutation
                     PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(holding => holding.CompanyId == targetCompany.Id)),
                     PersonalCash = personalCashAfterTrade ?? await PersonalBankAccountService.GetGrossCashAsync(db, player),
                     PersonalTaxReserve = player.PersonalTaxReserve,
-                    CompanyCash = account.Company.Cash,
+                    CompanyCash = companyCashAfterTrade,
                 };
             }
         }
@@ -165,7 +168,7 @@ public sealed partial class Mutation
             PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
             PersonalCash = personalCashAfterTrade ?? await PersonalBankAccountService.GetGrossCashAsync(db, player),
             PersonalTaxReserve = player.PersonalTaxReserve,
-            CompanyCash = account.Company?.Cash,
+            CompanyCash = companyCashAfterTrade,
         };
     }
 
@@ -224,6 +227,7 @@ public sealed partial class Mutation
         var totalValue = decimal.Round(bidPrice * shareCount, 4, MidpointRounding.AwayFromZero);
         var currentTick = await GetCurrentTickAsync(db);
         decimal? personalCashAfterTrade = null;
+        decimal? companyCashAfterTrade = null;
 
         holding.ShareCount = decimal.Round(holding.ShareCount - shareCount, 4, MidpointRounding.AwayFromZero);
         if (holding.ShareCount <= 0m)
@@ -254,7 +258,9 @@ public sealed partial class Mutation
         }
         else
         {
-            account.Company.Cash += totalValue;
+            var companyAccounts = await LoadActiveCompanyBankAccountsAsync(db, account.Company.Id, httpContextAccessor.HttpContext!.RequestAborted);
+            CompanyBankingService.TryCredit(companyAccounts, totalValue, null, out _);
+            companyCashAfterTrade = CompanyBankingService.GetTotalBalance(companyAccounts);
             AddCompanyLedgerEntry(
                 db,
                 account.Company,
@@ -284,13 +290,15 @@ public sealed partial class Mutation
             PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
             PersonalCash = personalCashAfterTrade ?? await PersonalBankAccountService.GetGrossCashAsync(db, player),
             PersonalTaxReserve = player.PersonalTaxReserve,
-            CompanyCash = account.Company?.Cash,
+            CompanyCash = companyCashAfterTrade,
         };
     }
 
     private static async Task<(List<Company> Companies, List<Shareholding> Shareholdings, Dictionary<Guid, decimal> SharePrices)> LoadSharePricingSnapshotAsync(AppDbContext db)
     {
-        var companies = await db.Companies.ToListAsync();
+        var companies = await db.Companies
+            .Include(company => company.BankAccounts)
+            .ToListAsync();
         var buildings = await db.Buildings.ToListAsync();
         var lots = await db.BuildingLots.Where(lot => lot.OwnerCompanyId.HasValue).ToListAsync();
         var inventories = await db.Inventories

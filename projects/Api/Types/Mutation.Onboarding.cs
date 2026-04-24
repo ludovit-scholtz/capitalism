@@ -131,13 +131,18 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = trimmedCompanyName,
-            Cash = founderContributionLocal + ipoRaiseLocal,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
             FoundedAtTick = currentTick
         };
         db.Companies.Add(company);
+        var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+            db,
+            company.Id,
+            city.CurrencyCode,
+            httpContextAccessor.HttpContext!.RequestAborted);
+        fundingAccount.Balance += founderContributionLocal + ipoRaiseLocal;
         await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = company.Id;
@@ -286,13 +291,18 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             PlayerId = userId,
             Name = trimmedCompanyName,
-            Cash = founderContributionLocal + ipoRaiseLocal,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
             FoundedAtTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync()
         };
         db.Companies.Add(company);
+        var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
+            db,
+            company.Id,
+            city.CurrencyCode,
+            httpContextAccessor.HttpContext!.RequestAborted);
+        fundingAccount.Balance += founderContributionLocal + ipoRaiseLocal;
         await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = company.Id;

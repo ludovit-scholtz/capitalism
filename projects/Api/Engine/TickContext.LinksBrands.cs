@@ -83,7 +83,7 @@ public sealed partial class TickContext
 
     public decimal GetCompanyAssetValue(Guid companyId)
     {
-        if (!CompaniesById.TryGetValue(companyId, out var company))
+        if (!CompaniesById.ContainsKey(companyId))
         {
             return 0m;
         }
@@ -102,7 +102,7 @@ public sealed partial class TickContext
             ? lots.Sum(Api.Utilities.WealthCalculator.GetLandValue)
             : 0m;
 
-        return company.Cash + buildingValue + inventoryValue + lotValue;
+        return GetCompanyBankBalance(companyId) + buildingValue + inventoryValue + lotValue;
     }
 
     /// <summary>Finds or creates a brand for a company and product.</summary>

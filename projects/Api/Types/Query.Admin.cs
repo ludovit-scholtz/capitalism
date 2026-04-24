@@ -26,6 +26,7 @@ public sealed partial class Query
         var players = await db.Players
             .AsNoTracking()
             .Include(player => player.Companies)
+            .ThenInclude(company => company.BankAccounts)
             .Where(player => player.Id == accessContext.ActorPlayer.Id || player.Id == effectiveUserId)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
 
@@ -69,6 +70,7 @@ public sealed partial class Query
         var players = await db.Players
             .AsNoTracking()
             .Include(player => player.Companies)
+            .ThenInclude(company => company.BankAccounts)
             .OrderBy(player => player.DisplayName)
             .ToListAsync(httpContextAccessor.HttpContext.RequestAborted);
         var companies = players.SelectMany(player => player.Companies).ToList();
@@ -107,8 +109,8 @@ public sealed partial class Query
         {
             ServerKey = masterServerOptions.Value.ServerKey,
             TotalPersonalCash = players.Sum(player => PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId)),
-            TotalCompanyCash = companies.Sum(company => company.Cash),
-            MoneySupply = players.Sum(player => PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId)) + companies.Sum(company => company.Cash),
+            TotalCompanyCash = companies.Sum(CompanyBankingService.GetTotalBalance),
+            MoneySupply = players.Sum(player => PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId)) + companies.Sum(CompanyBankingService.GetTotalBalance),
             ExternalMoneyInflowLast100Ticks = recentLedgerEntries
                 .Where(entry => entry.Amount > 0m)
                 .Where(entry => entry.Category is LedgerCategory.Revenue or LedgerCategory.MediaHouseIncome or LedgerCategory.RentIncome)
@@ -155,7 +157,7 @@ public sealed partial class Query
             IsInvisibleInChat = player.IsInvisibleInChat,
             LastLoginAtUtc = player.LastLoginAtUtc,
             PersonalCash = PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId),
-            TotalCompanyCash = player.Companies.Sum(company => company.Cash),
+            TotalCompanyCash = player.Companies.Sum(CompanyBankingService.GetTotalBalance),
             CompanyCount = player.Companies.Count,
             Companies = player.Companies
                 .OrderBy(company => company.Name)
@@ -163,7 +165,7 @@ public sealed partial class Query
                 {
                     Id = company.Id,
                     Name = company.Name,
-                    Cash = company.Cash,
+                    Cash = CompanyBankingService.GetTotalBalance(company),
                 })
                 .ToList(),
         };

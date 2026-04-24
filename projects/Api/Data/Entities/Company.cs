@@ -21,8 +21,8 @@ public sealed class Company
     [Required, MaxLength(200)]
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Available cash balance in game currency.</summary>
-    public decimal Cash { get; set; }
+    /// <summary>Bank accounts owned by this company.</summary>
+    public ICollection<BankAccount> BankAccounts { get; set; } = new List<BankAccount>();
 
     /// <summary>Total issued shares used for ownership, exchange pricing, and dividend distribution.</summary>
     public decimal TotalSharesIssued { get; set; } = 10_000m;

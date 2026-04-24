@@ -1,5 +1,6 @@
 using Api.Data;
 using Api.Data.Entities;
+using Api.Utilities;
 
 namespace Api.Engine;
 
@@ -122,5 +123,30 @@ public sealed partial class TickContext
         Data.Entities.PowerStatus.Offline     => 0m,
         _                                     => 1m
     };
+
+    public IEnumerable<BankAccount> GetCompanyBankAccounts(Guid companyId)
+        => BankAccountsById.Values.Where(account => account.CompanyId == companyId && account.ClosedAtUtc == null);
+
+    public decimal GetCompanyBankBalance(Guid companyId)
+        => CompanyBankingService.GetTotalBalance(GetCompanyBankAccounts(companyId));
+
+    public BankAccount? GetCompanyFundingAccount(Guid companyId, string? currencyCode = null, Guid? excludeAccountId = null)
+    {
+        var accounts = GetCompanyBankAccounts(companyId);
+        return string.IsNullOrWhiteSpace(currencyCode)
+            ? CompanyBankingService.FindAnyPreferredAccount(accounts, excludeAccountId)
+            : CompanyBankingService.FindPreferredAccount(accounts, currencyCode, excludeAccountId)
+                ?? CompanyBankingService.FindAnyPreferredAccount(accounts, excludeAccountId);
+    }
+
+    public BankAccount? GetBuildingFundingAccount(Building building)
+    {
+        if (building.BankAccountId.HasValue && BankAccountsById.TryGetValue(building.BankAccountId.Value, out var bankAccount))
+        {
+            return bankAccount;
+        }
+
+        return GetCompanyFundingAccount(building.CompanyId, CitiesById.GetValueOrDefault(building.CityId)?.CurrencyCode);
+    }
 
 }

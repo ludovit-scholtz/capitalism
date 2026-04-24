@@ -36,6 +36,10 @@ public sealed partial class Mutation
 
         var unit = await db.BuildingUnits
             .Include(u => u.Building)
+            .ThenInclude(b => b.City)
+            .Include(u => u.Building)
+            .ThenInclude(b => b.BankAccount)
+            .Include(u => u.Building)
             .ThenInclude(b => b.Company)
             .Include(u => u.Building)
             .ThenInclude(b => b.Units)
@@ -77,12 +81,18 @@ public sealed partial class Mutation
 
         var upgradeCost = Engine.GameConstants.UnitUpgradeCost(unit.UnitType, unit.Level);
         var company = unit.Building.Company;
+        var fundingAccount = unit.Building.BankAccount
+            ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
+                db,
+                unit.Building,
+                unit.Building.City?.CurrencyCode,
+                httpContextAccessor.HttpContext!.RequestAborted);
 
-        if (company.Cash < upgradeCost)
+        if (fundingAccount.Balance < upgradeCost)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage($"Insufficient funds. Upgrade costs ${upgradeCost.ToString("N0", CultureInfo.InvariantCulture)} but your company only has ${company.Cash.ToString("N0", CultureInfo.InvariantCulture)}.")
+                    .SetMessage($"Insufficient funds. Upgrade costs ${upgradeCost.ToString("N0", CultureInfo.InvariantCulture)} but bank account {fundingAccount.AccountNumber} only has ${fundingAccount.Balance.ToString("N0", CultureInfo.InvariantCulture)}.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }
@@ -265,7 +275,7 @@ public sealed partial class Mutation
             db.BuildingConfigurationPlans.Add(plan);
         }
 
-        company.Cash -= upgradeCost;
+        fundingAccount.Balance -= upgradeCost;
 
         db.LedgerEntries.Add(new LedgerEntry
         {

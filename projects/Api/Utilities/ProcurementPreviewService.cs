@@ -45,6 +45,8 @@ public static class ProcurementPreviewService
 
         var building = await db.Buildings
             .Include(b => b.Units)
+            .Include(b => b.City)
+            .Include(b => b.BankAccount)
             .FirstOrDefaultAsync(b => b.Id == unit.BuildingId);
 
         if (building is null)
@@ -59,7 +61,10 @@ public static class ProcurementPreviewService
         }
 
         // Check cash before anything else.
-        if (company.Cash <= 0m)
+        var availableBalance = building.BankAccount?.Balance
+            ?? await CompanyBankingService.GetTotalBalanceAsync(db, company.Id);
+
+        if (availableBalance <= 0m)
         {
             return new ProcurementPreview
             {

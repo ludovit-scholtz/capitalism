@@ -148,7 +148,11 @@ public sealed class PowerGridEconomicsPhase : ITickPhase
         }
         else
         {
-            company.Cash += income;
+            var fundingAccount = context.GetCompanyFundingAccount(company.Id, city.CurrencyCode);
+            if (fundingAccount is not null)
+            {
+                fundingAccount.Balance += income;
+            }
         }
 
         context.Db.LedgerEntries.Add(new LedgerEntry
@@ -187,7 +191,11 @@ public sealed class PowerGridEconomicsPhase : ITickPhase
         }
         else
         {
-            company.Cash -= fine;
+            var fundingAccount = context.GetCompanyFundingAccount(company.Id, city.CurrencyCode);
+            if (fundingAccount is not null)
+            {
+                fundingAccount.Balance -= fine;
+            }
         }
 
         context.Db.LedgerEntries.Add(new LedgerEntry

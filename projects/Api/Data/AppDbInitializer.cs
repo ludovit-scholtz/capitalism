@@ -302,8 +302,6 @@ public sealed partial class AppDbInitializer(
                     PowerStatus = Entities.PowerStatus.Powered,
                     BuiltAtUtc = DateTime.UtcNow,
                 });
-
-                govCompany.Cash += baseCapitalRequirement;
             }
 
             var baseDepositId = CreateDeterministicGuid($"gov-bank-base-deposit:{city.Id}");
@@ -365,7 +363,6 @@ public sealed partial class AppDbInitializer(
                 Id = CreateDeterministicGuid("company:government"),
                 PlayerId = govPlayer.Id,
                 Name = GovDisplayName,
-                Cash = 0m,
                 FoundedAtUtc = DateTime.UtcNow,
             };
             dbContext.Companies.Add(govCompany);

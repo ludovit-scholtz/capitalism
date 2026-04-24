@@ -36,14 +36,14 @@ public sealed class TaxPhase : ITickPhase
             var yearlyEntries = yearlyEntriesByCompany.GetValueOrDefault(company.Id, []);
             var taxableIncome = LedgerCalculator.ComputeTaxableIncome(yearlyEntries);
             var incomeTaxDue = GameTime.ComputeEstimatedIncomeTax(taxableIncome, gs.TaxRate);
-            var settledTax = Math.Min(company.Cash, incomeTaxDue);
+            var settledTax = Math.Min(context.GetCompanyBankBalance(company.Id), incomeTaxDue);
 
             if (settledTax <= 0m)
             {
                 continue;
             }
 
-            company.Cash -= settledTax;
+            CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(company.Id), settledTax);
 
             context.Db.LedgerEntries.Add(new LedgerEntry
             {

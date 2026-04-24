@@ -16,8 +16,8 @@ namespace Api.Types;
 public sealed partial class Mutation
 {
     /// <summary>
-    /// Transfers money from the company's cash into the building's assigned bank account.
-    /// If the building has no bank account yet, it is assigned the company's account in
+    /// Transfers money from one company-owned bank account into the building's assigned bank account.
+    /// If the building has no bank account yet, it is assigned a company account in
     /// the building city's currency before the transfer.
     /// </summary>
     [Authorize]
@@ -53,26 +53,35 @@ public sealed partial class Mutation
         }
 
         var company = building.Company;
-
-        if (company.Cash < input.Amount)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage($"Insufficient company cash. Available: {company.Cash:F2} {building.City?.CurrencyCode}.")
-                    .SetCode("INSUFFICIENT_COMPANY_CASH")
-                    .Build());
-        }
+        var cityCurrencyCode = building.City?.CurrencyCode ?? "EUR";
 
         var bankAccount = building.BankAccount
             ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
                 db,
                 building,
-                building.City?.CurrencyCode,
+                cityCurrencyCode,
                 httpContextAccessor.HttpContext!.RequestAborted);
+        var sourceAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            company.Id,
+            cityCurrencyCode,
+            bankAccount.Id,
+            httpContextAccessor.HttpContext!.RequestAborted);
 
-        // Transfer money.
-        company.Cash -= input.Amount;
-        bankAccount.Balance += input.Amount;
+        if (sourceAccount.Id != bankAccount.Id && sourceAccount.Balance < input.Amount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Insufficient company funds. Source account {sourceAccount.AccountNumber} has {sourceAccount.Balance:F2} {cityCurrencyCode} available.")
+                    .SetCode("INSUFFICIENT_COMPANY_CASH")
+                    .Build());
+        }
+
+        if (sourceAccount.Id != bankAccount.Id)
+        {
+            sourceAccount.Balance -= input.Amount;
+            bankAccount.Balance += input.Amount;
+        }
 
         // Clear any suspension that was due to insufficient funds.
         if (building.SuspendedReason?.StartsWith("INSUFFICIENT_FUNDS", StringComparison.Ordinal) == true)
@@ -86,7 +95,10 @@ public sealed partial class Mutation
         return new FundBuildingBankAccountResult
         {
             BankAccount = BuildingBankAccountInfoFromEntity(building, building.BankAccount),
-            RemainingCompanyCash = company.Cash,
+            RemainingCompanyCash = await CompanyBankingService.GetTotalBalanceAsync(
+                db,
+                company.Id,
+                httpContextAccessor.HttpContext!.RequestAborted),
         };
     }
 
@@ -256,5 +268,49 @@ public sealed partial class Mutation
         var bytes = RandomNumberGenerator.GetBytes(8);
         var value = BitConverter.ToUInt64(bytes, 0);
         return (value % 10_000_000_000_000_000UL).ToString("D16");
+    }
+
+    private static async Task<List<BankAccount>> LoadActiveCompanyBankAccountsAsync(
+        AppDbContext db,
+        Guid companyId,
+        CancellationToken cancellationToken = default)
+    {
+        return await db.BankAccounts
+            .Where(account => account.CompanyId == companyId && account.ClosedAtUtc == null)
+            .ToListAsync(cancellationToken);
+    }
+
+    private static async Task<BankAccount> ResolveCompanyTransferAccountAsync(
+        AppDbContext db,
+        Guid companyId,
+        string currencyCode,
+        Guid? excludeAccountId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var account = await CompanyBankingService.FindPreferredAccountAsync(
+            db,
+            companyId,
+            currencyCode,
+            excludeAccountId,
+            cancellationToken);
+
+        if (account is not null)
+        {
+            return account;
+        }
+
+        var newAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = GenerateRandomAccountNumber(),
+            CurrencyCode = currencyCode.ToUpperInvariant(),
+            Balance = 0m,
+            CompanyId = companyId,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+
+        db.BankAccounts.Add(newAccount);
+        return newAccount;
     }
 }

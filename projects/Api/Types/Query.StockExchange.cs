@@ -19,6 +19,7 @@ public sealed partial class Query
     {
         var companies = await db.Companies
             .AsNoTracking()
+            .Include(company => company.BankAccounts)
             .OrderBy(company => company.Name)
             .ToListAsync();
         var buildings = await db.Buildings.AsNoTracking().ToListAsync();
@@ -95,6 +96,7 @@ public sealed partial class Query
     {
         var companies = await db.Companies
             .AsNoTracking()
+            .Include(company => company.BankAccounts)
             .OrderBy(company => company.Name)
             .ToListAsync();
         var targetCompany = companies.FirstOrDefault(company => company.Id == companyId);

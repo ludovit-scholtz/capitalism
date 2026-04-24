@@ -41,15 +41,16 @@ public sealed class MediaHouseContentPhase : ITickPhase
             // 2. Apply content budget spend.
             if (building.ContentBudgetPerTick is null or <= 0m) continue;
             if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company)) continue;
-            if (company.Cash <= 0m) continue;
+            var fundingAccount = context.GetBuildingFundingAccount(building);
+            if (fundingAccount is null || fundingAccount.Balance <= 0m) continue;
 
-            var spend = Math.Min(building.ContentBudgetPerTick.Value, company.Cash);
+            var spend = Math.Min(building.ContentBudgetPerTick.Value, fundingAccount.Balance);
             if (spend <= 0m) continue;
 
             var efficiency = GameConstants.MediaHouseContentEfficiency(building.Level);
             var contentGain = spend * efficiency;
 
-            company.Cash -= spend;
+            fundingAccount.Balance -= spend;
             building.ContentValue += contentGain;
 
             context.Db.LedgerEntries.Add(new LedgerEntry

@@ -158,48 +158,22 @@ public sealed partial class Mutation
         var totalCost = lot.Price + constructionCost;
 
         var cityCurrencyCode = lot.City?.CurrencyCode ?? "EUR";
-        var requiresCurrencyBalance = validateDestinationCurrency &&
-            !string.Equals(cityCurrencyCode, "EUR", StringComparison.OrdinalIgnoreCase);
+        var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, company.Id, cityCurrencyCode);
 
-        if (requiresCurrencyBalance)
+        if (fundingAccount.Balance < totalCost)
         {
-            // Non-EUR city: validate and deduct from the player's local-currency bank account.
-            var playerBalance = await PersonalBankAccountService.GetTrackedAccountAsync(db, company.PlayerId, cityCurrencyCode);
+            var errorCode = validateDestinationCurrency && !string.Equals(cityCurrencyCode, "EUR", StringComparison.OrdinalIgnoreCase)
+                ? "INSUFFICIENT_LOCAL_CURRENCY_FUNDS"
+                : "INSUFFICIENT_FUNDS";
 
-            if (playerBalance is null)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage($"No {cityCurrencyCode} account found. Visit the Forex Exchange to swap EUR for {cityCurrencyCode} and open a {cityCurrencyCode} balance before purchasing property in this city.")
-                        .SetCode("MISSING_CURRENCY_ACCOUNT")
-                        .Build());
-            }
-
-            if (playerBalance.Balance < totalCost)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage($"Insufficient {cityCurrencyCode} funds. This purchase requires {totalCost.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode}, but you only have {playerBalance.Balance.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode}. Visit the Forex Exchange to add more {cityCurrencyCode}.")
-                        .SetCode("INSUFFICIENT_LOCAL_CURRENCY_FUNDS")
-                        .Build());
-            }
-
-            playerBalance.Balance -= totalCost;
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Insufficient {cityCurrencyCode} company funds. This purchase requires {totalCost.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode}, but company account {fundingAccount.AccountNumber} only has {fundingAccount.Balance.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode}.")
+                    .SetCode(errorCode)
+                    .Build());
         }
-        else
-        {
-            // EUR city or onboarding path: use company cash.
-            if (company.Cash < totalCost)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage($"Insufficient funds. This lot costs ${lot.Price.ToString("N0", CultureInfo.InvariantCulture)} and construction costs ${constructionCost.ToString("N0", CultureInfo.InvariantCulture)}, total ${totalCost.ToString("N0", CultureInfo.InvariantCulture)}, but you only have ${company.Cash.ToString("N0", CultureInfo.InvariantCulture)}.")
-                        .SetCode("INSUFFICIENT_FUNDS")
-                        .Build());
-            }
 
-            company.Cash -= totalCost;
-        }
+        fundingAccount.Balance -= totalCost;
 
         var constructionTicks = applyConstructionDelay ? Engine.GameConstants.ConstructionTicks(buildingType) : 0;
 

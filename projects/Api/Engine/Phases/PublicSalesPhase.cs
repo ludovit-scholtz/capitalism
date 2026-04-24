@@ -315,7 +315,11 @@ public sealed class PublicSalesPhase : ITickPhase
                     offer.Inventory.ProductTypeId,
                     outflowQuantity: sold);
                 context.WithdrawInventory(offer.Inventory, sold);
-                offer.Company.Cash += sold * offer.Price;
+                var fundingAccount = context.GetBuildingFundingAccount(offer.Building);
+                if (fundingAccount is not null)
+                {
+                    fundingAccount.Balance += sold * offer.Price;
+                }
                 unitSoldTotals[offer.Unit.Id] = unitSoldSoFar + sold;
             }
 

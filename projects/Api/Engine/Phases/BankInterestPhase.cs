@@ -1,5 +1,6 @@
 using Api.Data.Entities;
 using Api.Types;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Engine.Phases;
@@ -85,11 +86,11 @@ public sealed class BankInterestPhase : ITickPhase
                     continue;
 
                 // Pay what the bank can from own cash; central bank covers the rest
-                var actualPaid = Math.Min(interestThisTick, Math.Max(0m, bankCompany.Cash));
+                var actualPaid = Math.Min(interestThisTick, Math.Max(0m, context.GetCompanyBankBalance(bankCompany.Id)));
                 var shortfall = interestThisTick - actualPaid;
 
-                bankCompany.Cash -= actualPaid;
-                depositor.Cash += interestThisTick; // depositor always gets the full amount
+                CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(bankCompany.Id), actualPaid);
+                deposit.Balance += interestThisTick;
                 deposit.TotalInterestPaid += interestThisTick;
 
                 if (shortfall > 0m)
@@ -160,8 +161,8 @@ public sealed class BankInterestPhase : ITickPhase
             if (cbInterest > 0m)
             {
                 // Interest compounds onto the debt if bank can't afford it
-                var interestPaid = Math.Min(cbInterest, Math.Max(0m, bankCompany.Cash));
-                bankCompany.Cash -= interestPaid;
+                var interestPaid = Math.Min(cbInterest, Math.Max(0m, context.GetCompanyBankBalance(bankCompany.Id)));
+                CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(bankCompany.Id), interestPaid);
                 bank.CentralBankDebt += cbInterest - interestPaid; // unpaid interest compounds
 
                 context.Db.LedgerEntries.Add(new LedgerEntry
@@ -179,11 +180,11 @@ public sealed class BankInterestPhase : ITickPhase
 
             // Auto-repay central-bank debt with any surplus cash (above reserve requirement)
             var reserveNeeded = bank.TotalDeposits * 0.10m;
-            var surplusCash = bankCompany.Cash - reserveNeeded;
+            var surplusCash = context.GetCompanyBankBalance(bankCompany.Id) - reserveNeeded;
             if (surplusCash > 0m && bank.CentralBankDebt > 0m)
             {
                 var repayment = Math.Min(surplusCash, bank.CentralBankDebt);
-                bankCompany.Cash -= repayment;
+                CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(bankCompany.Id), repayment);
                 bank.CentralBankDebt -= repayment;
 
                 context.Db.LedgerEntries.Add(new LedgerEntry

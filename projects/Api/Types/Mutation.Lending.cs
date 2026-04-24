@@ -2,6 +2,7 @@ using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -337,8 +338,10 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        var lenderAccounts = await LoadActiveCompanyBankAccountsAsync(db, offer.LenderCompanyId, httpContextAccessor.HttpContext!.RequestAborted);
+
         // Lender must have the cash.
-        if (offer.LenderCompany.Cash < input.PrincipalAmount)
+        if (CompanyBankingService.GetTotalBalance(lenderAccounts) < input.PrincipalAmount)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -415,10 +418,15 @@ public sealed partial class Mutation
             * ((decimal)offer.DurationTicks / GameConstants.TicksPerYear);
         var totalRepayment = input.PrincipalAmount + totalInterest;
         var paymentAmount = decimal.Round(totalRepayment / totalPayments, 4, MidpointRounding.AwayFromZero);
+        var borrowerAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            borrower.Id,
+            offer.BankBuilding?.City?.CurrencyCode ?? "EUR",
+            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
 
         // Transfer cash.
-        offer.LenderCompany.Cash -= input.PrincipalAmount;
-        borrower.Cash += input.PrincipalAmount;
+        CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
+        borrowerAccount.Balance += input.PrincipalAmount;
         offer.UsedCapacity += input.PrincipalAmount;
 
         var loan = new Loan
