@@ -549,7 +549,12 @@ watch(activeTab, async (tab) => {
                       :accounts="myBankAccounts"
                       :label="t('forex.sourceAccount')"
                       id="from-bank-account"
-                      @update:model-value="() => { quote = null; showConfirm = false }"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
                     />
                   </template>
                   <template v-else>
@@ -558,7 +563,12 @@ watch(activeTab, async (tab) => {
                       :balances="toBalances"
                       :label="t('forex.sourceCurrency')"
                       id="from-currency"
-                      @update:model-value="() => { quote = null; showConfirm = false }"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
                     />
                   </template>
                 </div>
@@ -580,7 +590,10 @@ watch(activeTab, async (tab) => {
                       step="any"
                       :placeholder="t('forex.amountPlaceholder')"
                       class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
-                      @input="quote = null; showConfirm = false"
+                      @input="
+                        quote = null
+                        showConfirm = false
+                      "
                     />
                   </div>
                   <span class="field-hint text-xs text-muted mt-0.5"> {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }} </span>
@@ -608,7 +621,12 @@ watch(activeTab, async (tab) => {
                       :accounts="myBankAccounts"
                       :label="t('forex.destAccount')"
                       id="to-bank-account"
-                      @update:model-value="() => { quote = null; showConfirm = false }"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
                     />
                   </template>
                   <template v-else>
@@ -617,7 +635,12 @@ watch(activeTab, async (tab) => {
                       :balances="toBalances"
                       :label="t('forex.targetCurrency')"
                       id="to-currency"
-                      @update:model-value="() => { quote = null; showConfirm = false }"
+                      @update:model-value="
+                        () => {
+                          quote = null
+                          showConfirm = false
+                        }
+                      "
                     />
                   </template>
                 </div>

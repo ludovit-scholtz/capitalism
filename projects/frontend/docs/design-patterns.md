@@ -18,15 +18,15 @@ The guidance below follows the same principles used by mature design systems suc
 
 Use these Tailwind values by default:
 
-| Intent | Pixels | Tailwind |
-| --- | --- | --- |
-| Micro spacing inside tight UI | 8 | `gap-2`, `px-2`, `py-2` |
-| Compact component spacing | 12 | `gap-3`, `px-3`, `py-3` |
-| Standard component spacing | 16 | `gap-4`, `px-4`, `py-4` |
-| Comfortable card/form spacing | 24 | `gap-6`, `px-6`, `py-6` |
-| Section separation | 32 | `gap-8`, `py-8` |
-| Major page section separation | 40 to 48 | `gap-10`, `gap-12`, `py-10`, `py-12` |
-| Hero and large layout separation | 64+ | `py-16`, `py-20`, `pt-8`, `pb-20` |
+| Intent                           | Pixels   | Tailwind                             |
+| -------------------------------- | -------- | ------------------------------------ |
+| Micro spacing inside tight UI    | 8        | `gap-2`, `px-2`, `py-2`              |
+| Compact component spacing        | 12       | `gap-3`, `px-3`, `py-3`              |
+| Standard component spacing       | 16       | `gap-4`, `px-4`, `py-4`              |
+| Comfortable card/form spacing    | 24       | `gap-6`, `px-6`, `py-6`              |
+| Section separation               | 32       | `gap-8`, `py-8`                      |
+| Major page section separation    | 40 to 48 | `gap-10`, `gap-12`, `py-10`, `py-12` |
+| Hero and large layout separation | 64+      | `py-16`, `py-20`, `pt-8`, `pb-20`    |
 
 Avoid arbitrary values unless optical balancing is genuinely needed.
 

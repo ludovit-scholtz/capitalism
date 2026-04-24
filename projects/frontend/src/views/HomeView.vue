@@ -124,9 +124,7 @@ useTickRefresh(() => loadHomeData(true))
         <table class="w-full min-w-[38rem] border-collapse">
           <thead class="bg-card-raised">
             <tr>
-              <th class="w-20 border-b border-divider px-8 py-5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted">
-                #
-              </th>
+              <th class="w-20 border-b border-divider px-8 py-5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted">#</th>
               <th class="border-b border-divider px-8 py-5 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted">
                 {{ t('home.playerName') }}
               </th>
