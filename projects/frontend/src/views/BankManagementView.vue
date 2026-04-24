@@ -9,16 +9,7 @@ import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
 import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, CollateralEligibilitySummary } from '@/types'
-import {
-  formatLoanDuration,
-  formatCurrency,
-  formatPercent,
-  loanStatusClass,
-  computeCapacityUsedPercent,
-  computeTotalRepayment,
-  computePaymentAmount,
-  computeTotalPayments,
-} from '@/lib/loanHelpers'
+import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass, computeCapacityUsedPercent, computeTotalRepayment, computePaymentAmount, computeTotalPayments } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -40,9 +31,7 @@ const userCompanies = ref<Company[]>([])
 // (uses company buildings from me query, not bankInfo.lenderCompanyId)
 const isOwner = computed(() => {
   if (!auth.isAuthenticated) return false
-  return userCompanies.value.some((c) =>
-    (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'),
-  )
+  return userCompanies.value.some((c) => (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'))
 })
 
 // Customer-specific state
@@ -331,8 +320,8 @@ const MY_LOANS_QUERY = `
 `
 
 const CREATE_DEPOSIT_MUTATION = `
-  mutation CreateDeposit($input: CreateDepositInput!) {
-    createDeposit(input: $input) {
+  mutation OpenBankAccount($input: OpenBankAccountInput!) {
+    openBankAccount(input: $input) {
       id
       amount
       depositInterestRatePercent
@@ -354,8 +343,8 @@ const TOP_UP_DEPOSIT_MUTATION = `
 `
 
 const WITHDRAW_DEPOSIT_MUTATION = `
-  mutation WithdrawDeposit($input: WithdrawDepositInput!) {
-    withdrawDeposit(input: $input) {
+  mutation CloseBankAccount($input: CloseBankAccountInput!) {
+    closeBankAccount(input: $input) {
       id
       amount
       isActive
@@ -426,16 +415,12 @@ async function loadData(isRefresh = false) {
       gqlRequest<{ bankInfo: BankInfoSummary }>(BANK_INFO_QUERY, {
         id: bankBuildingId.value,
       }),
-      auth.isAuthenticated
-        ? gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY)
-        : Promise.resolve({ me: { companies: [] } }),
+      auth.isAuthenticated ? gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY) : Promise.resolve({ me: { companies: [] } }),
     ])
     bankInfo.value = infoResult.bankInfo ?? null
     userCompanies.value = companiesResult.me?.companies ?? []
 
-    const ownerDetected = userCompanies.value.some((c) =>
-      (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'),
-    )
+    const ownerDetected = userCompanies.value.some((c) => (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'))
 
     if (ownerDetected) {
       // Owner view: load full management data
@@ -448,9 +433,7 @@ async function loadData(isRefresh = false) {
           id: bankBuildingId.value,
         }),
       ])
-      const filtered = (offersResult.myLoanOffers ?? []).filter(
-        (o) => o.bankBuildingId === bankBuildingId.value,
-      )
+      const filtered = (offersResult.myLoanOffers ?? []).filter((o) => o.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myOffers.value, filtered)) {
         myOffers.value = filtered
       }
@@ -470,28 +453,18 @@ async function loadData(isRefresh = false) {
       // Customer view: load public loan offers, my deposits, and my loans at this bank
       const [offersResult, depositsResult, myLoansResult] = await Promise.all([
         gqlRequest<{ loanOffers: LoanOfferSummary[] }>(PUBLIC_LOAN_OFFERS_QUERY),
-        auth.isAuthenticated
-          ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY)
-          : Promise.resolve({ myDeposits: [] }),
-        auth.isAuthenticated
-          ? gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY)
-          : Promise.resolve({ myLoans: [] }),
+        auth.isAuthenticated ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY) : Promise.resolve({ myDeposits: [] }),
+        auth.isAuthenticated ? gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY) : Promise.resolve({ myLoans: [] }),
       ])
-      const bankOffers = (offersResult.loanOffers ?? []).filter(
-        (o) => o.bankBuildingId === bankBuildingId.value && o.isActive,
-      )
+      const bankOffers = (offersResult.loanOffers ?? []).filter((o) => o.bankBuildingId === bankBuildingId.value && o.isActive)
       if (!deepEqual(bankLoanOffers.value, bankOffers)) {
         bankLoanOffers.value = bankOffers
       }
-      const myDeposits = (depositsResult.myDeposits ?? []).filter(
-        (d) => d.bankBuildingId === bankBuildingId.value,
-      )
+      const myDeposits = (depositsResult.myDeposits ?? []).filter((d) => d.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myDepositsHere.value, myDeposits)) {
         myDepositsHere.value = myDeposits
       }
-      const loansHere = (myLoansResult.myLoans ?? []).filter(
-        (l: LoanSummary) => l.bankBuildingId === bankBuildingId.value,
-      )
+      const loansHere = (myLoansResult.myLoans ?? []).filter((l: LoanSummary) => l.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myLoansHere.value, loansHere)) {
         myLoansHere.value = loansHere
       }
@@ -519,17 +492,9 @@ const cityCurrency = computed(() => bankInfo.value?.cityCurrencyCode ?? 'EUR')
 /** Helper: format an amount in the bank's local city currency. */
 const fmt = (amount: number) => formatCurrency(amount, cityCurrency.value)
 
-const totalIssuedCapacity = computed(() =>
-  issuedLoans.value
-    .filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE')
-    .reduce((sum, l) => sum + l.remainingPrincipal, 0),
-)
+const totalIssuedCapacity = computed(() => issuedLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE').reduce((sum, l) => sum + l.remainingPrincipal, 0))
 
-const expectedMonthlyIncome = computed(() =>
-  issuedLoans.value
-    .filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE')
-    .reduce((sum, l) => sum + l.paymentAmount, 0),
-)
+const expectedMonthlyIncome = computed(() => issuedLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE').reduce((sum, l) => sum + l.paymentAmount, 0))
 
 async function publishOffer() {
   if (!bankBuildingId.value) return
@@ -596,10 +561,7 @@ async function submitBaseDeposit() {
   baseDepositError.value = null
   baseDepositSuccess.value = false
   try {
-    const result = await gqlRequest<{ initiateBaseDeposit: BankInfoSummary }>(
-      INITIATE_BASE_DEPOSIT_MUTATION,
-      { bankBuildingId: bankBuildingId.value },
-    )
+    const result = await gqlRequest<{ initiateBaseDeposit: BankInfoSummary }>(INITIATE_BASE_DEPOSIT_MUTATION, { bankBuildingId: bankBuildingId.value })
     bankInfo.value = result.initiateBaseDeposit
     baseDepositSuccess.value = true
     await loadData(true)
@@ -613,31 +575,19 @@ async function submitBaseDeposit() {
 // ── Customer view helpers ─────────────────────────────────────────────────────
 
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
-const isCompanyAccountActive = computed(
-  () => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value,
-)
+const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 
 // Account-style aggregation: treat all active non-base-capital deposits from active company as one account
-const myActiveDepositsHere = computed(() =>
-  myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital),
-)
-const myAccountBalance = computed(() =>
-  myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0),
-)
-const myAccountInterestEarned = computed(() =>
-  myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0),
-)
+const myActiveDepositsHere = computed(() => myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital))
+const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
+const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
 // The most recent active deposit (for top-up), the oldest for partial withdraw
 const myLatestDeposit = computed<BankDepositSummary | null>(() => {
-  const sorted = [...myActiveDepositsHere.value].sort(
-    (a, b) => b.depositedAtTick - a.depositedAtTick,
-  )
+  const sorted = [...myActiveDepositsHere.value].sort((a, b) => b.depositedAtTick - a.depositedAtTick)
   return sorted[0] ?? null
 })
 const myOldestDeposit = computed<BankDepositSummary | null>(() => {
-  const sorted = [...myActiveDepositsHere.value].sort(
-    (a, b) => a.depositedAtTick - b.depositedAtTick,
-  )
+  const sorted = [...myActiveDepositsHere.value].sort((a, b) => a.depositedAtTick - b.depositedAtTick)
   return sorted[0] ?? null
 })
 
@@ -656,7 +606,9 @@ async function submitCustomerDeposit() {
     })
     customerDepositSuccess.value = true
     await loadData()
-    setTimeout(() => { customerDepositSuccess.value = false }, 3000)
+    setTimeout(() => {
+      customerDepositSuccess.value = false
+    }, 3000)
   } catch (err) {
     customerDepositError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -681,7 +633,9 @@ async function submitTopUp() {
     showTopUpForm.value = false
     topUpAmount.value = 10_000
     await loadData()
-    setTimeout(() => { topUpSuccess.value = false }, 3000)
+    setTimeout(() => {
+      topUpSuccess.value = false
+    }, 3000)
   } catch (err) {
     topUpError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -707,7 +661,9 @@ async function submitWithdraw() {
     showWithdrawForm.value = false
     withdrawAmount.value = 0
     await loadData()
-    setTimeout(() => { withdrawSuccess.value = false }, 3000)
+    setTimeout(() => {
+      withdrawSuccess.value = false
+    }, 3000)
   } catch (err) {
     withdrawError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -732,7 +688,9 @@ async function submitCustomerLoan() {
     customerLoanSuccess.value = true
     closeLoanModal()
     await loadData()
-    setTimeout(() => { customerLoanSuccess.value = false }, 3000)
+    setTimeout(() => {
+      customerLoanSuccess.value = false
+    }, 3000)
   } catch (err) {
     customerLoanError.value = err instanceof Error ? err.message : String(err)
   } finally {
@@ -772,8 +730,8 @@ function closeLoanModal() {
   collateralLoadError.value = null
 }
 
-const selectedCollateral = computed<CollateralEligibilitySummary | null>(() =>
-  collateralBuildings.value.find((b: CollateralEligibilitySummary) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
+const selectedCollateral = computed<CollateralEligibilitySummary | null>(
+  () => collateralBuildings.value.find((b: CollateralEligibilitySummary) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
 )
 
 const collateralCapacityWarning = computed(() => {
@@ -786,20 +744,12 @@ const collateralCapacityWarning = computed(() => {
 
 const estimatedCustomerTotalRepayment = computed(() => {
   if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
-  return computeTotalRepayment(
-    customerLoanPrincipal.value,
-    customerLoanOffer.value.annualInterestRatePercent,
-    customerLoanOffer.value.durationTicks,
-  )
+  return computeTotalRepayment(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, customerLoanOffer.value.durationTicks)
 })
 
 const estimatedCustomerPaymentAmount = computed(() => {
   if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
-  return computePaymentAmount(
-    customerLoanPrincipal.value,
-    customerLoanOffer.value.annualInterestRatePercent,
-    customerLoanOffer.value.durationTicks,
-  )
+  return computePaymentAmount(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, customerLoanOffer.value.durationTicks)
 })
 
 const estimatedCustomerTotalPayments = computed(() => {
@@ -844,358 +794,335 @@ const estimatedCustomerTotalPayments = computed(() => {
     <template v-else>
       <!-- ── OWNER VIEW ─────────────────────────────────────────────── -->
       <template v-if="isOwner">
-
-      <!-- ── Base Capital Deposit Required ────────────────────────── -->
-      <div v-if="bankInfo && !bankInfo.baseCapitalDeposited" class="base-deposit-required">
-        <div class="base-deposit-icon" aria-hidden="true">🏦</div>
-        <div class="base-deposit-body">
-          <h2 class="base-deposit-title">{{ t('bank.baseDepositRequired') }}</h2>
-          <p class="base-deposit-description">
-            {{ t('bank.baseDepositRequiredBody', {
-              amount: fmt(bankInfo.baseCapitalRequirement ?? 10_000_000),
-            }) }}
-          </p>
-          <p class="base-deposit-hint">
-            {{ t('bank.baseCapitalRequired', {
-              amount: fmt(bankInfo.baseCapitalRequirement ?? 10_000_000),
-              currency: bankInfo.cityCurrencyCode ?? 'EUR',
-            }) }}
-          </p>
-          <p v-if="bankInfo.cityCurrencyCode && bankInfo.cityCurrencyCode !== 'EUR'" class="base-deposit-currency-note">
-            <span class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
-            {{ bankInfo.cityCurrencySymbol }}{{ (bankInfo.baseCapitalRequirement ?? 0).toLocaleString() }}
-            {{ t('bank.localCurrencyNote') }}
-          </p>
-        </div>
-        <div v-if="baseDepositError" class="error-message">{{ baseDepositError }}</div>
-        <div v-if="baseDepositSuccess" class="success-message">{{ t('bank.baseDepositSuccess') }}</div>
-        <button
-          class="btn btn-primary base-deposit-btn"
-          :disabled="baseDepositLoading"
-          @click="submitBaseDeposit"
-        >
-          {{ baseDepositLoading ? t('common.loading') : t('bank.makeBaseDeposit') }}
-        </button>
-      </div>
-
-      <!-- Bank Info & Rate Configuration (visible to owner regardless of activation status) -->
-      <div v-if="bankInfo" class="bank-info-section">
-        <div class="bank-info-header">
-          <h2>{{ t('bank.bankRates') }}</h2>
-          <button class="btn btn-secondary btn-sm" @click="showRatesForm = !showRatesForm">
-            {{ showRatesForm ? t('common.cancel') : t('bank.setBankRates') }}
+        <!-- ── Base Capital Deposit Required ────────────────────────── -->
+        <div v-if="bankInfo && !bankInfo.baseCapitalDeposited" class="base-deposit-required">
+          <div class="base-deposit-icon" aria-hidden="true">🏦</div>
+          <div class="base-deposit-body">
+            <h2 class="base-deposit-title">{{ t('bank.baseDepositRequired') }}</h2>
+            <p class="base-deposit-description">
+              {{
+                t('bank.baseDepositRequiredBody', {
+                  amount: fmt(bankInfo.baseCapitalRequirement ?? 10_000_000),
+                })
+              }}
+            </p>
+            <p class="base-deposit-hint">
+              {{
+                t('bank.baseCapitalRequired', {
+                  amount: fmt(bankInfo.baseCapitalRequirement ?? 10_000_000),
+                  currency: bankInfo.cityCurrencyCode ?? 'EUR',
+                })
+              }}
+            </p>
+            <p v-if="bankInfo.cityCurrencyCode && bankInfo.cityCurrencyCode !== 'EUR'" class="base-deposit-currency-note">
+              <span class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
+              {{ bankInfo.cityCurrencySymbol }}{{ (bankInfo.baseCapitalRequirement ?? 0).toLocaleString() }}
+              {{ t('bank.localCurrencyNote') }}
+            </p>
+          </div>
+          <div v-if="baseDepositError" class="error-message">{{ baseDepositError }}</div>
+          <div v-if="baseDepositSuccess" class="success-message">{{ t('bank.baseDepositSuccess') }}</div>
+          <button class="btn btn-primary base-deposit-btn" :disabled="baseDepositLoading" @click="submitBaseDeposit">
+            {{ baseDepositLoading ? t('common.loading') : t('bank.makeBaseDeposit') }}
           </button>
         </div>
 
-        <!-- Rates form -->
-        <div v-if="showRatesForm" class="rates-form">
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="deposit-rate">{{ t('bank.depositInterestRate') }} (%)</label>
-              <input
-                id="deposit-rate"
-                v-model.number="ratesForm.depositInterestRatePercent"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                class="form-input"
-              />
+        <!-- Bank Info & Rate Configuration (visible to owner regardless of activation status) -->
+        <div v-if="bankInfo" class="bank-info-section">
+          <div class="bank-info-header">
+            <h2>{{ t('bank.bankRates') }}</h2>
+            <button class="btn btn-secondary btn-sm" @click="showRatesForm = !showRatesForm">
+              {{ showRatesForm ? t('common.cancel') : t('bank.setBankRates') }}
+            </button>
+          </div>
+
+          <!-- Rates form -->
+          <div v-if="showRatesForm" class="rates-form">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="deposit-rate">{{ t('bank.depositInterestRate') }} (%)</label>
+                <input id="deposit-rate" v-model.number="ratesForm.depositInterestRatePercent" type="number" min="0" max="100" step="0.1" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label for="lending-rate">{{ t('bank.lendingInterestRate') }} (%)</label>
+                <input id="lending-rate" v-model.number="ratesForm.lendingInterestRatePercent" type="number" min="0.1" max="200" step="0.1" class="form-input" />
+              </div>
             </div>
-            <div class="form-group">
-              <label for="lending-rate">{{ t('bank.lendingInterestRate') }} (%)</label>
-              <input
-                id="lending-rate"
-                v-model.number="ratesForm.lendingInterestRatePercent"
-                type="number"
-                min="0.1"
-                max="200"
-                step="0.1"
-                class="form-input"
-              />
+            <div v-if="ratesError" class="error-message">{{ ratesError }}</div>
+            <button class="btn btn-primary" :disabled="ratesLoading" @click="saveRates">
+              {{ ratesLoading ? t('common.loading') : t('bank.setBankRates') }}
+            </button>
+          </div>
+          <!-- Success message shown outside the form so it persists after the form closes -->
+          <div v-if="ratesSuccess && !showRatesForm" class="success-message rates-success">
+            {{ t('bank.ratesUpdated') }}
+          </div>
+
+          <!-- Bank stats panel -->
+          <div class="bank-stats-grid">
+            <div class="bank-stat">
+              <span class="bank-stat-label">{{ t('bank.depositInterestRate') }}</span>
+              <span class="bank-stat-value deposit-rate">{{ formatPercent(bankInfo.depositInterestRatePercent) }}</span>
             </div>
-          </div>
-          <div v-if="ratesError" class="error-message">{{ ratesError }}</div>
-          <button class="btn btn-primary" :disabled="ratesLoading" @click="saveRates">
-            {{ ratesLoading ? t('common.loading') : t('bank.setBankRates') }}
-          </button>
-        </div>
-        <!-- Success message shown outside the form so it persists after the form closes -->
-        <div v-if="ratesSuccess && !showRatesForm" class="success-message rates-success">
-          {{ t('bank.ratesUpdated') }}
-        </div>
-
-        <!-- Bank stats panel -->
-        <div class="bank-stats-grid">
-          <div class="bank-stat">
-            <span class="bank-stat-label">{{ t('bank.depositInterestRate') }}</span>
-            <span class="bank-stat-value deposit-rate">{{ formatPercent(bankInfo.depositInterestRatePercent) }}</span>
-          </div>
-          <div class="bank-stat">
-            <span class="bank-stat-label">{{ t('bank.lendingInterestRate') }}</span>
-            <span class="bank-stat-value lending-rate">{{ formatPercent(bankInfo.lendingInterestRatePercent) }}</span>
-          </div>
-          <div class="bank-stat">
-            <span class="bank-stat-label">{{ t('bank.totalDeposits') }}</span>
-            <span class="bank-stat-value">{{ fmt(bankInfo.totalDeposits) }}</span>
-          </div>
-          <div class="bank-stat">
-            <span class="bank-stat-label">{{ t('bank.lendableCapacity') }}</span>
-            <span class="bank-stat-value">{{ fmt(bankInfo.lendableCapacity) }}</span>
-            <span class="bank-stat-hint">{{ t('bank.reserveInfo') }}</span>
-          </div>
-          <div class="bank-stat">
-            <span class="bank-stat-label">{{ t('bank.availableLendingCapacity') }}</span>
-            <span class="bank-stat-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'negative'">
-              {{ fmt(bankInfo.availableLendingCapacity) }}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Liquidity Health Panel (owner view) ──────────────────────────── -->
-      <section v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" class="liquidity-section">
-        <h2 class="section-title">{{ t('bank.liquidityHealth') }}</h2>
-        <div class="liquidity-status-banner" :class="`liquidity-${bankInfo.liquidityStatus.toLowerCase()}`">
-          <span class="liquidity-status-label">{{ t(`bank.liquidityStatus.${bankInfo.liquidityStatus}`) }}</span>
-          <span class="liquidity-status-hint">{{ t(`bank.liquidityStatusHint.${bankInfo.liquidityStatus}`) }}</span>
-        </div>
-
-        <div class="liquidity-grid">
-          <div class="liquidity-stat">
-            <span class="liquidity-stat-label">{{ t('bank.availableCash') }}</span>
-            <span class="liquidity-stat-value" :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'">
-              {{ fmt(bankInfo.availableCash ?? 0) }}
-            </span>
-          </div>
-          <div class="liquidity-stat">
-            <span class="liquidity-stat-label">{{ t('bank.reserveRequirement') }}</span>
-            <span class="liquidity-stat-value">{{ fmt(bankInfo.reserveRequirement ?? 0) }}</span>
-            <span class="liquidity-stat-hint">{{ t('bank.reserveInfo') }}</span>
-          </div>
-          <div class="liquidity-stat">
-            <span class="liquidity-stat-label">{{ t('bank.reserveShortfall') }}</span>
-            <span class="liquidity-stat-value" :class="(bankInfo.reserveShortfall ?? 0) > 0 ? 'negative' : 'positive'">
-              {{ (bankInfo.reserveShortfall ?? 0) > 0 ? fmt(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
-            </span>
-          </div>
-          <div class="liquidity-stat" :class="{ 'liquidity-stat-warning': (bankInfo.centralBankDebt ?? 0) > 0 }">
-            <span class="liquidity-stat-label">{{ t('bank.centralBankDebt') }}</span>
-            <span class="liquidity-stat-value" :class="(bankInfo.centralBankDebt ?? 0) > 0 ? 'negative' : 'positive'">
-              {{ (bankInfo.centralBankDebt ?? 0) > 0 ? fmt(bankInfo.centralBankDebt) : fmt(0) }}
-            </span>
-            <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint">
-              {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a.
-            </span>
-          </div>
-        </div>
-
-        <!-- Central-bank debt context -->
-        <div v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="central-bank-notice">
-          <div class="notice-icon">⚠</div>
-          <div class="notice-body">
-            <strong>{{ t('bank.centralBankDebt') }}</strong>
-            <p>{{ t('bank.centralBankDebtHint', { rate: (bankInfo.centralBankInterestRatePercent ?? 2).toFixed(2) }) }}</p>
-          </div>
-        </div>
-
-        <!-- Recommended actions when under pressure -->
-        <div v-if="bankInfo.liquidityStatus !== 'HEALTHY'" class="recommended-actions">
-          <h3 class="actions-title">{{ t('bank.recommendedActions') }}</h3>
-          <ul class="actions-list">
-            <li v-if="(bankInfo.reserveShortfall ?? 0) > 0">{{ t('bank.actionAddDeposits') }}</li>
-            <li v-if="bankInfo.outstandingLoanPrincipal > 0">{{ t('bank.actionReduceLending') }}</li>
-            <li v-if="(bankInfo.centralBankDebt ?? 0) > 0">{{ t('bank.actionRecapitalize') }}</li>
-          </ul>
-        </div>
-
-        <p class="capitalization-info">{{ t('bank.capitalRequirementInfo') }}</p>
-      </section>
-      <!-- ── end liquidity panel ─────────────────────────────────────────── -->
-
-      <!-- Depositors section -->
-      <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
-        <h2 class="section-title">{{ t('bank.bankDepositors') }}</h2>
-        <div v-if="bankDeposits.length === 0" class="empty-state">
-          <p>{{ t('bank.noBankDepositors') }}</p>
-        </div>
-        <div v-else class="depositors-table">
-          <table>
-            <thead>
-              <tr>
-                <th>{{ t('common.company') }}</th>
-                <th>{{ t('bank.depositAmount') }}</th>
-                <th>{{ t('bank.depositInterestRate') }}</th>
-                <th>{{ t('bank.depositInterestEarned') }}</th>
-                <th>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="dep in bankDeposits" :key="dep.id">
-                <td>{{ dep.depositorCompanyName }}</td>
-                <td>{{ formatCurrency(dep.amount, dep.cityCurrencyCode || cityCurrency) }}</td>
-                <td>{{ formatPercent(dep.depositInterestRatePercent) }}</td>
-                <td>{{ formatCurrency(dep.totalInterestPaid, dep.cityCurrencyCode || cityCurrency) }}</td>
-                <td>
-                  <span v-if="dep.isBaseCapital" class="badge badge-info">{{ t('bank.baseCapital') }}</span>
-                  <span v-else class="badge badge-success">Depositor</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      <!-- Overview stats -->
-      <div v-if="bankInfo?.baseCapitalDeposited" class="stats-row">
-        <div class="stat-card">
-          <span class="stat-label">Active Loans</span>
-          <span class="stat-value">{{ issuedLoans.filter((l) => l.status === 'ACTIVE').length }}</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Capital Outstanding</span>
-          <span class="stat-value">{{ fmt(totalIssuedCapacity) }}</span>
-        </div>
-        <div class="stat-card" :class="{ 'stat-card-warning': overdueLoans.length > 0 }">
-          <span class="stat-label">Overdue/Defaulted</span>
-          <span class="stat-value">{{ overdueLoans.length }}</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Expected Income/Payment</span>
-          <span class="stat-value">{{ fmt(expectedMonthlyIncome) }}</span>
-        </div>
-      </div>
-
-      <!-- Loan Offers Management -->
-      <section v-if="bankInfo?.baseCapitalDeposited" class="offers-section">
-        <div class="section-header">
-          <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
-          <button class="btn btn-primary btn-sm" @click="showPublishForm = !showPublishForm">
-            {{ showPublishForm ? t('common.cancel') : t('bank.publishOffer') }}
-          </button>
-        </div>
-
-        <!-- Publish Form -->
-        <div v-if="showPublishForm" class="publish-form">
-          <h3>{{ t('bank.publishOffer') }}</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="offer-interest-rate">{{ t('bank.interestRate') }} (%)</label>
-              <input id="offer-interest-rate" v-model.number="offerForm.annualInterestRatePercent" type="number" min="0.1" max="200" step="0.1" class="form-input" />
+            <div class="bank-stat">
+              <span class="bank-stat-label">{{ t('bank.lendingInterestRate') }}</span>
+              <span class="bank-stat-value lending-rate">{{ formatPercent(bankInfo.lendingInterestRatePercent) }}</span>
             </div>
-            <div class="form-group">
-              <label for="offer-max-principal">{{ t('bank.maxPrincipal') }} ($)</label>
-              <input id="offer-max-principal" v-model.number="offerForm.maxPrincipalPerLoan" type="number" min="1000" step="1000" class="form-input" />
+            <div class="bank-stat">
+              <span class="bank-stat-label">{{ t('bank.totalDeposits') }}</span>
+              <span class="bank-stat-value">{{ fmt(bankInfo.totalDeposits) }}</span>
             </div>
-            <div class="form-group">
-              <label for="offer-total-capacity">{{ t('bank.totalCapacity') }} ($)</label>
-              <input id="offer-total-capacity" v-model.number="offerForm.totalCapacity" type="number" min="1000" step="1000" class="form-input" />
+            <div class="bank-stat">
+              <span class="bank-stat-label">{{ t('bank.lendableCapacity') }}</span>
+              <span class="bank-stat-value">{{ fmt(bankInfo.lendableCapacity) }}</span>
+              <span class="bank-stat-hint">{{ t('bank.reserveInfo') }}</span>
             </div>
-            <div class="form-group">
-              <label for="offer-duration">{{ t('bank.durationTicks') }}</label>
-              <input id="offer-duration" v-model.number="offerForm.durationTicks" type="number" min="24" max="87600" step="24" class="form-input" />
-              <span class="form-hint">{{ formatLoanDuration(offerForm.durationTicks) }}</span>
+            <div class="bank-stat">
+              <span class="bank-stat-label">{{ t('bank.availableLendingCapacity') }}</span>
+              <span class="bank-stat-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'negative'">
+                {{ fmt(bankInfo.availableLendingCapacity) }}
+              </span>
             </div>
           </div>
-          <div v-if="publishError" class="error-message">{{ publishError }}</div>
-          <button class="btn btn-primary" :disabled="publishLoading" @click="publishOffer">
-            {{ publishLoading ? t('common.loading') : t('bank.publishOffer') }}
-          </button>
         </div>
 
-        <!-- Offers list -->
-        <div v-if="myOffers.length === 0" class="empty-state">
-          <p>No loan offers published for this bank yet.</p>
-        </div>
-        <div v-else class="offers-table">
-          <table>
-            <thead>
-              <tr>
-                <th>{{ t('bank.interestRate') }}</th>
-                <th>{{ t('bank.maxPrincipal') }}</th>
-                <th>{{ t('bank.remainingCapacity') }}</th>
-                <th>{{ t('bank.duration') }}</th>
-                <th>Status</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="offer in myOffers" :key="offer.id">
-                <td>{{ formatPercent(offer.annualInterestRatePercent) }}</td>
-                <td>{{ fmt(offer.maxPrincipalPerLoan) }}</td>
-                <td>
-                  {{ fmt(offer.remainingCapacity) }}
-                  <div class="capacity-bar">
-                    <div class="capacity-fill" :style="{ width: `${computeCapacityUsedPercent(offer)}%` }" />
-                  </div>
-                </td>
-                <td>{{ formatLoanDuration(offer.durationTicks) }}</td>
-                <td>
-                  <span class="status-pill" :class="offer.isActive ? 'status-active' : 'status-inactive'">
-                    {{ offer.isActive ? 'Active' : 'Inactive' }}
-                  </span>
-                </td>
-                <td>
-                  <button class="btn btn-sm btn-secondary" @click="toggleOfferActive(offer)">
-                    {{ offer.isActive ? t('bank.deactivateOffer') : t('bank.activateOffer') }}
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <!-- ── Liquidity Health Panel (owner view) ──────────────────────────── -->
+        <section v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" class="liquidity-section">
+          <h2 class="section-title">{{ t('bank.liquidityHealth') }}</h2>
+          <div class="liquidity-status-banner" :class="`liquidity-${bankInfo.liquidityStatus.toLowerCase()}`">
+            <span class="liquidity-status-label">{{ t(`bank.liquidityStatus.${bankInfo.liquidityStatus}`) }}</span>
+            <span class="liquidity-status-hint">{{ t(`bank.liquidityStatusHint.${bankInfo.liquidityStatus}`) }}</span>
+          </div>
 
-      <!-- Issued Loans -->
-      <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
-        <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
-        <div v-if="issuedLoans.length === 0" class="empty-state">
-          <p>{{ t('bank.noIssuedLoans') }}</p>
+          <div class="liquidity-grid">
+            <div class="liquidity-stat">
+              <span class="liquidity-stat-label">{{ t('bank.availableCash') }}</span>
+              <span class="liquidity-stat-value" :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'">
+                {{ fmt(bankInfo.availableCash ?? 0) }}
+              </span>
+            </div>
+            <div class="liquidity-stat">
+              <span class="liquidity-stat-label">{{ t('bank.reserveRequirement') }}</span>
+              <span class="liquidity-stat-value">{{ fmt(bankInfo.reserveRequirement ?? 0) }}</span>
+              <span class="liquidity-stat-hint">{{ t('bank.reserveInfo') }}</span>
+            </div>
+            <div class="liquidity-stat">
+              <span class="liquidity-stat-label">{{ t('bank.reserveShortfall') }}</span>
+              <span class="liquidity-stat-value" :class="(bankInfo.reserveShortfall ?? 0) > 0 ? 'negative' : 'positive'">
+                {{ (bankInfo.reserveShortfall ?? 0) > 0 ? fmt(bankInfo.reserveShortfall) : t('bank.noReserveShortfall') }}
+              </span>
+            </div>
+            <div class="liquidity-stat" :class="{ 'liquidity-stat-warning': (bankInfo.centralBankDebt ?? 0) > 0 }">
+              <span class="liquidity-stat-label">{{ t('bank.centralBankDebt') }}</span>
+              <span class="liquidity-stat-value" :class="(bankInfo.centralBankDebt ?? 0) > 0 ? 'negative' : 'positive'">
+                {{ (bankInfo.centralBankDebt ?? 0) > 0 ? fmt(bankInfo.centralBankDebt) : fmt(0) }}
+              </span>
+              <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint">
+                {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a.
+              </span>
+            </div>
+          </div>
+
+          <!-- Central-bank debt context -->
+          <div v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="central-bank-notice">
+            <div class="notice-icon">⚠</div>
+            <div class="notice-body">
+              <strong>{{ t('bank.centralBankDebt') }}</strong>
+              <p>{{ t('bank.centralBankDebtHint', { rate: (bankInfo.centralBankInterestRatePercent ?? 2).toFixed(2) }) }}</p>
+            </div>
+          </div>
+
+          <!-- Recommended actions when under pressure -->
+          <div v-if="bankInfo.liquidityStatus !== 'HEALTHY'" class="recommended-actions">
+            <h3 class="actions-title">{{ t('bank.recommendedActions') }}</h3>
+            <ul class="actions-list">
+              <li v-if="(bankInfo.reserveShortfall ?? 0) > 0">{{ t('bank.actionAddDeposits') }}</li>
+              <li v-if="bankInfo.outstandingLoanPrincipal > 0">{{ t('bank.actionReduceLending') }}</li>
+              <li v-if="(bankInfo.centralBankDebt ?? 0) > 0">{{ t('bank.actionRecapitalize') }}</li>
+            </ul>
+          </div>
+
+          <p class="capitalization-info">{{ t('bank.capitalRequirementInfo') }}</p>
+        </section>
+        <!-- ── end liquidity panel ─────────────────────────────────────────── -->
+
+        <!-- Depositors section -->
+        <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
+          <h2 class="section-title">{{ t('bank.bankDepositors') }}</h2>
+          <div v-if="bankDeposits.length === 0" class="empty-state">
+            <p>{{ t('bank.noBankDepositors') }}</p>
+          </div>
+          <div v-else class="depositors-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>{{ t('common.company') }}</th>
+                  <th>{{ t('bank.depositAmount') }}</th>
+                  <th>{{ t('bank.depositInterestRate') }}</th>
+                  <th>{{ t('bank.depositInterestEarned') }}</th>
+                  <th>Type</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="dep in bankDeposits" :key="dep.id">
+                  <td>{{ dep.depositorCompanyName }}</td>
+                  <td>{{ formatCurrency(dep.amount, dep.cityCurrencyCode || cityCurrency) }}</td>
+                  <td>{{ formatPercent(dep.depositInterestRatePercent) }}</td>
+                  <td>{{ formatCurrency(dep.totalInterestPaid, dep.cityCurrencyCode || cityCurrency) }}</td>
+                  <td>
+                    <span v-if="dep.isBaseCapital" class="badge badge-info">{{ t('bank.baseCapital') }}</span>
+                    <span v-else class="badge badge-success">Depositor</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Overview stats -->
+        <div v-if="bankInfo?.baseCapitalDeposited" class="stats-row">
+          <div class="stat-card">
+            <span class="stat-label">Active Loans</span>
+            <span class="stat-value">{{ issuedLoans.filter((l) => l.status === 'ACTIVE').length }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Capital Outstanding</span>
+            <span class="stat-value">{{ fmt(totalIssuedCapacity) }}</span>
+          </div>
+          <div class="stat-card" :class="{ 'stat-card-warning': overdueLoans.length > 0 }">
+            <span class="stat-label">Overdue/Defaulted</span>
+            <span class="stat-value">{{ overdueLoans.length }}</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Expected Income/Payment</span>
+            <span class="stat-value">{{ fmt(expectedMonthlyIncome) }}</span>
+          </div>
         </div>
-        <div v-else class="loans-table">
-          <table>
-            <thead>
-              <tr>
-                <th>{{ t('bank.borrower') }}</th>
-                <th>{{ t('bank.originalPrincipal') }}</th>
-                <th>{{ t('bank.remainingPrincipal') }}</th>
-                <th>{{ t('bank.paymentAmount') }}</th>
-                <th>Payments</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="loan in issuedLoans" :key="loan.id" :class="loanStatusClass(loan.status)">
-                <td>{{ loan.borrowerCompanyName }}</td>
-                <td>{{ fmt(loan.originalPrincipal) }}</td>
-                <td>{{ fmt(loan.remainingPrincipal) }}</td>
-                <td>{{ fmt(loan.paymentAmount) }}</td>
-                <td>{{ loan.paymentsMade }} / {{ loan.totalPayments }}</td>
-                <td>
-                  <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
-                    {{ t(`bank.statusBadge.${loan.status}`) }}
-                  </span>
-                  <div v-if="loan.missedPayments > 0" class="missed-hint">
-                    {{ loan.missedPayments }} missed
-                  </div>
-                  <div v-if="loan.collateralBuildingId" class="collateral-inline">
-                    <span aria-hidden="true">🏛</span> {{ loan.collateralBuildingName }}
-                    <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value">
-                      ({{ fmt(loan.collateralAppraisedValue) }})
+
+        <!-- Loan Offers Management -->
+        <section v-if="bankInfo?.baseCapitalDeposited" class="offers-section">
+          <div class="section-header">
+            <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
+            <button class="btn btn-primary btn-sm" @click="showPublishForm = !showPublishForm">
+              {{ showPublishForm ? t('common.cancel') : t('bank.publishOffer') }}
+            </button>
+          </div>
+
+          <!-- Publish Form -->
+          <div v-if="showPublishForm" class="publish-form">
+            <h3>{{ t('bank.publishOffer') }}</h3>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="offer-interest-rate">{{ t('bank.interestRate') }} (%)</label>
+                <input id="offer-interest-rate" v-model.number="offerForm.annualInterestRatePercent" type="number" min="0.1" max="200" step="0.1" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label for="offer-max-principal">{{ t('bank.maxPrincipal') }} ($)</label>
+                <input id="offer-max-principal" v-model.number="offerForm.maxPrincipalPerLoan" type="number" min="1000" step="1000" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label for="offer-total-capacity">{{ t('bank.totalCapacity') }} ($)</label>
+                <input id="offer-total-capacity" v-model.number="offerForm.totalCapacity" type="number" min="1000" step="1000" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label for="offer-duration">{{ t('bank.durationTicks') }}</label>
+                <input id="offer-duration" v-model.number="offerForm.durationTicks" type="number" min="24" max="87600" step="24" class="form-input" />
+                <span class="form-hint">{{ formatLoanDuration(offerForm.durationTicks) }}</span>
+              </div>
+            </div>
+            <div v-if="publishError" class="error-message">{{ publishError }}</div>
+            <button class="btn btn-primary" :disabled="publishLoading" @click="publishOffer">
+              {{ publishLoading ? t('common.loading') : t('bank.publishOffer') }}
+            </button>
+          </div>
+
+          <!-- Offers list -->
+          <div v-if="myOffers.length === 0" class="empty-state">
+            <p>No loan offers published for this bank yet.</p>
+          </div>
+          <div v-else class="offers-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>{{ t('bank.interestRate') }}</th>
+                  <th>{{ t('bank.maxPrincipal') }}</th>
+                  <th>{{ t('bank.remainingCapacity') }}</th>
+                  <th>{{ t('bank.duration') }}</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="offer in myOffers" :key="offer.id">
+                  <td>{{ formatPercent(offer.annualInterestRatePercent) }}</td>
+                  <td>{{ fmt(offer.maxPrincipalPerLoan) }}</td>
+                  <td>
+                    {{ fmt(offer.remainingCapacity) }}
+                    <div class="capacity-bar">
+                      <div class="capacity-fill" :style="{ width: `${computeCapacityUsedPercent(offer)}%` }" />
+                    </div>
+                  </td>
+                  <td>{{ formatLoanDuration(offer.durationTicks) }}</td>
+                  <td>
+                    <span class="status-pill" :class="offer.isActive ? 'status-active' : 'status-inactive'">
+                      {{ offer.isActive ? 'Active' : 'Inactive' }}
                     </span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-secondary" @click="toggleOfferActive(offer)">
+                      {{ offer.isActive ? t('bank.deactivateOffer') : t('bank.activateOffer') }}
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-      </template><!-- end owner view -->
+        <!-- Issued Loans -->
+        <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
+          <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
+          <div v-if="issuedLoans.length === 0" class="empty-state">
+            <p>{{ t('bank.noIssuedLoans') }}</p>
+          </div>
+          <div v-else class="loans-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>{{ t('bank.borrower') }}</th>
+                  <th>{{ t('bank.originalPrincipal') }}</th>
+                  <th>{{ t('bank.remainingPrincipal') }}</th>
+                  <th>{{ t('bank.paymentAmount') }}</th>
+                  <th>Payments</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="loan in issuedLoans" :key="loan.id" :class="loanStatusClass(loan.status)">
+                  <td>{{ loan.borrowerCompanyName }}</td>
+                  <td>{{ fmt(loan.originalPrincipal) }}</td>
+                  <td>{{ fmt(loan.remainingPrincipal) }}</td>
+                  <td>{{ fmt(loan.paymentAmount) }}</td>
+                  <td>{{ loan.paymentsMade }} / {{ loan.totalPayments }}</td>
+                  <td>
+                    <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
+                      {{ t(`bank.statusBadge.${loan.status}`) }}
+                    </span>
+                    <div v-if="loan.missedPayments > 0" class="missed-hint">{{ loan.missedPayments }} missed</div>
+                    <div v-if="loan.collateralBuildingId" class="collateral-inline">
+                      <span aria-hidden="true">🏛</span> {{ loan.collateralBuildingName }}
+                      <span v-if="loan.collateralAppraisedValue" class="collateral-inline-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section> </template
+      ><!-- end owner view -->
 
       <!-- ── CUSTOMER VIEW ──────────────────────────────────────────── -->
       <template v-else>
-
         <!-- Bank profile card (rates + capacity) -->
         <div v-if="bankInfo" class="customer-bank-profile">
           <div class="customer-rates-grid">
@@ -1227,10 +1154,22 @@ const estimatedCustomerTotalPayments = computed(() => {
               <span class="account-company-tag">{{ activeCompany?.name }}</span>
             </div>
             <div class="account-actions" v-if="myAccountBalance > 0">
-              <button class="btn btn-secondary btn-sm" @click="showTopUpForm = !showTopUpForm; showWithdrawForm = false">
+              <button
+                class="btn btn-secondary btn-sm"
+                @click="
+                  showTopUpForm = !showTopUpForm
+                  showWithdrawForm = false
+                "
+              >
                 {{ showTopUpForm ? t('common.cancel') : t('bank.addFunds') }}
               </button>
-              <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm; showTopUpForm = false">
+              <button
+                class="btn btn-outline btn-sm"
+                @click="
+                  showWithdrawForm = !showWithdrawForm
+                  showTopUpForm = false
+                "
+              >
                 {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
               </button>
             </div>
@@ -1245,9 +1184,7 @@ const estimatedCustomerTotalPayments = computed(() => {
             <div class="account-balance-meta">
               <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
               <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
-              <span v-if="bankInfo" class="account-rate-badge">
-                {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}
-              </span>
+              <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
             </div>
           </div>
 
@@ -1273,23 +1210,11 @@ const estimatedCustomerTotalPayments = computed(() => {
             <h3 class="action-form-title">{{ t('bank.withdraw') }}</h3>
             <div class="form-group">
               <label for="withdraw-amount">{{ t('bank.withdrawAmount') }}</label>
-              <input
-                id="withdraw-amount"
-                v-model.number="withdrawAmount"
-                type="number"
-                :min="1"
-                :max="myAccountBalance"
-                step="1000"
-                class="form-input"
-              />
+              <input id="withdraw-amount" v-model.number="withdrawAmount" type="number" :min="1" :max="myAccountBalance" step="1000" class="form-input" />
               <span class="form-hint">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
             </div>
             <div v-if="withdrawError" class="error-message">{{ withdrawError }}</div>
-            <button
-              class="btn btn-primary"
-              :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance"
-              @click="submitWithdraw"
-            >
+            <button class="btn btn-primary" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
               {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
             </button>
           </div>
@@ -1304,14 +1229,7 @@ const estimatedCustomerTotalPayments = computed(() => {
             <p class="account-empty-hint">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
             <div class="form-group">
               <label for="customer-deposit-amount">{{ t('bank.depositAmount') }}</label>
-              <input
-                id="customer-deposit-amount"
-                v-model.number="customerDepositAmount"
-                type="number"
-                min="1000"
-                step="1000"
-                class="form-input"
-              />
+              <input id="customer-deposit-amount" v-model.number="customerDepositAmount" type="number" min="1000" step="1000" class="form-input" />
               <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
             </div>
             <div v-if="bankInfo" class="repayment-preview">
@@ -1321,11 +1239,7 @@ const estimatedCustomerTotalPayments = computed(() => {
               </div>
             </div>
             <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
-            <button
-              class="btn btn-primary"
-              :disabled="customerDepositLoading || customerDepositAmount < 1000"
-              @click="submitCustomerDeposit"
-            >
+            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount < 1000" @click="submitCustomerDeposit">
               {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
             </button>
           </div>
@@ -1398,16 +1312,12 @@ const estimatedCustomerTotalPayments = computed(() => {
               </div>
               <div v-if="loan.collateralBuildingId" class="collateral-badge">
                 <span aria-hidden="true">🏛</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
-                <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value">
-                  ({{ fmt(loan.collateralAppraisedValue) }})
-                </span>
+                <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
               </div>
             </div>
           </div>
-        </section>
-
-      </template><!-- end customer view -->
-
+        </section> </template
+      ><!-- end customer view -->
     </template>
 
     <!-- Accept Loan Modal (with collateral selection) -->
@@ -1465,32 +1375,13 @@ const estimatedCustomerTotalPayments = computed(() => {
             <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
             <div v-else class="collateral-list">
               <!-- None option -->
-              <label
-                class="collateral-option"
-                :class="{ selected: selectedCollateralBuildingId === null }"
-              >
-                <input
-                  type="radio"
-                  :value="null"
-                  v-model="selectedCollateralBuildingId"
-                  class="collateral-radio"
-                />
+              <label class="collateral-option" :class="{ selected: selectedCollateralBuildingId === null }">
+                <input type="radio" :value="null" v-model="selectedCollateralBuildingId" class="collateral-radio" />
                 <span class="collateral-option-name">{{ t('bank.collateralNone') }}</span>
               </label>
               <!-- Building options -->
-              <label
-                v-for="b in collateralBuildings"
-                :key="b.buildingId"
-                class="collateral-option"
-                :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }"
-              >
-                <input
-                  type="radio"
-                  :value="b.buildingId"
-                  v-model="selectedCollateralBuildingId"
-                  class="collateral-radio"
-                  :disabled="!b.isEligible"
-                />
+              <label v-for="b in collateralBuildings" :key="b.buildingId" class="collateral-option" :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }">
+                <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" class="collateral-radio" :disabled="!b.isEligible" />
                 <div class="collateral-option-info">
                   <span class="collateral-option-name">{{ b.buildingName }}</span>
                   <span v-if="!b.isEligible" class="ineligible-tag">{{ b.ineligibilityReason ?? t('bank.collateralAlreadyPledged') }}</span>
@@ -1509,10 +1400,7 @@ const estimatedCustomerTotalPayments = computed(() => {
             <span>{{ t('bank.remainingCapacity') }}: {{ fmt(selectedCollateral.remainingBorrowingCapacity) }}</span>
             <!-- LTV capacity bar -->
             <div class="capacity-bar-wrap">
-              <div
-                class="capacity-bar"
-                :style="{ width: Math.min(100, (customerLoanPrincipal / selectedCollateral.maxBorrowable) * 100) + '%' }"
-              ></div>
+              <div class="capacity-bar" :style="{ width: Math.min(100, (customerLoanPrincipal / selectedCollateral.maxBorrowable) * 100) + '%' }"></div>
             </div>
           </div>
 
@@ -1525,11 +1413,7 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeLoanModal">{{ t('common.cancel') }}</button>
-          <button
-            class="btn btn-primary"
-            :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralCapacityWarning"
-            @click="submitCustomerLoan"
-          >
+          <button class="btn btn-primary" :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralCapacityWarning" @click="submitCustomerLoan">
             {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
           </button>
         </div>
@@ -1670,7 +1554,8 @@ table {
   font-size: 0.9rem;
 }
 
-th, td {
+th,
+td {
   padding: var(--spacing-sm);
   text-align: left;
   border-bottom: 1px solid var(--color-border);
@@ -1818,7 +1703,9 @@ th {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Bank info and rate configuration */
@@ -1873,10 +1760,18 @@ th {
   color: var(--color-text);
 }
 
-.bank-stat-value.deposit-rate { color: var(--color-success, #22c55e); }
-.bank-stat-value.lending-rate { color: var(--color-warning, #f59e0b); }
-.bank-stat-value.positive { color: var(--color-success, #22c55e); }
-.bank-stat-value.negative { color: var(--color-error, #ef4444); }
+.bank-stat-value.deposit-rate {
+  color: var(--color-success, #22c55e);
+}
+.bank-stat-value.lending-rate {
+  color: var(--color-warning, #f59e0b);
+}
+.bank-stat-value.positive {
+  color: var(--color-success, #22c55e);
+}
+.bank-stat-value.negative {
+  color: var(--color-error, #ef4444);
+}
 
 .bank-stat-hint {
   font-size: 0.72rem;
@@ -1995,10 +1890,18 @@ th {
   font-weight: 700;
 }
 
-.customer-rate-card.deposit .customer-rate-value { color: #22c55e; }
-.customer-rate-card.lending .customer-rate-value { color: #f59e0b; }
-.customer-rate-card.capacity .customer-rate-value.positive { color: #22c55e; }
-.customer-rate-card.capacity .customer-rate-value.muted { color: var(--color-text-muted); }
+.customer-rate-card.deposit .customer-rate-value {
+  color: #22c55e;
+}
+.customer-rate-card.lending .customer-rate-value {
+  color: #f59e0b;
+}
+.customer-rate-card.capacity .customer-rate-value.positive {
+  color: #22c55e;
+}
+.customer-rate-card.capacity .customer-rate-value.muted {
+  color: var(--color-text-muted);
+}
 
 .customer-rate-hint {
   font-size: 0.8rem;
@@ -2064,7 +1967,9 @@ th {
   font-size: 0.95rem;
 }
 
-.deposit-stat-value.positive { color: #22c55e; }
+.deposit-stat-value.positive {
+  color: #22c55e;
+}
 
 .customer-deposit-form-section,
 .customer-loans-section {
@@ -2169,8 +2074,12 @@ th {
   color: var(--color-text-secondary);
 }
 
-.offer-stat-row strong.positive { color: #22c55e; }
-.offer-stat-row strong.muted { color: var(--color-text-muted); }
+.offer-stat-row strong.positive {
+  color: #22c55e;
+}
+.offer-stat-row strong.muted {
+  color: var(--color-text-muted);
+}
 
 .customer-loan-request {
   border-top: 1px solid var(--color-border);
@@ -2259,7 +2168,7 @@ th {
   gap: 0.2rem;
   padding: var(--spacing-sm);
   border-radius: var(--radius-sm);
-  background: var(--color-surface-secondary, rgba(0,0,0,0.03));
+  background: var(--color-surface-secondary, rgba(0, 0, 0, 0.03));
 }
 
 .liquidity-stat-warning {
@@ -2599,7 +2508,7 @@ th {
 }
 
 .account-balance-card {
-  background: var(--color-bg-subtle, rgba(0,0,0,0.03));
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.03));
   border-radius: var(--radius-md, 8px);
   padding: var(--spacing-md) var(--spacing-lg);
   margin-bottom: var(--spacing-md);
@@ -2650,13 +2559,13 @@ th {
   font-size: 0.8rem;
   padding: 2px 8px;
   border-radius: 99px;
-  background: var(--color-primary-bg, rgba(59,130,246,0.1));
+  background: var(--color-primary-bg, rgba(59, 130, 246, 0.1));
   color: var(--color-primary, #3b82f6);
   font-weight: 600;
 }
 
 .account-action-form {
-  background: var(--color-surface-raised, rgba(0,0,0,0.02));
+  background: var(--color-surface-raised, rgba(0, 0, 0, 0.02));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md, 8px);
   padding: var(--spacing-md);

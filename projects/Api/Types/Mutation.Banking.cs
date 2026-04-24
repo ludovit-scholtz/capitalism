@@ -47,16 +47,17 @@ public sealed partial class Mutation
         _ => currencyCode,
     };
 
-    // ── Deposit Flows ─────────────────────────────────────────────────────────
+    // ── Bank Account Open/Close Flows ────────────────────────────────────────
 
     /// <summary>
-    /// Creates a cash deposit in a bank building.
-    /// The deposit earns interest each tick at the bank's current deposit rate.
-    /// Players may not deposit into their own bank company (use the owner deposit path instead).
+    /// Opens a bank account in a bank building.
+    /// The opening balance earns interest each tick at the bank's current deposit rate.
+    /// Players may not open an external interest-bearing account in their own bank company
+    /// (use the owner base-capital path instead).
     /// </summary>
     [Authorize]
-    public async Task<BankDepositSummary> CreateDeposit(
-        CreateDepositInput input,
+    public async Task<BankDepositSummary> OpenBankAccount(
+        OpenBankAccountInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -130,7 +131,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Minimum deposit amount is 1,000.")
+                    .SetMessage("Minimum opening balance is 1,000.")
                     .SetCode("INVALID_AMOUNT")
                     .Build());
         }
@@ -139,7 +140,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Insufficient company funds for this deposit.")
+                    .SetMessage("Insufficient company funds to open this bank account.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }
@@ -214,13 +215,14 @@ public sealed partial class Mutation
     }
 
     /// <summary>
-    /// Withdraws funds from an existing bank deposit.
+    /// Withdraws funds from an existing bank account.
     /// The bank must be able to cover the withdrawal from available cash.
     /// If the bank lacks sufficient funds, a central-bank borrowing is arranged automatically.
+    /// When the full balance is withdrawn, the account is closed.
     /// </summary>
     [Authorize]
-    public async Task<BankDepositSummary> WithdrawDeposit(
-        WithdrawDepositInput input,
+    public async Task<BankDepositSummary> CloseBankAccount(
+        CloseBankAccountInput input,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -236,7 +238,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Active deposit not found.")
+                    .SetMessage("Active bank account not found.")
                     .SetCode("DEPOSIT_NOT_FOUND")
                     .Build());
         }
@@ -254,7 +256,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("The bank's base-capital deposit cannot be withdrawn by external players.")
+                    .SetMessage("The bank's base-capital account cannot be closed by external players.")
                     .SetCode("WITHDRAWAL_NOT_ALLOWED")
                     .Build());
         }

@@ -19,7 +19,7 @@ public sealed class PlayerRanking
 
     /// <summary>
     /// TotalWealth normalized to USD for fair cross-currency leaderboard ranking.
-    /// Player.PersonalCash (EUR) and share values from companies in various currencies
+    /// Personal settlement cash (EUR) and share values from companies in various currencies
     /// are all converted to USD using current FX rates.
     /// </summary>
     public decimal TotalWealthUsd { get; set; }

@@ -10,6 +10,30 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider == "Microsoft.EntityFrameworkCore.Sqlite")
+            {
+                migrationBuilder.AddColumn<string>(
+                    name: "CurrencyCode",
+                    table: "Companies",
+                    type: "TEXT",
+                    maxLength: 3,
+                    nullable: false,
+                    defaultValue: "EUR");
+
+                migrationBuilder.Sql(@"
+                    UPDATE ""Companies""
+                    SET ""CurrencyCode"" = COALESCE(
+                        (SELECT ci.""CurrencyCode""
+                         FROM ""Buildings"" b
+                         JOIN ""Cities"" ci ON ci.""Id"" = b.""CityId""
+                         WHERE b.""CompanyId"" = ""Companies"".""Id""
+                         LIMIT 1),
+                        'EUR'
+                    )
+                ");
+                return;
+            }
+
             migrationBuilder.AddColumn<string>(
                 name: "CurrencyCode",
                 table: "Companies",

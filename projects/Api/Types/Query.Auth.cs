@@ -100,14 +100,16 @@ public sealed partial class Query
             .Take(100)
             .ToListAsync();
 
+        var grossPersonalCash = await PersonalBankAccountService.GetGrossCashAsync(db, player.Id);
+
         var result = new PersonAccountResult
         {
             PlayerId = player.Id,
             DisplayName = player.DisplayName,
-            PersonalCash = player.PersonalCash,
+            PersonalCash = grossPersonalCash,
             TaxReserve = player.PersonalTaxReserve,
-            AvailableCash = player.PersonalCash - player.PersonalTaxReserve,
-            TotalNetWealth = (player.PersonalCash - player.PersonalTaxReserve)
+            AvailableCash = grossPersonalCash - player.PersonalTaxReserve,
+            TotalNetWealth = (grossPersonalCash - player.PersonalTaxReserve)
                 + portfolio.Sum(holding => holding.MarketValue),
             ActiveAccountType = player.ActiveAccountType,
             ActiveCompanyId = player.ActiveCompanyId,

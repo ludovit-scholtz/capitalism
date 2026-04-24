@@ -3,6 +3,7 @@ using System;
 using Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Api.Data.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260423205443_RemoveCompanyCurrencyCode")]
+    partial class RemoveCompanyCurrencyCode
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -122,9 +125,6 @@ namespace Api.Data.Migrations
                     b.Property<bool>("IsGovernmentAccount")
                         .HasColumnType("boolean");
 
-                    b.Property<Guid?>("PlayerId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AccountNumber")
@@ -133,9 +133,6 @@ namespace Api.Data.Migrations
                     b.HasIndex("CompanyId");
 
                     b.HasIndex("CurrencyCode", "IsGovernmentAccount");
-
-                    b.HasIndex("PlayerId", "CurrencyCode")
-                        .IsUnique();
 
                     b.ToTable("BankAccounts");
                 });
@@ -1713,6 +1710,10 @@ namespace Api.Data.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<decimal>("PersonalCash")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("numeric(18,2)");
+
                     b.Property<decimal>("PersonalTaxReserve")
                         .HasColumnType("numeric");
 
@@ -2114,14 +2115,7 @@ namespace Api.Data.Migrations
                         .HasForeignKey("CompanyId")
                         .OnDelete(DeleteBehavior.SetNull);
 
-                    b.HasOne("Api.Data.Entities.Player", "Player")
-                        .WithMany()
-                        .HasForeignKey("PlayerId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
                     b.Navigation("Company");
-
-                    b.Navigation("Player");
                 });
 
             modelBuilder.Entity("Api.Data.Entities.BankDeposit", b =>

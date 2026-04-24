@@ -66,10 +66,11 @@ public sealed partial class Mutation
         var askPrice = SharePriceCalculator.ComputeAskPrice(sharePrice);
         var totalValue = decimal.Round(askPrice * shareCount, 4, MidpointRounding.AwayFromZero);
         var currentTick = await GetCurrentTickAsync(db);
+        decimal? personalCashAfterTrade = null;
 
         if (account.Company is null)
         {
-            if (player.PersonalCash - player.PersonalTaxReserve < totalValue)
+            if (await PersonalBankAccountService.GetAvailableCashAsync(db, player) < totalValue)
             {
                 throw new GraphQLException(
                     ErrorBuilder.New()
@@ -78,7 +79,7 @@ public sealed partial class Mutation
                         .Build());
             }
 
-            player.PersonalCash -= totalValue;
+            personalCashAfterTrade = await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, totalValue);
             db.PersonTradeRecords.Add(new PersonTradeRecord
             {
                 Id = Guid.NewGuid(),
@@ -132,7 +133,7 @@ public sealed partial class Mutation
                     TotalValue = totalValue,
                     OwnedShareCount = 0m,
                     PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(holding => holding.CompanyId == targetCompany.Id)),
-                    PersonalCash = player.PersonalCash,
+                    PersonalCash = personalCashAfterTrade ?? await PersonalBankAccountService.GetGrossCashAsync(db, player),
                     PersonalTaxReserve = player.PersonalTaxReserve,
                     CompanyCash = account.Company.Cash,
                 };
@@ -162,7 +163,7 @@ public sealed partial class Mutation
             TotalValue = totalValue,
             OwnedShareCount = holding.ShareCount,
             PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
-            PersonalCash = player.PersonalCash,
+            PersonalCash = personalCashAfterTrade ?? await PersonalBankAccountService.GetGrossCashAsync(db, player),
             PersonalTaxReserve = player.PersonalTaxReserve,
             CompanyCash = account.Company?.Cash,
         };
@@ -222,6 +223,7 @@ public sealed partial class Mutation
         var bidPrice = SharePriceCalculator.ComputeBidPrice(sharePrice);
         var totalValue = decimal.Round(bidPrice * shareCount, 4, MidpointRounding.AwayFromZero);
         var currentTick = await GetCurrentTickAsync(db);
+        decimal? personalCashAfterTrade = null;
 
         holding.ShareCount = decimal.Round(holding.ShareCount - shareCount, 4, MidpointRounding.AwayFromZero);
         if (holding.ShareCount <= 0m)
@@ -235,7 +237,7 @@ public sealed partial class Mutation
         if (account.Company is null)
         {
             taxReserved = decimal.Round(totalValue * GameConstants.PersonalStockSaleTaxRate, 4, MidpointRounding.AwayFromZero);
-            player.PersonalCash += totalValue;
+            personalCashAfterTrade = await PersonalBankAccountService.CreditTrackedGrossCashAsync(db, player, totalValue);
             player.PersonalTaxReserve += taxReserved;
             db.PersonTradeRecords.Add(new PersonTradeRecord
             {
@@ -280,7 +282,7 @@ public sealed partial class Mutation
             TaxReserved = taxReserved,
             OwnedShareCount = holding.ShareCount > 0m ? holding.ShareCount : 0m,
             PublicFloatShares = SharePriceCalculator.ComputePublicFloat(targetCompany, shareholdings.Where(item => item.CompanyId == targetCompany.Id)),
-            PersonalCash = player.PersonalCash,
+            PersonalCash = personalCashAfterTrade ?? await PersonalBankAccountService.GetGrossCashAsync(db, player),
             PersonalTaxReserve = player.PersonalTaxReserve,
             CompanyCash = account.Company?.Cash,
         };

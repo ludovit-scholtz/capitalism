@@ -553,6 +553,19 @@ public sealed class GlobalCitiesAndFxRatesTests
         return JsonSerializer.Deserialize<JsonElement>(body);
     }
 
+    private static async Task SetPersonalSettlementBalanceAsync(AppDbContext db, Guid playerId, decimal amount)
+    {
+        var player = await db.Players.FirstAsync(candidate => candidate.Id == playerId);
+        await PersonalBankAccountService.SetTrackedGrossCashAsync(db, player, amount);
+    }
+
+    private static async Task<decimal> GetPersonalSettlementBalanceAsync(AppDbContext db, Guid playerId)
+        => await db.BankAccounts
+            .Where(account => account.PlayerId == playerId
+                && account.CurrencyCode == PersonalBankAccountService.SettlementCurrencyCode)
+            .Select(account => account.Balance)
+            .FirstAsync();
+
     #endregion
 
     #region Forex exchange — quote and swap
@@ -624,8 +637,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         // Give the player some EUR (personal cash)
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FindAsync(playerId);
-        player!.PersonalCash = 1000m;
+        await SetPersonalSettlementBalanceAsync(db, playerId, 1000m);
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(client,
@@ -684,8 +696,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         // Give only a small amount
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FindAsync(playerId);
-        player!.PersonalCash = 5m;
+        await SetPersonalSettlementBalanceAsync(db, playerId, 5m);
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(client,
@@ -771,8 +782,7 @@ public sealed class GlobalCitiesAndFxRatesTests
 
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FindAsync(playerId);
-        player!.PersonalCash = 500m;
+        await SetPersonalSettlementBalanceAsync(db, playerId, 500m);
         await db.SaveChangesAsync();
 
         // Execute a swap
@@ -833,8 +843,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         // Seed EUR balance
         await using var setupScope = factory.Services.CreateAsyncScope();
         var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await setupDb.Players.FindAsync(playerId);
-        player!.PersonalCash = 1000m;
+        await SetPersonalSettlementBalanceAsync(setupDb, playerId, 1000m);
         await setupDb.SaveChangesAsync();
 
         // First swap: EUR -> CZK
@@ -897,8 +906,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var player = await db.Players.FindAsync(playerId);
-            player!.PersonalCash = 100m;
+            await SetPersonalSettlementBalanceAsync(db, playerId, 100m);
             await db.SaveChangesAsync();
         }
 
@@ -935,8 +943,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var player = await db.Players.FindAsync(playerId);
-            Assert.Equal(40m, player!.PersonalCash);
+            Assert.Equal(40m, await GetPersonalSettlementBalanceAsync(db, playerId));
         }
     }
 
@@ -1218,8 +1225,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         // Player B tries to swap FROM Player A's account.
         var meB = await ExecuteGraphQlAsync(client, "{ me { id } }", token: tokenB);
         var playerBId = Guid.Parse(meB.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
-        var player = await db.Players.FindAsync(playerBId);
-        player!.PersonalCash = 1000m;
+        await SetPersonalSettlementBalanceAsync(db, playerBId, 1000m);
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(client,

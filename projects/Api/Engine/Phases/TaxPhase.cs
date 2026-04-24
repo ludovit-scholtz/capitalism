@@ -1,6 +1,7 @@
 using Api.Data.Entities;
 using Api.Engine;
 using Api.Utilities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Api.Engine.Phases;
 
@@ -12,11 +13,11 @@ public sealed class TaxPhase : ITickPhase
     public string Name => "Tax";
     public int Order => 1000;
 
-    public Task ProcessAsync(TickContext context)
+    public async Task ProcessAsync(TickContext context)
     {
         var gs = context.GameState;
-        if (gs.TaxCycleTicks <= 0) return Task.CompletedTask;
-        if (gs.CurrentTick % gs.TaxCycleTicks != 0) return Task.CompletedTask;
+        if (gs.TaxCycleTicks <= 0) return;
+        if (gs.CurrentTick % gs.TaxCycleTicks != 0) return;
 
         var settledGameYear = GameTime.GetGameYear(gs.CurrentTick - 1L);
         var startTick = GameTime.GetStartTickForGameYear(settledGameYear);
@@ -63,14 +64,22 @@ public sealed class TaxPhase : ITickPhase
         var playersWithReserve = context.Db.Players
             .Where(p => p.PersonalTaxReserve > 0m)
             .ToList();
+        var personalCashByPlayerId = await PersonalBankAccountService.GetSettlementBalancesByPlayerIdAsync(
+            context.Db,
+            playersWithReserve.Select(player => player.Id));
 
         foreach (var player in playersWithReserve)
         {
-            var taxPaid = Math.Min(player.PersonalCash, player.PersonalTaxReserve);
-            player.PersonalCash -= taxPaid;
+            var taxPaid = Math.Min(
+                PersonalBankAccountService.GetGrossCash(player, personalCashByPlayerId),
+                player.PersonalTaxReserve);
+
+            if (taxPaid > 0m)
+            {
+                await PersonalBankAccountService.DebitTrackedGrossCashAsync(context.Db, player, taxPaid);
+            }
+
             player.PersonalTaxReserve = 0m;
         }
-
-        return Task.CompletedTask;
     }
 }

@@ -811,29 +811,35 @@ export type MockState = {
     toCurrencySymbol: string
   }[]
   /** Bank statement rows returned by the bankStatement query (keyed by companyId). */
-  bankStatementRows: Record<string, Array<{
-    id: string
-    recordedAtTick: number
-    recordedAtUtc: string
-    description: string
-    category: string
-    amount: number
-    runningBalance: number
-    buildingId: string | null
-    buildingName: string | null
-  }>>
+  bankStatementRows: Record<
+    string,
+    Array<{
+      id: string
+      recordedAtTick: number
+      recordedAtUtc: string
+      description: string
+      category: string
+      amount: number
+      runningBalance: number
+      buildingId: string | null
+      buildingName: string | null
+    }>
+  >
   /** Media houses returned by cityMediaHouses query, keyed by cityId. */
   cityMediaHouses: Record<string, MockCityMediaHouseInfo[]>
   /** Building bank account info keyed by buildingId. */
-  buildingBankAccounts: Record<string, {
-    hasBankAccount: boolean
-    bankAccountId: string | null
-    accountNumber: string | null
-    balance: number | null
-    isSuspendedForFunds: boolean
-    suspendedReason: string | null
-    currencyCode: string
-  }>
+  buildingBankAccounts: Record<
+    string,
+    {
+      hasBankAccount: boolean
+      bankAccountId: string | null
+      accountNumber: string | null
+      balance: number | null
+      isSuspendedForFunds: boolean
+      suspendedReason: string | null
+      currencyCode: string
+    }
+  >
   /** Player's company bank accounts returned by the myBankAccounts query. */
   myBankAccounts: Array<{
     id: string
@@ -4535,6 +4541,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const ageFactor = Number(Math.min(ageTicks / (TICKS_PER_YEAR * 2), 1).toFixed(4))
       const assetFactor = Number((maxAssetValue > 0 ? Math.min(companyAssetValue / maxAssetValue, 1) : 0).toFixed(4))
       const overheadRate = Number((0.5 * ageFactor * assetFactor).toFixed(4))
+      const primaryCurrencyCode = company.buildings.map((building) => state.cities.find((city) => city.id === building.cityId)?.currencyCode).find((currencyCode) => Boolean(currencyCode)) ?? 'EUR'
 
       return route.fulfill({
         status: 200,
@@ -4552,7 +4559,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               ageFactor,
               assetFactor,
               assetValue: companyAssetValue,
-              currencyCode: company.currencyCode ?? 'EUR',
+              currencyCode: primaryCurrencyCode,
               citySalarySettings: state.cities.map((city) => {
                 const salaryMultiplier = company.citySalaryMultipliers?.[city.id] ?? 1
                 return {
@@ -5664,6 +5671,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('bankInfo') &&
       !q.includes('createDeposit') &&
       !q.includes('withdrawDeposit') &&
+      !q.includes('openBankAccount') &&
+      !q.includes('closeBankAccount') &&
       !q.includes('setBankRates') &&
       !q.includes('initiateBaseDeposit') &&
       // acceptLoan mutation response includes paymentAmount which contains 'me'
@@ -5677,7 +5686,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       // campaignAnalytics has companyName/cityName fields that contain 'me' as substring
       !q.includes('campaignAnalytics') &&
       // buildingBankAccount contains 'me' as substring in some serializations
-      !q.includes('buildingBankAccount')
+      !q.includes('buildingBankAccount') &&
+      // transferFunds mutation response includes companyName/currencySymbol/accountNumber which contain 'me' as substring
+      !q.includes('transferFunds')
 
     if (isStandaloneMeQuery(query)) {
       const player = resolveCurrentPlayer()
@@ -6011,7 +6022,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('createDeposit')) {
+    if (query.includes('openBankAccount') || query.includes('createDeposit')) {
       const input = body.variables?.input ?? {}
       const bank = state.allBanks.find((b) => b.bankBuildingId === input.bankBuildingId)
       const newDeposit: MockBankDeposit = {
@@ -6032,7 +6043,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { createDeposit: newDeposit } }),
+        body: JSON.stringify({ data: { openBankAccount: newDeposit, createDeposit: newDeposit } }),
       })
     }
 
@@ -6049,14 +6060,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
-    if (query.includes('withdrawDeposit')) {
+    if (query.includes('closeBankAccount') || query.includes('withdrawDeposit')) {
       const depositId = body.variables?.input?.depositId
       const deposit = state.myDeposits.find((d) => d.id === depositId)
       if (deposit) deposit.isActive = false
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { withdrawDeposit: deposit ?? null } }),
+        body: JSON.stringify({ data: { closeBankAccount: deposit ?? null, withdrawDeposit: deposit ?? null } }),
       })
     }
 
@@ -6485,6 +6496,47 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    // ── Transfer funds between two of the player's bank accounts ─────────────
+    if (query.includes('transferFunds')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables as
+        | {
+            input?: { fromBankAccountId?: string; toBankAccountId?: string; amount?: number }
+          }
+        | undefined
+      const fromId = vars?.input?.fromBankAccountId ?? ''
+      const toId = vars?.input?.toBankAccountId ?? ''
+      const amount = vars?.input?.amount ?? 0
+      if (fromId === toId) return routeJsonError('Source and destination must be different.', 'SAME_ACCOUNT')
+      if (amount <= 0) return routeJsonError('Amount must be positive.', 'INVALID_AMOUNT')
+      const fromAcc = state.myBankAccounts.find((a) => a.id === fromId)
+      if (!fromAcc) return routeJsonError('Source bank account not found.', 'FROM_ACCOUNT_NOT_FOUND')
+      const toAcc = state.myBankAccounts.find((a) => a.id === toId)
+      if (!toAcc) return routeJsonError('Destination bank account not found.', 'TO_ACCOUNT_NOT_FOUND')
+      if (fromAcc.currencyCode !== toAcc.currencyCode) {
+        return routeJsonError('Both accounts must use the same currency.', 'CURRENCY_MISMATCH')
+      }
+      if (fromAcc.balance < amount) {
+        return routeJsonError('Insufficient funds in source account.', 'INSUFFICIENT_FUNDS')
+      }
+      fromAcc.balance -= amount
+      toAcc.balance += amount
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            transferFunds: {
+              amount,
+              currencyCode: fromAcc.currencyCode,
+              fromAccount: { ...fromAcc },
+              toAccount: { ...toAcc },
+            },
+          },
+        }),
+      })
+    }
+
     // ── Fund building bank account mutation ──────────────────────────────────
     if (query.includes('fundBuildingBankAccount')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
@@ -6558,19 +6610,13 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       if (!building) return routeJsonError('Building not found', 'BUILDING_NOT_FOUND')
 
       // Look up the account from state.buildingBankAccounts by bankAccountId.
-      const matchEntry = Object.entries(state.buildingBankAccounts).find(
-        ([, info]) => info.bankAccountId === bankAccountId,
-      )
+      const matchEntry = Object.entries(state.buildingBankAccounts).find(([, info]) => info.bankAccountId === bankAccountId)
       if (!matchEntry) return routeJsonError('Bank account not found', 'BANK_ACCOUNT_NOT_FOUND')
 
       const [, acctInfo] = matchEntry
       const city = state.cities.find((c) => c.id === building.cityId)
       const cityCurrency = city?.currencyCode ?? 'EUR'
-      if (acctInfo.currencyCode !== cityCurrency)
-        return routeJsonError(
-          `Account currency ${acctInfo.currencyCode} does not match city currency ${cityCurrency}.`,
-          'CURRENCY_MISMATCH',
-        )
+      if (acctInfo.currencyCode !== cityCurrency) return routeJsonError(`Account currency ${acctInfo.currencyCode} does not match city currency ${cityCurrency}.`, 'CURRENCY_MISMATCH')
 
       // Reassign the account to this building.
       state.buildingBankAccounts[buildingId] = { ...acctInfo }

@@ -14,7 +14,6 @@ public sealed partial class AppDbContext
             e.Property(p => p.Email).HasMaxLength(256);
             e.Property(p => p.DisplayName).HasMaxLength(100);
             e.Property(p => p.Role).HasMaxLength(20);
-            e.Property(p => p.PersonalCash).HasPrecision(18, 2);
             e.Property(p => p.ActiveAccountType).HasMaxLength(20);
             e.Property(p => p.OnboardingCurrentStep).HasMaxLength(40);
             e.Property(p => p.OnboardingIndustry).HasMaxLength(50);

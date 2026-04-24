@@ -1,8 +1,10 @@
 using Api.Configuration;
 using Api.Data;
+using Api.Data.Entities;
 using Api.Tests.Infrastructure;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 
 namespace Api.Tests;
@@ -12,6 +14,9 @@ public sealed class DatabaseMigrationBootstrapTests
     private const string PreBankingMigration = "20260415025150_AddProductResearchBudget";
     private const string AddMediaHouseContentBudgetPerTickMigration = "20260421070000_AddMediaHouseContentBudgetPerTick";
     private const string LegacySqlitePostgresTailMigration = "20260417135125_AddLoanCollateral";
+    private const string PreCompanyCurrencyRemovalMigration = "20260423025526_AddBankAccountsAndBuildingFunding";
+    private const string PrePlayerPersonalCashRemovalMigration = "20260423205443_RemoveCompanyCurrencyCode";
+    private const string RemovePlayerPersonalCashMigration = "20260423221000_RemovePlayerPersonalCash";
 
     [Fact]
     public void ShouldRepairSchemaArtifact_SkipsPendingPostgresNativeMigration()
@@ -39,6 +44,31 @@ public sealed class DatabaseMigrationBootstrapTests
         var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
             LegacySqlitePostgresTailMigration,
             pendingMigrations);
+
+        Assert.True(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_SkipsPendingPlayerPersonalCashRemovalMigration()
+    {
+        var pendingMigrations = new HashSet<string>(StringComparer.Ordinal)
+        {
+            RemovePlayerPersonalCashMigration
+        };
+
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            RemovePlayerPersonalCashMigration,
+            pendingMigrations);
+
+        Assert.False(shouldRepair);
+    }
+
+    [Fact]
+    public void ShouldRepairSchemaArtifact_AllowsCompletedPlayerPersonalCashRemovalRepair()
+    {
+        var shouldRepair = AppDbInitializer.ShouldRepairSchemaArtifact(
+            RemovePlayerPersonalCashMigration,
+            new HashSet<string>(StringComparer.Ordinal));
 
         Assert.True(shouldRepair);
     }
@@ -168,6 +198,146 @@ public sealed class DatabaseMigrationBootstrapTests
         }
     }
 
+    [Fact]
+    public async Task UpgradeFromPreRemovalSchema_DropsCompanyCurrencyColumn()
+    {
+        var dbPath = CreateDatabasePath();
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+            var migrationOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
+                .Options;
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PreCompanyCurrencyRemovalMigration);
+                await AssertColumnExistsAsync(legacyCtx, "Companies", "CurrencyCode");
+            }
+
+            // SQLite test startup intentionally uses EnsureCreated + baseline instead of replaying
+            // migrations, so validate the actual migration step directly here.
+            await using (var upgradeCtx = new AppDbContext(migrationOptions))
+            {
+                await upgradeCtx.Database.MigrateAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertColumnMissingAsync(verifyCtx, "Companies", "CurrencyCode");
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task StartupWithLegacyDatabaseMissingHistory_BackfillsPlayerSettlementAccountFromPersonalCash()
+    {
+        var dbPath = CreateDatabasePath();
+        var playerId = Guid.NewGuid();
+        const decimal expectedBalance = 12_345.67m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PrePlayerPersonalCashRemovalMigration);
+                await SeedLegacyPlayerPersonalCashAsync(legacyCtx, playerId, expectedBalance);
+                await DropMigrationHistoryAsync(legacyCtx);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                await CreateInitializer(upgradeCtx).InitializeAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertColumnExistsAsync(verifyCtx, "BankAccounts", "PlayerId");
+            await AssertPlayerSettlementBalanceAsync(verifyCtx, playerId, expectedBalance);
+            await AssertMigrationHistoryCountAsync(verifyCtx, verifyCtx.Database.GetMigrations().Count());
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task StartupWithMisbaselinedDatabase_BackfillsPlayerSettlementAccountFromPersonalCash()
+    {
+        var dbPath = CreateDatabasePath();
+        var playerId = Guid.NewGuid();
+        const decimal expectedBalance = 4_321.09m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PrePlayerPersonalCashRemovalMigration);
+                await SeedLegacyPlayerPersonalCashAsync(legacyCtx, playerId, expectedBalance);
+                await ReplaceMigrationHistoryWithCurrentHeadAsync(legacyCtx);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(options))
+            {
+                await CreateInitializer(upgradeCtx).InitializeAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertColumnExistsAsync(verifyCtx, "BankAccounts", "PlayerId");
+            await AssertPlayerSettlementBalanceAsync(verifyCtx, playerId, expectedBalance);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeFromPreRemovalSchema_MovesPersonalCashIntoPlayerSettlementAccountAndDropsColumn()
+    {
+        var dbPath = CreateDatabasePath();
+        var playerId = Guid.NewGuid();
+        const decimal expectedBalance = 9_876.54m;
+
+        try
+        {
+            var options = CreateOptions(dbPath);
+            var migrationOptions = new DbContextOptionsBuilder<AppDbContext>()
+                .UseSqlite($"Data Source={dbPath}")
+                .ConfigureWarnings(warnings => warnings.Ignore(RelationalEventId.PendingModelChangesWarning))
+                .Options;
+
+            await using (var legacyCtx = new AppDbContext(options))
+            {
+                await legacyCtx.Database.MigrateAsync(PrePlayerPersonalCashRemovalMigration);
+                await AssertColumnExistsAsync(legacyCtx, "Players", "PersonalCash");
+                await SeedLegacyPlayerPersonalCashAsync(legacyCtx, playerId, expectedBalance);
+            }
+
+            await using (var upgradeCtx = new AppDbContext(migrationOptions))
+            {
+                await upgradeCtx.Database.MigrateAsync();
+            }
+
+            await using var verifyCtx = new AppDbContext(options);
+            await AssertColumnMissingAsync(verifyCtx, "Players", "PersonalCash");
+            await AssertColumnExistsAsync(verifyCtx, "BankAccounts", "PlayerId");
+            await AssertPlayerSettlementBalanceAsync(verifyCtx, playerId, expectedBalance);
+        }
+        finally
+        {
+            DeleteDatabaseFiles(dbPath);
+        }
+    }
+
     private static DbContextOptions<AppDbContext> CreateOptions(string dbPath) =>
         new DbContextOptionsBuilder<AppDbContext>()
             .UseSqlite($"Data Source={dbPath}")
@@ -271,6 +441,16 @@ public sealed class DatabaseMigrationBootstrapTests
         Assert.True(exists > 0, $"Expected column '{tableName}.{columnName}' to exist.");
     }
 
+    private static async Task AssertColumnMissingAsync(AppDbContext dbContext, string tableName, string columnName)
+    {
+        var exists = await ExecuteScalarLongAsync(
+            dbContext,
+            $"SELECT COUNT(1) FROM pragma_table_info('{tableName.Replace("'", "''")}') WHERE name = @columnName",
+            ("@columnName", columnName));
+
+        Assert.Equal(0, exists);
+    }
+
     private static async Task AssertIndexExistsAsync(AppDbContext dbContext, string tableName, string indexName)
     {
         var exists = await ExecuteScalarLongAsync(
@@ -286,6 +466,34 @@ public sealed class DatabaseMigrationBootstrapTests
     {
         var actualCount = await ExecuteScalarLongAsync(dbContext, "SELECT COUNT(1) FROM \"__EFMigrationsHistory\"");
         Assert.Equal(expectedCount, (int)actualCount);
+    }
+
+    private static async Task AssertPlayerSettlementBalanceAsync(AppDbContext dbContext, Guid playerId, decimal expectedBalance)
+    {
+        var actualBalance = await dbContext.BankAccounts
+            .Where(account => account.PlayerId == playerId && account.CurrencyCode == "EUR")
+            .Select(account => account.Balance)
+            .SingleAsync();
+
+        Assert.Equal(expectedBalance, actualBalance);
+    }
+
+    private static async Task SeedLegacyPlayerPersonalCashAsync(AppDbContext dbContext, Guid playerId, decimal personalCash)
+    {
+        dbContext.Players.Add(new Player
+        {
+            Id = playerId,
+            Email = $"legacy-{playerId:N}@migration-test.local",
+            DisplayName = "Legacy Personal Cash Player",
+            PasswordHash = "seeded-hash",
+            Role = PlayerRole.Player,
+            ActiveAccountType = AccountContextType.Person,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+        await dbContext.SaveChangesAsync();
+
+        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+            $"UPDATE \"Players\" SET \"PersonalCash\" = {personalCash} WHERE \"Id\" = {playerId}");
     }
 
     private static async Task<long> ExecuteScalarLongAsync(

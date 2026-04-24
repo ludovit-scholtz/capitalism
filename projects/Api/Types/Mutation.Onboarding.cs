@@ -110,7 +110,7 @@ public sealed partial class Mutation
         }
 
         // Create company
-        if (player.PersonalCash < StarterFounderContribution)
+        if (await PersonalBankAccountService.GetGrossCashAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -132,14 +132,13 @@ public sealed partial class Mutation
             PlayerId = userId,
             Name = trimmedCompanyName,
             Cash = founderContributionLocal + ipoRaiseLocal,
-            CurrencyCode = city.CurrencyCode,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
             FoundedAtTick = currentTick
         };
         db.Companies.Add(company);
-        player.PersonalCash -= StarterFounderContribution;
+        await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = company.Id;
         db.Shareholdings.Add(new Shareholding
@@ -266,7 +265,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (player.PersonalCash < StarterFounderContribution)
+        if (await PersonalBankAccountService.GetGrossCashAsync(db, player, httpContextAccessor.HttpContext!.RequestAborted) < StarterFounderContribution)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -288,14 +287,13 @@ public sealed partial class Mutation
             PlayerId = userId,
             Name = trimmedCompanyName,
             Cash = founderContributionLocal + ipoRaiseLocal,
-            CurrencyCode = city.CurrencyCode,
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
             FoundedAtTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync()
         };
         db.Companies.Add(company);
-        player.PersonalCash -= StarterFounderContribution;
+        await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = company.Id;
         db.Shareholdings.Add(new Shareholding
@@ -444,9 +442,13 @@ public sealed partial class Mutation
 
         var onboardingCityId = player.OnboardingCityId!.Value;
 
-        // Look up the FX rate for the company's local currency to normalize starter prices.
-        // The company currency was set from the city chosen in StartOnboardingCompany.
-        var finishFxRate = await Query.ComputeForexRateAsync(db, "EUR", company.CurrencyCode);
+        // Look up the FX rate for the onboarding city's currency to normalize starter prices.
+        var onboardingCityCurrencyCode = await db.Cities
+            .AsNoTracking()
+            .Where(city => city.Id == onboardingCityId)
+            .Select(city => city.CurrencyCode)
+            .FirstOrDefaultAsync() ?? "EUR";
+        var finishFxRate = await Query.ComputeForexRateAsync(db, "EUR", onboardingCityCurrencyCode);
 
         var (_, shop) = await PrepareLotPurchaseAsync(
             db,

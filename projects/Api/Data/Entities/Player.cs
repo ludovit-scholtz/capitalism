@@ -36,11 +36,8 @@ public sealed class Player
     /// <summary>When true, the player's chat messages are only visible to themselves and administrators.</summary>
     public bool IsInvisibleInChat { get; set; }
 
-    /// <summary>Cash held in the player's personal account outside any company.</summary>
-    public decimal PersonalCash { get; set; }
-
     /// <summary>
-    /// Amount of personal cash reserved for future tax payment on stock-sale proceeds.
+    /// Amount reserved in the player's personal settlement account for future tax payment on stock-sale proceeds.
     /// 15% of each personal-account sale is blocked here and excluded from spendable funds.
     /// </summary>
     public decimal PersonalTaxReserve { get; set; }

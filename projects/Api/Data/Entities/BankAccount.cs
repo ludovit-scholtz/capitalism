@@ -4,8 +4,7 @@ namespace Api.Data.Entities;
 
 /// <summary>
 /// Represents a bank account with a unique 16-digit account number, currency, and balance.
-/// Every building is assigned exactly one bank account in the city's currency.
-/// Government accounts are auto-created for each city currency and used as defaults.
+/// Accounts may be owned by a company, a player, or the government.
 /// </summary>
 public sealed class BankAccount
 {
@@ -31,12 +30,21 @@ public sealed class BankAccount
 
     /// <summary>
     /// The company that owns this account.
-    /// Null for government-owned default accounts.
+    /// Null for player-owned or government-owned accounts.
     /// </summary>
     public Guid? CompanyId { get; set; }
 
     /// <summary>Navigation property to the owning company.</summary>
     public Company? Company { get; set; }
+
+    /// <summary>
+    /// The player that owns this account directly.
+    /// Null for company-owned or government-owned accounts.
+    /// </summary>
+    public Guid? PlayerId { get; set; }
+
+    /// <summary>Navigation property to the owning player.</summary>
+    public Player? Player { get; set; }
 
     /// <summary>
     /// True when this is a government-controlled default account for a given currency.

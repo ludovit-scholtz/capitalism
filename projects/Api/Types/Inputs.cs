@@ -524,26 +524,26 @@ public sealed class MergeCompanyInput
     public Guid DestinationCompanyId { get; set; }
 }
 
-/// <summary>Input for creating a cash deposit in a bank building.</summary>
-public sealed class CreateDepositInput
+/// <summary>Input for opening a bank account at a bank building.</summary>
+public sealed class OpenBankAccountInput
 {
-    /// <summary>The bank building to deposit into.</summary>
+    /// <summary>The bank building where the account is opened.</summary>
     public Guid BankBuildingId { get; set; }
 
-    /// <summary>The company making the deposit (must be owned by the authenticated player).</summary>
+    /// <summary>The company opening the account (must be owned by the authenticated player).</summary>
     public Guid DepositorCompanyId { get; set; }
 
-    /// <summary>Amount to deposit (must be >= 1,000).</summary>
+    /// <summary>Initial account balance (must be >= 1,000).</summary>
     public decimal Amount { get; set; }
 }
 
-/// <summary>Input for withdrawing funds from a bank deposit.</summary>
-public sealed class WithdrawDepositInput
+/// <summary>Input for withdrawing from or fully closing a bank account.</summary>
+public sealed class CloseBankAccountInput
 {
-    /// <summary>The deposit to withdraw from.</summary>
+    /// <summary>The account record to withdraw from.</summary>
     public Guid DepositId { get; set; }
 
-    /// <summary>Amount to withdraw. Pass the full deposit amount for a complete withdrawal.</summary>
+    /// <summary>Amount to withdraw. Pass the full balance for a complete account closure.</summary>
     public decimal Amount { get; set; }
 }
 
@@ -734,4 +734,28 @@ public sealed class CreateCompanyBankAccountInput
     /// </summary>
     [Required, MaxLength(3)]
     public string CurrencyCode { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Input for transferring funds between two of the authenticated player's bank accounts.
+/// Both accounts must be owned by companies the player owns and must use the same currency.
+/// Cross-currency transfers must go through the Forex Exchange swap flow.
+/// </summary>
+public sealed class TransferFundsInput
+{
+    /// <summary>Source bank account ID. Must be owned by a company the caller owns.</summary>
+    public Guid FromBankAccountId { get; set; }
+
+    /// <summary>Destination bank account ID. Must be owned by a company the caller owns.</summary>
+    public Guid ToBankAccountId { get; set; }
+
+    /// <summary>
+    /// Amount to transfer in the shared account currency. Must be positive and not exceed
+    /// the source account balance.
+    /// </summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>Optional human-readable description shown on both bank statement entries.</summary>
+    [MaxLength(200)]
+    public string? Description { get; set; }
 }

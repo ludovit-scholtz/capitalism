@@ -87,6 +87,22 @@ public sealed class CreateCompanyBankAccountResult
     public CompanyBankAccountSummary Account { get; set; } = new();
 }
 
+/// <summary>Result of the <c>transferFunds</c> mutation.</summary>
+public sealed class TransferFundsResult
+{
+    /// <summary>Source account after the transfer.</summary>
+    public PlayerBankAccountSummary FromAccount { get; set; } = new();
+
+    /// <summary>Destination account after the transfer.</summary>
+    public PlayerBankAccountSummary ToAccount { get; set; } = new();
+
+    /// <summary>Transferred amount in the shared account currency.</summary>
+    public decimal Amount { get; set; }
+
+    /// <summary>ISO 4217 currency code shared by both accounts.</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+}
+
 /// <summary>
 /// A bank account owned by one of the player's companies.
 /// Returned by the <c>myBankAccounts</c> query and used to populate forex swap selectors.

@@ -5,16 +5,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
+import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
 import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
-import type {
-  FxRate,
-  ForexQuote,
-  ForexTradeResult,
-  ForexTradeHistoryEntry,
-  CurrencyBalance,
-  PlayerBankAccountSummary,
-} from '@/types'
+import type { FxRate, ForexQuote, ForexTradeResult, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary } from '@/types'
 
 const { t } = useI18n()
 const auth = useAuthStore()
@@ -47,10 +41,10 @@ const swapLoading = ref(false)
 
 const showConfirm = ref(false)
 
-type ForexTab = 'swap' | 'rates' | 'history' | 'gold'
+type ForexTab = 'swap' | 'transfer' | 'rates' | 'history' | 'gold'
 
 function parseForexTab(value: unknown): ForexTab {
-  return value === 'rates' || value === 'history' || value === 'gold' ? value : 'swap'
+  return value === 'transfer' || value === 'rates' || value === 'history' || value === 'gold' ? value : 'swap'
 }
 
 function getInitialTab(): ForexTab {
@@ -222,6 +216,34 @@ async function loadData() {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * Silently refresh the player's bank account list (no global loading flag) so
+ * the Transfer panel can show updated balances after a successful transfer
+ * without unmounting the panel and losing its success state.
+ */
+async function reloadBankAccountsSilent() {
+  if (!auth.isAuthenticated) return
+  try {
+    const result = await gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(`
+      query {
+        myBankAccounts {
+          id
+          accountNumber
+          currencyCode
+          currencySymbol
+          balance
+          companyId
+          companyName
+        }
+      }
+    `)
+    myBankAccounts.value = result.myBankAccounts ?? []
+  } catch {
+    // Best-effort refresh; on failure the panel keeps stale balances until the
+    // next full reload.
   }
 }
 
@@ -413,20 +435,25 @@ watch(activeTab, async (tab) => {
           role="tab"
           :aria-selected="activeTab === 'swap'"
           class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'swap'
-            ? 'bg-brand border-brand text-white'
-            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          :class="activeTab === 'swap' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
           @click="activeTab = 'swap'"
         >
           {{ t('forex.tabSwap') }}
         </button>
         <button
           role="tab"
+          :aria-selected="activeTab === 'transfer'"
+          class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'transfer' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'transfer'"
+        >
+          {{ t('bankTransfer.tabLabel') }}
+        </button>
+        <button
+          role="tab"
           :aria-selected="activeTab === 'rates'"
           class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'rates'
-            ? 'bg-brand border-brand text-white'
-            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          :class="activeTab === 'rates' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
           @click="activeTab = 'rates'"
         >
           {{ t('forex.tabRateList') }}
@@ -435,9 +462,7 @@ watch(activeTab, async (tab) => {
           role="tab"
           :aria-selected="activeTab === 'history'"
           class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'history'
-            ? 'bg-brand border-brand text-white'
-            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          :class="activeTab === 'history' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
           @click="activeTab = 'history'"
         >
           {{ t('forex.tabHistory') }}
@@ -446,9 +471,7 @@ watch(activeTab, async (tab) => {
           role="tab"
           :aria-selected="activeTab === 'gold'"
           class="border rounded-full px-4 py-2 text-sm font-semibold cursor-pointer transition-colors"
-          :class="activeTab === 'gold'
-            ? 'bg-brand border-brand text-white'
-            : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          :class="activeTab === 'gold' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
           @click="activeTab = 'gold'"
         >
           {{ t('forex.tabGold') }}
@@ -456,28 +479,16 @@ watch(activeTab, async (tab) => {
       </div>
 
       <!-- Swap Tab -->
-      <section
-        v-if="activeTab === 'swap'"
-        class="bg-card border border-divider rounded-xl p-6 mb-6"
-        aria-label="Forex Swap"
-      >
+      <section v-if="activeTab === 'swap'" class="bg-card border border-divider rounded-xl p-6 mb-6" aria-label="Forex Swap">
         <h2 class="text-lg font-semibold text-body mb-4 pb-3 border-b border-divider">
           {{ t('forex.tabSwap') }}
         </h2>
 
         <!-- Bank account mode notice -->
-        <div
-          v-if="hasBankAccounts"
-          class="ba-notice flex items-center gap-2 bg-card-raised border border-divider rounded-lg px-4 py-2.5 mb-5 text-sm text-muted"
-          role="note"
-        >
+        <div v-if="hasBankAccounts" class="ba-notice flex items-center gap-2 bg-card-raised border border-divider rounded-lg px-4 py-2.5 mb-5 text-sm text-muted" role="note">
           <span class="text-lg">🏦</span>
           <span>{{ t('forex.bankAccountMode') }}</span>
-          <RouterLink
-            v-if="auth.player?.companies?.length"
-            :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
-            class="ml-1 text-xs font-semibold text-brand hover:underline"
-          >
+          <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="ml-1 text-xs font-semibold text-brand hover:underline">
             {{ t('forex.viewBankStatement') }} →
           </RouterLink>
         </div>
@@ -496,11 +507,7 @@ watch(activeTab, async (tab) => {
             {{ t('forex.balancesEmpty') }}
           </div>
           <div v-else class="flex flex-wrap gap-3">
-            <div
-              v-for="b in balances"
-              :key="b.currencyCode"
-              class="balance-card flex items-center gap-1.5 bg-card-raised border border-divider rounded-lg px-3 py-2"
-            >
+            <div v-for="b in balances" :key="b.currencyCode" class="balance-card flex items-center gap-1.5 bg-card-raised border border-divider rounded-lg px-3 py-2">
               <span class="text-brand font-semibold">{{ b.currencySymbol }}</span>
               <span class="text-sm font-semibold text-muted">{{ b.currencyCode }}</span>
               <span class="text-sm font-bold text-body">{{ formatAmount(b.balance) }}</span>
@@ -509,11 +516,7 @@ watch(activeTab, async (tab) => {
         </div>
 
         <!-- Swap success banner -->
-        <div
-          v-if="swapResult"
-          class="swap-result-banner flex flex-col gap-1.5 px-4 py-3 bg-good/10 border border-good rounded-lg mb-4 text-good font-semibold"
-          role="status"
-        >
+        <div v-if="swapResult" class="swap-result-banner flex flex-col gap-1.5 px-4 py-3 bg-good/10 border border-good rounded-lg mb-4 text-good font-semibold" role="status">
           <div class="flex items-center gap-2">
             <span>✓</span>
             <span>
@@ -528,12 +531,8 @@ watch(activeTab, async (tab) => {
             </span>
           </div>
           <div class="flex gap-3 text-xs text-muted font-normal">
-            <span class="bg-card-raised border border-divider rounded px-2 py-0.5">
-              {{ swapResult.fromCurrencyCode }}: {{ formatAmount(swapResult.newFromBalance) }}
-            </span>
-            <span class="bg-card-raised border border-divider rounded px-2 py-0.5">
-              {{ swapResult.toCurrencyCode }}: {{ formatAmount(swapResult.newToBalance) }}
-            </span>
+            <span class="bg-card-raised border border-divider rounded px-2 py-0.5"> {{ swapResult.fromCurrencyCode }}: {{ formatAmount(swapResult.newFromBalance) }} </span>
+            <span class="bg-card-raised border border-divider rounded px-2 py-0.5"> {{ swapResult.toCurrencyCode }}: {{ formatAmount(swapResult.newToBalance) }} </span>
           </div>
         </div>
 
@@ -548,7 +547,12 @@ watch(activeTab, async (tab) => {
                   :accounts="myBankAccounts"
                   :label="t('forex.sourceAccount')"
                   id="from-bank-account"
-                  @update:model-value="() => { quote = null; showConfirm = false }"
+                  @update:model-value="
+                    () => {
+                      quote = null
+                      showConfirm = false
+                    }
+                  "
                 />
               </template>
               <template v-else>
@@ -557,7 +561,12 @@ watch(activeTab, async (tab) => {
                   :balances="toBalances"
                   :label="t('forex.sourceCurrency')"
                   id="from-currency"
-                  @update:model-value="() => { quote = null; showConfirm = false }"
+                  @update:model-value="
+                    () => {
+                      quote = null
+                      showConfirm = false
+                    }
+                  "
                 />
               </template>
             </div>
@@ -579,12 +588,13 @@ watch(activeTab, async (tab) => {
                   step="any"
                   :placeholder="t('forex.amountPlaceholder')"
                   class="flex-1 bg-transparent border-none px-3 py-2.5 text-body text-base font-semibold focus:outline-none"
-                  @input="quote = null; showConfirm = false"
+                  @input="
+                    quote = null
+                    showConfirm = false
+                  "
                 />
               </div>
-              <span class="field-hint text-xs text-muted mt-0.5">
-                {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }}
-              </span>
+              <span class="field-hint text-xs text-muted mt-0.5"> {{ t('forex.availableBalance') }}: {{ fromSymbol }}{{ formatAmount(fromBalance) }} </span>
             </div>
           </div>
 
@@ -609,7 +619,12 @@ watch(activeTab, async (tab) => {
                   :accounts="myBankAccounts"
                   :label="t('forex.destAccount')"
                   id="to-bank-account"
-                  @update:model-value="() => { quote = null; showConfirm = false }"
+                  @update:model-value="
+                    () => {
+                      quote = null
+                      showConfirm = false
+                    }
+                  "
                 />
               </template>
               <template v-else>
@@ -618,7 +633,12 @@ watch(activeTab, async (tab) => {
                   :balances="toBalances"
                   :label="t('forex.targetCurrency')"
                   id="to-currency"
-                  @update:model-value="() => { quote = null; showConfirm = false }"
+                  @update:model-value="
+                    () => {
+                      quote = null
+                      showConfirm = false
+                    }
+                  "
                 />
               </template>
             </div>
@@ -641,69 +661,42 @@ watch(activeTab, async (tab) => {
           </div>
 
           <!-- Validation / quote errors -->
-          <div
-            v-if="validationError && amount"
-            class="validation-error text-sm text-bad px-3 py-2 bg-bad/10 rounded-md"
-            role="alert"
-          >
+          <div v-if="validationError && amount" class="validation-error text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
             {{ validationError }}
           </div>
-          <div
-            v-if="quoteError"
-            class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md"
-            role="alert"
-          >
+          <div v-if="quoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
             {{ quoteError }}
           </div>
 
           <!-- Get quote action -->
           <div v-if="!showConfirm">
-            <button
-              class="btn btn-primary"
-              :disabled="quoteLoading || !!validationError || !amount"
-              @click="fetchQuote"
-            >
+            <button class="btn btn-primary" :disabled="quoteLoading || !!validationError || !amount" @click="fetchQuote">
               {{ quoteLoading ? t('common.loading') : t('forex.getQuote') }}
             </button>
           </div>
         </div>
 
         <!-- Quote confirmation card -->
-        <div
-          v-if="showConfirm && quote"
-          class="mt-5 border border-brand rounded-xl p-5 bg-card-raised"
-          role="region"
-          aria-label="Exchange Quote"
-        >
+        <div v-if="showConfirm && quote" class="mt-5 border border-brand rounded-xl p-5 bg-card-raised" role="region" aria-label="Exchange Quote">
           <h3 class="text-base font-bold text-body mb-3">{{ t('forex.quoteTitle') }}</h3>
           <table class="quote-table w-full border-collapse mb-4 text-sm">
             <tbody>
               <tr>
                 <td class="py-1.5 text-muted w-2/5">{{ t('forex.rate') }}</td>
-                <td class="py-1.5 font-semibold text-body text-right">
-                  1 {{ quote.fromCurrencyCode }} = {{ formatAmount(quote.rate) }} {{ quote.toCurrencyCode }}
-                </td>
+                <td class="py-1.5 font-semibold text-body text-right">1 {{ quote.fromCurrencyCode }} = {{ formatAmount(quote.rate) }} {{ quote.toCurrencyCode }}</td>
               </tr>
               <tr>
                 <td class="py-1.5 text-muted">{{ t('forex.fee') }}</td>
-                <td class="py-1.5 font-semibold text-caution text-right">
-                  {{ quote.fromCurrencySymbol }}{{ formatAmount(quote.feeAmount) }}
-                </td>
+                <td class="py-1.5 font-semibold text-caution text-right">{{ quote.fromCurrencySymbol }}{{ formatAmount(quote.feeAmount) }}</td>
               </tr>
               <tr>
                 <td class="py-1.5 text-muted">{{ t('forex.youReceive') }}</td>
-                <td class="py-1.5 font-bold text-good text-right text-base">
-                  {{ quote.toCurrencySymbol }}{{ formatAmount(quote.toAmount) }}
-                </td>
+                <td class="py-1.5 font-bold text-good text-right text-base">{{ quote.toCurrencySymbol }}{{ formatAmount(quote.toAmount) }}</td>
               </tr>
             </tbody>
           </table>
 
-          <div
-            v-if="swapError"
-            class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md mb-3"
-            role="alert"
-          >
+          <div v-if="swapError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md mb-3" role="alert">
             {{ swapError }}
           </div>
 
@@ -718,12 +711,11 @@ watch(activeTab, async (tab) => {
         </div>
       </section>
 
+      <!-- Transfer Tab -->
+      <BankAccountTransferPanel v-else-if="activeTab === 'transfer'" :accounts="myBankAccounts" @transferred="reloadBankAccountsSilent" />
+
       <!-- Rates Tab -->
-      <section
-        v-else-if="activeTab === 'rates'"
-        class="bg-card border border-divider rounded-xl p-6 mb-6"
-        aria-label="Rate List"
-      >
+      <section v-else-if="activeTab === 'rates'" class="bg-card border border-divider rounded-xl p-6 mb-6" aria-label="Rate List">
         <h2 class="text-lg font-semibold text-body mb-4 pb-3 border-b border-divider">
           {{ t('forex.rateListTitle') }}
         </h2>
@@ -746,14 +738,8 @@ watch(activeTab, async (tab) => {
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="rateEntry in rates"
-                :key="`${rateEntry.baseCurrencyCode}-${rateEntry.quoteCurrencyCode}`"
-                class="history-row"
-              >
-                <td class="px-3 py-2.5 font-semibold text-body align-middle">
-                  {{ rateEntry.baseCurrencyCode }}/{{ rateEntry.quoteCurrencyCode }}
-                </td>
+              <tr v-for="rateEntry in rates" :key="`${rateEntry.baseCurrencyCode}-${rateEntry.quoteCurrencyCode}`" class="history-row">
+                <td class="px-3 py-2.5 font-semibold text-body align-middle">{{ rateEntry.baseCurrencyCode }}/{{ rateEntry.quoteCurrencyCode }}</td>
                 <td class="px-3 py-2.5 text-muted align-middle">{{ formatAmount(rateEntry.rate) }}</td>
                 <td class="px-3 py-2.5 text-subtle text-xs align-middle">{{ rateEntry.rateDate }}</td>
               </tr>
@@ -763,11 +749,7 @@ watch(activeTab, async (tab) => {
       </section>
 
       <!-- History Tab -->
-      <section
-        v-else-if="activeTab === 'history'"
-        class="bg-card border border-divider rounded-xl p-6 mb-6"
-        aria-label="Trade History"
-      >
+      <section v-else-if="activeTab === 'history'" class="bg-card border border-divider rounded-xl p-6 mb-6" aria-label="Trade History">
         <h2 class="text-lg font-semibold text-body mb-4 pb-3 border-b border-divider">
           {{ t('forex.historyTitle') }}
         </h2>
@@ -808,9 +790,7 @@ watch(activeTab, async (tab) => {
                   <span class="text-xs text-muted ml-1">{{ entry.toCurrencyCode }}</span>
                 </td>
                 <td class="px-3 py-2.5 text-muted align-middle">{{ formatAmount(entry.rate) }}</td>
-                <td class="px-3 py-2.5 text-caution align-middle">
-                  {{ entry.fromCurrencySymbol }}{{ formatAmount(entry.feeAmount) }}
-                </td>
+                <td class="px-3 py-2.5 text-caution align-middle">{{ entry.fromCurrencySymbol }}{{ formatAmount(entry.feeAmount) }}</td>
                 <td class="px-3 py-2.5 text-subtle text-xs align-middle">
                   {{ formatTick(entry.executedAtTick) }}
                 </td>
@@ -821,12 +801,7 @@ watch(activeTab, async (tab) => {
       </section>
     </template>
 
-    <GoldAmmSection
-      v-if="!loading && !error && activeTab === 'gold'"
-      :available-currencies="availableCurrencies"
-      :balances="balances"
-      @refresh="loadData"
-    />
+    <GoldAmmSection v-if="!loading && !error && activeTab === 'gold'" :available-currencies="availableCurrencies" :balances="balances" @refresh="loadData" />
   </main>
 </template>
 

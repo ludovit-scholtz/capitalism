@@ -1504,7 +1504,6 @@ export interface GameAdminDashboard {
   recentAuditLogs: GameAdminAuditLog[]
 }
 
-
 /** FX exchange rate summary returned by the fxRates query. EUR-based (1 EUR = rate units of quoteCurrency). */
 export interface FxRate {
   baseCurrencyCode: string
@@ -1795,4 +1794,12 @@ export interface AssignBuildingBankAccountResult {
 /** Result from the `createCompanyBankAccount` mutation. */
 export interface CreateCompanyBankAccountResult {
   account: CompanyBankAccountSummary
+}
+
+/** Result from the `transferFunds` mutation. */
+export interface TransferFundsResult {
+  amount: number
+  currencyCode: string
+  fromAccount: PlayerBankAccountSummary
+  toAccount: PlayerBankAccountSummary
 }
