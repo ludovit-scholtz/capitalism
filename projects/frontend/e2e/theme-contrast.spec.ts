@@ -370,3 +370,73 @@ test.describe('Theme toggle — dark/light mode switching', () => {
     expect(theme).toBe('dark')
   })
 })
+
+test.describe('Theme contrast — OnboardingView (Tailwind migration regression)', () => {
+  /**
+   * These tests guard against the dark-mode regression that occurred when
+   * OnboardingView.vue was migrated from scoped CSS to Tailwind utilities.
+   * The migration must not break dark-mode token resolution on the wizard pages.
+   */
+
+  test('industry cards are visible with correct dark background in dark mode', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    // Industry cards must be rendered
+    await expect(page.locator('.industry-card').first()).toBeVisible()
+
+    // Dark background token must be resolved on the onboarding page
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    expect(bg.toLowerCase()).toMatch(/^#[0-4]/)
+  })
+
+  test('onboarding wizard text is light-coloured in dark mode (readable)', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    const textColor = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim(),
+    )
+    // Light text on dark background
+    expect(textColor.toLowerCase()).toMatch(/^#[c-f]/)
+  })
+
+  test('theme toggle switches OnboardingView to light mode correctly', async ({ page }) => {
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    await expect(page.locator('.industry-card').first()).toBeVisible()
+
+    // Switch to light mode via toggle
+    await page.getByRole('button', { name: /Switch to light mode/i }).click()
+
+    const bg = await page.evaluate(() =>
+      getComputedStyle(document.documentElement).getPropertyValue('--color-background').trim(),
+    )
+    // Light mode background should be a light colour
+    expect(bg.toLowerCase()).toMatch(/^#[c-f]/)
+
+    // Industry cards must still be visible after theme switch
+    await expect(page.locator('.industry-card').first()).toBeVisible()
+  })
+
+  test('theme toggle in mobile viewport is accessible on onboarding page', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    setupMockApi(page)
+    await page.goto('/onboarding')
+
+    // Open mobile menu first to reach the toggle
+    const menuBtn = page.getByRole('button', { name: /menu/i })
+    if (await menuBtn.isVisible()) {
+      await menuBtn.click()
+    }
+
+    // Toggle button must be accessible (either in header or mobile nav)
+    const toggle = page
+      .getByRole('button', { name: /Switch to light mode/i })
+      .or(page.getByRole('button', { name: /Switch to dark mode/i }))
+    await expect(toggle.first()).toBeVisible()
+  })
+})
