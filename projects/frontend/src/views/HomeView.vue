@@ -93,10 +93,7 @@ useTickRefresh(() => loadHomeData(true))
       <!-- Game Status Cards -->
       <section v-if="gameState" class="space-y-5">
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-3">
-          <div
-            class="rounded-xl border border-divider bg-card px-6 py-5 text-center shadow-sm"
-            :title="t('home.currentTick', { tick: gameState.currentTick })"
-          >
+          <div class="rounded-xl border border-divider bg-card px-6 py-5 text-center shadow-sm" :title="t('home.currentTick', { tick: gameState.currentTick })">
             <span class="mb-2 block text-xs uppercase tracking-wide text-muted">{{ t('home.currentTime') }}</span>
             <span class="text-2xl font-bold text-body">{{ formattedGameTime }}</span>
           </div>
