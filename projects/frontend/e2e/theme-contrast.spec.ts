@@ -427,13 +427,10 @@ test.describe('Theme contrast — OnboardingView (Tailwind migration regression)
     setupMockApi(page)
     await page.goto('/onboarding')
 
-    // Open mobile menu first to reach the toggle
-    const menuBtn = page.getByRole('button', { name: /menu/i })
-    if (await menuBtn.isVisible()) {
-      await menuBtn.click()
-    }
+    // At 375px the hamburger menu is always present — click it to open mobile nav
+    await page.getByRole('button', { name: /menu/i }).click()
 
-    // Toggle button must be accessible (either in header or mobile nav)
+    // Toggle button must be accessible in the mobile nav
     const toggle = page
       .getByRole('button', { name: /Switch to light mode/i })
       .or(page.getByRole('button', { name: /Switch to dark mode/i }))
