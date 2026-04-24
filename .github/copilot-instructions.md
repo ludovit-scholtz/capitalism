@@ -1075,6 +1075,19 @@ Root-cause of CI failures (April 2026, PR #128 Tailwind migration):
 4. **After migrating any view to Tailwind, run the full targeted E2E spec** (`CI=true npx playwright test --project=chromium e2e/<spec>.ts`) before `report_progress`. Running only the build check (`npm run build`) is insufficient — Tailwind builds fine even when hook classes are missing.
 5. **When adding theme toggle functionality, always add E2E tests that verify:** toggle is visible, clicking toggles `data-theme`, preference persists in `localStorage`, stored preference is respected on reload, and light/dark token values are correct.
 
+## Vue scoped-style extraction — never leave child visuals in a parent `<style scoped>` block
+
+Root-cause of a design regression (April 2026, commit `e98acf480601054f251cb66c22441777e1063d82` / building-detail Tailwind migration):
+- `BuildingDetailView.vue` was split into child components including `BuildingUnitGrid.vue`.
+- The grid markup moved into the new child component, but the selectors that defined the grid card visuals (`.grid-container`, `.grid-header`, `.grid-cell`, `.link-toggle`, `.cell-item-block`, `.legend-item`, etc.) stayed behind in `BuildingDetailView.vue`'s `<style scoped>` block.
+- Vue scopes parent and child SFC styles with different `data-v-*` attributes, so the parent-scoped rules no longer matched the extracted child DOM. The grid still rendered semantically, but borders, padding, connector styling, and tile layout disappeared.
+
+**Rules to prevent recurrence:**
+1. **When extracting markup from a Vue SFC that uses `<style scoped>`, move every matching selector into the new child component in the same commit.** Parent-scoped CSS does not automatically style extracted child DOM.
+2. **If the extracted child would exceed the 500-line file budget, use one or more co-located stylesheets owned by the child** (for example `<style scoped src="./BuildingUnitGrid.layout.css"></style>`) instead of leaving child-specific selectors in the parent.
+3. **After any Vue component extraction, grep both the new child template classes and the old parent stylesheet.** If classes like `.grid-cell` or `.link-toggle` still only have definitions in the parent after the markup moved, treat that as a blocker before pushing.
+4. **Validate extracted visual components with the narrowest relevant Playwright spec or failure artifact, not just build/lint.** Scoped-style regressions still produce valid DOM snapshots and can slip past compile-time checks while the design is visibly broken.
+
 ## Multi-line inline Vue event handlers — always use semicolons or arrow functions
 
 Root-cause of CI build failures (April 2026, PR #128 — after merging main):

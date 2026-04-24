@@ -407,3 +407,6 @@ const { locale, currentTick, saving, saveError, isEditing, selectedCell, draftUp
   </div>
 </div>
 </template>
+
+<style scoped src="./BuildingUnitGrid.layout.css"></style>
+<style scoped src="./BuildingUnitGrid.cells.css"></style>
