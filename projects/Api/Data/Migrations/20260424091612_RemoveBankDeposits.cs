@@ -264,9 +264,20 @@ namespace Api.Data.Migrations
                                account."IsBaseCapitalDeposit",
                                CASE WHEN account."ClosedAtUtc" IS NULL THEN 1 ELSE 0 END,
                                COALESCE(account."DepositedAtTick", 0),
-                               account."CreatedAtUtc",
+                               COALESCE(
+                                   CASE
+                                       WHEN account."CreatedAtUtc" IS NULL THEN NULL
+                                       WHEN account."CreatedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (account."CreatedAtUtc"::text)::timestamp with time zone
+                                       ELSE NULL
+                                   END,
+                                   CURRENT_TIMESTAMP
+                               ),
                                account."ClosedAtTick",
-                               account."ClosedAtUtc",
+                               CASE
+                                   WHEN account."ClosedAtUtc" IS NULL THEN NULL
+                                   WHEN account."ClosedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (account."ClosedAtUtc"::text)::timestamp with time zone
+                                   ELSE NULL
+                               END,
                                account."TotalInterestPaid"
                         FROM "BankAccounts" AS account
                         WHERE account."BankBuildingId" IS NOT NULL
@@ -354,14 +365,25 @@ namespace Api.Data.Migrations
                            ),
                            legacy."DepositorCompanyId",
                            FALSE,
-                           legacy."DepositedAtUtc",
+                           COALESCE(
+                               CASE
+                                   WHEN legacy."DepositedAtUtc" IS NULL THEN NULL
+                                   WHEN legacy."DepositedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (legacy."DepositedAtUtc"::text)::timestamp with time zone
+                                   ELSE NULL
+                               END,
+                               CURRENT_TIMESTAMP
+                           ),
                            NULL,
                            legacy."BankBuildingId",
                            legacy."DepositInterestRatePercent",
                            legacy."DepositedAtTick",
                            legacy."IsBaseCapital",
                            legacy."WithdrawnAtTick",
-                           legacy."WithdrawnAtUtc",
+                           CASE
+                               WHEN legacy."WithdrawnAtUtc" IS NULL THEN NULL
+                               WHEN legacy."WithdrawnAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (legacy."WithdrawnAtUtc"::text)::timestamp with time zone
+                               ELSE NULL
+                           END,
                            legacy."TotalInterestPaid"
                     FROM "BankDeposits" AS legacy
                     INNER JOIN "Buildings" AS bank ON bank."Id"::text = legacy."BankBuildingId"::text

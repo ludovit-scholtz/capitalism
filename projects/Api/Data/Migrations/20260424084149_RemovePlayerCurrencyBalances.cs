@@ -102,7 +102,14 @@ namespace Api.Data.Migrations
                                                      END,
                                                      0
                                                  ),
-                                                     ba."CreatedAtUtc",
+                                                         COALESCE(
+                                                             CASE
+                                                                 WHEN ba."CreatedAtUtc" IS NULL THEN NULL
+                                                                 WHEN ba."CreatedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (ba."CreatedAtUtc"::text)::timestamp with time zone
+                                                                 ELSE NULL
+                                                             END,
+                                                             CURRENT_TIMESTAMP
+                                                         ),
                                                      CURRENT_TIMESTAMP
                                         FROM "BankAccounts" ba
                                         WHERE ba."PlayerId" IS NOT NULL
@@ -184,7 +191,14 @@ namespace Api.Data.Migrations
                                                  ),
                                                      NULL,
                                                      FALSE,
-                                                     legacy."CreatedAtUtc",
+                                                         COALESCE(
+                                                             CASE
+                                                                 WHEN legacy."CreatedAtUtc" IS NULL THEN NULL
+                                                                 WHEN legacy."CreatedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (legacy."CreatedAtUtc"::text)::timestamp with time zone
+                                                                 ELSE NULL
+                                                             END,
+                                                             CURRENT_TIMESTAMP
+                                                         ),
                                                      legacy."PlayerId"
                                         FROM "PlayerCurrencyBalances" AS legacy
                                         WHERE NOT EXISTS (
