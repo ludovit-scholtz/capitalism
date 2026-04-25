@@ -44,15 +44,15 @@ namespace Api.Data.Migrations
                               AND c.data_type <> 'boolean') THEN
 
                             EXECUTE format(
-                                'ALTER TABLE "%I" ALTER COLUMN "%I" DROP DEFAULT',
+                                'ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT',
                                 target.table_name,
                                 target.column_name);
 
                             EXECUTE format(
-                                'ALTER TABLE "%I" ALTER COLUMN "%I" TYPE boolean USING CASE
-                                    WHEN "%I" IS NULL THEN NULL
-                                    WHEN lower(trim("%I"::text)) IN (''1'',''true'',''t'',''yes'',''y'') THEN TRUE
-                                    WHEN lower(trim("%I"::text)) IN (''0'',''false'',''f'',''no'',''n'') THEN FALSE
+                                'ALTER TABLE %I ALTER COLUMN %I TYPE boolean USING CASE
+                                    WHEN %I IS NULL THEN NULL
+                                    WHEN lower(trim(%I::text)) IN (''1'',''true'',''t'',''yes'',''y'') THEN TRUE
+                                    WHEN lower(trim(%I::text)) IN (''0'',''false'',''f'',''no'',''n'') THEN FALSE
                                     ELSE FALSE
                                  END',
                                 target.table_name,
