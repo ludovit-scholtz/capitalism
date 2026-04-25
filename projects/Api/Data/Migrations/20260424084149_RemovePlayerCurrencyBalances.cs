@@ -76,7 +76,14 @@ namespace Api.Data.Migrations
                                         SELECT ba."Id",
                                                      ba."PlayerId",
                                                      ba."CurrencyCode",
-                                                     ba."Balance",
+                                                 COALESCE(
+                                                     CASE
+                                                         WHEN ba."Balance" IS NULL THEN NULL
+                                                         WHEN ba."Balance"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (ba."Balance"::text)::numeric
+                                                         ELSE NULL
+                                                     END,
+                                                     0
+                                                 ),
                                                      ba."CreatedAtUtc",
                                                      CURRENT_TIMESTAMP
                                         FROM "BankAccounts" ba
@@ -123,7 +130,24 @@ namespace Api.Data.Migrations
                                 :
                                         """
                                         UPDATE "BankAccounts" AS existing
-                                        SET "Balance" = existing."Balance" + legacy."Balance"
+                                        SET "Balance" =
+                                            COALESCE(
+                                                CASE
+                                                    WHEN existing."Balance" IS NULL THEN NULL
+                                                    WHEN existing."Balance"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (existing."Balance"::text)::numeric
+                                                    ELSE NULL
+                                                END,
+                                                0
+                                            )
+                                            +
+                                            COALESCE(
+                                                CASE
+                                                    WHEN legacy."Balance" IS NULL THEN NULL
+                                                    WHEN legacy."Balance"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (legacy."Balance"::text)::numeric
+                                                    ELSE NULL
+                                                END,
+                                                0
+                                            )
                                         FROM "PlayerCurrencyBalances" AS legacy
                                         WHERE existing."PlayerId" = legacy."PlayerId"
                                             AND existing."CurrencyCode" = legacy."CurrencyCode";
@@ -132,7 +156,14 @@ namespace Api.Data.Migrations
                                         SELECT legacy."Id",
                                                      LPAD((9100000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."PlayerId", legacy."CurrencyCode"))::text, 16, '0'),
                                                      legacy."CurrencyCode",
-                                                     legacy."Balance",
+                                                 COALESCE(
+                                                     CASE
+                                                         WHEN legacy."Balance" IS NULL THEN NULL
+                                                         WHEN legacy."Balance"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (legacy."Balance"::text)::numeric
+                                                         ELSE NULL
+                                                     END,
+                                                     0
+                                                 ),
                                                      NULL,
                                                      FALSE,
                                                      legacy."CreatedAtUtc",

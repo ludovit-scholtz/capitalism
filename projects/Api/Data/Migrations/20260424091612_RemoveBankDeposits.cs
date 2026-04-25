@@ -11,6 +11,67 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql("DROP INDEX IF EXISTS \"IX_BankAccounts_CompanyId\";");
+
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    DECLARE
+                        building_id_type TEXT;
+                    BEGIN
+                        SELECT pg_catalog.format_type(a.atttypid, a.atttypmod)
+                        INTO building_id_type
+                        FROM pg_attribute a
+                        JOIN pg_class c ON c.oid = a.attrelid
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = 'public'
+                          AND c.relname = 'Buildings'
+                          AND a.attname = 'Id'
+                          AND a.attnum > 0
+                          AND NOT a.attisdropped;
+
+                        IF building_id_type IS NULL THEN
+                            RAISE EXCEPTION 'Buildings.Id column not found while adding BankAccounts.BankBuildingId';
+                        END IF;
+
+                        EXECUTE format(
+                            'ALTER TABLE "BankAccounts" ADD COLUMN IF NOT EXISTS "BankBuildingId" %s NULL',
+                            CASE WHEN building_id_type = 'uuid' THEN 'uuid' ELSE 'text' END);
+                    END $$;
+                    """);
+
+                migrationBuilder.Sql("ALTER TABLE \"BankAccounts\" ADD COLUMN IF NOT EXISTS \"ClosedAtTick\" bigint NULL;");
+                migrationBuilder.Sql("ALTER TABLE \"BankAccounts\" ADD COLUMN IF NOT EXISTS \"ClosedAtUtc\" timestamp with time zone NULL;");
+                migrationBuilder.Sql("ALTER TABLE \"BankAccounts\" ADD COLUMN IF NOT EXISTS \"DepositInterestRatePercent\" numeric(8,4) NULL;");
+                migrationBuilder.Sql("ALTER TABLE \"BankAccounts\" ADD COLUMN IF NOT EXISTS \"DepositedAtTick\" bigint NULL;");
+                migrationBuilder.Sql("ALTER TABLE \"BankAccounts\" ADD COLUMN IF NOT EXISTS \"IsBaseCapitalDeposit\" boolean NOT NULL DEFAULT FALSE;");
+                migrationBuilder.Sql("ALTER TABLE \"BankAccounts\" ADD COLUMN IF NOT EXISTS \"TotalInterestPaid\" numeric(18,4) NOT NULL DEFAULT 0;");
+
+                migrationBuilder.Sql("CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_BankBuildingId_ClosedAtUtc\" ON \"BankAccounts\" (\"BankBuildingId\", \"ClosedAtUtc\");");
+                migrationBuilder.Sql("CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_CompanyId_BankBuildingId_ClosedAtUtc\" ON \"BankAccounts\" (\"CompanyId\", \"BankBuildingId\", \"ClosedAtUtc\");");
+
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM pg_constraint
+                            WHERE conname = 'FK_BankAccounts_Buildings_BankBuildingId') THEN
+                            ALTER TABLE "BankAccounts"
+                                ADD CONSTRAINT "FK_BankAccounts_Buildings_BankBuildingId"
+                                FOREIGN KEY ("BankBuildingId") REFERENCES "Buildings" ("Id") ON DELETE CASCADE;
+                        END IF;
+                    END $$;
+                    """);
+
+                migrationBuilder.Sql(GetBankDepositBackfillSql(isDown: false));
+                migrationBuilder.Sql("DROP TABLE IF EXISTS \"BankDeposits\";");
+                return;
+            }
+
             migrationBuilder.DropIndex(
                 name: "IX_BankAccounts_CompanyId",
                 table: "BankAccounts");
@@ -222,7 +283,14 @@ namespace Api.Data.Migrations
                         SELECT account."Id",
                                account."BankBuildingId",
                                account."CompanyId",
-                               account."Balance",
+                               COALESCE(
+                                   CASE
+                                       WHEN account."Balance" IS NULL THEN NULL
+                                       WHEN account."Balance"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (account."Balance"::text)::numeric
+                                       ELSE NULL
+                                   END,
+                                   0
+                               ),
                                COALESCE(account."DepositInterestRatePercent", 0),
                                account."IsBaseCapitalDeposit",
                                account."ClosedAtUtc" IS NULL,
@@ -276,7 +344,14 @@ namespace Api.Data.Migrations
                     SELECT legacy."Id",
                            LPAD((9200000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."Id"))::text, 16, '0'),
                            city."CurrencyCode",
-                           legacy."Amount",
+                           COALESCE(
+                               CASE
+                                   WHEN legacy."Amount" IS NULL THEN NULL
+                                   WHEN legacy."Amount"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (legacy."Amount"::text)::numeric
+                                   ELSE NULL
+                               END,
+                               0
+                           ),
                            legacy."DepositorCompanyId",
                            FALSE,
                            legacy."DepositedAtUtc",

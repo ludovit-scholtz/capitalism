@@ -11,6 +11,98 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    DECLARE
+                        company_id_type TEXT;
+                        bank_account_id_type TEXT;
+                    BEGIN
+                        SELECT pg_catalog.format_type(a.atttypid, a.atttypmod)
+                        INTO company_id_type
+                        FROM pg_attribute a
+                        JOIN pg_class c ON c.oid = a.attrelid
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = 'public'
+                          AND c.relname = 'Companies'
+                          AND a.attname = 'Id'
+                          AND a.attnum > 0
+                          AND NOT a.attisdropped;
+
+                        IF company_id_type IS NULL THEN
+                            RAISE EXCEPTION 'Companies.Id column not found while creating BankAccounts';
+                        END IF;
+
+                        IF company_id_type = 'uuid' THEN
+                            bank_account_id_type := 'uuid';
+                        ELSE
+                            bank_account_id_type := 'text';
+                        END IF;
+
+                        IF bank_account_id_type = 'uuid' THEN
+                            EXECUTE '
+                                CREATE TABLE IF NOT EXISTS "BankAccounts" (
+                                    "Id" uuid NOT NULL,
+                                    "AccountNumber" character varying(16) NOT NULL,
+                                    "CurrencyCode" character varying(3) NOT NULL,
+                                    "Balance" numeric(18,2) NOT NULL,
+                                    "CompanyId" uuid NULL,
+                                    "IsGovernmentAccount" boolean NOT NULL,
+                                    "CreatedAtUtc" timestamp with time zone NOT NULL,
+                                    CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id"),
+                                    CONSTRAINT "FK_BankAccounts_Companies_CompanyId"
+                                        FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE SET NULL
+                                )';
+                        ELSE
+                            EXECUTE '
+                                CREATE TABLE IF NOT EXISTS "BankAccounts" (
+                                    "Id" text NOT NULL,
+                                    "AccountNumber" character varying(16) NOT NULL,
+                                    "CurrencyCode" character varying(3) NOT NULL,
+                                    "Balance" numeric(18,2) NOT NULL,
+                                    "CompanyId" text NULL,
+                                    "IsGovernmentAccount" boolean NOT NULL,
+                                    "CreatedAtUtc" timestamp with time zone NOT NULL,
+                                    CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id"),
+                                    CONSTRAINT "FK_BankAccounts_Companies_CompanyId"
+                                        FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE SET NULL
+                                )';
+                        END IF;
+
+                        EXECUTE format(
+                            'ALTER TABLE "Buildings" ADD COLUMN IF NOT EXISTS "BankAccountId" %s NULL',
+                            bank_account_id_type);
+                    END $$;
+                    """);
+
+                migrationBuilder.Sql("ALTER TABLE \"Buildings\" ADD COLUMN IF NOT EXISTS \"IsSuspendedForFunds\" boolean NOT NULL DEFAULT FALSE;");
+                migrationBuilder.Sql("ALTER TABLE \"Buildings\" ADD COLUMN IF NOT EXISTS \"SuspendedReason\" character varying(200) NULL;");
+
+                migrationBuilder.Sql("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_BankAccounts_AccountNumber\" ON \"BankAccounts\" (\"AccountNumber\");");
+                migrationBuilder.Sql("CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_CompanyId\" ON \"BankAccounts\" (\"CompanyId\");");
+                migrationBuilder.Sql("CREATE INDEX IF NOT EXISTS \"IX_BankAccounts_CurrencyCode_IsGovernmentAccount\" ON \"BankAccounts\" (\"CurrencyCode\", \"IsGovernmentAccount\");");
+                migrationBuilder.Sql("CREATE INDEX IF NOT EXISTS \"IX_Buildings_BankAccountId\" ON \"Buildings\" (\"BankAccountId\");");
+
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM pg_constraint
+                            WHERE conname = 'FK_Buildings_BankAccounts_BankAccountId') THEN
+                            ALTER TABLE "Buildings"
+                                ADD CONSTRAINT "FK_Buildings_BankAccounts_BankAccountId"
+                                FOREIGN KEY ("BankAccountId") REFERENCES "BankAccounts" ("Id") ON DELETE SET NULL;
+                        END IF;
+                    END $$;
+                    """);
+
+                return;
+            }
+
             migrationBuilder.CreateTable(
                 name: "BankAccounts",
                 columns: table => new

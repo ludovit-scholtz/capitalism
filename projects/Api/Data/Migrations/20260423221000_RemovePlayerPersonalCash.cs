@@ -11,6 +11,58 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    DECLARE
+                        player_id_type TEXT;
+                    BEGIN
+                        SELECT pg_catalog.format_type(a.atttypid, a.atttypmod)
+                        INTO player_id_type
+                        FROM pg_attribute a
+                        JOIN pg_class c ON c.oid = a.attrelid
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = 'public'
+                          AND c.relname = 'Players'
+                          AND a.attname = 'Id'
+                          AND a.attnum > 0
+                          AND NOT a.attisdropped;
+
+                        IF player_id_type IS NULL THEN
+                            RAISE EXCEPTION 'Players.Id column not found while adding BankAccounts.PlayerId';
+                        END IF;
+
+                        EXECUTE format(
+                            'ALTER TABLE "BankAccounts" ADD COLUMN IF NOT EXISTS "PlayerId" %s NULL',
+                            CASE WHEN player_id_type = 'uuid' THEN 'uuid' ELSE 'text' END);
+                    END $$;
+                    """);
+
+                migrationBuilder.Sql(GetPlayerSettlementAccountBackfillSql(isDown: false));
+
+                migrationBuilder.Sql("CREATE UNIQUE INDEX IF NOT EXISTS \"IX_BankAccounts_PlayerId_CurrencyCode\" ON \"BankAccounts\" (\"PlayerId\", \"CurrencyCode\");");
+
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1
+                            FROM pg_constraint
+                            WHERE conname = 'FK_BankAccounts_Players_PlayerId') THEN
+                            ALTER TABLE "BankAccounts"
+                                ADD CONSTRAINT "FK_BankAccounts_Players_PlayerId"
+                                FOREIGN KEY ("PlayerId") REFERENCES "Players" ("Id") ON DELETE SET NULL;
+                        END IF;
+                    END $$;
+                    """);
+
+                migrationBuilder.Sql("ALTER TABLE \"Players\" DROP COLUMN IF EXISTS \"PersonalCash\";");
+                return;
+            }
+
             migrationBuilder.AddColumn<Guid>(
                 name: "PlayerId",
                 table: "BankAccounts",
@@ -108,7 +160,14 @@ namespace Api.Data.Migrations
                     SELECT p."Id",
                            LPAD((9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id"))::text, 16, '0'),
                            'EUR',
-                           p."PersonalCash",
+                           COALESCE(
+                               CASE
+                                   WHEN p."PersonalCash" IS NULL THEN NULL
+                                   WHEN p."PersonalCash"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (p."PersonalCash"::text)::numeric
+                                   ELSE NULL
+                               END,
+                               0
+                           ),
                            NULL,
                            FALSE,
                            CURRENT_TIMESTAMP,
