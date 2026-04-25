@@ -11,10 +11,14 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            var boolType = ActiveProvider.Contains("Npgsql", System.StringComparison.OrdinalIgnoreCase)
+                ? "boolean"
+                : "INTEGER";
+
             migrationBuilder.AddColumn<bool>(
                 name: "BaseCapitalDeposited",
                 table: "Buildings",
-                type: "INTEGER",
+                type: boolType,
                 nullable: false,
                 defaultValue: false);
 
@@ -52,8 +56,8 @@ namespace Api.Data.Migrations
                     DepositorCompanyId = table.Column<Guid>(type: "TEXT", nullable: false),
                     Amount = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
                     DepositInterestRatePercent = table.Column<decimal>(type: "TEXT", precision: 8, scale: 4, nullable: false),
-                    IsBaseCapital = table.Column<bool>(type: "INTEGER", nullable: false),
-                    IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
+                    IsBaseCapital = table.Column<bool>(type: boolType, nullable: false),
+                    IsActive = table.Column<bool>(type: boolType, nullable: false),
                     DepositedAtTick = table.Column<long>(type: "INTEGER", nullable: false),
                     DepositedAtUtc = table.Column<DateTime>(type: "TEXT", nullable: false),
                     WithdrawnAtTick = table.Column<long>(type: "INTEGER", nullable: true),

@@ -10,6 +10,10 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            var boolType = ActiveProvider.Contains("Npgsql", System.StringComparison.OrdinalIgnoreCase)
+                ? "boolean"
+                : "INTEGER";
+
             migrationBuilder.AddColumn<long>(
                 name: "ConstructionCompletesAtTick",
                 table: "Buildings",
@@ -28,7 +32,7 @@ namespace Api.Data.Migrations
             migrationBuilder.AddColumn<bool>(
                 name: "IsUnderConstruction",
                 table: "Buildings",
-                type: "INTEGER",
+                type: boolType,
                 nullable: false,
                 defaultValue: false);
         }
