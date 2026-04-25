@@ -54,18 +54,7 @@ const INITIATE_BASE_DEPOSIT_MUTATION = `
   }
 `
 
-const buildingTypes = [
-  'MINE',
-  'FACTORY',
-  'SALES_SHOP',
-  'RESEARCH_DEVELOPMENT',
-  'APARTMENT',
-  'COMMERCIAL',
-  'MEDIA_HOUSE',
-  'BANK',
-  'EXCHANGE',
-  'POWER_PLANT',
-]
+const buildingTypes = ['MINE', 'FACTORY', 'SALES_SHOP', 'RESEARCH_DEVELOPMENT', 'APARTMENT', 'COMMERCIAL', 'MEDIA_HOUSE', 'BANK', 'EXCHANGE', 'POWER_PLANT']
 
 const selectedCompany = computed<Company | null>(() => {
   return auth.player?.companies.find((company) => company.id === companyId.value) ?? null
@@ -81,11 +70,16 @@ const selectedCityObj = computed(() => cities.value.find((c) => c.id === selecte
 const bankBaseCapitalRequired = computed<number>(() => {
   const cc = selectedCityObj.value?.currencyCode?.toUpperCase() ?? 'EUR'
   switch (cc) {
-    case 'CZK': return 240_000_000
-    case 'GBP': return 8_600_000
-    case 'CNY': return 72_000_000
-    case 'INR': return 835_000_000
-    default:    return 10_000_000
+    case 'CZK':
+      return 240_000_000
+    case 'GBP':
+      return 8_600_000
+    case 'CNY':
+      return 72_000_000
+    case 'INR':
+      return 835_000_000
+    default:
+      return 10_000_000
   }
 })
 
@@ -93,9 +87,7 @@ const bankBaseCapitalRequired = computed<number>(() => {
 const companyBankBalanceInCityCurrency = computed<number>(() => {
   if (!selectedCompany.value) return 0
   const cc = selectedCityCurrencyCode.value
-  return companyBankAccounts.value
-    .filter((a) => a.ownerType === 'COMPANY' && a.companyId === selectedCompany.value!.id && a.currencyCode.toUpperCase() === cc)
-    .reduce((sum, a) => sum + a.balance, 0)
+  return companyBankAccounts.value.filter((a) => a.ownerType === 'COMPANY' && a.companyId === selectedCompany.value!.id && a.currencyCode.toUpperCase() === cc).reduce((sum, a) => sum + a.balance, 0)
 })
 
 const companyHasBankCapital = computed<boolean>(() => {
@@ -110,9 +102,7 @@ const bankCapitalInsufficientMessage = computed<string>(() =>
 )
 
 /** City currency code for the selected city (EUR if none selected). */
-const selectedCityCurrencyCode = computed<string>(
-  () => selectedCityObj.value?.currencyCode?.toUpperCase() ?? 'EUR',
-)
+const selectedCityCurrencyCode = computed<string>(() => selectedCityObj.value?.currencyCode?.toUpperCase() ?? 'EUR')
 
 /** Construction cost by building type, mirroring GameConstants.ConstructionCost on the backend. */
 const CONSTRUCTION_COSTS: Record<string, number> = {
@@ -161,9 +151,7 @@ const fundingGapType = computed<'missing_account' | 'insufficient_funds' | null>
 /** True when any funding gap is present (either missing account or insufficient balance). */
 const hasFundingGap = computed<boolean>(() => fundingGapType.value !== null)
 
-const canSubmit = computed(
-  () => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value,
-)
+const canSubmit = computed(() => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value)
 
 onMounted(async () => {
   if (!auth.isAuthenticated) {
@@ -179,9 +167,7 @@ onMounted(async () => {
   try {
     const [citiesData, balancesData, accountsData] = await Promise.all([
       gqlRequest<{ cities: City[] }>('{ cities { id name countryCode currencyCode population } }'),
-      gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>(
-        '{ playerCurrencyBalances { currencyCode currencySymbol balance } }',
-      ),
+      gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>('{ playerCurrencyBalances { currencyCode currencySymbol balance } }'),
       gqlRequest<{ myBankAccounts: Array<{ id: string; currencyCode: string; balance: number; companyId: string | null; ownerType: string }> }>(
         '{ myBankAccounts { id currencyCode balance companyId ownerType } }',
       ),
@@ -327,10 +313,7 @@ async function buyBuilding() {
   <div class="container py-8 px-4 max-w-4xl">
     <!-- Back nav -->
     <div class="mb-6">
-      <RouterLink
-        to="/dashboard"
-        class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-brand no-underline transition-colors"
-      >
+      <RouterLink to="/dashboard" class="inline-flex items-center gap-1.5 text-sm text-muted hover:text-brand no-underline transition-colors">
         <span>←</span> {{ t('buildingDetail.backToDashboard') }}
       </RouterLink>
     </div>
@@ -340,11 +323,7 @@ async function buyBuilding() {
       <h1 class="text-2xl font-bold mb-6">{{ t('buildings.title') }}</h1>
 
       <!-- Error alert -->
-      <div
-        v-if="error"
-        class="flex items-start gap-3 p-3 mb-5 bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad rounded-lg text-sm"
-        role="alert"
-      >
+      <div v-if="error" class="flex items-start gap-3 p-3 mb-5 bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad rounded-lg text-sm" role="alert">
         {{ error }}
       </div>
 
@@ -427,12 +406,14 @@ async function buyBuilding() {
                   {{ t('buildings.fundingGapTextMissing', { city: selectedCityObj?.name ?? '', currency: selectedCityCurrencyCode }) }}
                 </template>
                 <template v-else>
-                  {{ t('buildings.fundingGapTextInsufficient', {
-                    city: selectedCityObj?.name ?? '',
-                    currency: selectedCityCurrencyCode,
-                    available: formatCurrency(availableLocalBalance),
-                    required: formatCurrency(selectedLotTotalCost),
-                  }) }}
+                  {{
+                    t('buildings.fundingGapTextInsufficient', {
+                      city: selectedCityObj?.name ?? '',
+                      currency: selectedCityCurrencyCode,
+                      available: formatCurrency(availableLocalBalance),
+                      required: formatCurrency(selectedLotTotalCost),
+                    })
+                  }}
                 </template>
               </p>
               <!-- Amount breakdown (insufficient funds only) -->
@@ -493,9 +474,7 @@ async function buyBuilding() {
           <div
             v-if="selectedType === 'BANK'"
             class="flex items-start gap-3 mt-1 px-5 py-3.5 border rounded-lg"
-            :class="companyHasBankCapital
-              ? 'capital-ok bg-[rgba(16,185,129,0.07)] border-[rgba(16,185,129,0.3)]'
-              : 'capital-warn bg-[rgba(248,113,113,0.07)] border-[rgba(248,113,113,0.3)]'"
+            :class="companyHasBankCapital ? 'capital-ok bg-[rgba(16,185,129,0.07)] border-[rgba(16,185,129,0.3)]' : 'capital-warn bg-[rgba(248,113,113,0.07)] border-[rgba(248,113,113,0.3)]'"
           >
             <span class="text-xl flex-shrink-0" aria-hidden="true">{{ companyHasBankCapital ? '✅' : '⚠️' }}</span>
             <div class="flex flex-col gap-1">
@@ -516,7 +495,10 @@ async function buyBuilding() {
                 <input
                   id="depositRatePercent"
                   v-model.number="depositRatePercent"
-                  type="number" min="0" max="100" step="0.1"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
                   class="px-3 py-2 border border-divider rounded bg-card text-body text-[0.9rem] w-full max-w-[200px] focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
@@ -526,7 +508,10 @@ async function buyBuilding() {
                 <input
                   id="lendingRatePercent"
                   v-model.number="lendingRatePercent"
-                  type="number" min="0.1" max="200" step="0.1"
+                  type="number"
+                  min="0.1"
+                  max="200"
+                  step="0.1"
                   class="px-3 py-2 border border-divider rounded bg-card text-body text-[0.9rem] w-full max-w-[200px] focus:outline-none focus:border-brand transition-colors"
                 />
               </div>
@@ -542,10 +527,7 @@ async function buyBuilding() {
           </div>
 
           <!-- Empty state -->
-          <div
-            v-if="!lotsLoading && availableLots.length === 0"
-            class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm"
-          >
+          <div v-if="!lotsLoading && availableLots.length === 0" class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm">
             {{ t('buildings.noAvailableLand') }}
           </div>
 
@@ -563,12 +545,8 @@ async function buyBuilding() {
                 <span class="text-sm font-bold text-good shrink-0">{{ formatCurrency(lot.price) }}</span>
               </div>
               <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
-              <span class="text-[0.8125rem] text-muted">
-                {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }}
-              </span>
-              <span class="text-[0.8125rem] text-muted">
-                {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }}
-              </span>
+              <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
+              <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
             </button>
           </div>
 
@@ -580,7 +558,9 @@ async function buyBuilding() {
             </div>
             <div class="flex flex-wrap gap-4 text-sm text-muted">
               <span>{{ districtLabel(selectedLot.district) }}</span>
-              <span>{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong></span>
+              <span
+                >{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong></span
+              >
               <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
             </div>
           </div>
@@ -600,4 +580,3 @@ async function buyBuilding() {
     </div>
   </div>
 </template>
-
