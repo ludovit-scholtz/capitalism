@@ -167,7 +167,7 @@ namespace Api.Data.Migrations
                                                 0
                                             )
                                         FROM "PlayerCurrencyBalances" AS legacy
-                                        WHERE existing."PlayerId" = legacy."PlayerId"
+                                        WHERE existing."PlayerId"::text = legacy."PlayerId"::text
                                             AND existing."CurrencyCode" = legacy."CurrencyCode";
 
                                         INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
@@ -190,7 +190,7 @@ namespace Api.Data.Migrations
                                         WHERE NOT EXISTS (
                                                 SELECT 1
                                                 FROM "BankAccounts" AS existing
-                                                WHERE existing."PlayerId" = legacy."PlayerId"
+                                            WHERE existing."PlayerId"::text = legacy."PlayerId"::text
                                                     AND existing."CurrencyCode" = legacy."CurrencyCode"
                                         );
                                         """;

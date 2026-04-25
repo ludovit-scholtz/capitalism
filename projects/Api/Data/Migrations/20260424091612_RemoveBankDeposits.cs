@@ -305,7 +305,7 @@ namespace Api.Data.Migrations
                           AND NOT EXISTS (
                               SELECT 1
                               FROM "BankDeposits" AS legacy
-                              WHERE legacy."Id" = account."Id"
+                                                            WHERE legacy."Id"::text = account."Id"::text
                           );
                         """;
             }
@@ -364,12 +364,12 @@ namespace Api.Data.Migrations
                            legacy."WithdrawnAtUtc",
                            legacy."TotalInterestPaid"
                     FROM "BankDeposits" AS legacy
-                    INNER JOIN "Buildings" AS bank ON bank."Id" = legacy."BankBuildingId"
-                    INNER JOIN "Cities" AS city ON city."Id" = bank."CityId"
+                    INNER JOIN "Buildings" AS bank ON bank."Id"::text = legacy."BankBuildingId"::text
+                    INNER JOIN "Cities" AS city ON city."Id"::text = bank."CityId"::text
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM "BankAccounts" AS existing
-                        WHERE existing."Id" = legacy."Id"
+                        WHERE existing."Id"::text = legacy."Id"::text
                     );
                     """;
         }

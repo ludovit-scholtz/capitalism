@@ -45,7 +45,7 @@ UPDATE ""LedgerEntries"" AS le
 SET ""BankAccountId"" = b.""BankAccountId""
 FROM ""Buildings"" AS b
 WHERE le.""BankAccountId"" IS NULL
-    AND le.""BuildingId"" = b.""Id""
+    AND le.""BuildingId""::text = b.""Id""::text
     AND b.""BankAccountId"" IS NOT NULL;
 ");
 
@@ -70,7 +70,7 @@ WITH ranked_accounts AS (
         SET ""BankAccountId"" = ra.""Id""
 FROM ranked_accounts AS ra
         WHERE le.""BankAccountId"" IS NULL
-            AND le.""CompanyId"" = ra.""CompanyId""
+            AND le.""CompanyId""::text = ra.""CompanyId""::text
     AND ra.rn = 1;
 ");
 

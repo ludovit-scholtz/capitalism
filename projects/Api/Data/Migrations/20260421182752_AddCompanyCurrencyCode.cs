@@ -25,8 +25,8 @@ namespace Api.Data.Migrations
                     SET ""CurrencyCode"" = COALESCE(
                         (SELECT ci.""CurrencyCode""
                          FROM ""Buildings"" b
-                         JOIN ""Cities"" ci ON ci.""Id"" = b.""CityId""
-                         WHERE b.""CompanyId"" = ""Companies"".""Id""
+                         JOIN ""Cities"" ci ON ci.""Id""::text = b.""CityId""::text
+                         WHERE b.""CompanyId""::text = ""Companies"".""Id""::text
                          LIMIT 1),
                         'EUR'
                     )
@@ -49,8 +49,8 @@ namespace Api.Data.Migrations
                 SET ""CurrencyCode"" = COALESCE(
                     (SELECT ci.""CurrencyCode""
                      FROM ""Buildings"" b
-                     JOIN ""Cities"" ci ON ci.""Id"" = b.""CityId""
-                     WHERE b.""CompanyId"" = c.""Id""
+                     JOIN ""Cities"" ci ON ci.""Id""::text = b.""CityId""::text
+                     WHERE b.""CompanyId""::text = c.""Id""::text
                      LIMIT 1),
                     'EUR'
                 )

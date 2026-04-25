@@ -127,7 +127,7 @@ namespace Api.Data.Migrations
                     SET "PersonalCash" = COALESCE((
                         SELECT "Balance"
                         FROM "BankAccounts"
-                        WHERE "PlayerId" = "Players"."Id"
+                                                WHERE "PlayerId"::text = "Players"."Id"::text
                           AND "CurrencyCode" = 'EUR'
                         LIMIT 1
                     ), 0)
@@ -150,7 +150,7 @@ namespace Api.Data.Migrations
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM "BankAccounts" existing
-                        WHERE existing."PlayerId" = p."Id"
+                                                WHERE existing."PlayerId"::text = p."Id"::text
                           AND existing."CurrencyCode" = 'EUR'
                     )
                     """
@@ -176,7 +176,7 @@ namespace Api.Data.Migrations
                     WHERE NOT EXISTS (
                         SELECT 1
                         FROM "BankAccounts" existing
-                        WHERE existing."PlayerId" = p."Id"
+                                                WHERE existing."PlayerId"::text = p."Id"::text
                           AND existing."CurrencyCode" = 'EUR'
                     )
                     """;
