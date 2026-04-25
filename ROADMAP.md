@@ -53,6 +53,7 @@ Change cash flow management completely from the onboarding process, through unit
 - Change the deposits functionality completely where only one bank account per user in one bank is allowed. Remove the minimum deposit from the opening of the bank account so that user can open bank account for currency he does not own any time. Additional deposits to the bank account are handled by the bank transfer at the forex page.
 - Make sure that the user defalt bank account obtained in the onboarding step is visible in the banking section in the Accounts tab.
 - Rename Loan Offers and Browse Loan Marketplace at /banking to Banks
+- Remove from the opening bank account the amount to be deposited, always open the new account with zero balance.
 - Currency can be moved only between the bank accounts. Every money transfer must be visible in the ledger and also in the bank statement review. 
 - Create bank statement review where players can see the transfers in their bank accounts.
 - Every building has the bank account assigned, if it does not have, create one bank account in the government bank for the currency in the building's city. In edit building make sure user can change the building's bank account to different bank account. Allow to change the bank account only if the city's currency is equal to the bank account to which player wants to change the bank account.
