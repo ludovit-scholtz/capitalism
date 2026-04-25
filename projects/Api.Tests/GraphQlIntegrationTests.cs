@@ -25712,6 +25712,58 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(20_100_000m, bank.TotalDeposits);   // 20M base + 100k
     }
 
+        [Fact]
+        public async Task OpenBankAccount_WithSmallPositiveAmount_Succeeds()
+        {
+                var bankOwnerEmail = $"bank-owner-small-{Guid.NewGuid():N}@test.com";
+                var depositorEmail = $"depositor-small-{Guid.NewGuid():N}@test.com";
+                await RegisterAndGetTokenAsync(bankOwnerEmail, "BankOwnerSmall");
+                var depositorToken = await RegisterAndGetTokenAsync(depositorEmail, "DepositorSmall");
+
+                await using var scope = _factory.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+                var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+                var city = await db.Cities.FirstAsync();
+
+                var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCoSmall", Cash = 15_000_000m };
+                db.Companies.Add(bankCompany);
+                var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "DepositorCoSmall", Cash = 0m };
+                db.Companies.Add(depositorCompany);
+
+                db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+                {
+                    Id = Guid.NewGuid(),
+                    AccountNumber = Guid.NewGuid().ToString("N")[..16],
+                    CurrencyCode = city.CurrencyCode,
+                    CompanyId = depositorCompany.Id,
+                    Balance = 500_000m,
+                    IsGovernmentAccount = false,
+                    CreatedAtUtc = DateTime.UtcNow,
+                });
+
+                var bank = CreateTestBank(db, bankCompany, city.Id);
+                await db.SaveChangesAsync();
+
+                var result = await ExecuteGraphQlAsync(
+                        """
+                        mutation Dep($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) {
+                                id
+                                amount
+                                isActive
+                            }
+                        }
+                        """,
+                        new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 999m } },
+                        depositorToken);
+
+                    Assert.False(result.TryGetProperty("errors", out _), result.ToString());
+                var data = result.GetProperty("data").GetProperty("openBankAccount");
+                    Assert.Equal(999m, data.GetProperty("amount").GetDecimal());
+                Assert.True(data.GetProperty("isActive").GetBoolean());
+        }
+
     [Fact]
     public async Task OpenBankAccount_IntoUninitializedBank_ReturnsError()
     {
@@ -25724,7 +25776,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
         var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "UninitBankCo", Cash = 500_000m };
         db.Companies.Add(bankCompany);
@@ -25981,7 +26033,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task TopUpDeposit_CreatesNewDepositRecord_InsteadOfMutatingExisting()
+    public async Task TopUpDeposit_ReturnsUseForexTransferError()
     {
         // Arrange: bank + depositor via isolated factory so we can call the mutation with auth
         await using var isolatedFactory = new ApiWebApplicationFactory();
@@ -26028,122 +26080,91 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         db.BankAccounts.Add(originalDeposit);
         await db.SaveChangesAsync();
 
-        // Act: top-up the deposit
+                // Act
         var result = await ExecuteGraphQlAsync(
             isolatedClient,
             """
             mutation Tu($input: TopUpDepositInput!) {
               topUpDeposit(input: $input) {
-                id
-                amount
-                depositedAtTick
-                depositInterestRatePercent
-                isActive
+                                id
               }
             }
             """,
             new { input = new { depositId = originalDeposit.Id.ToString(), amount = 30_000m } },
             depositorToken);
 
-        var data = result.GetProperty("data").GetProperty("topUpDeposit");
-
-        // The returned deposit should be a NEW record (different id) with $30k
-        Assert.Equal(30_000m, data.GetProperty("amount").GetDecimal());
-        Assert.NotEqual(originalDeposit.Id.ToString(), data.GetProperty("id").GetString());
-        Assert.True(data.GetProperty("isActive").GetBoolean());
-
-        // Original deposit must NOT have been mutated — still $50k
-        await db.Entry(originalDeposit).ReloadAsync();
-        Assert.Equal(50_000m, originalDeposit.Balance);
-
-        // Bank.TotalDeposits must have grown by $30k
-        await db.Entry(bank).ReloadAsync();
-        Assert.Equal(10_030_000m, bank.TotalDeposits);
-
-        // Depositor cash reduced by $30k
-        await db.Entry(depCo).ReloadAsync();
-        Assert.Equal(470_000m, depCo.Cash);
-
-        // Two active non-base-capital deposits from this company now exist
-        var allDeposits = await db.BankAccounts
-            .Where(d => d.BankBuildingId == bank.Id && d.CompanyId == depCo.Id && d.ClosedAtUtc == null && !d.IsBaseCapitalDeposit)
-            .ToListAsync();
-        Assert.Equal(2, allDeposits.Count);
+                var errors = result.GetProperty("errors");
+                Assert.True(errors.GetArrayLength() > 0);
+                Assert.Equal("USE_FOREX_TRANSFER", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
-    public async Task TopUpDeposit_TopUpTranche_UsesCurrentBankRate()
+        public async Task OpenBankAccount_SecondActiveAccountInSameBank_ReturnsError()
     {
-        // Arrange: bank rate is lowered to 2% after original deposit at 5%.
-        // Top-up should get the NEW rate (2%), not the old snapshotted rate (5%).
         await using var isolatedFactory = new ApiWebApplicationFactory();
         using var isolatedClient = isolatedFactory.CreateClient();
 
-        var bankOwnerEmail = $"rate-bo-{Guid.NewGuid():N}@test.com";
-        var depositorEmail = $"rate-dep-{Guid.NewGuid():N}@test.com";
-        await RegisterAndGetTokenAsync(isolatedClient, bankOwnerEmail, "RateBankOwner");
-        var depositorToken = await RegisterAndGetTokenAsync(isolatedClient, depositorEmail, "RateDepositor");
+                var bankOwnerEmail = $"dup-bo-{Guid.NewGuid():N}@test.com";
+                var depositorEmail = $"dup-dep-{Guid.NewGuid():N}@test.com";
+                await RegisterAndGetTokenAsync(isolatedClient, bankOwnerEmail, "DupBankOwner");
+                var depositorToken = await RegisterAndGetTokenAsync(isolatedClient, depositorEmail, "DupDepositor");
 
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
-        var bankCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "RateBankCo", Cash = 20_000_000m };
-        var depCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "RateDepCo", Cash = 500_000m };
+                var bankCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "DupBankCo", Cash = 20_000_000m };
+                var depCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "DupDepCo", Cash = 0m };
         db.Companies.AddRange(bankCo, depCo);
+
+                db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+                {
+                    Id = Guid.NewGuid(),
+                    AccountNumber = Guid.NewGuid().ToString("N")[..16],
+                    CurrencyCode = city.CurrencyCode,
+                    CompanyId = depCo.Id,
+                    Balance = 500_000m,
+                    IsGovernmentAccount = false,
+                    CreatedAtUtc = DateTime.UtcNow,
+                });
 
         var bank = new Api.Data.Entities.Building
         {
             Id = Guid.NewGuid(), CompanyId = bankCo.Id, CityId = city.Id,
-            Type = Api.Data.Entities.BuildingType.Bank, Name = "RateBank", Level = 1,
-            // Bank now offers 2% — rate was lowered since original deposit was opened
-            DepositInterestRatePercent = 2m, LendingInterestRatePercent = 8m,
+                        Type = Api.Data.Entities.BuildingType.Bank, Name = "DupBank", Level = 1,
+                        DepositInterestRatePercent = 3m, LendingInterestRatePercent = 8m,
             TotalDeposits = 10_000_000m, BaseCapitalDeposited = true,
         };
         db.Buildings.Add(bank);
-
-        var originalDeposit = new Api.Data.Entities.BankAccount
-        {
-            Id = Guid.NewGuid(),
-            AccountNumber = Guid.NewGuid().ToString("N")[..16],
-            CurrencyCode = city.CurrencyCode,
-            CompanyId = depCo.Id,
-            BankBuildingId = bank.Id,
-            Balance = 50_000m,
-            DepositInterestRatePercent = 5m, // Original deposit got 5%
-            IsBaseCapitalDeposit = false,
-            DepositedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow,
-            IsGovernmentAccount = false,
-        };
-        db.BankAccounts.Add(originalDeposit);
         await db.SaveChangesAsync();
 
-        // Act: top-up at a time when the bank rate is 2%
-        var result = await ExecuteGraphQlAsync(
+                // First account open succeeds.
+                await ExecuteGraphQlAsync(
             isolatedClient,
             """
-            mutation Tu($input: TopUpDepositInput!) {
-              topUpDeposit(input: $input) {
-                id
-                depositInterestRatePercent
-              }
+                        mutation Dep($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) { id }
             }
             """,
-            new { input = new { depositId = originalDeposit.Id.ToString(), amount = 20_000m } },
+                        new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depCo.Id.ToString(), amount = 10_000m } },
             depositorToken);
 
-        var topUpRate = result.GetProperty("data").GetProperty("topUpDeposit")
-            .GetProperty("depositInterestRatePercent").GetDecimal();
+                // Second account in same bank for same player must fail.
+                var secondResult = await ExecuteGraphQlAsync(
+                        isolatedClient,
+                        """
+                        mutation Dep($input: OpenBankAccountInput!) {
+                            openBankAccount(input: $input) { id }
+                        }
+                        """,
+                        new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depCo.Id.ToString(), amount = 5_000m } },
+                        depositorToken);
 
-        // Top-up tranche must use the CURRENT bank rate (2%), not the old snapshot (5%)
-        Assert.Equal(2m, topUpRate);
-
-        // Original deposit still has its original 5% rate
-        await db.Entry(originalDeposit).ReloadAsync();
-        Assert.Equal(5m, originalDeposit.DepositInterestRatePercent);
+                var errors = secondResult.GetProperty("errors");
+                Assert.True(errors.GetArrayLength() > 0);
+                Assert.Equal("ACCOUNT_ALREADY_EXISTS", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

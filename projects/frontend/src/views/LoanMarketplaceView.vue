@@ -8,7 +8,7 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, Company, BankDepositSummary, BankInfoSummary, CollateralEligibilitySummary } from '@/types'
+import type { LoanOfferSummary, LoanSummary, Company, BankDepositSummary, BankInfoSummary, CollateralEligibilitySummary, PlayerBankAccountSummary } from '@/types'
 import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, computeTotalPayments, loanStatusClass, formatCurrency, formatPercent } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
@@ -27,6 +27,7 @@ const activeTab = ref<'borrow' | 'deposit'>('borrow')
 // Banks list (for deposit tab)
 const allBanks = ref<BankInfoSummary[]>([])
 const myDeposits = ref<BankDepositSummary[]>([])
+const myBankAccounts = ref<PlayerBankAccountSummary[]>([])
 
 // Sort/filter state for bank list
 type BankSortField = 'depositRate' | 'lendingRate' | 'capacity' | 'city'
@@ -182,6 +183,20 @@ const MY_DEPOSITS_QUERY = `
   }
 `
 
+const MY_BANK_ACCOUNTS_QUERY = `
+  {
+    myBankAccounts {
+      id
+      accountNumber
+      currencyCode
+      currencySymbol
+      balance
+      companyId
+      companyName
+    }
+  }
+`
+
 const CREATE_DEPOSIT_MUTATION = `
   mutation OpenBankAccount($input: OpenBankAccountInput!) {
     openBankAccount(input: $input) {
@@ -224,10 +239,11 @@ async function loadData(isRefresh = false) {
     }
 
     if (auth.isAuthenticated) {
-      const [loansResult, companiesResult, depositsResult] = await Promise.all([
+      const [loansResult, companiesResult, depositsResult, accountsResult] = await Promise.all([
         gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY),
         gqlRequest<{ myCompanies: Company[] }>(MY_COMPANIES_QUERY),
         gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY),
+        gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(MY_BANK_ACCOUNTS_QUERY),
       ])
       const newLoans = loansResult.myLoans ?? []
       if (!deepEqual(myLoans.value, newLoans)) {
@@ -237,6 +253,10 @@ async function loadData(isRefresh = false) {
       const newDeposits = depositsResult.myDeposits ?? []
       if (!deepEqual(myDeposits.value, newDeposits)) {
         myDeposits.value = newDeposits
+      }
+      const newAccounts = accountsResult.myBankAccounts ?? []
+      if (!deepEqual(myBankAccounts.value, newAccounts)) {
+        myBankAccounts.value = newAccounts
       }
     }
   } catch (err) {
@@ -394,7 +414,7 @@ async function confirmAcceptLoan() {
 function openDepositModal(bank: BankInfoSummary) {
   selectedBank.value = bank
   depositCompanyId.value = activeCompany.value?.id ?? ''
-  depositAmount.value = 10_000
+  depositAmount.value = 1_000
   depositError.value = null
   depositSuccess.value = false
   showDepositModal.value = true
@@ -446,8 +466,8 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 <template>
   <div class="loan-marketplace-view">
     <div class="page-header">
-      <h1 class="page-title">{{ t('bank.loanOffers') }}</h1>
-      <p class="page-subtitle">{{ t('bank.browseMarketplace') }}</p>
+      <h1 class="page-title">{{ t('bank.banks') }}</h1>
+      <p class="page-subtitle">{{ t('bank.browseBanks') }}</p>
     </div>
 
     <!-- Tab switcher -->
@@ -601,6 +621,31 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 
       <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
       <div v-if="activeTab === 'deposit'" class="deposit-tab">
+        <section v-if="auth.isAuthenticated" class="my-bank-accounts-section">
+          <h2 class="section-title">{{ t('bank.myBankAccounts') }}</h2>
+          <div v-if="myBankAccounts.length === 0" class="empty-state">
+            <p>{{ t('bank.noBankAccountsYet') }}</p>
+          </div>
+          <div v-else class="deposits-list">
+            <div v-for="account in myBankAccounts" :key="account.id" class="deposit-card" data-testid="bank-account-row">
+              <div class="deposit-card-header">
+                <span class="deposit-bank-name">{{ account.companyName }}</span>
+                <span class="deposit-rate-badge">{{ account.currencyCode }}</span>
+              </div>
+              <div class="deposit-stats">
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('bank.accountNumber') }}</span>
+                  <span class="deposit-stat-value">{{ account.accountNumber }}</span>
+                </div>
+                <div class="deposit-stat">
+                  <span class="deposit-stat-label">{{ t('bank.accountBalance') }}</span>
+                  <span class="deposit-stat-value">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- My Deposits -->
         <section v-if="auth.isAuthenticated && myDeposits.length > 0" class="my-deposits-section">
           <h2 class="section-title">{{ t('bank.myDeposits') }}</h2>
@@ -865,7 +910,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
           </div>
           <div class="form-group">
             <label for="deposit-amount">{{ t('bank.depositAmount') }}</label>
-            <input id="deposit-amount" v-model.number="depositAmount" type="number" min="1000" step="1000" class="form-input" />
+            <input id="deposit-amount" v-model.number="depositAmount" type="number" min="0.01" step="0.01" class="form-input" />
             <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
           </div>
           <div v-if="depositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
@@ -873,7 +918,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeDepositModal">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="depositLoading || depositAmount < 1000" @click="submitDeposit">
+          <button class="btn btn-primary" :disabled="depositLoading || depositAmount <= 0" @click="submitDeposit">
             <span v-if="depositLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.confirmDeposit') }}</span>
           </button>

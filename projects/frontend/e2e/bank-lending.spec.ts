@@ -117,9 +117,49 @@ test.describe('Loan Marketplace (/loans)', () => {
   test('shows loan marketplace page with empty borrow state when no banks', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/loans')
-    await expect(page.getByRole('heading', { name: 'Loan Offers', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Banks', level: 1 })).toBeVisible()
     // Borrow tab is active by default; with no banks, shows "no banks" empty state
     await expect(page.getByText('No banks are currently open for business.')).toBeVisible()
+  })
+
+  test('accounts tab shows player bank accounts including onboarding default account', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'starter-co-1',
+      playerId: player.id,
+      name: 'Starter Corp',
+      cash: 50_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'starter-bank-account-1',
+        accountNumber: '1234567890123456',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 12_500,
+        companyId: 'starter-co-1',
+        companyName: 'Starter Corp',
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/loans')
+    await page.getByRole('tab', { name: 'Accounts' }).click()
+
+    await expect(page.getByRole('heading', { name: 'My Company Bank Accounts' })).toBeVisible()
+    const accountRow = page.getByTestId('bank-account-row')
+    await expect(accountRow.getByText('1234567890123456')).toBeVisible()
+    await expect(accountRow.getByText('Starter Corp')).toBeVisible()
   })
 
   test('shows banks in borrow tab for unauthenticated user', async ({ page }) => {

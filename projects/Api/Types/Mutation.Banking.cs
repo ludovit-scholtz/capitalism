@@ -127,12 +127,30 @@ public sealed partial class Mutation
             }
         }
 
-        if (input.Amount < 1_000m)
+        if (input.Amount <= 0m)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Minimum opening balance is 1,000.")
+                    .SetMessage("Opening amount must be greater than zero.")
                     .SetCode("INVALID_AMOUNT")
+                    .Build());
+        }
+
+        var hasExistingActiveAccount = await db.BankAccounts
+            .Include(account => account.Company)
+            .AnyAsync(account =>
+                account.BankBuildingId == bank.Id
+                && account.ClosedAtUtc == null
+                && !account.IsBaseCapitalDeposit
+                && account.Company != null
+                && account.Company.PlayerId == userId);
+
+        if (hasExistingActiveAccount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You already have an active bank account in this bank. Use forex transfer to fund it.")
+                    .SetCode("ACCOUNT_ALREADY_EXISTS")
                     .Build());
         }
 
@@ -363,135 +381,15 @@ public sealed partial class Mutation
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        _ = input;
+        _ = db;
+        _ = httpContextAccessor;
 
-        var deposit = await db.BankAccounts
-            .Include(d => d.Company)
-            .Include(d => d.BankBuilding)
-            .ThenInclude(b => b!.Company)
-            .FirstOrDefaultAsync(d => d.Id == input.DepositId && d.BankBuildingId != null && d.ClosedAtUtc == null);
-
-        if (deposit is null)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Active deposit not found.")
-                    .SetCode("DEPOSIT_NOT_FOUND")
-                    .Build());
-        }
-
-        var depositorCompany = deposit.Company;
-        if (depositorCompany?.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You do not own the depositor company.")
-                    .SetCode("UNAUTHORIZED")
-                    .Build());
-        }
-
-        if (input.Amount < 1_000m)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Minimum top-up amount is $1,000.")
-                    .SetCode("INVALID_AMOUNT")
-                    .Build());
-        }
-
-        var sourceAccount = await ResolveCompanyTransferAccountAsync(
-            db,
-            depositorCompany.Id,
-            deposit.CurrencyCode,
-            deposit.Id,
-            httpContextAccessor.HttpContext!.RequestAborted);
-
-        var bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
-            db,
-            deposit.BankBuilding?.CompanyId ?? throw new Exception("Company id not found"),
-            deposit.CurrencyCode,
-            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
-
-        if (sourceAccount.Balance < input.Amount)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Insufficient company funds for this top-up.")
-                    .SetCode("INSUFFICIENT_FUNDS")
-                    .Build());
-        }
-
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
-        var bank = deposit.BankBuilding!;
-
-        // Transfer cash: depositor -> bank liquidity account
-        sourceAccount.Balance -= input.Amount;
-        bankLiquidityAccount.Balance += input.Amount;
-        bank.TotalDeposits += input.Amount;
-
-        // Create a NEW deposit record for this top-up tranche.
-        // Each tranche has its own DepositedAtTick (current tick) and the bank's CURRENT
-        // deposit rate — not the original deposit's snapshotted rate.  This prevents the
-        // retroactive-yield exploit where funds added at tick T could appear to have earned
-        // interest since the original deposit date, and prevents locking in old rates.
-        var currentRate = bank.DepositInterestRatePercent ?? 0m;
-        var topUpDeposit = new BankAccount
-        {
-            Id = Guid.NewGuid(),
-            AccountNumber = GenerateRandomAccountNumber(),
-            CurrencyCode = deposit.CurrencyCode,
-            CompanyId = deposit.CompanyId,
-            BankBuildingId = bank.Id,
-            Balance = input.Amount,
-            DepositInterestRatePercent = currentRate,
-            IsBaseCapitalDeposit = false,
-            DepositedAtTick = currentTick,
-            CreatedAtUtc = DateTime.UtcNow,
-            TotalInterestPaid = 0m,
-            IsGovernmentAccount = false,
-        };
-        db.BankAccounts.Add(topUpDeposit);
-
-        // Auto-repay central-bank debt from surplus (same logic as CreateDeposit)
-        if (bank.CentralBankDebt > 0m)
-        {
-            var reserveNeeded = bank.TotalDeposits * ReserveRatio;
-            var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bank.CompanyId, httpContextAccessor.HttpContext.RequestAborted);
-            var surplusCash = CompanyBankingService.GetTotalBalance(bankAccounts) - reserveNeeded;
-            var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
-            if (repayment > 0m)
-            {
-                CompanyBankingService.TryDebit(bankAccounts, repayment, deposit.CurrencyCode);
-                bank.CentralBankDebt -= repayment;
-                db.LedgerEntries.Add(new LedgerEntry
-                {
-                    Id = Guid.NewGuid(),
-                    CompanyId = bank.CompanyId,
-                    BuildingId = bank.Id,
-                    Category = LedgerCategory.CentralBankRepay,
-                    Description = $"Central bank repayment from deposit top-up (surplus above reserve)",
-                    Amount = -repayment,
-                    RecordedAtTick = currentTick,
-                    RecordedAtUtc = DateTime.UtcNow,
-                });
-            }
-        }
-
-        db.LedgerEntries.Add(new LedgerEntry
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = deposit.CompanyId!.Value,
-            BuildingId = bank.Id,
-            Category = LedgerCategory.DepositMade,
-            Description = $"Top-up deposit into {bank.Name} at {currentRate}% p.a.",
-            Amount = -input.Amount,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = DateTime.UtcNow,
-        });
-
-        await db.SaveChangesAsync();
-
-        return MapToDepositSummary(topUpDeposit, bank, depositorCompany);
+        throw new GraphQLException(
+            ErrorBuilder.New()
+                .SetMessage("Use bank-account transfer on the Forex page to add funds to an existing bank account.")
+                .SetCode("USE_FOREX_TRANSFER")
+                .Build());
     }
 
     // ── Bank Rate Configuration ───────────────────────────────────────────────

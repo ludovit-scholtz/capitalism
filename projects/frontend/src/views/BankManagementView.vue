@@ -48,11 +48,6 @@ const withdrawAmount = ref(0)
 const withdrawLoading = ref(false)
 const withdrawError = ref<string | null>(null)
 const withdrawSuccess = ref(false)
-const showTopUpForm = ref(false)
-const topUpAmount = ref(10_000)
-const topUpLoading = ref(false)
-const topUpError = ref<string | null>(null)
-const topUpSuccess = ref(false)
 
 // Loan acceptance modal state
 const showLoanModal = ref(false)
@@ -330,18 +325,6 @@ const CREATE_DEPOSIT_MUTATION = `
   }
 `
 
-const TOP_UP_DEPOSIT_MUTATION = `
-  mutation TopUpDeposit($input: TopUpDepositInput!) {
-    topUpDeposit(input: $input) {
-      id
-      amount
-      depositInterestRatePercent
-      isActive
-      totalInterestPaid
-    }
-  }
-`
-
 const WITHDRAW_DEPOSIT_MUTATION = `
   mutation CloseBankAccount($input: CloseBankAccountInput!) {
     closeBankAccount(input: $input) {
@@ -581,11 +564,7 @@ const isCompanyAccountActive = computed(() => auth.player?.activeAccountType ===
 const myActiveDepositsHere = computed(() => myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital))
 const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
 const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
-// The most recent active deposit (for top-up), the oldest for partial withdraw
-const myLatestDeposit = computed<BankDepositSummary | null>(() => {
-  const sorted = [...myActiveDepositsHere.value].sort((a, b) => b.depositedAtTick - a.depositedAtTick)
-  return sorted[0] ?? null
-})
+// The oldest tranche is used first for partial withdrawals.
 const myOldestDeposit = computed<BankDepositSummary | null>(() => {
   const sorted = [...myActiveDepositsHere.value].sort((a, b) => a.depositedAtTick - b.depositedAtTick)
   return sorted[0] ?? null
@@ -616,33 +595,6 @@ async function submitCustomerDeposit() {
   }
 }
 
-async function submitTopUp() {
-  const deposit = myLatestDeposit.value
-  if (!deposit || !activeCompany.value) {
-    topUpError.value = 'No active deposit found to top up.'
-    return
-  }
-  topUpLoading.value = true
-  topUpError.value = null
-  topUpSuccess.value = false
-  try {
-    await gqlRequest(TOP_UP_DEPOSIT_MUTATION, {
-      input: { depositId: deposit.id, amount: topUpAmount.value },
-    })
-    topUpSuccess.value = true
-    showTopUpForm.value = false
-    topUpAmount.value = 10_000
-    await loadData()
-    setTimeout(() => {
-      topUpSuccess.value = false
-    }, 3000)
-  } catch (err) {
-    topUpError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    topUpLoading.value = false
-  }
-}
-
 async function submitWithdraw() {
   const deposit = myOldestDeposit.value
   if (!deposit || !activeCompany.value) {
@@ -669,6 +621,10 @@ async function submitWithdraw() {
   } finally {
     withdrawLoading.value = false
   }
+}
+
+function navigateToForexTransfer() {
+  router.push('/forex?tab=transfer')
 }
 
 async function submitCustomerLoan() {
@@ -1156,13 +1112,13 @@ const estimatedCustomerTotalPayments = computed(() => {
             <div class="account-actions" v-if="myAccountBalance > 0">
               <button
                 class="btn btn-secondary btn-sm"
-                @click="showTopUpForm = !showTopUpForm; showWithdrawForm = false"
+                @click="navigateToForexTransfer"
               >
-                {{ showTopUpForm ? t('common.cancel') : t('bank.addFunds') }}
+                {{ t('bank.addFundsViaForex') }}
               </button>
               <button
                 class="btn btn-outline btn-sm"
-                @click="showWithdrawForm = !showWithdrawForm; showTopUpForm = false"
+                @click="showWithdrawForm = !showWithdrawForm"
               >
                 {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
               </button>
@@ -1182,23 +1138,6 @@ const estimatedCustomerTotalPayments = computed(() => {
             </div>
           </div>
 
-          <!-- Top-up form -->
-          <div v-if="showTopUpForm" class="account-action-form">
-            <h3 class="action-form-title">{{ t('bank.addFunds') }}</h3>
-            <div class="form-group">
-              <label for="top-up-amount">{{ t('bank.depositAmount') }}</label>
-              <input id="top-up-amount" v-model.number="topUpAmount" type="number" min="1000" step="1000" class="form-input" />
-              <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
-            </div>
-            <div class="form-group">
-              <span class="form-hint">{{ t('common.availableFunds') }}: {{ fmt(activeCompany?.cash ?? 0) }}</span>
-            </div>
-            <div v-if="topUpError" class="error-message">{{ topUpError }}</div>
-            <button class="btn btn-primary" :disabled="topUpLoading || topUpAmount < 1000" @click="submitTopUp">
-              {{ topUpLoading ? t('common.loading') : t('bank.confirmDeposit') }}
-            </button>
-          </div>
-
           <!-- Withdraw form -->
           <div v-if="showWithdrawForm" class="account-action-form">
             <h3 class="action-form-title">{{ t('bank.withdraw') }}</h3>
@@ -1214,7 +1153,6 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
 
           <!-- Success messages -->
-          <div v-if="topUpSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
           <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
           <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
 
@@ -1223,7 +1161,7 @@ const estimatedCustomerTotalPayments = computed(() => {
             <p class="account-empty-hint">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
             <div class="form-group">
               <label for="customer-deposit-amount">{{ t('bank.depositAmount') }}</label>
-              <input id="customer-deposit-amount" v-model.number="customerDepositAmount" type="number" min="1000" step="1000" class="form-input" />
+              <input id="customer-deposit-amount" v-model.number="customerDepositAmount" type="number" min="0.01" step="0.01" class="form-input" />
               <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
             </div>
             <div v-if="bankInfo" class="repayment-preview">
@@ -1233,7 +1171,7 @@ const estimatedCustomerTotalPayments = computed(() => {
               </div>
             </div>
             <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
-            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount < 1000" @click="submitCustomerDeposit">
+            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount <= 0" @click="submitCustomerDeposit">
               {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
             </button>
           </div>
