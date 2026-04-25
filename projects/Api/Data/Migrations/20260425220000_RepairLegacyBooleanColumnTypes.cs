@@ -1,10 +1,14 @@
+using Api.Data;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 #nullable disable
 
 namespace Api.Data.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(AppDbContext))]
+    [Migration("20260425220000_RepairLegacyBooleanColumnTypes")]
     public partial class RepairLegacyBooleanColumnTypes : Migration
     {
         /// <inheritdoc />
