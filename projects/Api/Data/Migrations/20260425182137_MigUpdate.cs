@@ -11,6 +11,41 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            if (ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql(
+                    """
+                    DO $$
+                    BEGIN
+                        IF EXISTS (
+                            SELECT 1
+                            FROM pg_constraint
+                            WHERE conname = 'FK_BankAccounts_Companies_CompanyId1') THEN
+                            ALTER TABLE "BankAccounts" DROP CONSTRAINT "FK_BankAccounts_Companies_CompanyId1";
+                        END IF;
+
+                        IF EXISTS (
+                            SELECT 1
+                            FROM pg_indexes
+                            WHERE schemaname = 'public'
+                              AND indexname = 'IX_BankAccounts_CompanyId1') THEN
+                            DROP INDEX "IX_BankAccounts_CompanyId1";
+                        END IF;
+
+                        IF EXISTS (
+                            SELECT 1
+                            FROM information_schema.columns
+                            WHERE table_schema = 'public'
+                              AND table_name = 'BankAccounts'
+                              AND column_name = 'CompanyId1') THEN
+                            ALTER TABLE "BankAccounts" DROP COLUMN "CompanyId1";
+                        END IF;
+                    END $$;
+                    """);
+
+                return;
+            }
+
             migrationBuilder.DropForeignKey(
                 name: "FK_BankAccounts_Companies_CompanyId1",
                 table: "BankAccounts");
