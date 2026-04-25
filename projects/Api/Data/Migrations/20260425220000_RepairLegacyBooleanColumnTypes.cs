@@ -29,10 +29,37 @@ namespace Api.Data.Migrations
                         SELECT *
                         FROM (VALUES
                             ('Players', 'IsInvisibleInChat'),
+                            ('ProductTypes', 'IsProOnly'),
                             ('Buildings', 'IsUnderConstruction'),
                             ('Buildings', 'BaseCapitalDeposited'),
+                            ('Buildings', 'IsForSale'),
+                            ('Buildings', 'IsGovernmentOwned'),
+                            ('Buildings', 'IsSuspendedForFunds'),
                             ('BankDeposits', 'IsBaseCapital'),
-                            ('BankDeposits', 'IsActive')
+                            ('BankDeposits', 'IsActive'),
+                            ('BankAccounts', 'IsGovernmentAccount'),
+                            ('BankAccounts', 'IsBaseCapitalDeposit'),
+                            ('ExchangeOrders', 'IsActive'),
+                            ('LoanOffers', 'IsActive'),
+                            ('BuildingUnits', 'LinkUp'),
+                            ('BuildingUnits', 'LinkDown'),
+                            ('BuildingUnits', 'LinkLeft'),
+                            ('BuildingUnits', 'LinkRight'),
+                            ('BuildingUnits', 'LinkUpLeft'),
+                            ('BuildingUnits', 'LinkUpRight'),
+                            ('BuildingUnits', 'LinkDownLeft'),
+                            ('BuildingUnits', 'LinkDownRight'),
+                            ('BuildingConfigurationPlanUnits', 'LinkUp'),
+                            ('BuildingConfigurationPlanUnits', 'LinkDown'),
+                            ('BuildingConfigurationPlanUnits', 'LinkLeft'),
+                            ('BuildingConfigurationPlanUnits', 'LinkRight'),
+                            ('BuildingConfigurationPlanUnits', 'LinkUpLeft'),
+                            ('BuildingConfigurationPlanUnits', 'LinkUpRight'),
+                            ('BuildingConfigurationPlanUnits', 'LinkDownLeft'),
+                            ('BuildingConfigurationPlanUnits', 'LinkDownRight'),
+                            ('BuildingConfigurationPlanUnits', 'IsChanged'),
+                            ('BuildingConfigurationPlanUnits', 'IsReverting'),
+                            ('BuildingConfigurationPlanRemovals', 'IsReverting')
                         ) AS t(table_name, column_name)
                     LOOP
                         IF EXISTS (
