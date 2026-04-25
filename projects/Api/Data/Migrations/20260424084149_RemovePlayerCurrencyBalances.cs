@@ -27,6 +27,24 @@ namespace Api.Data.Migrations
                     """);
             }
 
+            if (ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
+            {
+                // Legacy databases may already have this table dropped; create an empty compatibility shell
+                // so the backfill SQL below stays idempotent and startup-safe.
+                migrationBuilder.Sql(
+                    """
+                    CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
+                        "Id" uuid NOT NULL,
+                        "PlayerId" uuid NOT NULL,
+                        "CurrencyCode" character varying(3) NOT NULL,
+                        "Balance" numeric(18,4) NOT NULL DEFAULT 0,
+                        "CreatedAtUtc" timestamp with time zone NOT NULL,
+                        "UpdatedAtUtc" timestamp with time zone NOT NULL,
+                        CONSTRAINT "PK_PlayerCurrencyBalances" PRIMARY KEY ("Id")
+                    );
+                    """);
+            }
+
             migrationBuilder.Sql(GetPlayerCurrencyBalanceBackfillSql(isDown: false));
             migrationBuilder.Sql("DROP TABLE IF EXISTS \"PlayerCurrencyBalances\";");
         }
