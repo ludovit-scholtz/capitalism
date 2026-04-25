@@ -131,15 +131,18 @@ public static class CompanyBankingService
         Guid? excludeAccountId = null,
         CancellationToken cancellationToken = default)
     {
-        return await db.BankAccounts
+        var candidates = await db.BankAccounts
             .Where(account => account.CompanyId == companyId
                 && account.ClosedAtUtc == null
                 && account.CurrencyCode == currencyCode
                 && (!excludeAccountId.HasValue || account.Id != excludeAccountId.Value))
             .OrderBy(account => account.IsBaseCapitalDeposit)
             .ThenBy(account => account.BankBuildingId.HasValue)
-            .ThenByDescending(account => account.Balance)
-            .FirstOrDefaultAsync(cancellationToken);
+            .ToListAsync(cancellationToken);
+
+        return candidates
+            .OrderByDescending(account => account.Balance)
+            .FirstOrDefault();
     }
 
     public static async Task<BankAccount> EnsurePreferredAccountAsync(

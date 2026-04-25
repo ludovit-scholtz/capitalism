@@ -25673,9 +25673,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
-        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCo", Cash = 15_000_000m };
+        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCo", Cash = 0m };
         db.Companies.Add(bankCompany);
-        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "DepositorCo", Cash = 500_000m };
+        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "DepositorCo", Cash = 0m };
         db.Companies.Add(depositorCompany);
 
         var bank = CreateTestBank(db, bankCompany, city.Id);

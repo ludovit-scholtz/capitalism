@@ -11,10 +11,24 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(GetPlayerCurrencyBalanceBackfillSql(isDown: false));
+            if (ActiveProvider.Contains("Sqlite", StringComparison.OrdinalIgnoreCase))
+            {
+                migrationBuilder.Sql(
+                    """
+                    CREATE TABLE IF NOT EXISTS "PlayerCurrencyBalances" (
+                        "Id" TEXT NOT NULL,
+                        "PlayerId" TEXT NOT NULL,
+                        "CurrencyCode" TEXT NOT NULL,
+                        "Balance" TEXT NOT NULL DEFAULT '0',
+                        "CreatedAtUtc" TEXT NOT NULL,
+                        "UpdatedAtUtc" TEXT NOT NULL,
+                        PRIMARY KEY ("Id")
+                    );
+                    """);
+            }
 
-            migrationBuilder.DropTable(
-                name: "PlayerCurrencyBalances");
+            migrationBuilder.Sql(GetPlayerCurrencyBalanceBackfillSql(isDown: false));
+            migrationBuilder.Sql("DROP TABLE IF EXISTS \"PlayerCurrencyBalances\";");
         }
 
         /// <inheritdoc />
