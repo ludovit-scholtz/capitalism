@@ -9,7 +9,6 @@ import BuildingPropertyPanel from '@/components/buildings/BuildingPropertyPanel.
 import BuildingMediaHousePanel from '@/components/buildings/BuildingMediaHousePanel.vue'
 import BuildingPowerPlantPanel from '@/components/buildings/BuildingPowerPlantPanel.vue'
 import BuildingResearchPanel from '@/components/buildings/BuildingResearchPanel.vue'
-import BuildingChainStatusPanel from '@/components/buildings/BuildingChainStatusPanel.vue'
 import BuildingUnitGrid from '@/components/buildings/BuildingUnitGrid.vue'
 import BuildingEditingSidebar from '@/components/buildings/BuildingEditingSidebar.vue'
 import BuildingReadonlySidebar from '@/components/buildings/BuildingReadonlySidebar.vue'
@@ -162,8 +161,6 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
           }}
         </p>
       </div>
-
-      <BuildingChainStatusPanel />
 
       <div class="main-content">
         <BuildingUnitGrid />

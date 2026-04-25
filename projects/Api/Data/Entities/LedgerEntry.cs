@@ -9,6 +9,8 @@ public sealed class LedgerEntry
     public Company Company { get; set; } = null!;
     public Guid? BuildingId { get; set; }
     public Building? Building { get; set; }
+    public Guid? BankAccountId { get; set; }
+    public BankAccount? BankAccount { get; set; }
     public Guid? BuildingUnitId { get; set; }
     public BuildingUnit? BuildingUnit { get; set; }
 
@@ -66,6 +68,8 @@ public static class LedgerCategory
     public const string GridSurplusIncome = "GRID_SURPLUS_INCOME";
     /// <summary>Fine charged to a power plant operator when city supply falls below demand.</summary>
     public const string GridFine = "GRID_FINE";
+    public const string ForexSwapOut = "FOREX_SWAP_OUT";
+    public const string ForexSwapIn = "FOREX_SWAP_IN";
     /// <summary>Outgoing leg of a player-initiated transfer between two of their own bank accounts.</summary>
     public const string BankAccountTransferOut = "BANK_ACCOUNT_TRANSFER_OUT";
     /// <summary>Incoming leg of a player-initiated transfer between two of their own bank accounts.</summary>

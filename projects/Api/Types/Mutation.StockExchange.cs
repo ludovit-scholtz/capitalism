@@ -66,21 +66,28 @@ public sealed partial class Mutation
         var askPrice = SharePriceCalculator.ComputeAskPrice(sharePrice);
         var totalValue = decimal.Round(askPrice * shareCount, 4, MidpointRounding.AwayFromZero);
         var currentTick = await GetCurrentTickAsync(db);
+        var settlementAccount = await ResolveTradeSettlementBankAccountAsync(
+            db,
+            player,
+            account,
+            input.BankAccountId,
+            "USD");
         decimal? personalCashAfterTrade = null;
         decimal? companyCashAfterTrade = null;
 
         if (account.Company is null)
         {
-            if (await PersonalBankAccountService.GetAvailableCashAsync(db, player) < totalValue)
+            if (settlementAccount.Balance < totalValue)
             {
                 throw new GraphQLException(
                     ErrorBuilder.New()
-                        .SetMessage("Insufficient personal cash for this share purchase.")
+                        .SetMessage("Insufficient selected personal USD bank account balance for this share purchase.")
                         .SetCode("INSUFFICIENT_PERSONAL_FUNDS")
                         .Build());
             }
 
-            personalCashAfterTrade = await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, totalValue);
+            settlementAccount.Balance -= totalValue;
+            personalCashAfterTrade = settlementAccount.Balance;
             db.PersonTradeRecords.Add(new PersonTradeRecord
             {
                 Id = Guid.NewGuid(),
@@ -96,18 +103,17 @@ public sealed partial class Mutation
         }
         else
         {
-            var companyAccounts = await LoadActiveCompanyBankAccountsAsync(db, account.Company.Id, httpContextAccessor.HttpContext!.RequestAborted);
-            if (CompanyBankingService.GetTotalBalance(companyAccounts) < totalValue)
+            if (settlementAccount.Balance < totalValue)
             {
                 throw new GraphQLException(
                     ErrorBuilder.New()
-                        .SetMessage("The selected company does not have enough cash for this share purchase.")
+                        .SetMessage("The selected company USD bank account does not have enough cash for this share purchase.")
                         .SetCode("INSUFFICIENT_COMPANY_FUNDS")
                         .Build());
             }
 
-            CompanyBankingService.TryDebit(companyAccounts, totalValue);
-            companyCashAfterTrade = CompanyBankingService.GetTotalBalance(companyAccounts);
+            settlementAccount.Balance -= totalValue;
+            companyCashAfterTrade = settlementAccount.Balance;
             AddCompanyLedgerEntry(
                 db,
                 account.Company,
@@ -116,7 +122,8 @@ public sealed partial class Mutation
                     CultureInfo.InvariantCulture,
                     $"Bought {shareCount:0.####} shares in {targetCompany.Name} @ {askPrice:0.00}"),
                 -totalValue,
-                currentTick);
+                currentTick,
+                settlementAccount.Id);
 
             if (account.Company.Id == targetCompany.Id)
             {
@@ -226,6 +233,12 @@ public sealed partial class Mutation
         var bidPrice = SharePriceCalculator.ComputeBidPrice(sharePrice);
         var totalValue = decimal.Round(bidPrice * shareCount, 4, MidpointRounding.AwayFromZero);
         var currentTick = await GetCurrentTickAsync(db);
+        var settlementAccount = await ResolveTradeSettlementBankAccountAsync(
+            db,
+            player,
+            account,
+            input.BankAccountId,
+            "USD");
         decimal? personalCashAfterTrade = null;
         decimal? companyCashAfterTrade = null;
 
@@ -241,7 +254,8 @@ public sealed partial class Mutation
         if (account.Company is null)
         {
             taxReserved = decimal.Round(totalValue * GameConstants.PersonalStockSaleTaxRate, 4, MidpointRounding.AwayFromZero);
-            personalCashAfterTrade = await PersonalBankAccountService.CreditTrackedGrossCashAsync(db, player, totalValue);
+            settlementAccount.Balance += totalValue;
+            personalCashAfterTrade = settlementAccount.Balance;
             player.PersonalTaxReserve += taxReserved;
             db.PersonTradeRecords.Add(new PersonTradeRecord
             {
@@ -258,9 +272,8 @@ public sealed partial class Mutation
         }
         else
         {
-            var companyAccounts = await LoadActiveCompanyBankAccountsAsync(db, account.Company.Id, httpContextAccessor.HttpContext!.RequestAborted);
-            CompanyBankingService.TryCredit(companyAccounts, totalValue, null, out _);
-            companyCashAfterTrade = CompanyBankingService.GetTotalBalance(companyAccounts);
+            settlementAccount.Balance += totalValue;
+            companyCashAfterTrade = settlementAccount.Balance;
             AddCompanyLedgerEntry(
                 db,
                 account.Company,
@@ -269,7 +282,8 @@ public sealed partial class Mutation
                     CultureInfo.InvariantCulture,
                     $"Sold {shareCount:0.####} shares in {targetCompany.Name} @ {bidPrice:0.00}"),
                 totalValue,
-                currentTick);
+                currentTick,
+                settlementAccount.Id);
         }
 
         await RecordSharePriceHistoryAsync(db, targetCompany.Id, bidPrice, currentTick);
@@ -299,7 +313,9 @@ public sealed partial class Mutation
         var companies = await db.Companies
             .Include(company => company.BankAccounts)
             .ToListAsync();
-        var buildings = await db.Buildings.ToListAsync();
+        var buildings = await db.Buildings
+            .Include(building => building.City)
+            .ToListAsync();
         var lots = await db.BuildingLots.Where(lot => lot.OwnerCompanyId.HasValue).ToListAsync();
         var inventories = await db.Inventories
             .Include(inventory => inventory.ResourceType)
@@ -308,8 +324,176 @@ public sealed partial class Mutation
         var shareholdings = await db.Shareholdings.ToListAsync();
 
         var baseEquityByCompany = SharePriceCalculator.ComputeBaseEquityByCompany(companies, buildings, lots, inventories);
-        var sharePrices = SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
-        return (companies, shareholdings, sharePrices);
+        var localSharePrices = SharePriceCalculator.ComputeQuotedSharePriceByCompany(companies, baseEquityByCompany, shareholdings);
+        var companyCurrencyCodeById = companies.ToDictionary(
+            company => company.Id,
+            company => buildings
+                .Where(building => building.CompanyId == company.Id)
+                .Select(building => building.City?.CurrencyCode)
+                .FirstOrDefault(code => !string.IsNullOrWhiteSpace(code))
+                ?? "EUR");
+
+        var usdRate = await GetEurToUsdRateAsync(db);
+        var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencyCodeById.Values);
+        var sharePricesUsd = companies.ToDictionary(
+            company => company.Id,
+            company => decimal.Round(
+                ConvertToUsd(
+                    localSharePrices.GetValueOrDefault(company.Id),
+                    companyCurrencyCodeById.GetValueOrDefault(company.Id, "EUR"),
+                    eurRatesByCode,
+                    usdRate),
+                4,
+                MidpointRounding.AwayFromZero));
+
+        return (companies, shareholdings, sharePricesUsd);
+    }
+
+    private static async Task<BankAccount> ResolveTradeSettlementBankAccountAsync(
+        AppDbContext db,
+        Player player,
+        ActiveTradingAccount account,
+        Guid? bankAccountId,
+        string requiredCurrencyCode)
+    {
+        if (!bankAccountId.HasValue)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A settlement bank account must be selected for stock trades.")
+                    .SetCode("BANK_ACCOUNT_REQUIRED")
+                    .Build());
+        }
+
+        var settlementAccount = await db.BankAccounts
+            .FirstOrDefaultAsync(candidate => candidate.Id == bankAccountId.Value)
+            ?? throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Selected settlement bank account was not found.")
+                    .SetCode("BANK_ACCOUNT_NOT_FOUND")
+                    .Build());
+
+        if (settlementAccount.ClosedAtUtc.HasValue)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Selected settlement bank account is closed.")
+                    .SetCode("BANK_ACCOUNT_CLOSED")
+                    .Build());
+        }
+
+        if (!string.Equals(settlementAccount.CurrencyCode, requiredCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Stock trading settlement supports only {requiredCurrencyCode} accounts.")
+                    .SetCode("INVALID_SETTLEMENT_CURRENCY")
+                    .Build());
+        }
+
+        if (account.Company is null)
+        {
+            if (settlementAccount.PlayerId != player.Id)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Selected settlement account does not belong to the active personal account.")
+                        .SetCode("BANK_ACCOUNT_NOT_OWNED")
+                        .Build());
+            }
+        }
+        else if (settlementAccount.CompanyId != account.Company.Id)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Selected settlement account does not belong to the active company account.")
+                    .SetCode("BANK_ACCOUNT_NOT_OWNED")
+                    .Build());
+        }
+
+        return settlementAccount;
+    }
+
+    private static async Task<decimal> GetEurToUsdRateAsync(AppDbContext db)
+    {
+        var rate = await db.FxRates
+            .AsNoTracking()
+            .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "USD")
+            .OrderByDescending(r => r.RateDate)
+            .Select(r => r.Rate)
+            .FirstOrDefaultAsync();
+        return rate > 0 ? rate : 1.08m;
+    }
+
+    private static async Task<Dictionary<string, decimal>> BuildEurRatesLookupAsync(
+        AppDbContext db,
+        IEnumerable<string> currencyCodes)
+    {
+        var codes = currencyCodes
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Where(code => !string.Equals(code, "EUR", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var lookup = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["EUR"] = 1m,
+        };
+
+        if (codes.Count > 0)
+        {
+            var dbRates = await db.FxRates
+                .AsNoTracking()
+                .Where(r => r.BaseCurrencyCode == "EUR" && codes.Contains(r.QuoteCurrencyCode))
+                .GroupBy(r => r.QuoteCurrencyCode)
+                .Select(group => new
+                {
+                    CurrencyCode = group.Key,
+                    Rate = group.OrderByDescending(r => r.RateDate).Select(r => r.Rate).First(),
+                })
+                .ToListAsync();
+
+            foreach (var row in dbRates)
+            {
+                lookup[row.CurrencyCode] = row.Rate;
+            }
+        }
+
+        var fallbacks = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CZK"] = 25.20m,
+            ["USD"] = 1.08m,
+            ["GBP"] = 0.86m,
+            ["CNY"] = 7.84m,
+            ["INR"] = 90.50m,
+        };
+
+        foreach (var code in codes.Where(code => !lookup.ContainsKey(code)))
+        {
+            lookup[code] = fallbacks.TryGetValue(code, out var fallbackRate) ? fallbackRate : 1m;
+        }
+
+        return lookup;
+    }
+
+    private static decimal ConvertToUsd(
+        decimal amount,
+        string currencyCode,
+        Dictionary<string, decimal> eurRatesByCode,
+        decimal usdRate)
+    {
+        if (amount == 0m)
+        {
+            return 0m;
+        }
+
+        if (string.Equals(currencyCode, "USD", StringComparison.OrdinalIgnoreCase))
+        {
+            return amount;
+        }
+
+        var eurUnitsPerLocal = eurRatesByCode.TryGetValue(currencyCode, out var rate) && rate > 0m ? rate : 1m;
+        var amountInEur = amount / eurUnitsPerLocal;
+        return amountInEur * usdRate;
     }
 
     private static async Task RecordSharePriceHistoryAsync(AppDbContext db, Guid companyId, decimal sharePrice, long currentTick)

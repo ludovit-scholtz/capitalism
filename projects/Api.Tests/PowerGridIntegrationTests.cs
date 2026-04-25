@@ -5,6 +5,7 @@ using Api.Data.Entities;
 using Api.Engine;
 using Api.Engine.Phases;
 using Api.Tests.Infrastructure;
+using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -873,15 +874,18 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
             PowerConsumption = 5m, BuiltAtUtc = DateTime.UtcNow
         };
         db.Buildings.AddRange(powerPlant, consumer);
+        var settlementAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(
+            db,
+            company.Id,
+            city.CurrencyCode ?? "EUR");
         await db.SaveChangesAsync();
 
-        var gs = await db.GameStates.FirstAsync();
-        var tickBefore = gs.CurrentTick;
+        var balanceBefore = settlementAccount.Balance;
 
         var processor = await CreateProcessorAsync(scope);
         await processor.ProcessTickAsync();
 
-        await db.Entry(company).ReloadAsync();
+        await db.Entry(settlementAccount).ReloadAsync();
         var surplusLedger = await db.LedgerEntries
             .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridSurplusIncome)
             .ToListAsync();
@@ -891,7 +895,9 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         // surplusMw = 45, capacityShare = 1.0, income = 45 × 5 = 225
         var expectedIncome = 45m * GameConstants.GridSurplusIncomePerMwTick;
         Assert.Equal(expectedIncome, surplusLedger.First().Amount);
-        Assert.True(company.Cash >= expectedIncome, $"Company cash should have increased by surplus income; cash={company.Cash}");
+        Assert.True(
+            settlementAccount.Balance >= balanceBefore + expectedIncome,
+            $"Settlement account should have increased by surplus income; before={balanceBefore}, after={settlementAccount.Balance}");
     }
 
     /// <summary>
@@ -931,13 +937,18 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
             PowerConsumption = 50m, BuiltAtUtc = DateTime.UtcNow
         };
         db.Buildings.AddRange(powerPlant, consumer);
+        var settlementAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(
+            db,
+            company.Id,
+            city.CurrencyCode ?? "EUR");
+        settlementAccount.Balance = 100_000m;
         await db.SaveChangesAsync();
 
-        var cashBefore = company.Cash;
+        var balanceBefore = settlementAccount.Balance;
         var processor = await CreateProcessorAsync(scope);
         await processor.ProcessTickAsync();
 
-        await db.Entry(company).ReloadAsync();
+        await db.Entry(settlementAccount).ReloadAsync();
         var fineLedger = await db.LedgerEntries
             .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridFine)
             .ToListAsync();
@@ -947,8 +958,9 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         // shortageMw = 45, capacityShare = 1.0, fine = 45 × 8 = 360
         var expectedFine = 45m * GameConstants.GridFinePerMwTick;
         Assert.Equal(-expectedFine, fineLedger.First().Amount);
-        await db.Entry(company).ReloadAsync();
-        Assert.True(company.Cash < cashBefore, $"Company cash should have decreased due to fine; before={cashBefore}, after={company.Cash}");
+        Assert.True(
+            settlementAccount.Balance <= balanceBefore - expectedFine,
+            $"Settlement account should have decreased by fine; before={balanceBefore}, after={settlementAccount.Balance}");
     }
 
     /// <summary>

@@ -22,7 +22,10 @@ public sealed partial class Query
             .Include(company => company.BankAccounts)
             .OrderBy(company => company.Name)
             .ToListAsync();
-        var buildings = await db.Buildings.AsNoTracking().ToListAsync();
+        var buildings = await db.Buildings
+            .AsNoTracking()
+            .Include(building => building.City)
+            .ToListAsync();
         var lots = await db.BuildingLots
             .AsNoTracking()
             .Where(lot => lot.OwnerCompanyId.HasValue)
@@ -33,7 +36,22 @@ public sealed partial class Query
             .Include(inventory => inventory.ProductType)
             .ToListAsync();
         var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
-        var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var localSharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var companyCurrencyById = companies.ToDictionary(
+            company => company.Id,
+            company => ResolvePrimaryCurrencyCode(company.Id, buildings));
+        var usdRate = await GetEurToUsdRateAsync(db);
+        var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencyById.Values);
+        var sharePriceByCompany = companies.ToDictionary(
+            company => company.Id,
+            company => decimal.Round(
+                ConvertToUsd(
+                    localSharePriceByCompany.GetValueOrDefault(company.Id),
+                    companyCurrencyById.GetValueOrDefault(company.Id, "EUR"),
+                    eurRatesByCode,
+                    usdRate),
+                4,
+                MidpointRounding.AwayFromZero));
 
         Guid? userId = null;
         HashSet<Guid> controlledCompanyIds = [];
@@ -105,7 +123,10 @@ public sealed partial class Query
             return [];
         }
 
-        var buildings = await db.Buildings.AsNoTracking().ToListAsync();
+        var buildings = await db.Buildings
+            .AsNoTracking()
+            .Include(building => building.City)
+            .ToListAsync();
         var lots = await db.BuildingLots
             .AsNoTracking()
             .Where(lot => lot.OwnerCompanyId.HasValue)
@@ -116,7 +137,22 @@ public sealed partial class Query
             .Include(inventory => inventory.ProductType)
             .ToListAsync();
         var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
-        var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var localSharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var companyCurrencyById = companies.ToDictionary(
+            company => company.Id,
+            company => ResolvePrimaryCurrencyCode(company.Id, buildings));
+        var usdRate = await GetEurToUsdRateAsync(db);
+        var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencyById.Values);
+        var sharePriceByCompany = companies.ToDictionary(
+            company => company.Id,
+            company => decimal.Round(
+                ConvertToUsd(
+                    localSharePriceByCompany.GetValueOrDefault(company.Id),
+                    companyCurrencyById.GetValueOrDefault(company.Id, "EUR"),
+                    eurRatesByCode,
+                    usdRate),
+                4,
+                MidpointRounding.AwayFromZero));
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(gameState => (long?)gameState.CurrentTick)

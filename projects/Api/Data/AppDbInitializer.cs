@@ -150,12 +150,24 @@ public sealed partial class AppDbInitializer(
             await dbContext.SaveChangesAsync();
         }
 
+        // Legacy SQLite bootstrap schemas can still enforce NOT NULL on Companies.Cash
+        // while the current runtime model no longer maps that column. In that state,
+        // inserting new companies through EF would fail. Skip government company seeding
+        // until the legacy schema is migrated/repaired beyond that constraint.
+        var hasLegacyCompanyCashConstraint = await HasColumnAsync("Companies", "Cash");
+
         // Seed government-owned baseline media houses in every city (idempotent).
-        await SeedGovernmentMediaHousesAsync();
+        if (!hasLegacyCompanyCashConstraint)
+        {
+            await SeedGovernmentMediaHousesAsync();
+        }
 
         // Seed one government bank building in every city so each local market has
         // an immediately visible default bank on the public banking page.
-        await EnsureGovernmentBankBuildingsAsync();
+        if (!hasLegacyCompanyCashConstraint)
+        {
+            await EnsureGovernmentBankBuildingsAsync();
+        }
 
         // Ensure one government bank account exists for each unique city currency (idempotent).
         await EnsureGovernmentBankAccountsAsync();
@@ -166,6 +178,38 @@ public sealed partial class AppDbInitializer(
         // Existing buildings created before bank-account provisioning must be linked to
         // a company-owned account in their city currency on startup.
         await EnsureBuildingBankAccountsAsync();
+    }
+
+    private async Task<bool> HasColumnAsync(string tableName, string columnName)
+    {
+        var connection = dbContext.Database.GetDbConnection();
+        var wasOpen = connection.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"SELECT COUNT(1) FROM pragma_table_info('{tableName.Replace("'", "''")}') WHERE name = @columnName";
+
+            var parameter = command.CreateParameter();
+            parameter.ParameterName = "@columnName";
+            parameter.Value = columnName;
+            command.Parameters.Add(parameter);
+
+            var result = await command.ExecuteScalarAsync();
+            return Convert.ToInt64(result ?? 0) > 0;
+        }
+        finally
+        {
+            if (!wasOpen)
+            {
+                await connection.CloseAsync();
+            }
+        }
     }
 
     private async Task SeedFxRatesAsync()

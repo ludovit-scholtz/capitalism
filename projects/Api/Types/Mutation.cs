@@ -79,12 +79,16 @@ public sealed partial class Mutation
         string category,
         string description,
         decimal amount,
-        long currentTick)
+        long currentTick,
+        Guid? bankAccountId = null,
+        Guid? buildingId = null)
     {
         db.LedgerEntries.Add(new LedgerEntry
         {
             Id = Guid.NewGuid(),
             CompanyId = company.Id,
+            BuildingId = buildingId,
+            BankAccountId = bankAccountId,
             Category = category,
             Description = description,
             Amount = amount,

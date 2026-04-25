@@ -208,16 +208,6 @@ const CREATE_DEPOSIT_MUTATION = `
   }
 `
 
-const WITHDRAW_DEPOSIT_MUTATION = `
-  mutation CloseBankAccount($input: CloseBankAccountInput!) {
-    closeBankAccount(input: $input) {
-      id
-      amount
-      isActive
-    }
-  }
-`
-
 const CLOSE_BANK_ACCOUNT_MUTATION = `
   mutation CloseBankAccountById($input: CloseBankAccountInput!) {
     closeBankAccount(input: $input) {
@@ -474,18 +464,6 @@ async function submitDeposit() {
   }
 }
 
-async function withdrawDeposit(deposit: BankDepositSummary) {
-  if (!confirm(t('bank.confirmWithdraw'))) return
-  try {
-    await gqlRequest(WITHDRAW_DEPOSIT_MUTATION, {
-      input: { depositId: deposit.id, amount: deposit.amount },
-    })
-    await loadData()
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
-  }
-}
-
 async function closeBankAccount(accountId: string) {
   if (!confirm(t('bank.confirmCloseAccount'))) return
   try {
@@ -498,7 +476,7 @@ async function closeBankAccount(accountId: string) {
 </script>
 
 <template>
-  <main class="loan-marketplace-view container mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
+  <main class="loan-marketplace-view container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
     <div class="flex flex-col gap-10 lg:gap-12">
       <div class="page-header flex flex-col gap-3">
         <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ t('bank.banks') }}</h1>

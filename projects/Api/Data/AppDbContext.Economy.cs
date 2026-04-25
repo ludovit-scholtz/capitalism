@@ -126,10 +126,12 @@ public sealed partial class AppDbContext
             e.Property(l => l.Amount).HasPrecision(18, 4);
             e.HasOne(l => l.Company).WithMany().HasForeignKey(l => l.CompanyId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(l => l.Building).WithMany().HasForeignKey(l => l.BuildingId).OnDelete(DeleteBehavior.SetNull);
+            e.HasOne(l => l.BankAccount).WithMany().HasForeignKey(l => l.BankAccountId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(l => l.BuildingUnit).WithMany().HasForeignKey(l => l.BuildingUnitId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(l => l.ProductType).WithMany().HasForeignKey(l => l.ProductTypeId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(l => l.ResourceType).WithMany().HasForeignKey(l => l.ResourceTypeId).OnDelete(DeleteBehavior.SetNull);
             e.HasIndex(l => new { l.CompanyId, l.RecordedAtTick });
+            e.HasIndex(l => new { l.CompanyId, l.BankAccountId, l.RecordedAtTick });
             // Compound index for category-filtered drill-down queries
             e.HasIndex(l => new { l.CompanyId, l.Category, l.RecordedAtTick });
         });

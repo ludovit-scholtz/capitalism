@@ -170,6 +170,12 @@ public sealed class BuySharesInput
 
     /// <summary>Optional: company ID to trade from when TradeAccountType is "COMPANY".</summary>
     public Guid? TradeAccountCompanyId { get; set; }
+
+    /// <summary>
+    /// Required settlement account for this trade. Must belong to the active trade account
+    /// (person/company) and be denominated in USD.
+    /// </summary>
+    public Guid? BankAccountId { get; set; }
 }
 
 /// <summary>Input for selling company shares back to the public stock exchange.</summary>
@@ -185,6 +191,12 @@ public sealed class SellSharesInput
 
     /// <summary>Optional: company ID to trade from when TradeAccountType is "COMPANY".</summary>
     public Guid? TradeAccountCompanyId { get; set; }
+
+    /// <summary>
+    /// Required settlement account for this trade. Must belong to the active trade account
+    /// (person/company) and be denominated in USD.
+    /// </summary>
+    public Guid? BankAccountId { get; set; }
 }
 
 /// <summary>Input for storing a queued building configuration update.</summary>

@@ -229,6 +229,7 @@ public sealed partial class Mutation
                         Id = Guid.NewGuid(),
                         CompanyId = bank.CompanyId,
                         BuildingId = bank.Id,
+                        BankAccountId = bankLiquidityAccount.Id,
                         Category = LedgerCategory.CentralBankRepay,
                         Description = $"Central bank repayment from incoming deposit (surplus above reserve)",
                         Amount = -repayment,
@@ -266,6 +267,7 @@ public sealed partial class Mutation
                 Id = Guid.NewGuid(),
                 CompanyId = depositorCompany.Id,
                 BuildingId = bank.Id,
+                BankAccountId = deposit.Id,
                 Category = LedgerCategory.DepositMade,
                 Description = $"Deposit into {bank.Name} at {depositRate}% p.a.",
                 Amount = -input.Amount,
@@ -376,6 +378,7 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             CompanyId = deposit.CompanyId!.Value,
             BuildingId = bank.Id,
+            BankAccountId = destinationAccount.Id,
             Category = LedgerCategory.DepositWithdrawn,
             Description = $"Withdrawal from {bank.Name}",
             Amount = payout,
@@ -386,11 +389,14 @@ public sealed partial class Mutation
         // If bank couldn't fully pay from own cash, record central-bank emergency coverage
         if (centralBankCoverage > 0m)
         {
+            var bankLedgerAccount = CompanyBankingService.FindPreferredAccount(bankAccounts, deposit.CurrencyCode)
+                ?? CompanyBankingService.FindAnyPreferredAccount(bankAccounts);
             db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
                 CompanyId = bankCompany.Id,
                 BuildingId = bank.Id,
+                BankAccountId = bankLedgerAccount?.Id,
                 Category = LedgerCategory.CentralBankBorrow,
                 Description = $"Central bank emergency funding covering withdrawal shortfall of {centralBankCoverage:C0}",
                 Amount = -centralBankCoverage,
@@ -574,6 +580,7 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             CompanyId = bank.CompanyId,
             BuildingId = bank.Id,
+            BankAccountId = fundingAccount.Id,
             Category = LedgerCategory.DepositMade,
             Description = $"Base capital deposit to activate {bank.Name}",
             Amount = -baseCapitalRequired,

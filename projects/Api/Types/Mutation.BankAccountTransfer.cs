@@ -117,6 +117,7 @@ public sealed partial class Mutation
             {
                 Id = Guid.NewGuid(),
                 CompanyId = fromAccount.CompanyId.Value,
+                BankAccountId = fromAccount.Id,
                 Category = LedgerCategory.BankAccountTransferOut,
                 Description = $"{description} → {(toAccount.Company?.Name ?? toAccount.Player?.DisplayName ?? "Personal")} ({toAccount.AccountNumber})",
                 Amount = -input.Amount,
@@ -131,6 +132,7 @@ public sealed partial class Mutation
             {
                 Id = Guid.NewGuid(),
                 CompanyId = toAccount.CompanyId.Value,
+                BankAccountId = toAccount.Id,
                 Category = LedgerCategory.BankAccountTransferIn,
                 Description = $"{description} ← {(fromAccount.Company?.Name ?? fromAccount.Player?.DisplayName ?? "Personal")} ({fromAccount.AccountNumber})",
                 Amount = input.Amount,

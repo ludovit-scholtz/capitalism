@@ -53,6 +53,8 @@ public sealed partial class Mutation
             var feeAmount = Math.Round(input.Amount * (1m / 100m), 4);
             var netFromAmount = input.Amount - feeAmount;
             var toAmount = Math.Round(netFromAmount * rate, 4);
+            BankAccount? fromCompanyAccount = null;
+            BankAccount? toCompanyAccount = null;
 
             if (input.FromBankAccountId.HasValue)
             {
@@ -75,6 +77,7 @@ public sealed partial class Mutation
                         "INSUFFICIENT_FUNDS"));
 
                 fromAccount.Balance -= input.Amount;
+                fromCompanyAccount = fromAccount.CompanyId.HasValue ? fromAccount : null;
             }
             else
             {
@@ -115,6 +118,7 @@ public sealed partial class Mutation
                         "CURRENCY_MISMATCH"));
 
                 toAccount.Balance += toAmount;
+                toCompanyAccount = toAccount.CompanyId.HasValue ? toAccount : null;
             }
             else
             {
@@ -148,6 +152,36 @@ public sealed partial class Mutation
                 ExecutedAtUtc = DateTime.UtcNow
             };
             db.ForexTradeRecords.Add(tradeRecord);
+
+            if (fromCompanyAccount?.CompanyId is Guid fromCompanyId)
+            {
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = fromCompanyId,
+                    BankAccountId = fromCompanyAccount.Id,
+                    Category = LedgerCategory.ForexSwapOut,
+                    Description = $"Forex swap out {input.Amount:F2} {fromCode} to {toCode}",
+                    Amount = -input.Amount,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
+
+            if (toCompanyAccount?.CompanyId is Guid toCompanyId)
+            {
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = toCompanyId,
+                    BankAccountId = toCompanyAccount.Id,
+                    Category = LedgerCategory.ForexSwapIn,
+                    Description = $"Forex swap in {toAmount:F2} {toCode} from {fromCode}",
+                    Amount = toAmount,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
 
             await db.SaveChangesAsync();
             await tx.CommitAsync();

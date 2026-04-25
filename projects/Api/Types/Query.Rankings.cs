@@ -36,9 +36,13 @@ public sealed partial class Query
         var buildings = await db.Buildings
             .Include(b => b.City)
             .ToListAsync();
-        var personalCashByPlayerId = await PersonalBankAccountService.GetSettlementBalancesByPlayerIdAsync(
-            db,
-            players.Select(player => player.Id));
+        var playerIds = players.Select(player => player.Id).ToList();
+        var personalAccounts = await db.BankAccounts
+            .AsNoTracking()
+            .Where(account => account.PlayerId.HasValue
+                && playerIds.Contains(account.PlayerId.Value)
+                && account.ClosedAtUtc == null)
+            .ToListAsync();
         var lots = await db.BuildingLots
             .Where(l => l.OwnerCompanyId.HasValue)
             .ToListAsync();
@@ -56,8 +60,11 @@ public sealed partial class Query
         // Load FX rates once for USD normalization.
         // All stored rates are EUR-based (1 EUR = Rate units). EUR→USD = UsdRate.
         var usdRate = await GetEurToUsdRateAsync(db);
-        // Company cash currency → EUR rate lookup (EUR per 1 unit of company currency = 1/EurRate)
-        var companyCurrencies = companyCurrencyCodeById.Values.Distinct().ToList();
+        // Company and personal currencies → EUR rate lookup (EUR per 1 unit of currency = 1/EurRate)
+        var companyCurrencies = companyCurrencyCodeById.Values
+            .Concat(personalAccounts.Select(account => account.CurrencyCode))
+            .Distinct()
+            .ToList();
         var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencies);
 
         // Compute per-company share price in USD (share price is denominated in company currency).
@@ -73,17 +80,13 @@ public sealed partial class Query
         return players
             .Select(p =>
             {
-                var personalCash = PersonalBankAccountService.GetGrossCash(p, personalCashByPlayerId);
+                var personalCashUsd = decimal.Round(
+                    personalAccounts
+                        .Where(account => account.PlayerId == p.Id)
+                        .Sum(account => ConvertToUsd(account.Balance, account.CurrencyCode, eurRatesByCode, usdRate)),
+                    4,
+                    MidpointRounding.AwayFromZero);
                 var sharesValue = shareholdings
-                    .Where(sh => sh.OwnerPlayerId == p.Id && sh.ShareCount > 0m)
-                    .Sum(sh => decimal.Round(
-                        sh.ShareCount * sharePriceByCompany.GetValueOrDefault(sh.CompanyId),
-                        4,
-                        MidpointRounding.AwayFromZero));
-
-                // Normalize to USD: PersonalCash is always EUR; shares use per-company USD share prices.
-                var personalCashUsd = Math.Round(personalCash * usdRate, 4);
-                var sharesValueUsd = shareholdings
                     .Where(sh => sh.OwnerPlayerId == p.Id && sh.ShareCount > 0m)
                     .Sum(sh => decimal.Round(
                         sh.ShareCount * sharePriceUsdByCompany.GetValueOrDefault(sh.CompanyId),
@@ -94,10 +97,10 @@ public sealed partial class Query
                 {
                     PlayerId = p.Id,
                     DisplayName = p.DisplayName,
-                    PersonalCash = personalCash,
+                    PersonalCash = personalCashUsd,
                     SharesValue = sharesValue,
-                    TotalWealth = decimal.Round(personalCash + sharesValue, 4, MidpointRounding.AwayFromZero),
-                    TotalWealthUsd = decimal.Round(personalCashUsd + sharesValueUsd, 4, MidpointRounding.AwayFromZero),
+                    TotalWealth = decimal.Round(personalCashUsd + sharesValue, 4, MidpointRounding.AwayFromZero),
+                    TotalWealthUsd = decimal.Round(personalCashUsd + sharesValue, 4, MidpointRounding.AwayFromZero),
                     CompanyCount = companies.Count(c => c.PlayerId == p.Id)
                 };
             })
@@ -151,9 +154,16 @@ public sealed partial class Query
                     .Sum(b => inventoryByBuilding.TryGetValue(b.Id, out var inv)
                         ? inv.Sum(i => i.Quantity * WealthCalculator.GetItemBasePrice(i))
                         : 0m);
-                var companyCash = CompanyBankingService.GetTotalBalance(c);
-                var totalWealth = companyCash + buildingValue + inventoryValue;
                 var currencyCode = companyCurrencyCodeById.GetValueOrDefault(c.Id, "EUR");
+                var companyCashUsd = decimal.Round(
+                    c.BankAccounts
+                        .Where(account => account.ClosedAtUtc == null)
+                        .Sum(account => ConvertToUsd(account.Balance, account.CurrencyCode, eurRatesByCode, usdRate)),
+                    4,
+                    MidpointRounding.AwayFromZero);
+                var buildingValueUsd = decimal.Round(ConvertToUsd(buildingValue, currencyCode, eurRatesByCode, usdRate), 4, MidpointRounding.AwayFromZero);
+                var inventoryValueUsd = decimal.Round(ConvertToUsd(inventoryValue, currencyCode, eurRatesByCode, usdRate), 4, MidpointRounding.AwayFromZero);
+                var totalWealthUsd = companyCashUsd + buildingValueUsd + inventoryValueUsd;
 
                 return new CompanyRanking
                 {
@@ -161,12 +171,12 @@ public sealed partial class Query
                     CompanyName = c.Name,
                     PlayerId = c.PlayerId,
                     OwnerDisplayName = c.Player?.DisplayName ?? "Unknown",
-                    Cash = companyCash,
-                    CurrencyCode = currencyCode,
-                    BuildingValue = buildingValue,
-                    InventoryValue = inventoryValue,
-                    TotalWealth = totalWealth,
-                    TotalWealthUsd = Math.Round(ConvertToUsd(totalWealth, currencyCode, eurRatesByCode, usdRate), 4),
+                    Cash = companyCashUsd,
+                    CurrencyCode = "USD",
+                    BuildingValue = buildingValueUsd,
+                    InventoryValue = inventoryValueUsd,
+                    TotalWealth = totalWealthUsd,
+                    TotalWealthUsd = totalWealthUsd,
                     BuildingCount = c.Buildings.Count
                 };
             })

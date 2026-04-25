@@ -50,7 +50,10 @@ public sealed partial class Query
             .AsNoTracking()
             .OrderBy(company => company.Name)
             .ToListAsync();
-        var buildings = await db.Buildings.AsNoTracking().ToListAsync();
+        var buildings = await db.Buildings
+            .AsNoTracking()
+            .Include(building => building.City)
+            .ToListAsync();
         var lots = await db.BuildingLots
             .AsNoTracking()
             .Where(lot => lot.OwnerCompanyId.HasValue)
@@ -61,8 +64,30 @@ public sealed partial class Query
             .Include(inventory => inventory.ProductType)
             .ToListAsync();
         var shareholdings = await db.Shareholdings.AsNoTracking().ToListAsync();
-        var sharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var localSharePriceByCompany = BuildQuotedSharePriceLookup(companies, buildings, lots, inventories, shareholdings);
+        var companyCurrencyCodeById = companies.ToDictionary(
+            company => company.Id,
+            company => ResolvePrimaryCurrencyCode(company.Id, buildings));
+        var usdRate = await GetEurToUsdRateAsync(db);
+        var eurRatesByCode = await BuildEurRatesLookupAsync(db, companyCurrencyCodeById.Values);
+        var sharePriceByCompany = companies.ToDictionary(
+            company => company.Id,
+            company => decimal.Round(
+                ConvertToUsd(
+                    localSharePriceByCompany.GetValueOrDefault(company.Id),
+                    companyCurrencyCodeById.GetValueOrDefault(company.Id, "EUR"),
+                    eurRatesByCode,
+                    usdRate),
+                4,
+                MidpointRounding.AwayFromZero));
         var companiesById = companies.ToDictionary(company => company.Id);
+
+        var personalAccounts = await db.BankAccounts
+            .AsNoTracking()
+            .Where(account => account.PlayerId == userId && account.ClosedAtUtc == null)
+            .ToListAsync();
+        var personalCurrencies = personalAccounts.Select(account => account.CurrencyCode).Distinct().ToList();
+        var personalEurRatesByCode = await BuildEurRatesLookupAsync(db, personalCurrencies);
 
         var portfolio = shareholdings
             .Where(holding => holding.OwnerPlayerId == userId && holding.ShareCount > 0m)
@@ -100,16 +125,19 @@ public sealed partial class Query
             .Take(100)
             .ToListAsync();
 
-        var grossPersonalCash = await PersonalBankAccountService.GetGrossCashAsync(db, player.Id);
+        var grossPersonalCashUsd = decimal.Round(
+            personalAccounts.Sum(account => ConvertToUsd(account.Balance, account.CurrencyCode, personalEurRatesByCode, usdRate)),
+            4,
+            MidpointRounding.AwayFromZero);
 
         var result = new PersonAccountResult
         {
             PlayerId = player.Id,
             DisplayName = player.DisplayName,
-            PersonalCash = grossPersonalCash,
+            PersonalCash = grossPersonalCashUsd,
             TaxReserve = player.PersonalTaxReserve,
-            AvailableCash = grossPersonalCash - player.PersonalTaxReserve,
-            TotalNetWealth = (grossPersonalCash - player.PersonalTaxReserve)
+            AvailableCash = grossPersonalCashUsd - player.PersonalTaxReserve,
+            TotalNetWealth = (grossPersonalCashUsd - player.PersonalTaxReserve)
                 + portfolio.Sum(holding => holding.MarketValue),
             ActiveAccountType = player.ActiveAccountType,
             ActiveCompanyId = player.ActiveCompanyId,

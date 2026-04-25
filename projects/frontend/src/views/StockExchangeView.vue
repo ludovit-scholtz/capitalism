@@ -11,6 +11,7 @@ import { deepEqual } from '@/lib/utils'
 import type {
   CompanyOwnership,
   MergeCompanyResult,
+  PlayerBankAccountSummary,
   PersonAccount,
   ShareTradeResult,
   StockExchangeListing,
@@ -39,6 +40,8 @@ const error = ref<string | null>(null)
 const actionLoadingKey = ref<string | null>(null)
 const personAccount = ref<PersonAccount | null>(null)
 const listings = ref<StockExchangeListing[]>([])
+const myBankAccounts = ref<PlayerBankAccountSummary[]>([])
+const selectedSettlementBankAccountId = ref<string>('')
 const quantityByCompany = ref<Record<string, number>>({})
 const errorByCompany = ref<Record<string, string | null>>({})
 const successByCompany = ref<Record<string, string | null>>({})
@@ -129,6 +132,21 @@ const LISTINGS_QUERY = `
       combinedControlledOwnershipRatio
       canClaimControl
       canMerge
+    }
+  }
+`
+
+const MY_BANK_ACCOUNTS_QUERY = `
+  query MyBankAccounts {
+    myBankAccounts {
+      id
+      accountNumber
+      currencyCode
+      balance
+      companyId
+      companyName
+      ownerType
+      ownerDisplayName
     }
   }
 `
@@ -269,6 +287,22 @@ const activeTradeAccountCash = computed(() => {
   return personAccount.value?.availableCash ?? null
 })
 
+const activeSettlementAccounts = computed(() => {
+  if (activeTradeAccountType.value === 'COMPANY') {
+    const activeCompanyId = activeTradeAccount.value?.companyId ?? auth.player?.activeCompanyId ?? null
+    return myBankAccounts.value.filter(
+      (account) =>
+        account.ownerType === 'COMPANY' &&
+        account.companyId === activeCompanyId &&
+        account.currencyCode === 'USD',
+    )
+  }
+
+  return myBankAccounts.value.filter(
+    (account) => account.ownerType === 'PERSON' && account.currencyCode === 'USD',
+  )
+})
+
 const filteredAndSortedListings = computed(() => {
   const text = filterText.value.trim().toLowerCase()
   const filtered = text
@@ -306,6 +340,12 @@ watch([filterText, sortField, sortDir], () => {
 watch(totalPages, (value) => {
   if (currentPage.value > value) {
     currentPage.value = value
+  }
+})
+
+watch(activeSettlementAccounts, (accounts) => {
+  if (!accounts.some((account) => account.id === selectedSettlementBankAccountId.value)) {
+    selectedSettlementBankAccountId.value = accounts[0]?.id ?? ''
   }
 })
 
@@ -429,6 +469,9 @@ async function loadData(isRefresh = false) {
     }
 
     const listingDataPromise = gqlRequest<{ stockExchangeListings: StockExchangeListing[] }>(LISTINGS_QUERY)
+    const accountDataPromise = auth.isAuthenticated
+      ? gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(MY_BANK_ACCOUNTS_QUERY)
+      : Promise.resolve({ myBankAccounts: [] as PlayerBankAccountSummary[] })
     let resolvedPersonAccount: PersonAccount | null = null
 
     try {
@@ -439,12 +482,23 @@ async function loadData(isRefresh = false) {
     }
 
     const listingData = await listingDataPromise
+  const accountData = await accountDataPromise
 
     if (!deepEqual(personAccount.value, resolvedPersonAccount)) {
       personAccount.value = resolvedPersonAccount
     }
     if (!deepEqual(listings.value, listingData.stockExchangeListings)) {
       listings.value = listingData.stockExchangeListings
+    }
+    if (!deepEqual(myBankAccounts.value, accountData.myBankAccounts)) {
+      myBankAccounts.value = accountData.myBankAccounts
+    }
+
+    const hasSelectedSettlement = activeSettlementAccounts.value.some(
+      (account) => account.id === selectedSettlementBankAccountId.value,
+    )
+    if (!hasSelectedSettlement) {
+      selectedSettlementBankAccountId.value = activeSettlementAccounts.value[0]?.id ?? ''
     }
 
     setDefaultQuantities()
@@ -493,12 +547,23 @@ async function executeTrade(kind: 'buy' | 'sell', companyId: string) {
   successByCompany.value[companyId] = null
 
   const { tradeAccountType, tradeAccountCompanyId } = resolveTradeAccount()
+  if (!selectedSettlementBankAccountId.value) {
+    errorByCompany.value[companyId] = t('stockExchange.selectSettlementAccount')
+    successByCompany.value[companyId] = null
+    return
+  }
 
   try {
     let result: ShareTradeResult
     if (kind === 'buy') {
       const data = await gqlRequest<{ buyShares: ShareTradeResult }>(BUY_MUTATION, {
-        input: { companyId, shareCount, tradeAccountType, tradeAccountCompanyId },
+        input: {
+          companyId,
+          shareCount,
+          tradeAccountType,
+          tradeAccountCompanyId,
+          bankAccountId: selectedSettlementBankAccountId.value,
+        },
       })
       result = data.buyShares
       successByCompany.value[companyId] = t('stockExchange.buySuccess', {
@@ -507,7 +572,13 @@ async function executeTrade(kind: 'buy' | 'sell', companyId: string) {
       })
     } else {
       const data = await gqlRequest<{ sellShares: ShareTradeResult }>(SELL_MUTATION, {
-        input: { companyId, shareCount, tradeAccountType, tradeAccountCompanyId },
+        input: {
+          companyId,
+          shareCount,
+          tradeAccountType,
+          tradeAccountCompanyId,
+          bankAccountId: selectedSettlementBankAccountId.value,
+        },
       })
       result = data.sellShares
       if (result.taxReserved > 0) {
@@ -956,6 +1027,24 @@ useTickRefresh(async () => {
                                       ? t('stockExchange.tradeAccountHintCompany')
                                       : t('stockExchange.tradeAccountHintPerson')
                                   }}
+                                </p>
+                                <label class="trade-order-caption mt-2 block">{{ t('stockExchange.settlementAccountLabel') }}</label>
+                                <select
+                                  v-model="selectedSettlementBankAccountId"
+                                  class="trade-input mt-1"
+                                  :aria-label="t('stockExchange.settlementAccountLabel')"
+                                >
+                                  <option value="">{{ t('stockExchange.selectSettlementAccount') }}</option>
+                                  <option
+                                    v-for="account in activeSettlementAccounts"
+                                    :key="account.id"
+                                    :value="account.id"
+                                  >
+                                    {{ account.accountNumber }} · {{ formatCurrency(account.balance) }}
+                                  </option>
+                                </select>
+                                <p v-if="activeSettlementAccounts.length === 0" class="trade-order-hint mt-1">
+                                  {{ t('stockExchange.noUsdSettlementAccount') }}
                                 </p>
                               </div>
                               <span v-if="activeTradeAccountCash !== null" class="trade-account-cash">

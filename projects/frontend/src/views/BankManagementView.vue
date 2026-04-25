@@ -723,7 +723,7 @@ const estimatedCustomerTotalPayments = computed(() => {
 </script>
 
 <template>
-  <main class="bank-management-view container mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
+  <main class="bank-management-view container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
     <div class="page-header mb-10 flex flex-col gap-3 lg:mb-12">
       <!-- Show different titles based on ownership -->
       <template v-if="!loading && isOwner">

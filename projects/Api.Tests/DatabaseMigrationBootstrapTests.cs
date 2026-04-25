@@ -966,7 +966,12 @@ public sealed class DatabaseMigrationBootstrapTests
 
         dbContext.Add(player);
         dbContext.AddRange(cities);
-        dbContext.AddRange(bankCompany, depositorCompany, bankBuilding);
+        await dbContext.SaveChangesAsync();
+
+        await InsertLegacyCompanyRowAsync(dbContext, bankCompany.Id, bankCompany.PlayerId, bankCompany.Name);
+        await InsertLegacyCompanyRowAsync(dbContext, depositorCompany.Id, depositorCompany.PlayerId, depositorCompany.Name);
+
+        dbContext.Add(bankBuilding);
         await dbContext.SaveChangesAsync();
 
         await dbContext.Database.ExecuteSqlRawAsync(
@@ -992,6 +997,106 @@ public sealed class DatabaseMigrationBootstrapTests
             $"INSERT INTO \"BankDeposits\" (\"Id\", \"BankBuildingId\", \"DepositorCompanyId\", \"Amount\", \"DepositInterestRatePercent\", \"IsBaseCapital\", \"IsActive\", \"DepositedAtTick\", \"DepositedAtUtc\", \"WithdrawnAtTick\", \"WithdrawnAtUtc\", \"TotalInterestPaid\") VALUES ({depositId}, {bankBuilding.Id}, {depositorCompany.Id}, {amount}, {depositInterestRatePercent}, {isBaseCapital}, {withdrawnAtUtc is null}, {depositedAtTick}, {depositedAtUtc}, {withdrawnAtTick}, {withdrawnAtUtc}, {totalInterestPaid})");
 
         return (depositId, depositorCompany.Id, bankBuilding.Id);
+    }
+
+    private static async Task InsertLegacyCompanyRowAsync(
+        AppDbContext dbContext,
+        Guid companyId,
+        Guid playerId,
+        string name)
+    {
+        var companyColumns = await GetTableColumnsAsync(dbContext, "Companies");
+        var available = new HashSet<string>(companyColumns, StringComparer.OrdinalIgnoreCase);
+
+        var valuesByColumn = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Id"] = companyId,
+            ["PlayerId"] = playerId,
+            ["Name"] = name,
+            ["Cash"] = 0m,
+            ["CurrencyCode"] = "EUR",
+            ["FoundedAtUtc"] = DateTime.UtcNow,
+            ["FoundedAtTick"] = 1L,
+            ["DividendPayoutRatio"] = 0.2m,
+            ["TotalSharesIssued"] = 10_000m,
+        };
+
+        var targetColumns = valuesByColumn.Keys
+            .Where(column => available.Contains(column))
+            .ToList();
+
+        if (!targetColumns.Contains("Id", StringComparer.OrdinalIgnoreCase)
+            || !targetColumns.Contains("PlayerId", StringComparer.OrdinalIgnoreCase)
+            || !targetColumns.Contains("Name", StringComparer.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Legacy Companies table is missing required columns for test seeding.");
+        }
+
+        var connection = dbContext.Database.GetDbConnection();
+        var wasOpen = connection.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+
+            var columnSql = string.Join(", ", targetColumns.Select(column => $"\"{column}\""));
+            var parameterSql = string.Join(", ", targetColumns.Select((_, index) => $"@p{index}"));
+            command.CommandText = $"INSERT INTO \"Companies\" ({columnSql}) VALUES ({parameterSql})";
+
+            for (var index = 0; index < targetColumns.Count; index++)
+            {
+                var parameter = command.CreateParameter();
+                parameter.ParameterName = $"@p{index}";
+                parameter.Value = valuesByColumn[targetColumns[index]];
+                command.Parameters.Add(parameter);
+            }
+
+            await command.ExecuteNonQueryAsync();
+        }
+        finally
+        {
+            if (!wasOpen)
+            {
+                await connection.CloseAsync();
+            }
+        }
+    }
+
+    private static async Task<List<string>> GetTableColumnsAsync(AppDbContext dbContext, string tableName)
+    {
+        var columns = new List<string>();
+
+        var connection = dbContext.Database.GetDbConnection();
+        var wasOpen = connection.State == System.Data.ConnectionState.Open;
+        if (!wasOpen)
+        {
+            await connection.OpenAsync();
+        }
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = $"PRAGMA table_info('{tableName.Replace("'", "''")}')";
+
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                columns.Add(reader.GetString(1));
+            }
+        }
+        finally
+        {
+            if (!wasOpen)
+            {
+                await connection.CloseAsync();
+            }
+        }
+
+        return columns;
     }
 
     private static async Task AssertMigratedBankDepositAccountAsync(

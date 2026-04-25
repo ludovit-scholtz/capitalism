@@ -41,32 +41,26 @@ public sealed partial class Query
         var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
         var pageOffset = Math.Max(offset ?? 0, 0);
 
-        // Resolve the account filter: find the building (if any) linked to this account.
-        Guid? filterBuildingId = null;
         string? filterCurrencyCode = null;
         if (accountId.HasValue)
         {
-            // Look up the account to get its currency and owning building.
             var acct = await db.BankAccounts
                 .AsNoTracking()
-                .Include(a => a.BankBuilding).ThenInclude(b => b!.City)
                 .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId);
-            if (acct != null)
+            if (acct is null)
             {
-                filterCurrencyCode = acct.CurrencyCode;
-                // If the account is the primary account for a specific building, scope to that building.
-                var owningBuilding = company.Buildings.FirstOrDefault(b => b.BankAccountId == accountId.Value);
-                if (owningBuilding != null)
-                    filterBuildingId = owningBuilding.Id;
+                throw new GraphQLException(new Error("Selected bank account not found for this company.", "ACCOUNT_NOT_FOUND"));
             }
+
+            filterCurrencyCode = acct.CurrencyCode;
         }
 
-        // Load entries: filter by building when available, otherwise by company.
+        // Load entries for the company or for one specific bank account.
         var entriesQuery = db.LedgerEntries
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId);
-        if (filterBuildingId.HasValue)
-            entriesQuery = entriesQuery.Where(e => e.BuildingId == filterBuildingId.Value);
+        if (accountId.HasValue)
+            entriesQuery = entriesQuery.Where(e => e.BankAccountId == accountId.Value);
         if (fromTick.HasValue)
             entriesQuery = entriesQuery.Where(e => e.RecordedAtTick >= fromTick.Value);
         if (toTick.HasValue)
