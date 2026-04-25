@@ -1115,7 +1115,10 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="account-header-info flex flex-col gap-2">
               <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myAccount') }}</h2>
-              <span class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">{{ activeCompany?.name }}</span>
+              <span
+                class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
+                >{{ activeCompany?.name }}</span
+              >
             </div>
             <div class="account-actions flex flex-wrap gap-3" v-if="myAccountBalance > 0">
               <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
@@ -1145,7 +1148,15 @@ const estimatedCustomerTotalPayments = computed(() => {
             <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
             <div class="form-group mt-4 flex flex-col gap-3">
               <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
-              <input id="withdraw-amount" v-model.number="withdrawAmount" type="number" :min="1" :max="myAccountBalance" step="1000" class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body" />
+              <input
+                id="withdraw-amount"
+                v-model.number="withdrawAmount"
+                type="number"
+                :min="1"
+                :max="myAccountBalance"
+                step="1000"
+                class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
+              />
               <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
             </div>
             <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
@@ -1163,7 +1174,14 @@ const estimatedCustomerTotalPayments = computed(() => {
             <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
             <div class="form-group flex flex-col gap-3">
               <label for="customer-deposit-amount" class="text-sm font-semibold text-body">{{ t('bank.depositAmount') }}</label>
-              <input id="customer-deposit-amount" v-model.number="customerDepositAmount" type="number" min="0" step="0.01" class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body" />
+              <input
+                id="customer-deposit-amount"
+                v-model.number="customerDepositAmount"
+                type="number"
+                min="0"
+                step="0.01"
+                class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
+              />
               <span class="form-hint text-sm text-muted">{{ t('bank.depositAmountHint') }}</span>
               <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
             </div>
