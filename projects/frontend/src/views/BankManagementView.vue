@@ -1110,16 +1110,10 @@ const estimatedCustomerTotalPayments = computed(() => {
               <span class="account-company-tag">{{ activeCompany?.name }}</span>
             </div>
             <div class="account-actions" v-if="myAccountBalance > 0">
-              <button
-                class="btn btn-secondary btn-sm"
-                @click="navigateToForexTransfer"
-              >
+              <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
                 {{ t('bank.addFundsViaForex') }}
               </button>
-              <button
-                class="btn btn-outline btn-sm"
-                @click="showWithdrawForm = !showWithdrawForm"
-              >
+              <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
                 {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
               </button>
             </div>
