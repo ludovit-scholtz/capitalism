@@ -31,20 +31,15 @@ public static class PersonalBankAccountService
 
         if (UsePostgresCompatPath(db))
         {
-            var playerIdText = playerId.ToString("D");
+            var accountsInCurrency = await db.BankAccounts
+                .AsNoTracking()
+                .Where(account => account.PlayerId.HasValue
+                    && account.CurrencyCode != null
+                    && account.CurrencyCode.ToUpper() == normalizedCurrencyCode)
+                .OrderBy(account => account.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
 
-            return await db.BankAccounts
-                .FromSqlInterpolated(
-                    $"""
-                    SELECT *
-                    FROM "BankAccounts"
-                    WHERE "PlayerId" IS NOT NULL
-                      AND "PlayerId"::text = {playerIdText}
-                      AND UPPER("CurrencyCode") = {normalizedCurrencyCode}
-                    ORDER BY "CreatedAtUtc" ASC
-                    LIMIT 1
-                    """)
-                .FirstOrDefaultAsync(cancellationToken);
+            return accountsInCurrency.FirstOrDefault(account => account.PlayerId == playerId);
         }
 
         return await db.BankAccounts

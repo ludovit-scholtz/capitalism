@@ -346,17 +346,10 @@ public sealed partial class AppDbInitializer(
         Company? govCompany;
         if (dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
         {
-            var govPlayerIdText = govPlayer.Id.ToString("D");
-            govCompany = await dbContext.Companies
-                .FromSqlInterpolated(
-                    $"""
-                    SELECT *
-                    FROM "Companies"
-                    WHERE "Name" = {GovDisplayName}
-                      AND "PlayerId"::text = {govPlayerIdText}
-                    LIMIT 1
-                    """)
-                .FirstOrDefaultAsync();
+            var companiesByName = await dbContext.Companies
+                .Where(company => company.Name == GovDisplayName)
+                .ToListAsync();
+            govCompany = companiesByName.FirstOrDefault(company => company.PlayerId == govPlayer.Id);
         }
         else
         {

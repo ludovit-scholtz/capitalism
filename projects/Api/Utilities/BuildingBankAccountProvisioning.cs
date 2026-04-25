@@ -36,16 +36,10 @@ public static class BuildingBankAccountProvisioning
 
             if (UsePostgresCompatPath(db))
             {
-                var bankAccountIdText = building.BankAccountId.Value.ToString("D");
-                persistedAssignedAccount = await db.BankAccounts
-                    .FromSqlInterpolated(
-                        $"""
-                        SELECT *
-                        FROM "BankAccounts"
-                        WHERE "Id"::text = {bankAccountIdText}
-                        LIMIT 1
-                        """)
-                    .FirstOrDefaultAsync(cancellationToken);
+                var allAccounts = await db.BankAccounts
+                    .AsNoTracking()
+                    .ToListAsync(cancellationToken);
+                persistedAssignedAccount = allAccounts.FirstOrDefault(account => account.Id == building.BankAccountId.Value);
             }
             else
             {
@@ -93,19 +87,14 @@ public static class BuildingBankAccountProvisioning
 
         if (UsePostgresCompatPath(db))
         {
-            var companyIdText = companyId.ToString("D");
-            existingAccount = await db.BankAccounts
-                .FromSqlInterpolated(
-                    $"""
-                    SELECT *
-                    FROM "BankAccounts"
-                    WHERE "CompanyId" IS NOT NULL
-                      AND "CompanyId"::text = {companyIdText}
-                      AND UPPER("CurrencyCode") = {normalizedCurrencyCode}
-                    ORDER BY "CreatedAtUtc" ASC
-                    LIMIT 1
-                    """)
-                .FirstOrDefaultAsync(cancellationToken);
+            var companyAccountsInCurrency = await db.BankAccounts
+                .AsNoTracking()
+                .Where(account => account.CompanyId.HasValue
+                    && account.CurrencyCode != null
+                    && account.CurrencyCode.ToUpper() == normalizedCurrencyCode)
+                .OrderBy(account => account.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
+            existingAccount = companyAccountsInCurrency.FirstOrDefault(account => account.CompanyId == companyId);
         }
         else
         {

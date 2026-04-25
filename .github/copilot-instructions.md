@@ -31,6 +31,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - **SQLite is forbidden in this repository.** Do not add `UseSqlite`, `Microsoft.Data.Sqlite`, or SQLite-specific schema/query logic.
 - **All automated tests must use EF Core InMemory provider** (unique database name per test scope/factory) instead of SQLite files or `:memory:` connections.
 - **SQL commands are allowed only inside EF migration files.** In runtime services/initializers/tests, use LINQ and EF APIs only.
+- **Do not use `FromSqlInterpolated`, `FromSqlRaw`, or `ExecuteSql*` in runtime services/initializers/tests.** Use LINQ and EF APIs only; if legacy schema drift requires compatibility filtering, materialize with LINQ and perform safe in-memory matching rather than raw SQL.
 - When a backend model changes, always add the corresponding EF migration and make the startup upgrade path safe for a server restart onto the new build.
 - Never swallow `MigrateAsync()` failures for the game API. If schema upgrade fails, startup must fail so the server does not continue running with runtime `column does not exist` errors.
 - For every API model/migration change, add or update regression tests using EF InMemory to verify initialization and runtime behavior (idempotent startup, seeded data, and updated domain flow).
