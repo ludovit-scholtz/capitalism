@@ -23,14 +23,19 @@ internal static class TestHelpers
     /// Use this to unit-test CSV parsing logic (valid, malformed, empty content).
     /// </summary>
     public static NbsExchangeRateService CreateCsvParsingService(string csvContent) =>
-        new(new StaticCsvHttpClientFactory(csvContent), new TestEnvironment(), NullLogger<NbsExchangeRateService>.Instance);
+        new(new StaticCsvHttpClientFactory(csvContent), new TestEnvironment("Development"), NullLogger<NbsExchangeRateService>.Instance);
 
     private sealed class TestEnvironment : IWebHostEnvironment
     {
+        public TestEnvironment(string environmentName = "Testing")
+        {
+            EnvironmentName = environmentName;
+        }
+
         public string ApplicationName { get; set; } = "Api.Tests";
         public IFileProvider WebRootFileProvider { get; set; } = new NullFileProvider();
         public string WebRootPath { get; set; } = string.Empty;
-        public string EnvironmentName { get; set; } = "Testing";
+        public string EnvironmentName { get; set; }
         public string ContentRootPath { get; set; } = string.Empty;
         public IFileProvider ContentRootFileProvider { get; set; } = new NullFileProvider();
     }

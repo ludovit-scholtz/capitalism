@@ -24,6 +24,11 @@ public sealed partial class AppDbContext
 
     private async Task EnsureLedgerEntryBankAccountIdsAsync(CancellationToken cancellationToken)
     {
+        if (!Database.IsRelational())
+        {
+            return;
+        }
+
         var pendingEntries = ChangeTracker
             .Entries<LedgerEntry>()
             .Where(entry => entry.State is EntityState.Added or EntityState.Modified)

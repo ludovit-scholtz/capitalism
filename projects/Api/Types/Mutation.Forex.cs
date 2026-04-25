@@ -44,7 +44,9 @@ public sealed partial class Mutation
         ForexTradeRecord tradeRecord;
         try
         {
-            await using var tx = await db.Database.BeginTransactionAsync();
+            await using var tx = db.Database.IsRelational()
+                ? await db.Database.BeginTransactionAsync()
+                : null;
 
             var player = await db.Players.FirstOrDefaultAsync(p => p.Id == playerId)
                 ?? throw new GraphQLException(new Error("Player not found.", "PLAYER_NOT_FOUND"));
@@ -184,7 +186,10 @@ public sealed partial class Mutation
             }
 
             await db.SaveChangesAsync();
-            await tx.CommitAsync();
+            if (tx is not null)
+            {
+                await tx.CommitAsync();
+            }
         }
         catch (DbUpdateConcurrencyException)
         {

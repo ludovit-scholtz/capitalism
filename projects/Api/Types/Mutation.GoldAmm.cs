@@ -25,7 +25,9 @@ public sealed partial class Mutation
         var currencyCode = input.CurrencyCode?.ToUpperInvariant() ?? string.Empty;
         ValidateCreatePoolInput(currencyCode, input.FiatAmount, input.GoldAmount);
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
 
         var existing = await db.GoldAmmPools.FirstOrDefaultAsync(p => p.CurrencyCode == currencyCode);
         if (existing != null)
@@ -70,7 +72,10 @@ public sealed partial class Mutation
         await DeductGold(db, playerId, input.GoldAmount);
 
         await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        if (tx is not null)
+        {
+            await tx.CommitAsync();
+        }
 
         var newFiatBalance = await Query.GetPersonalBalanceAsync(db, playerId, currencyCode);
         var newGoldBalance = await Query.GetTotalGoldAsync(db, playerId);
@@ -105,7 +110,9 @@ public sealed partial class Mutation
         if (input.FiatAmount <= 0)
             throw new GraphQLException(new Error("FiatAmount must be > 0.", "INVALID_AMOUNT"));
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
 
         var pool = await db.GoldAmmPools
             .Include(p => p.Positions)
@@ -164,7 +171,10 @@ public sealed partial class Mutation
         await DeductGold(db, playerId, goldRequired);
 
         await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        if (tx is not null)
+        {
+            await tx.CommitAsync();
+        }
 
         var newFiatBalance = await Query.GetPersonalBalanceAsync(db, playerId, pool.CurrencyCode);
         var newGoldBalance = await Query.GetTotalGoldAsync(db, playerId);
@@ -199,7 +209,9 @@ public sealed partial class Mutation
         if (input.ShareFraction <= 0 || input.ShareFraction > 1)
             throw new GraphQLException(new Error("ShareFraction must be between 0 (exclusive) and 1 (inclusive).", "INVALID_FRACTION"));
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
 
         var position = await db.GoldAmmPositions
             .Include(p => p.Pool)
@@ -247,7 +259,10 @@ public sealed partial class Mutation
         await CreditGold(db, playerId, goldReturn);
 
         await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        if (tx is not null)
+        {
+            await tx.CommitAsync();
+        }
 
         var newFiatBalance = await Query.GetPersonalBalanceAsync(db, playerId, pool.CurrencyCode);
         var newGoldBalance = await Query.GetTotalGoldAsync(db, playerId);
@@ -279,7 +294,9 @@ public sealed partial class Mutation
         var currencyCode = input.CurrencyCode?.ToUpperInvariant() ?? string.Empty;
         Query.ValidateGoldAmmInput(direction, currencyCode, input.Amount);
 
-        await using var tx = await db.Database.BeginTransactionAsync();
+        await using var tx = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
 
         var pool = await db.GoldAmmPools.FirstOrDefaultAsync(p => p.CurrencyCode == currencyCode)
             ?? throw new GraphQLException(new Error($"No pool for {currencyCode}/XAU.", "POOL_NOT_FOUND"));
@@ -339,7 +356,10 @@ public sealed partial class Mutation
         db.GoldAmmTradeRecords.Add(tradeRecord);
 
         await db.SaveChangesAsync();
-        await tx.CommitAsync();
+        if (tx is not null)
+        {
+            await tx.CommitAsync();
+        }
 
         var newFiatBalance = await Query.GetPersonalBalanceAsync(db, playerId, currencyCode);
         var newGoldBalance = await Query.GetTotalGoldAsync(db, playerId);
