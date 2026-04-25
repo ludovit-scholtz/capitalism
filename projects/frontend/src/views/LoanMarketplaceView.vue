@@ -414,10 +414,18 @@ async function confirmAcceptLoan() {
 function openDepositModal(bank: BankInfoSummary) {
   selectedBank.value = bank
   depositCompanyId.value = activeCompany.value?.id ?? ''
-  depositAmount.value = 1_000
+  depositAmount.value = 0
   depositError.value = null
   depositSuccess.value = false
   showDepositModal.value = true
+}
+
+function formatOpenAccountError(errorMessage: string) {
+  if (!errorMessage.includes('Insufficient company funds to open this bank account.')) {
+    return errorMessage
+  }
+
+  return `${errorMessage} ${t('bank.zeroBalanceFundingHint')}`
 }
 
 function closeDepositModal() {
@@ -444,7 +452,7 @@ async function submitDeposit() {
     await loadData()
     setTimeout(closeDepositModal, 1500)
   } catch (err) {
-    depositError.value = err instanceof Error ? err.message : String(err)
+    depositError.value = formatOpenAccountError(err instanceof Error ? err.message : String(err))
   } finally {
     depositLoading.value = false
   }
@@ -464,20 +472,37 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 </script>
 
 <template>
-  <div class="loan-marketplace-view">
-    <div class="page-header">
-      <h1 class="page-title">{{ t('bank.banks') }}</h1>
-      <p class="page-subtitle">{{ t('bank.browseBanks') }}</p>
-    </div>
+  <main class="loan-marketplace-view container mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
+    <div class="flex flex-col gap-10 lg:gap-12">
+      <div class="page-header flex flex-col gap-3">
+        <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ t('bank.banks') }}</h1>
+        <p class="page-subtitle max-w-3xl text-sm text-muted sm:text-base">{{ t('bank.browseBanks') }}</p>
+      </div>
 
     <!-- Tab switcher -->
-    <div class="marketplace-tabs" role="tablist">
-      <button role="tab" :aria-selected="activeTab === 'borrow'" :class="['tab-btn', { 'tab-active': activeTab === 'borrow' }]" @click="activeTab = 'borrow'">
+    <div class="marketplace-tabs flex flex-wrap gap-2 border-b border-divider pb-1" role="tablist">
+      <button
+        role="tab"
+        :aria-selected="activeTab === 'borrow'"
+        :class="[
+          'tab-btn inline-flex items-center gap-2 rounded-t-2xl border-b-2 px-5 py-3 text-sm font-semibold transition-colors',
+          activeTab === 'borrow' ? 'tab-active border-brand text-brand' : 'border-transparent text-muted hover:text-body',
+        ]"
+        @click="activeTab = 'borrow'"
+      >
         {{ t('bank.borrowTab') }}
       </button>
-      <button role="tab" :aria-selected="activeTab === 'deposit'" :class="['tab-btn', { 'tab-active': activeTab === 'deposit' }]" @click="activeTab = 'deposit'">
+      <button
+        role="tab"
+        :aria-selected="activeTab === 'deposit'"
+        :class="[
+          'tab-btn inline-flex items-center gap-2 rounded-t-2xl border-b-2 px-5 py-3 text-sm font-semibold transition-colors',
+          activeTab === 'deposit' ? 'tab-active border-brand text-brand' : 'border-transparent text-muted hover:text-body',
+        ]"
+        @click="activeTab = 'deposit'"
+      >
         {{ t('bank.depositTab') }}
-        <span v-if="myDeposits.length > 0" class="tab-badge">{{ myDeposits.length }}</span>
+        <span v-if="myDeposits.length > 0" class="tab-badge inline-flex min-w-5 items-center justify-center rounded-full bg-brand px-2 py-0.5 text-xs font-bold text-white">{{ myDeposits.length }}</span>
       </button>
     </div>
 
@@ -493,13 +518,13 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 
     <template v-else>
       <!-- ── BORROW TAB ────────────────────────────────────────────────────── -->
-      <div v-if="activeTab === 'borrow'">
+      <div v-if="activeTab === 'borrow'" class="flex flex-col gap-10 lg:gap-12">
         <!-- Lender action panel: context-aware CTA for offering loans -->
-        <section class="lender-cta-section" aria-label="Lender action">
-          <h2 class="section-title">{{ t('bank.becomeALender') }}</h2>
+        <section class="lender-cta-section flex flex-col gap-6" aria-label="Lender action">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.becomeALender') }}</h2>
 
           <!-- Unauthenticated: prompt login -->
-          <div v-if="!auth.isAuthenticated" class="lender-cta-card lender-cta-login">
+          <div v-if="!auth.isAuthenticated" class="lender-cta-card lender-cta-login flex flex-col gap-5 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div class="lender-cta-icon" aria-hidden="true">🏦</div>
             <div class="lender-cta-body">
               <h3 class="lender-cta-title">{{ t('bank.loginToLendTitle') }}</h3>
@@ -511,7 +536,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
           </div>
 
           <!-- Authenticated, no bank building: acquire CTA -->
-          <div v-else-if="!hasBankBuilding" class="lender-cta-card lender-cta-acquire">
+          <div v-else-if="!hasBankBuilding" class="lender-cta-card lender-cta-acquire flex flex-col gap-5 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div class="lender-cta-icon" aria-hidden="true">🏦</div>
             <div class="lender-cta-body">
               <h3 class="lender-cta-title">{{ t('bank.noBankCTATitle') }}</h3>
@@ -523,7 +548,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
           </div>
 
           <!-- Authenticated, has bank: manage bank CTA -->
-          <div v-else class="lender-cta-card lender-cta-manage">
+          <div v-else class="lender-cta-card lender-cta-manage flex flex-col gap-5 rounded-3xl border border-brand/40 bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
             <div class="lender-cta-icon" aria-hidden="true">🏦</div>
             <div class="lender-cta-body">
               <h3 class="lender-cta-title">{{ t('bank.hasBankCTATitle') }}</h3>
@@ -537,10 +562,10 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </section>
 
         <!-- Active loans section (authenticated borrowers) -->
-        <section v-if="auth.isAuthenticated && activeLoans.length > 0" class="my-loans-section">
-          <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
-          <div class="loans-grid">
-            <div v-for="loan in activeLoans" :key="loan.id" class="loan-card" :class="loanStatusClass(loan.status)">
+        <section v-if="auth.isAuthenticated && activeLoans.length > 0" class="my-loans-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>
+          <div class="loans-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="loan in activeLoans" :key="loan.id" class="loan-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" :class="loanStatusClass(loan.status)">
               <div class="loan-card-header">
                 <span class="lender-name">{{ loan.lenderCompanyName }}</span>
                 <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
@@ -575,14 +600,16 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </section>
 
         <!-- Bank discovery section for borrowers: choose a bank first, then create loan on bank page -->
-        <section class="offers-section">
-          <h2 class="section-title">{{ t('bank.chooseBankToBorrow') }}</h2>
-          <p class="section-subtitle">{{ t('bank.chooseBankToBorrowHint') }}</p>
+        <section class="offers-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <div class="flex flex-col gap-3">
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.chooseBankToBorrow') }}</h2>
+            <p class="section-subtitle max-w-3xl text-sm text-muted sm:text-base">{{ t('bank.chooseBankToBorrowHint') }}</p>
+          </div>
           <div v-if="sortedBanksForBorrow.length === 0" class="empty-state">
             <p>{{ t('bank.noBanksAvailable') }}</p>
           </div>
-          <div v-else class="banks-for-borrow-grid">
-            <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card">
+          <div v-else class="banks-for-borrow-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card flex flex-col gap-4 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <div class="bank-borrow-card-header">
                 <div class="bank-borrow-identity">
                   <span class="bank-borrow-icon">🏦</span>
@@ -620,14 +647,14 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
       <!-- end borrow tab -->
 
       <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
-      <div v-if="activeTab === 'deposit'" class="deposit-tab">
-        <section v-if="auth.isAuthenticated" class="my-bank-accounts-section">
-          <h2 class="section-title">{{ t('bank.myBankAccounts') }}</h2>
+      <div v-if="activeTab === 'deposit'" class="deposit-tab flex flex-col gap-8 lg:gap-10">
+        <section v-if="auth.isAuthenticated" class="my-bank-accounts-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myBankAccounts') }}</h2>
           <div v-if="myBankAccounts.length === 0" class="empty-state">
             <p>{{ t('bank.noBankAccountsYet') }}</p>
           </div>
-          <div v-else class="deposits-list">
-            <div v-for="account in myBankAccounts" :key="account.id" class="deposit-card" data-testid="bank-account-row">
+          <div v-else class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="account in myBankAccounts" :key="account.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" data-testid="bank-account-row">
               <div class="deposit-card-header">
                 <span class="deposit-bank-name">{{ account.companyName }}</span>
                 <span class="deposit-rate-badge">{{ account.currencyCode }}</span>
@@ -647,10 +674,10 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </section>
 
         <!-- My Deposits -->
-        <section v-if="auth.isAuthenticated && myDeposits.length > 0" class="my-deposits-section">
-          <h2 class="section-title">{{ t('bank.myDeposits') }}</h2>
-          <div class="deposits-list">
-            <div v-for="dep in myDeposits" :key="dep.id" class="deposit-card">
+        <section v-if="auth.isAuthenticated && myDeposits.length > 0" class="my-deposits-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myDeposits') }}</h2>
+          <div class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="dep in myDeposits" :key="dep.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <div class="deposit-card-header">
                 <span class="deposit-bank-name">{{ dep.bankBuildingName }}</span>
                 <span class="deposit-rate-badge">{{ formatPercent(dep.depositInterestRatePercent) }} p.a.</span>
@@ -677,8 +704,8 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         </section>
 
         <!-- Banks List -->
-        <section class="banks-list-section">
-          <h2 class="section-title">{{ t('bank.allBanks') }}</h2>
+        <section class="banks-list-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.allBanks') }}</h2>
 
           <div v-if="allBanks.length === 0" class="empty-state">
             <p>{{ t('bank.noBanksAvailable') }}</p>
@@ -686,25 +713,25 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 
           <template v-else>
             <!-- Sort/filter controls -->
-            <div class="banks-controls">
-              <div class="banks-filter">
+            <div class="banks-controls mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 lg:flex-row lg:items-end lg:justify-between">
+              <div class="banks-filter flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
                 <label class="filter-label" for="city-filter">{{ t('bank.cityFilter') }}</label>
-                <select id="city-filter" v-model="bankCityFilter" class="filter-select">
+                <select id="city-filter" v-model="bankCityFilter" class="filter-select rounded-xl border border-divider bg-card px-4 py-3 text-sm text-body">
                   <option value="">{{ t('common.city') }}: All</option>
                   <option v-for="city in availableBankCities" :key="city" :value="city">{{ city }}</option>
                 </select>
-                <label class="filter-check">
+                <label class="filter-check inline-flex items-center gap-3 rounded-xl border border-divider px-4 py-3 text-sm text-body">
                   <input v-model="bankShowAvailableOnly" type="checkbox" />
                   {{ t('bank.showAvailableOnly') }}
                 </label>
               </div>
-              <div class="banks-sort" role="group" :aria-label="t('bank.sortBy')">
-                <span class="sort-label">{{ t('bank.sortBy') }}</span>
+              <div class="banks-sort flex flex-wrap items-center gap-3" role="group" :aria-label="t('bank.sortBy')">
+                <span class="sort-label text-xs font-semibold uppercase tracking-[0.16em] text-muted">{{ t('bank.sortBy') }}</span>
                 <button
                   v-for="field in ['depositRate', 'lendingRate', 'capacity', 'city'] as BankSortField[]"
                   :key="field"
-                  class="sort-btn"
-                  :class="{ 'sort-active': bankSortBy === field }"
+                  class="sort-btn inline-flex items-center gap-2 rounded-full border border-divider px-4 py-2 text-sm font-medium text-body transition-colors hover:border-brand hover:text-brand"
+                  :class="{ 'sort-active bg-card text-brand border-brand': bankSortBy === field }"
                   @click="toggleBankSort(field)"
                 >
                   <span v-if="field === 'depositRate'">{{ t('bank.depositInterestRate') }}</span>
@@ -722,8 +749,8 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
               <p>{{ t('bank.noBanksAvailable') }}</p>
             </div>
 
-            <div v-else class="banks-grid">
-              <div v-for="bank in filteredAndSortedBanks" :key="bank.bankBuildingId" class="bank-card">
+            <div v-else class="banks-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div v-for="bank in filteredAndSortedBanks" :key="bank.bankBuildingId" class="bank-card flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
                 <div class="bank-card-header">
                   <div>
                     <h3 class="bank-card-name">{{ bank.bankBuildingName }}</h3>
@@ -891,41 +918,43 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
     </div>
 
     <!-- Deposit Modal -->
-    <div v-if="showDepositModal && selectedBank" class="modal-overlay" @click.self="closeDepositModal">
-      <div class="modal" role="dialog" :aria-label="t('bank.makeDeposit')">
-        <div class="modal-header">
-          <h2>{{ t('bank.makeDeposit') }}</h2>
+    <div v-if="showDepositModal && selectedBank" class="modal-overlay fixed inset-0 z-1000 flex items-center justify-center bg-black/60 p-4" @click.self="closeDepositModal">
+      <div class="modal w-full max-w-xl overflow-y-auto rounded-[28px] border border-divider bg-card shadow-2xl" role="dialog" :aria-label="t('bank.makeDeposit')">
+        <div class="modal-header flex items-center justify-between border-b border-divider px-6 py-5 sm:px-8 sm:py-6">
+          <h2 class="text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
           <button class="modal-close" :aria-label="t('common.close')" @click="closeDepositModal">✕</button>
         </div>
-        <div class="modal-body">
-          <div class="loan-summary">
-            <div class="summary-row">
+        <div class="modal-body flex flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8">
+          <div class="loan-summary rounded-2xl border border-divider bg-card-raised p-5">
+            <div class="summary-row flex items-center justify-between gap-4 py-1.5 text-sm">
               <span>Bank</span>
               <strong>{{ selectedBank.bankBuildingName }}</strong>
             </div>
-            <div class="summary-row">
+            <div class="summary-row flex items-center justify-between gap-4 py-1.5 text-sm">
               <span>{{ t('bank.depositInterestRate') }}</span>
               <strong>{{ formatPercent(selectedBank.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
             </div>
           </div>
-          <div class="form-group">
-            <label for="deposit-amount">{{ t('bank.depositAmount') }}</label>
-            <input id="deposit-amount" v-model.number="depositAmount" type="number" min="0.01" step="0.01" class="form-input" />
-            <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
+          <div class="form-group flex flex-col gap-3">
+            <label for="deposit-amount" class="text-sm font-semibold text-body">{{ t('bank.depositAmount') }}</label>
+            <input id="deposit-amount" v-model.number="depositAmount" type="number" min="0" step="0.01" class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body" />
+            <span class="form-hint text-sm text-muted">{{ t('bank.depositAmountHint') }}</span>
+            <p class="rounded-2xl border border-divider bg-card-raised px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
           </div>
           <div v-if="depositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
           <div v-if="depositError" class="error-message">{{ depositError }}</div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer flex justify-end gap-3 border-t border-divider px-6 py-5 sm:px-8 sm:py-6">
           <button class="btn btn-secondary" @click="closeDepositModal">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="depositLoading || depositAmount <= 0" @click="submitDeposit">
+          <button class="btn btn-primary" :disabled="depositLoading || depositAmount < 0" @click="submitDeposit">
             <span v-if="depositLoading">{{ t('common.loading') }}</span>
             <span v-else>{{ t('bank.confirmDeposit') }}</span>
           </button>
         </div>
       </div>
     </div>
-  </div>
+    </div>
+  </main>
 </template>
 
 <style scoped>

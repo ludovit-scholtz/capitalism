@@ -980,7 +980,7 @@ test.describe('Bank Management — customer view', () => {
     await expect(page.locator('.customer-rate-card.capacity')).toBeVisible()
   })
 
-  test('authenticated customer can open a bank account and see it listed', async ({ page }) => {
+  test('authenticated customer can open a zero-balance bank account and see the forex funding guidance', async ({ page }) => {
     const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
     player.companies.push({
       id: 'depositor-co-1',
@@ -1023,10 +1023,11 @@ test.describe('Bank Management — customer view', () => {
     await expect(page.getByRole('heading', { name: 'My Bank Account' })).toBeVisible()
 
     // The empty-state deposit form is shown (no existing deposits)
-    await page.locator('#customer-deposit-amount').fill('25000')
+    await page.locator('#customer-deposit-amount').fill('0')
 
     // Rate preview is shown (formatPercent gives 1 decimal place) — scope to preview section
     await expect(page.locator('.repayment-preview').getByText('5.0%')).toBeVisible()
+    await expect(page.getByText('Open the account with 0 balance for a new currency, then fund it from the Forex page.')).toBeVisible()
 
     await page.getByRole('button', { name: 'Open Account' }).click()
 

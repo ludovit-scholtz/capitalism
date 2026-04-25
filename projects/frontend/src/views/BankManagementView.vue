@@ -37,7 +37,7 @@ const isOwner = computed(() => {
 // Customer-specific state
 const bankLoanOffers = ref<LoanOfferSummary[]>([])
 const myDepositsHere = ref<BankDepositSummary[]>([])
-const customerDepositAmount = ref(10_000)
+const customerDepositAmount = ref(0)
 const customerDepositLoading = ref(false)
 const customerDepositError = ref<string | null>(null)
 const customerDepositSuccess = ref(false)
@@ -570,6 +570,14 @@ const myOldestDeposit = computed<BankDepositSummary | null>(() => {
   return sorted[0] ?? null
 })
 
+function formatOpenAccountError(errorMessage: string) {
+  if (!errorMessage.includes('Insufficient company funds to open this bank account.')) {
+    return errorMessage
+  }
+
+  return `${errorMessage} ${t('bank.zeroBalanceFundingHint')}`
+}
+
 async function submitCustomerDeposit() {
   if (!activeCompany.value || !bankBuildingId.value) return
   customerDepositLoading.value = true
@@ -589,7 +597,7 @@ async function submitCustomerDeposit() {
       customerDepositSuccess.value = false
     }, 3000)
   } catch (err) {
-    customerDepositError.value = err instanceof Error ? err.message : String(err)
+    customerDepositError.value = formatOpenAccountError(err instanceof Error ? err.message : String(err))
   } finally {
     customerDepositLoading.value = false
   }
@@ -715,25 +723,25 @@ const estimatedCustomerTotalPayments = computed(() => {
 </script>
 
 <template>
-  <div class="bank-management-view">
-    <div class="page-header">
+  <main class="bank-management-view container mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
+    <div class="page-header mb-10 flex flex-col gap-3 lg:mb-12">
       <!-- Show different titles based on ownership -->
       <template v-if="!loading && isOwner">
-        <h1 class="page-title">{{ t('bank.configureBank') }}</h1>
-        <p class="page-subtitle">{{ t('bank.lending') }}</p>
+        <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ t('bank.configureBank') }}</h1>
+        <p class="page-subtitle text-sm text-muted sm:text-base">{{ t('bank.lending') }}</p>
       </template>
       <template v-else-if="!loading">
         <div class="customer-nav">
           <button class="btn-back" @click="router.push('/banking')">← {{ t('bank.backToMarketplace') }}</button>
         </div>
-        <h1 class="page-title">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
-        <p class="page-subtitle">
+        <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ bankInfo?.bankBuildingName ?? t('bank.customerView') }}</h1>
+        <p class="page-subtitle flex flex-wrap items-center gap-2 text-sm text-muted sm:text-base">
           {{ bankInfo?.lenderCompanyName }} · {{ bankInfo?.cityName }}
           <span v-if="bankInfo?.cityCurrencyCode" class="currency-badge">{{ bankInfo.cityCurrencyCode }}</span>
         </p>
       </template>
       <template v-else>
-        <h1 class="page-title">{{ t('bank.customerView') }}</h1>
+        <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ t('bank.customerView') }}</h1>
       </template>
     </div>
 
@@ -1080,19 +1088,19 @@ const estimatedCustomerTotalPayments = computed(() => {
       <!-- ── CUSTOMER VIEW ──────────────────────────────────────────── -->
       <template v-else>
         <!-- Bank profile card (rates + capacity) -->
-        <div v-if="bankInfo" class="customer-bank-profile">
-          <div class="customer-rates-grid">
-            <div class="customer-rate-card deposit">
+        <div v-if="bankInfo" class="customer-bank-profile rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <div class="customer-rates-grid grid gap-4 md:grid-cols-3">
+            <div class="customer-rate-card deposit rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <span class="customer-rate-label">{{ t('bank.depositInterestRate') }}</span>
               <span class="customer-rate-value">{{ formatPercent(bankInfo.depositInterestRatePercent) }}</span>
               <span class="customer-rate-hint">{{ t('bank.perYear') }}</span>
             </div>
-            <div class="customer-rate-card lending">
+            <div class="customer-rate-card lending rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <span class="customer-rate-label">{{ t('bank.lendingInterestRate') }}</span>
               <span class="customer-rate-value">{{ formatPercent(bankInfo.lendingInterestRatePercent) }}</span>
               <span class="customer-rate-hint">{{ t('bank.perYear') }}</span>
             </div>
-            <div class="customer-rate-card capacity">
+            <div class="customer-rate-card capacity rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <span class="customer-rate-label">{{ t('bank.availableLendingCapacity') }}</span>
               <span class="customer-rate-value" :class="bankInfo.availableLendingCapacity > 0 ? 'positive' : 'muted'">
                 {{ fmt(bankInfo.availableLendingCapacity) }}
@@ -1103,13 +1111,13 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
 
         <!-- Account-style deposit relationship -->
-        <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section">
-          <div class="account-header">
-            <div class="account-header-info">
-              <h2 class="section-title">{{ t('bank.myAccount') }}</h2>
-              <span class="account-company-tag">{{ activeCompany?.name }}</span>
+        <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="account-header-info flex flex-col gap-2">
+              <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myAccount') }}</h2>
+              <span class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">{{ activeCompany?.name }}</span>
             </div>
-            <div class="account-actions" v-if="myAccountBalance > 0">
+            <div class="account-actions flex flex-wrap gap-3" v-if="myAccountBalance > 0">
               <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
                 {{ t('bank.addFundsViaForex') }}
               </button>
@@ -1120,12 +1128,12 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
 
           <!-- Account balance card -->
-          <div v-if="myAccountBalance > 0" class="account-balance-card">
-            <div class="account-balance-main">
+          <div v-if="myAccountBalance > 0" class="account-balance-card mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+            <div class="account-balance-main flex flex-col gap-1">
               <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
               <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
             </div>
-            <div class="account-balance-meta">
+            <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
               <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
               <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
               <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
@@ -1133,15 +1141,15 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
 
           <!-- Withdraw form -->
-          <div v-if="showWithdrawForm" class="account-action-form">
-            <h3 class="action-form-title">{{ t('bank.withdraw') }}</h3>
-            <div class="form-group">
-              <label for="withdraw-amount">{{ t('bank.withdrawAmount') }}</label>
-              <input id="withdraw-amount" v-model.number="withdrawAmount" type="number" :min="1" :max="myAccountBalance" step="1000" class="form-input" />
-              <span class="form-hint">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
+          <div v-if="showWithdrawForm" class="account-action-form mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+            <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
+            <div class="form-group mt-4 flex flex-col gap-3">
+              <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
+              <input id="withdraw-amount" v-model.number="withdrawAmount" type="number" :min="1" :max="myAccountBalance" step="1000" class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body" />
+              <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
             </div>
-            <div v-if="withdrawError" class="error-message">{{ withdrawError }}</div>
-            <button class="btn btn-primary" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
+            <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
+            <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
               {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
             </button>
           </div>
@@ -1151,46 +1159,47 @@ const estimatedCustomerTotalPayments = computed(() => {
           <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
 
           <!-- First deposit (no account yet) -->
-          <div v-if="myAccountBalance === 0 && !customerDepositSuccess" class="account-empty-state">
-            <p class="account-empty-hint">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
-            <div class="form-group">
-              <label for="customer-deposit-amount">{{ t('bank.depositAmount') }}</label>
-              <input id="customer-deposit-amount" v-model.number="customerDepositAmount" type="number" min="0.01" step="0.01" class="form-input" />
-              <span class="form-hint">{{ t('bank.depositAmountHint') }}</span>
+          <div v-if="myAccountBalance === 0 && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+            <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
+            <div class="form-group flex flex-col gap-3">
+              <label for="customer-deposit-amount" class="text-sm font-semibold text-body">{{ t('bank.depositAmount') }}</label>
+              <input id="customer-deposit-amount" v-model.number="customerDepositAmount" type="number" min="0" step="0.01" class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body" />
+              <span class="form-hint text-sm text-muted">{{ t('bank.depositAmountHint') }}</span>
+              <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
             </div>
-            <div v-if="bankInfo" class="repayment-preview">
-              <div class="preview-row">
+            <div v-if="bankInfo" class="repayment-preview rounded-2xl border border-divider bg-card px-4 py-4">
+              <div class="preview-row flex items-center justify-between gap-4 text-sm">
                 <span>{{ t('bank.depositInterestRate') }}</span>
                 <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
               </div>
             </div>
             <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
-            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount <= 0" @click="submitCustomerDeposit">
+            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount < 0" @click="submitCustomerDeposit">
               {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
             </button>
           </div>
         </section>
 
         <!-- Prompt to log in or switch account if not in company mode -->
-        <section v-else class="customer-deposit-form-section">
-          <h2 class="section-title">{{ t('bank.makeDeposit') }}</h2>
-          <div v-if="!auth.isAuthenticated" class="auth-prompt">
+        <section v-else class="customer-deposit-form-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
+          <div v-if="!auth.isAuthenticated" class="auth-prompt mt-4 flex flex-col gap-4">
             <p>{{ t('bank.loginToLendDescription') }}</p>
             <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
           </div>
-          <div v-else class="auth-prompt">
+          <div v-else class="auth-prompt mt-4">
             <p>{{ t('bank.companyAccountRequired') }}</p>
           </div>
         </section>
 
         <!-- Available loan offers -->
-        <section class="customer-loans-section">
-          <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
+        <section class="customer-loans-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.loanOffers') }}</h2>
           <div v-if="bankLoanOffers.length === 0" class="empty-state">
             <p>{{ t('bank.noOffersFromBank') }}</p>
           </div>
-          <div v-else class="customer-offers-grid">
-            <div v-for="offer in bankLoanOffers" :key="offer.id" class="customer-offer-card">
+          <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+            <div v-for="offer in bankLoanOffers" :key="offer.id" class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <div class="customer-offer-header">
                 <span class="offer-rate-big">{{ formatPercent(offer.annualInterestRatePercent) }}</span>
                 <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
@@ -1228,10 +1237,10 @@ const estimatedCustomerTotalPayments = computed(() => {
         </section>
 
         <!-- My Loans at This Bank -->
-        <section v-if="auth.isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section">
-          <h2 class="section-title">{{ t('bank.myLoans') }}</h2>
-          <div class="loans-list">
-            <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row">
+        <section v-if="auth.isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>
+          <div class="loans-list mt-6 grid gap-4">
+            <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row rounded-2xl border border-divider bg-card-raised p-4 shadow-sm">
               <div class="loan-row-main">
                 <span class="loan-amount">{{ fmt(loan.remainingPrincipal) }}</span>
                 <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
@@ -1345,7 +1354,7 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
       </div>
     </div>
-  </div>
+  </main>
 </template>
 
 <style scoped>

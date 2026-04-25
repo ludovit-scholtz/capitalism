@@ -25764,6 +25764,65 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
                 Assert.True(data.GetProperty("isActive").GetBoolean());
         }
 
+            [Fact]
+            public async Task OpenBankAccount_WithZeroAmount_SucceedsWithoutTransferringCash()
+            {
+                await using var isolatedFactory = new ApiWebApplicationFactory();
+                using var isolatedClient = isolatedFactory.CreateClient();
+
+                var bankOwnerEmail = $"bank-owner-zero-{Guid.NewGuid():N}@test.com";
+                var depositorEmail = $"depositor-zero-{Guid.NewGuid():N}@test.com";
+                await RegisterAndGetTokenAsync(isolatedClient, bankOwnerEmail, "BankOwnerZero");
+                var depositorToken = await RegisterAndGetTokenAsync(isolatedClient, depositorEmail, "DepositorZero");
+
+                await using var scope = isolatedFactory.Services.CreateAsyncScope();
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+                var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+                var city = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+                var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCoZero", Cash = 15_000_000m };
+                var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "DepositorCoZero", Cash = 0m };
+                db.Companies.AddRange(bankCompany, depositorCompany);
+
+                var bank = CreateTestBank(db, bankCompany, city.Id);
+                await db.SaveChangesAsync();
+
+                var result = await ExecuteGraphQlAsync(
+                    isolatedClient,
+                    """
+                    mutation Dep($input: OpenBankAccountInput!) {
+                      openBankAccount(input: $input) {
+                        id
+                        amount
+                        isActive
+                        bankBuildingId
+                      }
+                    }
+                    """,
+                    new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 0m } },
+                    depositorToken);
+
+                Assert.False(result.TryGetProperty("errors", out _), result.ToString());
+                var data = result.GetProperty("data").GetProperty("openBankAccount");
+                Assert.Equal(0m, data.GetProperty("amount").GetDecimal());
+                Assert.True(data.GetProperty("isActive").GetBoolean());
+                Assert.Equal(bank.Id.ToString(), data.GetProperty("bankBuildingId").GetString());
+
+                await db.Entry(depositorCompany).ReloadAsync();
+                await db.Entry(bankCompany).ReloadAsync();
+                await db.Entry(bank).ReloadAsync();
+
+                Assert.Equal(0m, depositorCompany.Cash);
+                Assert.Equal(15_000_000m, bankCompany.Cash);
+                Assert.Equal(20_000_000m, bank.TotalDeposits);
+
+                var openedAccount = await db.BankAccounts
+                    .SingleAsync(a => a.CompanyId == depositorCompany.Id && a.BankBuildingId == bank.Id && !a.IsGovernmentAccount);
+                Assert.Equal(0m, openedAccount.Balance);
+                Assert.Equal(city.CurrencyCode, openedAccount.CurrencyCode);
+            }
+
     [Fact]
     public async Task OpenBankAccount_IntoUninitializedBank_ReturnsError()
     {

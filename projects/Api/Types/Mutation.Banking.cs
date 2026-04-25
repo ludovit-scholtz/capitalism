@@ -127,11 +127,11 @@ public sealed partial class Mutation
             }
         }
 
-        if (input.Amount <= 0m)
+        if (input.Amount < 0m)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Opening amount must be greater than zero.")
+                    .SetMessage("Opening amount cannot be negative.")
                     .SetCode("INVALID_AMOUNT")
                     .Build());
         }
@@ -154,59 +154,62 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var sourceAccount = await ResolveCompanyTransferAccountAsync(
-            db,
-            depositorCompany.Id,
-            cityCurrencyCode,
-            cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
-        var bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
-            db,
-            bank.CompanyId,
-            cityCurrencyCode,
-            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
-
-        if (sourceAccount.Balance < input.Amount)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Insufficient company funds to open this bank account.")
-                    .SetCode("INSUFFICIENT_FUNDS")
-                    .Build());
-        }
-
         var depositRate = bank.DepositInterestRatePercent ?? 0m;
 
-        // Transfer cash: depositor company -> bank company liquidity account
-        sourceAccount.Balance -= input.Amount;
-        bankLiquidityAccount.Balance += input.Amount;
-        bank.TotalDeposits += input.Amount;
-
-        // Auto-repay central-bank debt only from surplus cash above the reserve requirement.
-        // This mirrors BankInterestPhase auto-repayment: the deposit has already increased
-        // TotalDeposits (and therefore the required reserve), so we must preserve the full
-        // reserve before applying any payment toward CB debt. Using all available cash would
-        // drain the bank below the reserve that the same deposit just raised.
-        if (bank.CentralBankDebt > 0m)
+        if (input.Amount > 0m)
         {
-            var reserveNeeded = bank.TotalDeposits * ReserveRatio;
-            var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bank.CompanyId, httpContextAccessor.HttpContext.RequestAborted);
-            var surplusCash = CompanyBankingService.GetTotalBalance(bankAccounts) - reserveNeeded;
-            var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
-            if (repayment > 0m)
+            var sourceAccount = await ResolveCompanyTransferAccountAsync(
+                db,
+                depositorCompany.Id,
+                cityCurrencyCode,
+                cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
+            var bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
+                db,
+                bank.CompanyId,
+                cityCurrencyCode,
+                cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
+
+            if (sourceAccount.Balance < input.Amount)
             {
-                CompanyBankingService.TryDebit(bankAccounts, repayment, cityCurrencyCode);
-                bank.CentralBankDebt -= repayment;
-                db.LedgerEntries.Add(new LedgerEntry
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Insufficient company funds to open this bank account.")
+                        .SetCode("INSUFFICIENT_FUNDS")
+                        .Build());
+            }
+
+            // Transfer cash: depositor company -> bank company liquidity account
+            sourceAccount.Balance -= input.Amount;
+            bankLiquidityAccount.Balance += input.Amount;
+            bank.TotalDeposits += input.Amount;
+
+            // Auto-repay central-bank debt only from surplus cash above the reserve requirement.
+            // This mirrors BankInterestPhase auto-repayment: the deposit has already increased
+            // TotalDeposits (and therefore the required reserve), so we must preserve the full
+            // reserve before applying any payment toward CB debt. Using all available cash would
+            // drain the bank below the reserve that the same deposit just raised.
+            if (bank.CentralBankDebt > 0m)
+            {
+                var reserveNeeded = bank.TotalDeposits * ReserveRatio;
+                var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bank.CompanyId, httpContextAccessor.HttpContext.RequestAborted);
+                var surplusCash = CompanyBankingService.GetTotalBalance(bankAccounts) - reserveNeeded;
+                var repayment = Math.Min(bank.CentralBankDebt, Math.Max(0m, surplusCash));
+                if (repayment > 0m)
                 {
-                    Id = Guid.NewGuid(),
-                    CompanyId = bank.CompanyId,
-                    BuildingId = bank.Id,
-                    Category = LedgerCategory.CentralBankRepay,
-                    Description = $"Central bank repayment from incoming deposit (surplus above reserve)",
-                    Amount = -repayment,
-                    RecordedAtTick = currentTick,
-                    RecordedAtUtc = DateTime.UtcNow,
-                });
+                    CompanyBankingService.TryDebit(bankAccounts, repayment, cityCurrencyCode);
+                    bank.CentralBankDebt -= repayment;
+                    db.LedgerEntries.Add(new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = bank.CompanyId,
+                        BuildingId = bank.Id,
+                        Category = LedgerCategory.CentralBankRepay,
+                        Description = $"Central bank repayment from incoming deposit (surplus above reserve)",
+                        Amount = -repayment,
+                        RecordedAtTick = currentTick,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    });
+                }
             }
         }
 
@@ -228,18 +231,21 @@ public sealed partial class Mutation
 
         db.BankAccounts.Add(deposit);
 
-        // Ledger: depositor makes deposit
-        db.LedgerEntries.Add(new LedgerEntry
+        if (input.Amount > 0m)
         {
-            Id = Guid.NewGuid(),
-            CompanyId = depositorCompany.Id,
-            BuildingId = bank.Id,
-            Category = LedgerCategory.DepositMade,
-            Description = $"Deposit into {bank.Name} at {depositRate}% p.a.",
-            Amount = -input.Amount,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = DateTime.UtcNow,
-        });
+            // Ledger: depositor makes deposit
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = depositorCompany.Id,
+                BuildingId = bank.Id,
+                Category = LedgerCategory.DepositMade,
+                Description = $"Deposit into {bank.Name} at {depositRate}% p.a.",
+                Amount = -input.Amount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        }
 
         await db.SaveChangesAsync();
 
