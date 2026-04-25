@@ -260,7 +260,14 @@ namespace Api.Data.Migrations
                                account."BankBuildingId",
                                account."CompanyId",
                                account."Balance",
-                               COALESCE(account."DepositInterestRatePercent", 0),
+                               COALESCE(
+                                   CASE
+                                       WHEN account."DepositInterestRatePercent" IS NULL THEN NULL
+                                       WHEN account."DepositInterestRatePercent"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (account."DepositInterestRatePercent"::text)::numeric
+                                       ELSE NULL
+                                   END,
+                                   0
+                               ),
                                account."IsBaseCapitalDeposit",
                                CASE WHEN account."ClosedAtUtc" IS NULL THEN 1 ELSE 0 END,
                                COALESCE(account."DepositedAtTick", 0),
@@ -302,14 +309,39 @@ namespace Api.Data.Migrations
                                    END,
                                    0
                                ),
-                               COALESCE(account."DepositInterestRatePercent", 0),
+                               COALESCE(
+                                   CASE
+                                       WHEN account."DepositInterestRatePercent" IS NULL THEN NULL
+                                       WHEN account."DepositInterestRatePercent"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (account."DepositInterestRatePercent"::text)::numeric
+                                       ELSE NULL
+                                   END,
+                                   0
+                               ),
                                account."IsBaseCapitalDeposit",
                                account."ClosedAtUtc" IS NULL,
                                COALESCE(account."DepositedAtTick", 0),
-                               account."CreatedAtUtc",
+                               COALESCE(
+                                   CASE
+                                       WHEN account."CreatedAtUtc" IS NULL THEN NULL
+                                       WHEN account."CreatedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (account."CreatedAtUtc"::text)::timestamp with time zone
+                                       ELSE NULL
+                                   END,
+                                   CURRENT_TIMESTAMP
+                               ),
                                account."ClosedAtTick",
-                               account."ClosedAtUtc",
-                               account."TotalInterestPaid"
+                               CASE
+                                   WHEN account."ClosedAtUtc" IS NULL THEN NULL
+                                   WHEN account."ClosedAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (account."ClosedAtUtc"::text)::timestamp with time zone
+                                   ELSE NULL
+                               END,
+                               COALESCE(
+                                   CASE
+                                       WHEN account."TotalInterestPaid" IS NULL THEN NULL
+                                       WHEN account."TotalInterestPaid"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (account."TotalInterestPaid"::text)::numeric
+                                       ELSE NULL
+                                   END,
+                                   0
+                               )
                         FROM "BankAccounts" AS account
                         WHERE account."BankBuildingId" IS NOT NULL
                           AND account."CompanyId" IS NOT NULL
@@ -375,7 +407,14 @@ namespace Api.Data.Migrations
                            ),
                            NULL,
                            legacy."BankBuildingId",
-                           legacy."DepositInterestRatePercent",
+                           COALESCE(
+                               CASE
+                                   WHEN legacy."DepositInterestRatePercent" IS NULL THEN NULL
+                                   WHEN legacy."DepositInterestRatePercent"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (legacy."DepositInterestRatePercent"::text)::numeric
+                                   ELSE NULL
+                               END,
+                               0
+                           ),
                            legacy."DepositedAtTick",
                            legacy."IsBaseCapital",
                            legacy."WithdrawnAtTick",
@@ -384,7 +423,14 @@ namespace Api.Data.Migrations
                                WHEN legacy."WithdrawnAtUtc"::text ~ '^\s*\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}:\d{2}(\.\d+)?)?([+-]\d{2}(:?\d{2})?|Z)?\s*$' THEN (legacy."WithdrawnAtUtc"::text)::timestamp with time zone
                                ELSE NULL
                            END,
-                           legacy."TotalInterestPaid"
+                           COALESCE(
+                               CASE
+                                   WHEN legacy."TotalInterestPaid" IS NULL THEN NULL
+                                   WHEN legacy."TotalInterestPaid"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (legacy."TotalInterestPaid"::text)::numeric
+                                   ELSE NULL
+                               END,
+                               0
+                           )
                     FROM "BankDeposits" AS legacy
                     INNER JOIN "Buildings" AS bank ON bank."Id"::text = legacy."BankBuildingId"::text
                     INNER JOIN "Cities" AS city ON city."Id"::text = bank."CityId"::text
