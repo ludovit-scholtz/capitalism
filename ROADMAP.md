@@ -67,6 +67,8 @@ Change cash flow management completely from the onboarding process, through unit
 - In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
 - When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
 - If player wants to expand to different city with different currency, he must first open the bank account for that currency and do the fx swap. Otherwise in the buy building guide should be warning that player does not have any money in this currency and steps what he should do with the links.
+- Allow to close down account only if the balance of the account is equal exactly to 0. Do not show 'My Bank Accounts' section in banks page in accounts if there is no account which has to be close. Rename the section to Bank accounts available to be closed.
+- Sort bank accounts by the account balance
 
 ### Onboarding
 
