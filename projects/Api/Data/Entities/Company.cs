@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Api.Data.Entities;
 
@@ -8,6 +9,8 @@ namespace Api.Data.Entities;
 /// </summary>
 public sealed class Company
 {
+    private decimal _legacyCash;
+
     /// <summary>Unique identifier for the company.</summary>
     public Guid Id { get; set; }
 
@@ -23,6 +26,48 @@ public sealed class Company
 
     /// <summary>Bank accounts owned by this company.</summary>
     public ICollection<BankAccount> BankAccounts { get; set; } = new List<BankAccount>();
+
+    /// <summary>
+    /// Legacy compatibility alias used by older tests and callers.
+    /// Runtime money is still stored in company bank accounts.
+    /// </summary>
+    [NotMapped]
+    public decimal Cash
+    {
+        get
+        {
+            if (BankAccounts.Count == 0)
+            {
+                return _legacyCash;
+            }
+
+            return BankAccounts
+                .Where(account => account.ClosedAtUtc == null)
+                .Sum(account => account.Balance);
+        }
+
+        set
+        {
+            _legacyCash = value;
+
+            var activeAccount = BankAccounts.FirstOrDefault(account => account.ClosedAtUtc == null);
+            if (activeAccount is null)
+            {
+                BankAccounts.Add(new BankAccount
+                {
+                    Id = Guid.NewGuid(),
+                    AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 10_000_000).ToString("D7") + DateTime.UtcNow.Ticks.ToString()[^9..],
+                    CurrencyCode = "EUR",
+                    Balance = value,
+                    IsGovernmentAccount = false,
+                    CreatedAtUtc = DateTime.UtcNow,
+                });
+                return;
+            }
+
+            activeAccount.Balance = value;
+        }
+    }
 
     /// <summary>Total issued shares used for ownership, exchange pricing, and dividend distribution.</summary>
     public decimal TotalSharesIssued { get; set; } = 10_000m;
