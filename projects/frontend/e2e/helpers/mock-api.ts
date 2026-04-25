@@ -6074,16 +6074,14 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       state.myDeposits.push(newDeposit)
       const currencyCode = bank?.cityCurrencyCode ?? 'EUR'
-      const existingAccount = state.myBankAccounts.find(
-        (account) => {
-          const normalized = normalizeMockBankAccount(account, currentPlayer?.displayName ?? 'Personal Account')
-          return (
-            normalized.currencyCode === currencyCode
-            && normalized.ownerType === ownerType
-            && ((ownerType === 'COMPANY' && normalized.companyId === depositorCompany?.id) || (ownerType === 'PERSON' && normalized.companyId == null))
-          )
-        },
-      )
+      const existingAccount = state.myBankAccounts.find((account) => {
+        const normalized = normalizeMockBankAccount(account, currentPlayer?.displayName ?? 'Personal Account')
+        return (
+          normalized.currencyCode === currencyCode &&
+          normalized.ownerType === ownerType &&
+          ((ownerType === 'COMPANY' && normalized.companyId === depositorCompany?.id) || (ownerType === 'PERSON' && normalized.companyId == null))
+        )
+      })
       if (!existingAccount) {
         state.myBankAccounts.push({
           id: `bank-account-${Date.now()}`,

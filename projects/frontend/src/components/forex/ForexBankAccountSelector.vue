@@ -24,9 +24,7 @@ const emit = defineEmits<Emits>()
 
 const { t } = useI18n()
 
-const selectedAccount = computed<PlayerBankAccountSummary | null>(
-  () => props.accounts.find((a) => a.id === props.modelValue) ?? null,
-)
+const selectedAccount = computed<PlayerBankAccountSummary | null>(() => props.accounts.find((a) => a.id === props.modelValue) ?? null)
 
 function formatAmount(val: number): string {
   return new Intl.NumberFormat('en', {
@@ -68,11 +66,7 @@ function onSelect(event: Event) {
         </option>
       </select>
     </div>
-    <div
-      v-if="selectedAccount"
-      class="balance-display inline-flex items-baseline gap-1.5 flex-wrap px-2 py-1 bg-card-raised border border-divider rounded-md w-fit"
-      aria-live="polite"
-    >
+    <div v-if="selectedAccount" class="balance-display inline-flex items-baseline gap-1.5 flex-wrap px-2 py-1 bg-card-raised border border-divider rounded-md w-fit" aria-live="polite">
       <span class="font-bold text-brand text-sm">{{ selectedAccount.currencySymbol }}</span>
       <span class="font-bold text-body text-sm">{{ formatAmount(selectedAccount.balance) }}</span>
       <span class="text-xs text-muted font-medium">{{ selectedAccount.currencyCode }}</span>
