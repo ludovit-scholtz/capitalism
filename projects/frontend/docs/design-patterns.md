@@ -36,7 +36,7 @@ Every page should start with a shell that creates breathing room below the stick
 
 ```vue
 <main class="container pb-16 pt-6 lg:pb-20 lg:pt-8">
-  <div class="mx-auto flex max-w-6xl flex-col gap-10 lg:gap-12">
+  <div class="flex flex-col gap-10 lg:gap-12">
     <!-- page sections -->
   </div>
 </main>

@@ -847,8 +847,10 @@ export type MockState = {
     currencyCode: string
     currencySymbol: string
     balance: number
-    companyId: string
-    companyName: string
+    companyId: string | null
+    companyName: string | null
+    ownerType?: 'PERSON' | 'COMPANY'
+    ownerDisplayName?: string
   }>
 }
 
@@ -862,6 +864,29 @@ const DEFAULT_DIVIDEND_PAYOUT_RATIO = 0.2
 const GAME_START_YEAR = 2000
 const TICKS_PER_DAY = 24
 const TICKS_PER_YEAR = 24 * 365
+
+function normalizeMockBankAccount(
+  account: {
+    id: string
+    accountNumber: string
+    currencyCode: string
+    currencySymbol: string
+    balance: number
+    companyId: string | null
+    companyName: string | null
+    ownerType?: 'PERSON' | 'COMPANY'
+    ownerDisplayName?: string
+  },
+  defaultPersonalName: string,
+) {
+  const ownerType = account.ownerType ?? (account.companyId ? 'COMPANY' : 'PERSON')
+  const ownerDisplayName = account.ownerDisplayName ?? account.companyName ?? defaultPersonalName
+  return {
+    ...account,
+    ownerType,
+    ownerDisplayName,
+  }
+}
 
 function resolveIpoSelection(raiseTarget?: number) {
   switch (raiseTarget ?? DEFAULT_IPO_RAISE_TARGET) {
@@ -5156,10 +5181,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
     if (query.includes('myBankAccounts') && !query.includes('executeForexSwap')) {
       if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const currentPlayer = state.players.find((p) => p.id === state.currentUserId)
+      const normalizedAccounts = state.myBankAccounts.map((account) => normalizeMockBankAccount(account, currentPlayer?.displayName ?? 'Personal Account'))
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { myBankAccounts: state.myBankAccounts } }),
+        body: JSON.stringify({ data: { myBankAccounts: normalizedAccounts } }),
       })
     }
 
@@ -6026,12 +6053,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('openBankAccount') || query.includes('createDeposit')) {
       const input = body.variables?.input ?? {}
       const bank = state.allBanks.find((b) => b.bankBuildingId === input.bankBuildingId)
+      const currentPlayer = state.players.find((p) => p.id === state.currentUserId)
+      const depositorCompanyId = input.depositorCompanyId ?? null
+      const depositorCompany = depositorCompanyId ? currentPlayer?.companies.find((company) => company.id === depositorCompanyId) : null
+      const ownerType: 'PERSON' | 'COMPANY' = depositorCompany ? 'COMPANY' : 'PERSON'
+      const ownerDisplayName = depositorCompany?.name ?? currentPlayer?.displayName ?? 'Personal Account'
       const newDeposit: MockBankDeposit = {
         id: `deposit-${Date.now()}`,
         bankBuildingId: input.bankBuildingId ?? '',
         bankBuildingName: bank?.bankBuildingName ?? 'Bank',
-        depositorCompanyId: input.depositorCompanyId ?? '',
-        depositorCompanyName: 'My Company',
+        depositorCompanyId: depositorCompany?.id ?? '',
+        depositorCompanyName: ownerDisplayName,
         amount: input.amount ?? 0,
         depositInterestRatePercent: bank?.depositInterestRatePercent ?? 5,
         isBaseCapital: false,
@@ -6041,6 +6073,30 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         totalInterestPaid: 0,
       }
       state.myDeposits.push(newDeposit)
+      const currencyCode = bank?.cityCurrencyCode ?? 'EUR'
+      const existingAccount = state.myBankAccounts.find(
+        (account) => {
+          const normalized = normalizeMockBankAccount(account, currentPlayer?.displayName ?? 'Personal Account')
+          return (
+            normalized.currencyCode === currencyCode
+            && normalized.ownerType === ownerType
+            && ((ownerType === 'COMPANY' && normalized.companyId === depositorCompany?.id) || (ownerType === 'PERSON' && normalized.companyId == null))
+          )
+        },
+      )
+      if (!existingAccount) {
+        state.myBankAccounts.push({
+          id: `bank-account-${Date.now()}`,
+          accountNumber: String(Math.floor(Math.random() * 1e16)).padStart(16, '0'),
+          currencyCode,
+          currencySymbol: bank?.cityCurrencySymbol ?? currencyCode,
+          balance: 0,
+          companyId: depositorCompany?.id ?? null,
+          companyName: depositorCompany?.name ?? null,
+          ownerType,
+          ownerDisplayName,
+        })
+      }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -6568,8 +6624,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             transferFunds: {
               amount,
               currencyCode: fromAcc.currencyCode,
-              fromAccount: { ...fromAcc },
-              toAccount: { ...toAcc },
+              fromAccount: normalizeMockBankAccount(fromAcc, 'Personal Account'),
+              toAccount: normalizeMockBankAccount(toAcc, 'Personal Account'),
             },
           },
         }),

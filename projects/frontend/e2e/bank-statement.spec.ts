@@ -34,6 +34,8 @@ function seedBankAccounts(state: ReturnType<typeof setupMockApi>, playerId: stri
       balance: 100000,
       companyId: COMPANY_ID,
       companyName: 'Test Trading Co.',
+      ownerType: 'COMPANY',
+      ownerDisplayName: 'Test Trading Co.',
     },
     {
       id: ACCOUNT_ID_2,
@@ -43,6 +45,8 @@ function seedBankAccounts(state: ReturnType<typeof setupMockApi>, playerId: stri
       balance: 250000,
       companyId: COMPANY_ID_2,
       companyName: 'Prague Imports',
+      ownerType: 'COMPANY',
+      ownerDisplayName: 'Prague Imports',
     },
   ]
 
@@ -233,7 +237,7 @@ test.describe('Bank Statement Review', () => {
     await expect(page.locator('.description-sub').filter({ hasText: 'Central Factory' })).toBeVisible()
   })
 
-  test('lists all bank accounts and switches between them', async ({ page }) => {
+  test('reacts to navbar account-context switch', async ({ page }) => {
     const player = makePlayerWithCompany()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -275,7 +279,12 @@ test.describe('Bank Statement Review', () => {
 
     const selector = page.locator('#account-select')
     await expect(selector).toHaveValue(ACCOUNT_ID)
-    await selector.selectOption(ACCOUNT_ID_2)
+    await expect(selector.locator('option')).toHaveCount(1)
+
+    await page.locator('.account-trigger').click()
+    await page.locator('.account-option').filter({ hasText: 'Prague Imports' }).click()
+
+    await expect(page.locator('#account-select')).toHaveValue(ACCOUNT_ID_2)
     await expect(page).toHaveURL(/\/bank-statement\/account-test-2/)
     await expect(page.locator('[aria-label="Account summary"]')).toContainText('Prague Imports')
     await expect(page.locator('[aria-label="Account summary"]')).toContainText('5555666677778888')

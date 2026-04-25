@@ -37,7 +37,7 @@ function formatAmount(val: number): string {
 
 function accountLabel(a: PlayerBankAccountSummary): string {
   const last4 = a.accountNumber.slice(-4)
-  return `${a.companyName} — ${a.currencySymbol}${formatAmount(a.balance)} (${a.currencyCode}) #${last4}`
+  return `${a.ownerDisplayName} — ${a.currencySymbol}${formatAmount(a.balance)} (${a.currencyCode}) #${last4}`
 }
 
 function onSelect(event: Event) {
@@ -76,7 +76,7 @@ function onSelect(event: Event) {
       <span class="font-bold text-brand text-sm">{{ selectedAccount.currencySymbol }}</span>
       <span class="font-bold text-body text-sm">{{ formatAmount(selectedAccount.balance) }}</span>
       <span class="text-xs text-muted font-medium">{{ selectedAccount.currencyCode }}</span>
-      <span class="text-xs text-muted ml-1">{{ selectedAccount.companyName }}</span>
+      <span class="text-xs text-muted ml-1">{{ selectedAccount.ownerDisplayName }}</span>
     </div>
   </div>
 </template>

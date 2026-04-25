@@ -193,6 +193,8 @@ async function loadData() {
               balance
               companyId
               companyName
+              ownerType
+              ownerDisplayName
             }
           }
         `),
@@ -237,6 +239,8 @@ async function reloadBankAccountsSilent() {
           balance
           companyId
           companyName
+          ownerType
+          ownerDisplayName
         }
       }
     `)
@@ -413,7 +417,7 @@ watch(activeTab, async (tab) => {
 
 <template>
   <main class="container min-h-[calc(100vh-64px)] pb-16 pt-6 lg:pb-20 lg:pt-8">
-    <div class="mx-auto flex max-w-6xl flex-col gap-10 lg:gap-12">
+    <div class="flex flex-col gap-10 lg:gap-12">
       <!-- Hero -->
       <div class="forex-hero rounded-2xl border border-divider bg-card px-6 py-6 shadow-sm sm:px-8 sm:py-7">
         <h1 class="text-3xl font-bold text-body">{{ t('forex.title') }}</h1>

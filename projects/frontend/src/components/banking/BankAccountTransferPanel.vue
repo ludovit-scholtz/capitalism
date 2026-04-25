@@ -72,8 +72,8 @@ const TRANSFER_MUTATION = `
     transferFunds(input: $input) {
       amount
       currencyCode
-      fromAccount { id accountNumber currencyCode currencySymbol balance companyId companyName }
-      toAccount { id accountNumber currencyCode currencySymbol balance companyId companyName }
+      fromAccount { id accountNumber currencyCode currencySymbol balance companyId companyName ownerType ownerDisplayName }
+      toAccount { id accountNumber currencyCode currencySymbol balance companyId companyName ownerType ownerDisplayName }
     }
   }
 `
@@ -181,8 +181,8 @@ function onFromChanged(newId: string) {
             t('bankTransfer.success', {
               amount: formatAmount(successResult.amount),
               currency: successResult.currencyCode,
-              from: successResult.fromAccount.companyName,
-              to: successResult.toAccount.companyName,
+              from: successResult.fromAccount.ownerDisplayName,
+              to: successResult.toAccount.ownerDisplayName,
             })
           }}
         </p>

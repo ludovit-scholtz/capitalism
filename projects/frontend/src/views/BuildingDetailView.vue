@@ -1929,7 +1929,6 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
 }
 
 .purchase-selector-shell {
-  max-width: 1100px;
   margin: 0 auto;
   background: var(--color-bg);
   border-radius: 18px;

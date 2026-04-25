@@ -200,10 +200,7 @@ async function loadOffers(isRefresh = false) {
   }
   error.value = null
   try {
-    const data = await gqlRequest<{ globalExchangeOffers: GlobalExchangeOffer[] }>(
-      EXCHANGE_QUERY,
-      { destinationCityId: selectedCityId.value },
-    )
+    const data = await gqlRequest<{ globalExchangeOffers: GlobalExchangeOffer[] }>(EXCHANGE_QUERY, { destinationCityId: selectedCityId.value })
     if (!deepEqual(allOffers.value, data.globalExchangeOffers)) {
       allOffers.value = data.globalExchangeOffers
     }
@@ -220,9 +217,7 @@ async function loadProductListings(isRefresh = false) {
   }
   productListingsError.value = null
   try {
-    const data = await gqlRequest<{ globalExchangeProductListings: GlobalExchangeProductListing[] }>(
-      PRODUCT_LISTINGS_QUERY,
-    )
+    const data = await gqlRequest<{ globalExchangeProductListings: GlobalExchangeProductListing[] }>(PRODUCT_LISTINGS_QUERY)
     if (!deepEqual(allProductListings.value, data.globalExchangeProductListings)) {
       allProductListings.value = data.globalExchangeProductListings
     }
@@ -274,11 +269,7 @@ useTickRefresh(async () => {
 })
 
 const currentTick = computed(() => gameStateStore.gameState?.currentTick ?? null)
-const formattedSnapshotTime = computed(() =>
-  gameStateStore.gameState?.currentGameTimeUtc
-    ? formatInGameTime(gameStateStore.gameState.currentGameTimeUtc, locale.value)
-    : '',
-)
+const formattedSnapshotTime = computed(() => (gameStateStore.gameState?.currentGameTimeUtc ? formatInGameTime(gameStateStore.gameState.currentGameTimeUtc, locale.value) : ''))
 
 const categories = computed(() => {
   const cats = [...new Set(resources.value.map((r) => r.category))]
@@ -294,8 +285,7 @@ const exchangeRows = computed<ExchangeRow[]>(() => {
   const q = search.value.trim().toLowerCase()
   const filtered = resources.value.filter((r) => {
     const matchesCat = selectedCategory.value === 'ALL' || r.category === selectedCategory.value
-    const matchesSearch =
-      !q || r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
+    const matchesSearch = !q || r.name.toLowerCase().includes(q) || r.slug.toLowerCase().includes(q)
     return matchesCat && matchesSearch
   })
 
@@ -322,8 +312,7 @@ const productRows = computed<ProductRow[]>(() => {
   const q = productSearch.value.trim().toLowerCase()
   const filtered = products.value.filter((p) => {
     const matchesInd = selectedIndustry.value === 'ALL' || p.industry === selectedIndustry.value
-    const matchesSearch =
-      !q || p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)
     return matchesInd && matchesSearch
   })
 
@@ -346,9 +335,7 @@ const productRows = computed<ProductRow[]>(() => {
 
 const productRowsEmpty = computed(() => productRows.value.length === 0)
 
-const selectedCityCurrencyCode = computed(
-  () => cities.value.find((c) => c.id === selectedCityId.value)?.currencyCode ?? 'EUR',
-)
+const selectedCityCurrencyCode = computed(() => cities.value.find((c) => c.id === selectedCityId.value)?.currencyCode ?? 'EUR')
 
 function formatPrice(value: number): string {
   return formatMoney(value, selectedCityCurrencyCode.value, locale.value)
@@ -400,10 +387,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         <h1 class="exchange-title">{{ t('globalExchange.title') }}</h1>
         <p class="exchange-subtitle">{{ t('globalExchange.subtitle') }}</p>
         <div class="exchange-hero-meta">
-          <span
-            class="exchange-tick-chip"
-            :title="currentTick !== null ? t('globalExchange.tickHint', { tick: currentTick }) : undefined"
-          >
+          <span class="exchange-tick-chip" :title="currentTick !== null ? t('globalExchange.tickHint', { tick: currentTick }) : undefined">
             <span class="exchange-tick-label">{{ t('globalExchange.snapshotTime') }}</span>
             <span class="exchange-tick-value">{{ formattedSnapshotTime || '—' }}</span>
           </span>
@@ -415,20 +399,10 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
     <div class="container exchange-body">
       <!-- Market mode toggle: Resources / Products -->
       <div class="market-mode-tabs" role="tablist" :aria-label="'Market type'">
-        <button
-          role="tab"
-          :aria-selected="marketMode === 'resources'"
-          :class="['mode-tab', { active: marketMode === 'resources' }]"
-          @click="marketMode = 'resources'"
-        >
+        <button role="tab" :aria-selected="marketMode === 'resources'" :class="['mode-tab', { active: marketMode === 'resources' }]" @click="marketMode = 'resources'">
           {{ t('globalExchange.modeResources') }}
         </button>
-        <button
-          role="tab"
-          :aria-selected="marketMode === 'products'"
-          :class="['mode-tab', 'mode-tab-products', { active: marketMode === 'products' }]"
-          @click="marketMode = 'products'"
-        >
+        <button role="tab" :aria-selected="marketMode === 'products'" :class="['mode-tab', 'mode-tab-products', { active: marketMode === 'products' }]" @click="marketMode = 'products'">
           {{ t('globalExchange.modeProducts') }}
         </button>
       </div>
@@ -453,13 +427,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         <!-- Search and filter row -->
         <div class="exchange-filters">
           <div class="search-wrapper">
-            <input
-              v-model="search"
-              type="search"
-              class="search-input"
-              :placeholder="t('globalExchange.searchPlaceholder')"
-              :aria-label="t('globalExchange.searchPlaceholder')"
-            />
+            <input v-model="search" type="search" class="search-input" :placeholder="t('globalExchange.searchPlaceholder')" :aria-label="t('globalExchange.searchPlaceholder')" />
           </div>
           <div class="category-filter">
             <label for="category-select" class="filter-label">{{ t('globalExchange.filterCategory') }}</label>
@@ -480,62 +448,39 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 
         <!-- Resource rows -->
         <template v-else>
-          <div
-            v-for="row in exchangeRows"
-            :key="row.resourceId"
-            class="resource-row"
-            :data-slug="row.resourceSlug"
-          >
+          <div v-for="row in exchangeRows" :key="row.resourceId" class="resource-row" :data-slug="row.resourceSlug">
             <div class="resource-row-header">
               <span class="resource-name">{{ row.resourceName }}</span>
               <span class="resource-category-badge">{{ localizedCategory(row.category) }}</span>
-              <RouterLink
-                :to="`/encyclopedia/resources/${row.resourceSlug}`"
-                class="production-chain-link"
-                :aria-label="`${t('globalExchange.viewProductionChain')}: ${row.resourceName}`"
-              >{{ t('globalExchange.viewProductionChain') }}</RouterLink>
+              <RouterLink :to="`/encyclopedia/resources/${row.resourceSlug}`" class="production-chain-link" :aria-label="`${t('globalExchange.viewProductionChain')}: ${row.resourceName}`">{{
+                t('globalExchange.viewProductionChain')
+              }}</RouterLink>
             </div>
 
             <div class="city-offers-grid">
-              <div
-                v-for="offer in row.offers"
-                :key="offer.cityId"
-                :class="['city-offer-card', { 'best-offer': offer.cityId === row.bestCityId }]"
-              >
+              <div v-for="offer in row.offers" :key="offer.cityId" :class="['city-offer-card', { 'best-offer': offer.cityId === row.bestCityId }]">
                 <div class="offer-card-header">
                   <strong class="offer-city-name">{{ offer.cityName }}</strong>
-                  <span
-                    v-if="offer.cityId === row.bestCityId"
-                    class="best-badge"
-                    :title="t('globalExchange.bestDeliveredHint')"
-                  >{{ t('globalExchange.bestDelivered') }}</span>
+                  <span v-if="offer.cityId === row.bestCityId" class="best-badge" :title="t('globalExchange.bestDeliveredHint')">{{ t('globalExchange.bestDelivered') }}</span>
                 </div>
 
                 <div class="offer-metrics">
                   <div class="offer-metric">
                     <span class="metric-label">{{ t('globalExchange.exchangePrice') }}</span>
-                    <span class="metric-value exchange-price">
-                      {{ formatPrice(offer.exchangePricePerUnit) }}/{{ offer.unitSymbol }}
-                    </span>
+                    <span class="metric-value exchange-price"> {{ formatPrice(offer.exchangePricePerUnit) }}/{{ offer.unitSymbol }} </span>
                   </div>
                   <div class="offer-metric">
                     <span class="metric-label">{{ t('globalExchange.transitCost') }}</span>
-                    <span class="metric-value transit-cost">
-                      +{{ formatPrice(offer.transitCostPerUnit) }} · {{ offer.distanceKm }} km
-                    </span>
+                    <span class="metric-value transit-cost"> +{{ formatPrice(offer.transitCostPerUnit) }} · {{ offer.distanceKm }} km </span>
                   </div>
                   <div class="offer-metric delivered-metric">
                     <span class="metric-label">{{ t('globalExchange.deliveredPrice') }}</span>
-                    <span class="metric-value delivered-price">
-                      {{ formatPrice(offer.deliveredPricePerUnit) }}/{{ offer.unitSymbol }}
-                    </span>
+                    <span class="metric-value delivered-price"> {{ formatPrice(offer.deliveredPricePerUnit) }}/{{ offer.unitSymbol }} </span>
                   </div>
                   <div class="offer-metric">
                     <span class="metric-label">{{ t('globalExchange.quality') }}</span>
                     <span class="metric-value quality-value">
-                      <span class="quality-range">
-                        {{ formatPercent(offer.qualityMin) }}&nbsp;–&nbsp;{{ formatPercent(offer.qualityMax) }}
-                      </span>
+                      <span class="quality-range"> {{ formatPercent(offer.qualityMin) }}&nbsp;–&nbsp;{{ formatPercent(offer.qualityMax) }} </span>
                       <span class="quality-band-bar" :title="t('globalExchange.qualityBandHint')">
                         <span
                           class="quality-band-fill"
@@ -544,10 +489,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
                             width: `${(offer.qualityMax - offer.qualityMin) * 100}%`,
                           }"
                         ></span>
-                        <span
-                          class="quality-band-center"
-                          :style="{ left: `${offer.estimatedQuality * 100}%` }"
-                        ></span>
+                        <span class="quality-band-center" :style="{ left: `${offer.estimatedQuality * 100}%` }"></span>
                       </span>
                     </span>
                   </div>
@@ -571,13 +513,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         <!-- Product search and filter -->
         <div class="exchange-filters">
           <div class="search-wrapper">
-            <input
-              v-model="productSearch"
-              type="search"
-              class="search-input"
-              :placeholder="t('globalExchange.productSearchPlaceholder')"
-              :aria-label="t('globalExchange.productSearchPlaceholder')"
-            />
+            <input v-model="productSearch" type="search" class="search-input" :placeholder="t('globalExchange.productSearchPlaceholder')" :aria-label="t('globalExchange.productSearchPlaceholder')" />
           </div>
           <div class="category-filter">
             <label for="industry-select" class="filter-label">{{ t('globalExchange.filterIndustry') }}</label>
@@ -601,21 +537,14 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 
         <!-- Product rows -->
         <template v-else>
-          <div
-            v-for="row in productRows"
-            :key="row.productId"
-            class="product-row"
-            :data-slug="row.productSlug"
-          >
+          <div v-for="row in productRows" :key="row.productId" class="product-row" :data-slug="row.productSlug">
             <div class="product-row-header">
               <span class="product-name">{{ row.productName }}</span>
               <span class="product-industry-badge">{{ localizedIndustry(row.productIndustry) }}</span>
               <span class="product-listing-count">{{ t('globalExchange.productListingsCount', { count: row.listings.length }) }}</span>
-              <RouterLink
-                :to="`/encyclopedia/products/${row.productSlug}`"
-                class="production-chain-link"
-                :aria-label="`${t('globalExchange.viewProductDetail')}: ${row.productName}`"
-              >{{ t('globalExchange.viewProductDetail') }}</RouterLink>
+              <RouterLink :to="`/encyclopedia/products/${row.productSlug}`" class="production-chain-link" :aria-label="`${t('globalExchange.viewProductDetail')}: ${row.productName}`">{{
+                t('globalExchange.viewProductDetail')
+              }}</RouterLink>
             </div>
 
             <div class="product-market-quote-grid">
@@ -645,20 +574,12 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
                 <span>{{ t('globalExchange.productSeller') }}</span>
                 <span>{{ t('globalExchange.productCity') }}</span>
               </div>
-              <div
-                v-for="listing in row.listings"
-                :key="listing.orderId"
-                class="listing-row"
-              >
-                <span class="listing-price">
-                  {{ formatPrice(listing.pricePerUnit) }}/{{ listing.unitSymbol }}
-                </span>
+              <div v-for="listing in row.listings" :key="listing.orderId" class="listing-row">
+                <span class="listing-price"> {{ formatPrice(listing.pricePerUnit) }}/{{ listing.unitSymbol }} </span>
                 <span :class="['listing-vs-base', priceVsBaseClass(listing.pricePerUnit, row.basePrice)]">
                   {{ priceVsBase(listing.pricePerUnit, row.basePrice) }}
                 </span>
-                <span class="listing-quantity">
-                  {{ listing.remainingQuantity.toFixed(0) }} {{ listing.unitSymbol }}
-                </span>
+                <span class="listing-quantity"> {{ listing.remainingQuantity.toFixed(0) }} {{ listing.unitSymbol }} </span>
                 <span class="listing-seller">{{ listing.sellerCompanyName }}</span>
                 <span class="listing-city">{{ listing.sellerCityName }}</span>
               </div>
@@ -685,9 +606,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 }
 
 .container {
-  max-width: 1100px;
   margin: 0 auto;
-  padding: 0 1rem;
 }
 
 .exchange-eyebrow {
@@ -784,7 +703,9 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
   font-size: 0.9375rem;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
   border-radius: var(--radius-sm, 4px) var(--radius-sm, 4px) 0 0;
 }
 
@@ -822,7 +743,10 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .city-tab:hover {

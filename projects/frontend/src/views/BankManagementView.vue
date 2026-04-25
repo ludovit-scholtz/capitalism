@@ -1377,9 +1377,7 @@ const estimatedCustomerTotalPayments = computed(() => {
 
 <style scoped>
 .bank-management-view {
-  max-width: 1100px;
   margin: 0 auto;
-  padding: var(--spacing-lg);
 }
 
 .page-header {

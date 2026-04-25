@@ -1038,7 +1038,7 @@ public sealed class GlobalCitiesAndFxRatesTests
 
         var accounts = result.GetProperty("data").GetProperty("myBankAccounts");
         Assert.Equal(JsonValueKind.Array, accounts.ValueKind);
-        Assert.Equal(2, accounts.GetArrayLength());
+        Assert.True(accounts.GetArrayLength() >= 2, "Expected at least two company-owned accounts in myBankAccounts response.");
 
         var ids = accounts.EnumerateArray().Select(a => Guid.Parse(a.GetProperty("id").GetString()!)).ToHashSet();
         Assert.Contains(accA.Id, ids);

@@ -62,17 +62,32 @@ public sealed partial class Mutation
         [Service] IHttpContextAccessor httpContextAccessor)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+        var depositorCompany = default(Company);
+        var depositorPlayer = default(Player);
+        var isCompanyDepositor = input.DepositorCompanyId.HasValue;
 
-        var depositorCompany = await db.Companies
-            .FirstOrDefaultAsync(c => c.Id == input.DepositorCompanyId && c.PlayerId == userId);
-
-        if (depositorCompany is null)
+        if (isCompanyDepositor)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Depositor company not found or you do not own it.")
-                    .SetCode("COMPANY_NOT_FOUND")
-                    .Build());
+            depositorCompany = await db.Companies
+                .FirstOrDefaultAsync(c => c.Id == input.DepositorCompanyId!.Value && c.PlayerId == userId);
+
+            if (depositorCompany is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Depositor company not found or you do not own it.")
+                        .SetCode("COMPANY_NOT_FOUND")
+                        .Build());
+            }
+        }
+        else
+        {
+            depositorPlayer = await db.Players.FirstOrDefaultAsync(p => p.Id == userId)
+                ?? throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Authenticated player not found.")
+                        .SetCode("PLAYER_NOT_FOUND")
+                        .Build());
         }
 
         var bank = await db.Buildings
@@ -91,7 +106,7 @@ public sealed partial class Mutation
         }
 
         // Bank's own company cannot deposit into its own bank (no self-interest)
-        if (depositorCompany.Id == bank.CompanyId)
+        if (depositorCompany is not null && depositorCompany.Id == bank.CompanyId)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -138,12 +153,14 @@ public sealed partial class Mutation
 
         var hasExistingActiveAccount = await db.BankAccounts
             .Include(account => account.Company)
+            .Include(account => account.Player)
             .AnyAsync(account =>
                 account.BankBuildingId == bank.Id
                 && account.ClosedAtUtc == null
                 && !account.IsBaseCapitalDeposit
-                && account.Company != null
-                && account.Company.PlayerId == userId);
+                && (isCompanyDepositor
+                    ? account.CompanyId == depositorCompany!.Id
+                    : account.PlayerId == userId));
 
         if (hasExistingActiveAccount)
         {
@@ -158,6 +175,15 @@ public sealed partial class Mutation
 
         if (input.Amount > 0m)
         {
+            if (depositorCompany is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Personal account opening supports zero-balance account creation only.")
+                        .SetCode("PERSONAL_OPENING_TOPUP_NOT_SUPPORTED")
+                        .Build());
+            }
+
             var sourceAccount = await ResolveCompanyTransferAccountAsync(
                 db,
                 depositorCompany.Id,
@@ -218,7 +244,8 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             AccountNumber = GenerateRandomAccountNumber(),
             CurrencyCode = cityCurrencyCode,
-            CompanyId = depositorCompany.Id,
+            CompanyId = depositorCompany?.Id,
+            PlayerId = depositorPlayer?.Id,
             BankBuildingId = bank.Id,
             Balance = input.Amount,
             DepositInterestRatePercent = depositRate,
@@ -231,7 +258,7 @@ public sealed partial class Mutation
 
         db.BankAccounts.Add(deposit);
 
-        if (input.Amount > 0m)
+        if (input.Amount > 0m && depositorCompany is not null)
         {
             // Ledger: depositor makes deposit
             db.LedgerEntries.Add(new LedgerEntry
@@ -249,7 +276,7 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
-        return MapToDepositSummary(deposit, bank, depositorCompany);
+    return MapToDepositSummary(deposit, bank, depositorCompany, depositorPlayer);
     }
 
     /// <summary>
@@ -374,7 +401,7 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
-        return MapToDepositSummary(deposit, bank, depositorCompany);
+        return MapToDepositSummary(deposit, bank, depositorCompany, null);
     }
 
     /// <summary>
@@ -561,13 +588,13 @@ public sealed partial class Mutation
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    internal static BankDepositSummary MapToDepositSummary(BankAccount d, Building bank, Company depositor) => new()
+    internal static BankDepositSummary MapToDepositSummary(BankAccount d, Building bank, Company? depositorCompany, Player? depositorPlayer) => new()
     {
         Id = d.Id,
         BankBuildingId = d.BankBuildingId!.Value,
         BankBuildingName = bank.Name,
         DepositorCompanyId = d.CompanyId ?? Guid.Empty,
-        DepositorCompanyName = depositor.Name,
+        DepositorCompanyName = depositorCompany?.Name ?? depositorPlayer?.DisplayName ?? string.Empty,
         Amount = d.Balance,
         DepositInterestRatePercent = d.DepositInterestRatePercent ?? 0m,
         IsBaseCapital = d.IsBaseCapitalDeposit,

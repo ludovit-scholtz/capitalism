@@ -104,7 +104,7 @@ public sealed class TransferFundsResult
 }
 
 /// <summary>
-/// A bank account owned by one of the player's companies.
+/// A bank account owned by the authenticated player or one of their companies.
 /// Returned by the <c>myBankAccounts</c> query and used to populate forex swap selectors.
 /// </summary>
 public sealed class PlayerBankAccountSummary
@@ -124,9 +124,15 @@ public sealed class PlayerBankAccountSummary
     /// <summary>Current balance of the account.</summary>
     public decimal Balance { get; set; }
 
-    /// <summary>ID of the company that owns this account.</summary>
-    public Guid CompanyId { get; set; }
+    /// <summary>ID of the company that owns this account. Null for personal accounts.</summary>
+    public Guid? CompanyId { get; set; }
 
-    /// <summary>Human-readable company name.</summary>
-    public string CompanyName { get; set; } = string.Empty;
+    /// <summary>Human-readable company name. Null for personal accounts.</summary>
+    public string? CompanyName { get; set; }
+
+    /// <summary>Account owner type: PERSON or COMPANY.</summary>
+    public string OwnerType { get; set; } = "COMPANY";
+
+    /// <summary>Human-readable owner display name (player display name or company name).</summary>
+    public string OwnerDisplayName { get; set; } = string.Empty;
 }

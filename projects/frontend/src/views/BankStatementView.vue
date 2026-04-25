@@ -42,8 +42,22 @@ const statement = ref<BankStatementResult | null>(null)
 const accounts = ref<PlayerBankAccountSummary[]>([])
 const pageSize = ref(50)
 const page = ref(1)
+const isPersonalContext = computed(() => auth.player?.activeAccountType === 'PERSON')
 
-const selectedAccount = computed<PlayerBankAccountSummary | null>(() => accounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null)
+const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
+  if (isPersonalContext.value) {
+    return accounts.value.filter((account) => account.ownerType === 'PERSON')
+  }
+
+  const activeCompanyId = auth.player?.activeCompanyId
+  if (!activeCompanyId) {
+    return []
+  }
+
+  return accounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === activeCompanyId)
+})
+
+const selectedAccount = computed<PlayerBankAccountSummary | null>(() => contextAccounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null)
 
 const BANK_STATEMENT_QUERY = `
   query BankStatement($companyId: UUID!, $limit: Int, $offset: Int) {
@@ -79,12 +93,20 @@ const MY_BANK_ACCOUNTS_QUERY = `
       balance
       companyId
       companyName
+      ownerType
+      ownerDisplayName
     }
   }
 `
 
 async function loadStatement() {
   if (!selectedAccount.value) return
+  if (!selectedAccount.value.companyId) {
+    statement.value = null
+    loading.value = false
+    return
+  }
+
   loading.value = true
   error.value = null
   try {
@@ -107,20 +129,20 @@ async function loadAccounts() {
 }
 
 async function syncRouteToAccount() {
-  if (accounts.value.length === 0) {
+  if (contextAccounts.value.length === 0) {
     statement.value = null
     loading.value = false
     return false
   }
 
   const routeId = routeAccountOrCompanyId.value
-  const matchingAccount = accounts.value.find((account) => account.id === routeId)
+  const matchingAccount = contextAccounts.value.find((account) => account.id === routeId)
   if (matchingAccount) {
     return true
   }
 
-  const firstAccountForCompany = accounts.value.find((account) => account.companyId === routeId)
-  const fallbackAccount = firstAccountForCompany ?? accounts.value[0] ?? null
+  const firstAccountForCompany = contextAccounts.value.find((account) => account.companyId === routeId)
+  const fallbackAccount = firstAccountForCompany ?? contextAccounts.value[0] ?? null
   if (!fallbackAccount) {
     statement.value = null
     loading.value = false
@@ -155,6 +177,17 @@ watch(routeAccountOrCompanyId, async (id, previousId) => {
     await loadStatement()
   }
 })
+
+watch(
+  () => [auth.player?.activeAccountType, auth.player?.activeCompanyId],
+  async () => {
+    page.value = 1
+    if (!(await syncRouteToAccount())) {
+      return
+    }
+    await loadStatement()
+  },
+)
 
 watch(pageSize, async (value, previousValue) => {
   if (value === previousValue) return
@@ -286,7 +319,7 @@ function goToNextPage() {
     </div>
 
     <!-- Account selector -->
-    <div v-if="accounts.length > 0" class="flex flex-col gap-3 mb-4 lg:flex-row lg:items-center">
+    <div v-if="contextAccounts.length > 0" class="flex flex-col gap-3 mb-4 lg:flex-row lg:items-center">
       <label for="account-select" class="text-sm font-semibold text-muted whitespace-nowrap">
         {{ t('bankStatement.selectAccount') }}
       </label>
@@ -296,8 +329,8 @@ function goToNextPage() {
         class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
         @change="onAccountChange"
       >
-        <option v-for="account in accounts" :key="account.id" :value="account.id">
-          {{ account.companyName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ account.currencySymbol }}{{ formatAmount(account.balance) }}
+        <option v-for="account in contextAccounts" :key="account.id" :value="account.id">
+          {{ account.ownerDisplayName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ account.currencySymbol }}{{ formatAmount(account.balance) }}
         </option>
       </select>
     </div>
@@ -326,7 +359,7 @@ function goToNextPage() {
     <div v-else-if="error" class="state-message text-center py-12 text-bad" role="alert">
       {{ error }}
     </div>
-    <div v-else-if="accounts.length === 0" class="state-message text-center py-12 text-muted" role="status">
+    <div v-else-if="contextAccounts.length === 0" class="state-message text-center py-12 text-muted" role="status">
       {{ t('bankStatement.noOwnedAccounts') }}
     </div>
 
@@ -336,7 +369,7 @@ function goToNextPage() {
         <div class="flex items-center gap-2">
           <span class="text-2xl">🏢</span>
           <div class="flex flex-col gap-0.5">
-            <span class="text-lg font-bold text-body">{{ selectedAccount?.companyName ?? statement.companyName }}</span>
+            <span class="text-lg font-bold text-body">{{ selectedAccount?.ownerDisplayName ?? statement.companyName }}</span>
             <span v-if="selectedAccount" class="text-xs text-muted"> {{ t('bankStatement.accountNumber') }}: {{ selectedAccount.accountNumber }} </span>
           </div>
         </div>

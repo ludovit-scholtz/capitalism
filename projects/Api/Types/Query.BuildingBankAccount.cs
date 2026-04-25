@@ -104,7 +104,7 @@ public sealed partial class Query
     }
 
     /// <summary>
-    /// Returns all bank accounts across all companies owned by the authenticated player.
+    /// Returns all bank accounts across the authenticated player's personal and company contexts.
     /// Used to populate source/destination account selectors in the Forex Exchange swap form.
     /// </summary>
     [Authorize]
@@ -116,9 +116,11 @@ public sealed partial class Query
 
         var accounts = await db.BankAccounts
             .Include(a => a.Company)
-            .Where(a => a.Company != null && a.Company.PlayerId == userId)
+            .Include(a => a.Player)
+            .Where(a => a.ClosedAtUtc == null
+                && ((a.Company != null && a.Company.PlayerId == userId) || a.PlayerId == userId))
             .AsNoTracking()
-            .OrderBy(a => a.Company!.Name)
+            .OrderBy(a => a.Company != null ? a.Company.Name : a.Player!.DisplayName)
             .ThenBy(a => a.CurrencyCode)
             .ToListAsync();
 
@@ -128,8 +130,10 @@ public sealed partial class Query
             AccountNumber = a.AccountNumber,
             CurrencyCode = a.CurrencyCode,
             Balance = a.Balance,
-            CompanyId = a.CompanyId!.Value,
-            CompanyName = a.Company!.Name,
+            CompanyId = a.CompanyId,
+            CompanyName = a.Company?.Name,
+            OwnerType = a.CompanyId.HasValue ? "COMPANY" : "PERSON",
+            OwnerDisplayName = a.Company?.Name ?? a.Player?.DisplayName ?? string.Empty,
         }).ToList();
     }
 }

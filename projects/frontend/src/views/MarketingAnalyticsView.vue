@@ -20,7 +20,6 @@ const analytics = ref<CampaignAnalyticsResult | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-
 // ── Queries ──────────────────────────────────────────────────────────────────
 
 const MY_COMPANIES_QUERY = `
@@ -103,10 +102,7 @@ async function loadAnalytics(isRefresh = false) {
   if (!isRefresh) loading.value = true
   error.value = null
   try {
-    const data = await gqlRequest<{ campaignAnalytics: CampaignAnalyticsResult | null }>(
-      buildCampaignQuery(),
-      { companyId: selectedCompanyId.value },
-    )
+    const data = await gqlRequest<{ campaignAnalytics: CampaignAnalyticsResult | null }>(buildCampaignQuery(), { companyId: selectedCompanyId.value })
     const result = data.campaignAnalytics ?? null
     if (!deepEqual(analytics.value, result)) {
       analytics.value = result
@@ -153,39 +149,56 @@ const roiLabel = computed(() => {
 
 function balanceClass(bvp: string): string {
   switch (bvp) {
-    case 'PREMIUM_JUSTIFIED': return 'ca-balance-premium-ok'
-    case 'PREMIUM_RISKY': return 'ca-balance-premium-risk'
-    case 'DISCOUNT_WITH_BRAND': return 'ca-balance-discount-brand'
-    case 'COMPETITIVE_BASELINE': return 'ca-balance-baseline'
-    case 'BRAND_BUILDING': return 'ca-balance-building'
-    default: return 'ca-balance-none'
+    case 'PREMIUM_JUSTIFIED':
+      return 'ca-balance-premium-ok'
+    case 'PREMIUM_RISKY':
+      return 'ca-balance-premium-risk'
+    case 'DISCOUNT_WITH_BRAND':
+      return 'ca-balance-discount-brand'
+    case 'COMPETITIVE_BASELINE':
+      return 'ca-balance-baseline'
+    case 'BRAND_BUILDING':
+      return 'ca-balance-building'
+    default:
+      return 'ca-balance-none'
   }
 }
 
 function impactClass(impact: string): string {
   switch (impact) {
-    case 'STRONG': return 'ca-impact-strong'
-    case 'MODERATE': return 'ca-impact-moderate'
-    case 'WEAK': return 'ca-impact-weak'
-    default: return 'ca-impact-none'
+    case 'STRONG':
+      return 'ca-impact-strong'
+    case 'MODERATE':
+      return 'ca-impact-moderate'
+    case 'WEAK':
+      return 'ca-impact-weak'
+    default:
+      return 'ca-impact-none'
   }
 }
 
 function demandClass(signal: string): string {
   switch (signal) {
     case 'SUPPLY_CONSTRAINED':
-    case 'STRONG': return 'ca-demand-strong'
-    case 'MODERATE': return 'ca-demand-moderate'
-    case 'WEAK': return 'ca-demand-weak'
-    default: return ''
+    case 'STRONG':
+      return 'ca-demand-strong'
+    case 'MODERATE':
+      return 'ca-demand-moderate'
+    case 'WEAK':
+      return 'ca-demand-weak'
+    default:
+      return ''
   }
 }
 
 function trendClass(dir: string): string {
   switch (dir) {
-    case 'UP': return 'ca-trend-up'
-    case 'DOWN': return 'ca-trend-down'
-    default: return 'ca-trend-flat'
+    case 'UP':
+      return 'ca-trend-up'
+    case 'DOWN':
+      return 'ca-trend-down'
+    default:
+      return 'ca-trend-flat'
   }
 }
 
@@ -214,7 +227,7 @@ function formatFactor(factor: string | null): string {
 </script>
 
 <template>
-  <div class="ca-view">
+  <div class="ca-view container">
     <!-- Page header -->
     <div class="ca-header">
       <div>
@@ -297,12 +310,7 @@ function formatFactor(factor: string | null): string {
 
       <!-- Per-unit analytics cards -->
       <div v-else class="ca-rows">
-        <article
-          v-for="row in analytics.rows"
-          :key="row.buildingUnitId"
-          class="ca-row-card"
-          :aria-label="rowTitle(row)"
-        >
+        <article v-for="row in analytics.rows" :key="row.buildingUnitId" class="ca-row-card" :aria-label="rowTitle(row)">
           <!-- Card header -->
           <div class="ca-row-header">
             <div class="ca-row-identity">
@@ -310,16 +318,12 @@ function formatFactor(factor: string | null): string {
               <span class="ca-row-building">{{ row.buildingName }}</span>
             </div>
             <div class="ca-row-badges">
-              <span
-                class="ca-badge ca-balance-badge"
-                :class="balanceClass(row.brandVsPriceBalance)"
-                :title="t(`campaignAnalytics.balance_${row.brandVsPriceBalance}`)"
-              >{{ t(`campaignAnalytics.balance_${row.brandVsPriceBalance}`) }}</span>
-              <span
-                class="ca-badge ca-impact-badge"
-                :class="impactClass(row.campaignImpact)"
-                :title="t(`campaignAnalytics.campaignImpact_${row.campaignImpact}`)"
-              >{{ t(`campaignAnalytics.campaignImpact_${row.campaignImpact}`) }}</span>
+              <span class="ca-badge ca-balance-badge" :class="balanceClass(row.brandVsPriceBalance)" :title="t(`campaignAnalytics.balance_${row.brandVsPriceBalance}`)">{{
+                t(`campaignAnalytics.balance_${row.brandVsPriceBalance}`)
+              }}</span>
+              <span class="ca-badge ca-impact-badge" :class="impactClass(row.campaignImpact)" :title="t(`campaignAnalytics.campaignImpact_${row.campaignImpact}`)">{{
+                t(`campaignAnalytics.campaignImpact_${row.campaignImpact}`)
+              }}</span>
             </div>
           </div>
 
@@ -366,7 +370,8 @@ function formatFactor(factor: string | null): string {
                   'ca-quality-high': (row.brandQuality ?? 0) >= 0.5,
                   'ca-quality-low': (row.brandQuality ?? 0) < 0.2,
                 }"
-              >{{ formatPct(row.brandQuality) }}</strong>
+                >{{ formatPct(row.brandQuality) }}</strong
+              >
             </div>
             <!-- Marketing prestige -->
             <div v-if="row.marketingQuality !== null" class="ca-metric">
@@ -386,7 +391,8 @@ function formatFactor(factor: string | null): string {
                     'ca-price-premium': (row.pricePremiumPct ?? 0) > 5,
                     'ca-price-discount': (row.pricePremiumPct ?? 0) < -5,
                   }"
-                >{{ formatPricePremium(row.pricePremiumPct) }}</span>
+                  >{{ formatPricePremium(row.pricePremiumPct) }}</span
+                >
               </strong>
             </div>
             <div v-if="row.basePrice !== null" class="ca-metric">
@@ -403,9 +409,7 @@ function formatFactor(factor: string | null): string {
             <!-- Brand revenue boost -->
             <div v-if="row.brandRevenueBoost !== null && (row.brandRevenueBoost ?? 0) > 0" class="ca-metric">
               <span class="ca-metric-label">{{ t('campaignAnalytics.brandBoost') }}</span>
-              <strong class="ca-metric-value ca-quality-high">
-                +{{ ((row.brandRevenueBoost ?? 0) * 100).toFixed(0) }}%
-              </strong>
+              <strong class="ca-metric-value ca-quality-high"> +{{ ((row.brandRevenueBoost ?? 0) * 100).toFixed(0) }}% </strong>
             </div>
           </div>
 
@@ -441,8 +445,6 @@ function formatFactor(factor: string | null): string {
 
 <style scoped>
 .ca-view {
-  padding: 2rem 1rem;
-  max-width: 1200px;
   margin: 0 auto;
 }
 
@@ -494,7 +496,7 @@ function formatFactor(factor: string | null): string {
 
 .ca-kpi-card {
   flex: 1 1 160px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1rem 1.25rem;
@@ -530,8 +532,8 @@ function formatFactor(factor: string | null): string {
   display: flex;
   gap: 1rem;
   align-items: flex-start;
-  background: rgba(34,197,94,0.08);
-  border: 1px solid rgba(34,197,94,0.3);
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
   border-radius: var(--radius-lg);
   padding: 1rem 1.25rem;
   margin-bottom: 2rem;
@@ -565,7 +567,7 @@ function formatFactor(factor: string | null): string {
 }
 
 .ca-row-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 1.25rem;
@@ -618,17 +620,39 @@ function formatFactor(factor: string | null): string {
   border: 1px solid currentColor;
 }
 
-.ca-balance-premium-ok { color: #22c55e; }
-.ca-balance-premium-risk { color: #f87171; }
-.ca-balance-discount-brand { color: #60a5fa; }
-.ca-balance-baseline { color: var(--color-text-muted); }
-.ca-balance-building { color: #a78bfa; }
-.ca-balance-none { color: var(--color-text-muted); opacity: 0.6; }
+.ca-balance-premium-ok {
+  color: #22c55e;
+}
+.ca-balance-premium-risk {
+  color: #f87171;
+}
+.ca-balance-discount-brand {
+  color: #60a5fa;
+}
+.ca-balance-baseline {
+  color: var(--color-text-muted);
+}
+.ca-balance-building {
+  color: #a78bfa;
+}
+.ca-balance-none {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
 
-.ca-impact-strong { color: #22c55e; }
-.ca-impact-moderate { color: #facc15; }
-.ca-impact-weak { color: #f87171; }
-.ca-impact-none { color: var(--color-text-muted); opacity: 0.6; }
+.ca-impact-strong {
+  color: #22c55e;
+}
+.ca-impact-moderate {
+  color: #facc15;
+}
+.ca-impact-weak {
+  color: #f87171;
+}
+.ca-impact-none {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
 
 /* Metrics grid */
 .ca-metrics-grid {
@@ -656,14 +680,30 @@ function formatFactor(factor: string | null): string {
   color: var(--color-heading);
 }
 
-.ca-demand-strong { color: #22c55e; }
-.ca-demand-moderate { color: #facc15; }
-.ca-demand-weak { color: #f87171; }
-.ca-trend-up { color: #22c55e; }
-.ca-trend-down { color: #f87171; }
-.ca-trend-flat { color: var(--color-text-muted); }
-.ca-quality-high { color: #22c55e; }
-.ca-quality-low { color: #f87171; }
+.ca-demand-strong {
+  color: #22c55e;
+}
+.ca-demand-moderate {
+  color: #facc15;
+}
+.ca-demand-weak {
+  color: #f87171;
+}
+.ca-trend-up {
+  color: #22c55e;
+}
+.ca-trend-down {
+  color: #f87171;
+}
+.ca-trend-flat {
+  color: var(--color-text-muted);
+}
+.ca-quality-high {
+  color: #22c55e;
+}
+.ca-quality-low {
+  color: #f87171;
+}
 
 .ca-price-delta {
   font-size: 0.78rem;
@@ -671,8 +711,12 @@ function formatFactor(factor: string | null): string {
   margin-left: 0.3rem;
 }
 
-.ca-price-premium { color: #f87171; }
-.ca-price-discount { color: #22c55e; }
+.ca-price-premium {
+  color: #f87171;
+}
+.ca-price-discount {
+  color: #22c55e;
+}
 
 /* Demand factor comparison */
 .ca-factors {
@@ -691,12 +735,12 @@ function formatFactor(factor: string | null): string {
 }
 
 .ca-factor-positive {
-  background: rgba(34,197,94,0.1);
+  background: rgba(34, 197, 94, 0.1);
   color: #22c55e;
 }
 
 .ca-factor-negative {
-  background: rgba(248,113,113,0.1);
+  background: rgba(248, 113, 113, 0.1);
   color: #f87171;
 }
 
@@ -714,7 +758,7 @@ function formatFactor(factor: string | null): string {
   display: flex;
   gap: 0.6rem;
   align-items: flex-start;
-  background: rgba(255,255,255,0.03);
+  background: rgba(255, 255, 255, 0.03);
   border-left: 3px solid var(--color-border);
   padding: 0.6rem 0.75rem;
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;

@@ -53,7 +53,9 @@ const isDeduction = computed(
 )
 
 const selectedBalance = computed(() =>
-  selectedEmail.value ? (balances.value.find((b) => b.email === selectedEmail.value) ?? null) : null,
+  selectedEmail.value
+    ? (balances.value.find((b) => b.email === selectedEmail.value) ?? null)
+    : null,
 )
 
 // ── Data loading ───────────────────────────────────────────────────────────
@@ -115,12 +117,7 @@ async function handleAdjust() {
   adjustSuccess.value = ''
 
   try {
-    const updated = await adjustGoldTokenBalance(
-      auth.token,
-      selectedEmail.value,
-      amount,
-      note,
-    )
+    const updated = await adjustGoldTokenBalance(auth.token, selectedEmail.value, amount, note)
 
     // Update the local balance display
     const idx = balances.value.findIndex((b) => b.email === selectedEmail.value)
@@ -201,7 +198,12 @@ onMounted(async () => {
       <section class="gold-section" aria-labelledby="balances-heading">
         <div class="gold-section-header">
           <h2 id="balances-heading">Player Balances</h2>
-          <button class="refresh-btn" type="button" :disabled="balancesLoading" @click="loadBalances">
+          <button
+            class="refresh-btn"
+            type="button"
+            :disabled="balancesLoading"
+            @click="loadBalances"
+          >
             {{ balancesLoading ? 'Loading…' : 'Refresh' }}
           </button>
         </div>
@@ -245,11 +247,7 @@ onMounted(async () => {
                   <span class="gold-badge">⚙ {{ formatGold(row.goldTokenBalance) }} g</span>
                 </td>
                 <td>
-                  <button
-                    class="select-btn"
-                    type="button"
-                    @click.stop="selectUser(row.email)"
-                  >
+                  <button class="select-btn" type="button" @click.stop="selectUser(row.email)">
                     Manage
                   </button>
                 </td>
@@ -317,13 +315,7 @@ onMounted(async () => {
               <template v-else-if="isDeduction">Deduct Gold</template>
               <template v-else>Add Gold</template>
             </button>
-            <button
-              type="button"
-              class="cancel-btn"
-              @click="selectedEmail = null"
-            >
-              Cancel
-            </button>
+            <button type="button" class="cancel-btn" @click="selectedEmail = null">Cancel</button>
           </div>
 
           <p v-if="adjustError" class="form-error" role="alert">{{ adjustError }}</p>
@@ -350,7 +342,12 @@ onMounted(async () => {
           <button
             type="button"
             class="refresh-btn refresh-btn--ghost"
-            @click="() => { txFilterEmail = ''; void loadTransactions() }"
+            @click="
+              () => {
+                txFilterEmail = ''
+                void loadTransactions()
+              }
+            "
           >
             Clear
           </button>
@@ -360,9 +357,7 @@ onMounted(async () => {
         <p v-else-if="txLoading && transactions.length === 0" class="state-message">
           Loading transactions…
         </p>
-        <p v-else-if="transactions.length === 0" class="state-message">
-          No transactions found.
-        </p>
+        <p v-else-if="transactions.length === 0" class="state-message">No transactions found.</p>
 
         <div v-else class="tx-table-wrap">
           <table class="tx-table" aria-label="Gold token transaction log">
@@ -415,7 +410,6 @@ onMounted(async () => {
 }
 
 .gold-admin-header-inner {
-  max-width: 1200px;
   margin: 0 auto;
   display: flex;
   align-items: flex-start;
@@ -465,9 +459,7 @@ h1 {
 }
 
 .gold-admin-main {
-  max-width: 1200px;
   margin: 0 auto;
-  padding: 2rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 2rem;

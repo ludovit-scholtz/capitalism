@@ -25671,7 +25671,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
         var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCo", Cash = 15_000_000m };
         db.Companies.Add(bankCompany);
@@ -25679,6 +25679,29 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         db.Companies.Add(depositorCompany);
 
         var bank = CreateTestBank(db, bankCompany, city.Id);
+
+        var bankLiquidityAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = bankCompany.Id,
+            Balance = 15_000_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        var depositorFundingAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depositorCompany.Id,
+            Balance = 500_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.AddRange(bankLiquidityAccount, depositorFundingAccount);
+
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
@@ -25697,19 +25720,20 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             new { input = new { bankBuildingId = bank.Id.ToString(), depositorCompanyId = depositorCompany.Id.ToString(), amount = 100_000m } },
             depositorToken);
 
+        Assert.False(result.TryGetProperty("errors", out _), result.ToString());
         var data = result.GetProperty("data").GetProperty("openBankAccount");
         Assert.Equal(100_000m, data.GetProperty("amount").GetDecimal());
         Assert.Equal(5m, data.GetProperty("depositInterestRatePercent").GetDecimal());
         Assert.True(data.GetProperty("isActive").GetBoolean());
 
-        // Verify cash was transferred
-        await db.Entry(depositorCompany).ReloadAsync();
-        await db.Entry(bankCompany).ReloadAsync();
+        // Verify transfer happened between company bank accounts and increased total deposits.
+        await db.Entry(depositorFundingAccount).ReloadAsync();
+        await db.Entry(bankLiquidityAccount).ReloadAsync();
         await db.Entry(bank).ReloadAsync();
 
-        Assert.Equal(400_000m, depositorCompany.Cash);   // 500k - 100k
-        Assert.Equal(15_100_000m, bankCompany.Cash);     // 15M + 100k
-        Assert.Equal(20_100_000m, bank.TotalDeposits);   // 20M base + 100k
+        Assert.Equal(400_000m, depositorFundingAccount.Balance); // 500k - 100k
+        Assert.Equal(15_100_000m, bankLiquidityAccount.Balance); // 15M + 100k
+        Assert.Equal(20_100_000m, bank.TotalDeposits); // 20M base + 100k
     }
 
         [Fact]

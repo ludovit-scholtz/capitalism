@@ -1769,15 +1769,17 @@ export interface CompanyBankAccountSummary {
   balance: number
 }
 
-/** A bank account owned by one of the player's companies. Returned by the `myBankAccounts` query. */
+/** A bank account owned by the player or one of the player's companies. Returned by the `myBankAccounts` query. */
 export interface PlayerBankAccountSummary {
   id: string
   accountNumber: string
   currencyCode: string
   currencySymbol: string
   balance: number
-  companyId: string
-  companyName: string
+  companyId: string | null
+  companyName: string | null
+  ownerType: 'PERSON' | 'COMPANY'
+  ownerDisplayName: string
 }
 
 /** Result from the `fundBuildingBankAccount` mutation. */

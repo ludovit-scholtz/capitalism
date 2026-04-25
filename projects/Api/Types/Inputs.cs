@@ -530,10 +530,13 @@ public sealed class OpenBankAccountInput
     /// <summary>The bank building where the account is opened.</summary>
     public Guid BankBuildingId { get; set; }
 
-    /// <summary>The company opening the account (must be owned by the authenticated player).</summary>
-    public Guid DepositorCompanyId { get; set; }
+    /// <summary>
+    /// Optional company opening the account (must be owned by the authenticated player).
+    /// When omitted, the authenticated player's personal account context is used.
+    /// </summary>
+    public Guid? DepositorCompanyId { get; set; }
 
-    /// <summary>Initial account balance (must be >= 1,000).</summary>
+    /// <summary>Initial account balance. Zero is allowed and is the default onboarding flow.</summary>
     public decimal Amount { get; set; }
 }
 

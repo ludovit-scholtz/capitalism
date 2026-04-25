@@ -39,8 +39,6 @@ const bankShowAvailableOnly = ref(false)
 // Deposit modal state
 const showDepositModal = ref(false)
 const selectedBank = ref<BankInfoSummary | null>(null)
-const depositCompanyId = ref('')
-const depositAmount = ref(10000)
 const depositLoading = ref(false)
 const depositError = ref<string | null>(null)
 const depositSuccess = ref(false)
@@ -193,6 +191,8 @@ const MY_BANK_ACCOUNTS_QUERY = `
       balance
       companyId
       companyName
+      ownerType
+      ownerDisplayName
     }
   }
 `
@@ -277,6 +277,13 @@ useTickRefresh(async () => {
 const activeLoans = computed(() => myLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE'))
 const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
+const visibleBankAccounts = computed(() => {
+  if (auth.player?.activeAccountType === 'COMPANY' && auth.player.activeCompanyId) {
+    return myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === auth.player?.activeCompanyId)
+  }
+
+  return myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
+})
 
 // Lender eligibility: detect BANK buildings across all companies
 const myBankBuildings = computed(() => myCompanies.value.flatMap((c) => (c.buildings ?? []).filter((b) => b.type === 'BANK').map((b) => ({ ...b, companyId: c.id }))))
@@ -413,8 +420,6 @@ async function confirmAcceptLoan() {
 
 function openDepositModal(bank: BankInfoSummary) {
   selectedBank.value = bank
-  depositCompanyId.value = activeCompany.value?.id ?? ''
-  depositAmount.value = 0
   depositError.value = null
   depositSuccess.value = false
   showDepositModal.value = true
@@ -436,16 +441,17 @@ function closeDepositModal() {
 }
 
 async function submitDeposit() {
-  if (!selectedBank.value || !depositCompanyId.value) return
+  if (!selectedBank.value) return
   depositLoading.value = true
   depositError.value = null
   depositSuccess.value = false
+  const contextCompanyId = isCompanyAccountActive.value ? (activeCompany.value?.id ?? null) : null
   try {
     await gqlRequest(CREATE_DEPOSIT_MUTATION, {
       input: {
         bankBuildingId: selectedBank.value.bankBuildingId,
-        depositorCompanyId: depositCompanyId.value,
-        amount: depositAmount.value,
+        depositorCompanyId: contextCompanyId,
+        amount: 0,
       },
     })
     depositSuccess.value = true
@@ -658,13 +664,13 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         <div v-if="activeTab === 'deposit'" class="deposit-tab flex flex-col gap-8 lg:gap-10">
           <section v-if="auth.isAuthenticated" class="my-bank-accounts-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
             <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myBankAccounts') }}</h2>
-            <div v-if="myBankAccounts.length === 0" class="empty-state">
+            <div v-if="visibleBankAccounts.length === 0" class="empty-state">
               <p>{{ t('bank.noBankAccountsYet') }}</p>
             </div>
             <div v-else class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div v-for="account in myBankAccounts" :key="account.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" data-testid="bank-account-row">
+              <div v-for="account in visibleBankAccounts" :key="account.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" data-testid="bank-account-row">
                 <div class="deposit-card-header">
-                  <span class="deposit-bank-name">{{ account.companyName }}</span>
+                  <span class="deposit-bank-name">{{ account.ownerDisplayName }}</span>
                   <span class="deposit-rate-badge">{{ account.currencyCode }}</span>
                 </div>
                 <div class="deposit-stats">
@@ -785,13 +791,12 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                     <button class="btn btn-secondary btn-sm" @click="navigateToBank(bank.bankBuildingId)">
                       {{ t('bank.viewBankDetail') }}
                     </button>
-                    <button v-if="auth.isAuthenticated && isCompanyAccountActive" class="btn btn-primary btn-sm bank-deposit-btn" @click="openDepositModal(bank)">
+                    <button v-if="auth.isAuthenticated" class="btn btn-primary btn-sm bank-deposit-btn" @click="openDepositModal(bank)">
                       {{ t('bank.makeDeposit') }}
                     </button>
                     <router-link v-else-if="!auth.isAuthenticated" to="/login" class="btn btn-primary btn-sm">
                       {{ t('auth.login') }}
                     </router-link>
-                    <p v-else class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
                   </div>
                 </div>
               </div>
@@ -943,18 +948,13 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                 <strong>{{ formatPercent(selectedBank.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
               </div>
             </div>
-            <div class="form-group flex flex-col gap-3">
-              <label for="deposit-amount" class="text-sm font-semibold text-body">{{ t('bank.depositAmount') }}</label>
-              <input id="deposit-amount" v-model.number="depositAmount" type="number" min="0" step="0.01" class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body" />
-              <span class="form-hint text-sm text-muted">{{ t('bank.depositAmountHint') }}</span>
-              <p class="rounded-2xl border border-divider bg-card-raised px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
-            </div>
+            <p class="rounded-2xl border border-divider bg-card-raised px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
             <div v-if="depositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
             <div v-if="depositError" class="error-message">{{ depositError }}</div>
           </div>
           <div class="modal-footer flex justify-end gap-3 border-t border-divider px-6 py-5 sm:px-8 sm:py-6">
             <button class="btn btn-secondary" @click="closeDepositModal">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="depositLoading || depositAmount < 0" @click="submitDeposit">
+            <button class="btn btn-primary" :disabled="depositLoading" @click="submitDeposit">
               <span v-if="depositLoading">{{ t('common.loading') }}</span>
               <span v-else>{{ t('bank.confirmDeposit') }}</span>
             </button>
@@ -967,9 +967,7 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
 
 <style scoped>
 .loan-marketplace-view {
-  max-width: 1100px;
   margin: 0 auto;
-  padding: var(--spacing-lg);
 }
 
 .page-header {

@@ -45,11 +45,12 @@ public sealed partial class Mutation
 
         var fromAccount = await db.BankAccounts
             .Include(a => a.Company)
+            .Include(a => a.Player)
             .FirstOrDefaultAsync(a => a.Id == input.FromBankAccountId);
 
         if (fromAccount is null
-            || fromAccount.Company is null
-            || fromAccount.Company.PlayerId != userId)
+            || ((fromAccount.Company is null || fromAccount.Company.PlayerId != userId)
+                && fromAccount.PlayerId != userId))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -60,11 +61,12 @@ public sealed partial class Mutation
 
         var toAccount = await db.BankAccounts
             .Include(a => a.Company)
+            .Include(a => a.Player)
             .FirstOrDefaultAsync(a => a.Id == input.ToBankAccountId);
 
         if (toAccount is null
-            || toAccount.Company is null
-            || toAccount.Company.PlayerId != userId)
+            || ((toAccount.Company is null || toAccount.Company.PlayerId != userId)
+                && toAccount.PlayerId != userId))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -109,29 +111,33 @@ public sealed partial class Mutation
 
         var nowUtc = DateTime.UtcNow;
 
-        // Outgoing leg on the source company's ledger.
-        db.LedgerEntries.Add(new LedgerEntry
+        if (fromAccount.CompanyId.HasValue)
         {
-            Id = Guid.NewGuid(),
-            CompanyId = fromAccount.CompanyId!.Value,
-            Category = LedgerCategory.BankAccountTransferOut,
-            Description = $"{description} → {toAccount.Company.Name} ({toAccount.AccountNumber})",
-            Amount = -input.Amount,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = nowUtc,
-        });
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = fromAccount.CompanyId.Value,
+                Category = LedgerCategory.BankAccountTransferOut,
+                Description = $"{description} → {(toAccount.Company?.Name ?? toAccount.Player?.DisplayName ?? "Personal")} ({toAccount.AccountNumber})",
+                Amount = -input.Amount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+            });
+        }
 
-        // Incoming leg on the destination company's ledger.
-        db.LedgerEntries.Add(new LedgerEntry
+        if (toAccount.CompanyId.HasValue)
         {
-            Id = Guid.NewGuid(),
-            CompanyId = toAccount.CompanyId!.Value,
-            Category = LedgerCategory.BankAccountTransferIn,
-            Description = $"{description} ← {fromAccount.Company.Name} ({fromAccount.AccountNumber})",
-            Amount = input.Amount,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = nowUtc,
-        });
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = toAccount.CompanyId.Value,
+                Category = LedgerCategory.BankAccountTransferIn,
+                Description = $"{description} ← {(fromAccount.Company?.Name ?? fromAccount.Player?.DisplayName ?? "Personal")} ({fromAccount.AccountNumber})",
+                Amount = input.Amount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+            });
+        }
 
         await db.SaveChangesAsync();
 
@@ -145,8 +151,10 @@ public sealed partial class Mutation
                 AccountNumber = fromAccount.AccountNumber,
                 CurrencyCode = fromAccount.CurrencyCode,
                 Balance = fromAccount.Balance,
-                CompanyId = fromAccount.CompanyId.Value,
-                CompanyName = fromAccount.Company.Name,
+                CompanyId = fromAccount.CompanyId,
+                CompanyName = fromAccount.Company?.Name,
+                OwnerType = fromAccount.CompanyId.HasValue ? "COMPANY" : "PERSON",
+                OwnerDisplayName = fromAccount.Company?.Name ?? fromAccount.Player?.DisplayName ?? string.Empty,
             },
             ToAccount = new PlayerBankAccountSummary
             {
@@ -154,8 +162,10 @@ public sealed partial class Mutation
                 AccountNumber = toAccount.AccountNumber,
                 CurrencyCode = toAccount.CurrencyCode,
                 Balance = toAccount.Balance,
-                CompanyId = toAccount.CompanyId.Value,
-                CompanyName = toAccount.Company.Name,
+                CompanyId = toAccount.CompanyId,
+                CompanyName = toAccount.Company?.Name,
+                OwnerType = toAccount.CompanyId.HasValue ? "COMPANY" : "PERSON",
+                OwnerDisplayName = toAccount.Company?.Name ?? toAccount.Player?.DisplayName ?? string.Empty,
             },
         };
     }
