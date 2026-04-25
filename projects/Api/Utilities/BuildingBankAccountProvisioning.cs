@@ -12,6 +12,9 @@ namespace Api.Utilities;
 /// </summary>
 public static class BuildingBankAccountProvisioning
 {
+    private static bool UsePostgresCompatPath(AppDbContext db)
+        => db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+
     public static async Task<BankAccount> EnsureBuildingAssignedAccountAsync(
         AppDbContext db,
         Building building,
@@ -29,8 +32,26 @@ public static class BuildingBankAccountProvisioning
                 return trackedAssignedAccount;
             }
 
-            var persistedAssignedAccount = await db.BankAccounts
-                .FirstOrDefaultAsync(account => account.Id == building.BankAccountId.Value, cancellationToken);
+            BankAccount? persistedAssignedAccount;
+
+            if (UsePostgresCompatPath(db))
+            {
+                var bankAccountIdText = building.BankAccountId.Value.ToString("D");
+                persistedAssignedAccount = await db.BankAccounts
+                    .FromSqlInterpolated(
+                        $"""
+                        SELECT *
+                        FROM "BankAccounts"
+                        WHERE "Id"::text = {bankAccountIdText}
+                        LIMIT 1
+                        """)
+                    .FirstOrDefaultAsync(cancellationToken);
+            }
+            else
+            {
+                persistedAssignedAccount = await db.BankAccounts
+                    .FirstOrDefaultAsync(account => account.Id == building.BankAccountId.Value, cancellationToken);
+            }
 
             if (persistedAssignedAccount is not null)
             {
@@ -68,9 +89,30 @@ public static class BuildingBankAccountProvisioning
             return trackedAccount;
         }
 
-        var existingAccount = await db.BankAccounts.FirstOrDefaultAsync(
-            account => account.CompanyId == companyId && account.CurrencyCode == normalizedCurrencyCode,
-            cancellationToken);
+        BankAccount? existingAccount;
+
+        if (UsePostgresCompatPath(db))
+        {
+            var companyIdText = companyId.ToString("D");
+            existingAccount = await db.BankAccounts
+                .FromSqlInterpolated(
+                    $"""
+                    SELECT *
+                    FROM "BankAccounts"
+                    WHERE "CompanyId" IS NOT NULL
+                      AND "CompanyId"::text = {companyIdText}
+                      AND UPPER("CurrencyCode") = {normalizedCurrencyCode}
+                    ORDER BY "CreatedAtUtc" ASC
+                    LIMIT 1
+                    """)
+                .FirstOrDefaultAsync(cancellationToken);
+        }
+        else
+        {
+            existingAccount = await db.BankAccounts.FirstOrDefaultAsync(
+                account => account.CompanyId == companyId && account.CurrencyCode == normalizedCurrencyCode,
+                cancellationToken);
+        }
 
         if (existingAccount is not null)
         {

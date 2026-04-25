@@ -343,8 +343,26 @@ public sealed partial class AppDbInitializer(
             await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, govPlayer, 0m);
         }
 
-        var govCompany = await dbContext.Companies
-            .FirstOrDefaultAsync(company => company.PlayerId == govPlayer.Id && company.Name == GovDisplayName);
+        Company? govCompany;
+        if (dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var govPlayerIdText = govPlayer.Id.ToString("D");
+            govCompany = await dbContext.Companies
+                .FromSqlInterpolated(
+                    $"""
+                    SELECT *
+                    FROM "Companies"
+                    WHERE "Name" = {GovDisplayName}
+                      AND "PlayerId"::text = {govPlayerIdText}
+                    LIMIT 1
+                    """)
+                .FirstOrDefaultAsync();
+        }
+        else
+        {
+            govCompany = await dbContext.Companies
+                .FirstOrDefaultAsync(company => company.PlayerId == govPlayer.Id && company.Name == GovDisplayName);
+        }
 
         if (govCompany is null)
         {
