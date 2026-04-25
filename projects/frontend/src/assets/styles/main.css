@@ -87,6 +87,7 @@
   --color-border-muted: rgba(48, 54, 61, 0.5);
 
   --spacing-md: 1rem;
+  --spacing-lg: 1.25rem;
   --spacing-xl: 1.5rem;
   --spacing-sm: 0.5rem;
 }

@@ -24,6 +24,7 @@ public sealed partial class Query
         Guid companyId,
         int? limit,
         int? offset,
+        Guid? accountId,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -38,10 +39,38 @@ public sealed partial class Query
         var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
     var pageOffset = Math.Max(offset ?? 0, 0);
 
-        // Load all entries to compute an accurate running balance (newest-first for display).
-        var allEntries = await db.LedgerEntries
+        // If accountId is provided, find the building that owns the account so we can filter entries.
+        Guid? filterBuildingId = null;
+        string? filterCurrencyCode = null;
+        if (accountId.HasValue)
+        {
+            var owningBuilding = await db.Buildings
+                .AsNoTracking()
+                .Include(b => b.City)
+                .FirstOrDefaultAsync(b => b.BankAccountId == accountId.Value && b.CompanyId == companyId);
+            if (owningBuilding != null)
+            {
+                filterBuildingId = owningBuilding.Id;
+                filterCurrencyCode = owningBuilding.City?.CurrencyCode;
+            }
+            else
+            {
+                // Account may be a company-level (non-building) account; fall back to querying by currency from the bank account.
+                var acct = await db.BankAccounts
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId);
+                filterCurrencyCode = acct?.CurrencyCode;
+            }
+        }
+
+        // Load entries: if a building filter is active, scope to that building only.
+        var entriesQuery = db.LedgerEntries
             .AsNoTracking()
-            .Where(e => e.CompanyId == companyId)
+            .Where(e => e.CompanyId == companyId);
+        if (filterBuildingId.HasValue)
+            entriesQuery = entriesQuery.Where(e => e.BuildingId == filterBuildingId.Value);
+
+        var allEntries = await entriesQuery
             .Include(e => e.Building)
             .OrderBy(e => e.RecordedAtTick)
             .ThenBy(e => e.RecordedAtUtc)
@@ -77,11 +106,12 @@ public sealed partial class Query
             BuildingName = e.Building?.Name,
         }).ToList();
 
-        // Primary currency code for the company (determined by the city of its first building,
-        // falling back to EUR if the company has no buildings yet).
-        var primaryCurrencyCode = company.Buildings
-            .Select(b => b.City?.CurrencyCode)
-            .FirstOrDefault(c => !string.IsNullOrEmpty(c)) ?? "EUR";
+        // Primary currency: prefer the filtered account's currency, then first building city, then EUR.
+        var primaryCurrencyCode = filterCurrencyCode
+            ?? company.Buildings
+                .Select(b => b.City?.CurrencyCode)
+                .FirstOrDefault(c => !string.IsNullOrEmpty(c))
+            ?? "EUR";
 
         var currentBalance = allEntries.Sum(e => e.Amount);
 

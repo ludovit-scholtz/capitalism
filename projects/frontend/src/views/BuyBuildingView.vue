@@ -29,6 +29,8 @@ const depositRatePercent = ref<number>(3)
 const lendingRatePercent = ref<number>(8)
 // Funding guidance
 const playerBalances = ref<CurrencyBalance[]>([])
+// Company bank accounts (for bank capital check)
+const companyBankAccounts = ref<Array<{ id: string; currencyCode: string; balance: number; companyId: string | null; ownerType: string }>>([])
 
 const SET_BANK_RATES_MUTATION = `
   mutation SetBankRates($input: SetBankRatesInput!) {
@@ -87,9 +89,18 @@ const bankBaseCapitalRequired = computed<number>(() => {
   }
 })
 
+/** Sum of all company bank-account balances in the city currency. */
+const companyBankBalanceInCityCurrency = computed<number>(() => {
+  if (!selectedCompany.value) return 0
+  const cc = selectedCityCurrencyCode.value
+  return companyBankAccounts.value
+    .filter((a) => a.ownerType === 'COMPANY' && a.companyId === selectedCompany.value!.id && a.currencyCode.toUpperCase() === cc)
+    .reduce((sum, a) => sum + a.balance, 0)
+})
+
 const companyHasBankCapital = computed<boolean>(() => {
   if (!selectedCompany.value) return false
-  return selectedCompany.value.cash >= bankBaseCapitalRequired.value
+  return companyBankBalanceInCityCurrency.value >= bankBaseCapitalRequired.value
 })
 
 const bankCapitalInsufficientMessage = computed<string>(() =>
@@ -166,14 +177,18 @@ onMounted(async () => {
 
   loading.value = true
   try {
-    const [citiesData, balancesData] = await Promise.all([
+    const [citiesData, balancesData, accountsData] = await Promise.all([
       gqlRequest<{ cities: City[] }>('{ cities { id name countryCode currencyCode population } }'),
       gqlRequest<{ playerCurrencyBalances: CurrencyBalance[] }>(
         '{ playerCurrencyBalances { currencyCode currencySymbol balance } }',
       ),
+      gqlRequest<{ myBankAccounts: Array<{ id: string; currencyCode: string; balance: number; companyId: string | null; ownerType: string }> }>(
+        '{ myBankAccounts { id currencyCode balance companyId ownerType } }',
+      ),
     ])
     cities.value = citiesData.cities
     playerBalances.value = balancesData.playerCurrencyBalances ?? []
+    companyBankAccounts.value = accountsData.myBankAccounts ?? []
 
     if (!selectedCompany.value) {
       error.value = t('cityMap.noCompany')
@@ -188,6 +203,12 @@ onMounted(async () => {
   const typeParam = route.query.type as string | undefined
   if (typeParam && buildingTypes.includes(typeParam)) {
     selectedType.value = typeParam
+  }
+
+  // Pre-select city if passed as query param
+  const cityParam = route.query.city as string | undefined
+  if (cityParam && cities.value.find((c) => c.id === cityParam)) {
+    selectedCityId.value = cityParam
   }
 })
 
@@ -331,8 +352,8 @@ async function buyBuilding() {
       <div v-if="loading" class="text-center py-8 text-muted">{{ t('common.loading') }}</div>
 
       <template v-else>
-        <!-- Step 1: Building type -->
-        <div class="mb-8">
+        <!-- Step 1: Building type (hidden when ?type= is pre-selected in URL) -->
+        <div v-if="!route.query.type || !buildingTypes.includes(route.query.type as string)" class="mb-8">
           <h2 class="text-lg font-semibold mb-3">{{ t('buildings.selectType') }}</h2>
           <div class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(180px,1fr))]">
             <button
@@ -448,10 +469,10 @@ async function buyBuilding() {
             </div>
           </div>
 
-          <!-- Company balance banner -->
+          <!-- Company balance banner (shows bank account balance in selected city currency, or all-currency summary) -->
           <div v-if="selectedCompany" class="flex justify-between items-center mt-1 px-4 py-3 border border-divider rounded-lg bg-page">
             <span class="font-medium">{{ selectedCompany.name }}</span>
-            <strong class="text-good">{{ formatCurrency(selectedCompany.cash) }}</strong>
+            <strong class="text-good">{{ formatCurrency(companyBankBalanceInCityCurrency) }}</strong>
           </div>
 
           <!-- BANK: setup info -->
