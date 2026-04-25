@@ -268,8 +268,13 @@ namespace Api.Data.Migrations
                                    END,
                                    0
                                ),
-                               account."IsBaseCapitalDeposit",
-                               CASE WHEN account."ClosedAtUtc" IS NULL THEN 1 ELSE 0 END,
+                               CASE
+                                   WHEN account."IsBaseCapitalDeposit" IS NULL THEN FALSE
+                                   WHEN LOWER(TRIM(account."IsBaseCapitalDeposit"::text)) IN ('1', 'true', 't', 'yes', 'y') THEN TRUE
+                                   WHEN LOWER(TRIM(account."IsBaseCapitalDeposit"::text)) IN ('0', 'false', 'f', 'no', 'n') THEN FALSE
+                                   ELSE FALSE
+                               END,
+                               account."ClosedAtUtc" IS NULL,
                                COALESCE(account."DepositedAtTick", 0),
                                COALESCE(
                                    CASE
@@ -317,7 +322,12 @@ namespace Api.Data.Migrations
                                    END,
                                    0
                                ),
-                               account."IsBaseCapitalDeposit",
+                               CASE
+                                   WHEN account."IsBaseCapitalDeposit" IS NULL THEN FALSE
+                                   WHEN LOWER(TRIM(account."IsBaseCapitalDeposit"::text)) IN ('1', 'true', 't', 'yes', 'y') THEN TRUE
+                                   WHEN LOWER(TRIM(account."IsBaseCapitalDeposit"::text)) IN ('0', 'false', 'f', 'no', 'n') THEN FALSE
+                                   ELSE FALSE
+                               END,
                                account."ClosedAtUtc" IS NULL,
                                COALESCE(account."DepositedAtTick", 0),
                                COALESCE(
@@ -416,7 +426,12 @@ namespace Api.Data.Migrations
                                0
                            ),
                            legacy."DepositedAtTick",
-                           legacy."IsBaseCapital",
+                           CASE
+                               WHEN legacy."IsBaseCapital" IS NULL THEN FALSE
+                               WHEN LOWER(TRIM(legacy."IsBaseCapital"::text)) IN ('1', 'true', 't', 'yes', 'y') THEN TRUE
+                               WHEN LOWER(TRIM(legacy."IsBaseCapital"::text)) IN ('0', 'false', 'f', 'no', 'n') THEN FALSE
+                               ELSE FALSE
+                           END,
                            legacy."WithdrawnAtTick",
                            CASE
                                WHEN legacy."WithdrawnAtUtc" IS NULL THEN NULL
