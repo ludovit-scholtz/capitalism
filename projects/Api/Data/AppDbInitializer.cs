@@ -22,25 +22,7 @@ public sealed partial class AppDbInitializer(
 {
     /// <summary>
     /// Ensures the schema is up to date and seeds initial data if missing.
-    ///
-    /// Startup sequence (relational databases):
-    /// 1. <c>EnsureCreatedAsync</c> — creates the database and all tables if they do not exist
-    ///    yet.  For databases that already exist (whether bootstrapped by a previous
-    ///    <c>EnsureCreated</c> call or by an earlier migration run) this is a no-op.
-    /// 2. <c>RepairKnownLegacySchemaDriftAsync</c> — idempotently patches known additive schema
-    ///    gaps for legacy databases that were later baselined as if every migration had already
-    ///    run.
-    /// 3. <c>EnsureMigrationsHistoryBaselineAsync</c> — if <c>__EFMigrationsHistory</c> is
-    ///    absent (legacy database that was bootstrapped by <c>EnsureCreatedAsync</c> before
-    ///    migration support was introduced) this method creates the history table and marks every
-    ///    currently-defined migration as already applied after the legacy repair step has brought
-    ///    the schema up to the current model.
-    /// 4. <c>MigrateAsync</c> — on PostgreSQL, applies only the migrations that are not yet in
-    ///    the history table. For SQLite test databases, startup stops after the repair + baseline
-    ///    path because migrations are intentionally scaffolded against PostgreSQL.
-    ///
-    /// For in-memory databases (used in local development) migrations are not supported by
-    /// the provider; <c>EnsureCreatedAsync</c> is used directly and steps 2–4 are skipped.
+    /// Runtime relational providers apply migrations; in-memory test providers use EnsureCreated.
     /// </summary>
     public async Task InitializeAsync()
     {
@@ -150,11 +132,7 @@ public sealed partial class AppDbInitializer(
             await dbContext.SaveChangesAsync();
         }
 
-        // Legacy SQLite bootstrap schemas can still enforce NOT NULL on Companies.Cash
-        // while the current runtime model no longer maps that column. In that state,
-        // inserting new companies through EF would fail. Skip government company seeding
-        // until the legacy schema is migrated/repaired beyond that constraint.
-        var hasLegacyCompanyCashConstraint = await HasColumnAsync("Companies", "Cash");
+        var hasLegacyCompanyCashConstraint = false;
 
         // Seed government-owned baseline media houses in every city (idempotent).
         if (!hasLegacyCompanyCashConstraint)
@@ -178,38 +156,6 @@ public sealed partial class AppDbInitializer(
         // Existing buildings created before bank-account provisioning must be linked to
         // a company-owned account in their city currency on startup.
         await EnsureBuildingBankAccountsAsync();
-    }
-
-    private async Task<bool> HasColumnAsync(string tableName, string columnName)
-    {
-        var connection = dbContext.Database.GetDbConnection();
-        var wasOpen = connection.State == System.Data.ConnectionState.Open;
-        if (!wasOpen)
-        {
-            await connection.OpenAsync();
-        }
-
-        try
-        {
-            await using var command = connection.CreateCommand();
-            command.CommandText =
-                $"SELECT COUNT(1) FROM pragma_table_info('{tableName.Replace("'", "''")}') WHERE name = @columnName";
-
-            var parameter = command.CreateParameter();
-            parameter.ParameterName = "@columnName";
-            parameter.Value = columnName;
-            command.Parameters.Add(parameter);
-
-            var result = await command.ExecuteScalarAsync();
-            return Convert.ToInt64(result ?? 0) > 0;
-        }
-        finally
-        {
-            if (!wasOpen)
-            {
-                await connection.CloseAsync();
-            }
-        }
     }
 
     private async Task SeedFxRatesAsync()

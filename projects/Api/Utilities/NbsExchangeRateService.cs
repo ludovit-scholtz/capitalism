@@ -7,7 +7,7 @@ namespace Api.Utilities;
 /// Feed URL: https://nbs.sk/export/en/exchange-rate/{date}/csv where {date} is yyyy-MM-dd.
 /// Falls back to hardcoded approximate rates when the live feed is unavailable.
 /// </summary>
-public sealed class NbsExchangeRateService(IHttpClientFactory httpClientFactory, ILogger<NbsExchangeRateService> logger)
+public sealed class NbsExchangeRateService(IHttpClientFactory httpClientFactory, IWebHostEnvironment webHostEnvironment, ILogger<NbsExchangeRateService> logger)
 {
     /// <summary>
     /// Fallback rates expressed as "units of quote currency per 1 EUR".
@@ -29,6 +29,10 @@ public sealed class NbsExchangeRateService(IHttpClientFactory httpClientFactory,
     public async Task<IReadOnlyList<FxRate>> FetchLatestRatesAsync(CancellationToken ct = default)
     {
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        if (webHostEnvironment.IsEnvironment("Testing"))
+        {
+            return BuildFallbackRates(today);
+        }
         var dateString = today.ToString("yyyy-MM-dd");
         var url = $"https://nbs.sk/export/en/exchange-rate/{dateString}/csv";
 

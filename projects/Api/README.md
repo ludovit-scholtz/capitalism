@@ -6,7 +6,7 @@
 - GraphQL API for public event discovery and authenticated management
 - Event domain taxonomy with administrator-managed `slug` and `subdomain`
 - JWT authentication for contributors and administrators
-- Entity Framework Core storage using SQLite by default
+- Entity Framework Core storage using PostgreSQL in runtime and InMemory provider in automated tests
 - Seeded sample data for Prague crypto and AI events
 - Contributor dashboard queries and admin moderation queries/mutations
 - Automated tests, container image build, and Kubernetes deployment manifests

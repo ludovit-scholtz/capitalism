@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using System.Text;
-using System.Data.Common;
 using Api.Data.Entities;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -9,10 +8,6 @@ namespace Api.Data;
 
 public sealed partial class AppDbInitializer
 {
-    private const string HistoryTableName = "__EFMigrationsHistory";
-    private const string LegacySqlitePostgresMigrationHydrationFloor = "20260413222338_AddPersonalTaxReserve";
-    private const string LegacySqlitePostgresMigrationCutoff = "20260417135125_AddLoanCollateral";
-
     private async Task SeedBuildingLotsAsync()
     {
         var bratislava = await dbContext.Cities.FirstAsync(c => c.Name == "Bratislava");
@@ -27,7 +22,7 @@ public sealed partial class AppDbInitializer
         // This means mine lots with raw-material deposits will always have Price > BasePrice.
         var lotsToSeed = new List<BuildingLot>
         {
-            // ── Industrial Zone (eastern outskirts) ──
+            // Industrial Zone (eastern outskirts)
             // Low population index: these lots are near logistics hubs but away from residential areas.
             new BuildingLot
             {
@@ -64,18 +59,18 @@ public sealed partial class AppDbInitializer
                 MaterialQuantity = 12_000m
             },
             // Premium gold deposit site (upper range of mine pricing, ~$130M)
-            // Gold: 3,200 kg × 500 EUR/kg × 82% quality × captureRate(100) = 131,200,000 EUR
+            // Gold: 3,200 kg x 500 EUR/kg x 82% quality x captureRate(100) = 131,200,000 EUR
             new BuildingLot
             {
                 Id = CreateDeterministicGuid("lot:ba-mine-gold-1"),
                 CityId = bratislava.Id,
                 Name = "Carpathian Gold Seam",
-                Description = "Rare high-grade gold deposit in the Carpathian foothills north of Bratislava. Geological surveys confirm 3,200 kg of recoverable gold at 82% purity — one of the richest seams in Central Europe.",
+                Description = "Rare high-grade gold deposit in the Carpathian foothills north of Bratislava. Geological surveys confirm 3,200 kg of recoverable gold at 82% purity - one of the richest seams in Central Europe.",
                 District = "Extraction Belt",
                 Latitude = 48.1740, Longitude = 17.0950,
                 PopulationIndex = 0.42m,
                 BasePrice = 80_000m,
-                Price = 80_000m,  // will be recomputed below — resource premium ≈ $131M
+                Price = 80_000m,  // will be recomputed below - resource premium approx. $131M
                 SuitableTypes = "MINE",
                 ResourceTypeId = resources.TryGetValue("gold", out var gold) ? gold.Id : null,
                 ResourceType = resources.TryGetValue("gold", out var goldNav) ? goldNav : null,
@@ -95,7 +90,7 @@ public sealed partial class AppDbInitializer
                 Price = 90_000m,
                 SuitableTypes = "FACTORY,POWER_PLANT"
             },
-            // ── Commercial District (city center) ──
+            // Commercial District (city center)
             // High population index: these lots are in the heart of the city with dense foot traffic.
             new BuildingLot
             {
@@ -136,7 +131,7 @@ public sealed partial class AppDbInitializer
                 Price = 100_000m,
                 SuitableTypes = "SALES_SHOP"
             },
-            // ── Business Park (northern area) ──
+            // Business Park (northern area)
             // Moderate-to-high population index: professional district with daytime footfall.
             new BuildingLot
             {
@@ -164,7 +159,7 @@ public sealed partial class AppDbInitializer
                 Price = 200_000m,
                 SuitableTypes = "BANK,EXCHANGE"
             },
-            // ── Residential Quarter (western area) ──
+            // Residential Quarter (western area)
             // Steady population index: consistent local demand from residents.
             new BuildingLot
             {
@@ -192,7 +187,7 @@ public sealed partial class AppDbInitializer
                 Price = 70_000m,
                 SuitableTypes = "APARTMENT"
             },
-            // ── Media & Cultural District (south-central) ──
+            // Media & Cultural District (south-central)
             // Moderate population index: near cultural venues with evening and weekend activity.
             new BuildingLot
             {
@@ -207,7 +202,7 @@ public sealed partial class AppDbInitializer
                 Price = 140_000m,
                 SuitableTypes = "MEDIA_HOUSE"
             },
-            // ── Energy Zone (south-eastern outskirts) ──
+            // Energy Zone (south-eastern outskirts)
             // Low population index: far from residential areas; access to grid infrastructure.
             new BuildingLot
             {
@@ -257,7 +252,7 @@ public sealed partial class AppDbInitializer
     /// <summary>
     /// Idempotent upgrade: adds the Carpathian Gold Seam lot to Bratislava if it was not
     /// present when the database was first seeded (e.g., pre-mining-premium databases).
-    /// Safe to call on every startup — no-op when the lot already exists.
+    /// Safe to call on every startup - no-op when the lot already exists.
     /// </summary>
     private async Task EnsureCarpathianGoldSeamLotAsync()
     {
@@ -274,7 +269,7 @@ public sealed partial class AppDbInitializer
             Id = goldLotId,
             CityId = bratislava.Id,
             Name = "Carpathian Gold Seam",
-            Description = "Rare high-grade gold deposit in the Carpathian foothills north of Bratislava. Geological surveys confirm 3,200 kg of recoverable gold at 82% purity — one of the richest seams in Central Europe.",
+            Description = "Rare high-grade gold deposit in the Carpathian foothills north of Bratislava. Geological surveys confirm 3,200 kg of recoverable gold at 82% purity - one of the richest seams in Central Europe.",
             District = "Extraction Belt",
             Latitude = 48.1740, Longitude = 17.0950,
             PopulationIndex = 0.42m,
@@ -304,243 +299,16 @@ public sealed partial class AppDbInitializer
         return new Guid(hash);
     }
 
-    /// <summary>
-    /// Applies the database schema in a way that is safe for three distinct startup scenarios:
-    /// <list type="bullet">
-    ///   <item><description>
-    ///     <b>In-memory database (local development)</b> — EF migrations are not supported by
-    ///     the in-memory provider.  <c>EnsureCreatedAsync</c> is used directly; migration steps
-    ///     are skipped.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Fresh relational database</b> — <c>EnsureCreatedAsync</c> creates the schema,
-    ///     legacy schema repair runs as a no-op safety check, and then a baseline entry is
-    ///     inserted into <c>__EFMigrationsHistory</c> for every currently-defined migration so
-    ///     that <c>MigrateAsync</c> has nothing left to apply.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Legacy relational database</b> (created by <c>EnsureCreatedAsync</c> before
-    ///     migration support was introduced, no <c>__EFMigrationsHistory</c> table) —
-    ///     same as fresh path, except known additive schema gaps are repaired before baseline
-    ///     entries are inserted for all existing migrations.
-    ///   </description></item>
-    ///   <item><description>
-    ///     <b>Relational database already managed by migrations</b> — <c>EnsureCreatedAsync</c>
-    ///     is a no-op, legacy schema repair still runs as a safety net, and <c>MigrateAsync</c>
-    ///     applies only pending migrations. Migration failures are fatal so the app never starts
-    ///     against a partially-upgraded schema.
-    ///   </description></item>
-    /// </list>
-    /// </summary>
     private async Task SafelyApplyMigrationsAsync()
     {
-        // In-memory databases (development mode: UseInMemoryDatabase) do not support EF
-        // migrations at all — the in-memory provider has no IMigrator service.  Fall back to
-        // EnsureCreatedAsync which correctly builds the schema from the current model.
-        if (!dbContext.Database.IsRelational())
+        if (dbContext.Database.IsRelational())
         {
-            await dbContext.Database.EnsureCreatedAsync();
+            await dbContext.Database.MigrateAsync();
             return;
         }
 
-        // For relational databases (PostgreSQL in runtime, SQLite in tests):
-        //   a) EnsureCreatedAsync is idempotent and safe to call even when tables already exist.
-        //      It creates the database file and schema when absent and returns false (no-op)
-        //      when the database already exists — regardless of whether it was originally
-        //      created by EnsureCreated or by a previous migration run.
         await dbContext.Database.EnsureCreatedAsync();
-
-        //   b) Repair known additive schema drift for legacy databases that were baselined
-        //      without actually having every later migration applied.
-        await RepairKnownLegacySchemaDriftAsync();
-
-        //   c) If the database has no __EFMigrationsHistory table, every currently-defined
-        //      migration is marked as already applied so that MigrateAsync (step d) does not
-        //      attempt to re-create tables that already exist.
-        var baselinedMigrationsHistory = await EnsureMigrationsHistoryBaselineAsync();
-
-        if (baselinedMigrationsHistory)
-        {
-            return;
-        }
-
-        // SQLite is used only in tests. Once migrations are scaffolded against PostgreSQL,
-        // replaying them on SQLite is no longer a meaningful validation path. The SQLite test
-        // provider therefore stays on the EnsureCreated + repair + history-baseline path.
-        if (!GetSchemaDialect().IsPostgres)
-        {
-            return;
-        }
-
-        //   d) PostgreSQL databases that still have pending legacy SQLite-scaffolded migrations
-        //      are repaired to the current model shape and then have just that repaired legacy
-        //      tail marked as applied. Future PostgreSQL-native migrations (added after the
-        //      legacy cutoff) are still left pending and will run normally in the next step.
-        await EnsureRepairedLegacyPostgresMigrationHistoryAsync();
-
-        //   e) Apply any migrations that are not yet recorded in __EFMigrationsHistory.
-        //      This is a no-op for brand-new or already up-to-date databases.
-        await dbContext.Database.MigrateAsync();
     }
-
-    /// <summary>
-    /// Creates <c>__EFMigrationsHistory</c> and inserts baseline rows for every currently-defined
-    /// migration when the table does not exist.  This makes databases that were bootstrapped
-    /// with <c>EnsureCreatedAsync</c> (before migration support was introduced) compatible with
-    /// <c>MigrateAsync</c> without requiring a database drop-and-recreate.
-    ///
-    /// If <c>__EFMigrationsHistory</c> already exists the method returns immediately; it never
-    /// removes or alters existing history rows.
-    /// </summary>
-    private async Task<bool> EnsureMigrationsHistoryBaselineAsync()
-    {
-        // The ProductVersion column records which EF Core version managed each migration.
-        // For baseline rows we record the current EF Core runtime version so reviewers can
-        // see when the baseline was applied.
-        var efProductVersion = GetEfProductVersion();
-
-        var connection = dbContext.Database.GetDbConnection();
-        var wasOpen = connection.State == System.Data.ConnectionState.Open;
-
-        if (!wasOpen)
-            await connection.OpenAsync();
-
-        try
-        {
-            // Check whether the migrations-history table already exists.
-            var historyExists = await MigrationsHistoryTableExistsAsync(connection);
-
-            if (historyExists)
-                return false; // Already managed by migrations — nothing to do.
-
-            // Create the history table with a provider-neutral shape that both SQLite and PostgreSQL accept.
-            await using var createCmd = connection.CreateCommand();
-            createCmd.CommandText =
-                $"""
-                CREATE TABLE "{HistoryTableName}" (
-                    "MigrationId" TEXT NOT NULL,
-                    "ProductVersion" TEXT NOT NULL,
-                    CONSTRAINT "PK__{HistoryTableName}" PRIMARY KEY ("MigrationId")
-                )
-                """;
-            await createCmd.ExecuteNonQueryAsync();
-
-            // Baseline: mark every currently-defined migration as already applied.
-            // EnsureCreatedAsync (called just before this) already created the full schema
-            // corresponding to all migrations up to HEAD, so no migration needs to be
-            // replayed.  Future migrations added after this baseline will still be applied
-            // correctly by MigrateAsync because they will NOT be in this initial history.
-            foreach (var migrationId in dbContext.Database.GetMigrations())
-            {
-                // Use parameterized queries to prevent any injection risks even though
-                // migration IDs come from the compiled assembly (not external input).
-                await using var insertCmd = connection.CreateCommand();
-                insertCmd.CommandText =
-                    $"""
-                    INSERT INTO "{HistoryTableName}" ("MigrationId", "ProductVersion")
-                    VALUES (@MigrationId, @ProductVersion)
-                    """;
-                var migParam = insertCmd.CreateParameter();
-                migParam.ParameterName = "@MigrationId";
-                migParam.Value = migrationId;
-                insertCmd.Parameters.Add(migParam);
-
-                var verParam = insertCmd.CreateParameter();
-                verParam.ParameterName = "@ProductVersion";
-                verParam.Value = efProductVersion;
-                insertCmd.Parameters.Add(verParam);
-
-                await insertCmd.ExecuteNonQueryAsync();
-            }
-
-            return true;
-        }
-        finally
-        {
-            if (!wasOpen)
-                connection.Close();
-        }
-    }
-
-    private async Task EnsureRepairedLegacyPostgresMigrationHistoryAsync()
-    {
-        if (!GetSchemaDialect().IsPostgres)
-        {
-            return;
-        }
-
-        var connection = dbContext.Database.GetDbConnection();
-        var wasOpen = connection.State == System.Data.ConnectionState.Open;
-
-        if (!wasOpen)
-        {
-            await connection.OpenAsync();
-        }
-
-        try
-        {
-            if (!await MigrationsHistoryTableExistsAsync(connection))
-            {
-                return;
-            }
-
-            var pendingRepairedLegacyMigrations = (await dbContext.Database.GetPendingMigrationsAsync())
-                .Where(IsRepairedLegacySqlitePostgresMigration)
-                .ToList();
-
-            if (pendingRepairedLegacyMigrations.Count == 0)
-            {
-                return;
-            }
-
-            var efProductVersion = GetEfProductVersion();
-
-            foreach (var migrationId in pendingRepairedLegacyMigrations)
-            {
-                await using var insertCmd = connection.CreateCommand();
-                insertCmd.CommandText =
-                    $"""
-                    INSERT INTO "{HistoryTableName}" ("MigrationId", "ProductVersion")
-                    VALUES (@MigrationId, @ProductVersion)
-                    """;
-
-                var migrationParam = insertCmd.CreateParameter();
-                migrationParam.ParameterName = "@MigrationId";
-                migrationParam.Value = migrationId;
-                insertCmd.Parameters.Add(migrationParam);
-
-                var versionParam = insertCmd.CreateParameter();
-                versionParam.ParameterName = "@ProductVersion";
-                versionParam.Value = efProductVersion;
-                insertCmd.Parameters.Add(versionParam);
-
-                await insertCmd.ExecuteNonQueryAsync();
-            }
-        }
-        finally
-        {
-            if (!wasOpen)
-            {
-                await connection.CloseAsync();
-            }
-        }
-    }
-
-    private async Task<bool> MigrationsHistoryTableExistsAsync(DbConnection connection)
-    {
-        await using var checkCmd = connection.CreateCommand();
-        checkCmd.CommandText = GetSchemaDialect().IsPostgres
-            ? $"SELECT COUNT(1) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname = 'public' AND c.relname = '{HistoryTableName}'"
-            : $"SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='{HistoryTableName}'";
-
-        return Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0L) > 0;
-    }
-
-    private static string GetEfProductVersion() =>
-        (System.Reflection.CustomAttributeExtensions.GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(
-            typeof(Microsoft.EntityFrameworkCore.DbContext).Assembly))
-        ?.InformationalVersion
-        ?? "unknown";
 
     internal static bool ShouldRepairSchemaArtifact(string migrationId, IReadOnlySet<string>? pendingMigrations)
     {
@@ -549,10 +317,6 @@ public sealed partial class AppDbInitializer
             return true;
         }
 
-        return IsRepairedLegacySqlitePostgresMigration(migrationId);
+        return false;
     }
-
-    private static bool IsRepairedLegacySqlitePostgresMigration(string migrationId) =>
-        string.CompareOrdinal(migrationId, LegacySqlitePostgresMigrationHydrationFloor) >= 0
-        && string.CompareOrdinal(migrationId, LegacySqlitePostgresMigrationCutoff) <= 0;
 }

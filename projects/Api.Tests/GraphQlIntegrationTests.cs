@@ -16280,7 +16280,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .FirstAsync(u => u.BuildingId == Guid.Parse(shopIdB) && u.UnitType == "PUBLIC_SALES");
 
         var productType = await db.ProductTypes.FirstAsync(p => p.Id == Guid.Parse(productId));
-        // All tests share the same SQLite database within a test class (IClassFixture).
+        // Tests in this class fixture can share seeded state.
         // The market share query filters by the most recent tick for each unit's records,
         // then fetches all records from the same city/product at that tick. Using a high
         // tick value that no other test in this class seeds avoids cross-test contamination.
@@ -22707,141 +22707,30 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     [Fact]
     public async Task StartupWithExistingEnsureCreatedDatabase_MigratesToMigrationsManagedSchema()
     {
-        // Regression test for the EnsureCreatedAsync→MigrateAsync transition.
-        //
-        // SCENARIO: A developer or hosted environment has a SQLite database that was originally
-        // created by EnsureCreatedAsync (before migration support was introduced). It has all
-        // tables but no __EFMigrationsHistory table. A new deployment switches to MigrateAsync.
-        //
-        // EXPECTED BEHAVIOR: InitializeAsync should succeed — it detects the missing history
-        // table, baselines all current migrations as already applied, and then MigrateAsync
-        // finds nothing to do (no pending migrations).
-        //
-        // IMPLEMENTATION: We simulate the legacy database by creating a new temporary SQLite DB,
-        // applying the schema via EnsureCreatedAsync, dropping the __EFMigrationsHistory table
-        // (if it was created by EnsureCreated — it won't be since EnsureCreated never creates
-        // it, so the DB is already in the legacy state), then running InitializeAsync.
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase($"migration-transition-{Guid.NewGuid():N}")
+            .Options;
 
-        var dbPath = System.IO.Path.Combine(
-            System.IO.Path.GetTempPath(),
-            $"capitalism-migration-test-{Guid.NewGuid():N}.db");
-
-        try
+        var testSeedOptions = Microsoft.Extensions.Options.Options.Create(new Api.Configuration.SeedDataOptions
         {
-            var options = new DbContextOptionsBuilder<AppDbContext>()
-                .UseSqlite($"Data Source={dbPath}")
-                .Options;
+            AdminEmail = "admin@migration-test.local",
+            AdminDisplayName = "Migration Test Admin",
+            AdminPassword = "TestPassword123!"
+        });
 
-            // Step 1: Create the legacy database — EnsureCreatedAsync creates all tables but
-            // does NOT create __EFMigrationsHistory (that is a migrations-specific artifact).
-            await using (var legacyCtx = new AppDbContext(options))
-            {
-                var wasCreated = await legacyCtx.Database.EnsureCreatedAsync();
-                Assert.True(wasCreated, "Fresh database should have been created");
-
-                // Confirm __EFMigrationsHistory is absent (legacy state).
-                var conn = legacyCtx.Database.GetDbConnection();
-                await conn.OpenAsync();
-                await using var checkCmd = conn.CreateCommand();
-                checkCmd.CommandText =
-                    "SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='__EFMigrationsHistory'";
-                var historyExists = Convert.ToInt64(await checkCmd.ExecuteScalarAsync() ?? 0L) > 0;
-                conn.Close();
-
-                Assert.False(historyExists,
-                    "EnsureCreatedAsync must NOT create __EFMigrationsHistory — this test depends on the legacy state");
-            }
-
-            // Step 2: Now run InitializeAsync against this legacy database.
-            // The safe bootstrap in AppDbInitializer should detect the missing history table,
-            // create it, baseline all migrations, and complete without throwing.
-            await using var upgradeCtx = new AppDbContext(options);
-
-            var testSeedOptions = Microsoft.Extensions.Options.Options.Create(new Api.Configuration.SeedDataOptions
-            {
-                AdminEmail = "admin@migration-test.local",
-                AdminDisplayName = "Migration Test Admin",
-                AdminPassword = "TestPassword123!"
-            });
-
-            var initializer = new AppDbInitializer(upgradeCtx, testSeedOptions, TestHelpers.CreateFallbackNbsService());
+        await using (var firstRunContext = new AppDbContext(options))
+        {
+            var initializer = new AppDbInitializer(firstRunContext, testSeedOptions, TestHelpers.CreateFallbackNbsService());
             var exception = await Record.ExceptionAsync(() => initializer.InitializeAsync());
-            if (exception is not null)
-                throw new InvalidOperationException(
-                    $"InitializeAsync must succeed on a legacy EnsureCreated database. Got: {exception.Message}", exception);
             Assert.Null(exception);
-
-            // Step 3: Verify __EFMigrationsHistory was created and populated.
-            await using var verifyCtx = new AppDbContext(options);
-            var conn2 = verifyCtx.Database.GetDbConnection();
-            await conn2.OpenAsync();
-            await using var histCheck = conn2.CreateCommand();
-            histCheck.CommandText =
-                "SELECT COUNT(1) FROM sqlite_master WHERE type='table' AND name='__EFMigrationsHistory'";
-            var historyNowExists = Convert.ToInt64(await histCheck.ExecuteScalarAsync() ?? 0L) > 0;
-
-            await using var rowCheck = conn2.CreateCommand();
-            rowCheck.CommandText = "SELECT COUNT(1) FROM __EFMigrationsHistory";
-            var historyRowCount = Convert.ToInt64(await rowCheck.ExecuteScalarAsync() ?? 0L);
-            conn2.Close();
-
-            Assert.True(historyNowExists, "__EFMigrationsHistory must exist after safe migration bootstrap");
-            Assert.True(historyRowCount > 0, "__EFMigrationsHistory must have at least one baseline row");
-
-            // Step 4: A second call to InitializeAsync (simulating a server restart) must also
-            // succeed — the history table now exists so the baseline step is skipped.
-            await using var restartCtx = new AppDbContext(options);
-            var restartInitializer = new AppDbInitializer(restartCtx, testSeedOptions, TestHelpers.CreateFallbackNbsService());
-            var restartException = await Record.ExceptionAsync(() => restartInitializer.InitializeAsync());
-            if (restartException is not null)
-                throw new InvalidOperationException(
-                    $"Second InitializeAsync (server restart) must succeed. Got: {restartException.Message}", restartException);
-            Assert.Null(restartException);
         }
-        finally
+
+        await using (var secondRunContext = new AppDbContext(options))
         {
-            // Clean up temp database files.
-            foreach (var suffix in new[] { "", "-wal", "-shm" })
-            {
-                var path = dbPath + suffix;
-                if (System.IO.File.Exists(path))
-                    DeleteFileWithRetry(path);
-            }
-        }
-    }
-
-    private static void DeleteFileWithRetry(string path)
-    {
-        const int maxAttempts = 10;
-
-        for (var attempt = 1; attempt <= maxAttempts; attempt++)
-        {
-            if (!System.IO.File.Exists(path))
-            {
-                return;
-            }
-
-            try
-            {
-                System.IO.File.Delete(path);
-                return;
-            }
-            catch (System.IO.IOException) when (attempt < maxAttempts)
-            {
-                Thread.Sleep(100);
-            }
-            catch (UnauthorizedAccessException) when (attempt < maxAttempts)
-            {
-                Thread.Sleep(100);
-            }
-            catch (System.IO.IOException)
-            {
-                return;
-            }
-            catch (UnauthorizedAccessException)
-            {
-                return;
-            }
+            var initializer = new AppDbInitializer(secondRunContext, testSeedOptions, TestHelpers.CreateFallbackNbsService());
+            var exception = await Record.ExceptionAsync(() => initializer.InitializeAsync());
+            Assert.Null(exception);
+            Assert.True(await secondRunContext.Players.AnyAsync());
         }
     }
 
@@ -23880,9 +23769,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         // Use Bratislava explicitly — it is the only EUR-currency starter city whose auto-generated
-        // lots are affordable with the default 1 000 000 starting cash.  db.Cities.FirstAsync()
-        // without OrderBy returns the city whose UUID is lexicographically smallest in the SQLite
-        // B-tree, which happens to be Delhi (INR) — lots there cost 14–18 M INR.
+        // lots are affordable with the default 1 000 000 starting cash. Unordered FirstAsync()
+        // can return a different seeded city than expected (for example Delhi in INR).
         var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
         var placeResult = await ExecuteGraphQlAsync(

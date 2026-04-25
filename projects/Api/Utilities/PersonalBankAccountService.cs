@@ -1,7 +1,6 @@
 using System.Security.Cryptography;
 using Api.Data;
 using Api.Data.Entities;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
 namespace Api.Utilities;
@@ -27,57 +26,11 @@ public static class PersonalBankAccountService
             return tracked;
         }
 
-        try
-        {
-            await using var command = db.Database.GetDbConnection().CreateCommand();
-            if (command.Connection!.State != System.Data.ConnectionState.Open)
-            {
-                await command.Connection.OpenAsync(cancellationToken);
-            }
-
-            command.CommandText =
-                """
-                SELECT "Id", "AccountNumber", "CurrencyCode", "Balance", "PlayerId", "IsGovernmentAccount", "CreatedAtUtc"
-                FROM "BankAccounts"
-                WHERE "PlayerId" = @playerId AND "CurrencyCode" = @currencyCode
-                LIMIT 1
-                """;
-
-            var playerIdParameter = command.CreateParameter();
-            playerIdParameter.ParameterName = "@playerId";
-            playerIdParameter.Value = playerId;
-            command.Parameters.Add(playerIdParameter);
-
-            var currencyCodeParameter = command.CreateParameter();
-            currencyCodeParameter.ParameterName = "@currencyCode";
-            currencyCodeParameter.Value = normalizedCurrencyCode;
-            command.Parameters.Add(currencyCodeParameter);
-
-            await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            if (!await reader.ReadAsync(cancellationToken))
-            {
-                return null;
-            }
-
-            var account = new BankAccount
-            {
-                Id = reader.GetGuid(0),
-                AccountNumber = reader.GetString(1),
-                CurrencyCode = reader.GetString(2),
-                Balance = reader.GetDecimal(3),
-                PlayerId = reader.IsDBNull(4) ? null : reader.GetGuid(4),
-                IsGovernmentAccount = !reader.IsDBNull(5) && reader.GetBoolean(5),
-                CreatedAtUtc = reader.IsDBNull(6) ? DateTime.UtcNow : reader.GetDateTime(6),
-            };
-
-            db.Attach(account);
-            return account;
-        }
-        catch (SqliteException)
-        {
-            // Legacy bootstrap databases may have older BankAccounts shape or no table yet.
-            return null;
-        }
+        return await db.BankAccounts
+            .FirstOrDefaultAsync(
+                account => account.PlayerId == playerId
+                    && account.CurrencyCode == normalizedCurrencyCode,
+                cancellationToken);
     }
 
     public static Task<BankAccount> EnsureTrackedAccountAsync(
