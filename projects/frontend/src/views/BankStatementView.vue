@@ -42,6 +42,8 @@ const statement = ref<BankStatementResult | null>(null)
 const accounts = ref<PlayerBankAccountSummary[]>([])
 const pageSize = ref(50)
 const page = ref(1)
+const fromTick = ref<number | null>(null)
+const toTick = ref<number | null>(null)
 const isPersonalContext = computed(() => auth.player?.activeAccountType === 'PERSON')
 
 const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
@@ -60,8 +62,8 @@ const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
 const selectedAccount = computed<PlayerBankAccountSummary | null>(() => contextAccounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null)
 
 const BANK_STATEMENT_QUERY = `
-  query BankStatement($companyId: UUID!, $accountId: UUID, $limit: Int, $offset: Int) {
-    bankStatement(companyId: $companyId, accountId: $accountId, limit: $limit, offset: $offset) {
+  query BankStatement($companyId: UUID!, $accountId: UUID, $limit: Int, $offset: Int, $fromTick: Long, $toTick: Long) {
+    bankStatement(companyId: $companyId, accountId: $accountId, limit: $limit, offset: $offset, fromTick: $fromTick, toTick: $toTick) {
       companyId
       companyName
       currencyCode
@@ -115,6 +117,8 @@ async function loadStatement() {
       accountId: selectedAccount.value.id,
       limit: pageSize.value,
       offset: (page.value - 1) * pageSize.value,
+      fromTick: fromTick.value ?? undefined,
+      toTick: toTick.value ?? undefined,
     })
     statement.value = result.bankStatement
   } catch (e: unknown) {
@@ -198,6 +202,11 @@ watch(pageSize, async (value, previousValue) => {
 
 watch(page, async (value, previousValue) => {
   if (value === previousValue) return
+  await loadStatement()
+})
+
+watch([fromTick, toTick], async () => {
+  page.value = 1
   await loadStatement()
 })
 
@@ -336,21 +345,54 @@ function goToNextPage() {
       </select>
     </div>
 
-    <!-- Limit selector -->
-    <div class="flex items-center gap-3 mb-6">
-      <label for="limit-select" class="text-sm font-semibold text-muted whitespace-nowrap">
-        {{ t('bankStatement.showEntries') }}
-      </label>
-      <select
-        id="limit-select"
-        v-model.number="pageSize"
-        class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
+    <!-- Limit selector + tick range filter -->
+    <div class="flex flex-wrap items-center gap-4 mb-6">
+      <div class="flex items-center gap-2">
+        <label for="limit-select" class="text-sm font-semibold text-muted whitespace-nowrap">
+          {{ t('bankStatement.showEntries') }}
+        </label>
+        <select
+          id="limit-select"
+          v-model.number="pageSize"
+          class="selector-select bg-card border border-divider rounded-lg px-3 py-2 text-body text-sm cursor-pointer focus:outline-none focus:border-brand"
+        >
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+          <option :value="100">100</option>
+          <option :value="200">200</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="from-tick" class="text-sm font-semibold text-muted whitespace-nowrap">{{ t('bankStatement.fromTick') }}</label>
+        <input
+          id="from-tick"
+          v-model.number="fromTick"
+          type="number"
+          min="0"
+          step="1"
+          :placeholder="t('bankStatement.tickPlaceholder')"
+          class="w-28 px-3 py-2 border border-divider rounded-lg bg-card text-body text-sm focus:outline-none focus:border-brand"
+        />
+      </div>
+      <div class="flex items-center gap-2">
+        <label for="to-tick" class="text-sm font-semibold text-muted whitespace-nowrap">{{ t('bankStatement.toTick') }}</label>
+        <input
+          id="to-tick"
+          v-model.number="toTick"
+          type="number"
+          min="0"
+          step="1"
+          :placeholder="t('bankStatement.tickPlaceholder')"
+          class="w-28 px-3 py-2 border border-divider rounded-lg bg-card text-body text-sm focus:outline-none focus:border-brand"
+        />
+      </div>
+      <button
+        v-if="fromTick !== null || toTick !== null"
+        class="text-xs text-muted hover:text-bad transition-colors"
+        @click="fromTick = null; toTick = null"
       >
-        <option :value="20">20</option>
-        <option :value="50">50</option>
-        <option :value="100">100</option>
-        <option :value="200">200</option>
-      </select>
+        {{ t('common.clearFilter') }}
+      </button>
     </div>
 
     <!-- Loading / error -->

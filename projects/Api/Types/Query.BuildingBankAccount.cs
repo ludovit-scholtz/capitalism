@@ -120,7 +120,8 @@ public sealed partial class Query
             .Where(a => a.ClosedAtUtc == null
                 && ((a.Company != null && a.Company.PlayerId == userId) || a.PlayerId == userId))
             .AsNoTracking()
-            .OrderBy(a => a.Company != null ? a.Company.Name : a.Player!.DisplayName)
+            .OrderByDescending(a => a.Balance)
+            .ThenBy(a => a.Company != null ? a.Company.Name : a.Player!.DisplayName)
             .ThenBy(a => a.CurrencyCode)
             .ToListAsync();
 

@@ -545,7 +545,7 @@ watch(activeTab, async (tab) => {
             <!-- Swap form -->
             <div class="flex flex-col gap-4">
               <!-- From row -->
-              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
+              <div class="grid grid-cols-[1fr_2fr] gap-4 items-start">
                 <div class="flex flex-col gap-1">
                   <template v-if="hasBankAccounts">
                     <ForexBankAccountSelector
@@ -613,7 +613,7 @@ watch(activeTab, async (tab) => {
               </div>
 
               <!-- To row -->
-              <div class="grid grid-cols-1 sm:grid-cols-[1fr_2fr] gap-4 items-end">
+              <div class="grid grid-cols-[1fr_2fr] gap-4 items-start">
                 <div class="flex flex-col gap-1">
                   <template v-if="hasBankAccounts">
                     <ForexBankAccountSelector

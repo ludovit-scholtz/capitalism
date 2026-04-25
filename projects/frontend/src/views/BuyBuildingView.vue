@@ -125,10 +125,22 @@ const selectedLotTotalCost = computed<number>(() => {
   return selectedLot.value.price + construction
 })
 
-/** Player's balance in the destination city currency (0 if none). */
+/** Company's total balance in the destination city currency across all bank accounts. */
 const availableLocalBalance = computed<number>(() => {
   const cc = selectedCityCurrencyCode.value
   if (cc === 'EUR') return 0
+  // Use company bank accounts (already fetched)
+  if (selectedCompany.value) {
+    return companyBankAccounts.value
+      .filter(
+        (a) =>
+          a.ownerType === 'COMPANY' &&
+          a.companyId === selectedCompany.value!.id &&
+          a.currencyCode.toUpperCase() === cc,
+      )
+      .reduce((sum, a) => sum + a.balance, 0)
+  }
+  // Fallback to player-level balances if no company selected
   return playerBalances.value.find((b) => b.currencyCode === cc)?.balance ?? 0
 })
 

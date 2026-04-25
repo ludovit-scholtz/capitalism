@@ -218,6 +218,16 @@ const WITHDRAW_DEPOSIT_MUTATION = `
   }
 `
 
+const CLOSE_BANK_ACCOUNT_MUTATION = `
+  mutation CloseBankAccountById($input: CloseBankAccountInput!) {
+    closeBankAccount(input: $input) {
+      id
+      isActive
+      closedAtUtc
+    }
+  }
+`
+
 async function loadData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
@@ -475,6 +485,16 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
     error.value = err instanceof Error ? err.message : String(err)
   }
 }
+
+async function closeBankAccount(accountId: string) {
+  if (!confirm(t('bank.confirmCloseAccount'))) return
+  try {
+    await gqlRequest(CLOSE_BANK_ACCOUNT_MUTATION, { input: { depositId: accountId, amount: 0 } })
+    await loadData()
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : String(err)
+  }
+}
 </script>
 
 <template>
@@ -663,11 +683,8 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
         <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
         <div v-if="activeTab === 'deposit'" class="deposit-tab flex flex-col gap-8 lg:gap-10">
           <section v-if="auth.isAuthenticated" class="my-bank-accounts-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myBankAccounts') }}</h2>
-            <div v-if="visibleBankAccounts.length === 0" class="empty-state">
-              <p>{{ t('bank.noBankAccountsYet') }}</p>
-            </div>
-            <div v-else class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.bankAccountsToClose') }}</h2>
+            <div class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div v-for="account in visibleBankAccounts" :key="account.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" data-testid="bank-account-row">
                 <div class="deposit-card-header">
                   <span class="deposit-bank-name">{{ account.ownerDisplayName }}</span>
@@ -683,35 +700,8 @@ async function withdrawDeposit(deposit: BankDepositSummary) {
                     <span class="deposit-stat-value">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
                   </div>
                 </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- My Deposits -->
-          <section v-if="auth.isAuthenticated && myDeposits.length > 0" class="my-deposits-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myDeposits') }}</h2>
-            <div class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div v-for="dep in myDeposits" :key="dep.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-                <div class="deposit-card-header">
-                  <span class="deposit-bank-name">{{ dep.bankBuildingName }}</span>
-                  <span class="deposit-rate-badge">{{ formatPercent(dep.depositInterestRatePercent) }} p.a.</span>
-                </div>
-                <div class="deposit-stats">
-                  <div class="deposit-stat">
-                    <span class="deposit-stat-label">{{ t('bank.depositAmount') }}</span>
-                    <span class="deposit-stat-value">{{ formatCurrency(dep.amount) }}</span>
-                  </div>
-                  <div class="deposit-stat">
-                    <span class="deposit-stat-label">{{ t('bank.depositInterestEarned') }}</span>
-                    <span class="deposit-stat-value positive">+{{ formatCurrency(dep.totalInterestPaid) }}</span>
-                  </div>
-                  <div class="deposit-stat">
-                    <span class="deposit-stat-label">{{ t('common.company') }}</span>
-                    <span class="deposit-stat-value">{{ dep.depositorCompanyName }}</span>
-                  </div>
-                </div>
-                <button v-if="!dep.isBaseCapital" class="btn btn-secondary btn-sm" @click="withdrawDeposit(dep)">
-                  {{ t('bank.withdrawDeposit') }}
+                <button v-if="account.balance == 0" class="btn btn-danger btn-sm mt-3" @click="closeBankAccount(account.id)">
+                  {{ t('bank.closeAccount') }}
                 </button>
               </div>
             </div>

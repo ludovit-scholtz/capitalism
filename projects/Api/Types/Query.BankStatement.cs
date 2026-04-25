@@ -25,6 +25,8 @@ public sealed partial class Query
         int? limit,
         int? offset,
         Guid? accountId,
+        long? fromTick,
+        long? toTick,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -37,38 +39,38 @@ public sealed partial class Query
             ?? throw new GraphQLException(new Error("Company not found or you do not own it.", "COMPANY_NOT_FOUND"));
 
         var pageSize = Math.Clamp(limit ?? BankStatementDefaultLimit, 1, BankStatementMaxLimit);
-    var pageOffset = Math.Max(offset ?? 0, 0);
+        var pageOffset = Math.Max(offset ?? 0, 0);
 
-        // If accountId is provided, find the building that owns the account so we can filter entries.
+        // Resolve the account filter: find the building (if any) linked to this account.
         Guid? filterBuildingId = null;
         string? filterCurrencyCode = null;
         if (accountId.HasValue)
         {
-            var owningBuilding = await db.Buildings
+            // Look up the account to get its currency and owning building.
+            var acct = await db.BankAccounts
                 .AsNoTracking()
-                .Include(b => b.City)
-                .FirstOrDefaultAsync(b => b.BankAccountId == accountId.Value && b.CompanyId == companyId);
-            if (owningBuilding != null)
+                .Include(a => a.BankBuilding).ThenInclude(b => b!.City)
+                .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId);
+            if (acct != null)
             {
-                filterBuildingId = owningBuilding.Id;
-                filterCurrencyCode = owningBuilding.City?.CurrencyCode;
-            }
-            else
-            {
-                // Account may be a company-level (non-building) account; fall back to querying by currency from the bank account.
-                var acct = await db.BankAccounts
-                    .AsNoTracking()
-                    .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId);
-                filterCurrencyCode = acct?.CurrencyCode;
+                filterCurrencyCode = acct.CurrencyCode;
+                // If the account is the primary account for a specific building, scope to that building.
+                var owningBuilding = company.Buildings.FirstOrDefault(b => b.BankAccountId == accountId.Value);
+                if (owningBuilding != null)
+                    filterBuildingId = owningBuilding.Id;
             }
         }
 
-        // Load entries: if a building filter is active, scope to that building only.
+        // Load entries: filter by building when available, otherwise by company.
         var entriesQuery = db.LedgerEntries
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId);
         if (filterBuildingId.HasValue)
             entriesQuery = entriesQuery.Where(e => e.BuildingId == filterBuildingId.Value);
+        if (fromTick.HasValue)
+            entriesQuery = entriesQuery.Where(e => e.RecordedAtTick >= fromTick.Value);
+        if (toTick.HasValue)
+            entriesQuery = entriesQuery.Where(e => e.RecordedAtTick <= toTick.Value);
 
         var allEntries = await entriesQuery
             .Include(e => e.Building)
