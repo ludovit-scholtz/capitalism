@@ -131,14 +131,7 @@ const availableLocalBalance = computed<number>(() => {
   if (cc === 'EUR') return 0
   // Use company bank accounts (already fetched)
   if (selectedCompany.value) {
-    return companyBankAccounts.value
-      .filter(
-        (a) =>
-          a.ownerType === 'COMPANY' &&
-          a.companyId === selectedCompany.value!.id &&
-          a.currencyCode.toUpperCase() === cc,
-      )
-      .reduce((sum, a) => sum + a.balance, 0)
+    return companyBankAccounts.value.filter((a) => a.ownerType === 'COMPANY' && a.companyId === selectedCompany.value!.id && a.currencyCode.toUpperCase() === cc).reduce((sum, a) => sum + a.balance, 0)
   }
   // Fallback to player-level balances if no company selected
   return playerBalances.value.find((b) => b.currencyCode === cc)?.balance ?? 0

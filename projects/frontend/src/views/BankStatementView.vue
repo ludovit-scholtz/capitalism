@@ -386,11 +386,7 @@ function goToNextPage() {
           class="w-28 px-3 py-2 border border-divider rounded-lg bg-card text-body text-sm focus:outline-none focus:border-brand"
         />
       </div>
-      <button
-        v-if="fromTick !== null || toTick !== null"
-        class="text-xs text-muted hover:text-bad transition-colors"
-        @click="fromTick = null; toTick = null"
-      >
+      <button v-if="fromTick !== null || toTick !== null" class="text-xs text-muted hover:text-bad transition-colors">
         {{ t('common.clearFilter') }}
       </button>
     </div>
