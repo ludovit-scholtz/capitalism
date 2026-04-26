@@ -45,22 +45,14 @@ export function formatLoanDuration(ticks: number): string {
  * Computes total interest cost for a loan given principal, rate, and duration.
  * Uses simple (flat) interest: interest = principal × rate × (ticks / ticksPerYear).
  */
-export function computeTotalInterest(
-  principal: number,
-  annualRatePercent: number,
-  durationTicks: number,
-): number {
+export function computeTotalInterest(principal: number, annualRatePercent: number, durationTicks: number): number {
   return principal * (annualRatePercent / 100) * (durationTicks / TICKS_PER_YEAR)
 }
 
 /**
  * Computes total repayment (principal + interest).
  */
-export function computeTotalRepayment(
-  principal: number,
-  annualRatePercent: number,
-  durationTicks: number,
-): number {
+export function computeTotalRepayment(principal: number, annualRatePercent: number, durationTicks: number): number {
   return principal + computeTotalInterest(principal, annualRatePercent, durationTicks)
 }
 
@@ -68,14 +60,10 @@ export function computeTotalRepayment(
  * Computes estimated periodic payment amount.
  * Payments are made every 720 ticks (30 in-game days).
  */
-export function computePaymentAmount(
-  principal: number,
-  annualRatePercent: number,
-  durationTicks: number,
-): number {
+export function computePaymentAmount(principal: number, annualRatePercent: number, durationTicks: number): number {
   const totalPayments = Math.max(1, Math.floor(durationTicks))
   const principalPerTick = principal / totalPayments
-  const firstTickInterest = principal * (annualRatePercent / 100) / TICKS_PER_YEAR
+  const firstTickInterest = (principal * (annualRatePercent / 100)) / TICKS_PER_YEAR
   return principalPerTick + firstTickInterest
 }
 

@@ -161,13 +161,7 @@ const canContinueFromStep1 = computed(() => !!selectedCollateral.value)
 const canContinueFromStep2 = computed(() => principalAmount.value > 0 && principalAmount.value <= collateralMaxPrincipal.value)
 const canContinueFromStep3 = computed(() => normalizedDurationTicks.value >= 24 && normalizedDurationTicks.value <= 87600)
 const canSubmit = computed(
-  () =>
-    auth.isAuthenticated &&
-    isCompanyAccountActive.value &&
-    canContinueFromStep1.value &&
-    canContinueFromStep2.value &&
-    canContinueFromStep3.value &&
-    !!selectedBankAccountId.value,
+  () => auth.isAuthenticated && isCompanyAccountActive.value && canContinueFromStep1.value && canContinueFromStep2.value && canContinueFromStep3.value && !!selectedBankAccountId.value,
 )
 
 const estimatedPaymentAmount = computed(() => {
@@ -198,10 +192,7 @@ async function loadData() {
 
     const selectedCompany = getActiveCompany(auth.player, userCompanies.value)
     if (auth.isAuthenticated && selectedCompany) {
-      const accountsResult = await gqlRequest<{ companyBankAccounts: CompanyBankAccountSummary[] }>(
-        COMPANY_BANK_ACCOUNTS_QUERY,
-        { companyId: selectedCompany.id },
-      )
+      const accountsResult = await gqlRequest<{ companyBankAccounts: CompanyBankAccountSummary[] }>(COMPANY_BANK_ACCOUNTS_QUERY, { companyId: selectedCompany.id })
       settlementAccounts.value = accountsResult.companyBankAccounts ?? []
     } else {
       settlementAccounts.value = []
@@ -310,10 +301,18 @@ function previousStep() {
 
     <section v-else-if="bankInfo" class="loan-request-form-card rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
       <div class="mb-6 grid gap-2 sm:grid-cols-4">
-        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 1 ? 'bg-card-raised text-body' : 'text-muted'">1. {{ t('bank.collateral') }}</div>
-        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 2 ? 'bg-card-raised text-body' : 'text-muted'">2. {{ t('bank.principalAmount') }}</div>
-        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 3 ? 'bg-card-raised text-body' : 'text-muted'">3. {{ t('bank.duration') }}</div>
-        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 4 ? 'bg-card-raised text-body' : 'text-muted'">4. {{ t('bank.myAccount') }}</div>
+        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 1 ? 'bg-card-raised text-body' : 'text-muted'">
+          1. {{ t('bank.collateral') }}
+        </div>
+        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 2 ? 'bg-card-raised text-body' : 'text-muted'">
+          2. {{ t('bank.principalAmount') }}
+        </div>
+        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 3 ? 'bg-card-raised text-body' : 'text-muted'">
+          3. {{ t('bank.duration') }}
+        </div>
+        <div class="rounded-xl border border-divider p-3 text-xs font-semibold uppercase tracking-wide" :class="currentStep >= 4 ? 'bg-card-raised text-body' : 'text-muted'">
+          4. {{ t('bank.myAccount') }}
+        </div>
       </div>
 
       <div v-if="currentStep === 1" class="form-group collateral-group mb-5 flex flex-col gap-2 border-t border-divider pt-5">
@@ -433,7 +432,12 @@ function previousStep() {
 
       <div class="flex flex-wrap gap-3">
         <button v-if="currentStep > 1" class="btn btn-secondary" @click="previousStep">{{ t('common.back') }}</button>
-        <button v-if="currentStep < 4" class="btn btn-primary" :disabled="(currentStep === 1 && !canContinueFromStep1) || (currentStep === 2 && !canContinueFromStep2) || (currentStep === 3 && !canContinueFromStep3)" @click="nextStep">
+        <button
+          v-if="currentStep < 4"
+          class="btn btn-primary"
+          :disabled="(currentStep === 1 && !canContinueFromStep1) || (currentStep === 2 && !canContinueFromStep2) || (currentStep === 3 && !canContinueFromStep3)"
+          @click="nextStep"
+        >
           {{ t('common.next') }}
         </button>
         <button v-else class="btn btn-primary" :disabled="submitting || !canSubmit || !!collateralRequiredWarning || !!collateralCapacityWarning" @click="submitLoanRequest">
