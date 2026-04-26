@@ -27,11 +27,13 @@ const bankDeposits = ref<BankDepositSummary[]>([])
 const bankInfo = ref<BankInfoSummary | null>(null)
 const userCompanies = ref<Company[]>([])
 
-// Ownership detection — check if any user company owns this bank building
-// (uses company buildings from me query, not bankInfo.lenderCompanyId)
+// Ownership detection uses the navbar-selected company and bank owner company id.
 const isOwner = computed(() => {
   if (!auth.isAuthenticated) return false
-  return userCompanies.value.some((c) => (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'))
+  const selectedCompany = getActiveCompany(auth.player, userCompanies.value)
+  const bankOwnerCompanyId = bankInfo.value?.lenderCompanyId
+  if (!selectedCompany || !bankOwnerCompanyId) return false
+  return selectedCompany.id === bankOwnerCompanyId
 })
 
 // Customer-specific state
@@ -403,7 +405,8 @@ async function loadData(isRefresh = false) {
     bankInfo.value = infoResult.bankInfo ?? null
     userCompanies.value = companiesResult.me?.companies ?? []
 
-    const ownerDetected = userCompanies.value.some((c) => (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'))
+    const selectedCompany = getActiveCompany(auth.player, userCompanies.value)
+    const ownerDetected = !!selectedCompany && selectedCompany.id === bankInfo.value?.lenderCompanyId
 
     if (ownerDetected) {
       // Owner view: load full management data
