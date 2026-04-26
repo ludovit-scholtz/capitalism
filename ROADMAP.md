@@ -538,7 +538,7 @@ Company can request loan from any bank which has available deposits.
 
 User can borrow money only for buildings which are not mortgaged. User can pick a building and he can borrow against it a money up to 70% of the property value.
 
-Borrower decide the amount and duration of the loan.
+Borrower decide the amount and duration of the loan. When player goes to the bank, he can request a loan for his own duration and the requested amount. He also deposits a building as a collateral. One building can be used only in one loan.
 
 Creating a loan creates a contract between bank and a player which will hold the interest rate even if the bank player changes the lending interest rate. Each contract has a maturity date. User can see each tick payment amount. The calculation is the same as in the real world mortgage payments with difference that the payment is done on every tick. The borrower pays the interest and principal amount.
 
