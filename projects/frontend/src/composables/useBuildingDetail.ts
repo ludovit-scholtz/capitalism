@@ -210,6 +210,11 @@ export function useBuildingDetail() {
     return { x, y }
   }
 
+  function parseUnitTabQuery(value: unknown): string | null {
+    if (typeof value !== 'string' || value.length === 0) return null
+    return value
+  }
+
   function syncSelectedCellQuery(cell: GridCellSelection | null) {
     const nextUnit = cell ? `${cell.x},${cell.y}` : undefined
     const currentUnit = typeof route.query.unit === 'string' ? route.query.unit : undefined
@@ -223,15 +228,38 @@ export function useBuildingDetail() {
     })
   }
 
+  function syncSelectedUnitTabQuery(tab: string | null) {
+    const nextTab = tab ?? undefined
+    const currentTab = typeof route.query.unitTab === 'string' ? route.query.unitTab : undefined
+    if (currentTab === nextTab) return
+
+    void router.replace({
+      query: {
+        ...route.query,
+        unitTab: nextTab,
+      },
+    })
+  }
+
   function setReadOnlySelectedCell(cell: GridCellSelection | null) {
     selectedCell.value = cell
     syncSelectedCellQuery(cell)
+    if (!cell) {
+      syncSelectedUnitTabQuery(null)
+    }
   }
 
   function restoreReadOnlySelectedCell(units: GridUnit[]) {
     const requestedCell = parseUnitQuery(route.query.unit)
     if (!requestedCell) {
       selectedCell.value = null
+      return
+    }
+
+    // During live refreshes there can be a brief empty-state before units repopulate.
+    // Keep the requested selection in that window so route-driven state does not get lost.
+    if (units.length === 0) {
+      selectedCell.value = requestedCell
       return
     }
 
@@ -814,10 +842,55 @@ export function useBuildingDetail() {
     return tabs
   })
 
-  /** Reset to Basic Info whenever the user selects a different unit. */
-  watch(selectedDisplayUnit, () => {
-    selectedUnitTab.value = 'basicInfo'
-  })
+  function restoreSelectedUnitTabFromRoute() {
+    if (isEditing.value || unitDetailTabs.value.length === 0) {
+      selectedUnitTab.value = 'basicInfo'
+      syncSelectedUnitTabQuery(null)
+      return
+    }
+
+    const availableKeys = new Set(unitDetailTabs.value.map((tab) => tab.key))
+    const requestedTab = parseUnitTabQuery(route.query.unitTab)
+
+    if (requestedTab && availableKeys.has(requestedTab)) {
+      if (selectedUnitTab.value !== requestedTab) {
+        selectedUnitTab.value = requestedTab
+      }
+      return
+    }
+
+    if (!availableKeys.has(selectedUnitTab.value)) {
+      selectedUnitTab.value = 'basicInfo'
+    }
+
+    syncSelectedUnitTabQuery(selectedUnitTab.value)
+  }
+
+  watch(
+    () => selectedUnitTab.value,
+    (tab) => {
+      if (isEditing.value || unitDetailTabs.value.length === 0) {
+        syncSelectedUnitTabQuery(null)
+        return
+      }
+      const isValid = unitDetailTabs.value.some((t) => t.key === tab)
+      syncSelectedUnitTabQuery(isValid ? tab : 'basicInfo')
+    },
+  )
+
+  watch(
+    () => route.query.unitTab,
+    () => {
+      restoreSelectedUnitTabFromRoute()
+    },
+  )
+
+  watch(
+    () => unitDetailTabs.value.map((tab) => tab.key).join(','),
+    () => {
+      restoreSelectedUnitTabFromRoute()
+    },
+  )
 
   let activeBuildingFinancialTimelineRequest = 0
   let activePowerPlantAnalyticsRequest = 0
@@ -3956,6 +4029,7 @@ export function useBuildingDetail() {
     () => {
       if (!isEditing.value) {
         restoreReadOnlySelectedCell(activeUnits.value)
+        restoreSelectedUnitTabFromRoute()
       }
     },
   )
@@ -3974,6 +4048,8 @@ export function useBuildingDetail() {
   watch(
     () => selectedCell.value,
     () => {
+      if (isEditing.value) return
+      syncSelectedCellQuery(selectedCell.value)
       flushStorageError.value = null
       flushStorageSuccess.value = false
       showFlushConfirmDialog.value = false

@@ -372,40 +372,31 @@ const {
               <div v-else-if="cityMediaHouses.length === 0" class="config-hint">
                 {{ t('buildingDetail.config.noMediaHouseAvailable') }}
               </div>
-              <div v-else class="media-house-picker">
-                <!-- None option -->
-                <div
-                  class="media-house-option"
-                  :class="{ selected: !getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId }"
-                  @click="updateSelectedUnitConfig('mediaHouseBuildingId', null)"
+              <div v-else class="media-house-picker flex flex-col gap-2">
+                <select
+                  class="form-input media-house-combobox"
+                  :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId ?? ''"
+                  @change="updateSelectedUnitConfig('mediaHouseBuildingId', ($event.target as HTMLSelectElement).value || null)"
                 >
-                  <span class="mh-option-name">{{ t('buildingDetail.config.noMediaHouse') }}</span>
-                </div>
-                <!-- Picker items sorted by server (player-owned first, then by ranking) -->
-                <div
-                  v-for="mh in cityMediaHouses"
-                  :key="mh.id"
-                  class="media-house-option"
-                  :class="{
-                    selected: getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId === mh.id,
-                    'mh-disabled': mh.isUnderConstruction || mh.powerStatus === 'OFFLINE',
-                    'mh-own': mh.ownerCompanyId === building?.companyId,
-                  }"
-                  @click="!(mh.isUnderConstruction || mh.powerStatus === 'OFFLINE') && updateSelectedUnitConfig('mediaHouseBuildingId', mh.id)"
-                >
-                  <div class="mh-option-row">
-                    <span class="mh-option-name">{{ mh.name }}</span>
-                    <span class="mh-badge mh-type-badge">{{ mh.mediaType ?? '?' }}</span>
-                    <span v-if="mh.isGovernmentOwned" class="mh-badge mh-gov-badge" :title="t('buildingDetail.config.governmentOwned')">{{ t('buildingDetail.config.govBadge') }}</span>
-                    <span v-else-if="mh.ownerCompanyId === building?.companyId" class="mh-badge mh-own-badge">{{ t('buildingDetail.config.yourStation') }}</span>
-                  </div>
-                  <div class="mh-option-meta">
-                    <span class="mh-meta-city">{{ mh.cityName }}</span>
-                    <span class="mh-meta-reach">×{{ mh.effectivenessMultiplier.toFixed(1) }}</span>
-                    <span class="mh-meta-ranking"> {{ t('buildingDetail.config.contentRanking') }}: {{ mh.contentRanking.toFixed(0) }}% </span>
-                    <span v-if="mh.isUnderConstruction" class="mh-meta-status mh-status-construction">{{ t('buildingDetail.config.underConstruction') }}</span>
-                    <span v-else-if="mh.powerStatus === 'OFFLINE'" class="mh-meta-status mh-status-offline">{{ t('buildingDetail.config.offline') }}</span>
-                  </div>
+                  <option value="">{{ t('buildingDetail.config.noMediaHouse') }}</option>
+                  <option
+                    v-for="mh in cityMediaHouses"
+                    :key="mh.id"
+                    :value="mh.id"
+                    :disabled="mh.isUnderConstruction || mh.powerStatus === 'OFFLINE'"
+                  >
+                    {{ mh.name }} · {{ mh.mediaType ?? '?' }} · ×{{ mh.effectivenessMultiplier.toFixed(1) }} · {{ t('buildingDetail.config.contentRanking') }} {{ mh.contentRanking.toFixed(0) }}%
+                    {{ mh.isGovernmentOwned ? ` · ${t('buildingDetail.config.govBadge')}` : '' }}
+                    {{ mh.ownerCompanyId === building?.companyId ? ` · ${t('buildingDetail.config.yourStation')}` : '' }}
+                    {{ mh.isUnderConstruction ? ` · ${t('buildingDetail.config.underConstruction')}` : '' }}
+                    {{ mh.powerStatus === 'OFFLINE' ? ` · ${t('buildingDetail.config.offline')}` : '' }}
+                  </option>
+                </select>
+
+                <div v-if="selectedDraftMediaHouse" class="rounded-lg border border-divider bg-surface p-2 text-xs text-muted">
+                  <p class="font-medium text-foreground">{{ selectedDraftMediaHouse.name }} ({{ selectedDraftMediaHouse.mediaType ?? '?' }})</p>
+                  <p>{{ selectedDraftMediaHouse.cityName }} · ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
+                  <p>{{ t('buildingDetail.config.contentRanking') }}: {{ selectedDraftMediaHouse.contentRanking.toFixed(0) }}%</p>
                 </div>
               </div>
               <p v-if="selectedDraftMediaHouse" class="config-hint">{{ t('buildingDetail.config.channelEffect') }} ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
