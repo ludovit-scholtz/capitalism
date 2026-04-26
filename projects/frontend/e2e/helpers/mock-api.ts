@@ -3905,6 +3905,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           body: JSON.stringify({ errors: [{ message: `Building type ${input.buildingType} is not suitable for this lot.`, extensions: { code: 'UNSUITABLE_BUILDING_TYPE' } }] }),
         })
       }
+      if (input.buildingType === 'MEDIA_HOUSE') {
+        const validMediaTypes = ['NEWSPAPER', 'RADIO', 'TV']
+        if (!input.mediaType || !validMediaTypes.includes(input.mediaType)) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [
+                {
+                  message: `A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: '${input.mediaType ?? ''}'.`,
+                  extensions: { code: 'INVALID_MEDIA_TYPE' },
+                },
+              ],
+            }),
+          })
+        }
+      }
       const constructionCostsByType: Record<string, number> = {
         MINE: 5000,
         FACTORY: 15000,
@@ -3970,6 +3987,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         powerOutput: isPowerPlant ? (defaultOutputByType[plantType ?? ''] ?? 30) : null,
         powerStatus: 'POWERED',
         isForSale: false,
+        mediaType: input.buildingType === 'MEDIA_HOUSE' ? input.mediaType : null,
         builtAtUtc: new Date().toISOString(),
         isUnderConstruction: true,
         constructionCompletesAtTick: currentTick + constructionTicks,

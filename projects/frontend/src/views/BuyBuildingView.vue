@@ -22,6 +22,7 @@ const availableLots = ref<BuildingLot[]>([])
 const selectedLotId = ref('')
 const selectedType = ref('')
 const selectedCityId = ref('')
+const selectedMediaType = ref('')
 const buildingName = ref('')
 const submitting = ref(false)
 // Bank setup fields
@@ -156,7 +157,11 @@ const fundingGapType = computed<'missing_account' | 'insufficient_funds' | null>
 /** True when any funding gap is present (either missing account or insufficient balance). */
 const hasFundingGap = computed<boolean>(() => fundingGapType.value !== null)
 
-const canSubmit = computed(() => !!selectedType.value && !!selectedCityId.value && !!selectedLot.value)
+const canSubmit = computed(() => {
+  if (!selectedType.value || !selectedCityId.value || !selectedLot.value) return false
+  if (selectedType.value === 'MEDIA_HOUSE' && !selectedMediaType.value) return false
+  return true
+})
 
 onMounted(async () => {
   if (!auth.isAuthenticated) {
@@ -206,6 +211,10 @@ onMounted(async () => {
 watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
   selectedLotId.value = ''
   availableLots.value = []
+
+  if (buildingType !== 'MEDIA_HOUSE') {
+    selectedMediaType.value = ''
+  }
 
   if (!cityId || !buildingType) {
     return
@@ -275,6 +284,7 @@ async function buyBuilding() {
           lotId: selectedLot.value.id,
           buildingType: selectedType.value,
           buildingName: buildingName.value.trim() || null,
+          mediaType: selectedType.value === 'MEDIA_HOUSE' ? selectedMediaType.value || null : null,
         },
       },
     )
@@ -370,6 +380,23 @@ async function buyBuilding() {
               :placeholder="t('buildings.buildingNamePlaceholder')"
               class="w-full px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base placeholder:text-muted focus:outline-none focus:border-brand focus:shadow-[0_0_0_3px_rgba(0,71,255,0.15)] transition-colors"
             />
+          </div>
+
+          <!-- Media house channel type -->
+          <div v-if="selectedType === 'MEDIA_HOUSE'" class="flex flex-col gap-1.5">
+            <label for="mediaType" class="text-sm font-semibold">{{ t('cityMap.mediaType') }}</label>
+            <select
+              id="mediaType"
+              v-model="selectedMediaType"
+              class="w-full px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand focus:shadow-[0_0_0_3px_rgba(0,71,255,0.15)] transition-colors"
+              required
+            >
+              <option value="">{{ t('cityMap.selectMediaType') }}</option>
+              <option value="NEWSPAPER">📰 {{ t('cityMap.mediaTypeNewspaper') }} (×1.0)</option>
+              <option value="RADIO">📻 {{ t('cityMap.mediaTypeRadio') }} (×1.5)</option>
+              <option value="TV">📺 {{ t('cityMap.mediaTypeTv') }} (×2.0)</option>
+            </select>
+            <p class="text-xs text-muted m-0">{{ t('cityMap.mediaTypeHint') }}</p>
           </div>
 
           <!-- City selection -->
