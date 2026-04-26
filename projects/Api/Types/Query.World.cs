@@ -41,7 +41,7 @@ public sealed partial class Query
     /// <summary>Gets a specific city by ID.</summary>
     public async Task<City?> GetCity(Guid id, [Service] AppDbContext db)
     {
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         if (gameState is not null)
         {
             await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
@@ -101,7 +101,7 @@ public sealed partial class Query
             var subscriptionEndsAtUtc = await db.Players
                 .Where(player => player.Id == userId)
                 .Select(player => player.ProSubscriptionEndsAtUtc)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
 
             hasActiveProSubscription = ProductAccessService.HasActiveProSubscription(subscriptionEndsAtUtc, DateTime.UtcNow);
         }
@@ -137,7 +137,7 @@ public sealed partial class Query
             var subscriptionEndsAtUtc = await db.Players
                 .Where(player => player.Id == userId)
                 .Select(player => player.ProSubscriptionEndsAtUtc)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
 
             hasActiveProSubscription = ProductAccessService.HasActiveProSubscription(subscriptionEndsAtUtc, DateTime.UtcNow);
         }
@@ -201,7 +201,7 @@ public sealed partial class Query
         var subscriptionEndsAtUtc = await db.Players
             .Where(p => p.Id == userId)
             .Select(p => p.ProSubscriptionEndsAtUtc)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var hasActivePro = ProductAccessService.HasActiveProSubscription(subscriptionEndsAtUtc, DateTime.UtcNow);
 
         // Load all product types with recipes.

@@ -115,7 +115,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
         var cityCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
         var baseCapitalRequirement = GetBaseCapitalRequirement(cityCurrencyCode);
 
@@ -349,7 +349,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
         var bank = deposit.BankBuilding!;
         var bankCompany = bank.Company!;
 
@@ -565,7 +565,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
 
         // Transfer cash from owning company into the bank base-capital account
         fundingAccount.Balance -= baseCapitalRequired;

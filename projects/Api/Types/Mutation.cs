@@ -70,7 +70,7 @@ public sealed partial class Mutation
     {
         return await db.GameStates
             .Select(gameState => (long?)gameState.CurrentTick)
-            .FirstOrDefaultAsync() ?? 0L;
+            .FirstOrDefaultDeterministicAsync() ?? 0L;
     }
 
     private static void AddCompanyLedgerEntry(

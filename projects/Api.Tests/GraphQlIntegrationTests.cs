@@ -208,7 +208,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultDeterministicAsync();
 
         var company = new Company
         {
@@ -2145,7 +2145,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.SingleAsync(candidate => candidate.Email == "company-settings@test.com");
             playerId = player.Id;
-            cityId = await db.Cities.OrderBy(candidate => candidate.Name).Select(candidate => candidate.Id).FirstAsync();
+            cityId = await db.Cities.OrderBy(candidate => candidate.Name).Select(candidate => candidate.Id).FirstDeterministicAsync();
 
             var company = new Company
             {
@@ -2226,7 +2226,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            cityId = await db.Cities.OrderBy(candidate => candidate.Name).Select(candidate => candidate.Id).FirstAsync();
+            cityId = await db.Cities.OrderBy(candidate => candidate.Name).Select(candidate => candidate.Id).FirstDeterministicAsync();
         }
 
         var result = await ExecuteGraphQlAsync(
@@ -2342,7 +2342,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            cityId = await db.Cities.OrderBy(c => c.Name).Select(c => c.Id).FirstAsync();
+            cityId = await db.Cities.OrderBy(c => c.Name).Select(c => c.Id).FirstDeterministicAsync();
         }
 
         var result = await ExecuteGraphQlAsync(
@@ -2690,7 +2690,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "CZK")
             .OrderByDescending(r => r.FetchedAtUtc)
             .Select(r => r.Rate)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.True(fxRate > GameConstants.HighFxRateThreshold, $"CZK FX rate {fxRate} should be > {GameConstants.HighFxRateThreshold}");
 
         // Create an EUR-anchored lot (BasePrice well below the EurAnchoredLotBasePriceThreshold)
@@ -2843,7 +2843,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            cityId = await db.Cities.OrderBy(c => c.Name).Select(c => c.Id).FirstAsync();
+            cityId = await db.Cities.OrderBy(c => c.Name).Select(c => c.Id).FirstDeterministicAsync();
         }
 
         var result = await ExecuteGraphQlAsync(
@@ -2887,7 +2887,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = _factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            cityId = await db.Cities.OrderBy(c => c.Name).Select(c => c.Id).FirstAsync();
+            cityId = await db.Cities.OrderBy(c => c.Name).Select(c => c.Id).FirstDeterministicAsync();
         }
 
         // Submit the same city twice — the last entry should win
@@ -3140,7 +3140,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.SingleAsync(candidate => candidate.Email == "history-query@test.com");
-            var city = await db.Cities.FirstAsync();
+            var city = await db.Cities.FirstDeterministicAsync();
             var product = await db.ProductTypes
                 .Include(candidate => candidate.Recipes)
                 .FirstAsync(candidate => candidate.Slug == "wooden-chair");
@@ -4446,7 +4446,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var breadId = await GetProductGuidBySlugAsync(db, "bread");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "StkCo", Cash = 100_000m };
@@ -8174,7 +8174,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using (var scope = isolatedFactory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var currentTick = await db.GameStates.AsNoTracking().Select(s => s.CurrentTick).FirstOrDefaultAsync();
+            var currentTick = await db.GameStates.AsNoTracking().Select(s => s.CurrentTick).FirstOrDefaultDeterministicAsync();
             var company = new Company
             {
                 Id = Guid.NewGuid(),
@@ -11132,7 +11132,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 .Where(rate => rate.BaseCurrencyCode == "EUR" && rate.QuoteCurrencyCode == "USD")
                 .OrderByDescending(rate => rate.RateDate)
                 .Select(rate => rate.Rate)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
             if (eurToUsdRate <= 0m)
             {
                 eurToUsdRate = 1m;
@@ -12792,7 +12792,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ProdListCo", Cash = 500_000m };
@@ -12871,7 +12871,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ProdInactCo", Cash = 500_000m };
@@ -12936,7 +12936,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var chairProduct = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
         var breadProduct = await db.ProductTypes.FirstAsync(p => p.Slug == "bread");
 
@@ -13002,7 +13002,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ProdBuyCo", Cash = 500_000m };
@@ -13062,7 +13062,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var chairProduct = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
         var breadProduct = await db.ProductTypes.FirstAsync(p => p.Slug == "bread");
@@ -13141,7 +13141,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ProdResCo", Cash = 500_000m };
@@ -13200,9 +13200,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
-        var product = await db.ProductTypes.FirstAsync();
+        var product = await db.ProductTypes.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "MixedOrderCo", Cash = 500_000m };
         db.Companies.Add(company);
@@ -14202,7 +14202,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
         var buildingToModify = await setupDb.Buildings.FindAsync(buildingId);
         Assert.NotNull(buildingToModify);
-        var gameState = await setupDb.GameStates.FirstOrDefaultAsync();
+        var gameState = await setupDb.GameStates.FirstOrDefaultDeterministicAsync();
         Assert.NotNull(gameState);
         buildingToModify.ConstructionCompletesAtTick = gameState.CurrentTick;
         await setupDb.SaveChangesAsync();
@@ -18107,7 +18107,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // Seed: company with a sales shop, marketing unit, and linked public-sales unit.
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var player = new Player
@@ -18197,7 +18197,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var player = new Player
@@ -18280,7 +18280,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var player = new Player
@@ -18498,7 +18498,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
         var companyGuid = Guid.Parse(companyId);
 
@@ -18567,7 +18567,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var shop = new Building { Id = Guid.NewGuid(), CompanyId = companyId, CityId = city.Id, Type = BuildingType.SalesShop, Name = "BQ Analytics Shop", Level = 1 };
@@ -18613,9 +18613,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
 
         // ── Shared media house with high content ranking in city ──
         var mediaHouseOwner = new Player { Id = Guid.NewGuid(), Email = $"mh-owner-{Guid.NewGuid():N}@test.com", DisplayName = "MHO", PasswordHash = "hash", Role = PlayerRole.Player };
@@ -18702,7 +18702,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var productChair = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
         var productTable = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-table");
 
@@ -18811,17 +18811,17 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
             var unit = await db.BuildingUnits
                 .Where(candidate => candidate.BuildingId == factoryGuid && candidate.UnitType == UnitType.Purchase)
-                .FirstAsync();
+                .FirstDeterministicAsync();
 
             var woodId = await db.ResourceTypes
                 .Where(resource => resource.Slug == "wood")
                 .Select(resource => resource.Id)
-                .FirstAsync();
+                .FirstDeterministicAsync();
 
             var grainId = await db.ResourceTypes
                 .Where(resource => resource.Slug == "grain")
                 .Select(resource => resource.Id)
-                .FirstAsync();
+                .FirstDeterministicAsync();
 
             unitId = unit.Id;
             db.Inventories.AddRange(
@@ -18909,13 +18909,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
             var unit = await db.BuildingUnits
                 .Where(u => u.BuildingId == factoryGuid && u.UnitType == UnitType.Purchase)
-                .FirstAsync();
+                .FirstDeterministicAsync();
             unitId = unit.Id;
 
             woodId = await db.ResourceTypes
                 .Where(r => r.Slug == "wood")
                 .Select(r => r.Id)
-                .FirstAsync();
+                .FirstDeterministicAsync();
 
             // Seed older tick history (tick 5) — should NOT appear in lastTick fields.
             db.BuildingUnitResourceHistories.Add(new Data.Entities.BuildingUnitResourceHistory
@@ -19394,7 +19394,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.SingleAsync(p => p.Email == "ledger-multi-bld@test.com");
-            var city = await db.Cities.FirstAsync();
+            var city = await db.Cities.FirstDeterministicAsync();
             var company = new Company
             {
                 Id = Guid.NewGuid(),
@@ -19468,7 +19468,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             if (pragueCity == null)
             {
                 // Fallback: create or use Bratislava with known EUR currency
-                pragueCity = await db.Cities.FirstAsync();
+                pragueCity = await db.Cities.FirstDeterministicAsync();
             }
             var company = new Company
             {
@@ -19577,7 +19577,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var player = await db.Players.SingleAsync(p => p.Email == "ledger-bld-currency@test.com");
-            var city = await db.Cities.FirstAsync();
+            var city = await db.Cities.FirstDeterministicAsync();
             expectedCurrencyCode = city.CurrencyCode ?? "EUR";
             var company = new Company
             {
@@ -21129,7 +21129,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "TfNullCo", Cash = 10_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -21141,7 +21141,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
 
-        var productType = await db.ProductTypes.FirstAsync();
+        var productType = await db.ProductTypes.FirstDeterministicAsync();
         var unit = new Api.Data.Entities.BuildingUnit
         {
             Id = Guid.NewGuid(), BuildingId = building.Id,
@@ -21177,7 +21177,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "TfBoundsCo", Cash = 10_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -21189,7 +21189,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
 
-        var productType = await db.ProductTypes.FirstAsync();
+        var productType = await db.ProductTypes.FirstDeterministicAsync();
         var unit = new Api.Data.Entities.BuildingUnit
         {
             Id = Guid.NewGuid(), BuildingId = building.Id,
@@ -21248,7 +21248,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "TfHotCo", Cash = 10_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -21260,7 +21260,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
 
-        var productType = await db.ProductTypes.FirstAsync();
+        var productType = await db.ProductTypes.FirstDeterministicAsync();
         var unit = new Api.Data.Entities.BuildingUnit
         {
             Id = Guid.NewGuid(), BuildingId = building.Id,
@@ -21316,7 +21316,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "TfDriverCo", Cash = 10_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -21328,7 +21328,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
 
-        var productType = await db.ProductTypes.FirstAsync();
+        var productType = await db.ProductTypes.FirstDeterministicAsync();
         var unit = new Api.Data.Entities.BuildingUnit
         {
             Id = Guid.NewGuid(), BuildingId = building.Id,
@@ -21395,7 +21395,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "TfColdCo", Cash = 10_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -21407,7 +21407,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
 
-        var productType = await db.ProductTypes.FirstAsync();
+        var productType = await db.ProductTypes.FirstDeterministicAsync();
         var unit = new Api.Data.Entities.BuildingUnit
         {
             Id = Guid.NewGuid(), BuildingId = building.Id,
@@ -21732,7 +21732,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     #endregion
 
     private static async Task<Guid> GetProductGuidBySlugAsync(AppDbContext db, string slug)
-        => await db.ProductTypes.Where(p => p.Slug == slug).Select(p => p.Id).FirstAsync();
+        => await db.ProductTypes.Where(p => p.Slug == slug).Select(p => p.Id).FirstDeterministicAsync();
 
     #region MergeCompany
 
@@ -23044,8 +23044,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var (token, buildingId) = await SeedOperationalStatusTestAsync("opstat-active",
             (db, bid, _, _) =>
             {
-                var resource = db.ResourceTypes.First();
-                var gameState = db.GameStates.FirstOrDefault();
+                var resource = db.ResourceTypes.OrderBy(resourceType => resourceType.Slug).First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 var currentTick = gameState?.CurrentTick ?? 0L;
 
                 var unitId = Guid.NewGuid();
@@ -23103,7 +23103,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var (token, buildingId) = await SeedOperationalStatusTestAsync("opstat-mfg-blocked",
             (db, bid, _, _) =>
             {
-                var product = db.ProductTypes.First();
+                var product = db.ProductTypes.OrderBy(productType => productType.Slug).First();
                 db.BuildingUnits.Add(new BuildingUnit
                 {
                     Id = Guid.NewGuid(),
@@ -23169,7 +23169,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var (token, buildingId) = await SeedOperationalStatusTestAsync("recent-activity",
             (db, bid, _, _) =>
             {
-                var resource = db.ResourceTypes.First();
+                var resource = db.ResourceTypes.OrderBy(resourceType => resourceType.Slug).First();
                 var unitId = Guid.NewGuid();
                 db.BuildingUnits.Add(new BuildingUnit
                 {
@@ -23268,7 +23268,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             {
                 var primaryUnitId = Guid.NewGuid();
                 var secondaryUnitId = Guid.NewGuid();
-                var gameState = db.GameStates.First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 gameState.CurrentTick = 42;
 
                 db.BuildingUnits.AddRange(
@@ -23412,7 +23412,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             {
                 var salesUnitId = Guid.NewGuid();
                 var purchaseUnitId = Guid.NewGuid();
-                var gameState = db.GameStates.First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 gameState.CurrentTick = 140;
 
                 db.BuildingUnits.AddRange(
@@ -23582,7 +23582,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             (db, bid, _, _) =>
             {
                 // No ledger entries seeded — building has no economic activity
-                var gameState = db.GameStates.First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 gameState.CurrentTick = 10;
             });
 
@@ -23632,7 +23632,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             (db, bid, companyId, _) =>
             {
                 var unitId = Guid.NewGuid();
-                var gameState = db.GameStates.First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 gameState.CurrentTick = 5;
 
                 db.BuildingUnits.Add(new BuildingUnit
@@ -23723,7 +23723,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             (db, bid, companyId, _) =>
             {
                 var unitId = Guid.NewGuid();
-                var gameState = db.GameStates.First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 gameState.CurrentTick = 5;
 
                 db.BuildingUnits.Add(new BuildingUnit
@@ -23777,7 +23777,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             (db, bid, companyId, _) =>
             {
                 var salesUnitId = Guid.NewGuid();
-                var gameState = db.GameStates.First();
+                var gameState = db.GameStates.Single(state => state.Id == 1);
                 gameState.CurrentTick = 3;
 
                 db.BuildingUnits.Add(new BuildingUnit
@@ -23860,7 +23860,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var (token, buildingId) = await SeedOperationalStatusTestAsync("opstat-costest",
             (db, bid, _, _) =>
             {
-                var resource = db.ResourceTypes.First();
+                var resource = db.ResourceTypes.OrderBy(resourceType => resourceType.Slug).First();
                 db.BuildingUnits.Add(new BuildingUnit
                 {
                     Id = Guid.NewGuid(),
@@ -23915,7 +23915,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var (token, buildingId) = await SeedOperationalStatusTestAsync("opstat-mfg-cost",
             (db, bid, _, _) =>
             {
-                var product = db.ProductTypes.First();
+                var product = db.ProductTypes.OrderBy(productType => productType.Slug).First();
                 db.BuildingUnits.Add(new BuildingUnit
                 {
                     Id = Guid.NewGuid(),
@@ -24012,7 +24012,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var placeResult = await ExecuteGraphQlAsync(
             """
@@ -24041,7 +24041,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var placeResult = await ExecuteGraphQlAsync(
             """
@@ -24064,7 +24064,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player
         {
             Id = Guid.NewGuid(),
@@ -24121,7 +24121,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mh-np-{Guid.NewGuid():N}@test.com", DisplayName = "NP", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Newspaper Co", Cash = 1m };
@@ -24143,7 +24143,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mh-radio-{Guid.NewGuid():N}@test.com", DisplayName = "Radio", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Radio Co", Cash = 1m };
@@ -24204,7 +24204,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var result = await ExecuteGraphQlAsync(
             $"{{ cityMediaHouses(cityId: \"{city.Id}\") {{ id contentRanking isGovernmentOwned }} }}");
@@ -24234,7 +24234,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"tv-rank-{Guid.NewGuid():N}@test.com", DisplayName = "TV Rank", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Elite TV Corp", Cash = 1_000_000m };
@@ -24281,7 +24281,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"sort-{Guid.NewGuid():N}@test.com", DisplayName = "Sort Test", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "My Media Corp", Cash = 500_000m };
@@ -24319,7 +24319,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var advertiserPlayer = new Player { Id = Guid.NewGuid(), Email = $"tv-adv-{Guid.NewGuid():N}@test.com", DisplayName = "Advertiser", PasswordHash = "h", Role = PlayerRole.Player };
@@ -24364,13 +24364,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var incomeEntry = await db.LedgerEntries
             .Where(e => e.CompanyId == mediaOwnerCompany.Id && e.Category == LedgerCategory.MediaHouseIncome)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(incomeEntry);
         Assert.True(incomeEntry.Amount > 0, "Media house income ledger entry must be positive.");
 
         var brand = await db.Brands
             .Where(b => b.CompanyId == advertiserCompany.Id && b.ProductTypeId == product.Id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(brand);
         Assert.True(brand.Awareness > 0, "Brand awareness should increase after TV marketing.");
     }
@@ -24381,7 +24381,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var player1 = new Player { Id = Guid.NewGuid(), Email = $"tv-cmp-{Guid.NewGuid():N}@test.com", DisplayName = "TV Adv", PasswordHash = "h", Role = PlayerRole.Player };
@@ -24428,7 +24428,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var player = new Player { Id = Guid.NewGuid(), Email = $"self-mh-{Guid.NewGuid():N}@test.com", DisplayName = "Self MH", PasswordHash = "h", Role = PlayerRole.Player };
@@ -24455,13 +24455,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Marketing ledger entry should show the deduction (the tick processes other phases too, so just verify the ledger).
         var marketingEntry = await db.LedgerEntries
             .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.Marketing)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(marketingEntry);
         Assert.Equal(-1_000m, marketingEntry.Amount, precision: 2);
         // No MEDIA_HOUSE_INCOME entry should exist for the company advertising on its own station.
         var selfIncomeEntry = await db.LedgerEntries
             .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.MediaHouseIncome)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.Null(selfIncomeEntry);
     }
 
@@ -24475,7 +24475,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var seedPlayer = await seedDb.Players.FirstAsync(p => p.Email.StartsWith("mh-cfg-"));
         var seedCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = seedPlayer.Id, Name = "MH Cfg Co", Cash = 100_000m };
         seedDb.Companies.Add(seedCompany);
-        var seedCity = await seedDb.Cities.FirstAsync();
+        var seedCity = await seedDb.Cities.FirstDeterministicAsync();
         var seedShop = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = seedCompany.Id, CityId = seedCity.Id, Type = Api.Data.Entities.BuildingType.SalesShop, Name = "Shop", Level = 1 };
         seedDb.Buildings.Add(seedShop);
         await seedDb.SaveChangesAsync();
@@ -24519,7 +24519,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var seedPlayer = await seedDb.Players.FirstAsync(p => p.Email.StartsWith("mh-cfg2-"));
         var seedCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = seedPlayer.Id, Name = "MH Cfg2 Co", Cash = 100_000m };
         seedDb.Companies.Add(seedCompany);
-        var seedCity = await seedDb.Cities.FirstAsync();
+        var seedCity = await seedDb.Cities.FirstDeterministicAsync();
         var seedShop = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = seedCompany.Id, CityId = seedCity.Id, Type = Api.Data.Entities.BuildingType.SalesShop, Name = "Shop2", Level = 1 };
         var seedFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = seedCompany.Id, CityId = seedCity.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "Factory2", Level = 1 };
         seedDb.Buildings.AddRange(seedShop, seedFactory);
@@ -24563,7 +24563,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var seedPlayer = await db.Players.FirstAsync(p => p.Email.StartsWith("mh-city-"));
-        var homeCity = await db.Cities.FirstAsync();
+        var homeCity = await db.Cities.FirstDeterministicAsync();
         var otherCity = await db.Cities.FirstAsync(c => c.Id != homeCity.Id);
         var seedCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = seedPlayer.Id, Name = "MH City Co", Cash = 100_000m };
         db.Companies.Add(seedCompany);
@@ -24626,7 +24626,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BankCo", Cash = 500_000m };
         db.Companies.Add(company);
         var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "My Bank", Level = 1, TotalDeposits = 300_000m, BaseCapitalDeposited = true };
@@ -24662,7 +24662,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "FactoryCo", Cash = 500_000m };
         db.Companies.Add(company);
         var factory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "My Factory", Level = 1 };
@@ -24692,7 +24692,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "RateCo", Cash = 500_000m };
         db.Companies.Add(company);
         var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "Rate Bank", Level = 1 };
@@ -24741,7 +24741,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BorrowerCo", Cash = 1_000m };
@@ -24817,7 +24817,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "SelfLendCo", Cash = 500_000m };
         db.Companies.Add(company);
         var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "SelfBank", Level = 1 };
@@ -24867,7 +24867,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "CapLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "CapBorrowerCo", Cash = 1_000m };
@@ -24920,7 +24920,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "GloLenderCo", Cash = 500_000m };
         db.Companies.Add(lenderCompany);
         var bank = new Api.Data.Entities.Building
@@ -24973,7 +24973,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "MylLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "MylBorrowerCo", Cash = 1_000m };
@@ -25022,7 +25022,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "DeactLenderCo", Cash = 500_000m };
         db.Companies.Add(lenderCompany);
         var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "DeactBank", Level = 1 };
@@ -25059,7 +25059,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "TrLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "TrBorrowerCo", Cash = 200_000m };
@@ -25085,7 +25085,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             .SumAsync(account => account.Balance);
 
         // Advance game ticks to payment due tick
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         gameState.CurrentTick = loanFromDb.NextPaymentTick - 1;
         await db.SaveChangesAsync();
 
@@ -25127,7 +25127,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "MissLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "MissBorrowerCo", Cash = 0m };
@@ -25139,7 +25139,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         db.LoanOffers.Add(offer);
 
         // Manually create a loan where borrower has no cash
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var loan = new Api.Data.Entities.Loan
         {
             Id = Guid.NewGuid(),
@@ -25191,7 +25191,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "UpdateOfferCo", Cash = 500_000m };
         db.Companies.Add(company);
         var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "UpdateBank", Level = 1 };
@@ -25227,7 +25227,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "BLLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BLBorrowerCo", Cash = 1_000m };
@@ -25271,7 +25271,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "CapFullLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "CapFullBorrowerCo", Cash = 1_000m };
@@ -25497,7 +25497,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "ColLenderCo", Cash = 1_000_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "ColBorrowerCo", Cash = 5_000m };
@@ -25557,7 +25557,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LTVLenderCo", Cash = 1_000_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "LTVBorrowerCo", Cash = 5_000m };
@@ -25616,7 +25616,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
         var otherPlayer = await db.Players.FirstAsync(p => p.Email == otherEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "NOLenderCo", Cash = 1_000_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "NOBorrowerCo", Cash = 5_000m };
@@ -25672,7 +25672,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "PledgedLenderCo", Cash = 2_000_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "PledgedBorrowerCo", Cash = 5_000m };
@@ -25700,7 +25700,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         db.LoanOffers.Add(offer);
 
         // First loan: successfully pledges the factory
-        var gs = await db.GameStates.FirstAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
         var existingLoan = new Api.Data.Entities.Loan
         {
             Id = Guid.NewGuid(),
@@ -25751,7 +25751,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ColQueryCo", Cash = 100_000m };
         db.Companies.Add(company);
@@ -25806,7 +25806,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "UnsecLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "UnsecBorrowerCo", Cash = 1_000m };
@@ -25865,7 +25865,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
         var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"FRLenderCo-{Guid.NewGuid():N}", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = $"FRBorrowerCo-{Guid.NewGuid():N}", Cash = 10_000m };
@@ -25877,7 +25877,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 10m, MaxPrincipalPerLoan = 5_000m, TotalCapacity = 50_000m, UsedCapacity = 0m, DurationTicks = 1440L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
         db.LoanOffers.Add(offer);
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         // Seed a loan where the last payment clears the remaining balance
         var loan = new Api.Data.Entities.Loan
         {
@@ -26029,7 +26029,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
                 var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
                 var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-                var city = await db.Cities.FirstAsync();
+                var city = await db.Cities.FirstDeterministicAsync();
 
                 var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "BankCoSmall", Cash = 15_000_000m };
                 db.Companies.Add(bankCompany);
@@ -26183,7 +26183,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "WdBankCo", Cash = 20_000_000m };
         db.Companies.Add(bankCompany);
@@ -26302,7 +26302,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "RatesCo", Cash = 15_000_000m };
         db.Companies.Add(company);
@@ -26336,7 +26336,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "InfoCo", Cash = 15_000_000m };
         db.Companies.Add(company);
@@ -26377,7 +26377,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "ReserveCo", Cash = 1_000_000m };
         db.Companies.Add(company);
@@ -26407,7 +26407,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var bankPlayer = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"bank-int-{Guid.NewGuid():N}@test.com", DisplayName = "BankInt", Role = "PLAYER", PasswordHash = "x" };
         var depositorPlayer = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"dep-int-{Guid.NewGuid():N}@test.com", DisplayName = "DepInt", Role = "PLAYER", PasswordHash = "x" };
@@ -26474,7 +26474,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var bankCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "TuBankCo", Cash = 20_000_000m };
         var depCo = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "TuDepCo", Cash = 500_000m };
@@ -26605,7 +26605,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         // Use a very high rate so interest amounts are measurable and distinct
         const decimal ratePercent = 3650m; // 3650% p.a. = 10% of deposit per year × TicksPerYear ⇒ clean per-tick math
@@ -26630,7 +26630,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         db.Buildings.Add(bank);
 
         // Original deposit at tick 1
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         gameState.CurrentTick = 1L;
         var origDeposit = new Api.Data.Entities.BankAccount
         {
@@ -26856,7 +26856,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var owner = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"excl-o-{Guid.NewGuid():N}@t.com", DisplayName = "ExclO", Role = "PLAYER", PasswordHash = "x" };
         db.Players.Add(owner);
@@ -26945,7 +26945,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Unauthenticated requests to openBankAccount must be rejected.
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var owner = new Api.Data.Entities.Player { Id = Guid.NewGuid(), Email = $"cd-unauth-o-{Guid.NewGuid():N}@t.com", DisplayName = "CDUnO", Role = "PLAYER", PasswordHash = "x" };
         db.Players.Add(owner);
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"CDUnCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
@@ -26972,7 +26972,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"WDUnCo-{Guid.NewGuid():N}", Cash = 1_000_000m };
         db.Companies.Add(co);
@@ -27002,7 +27002,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"SbrCo-{Guid.NewGuid():N}", Cash = 15_000_000m };
         db.Companies.Add(co);
@@ -27030,8 +27030,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
-        var ownerPlayer = await db.Players.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var ownerPlayer = await db.Players.FirstDeterministicAsync();
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = ownerPlayer.Id, Name = $"BInfoPubCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
         db.Companies.Add(co);
         var bank = CreateTestBank(db, co, city.Id);
@@ -27123,7 +27123,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
 
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdPoorCo-{Guid.NewGuid():N}", Cash = 500_000m };
@@ -27155,7 +27155,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
 
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdDoneCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
@@ -27184,7 +27184,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
 
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"IbdOwn2Co-{Guid.NewGuid():N}", Cash = 20_000_000m };
@@ -27213,8 +27213,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
-        var player = await db.Players.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var co = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"IbdUnauthCo-{Guid.NewGuid():N}", Cash = 20_000_000m };
         db.Companies.Add(co);
         var bank = new Api.Data.Entities.Building
@@ -27249,7 +27249,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "PPOptCo", Cash = 100_000m };
@@ -27294,7 +27294,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "PPMaxCo", Cash = 100_000m };
@@ -27338,7 +27338,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "PPMinQCo", Cash = 100_000m };
@@ -27428,7 +27428,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "PPNoConfCo", Cash = 100_000m };
         db.Companies.Add(company);
@@ -27544,7 +27544,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
         var seller = await db.Players.FirstAsync(p => p.Email == sellerEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "iron-ore");
 
         var buyerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BuyerCoOpt", Cash = 100_000m };
@@ -27612,7 +27612,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "CfgClearLockedCo", Cash = 500_000m };
@@ -27691,7 +27691,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var player = await db.Players.FirstAsync(p => p.Email == email);
         var seller = await db.Players.FirstAsync(p => p.Email == sellerEmail);
         var other = await db.Players.FirstAsync(p => p.Email == otherEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var buyerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BuyerVL", Cash = 100_000m };
@@ -27754,7 +27754,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCRankedCo", Cash = 100_000m };
@@ -27832,7 +27832,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCMaxPriceCo", Cash = 100_000m };
@@ -27890,7 +27890,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCMinQualityCo", Cash = 100_000m };
@@ -27947,7 +27947,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCNoConfigCo", Cash = 100_000m };
         db.Companies.Add(company);
@@ -27996,7 +27996,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCAnonCo", Cash = 100_000m };
@@ -28051,7 +28051,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCLocalCo", Cash = 100_000m };
@@ -28114,7 +28114,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUCo", Cash = 50_000m };
         db.Companies.Add(company);
@@ -28171,7 +28171,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUMaxCo", Cash = 500_000m };
         db.Companies.Add(company);
@@ -28215,7 +28215,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUBrokeCo", Cash = 1m };
         db.Companies.Add(company);
@@ -28259,8 +28259,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
-        var gameState = await db.GameStates.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUPendingCo", Cash = 100_000m };
         db.Companies.Add(company);
@@ -28322,7 +28322,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUNoUpCo", Cash = 100_000m };
         db.Companies.Add(company);
@@ -28366,7 +28366,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUTickCo", Cash = 100_000m };
         db.Companies.Add(company);
@@ -28428,7 +28428,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIInfoCo", Cash = 50_000m };
         db.Companies.Add(company);
@@ -28485,7 +28485,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIMaxCo", Cash = 50_000m };
         db.Companies.Add(company);
@@ -28535,7 +28535,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUICostsCo", Cash = 50_000m };
         db.Companies.Add(company);
@@ -28617,7 +28617,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIStorageCo", Cash = 50_000m };
         db.Companies.Add(company);
@@ -28677,7 +28677,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIStorUnitCo", Cash = 50_000m };
         db.Companies.Add(company);
@@ -28731,7 +28731,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUAnonCo", Cash = 100_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -28775,7 +28775,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUDualCo", Cash = 500_000m };
         db.Companies.Add(company);
@@ -28856,8 +28856,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
-        var gameState = await db.GameStates.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUThirdCo", Cash = 1_000_000m };
         db.Companies.Add(company);
@@ -28943,8 +28943,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
-        var gameState = await db.GameStates.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUDupCo", Cash = 500_000m };
         db.Companies.Add(company);
@@ -29002,7 +29002,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     #region RankedProductTypes
 
     private static async Task<Guid> GetProductGuidBySlugAsync(AppDbContext db, string slug)
-        => await db.ProductTypes.Where(p => p.Slug == slug).Select(p => p.Id).FirstAsync();
+        => await db.ProductTypes.Where(p => p.Slug == slug).Select(p => p.Id).FirstDeterministicAsync();
 
     [Fact]
     public async Task RankedProductTypes_PublicSalesContext_ConnectedProductRankedFirst()
@@ -29016,7 +29016,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var woodenChairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPsCo", Cash = 100_000m };
@@ -29065,7 +29065,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var breadId = await GetProductGuidBySlugAsync(db, "bread");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqCo", Cash = 100_000m };
@@ -29121,7 +29121,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var basicMedicineId = await GetProductGuidBySlugAsync(db, "basic-medicine");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptBqCo", Cash = 100_000m };
@@ -29175,7 +29175,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptCatCo", Cash = 50_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -29233,7 +29233,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptOrdCo", Cash = 50_000m };
         db.Companies.Add(company);
         var building = new Api.Data.Entities.Building
@@ -29275,7 +29275,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var woodenChairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptStCo", Cash = 100_000m };
@@ -29324,7 +29324,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var breadId = await GetProductGuidBySlugAsync(db, "bread");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptStkCo", Cash = 100_000m };
@@ -29382,7 +29382,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var basicMedicineId = await GetProductGuidBySlugAsync(db, "basic-medicine");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptB2bCo", Cash = 100_000m };
@@ -29434,7 +29434,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var flourId = await GetProductGuidBySlugAsync(db, "flour");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptB2bsCo", Cash = 100_000m };
@@ -29485,7 +29485,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var bandagesId = await GetProductGuidBySlugAsync(db, "bandages");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptStPcCo", Cash = 100_000m };
@@ -29547,7 +29547,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var flourId = await GetProductGuidBySlugAsync(db, "flour");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPsPcCo", Cash = 100_000m };
@@ -29609,7 +29609,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var woodenTableId = await GetProductGuidBySlugAsync(db, "wooden-table");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptB2bPcCo", Cash = 100_000m };
@@ -29672,7 +29672,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var flourId = await GetProductGuidBySlugAsync(db, "flour");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqPsCo", Cash = 100_000m };
@@ -29730,7 +29730,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var breadId = await GetProductGuidBySlugAsync(db, "bread");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqB2bCo", Cash = 100_000m };
@@ -29788,7 +29788,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var basicMedicineId = await GetProductGuidBySlugAsync(db, "basic-medicine");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqInvCo", Cash = 100_000m };
@@ -29849,7 +29849,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqNoneCo", Cash = 50_000m };
         db.Companies.Add(company);
         var rdBuilding = new Api.Data.Entities.Building
@@ -29893,7 +29893,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var woodenBedId = await GetProductGuidBySlugAsync(db, "wooden-bed");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptBqPsCo", Cash = 100_000m };
@@ -29951,7 +29951,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var woodenTableId = await GetProductGuidBySlugAsync(db, "wooden-table");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptPqPendCo", Cash = 100_000m };
@@ -30020,7 +30020,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var breadId = await GetProductGuidBySlugAsync(db, "bread");
 
         var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptBqPendCo", Cash = 100_000m };
@@ -30086,7 +30086,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var company = new Company
         {
             Id = Guid.NewGuid(),
@@ -31059,7 +31059,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mhcontent-{Guid.NewGuid():N}@test.com", DisplayName = "MH Invest", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Media Corp", Cash = 100_000m };
@@ -31098,7 +31098,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mhcontent2-{Guid.NewGuid():N}@test.com", DisplayName = "MH L2", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Level 2 Media Corp", Cash = 100_000m };
@@ -31138,7 +31138,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mhdecay-{Guid.NewGuid():N}@test.com", DisplayName = "MH Decay", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Decay Media Corp", Cash = 0m };
@@ -31177,7 +31177,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mhcash-{Guid.NewGuid():N}@test.com", DisplayName = "MH Cash", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         // Company has only 300 cash but budget is 1000 → only 300 is spent.
@@ -31219,7 +31219,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mhledger-{Guid.NewGuid():N}@test.com", DisplayName = "MH Ledger", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Ledger Media Corp", Cash = 100_000m };
@@ -31246,7 +31246,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         var ledgerEntry = await db.LedgerEntries
             .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.MediaHouseContent)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         Assert.NotNull(ledgerEntry);
         Assert.Equal(-500m, ledgerEntry.Amount, precision: 2);
@@ -31262,7 +31262,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var player = await db.Players.FirstAsync(p => p.Email.StartsWith("mhbudget-"));
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Budget Media Corp", Cash = 100_000m };
         db.Companies.Add(company);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var mediaBuilding = new Building
         {
             Id = Guid.NewGuid(),
@@ -31314,7 +31314,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var otherPlayer = await db.Players.FirstAsync(p => p.Email.StartsWith("mhother-"));
         var otherCompany = new Company { Id = Guid.NewGuid(), PlayerId = otherPlayer.Id, Name = "Other Media Corp", Cash = 100_000m };
         db.Companies.Add(otherCompany);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var mediaBuilding = new Building
         {
             Id = Guid.NewGuid(),
@@ -31352,7 +31352,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var player = await db.Players.FirstAsync(p => p.Email.StartsWith("mhinvalid-"));
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Factory Owner Corp", Cash = 100_000m };
         db.Companies.Add(company);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var factory = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = BuildingType.Factory, Name = "Not a Media House", Level = 1 };
         db.Buildings.Add(factory);
         await db.SaveChangesAsync();
@@ -31381,7 +31381,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var player = await db.Players.FirstAsync(p => p.Email.StartsWith("mhneg-"));
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Neg Media Corp", Cash = 100_000m };
         db.Companies.Add(company);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var mediaBuilding = new Building
         {
             Id = Guid.NewGuid(),
@@ -31416,7 +31416,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"mhfields-{Guid.NewGuid():N}@test.com", DisplayName = "MH Fields", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Fields Media Corp", Cash = 100_000m };
@@ -31458,7 +31458,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
 
         var mediaOwner = new Player { Id = Guid.NewGuid(), Email = $"mheff-own-{Guid.NewGuid():N}@test.com", DisplayName = "Media Owner", PasswordHash = "h", Role = PlayerRole.Player };
@@ -31518,7 +31518,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var player = await db.Players.FirstAsync(p => p.Email.StartsWith("mhclear-"));
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Clear Media Corp", Cash = 100_000m };
         db.Companies.Add(company);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var mediaBuilding = new Building
         {
             Id = Guid.NewGuid(),

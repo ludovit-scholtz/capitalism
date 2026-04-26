@@ -115,7 +115,7 @@ public sealed class BankingIntegrationTests
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Undercap Corp", Cash = 5_000_000m };
         db.Companies.Add(company);
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var bank = new Building
         {
             Id = Guid.NewGuid(),
@@ -451,7 +451,7 @@ public sealed class BankingIntegrationTests
 
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         // Bank starts under reserve: $80K liquidity, $1M deposits, $500K CB debt
         var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "PressuredBankCo", Cash = 80_000m };
@@ -543,7 +543,7 @@ public sealed class BankingIntegrationTests
 
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         // Bank: 5M deposits, cash=400K (below reserve of 500K), CB debt=1M → CRITICAL
         var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "ConsistencyBankCo", Cash = 400_000m };
@@ -627,7 +627,7 @@ public sealed class BankingIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var ownerUser = await db.Players.FirstAsync(p => p.Email == "rateowner@test.com");
         var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Rate Bank Co", Cash = 50_000_000m };
@@ -674,7 +674,7 @@ public sealed class BankingIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var ownerUser = await db.Players.FirstAsync(p => p.Email == "rateowner2@test.com");
         var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Rate Bank Co 2", Cash = 50_000_000m };
@@ -718,8 +718,8 @@ public sealed class BankingIntegrationTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var processor = await CreateProcessorAsync(scope);
-        var city = await db.Cities.FirstAsync();
-        var gs = await db.GameStates.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
 
         // Bank owner
         var bankOwner = new Player { Id = Guid.NewGuid(), Email = "selfint@test.com", DisplayName = "Self Int", PasswordHash = "x", Role = PlayerRole.Player };

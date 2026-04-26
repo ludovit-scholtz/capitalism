@@ -433,7 +433,7 @@ public sealed partial class Mutation
             .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "USD")
             .OrderByDescending(r => r.RateDate)
             .Select(r => r.Rate)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         return rate > 0 ? rate : 1.08m;
     }
 
@@ -513,7 +513,7 @@ public sealed partial class Mutation
         var latestEntryForTick = await db.SharePriceHistoryEntries
             .Where(entry => entry.CompanyId == companyId && entry.RecordedAtTick == currentTick)
             .OrderByDescending(entry => entry.RecordedAtUtc)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         if (latestEntryForTick is null)
         {

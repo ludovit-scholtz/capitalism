@@ -99,7 +99,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(gs => gs.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         // Move the money.
         fromAccount.Balance -= input.Amount;

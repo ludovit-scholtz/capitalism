@@ -207,7 +207,7 @@ public sealed partial class Query
             .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "USD")
             .OrderByDescending(r => r.RateDate)
             .Select(r => r.Rate)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         return rate > 0 ? rate : 1.08m; // fallback
     }
 
@@ -287,7 +287,7 @@ public sealed partial class Query
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         if (gameState is not null)
         {
             await BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
@@ -495,7 +495,7 @@ public sealed partial class Query
             candidate => candidate.Id,
             candidate => ComputeCompanyAssetValue(candidate, allOwnedLots, allInventories));
         var assetValue = companyAssetValues.GetValueOrDefault(company.Id);
-        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultDeterministicAsync();
         var maxAssetValue = companyAssetValues.Values.DefaultIfEmpty(0m).Max();
         var overheadRate = CompanyEconomyCalculator.ComputeAdministrationOverheadRate(
             company,
@@ -549,7 +549,7 @@ public sealed partial class Query
             return cached;
         }
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         if (gameState is null)
         {
             return null;

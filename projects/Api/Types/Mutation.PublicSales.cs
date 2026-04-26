@@ -109,7 +109,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstAsync();
+            .FirstDeterministicAsync();
 
         var inventory = await db.Inventories
             .Where(i => i.BuildingUnitId == unit.Id && i.Quantity > 0m)

@@ -153,7 +153,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultAsync())?.CurrentTick ?? 0;
+        var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
         var constructionCost = applyConstructionDelay ? Engine.GameConstants.ConstructionCost(buildingType) : 0m;
         var totalCost = lot.Price + constructionCost;
 

@@ -34,7 +34,7 @@ It will use real world map. The game will start in single city and later other c
 ### Currencies and bank accounts (50% complete)
 
 - [ ] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
-- [ ] In forex exchange show the fx rate list table
+- [ ] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
 - [ ] Organizie forex exchange to tabs, add to the top forex tabs the amm features like add liquidity, show liquidity, and swap at AMM 
 - [ ] Player cannot go to minus on the bank account unless he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
 - [ ] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.

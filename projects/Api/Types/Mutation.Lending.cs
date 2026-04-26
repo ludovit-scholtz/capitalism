@@ -110,7 +110,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
 
         var offer = new LoanOffer
         {
@@ -415,7 +415,7 @@ public sealed partial class Mutation
             }
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
 
         // Tick-based repayment schedule: principal is paid each tick over the agreed duration.
         var ticksPerPayment = 1L;
@@ -593,7 +593,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
         var durationTicks = input.DurationTicks ?? GameConstants.TicksPerYear;
         var annualRate = bank.LendingInterestRatePercent ?? 8m;
 

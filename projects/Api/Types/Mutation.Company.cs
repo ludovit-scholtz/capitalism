@@ -28,7 +28,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         var company = new Company
         {
@@ -208,7 +208,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
         var lotId = await FindCompatibleAvailableLotIdAsync(db, city.Id, input.Type);
 
@@ -419,7 +419,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;
 
         // Settle taxes for the target company at merge time

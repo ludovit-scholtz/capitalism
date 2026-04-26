@@ -72,7 +72,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [city.Id]);
 
         // Validate product
@@ -294,7 +294,7 @@ public sealed partial class Mutation
             TotalSharesIssued = DefaultCompanyShareCount,
             DividendPayoutRatio = DefaultDividendPayoutRatio,
             FoundedAtUtc = nowUtc,
-            FoundedAtTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultAsync()
+            FoundedAtTick = await db.GameStates.AsNoTracking().Select(state => state.CurrentTick).FirstOrDefaultDeterministicAsync()
         };
         db.Companies.Add(company);
         var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(
@@ -334,7 +334,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         try
         {
@@ -457,7 +457,7 @@ public sealed partial class Mutation
             .AsNoTracking()
             .Where(city => city.Id == onboardingCityId)
             .Select(city => city.CurrencyCode)
-            .FirstOrDefaultAsync() ?? "EUR";
+            .FirstOrDefaultDeterministicAsync() ?? "EUR";
         var finishFxRate = await Query.ComputeForexRateAsync(db, "EUR", onboardingCityCurrencyCode);
 
         var (_, shop) = await PrepareLotPurchaseAsync(
@@ -481,7 +481,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         try
         {

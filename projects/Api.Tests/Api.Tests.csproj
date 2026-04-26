@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Using Include="Api.Utilities" />
     <Using Include="Xunit" />
   </ItemGroup>
 

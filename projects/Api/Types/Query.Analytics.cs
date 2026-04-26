@@ -234,7 +234,7 @@ public sealed partial class Query
             .Include(r => r.ProductType)
             .Where(r => r.BuildingId == shopBuilding.Id && r.QuantitySold > 0m)
             .OrderBy(r => r.Tick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         if (firstSaleRecord is not null)
         {
@@ -616,7 +616,7 @@ public sealed partial class Query
             // Demand drivers for top factor identification.
             var lot = lots.TryGetValue(unit.BuildingId, out var l) ? l : null;
             decimal? populationIndex = lot?.PopulationIndex;
-            var inventory = await db.Inventories.Where(i => i.BuildingUnitId == unit.Id).FirstOrDefaultAsync();
+            var inventory = await db.Inventories.Where(i => i.BuildingUnitId == unit.Id).FirstOrDefaultDeterministicAsync();
             decimal? inventoryQuality = inventory?.Quality;
 
             var demandDrivers = ComputeDemandDrivers(

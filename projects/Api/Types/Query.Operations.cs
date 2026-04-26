@@ -21,7 +21,7 @@ public sealed partial class Query
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;
 
         var plans = await db.BuildingConfigurationPlans
@@ -88,7 +88,7 @@ public sealed partial class Query
             .ToDictionaryAsync(x => x.UnitId, x => x.Total);
 
         // Load recent history (last 5 ticks) to detect idle vs active units.
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;
         var windowStart = Math.Max(0L, currentTick - 4L);
 

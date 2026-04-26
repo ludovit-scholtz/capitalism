@@ -83,7 +83,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync()
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync()
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Game state not found.")
@@ -167,7 +167,7 @@ public sealed partial class Mutation
             var currentTick = await db.GameStates
                 .AsNoTracking()
                 .Select(state => state.CurrentTick)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
             await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [lot.CityId]);
             await db.SaveChangesAsync();
         }

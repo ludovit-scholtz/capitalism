@@ -564,7 +564,7 @@ public sealed class GlobalCitiesAndFxRatesTests
             .Where(account => account.PlayerId == playerId
                 && account.CurrencyCode == PersonalBankAccountService.SettlementCurrencyCode)
             .Select(account => account.Balance)
-            .FirstAsync();
+            .FirstDeterministicAsync();
 
     #endregion
 

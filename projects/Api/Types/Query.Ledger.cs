@@ -35,7 +35,7 @@ public sealed partial class Query
 
         var gameState = await db.GameStates
             .AsNoTracking()
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;
         var currentGameYear = GameTime.GetGameYear(currentTick);
         var selectedGameYear = gameYear ?? currentGameYear;

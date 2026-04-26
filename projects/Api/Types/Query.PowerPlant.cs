@@ -55,7 +55,7 @@ public sealed partial class Query
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(gs => (long?)gs.CurrentTick)
-            .FirstOrDefaultAsync() ?? 0L;
+            .FirstOrDefaultDeterministicAsync() ?? 0L;
         var windowStart = Math.Max(0L, currentTick - (safeLimit - 1L));
 
         var entries = await db.LedgerEntries

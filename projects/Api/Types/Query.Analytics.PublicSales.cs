@@ -32,7 +32,7 @@ public sealed partial class Query
         // Load current tick for the salary window calculation, and compute
         // the total salary paid in this city over the past 10 ticks so the
         // SALARY demand driver can reflect dynamic economic activity.
-        var gameStateForSalary = await db.GameStates.FirstOrDefaultAsync();
+        var gameStateForSalary = await db.GameStates.FirstOrDefaultDeterministicAsync();
         decimal recentCitySalary = 0m;
         if (gameStateForSalary is not null && city is not null)
         {
@@ -220,7 +220,7 @@ public sealed partial class Query
 
         var inventory = await db.Inventories
             .Where(i => i.BuildingUnitId == unit.Id)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         if (inventory is not null)
             inventoryQuality = inventory.Quality;
 
@@ -237,7 +237,7 @@ public sealed partial class Query
                                     || b.Scope == "CATEGORY" && b.IndustryCategory == productTypeForAnalytics.Industry
                                     || b.Scope == "COMPANY"))
                     .OrderByDescending(b => b.Awareness)
-                    .FirstOrDefaultAsync();
+                    .FirstOrDefaultDeterministicAsync();
                 if (brand is not null)
                 {
                     brandAwareness = brand.Awareness;
