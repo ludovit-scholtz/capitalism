@@ -74,7 +74,7 @@ const {
         </div>
 
         <!-- ── Building Layouts panel ── -->
-        <div class="layout-section" aria-label="Building Layouts">
+        <div class="layout-section" :aria-label="t('buildingDetail.accessibility.buildingLayouts')">
           <div class="layout-header">
             <h4>{{ t('buildingDetail.layouts.title') }}</h4>
           </div>

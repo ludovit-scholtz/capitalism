@@ -13,7 +13,7 @@ const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent
     v-if="building?.type === 'APARTMENT' || building?.type === 'COMMERCIAL'"
     class="property-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5"
     role="region"
-    aria-label="property management"
+    :aria-label="t('buildingDetail.accessibility.propertyManagement')"
   >
     <div class="property-panel-header mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 class="property-panel-title text-lg font-semibold text-foreground">{{ t('property.panelTitle') }}</h2>

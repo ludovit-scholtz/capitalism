@@ -20,7 +20,12 @@ const {
 </script>
 
 <template>
-  <div v-if="building?.type === 'MEDIA_HOUSE'" class="media-house-mgmt-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5" role="region" aria-label="media house management">
+  <div
+    v-if="building?.type === 'MEDIA_HOUSE'"
+    class="media-house-mgmt-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5"
+    role="region"
+    :aria-label="t('buildingDetail.accessibility.mediaHouseManagement')"
+  >
     <div class="media-house-mgmt-header mb-4 flex items-center justify-between">
       <h2 class="media-house-mgmt-title text-lg font-semibold text-foreground">📡 {{ t('mediaHouse.panelTitle') }}</h2>
     </div>
@@ -118,10 +123,7 @@ const {
           v-if="building?.contentBudgetPerTick"
           class="btn btn-secondary"
           :disabled="savingContentBudget"
-          @click="
-            contentBudgetInput = 0
-            saveContentBudget()
-          "
+          @click="contentBudgetInput = 0; saveContentBudget()"
         >
           {{ t('mediaHouse.stopInvestmentBtn') }}
         </button>

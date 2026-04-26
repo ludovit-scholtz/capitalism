@@ -112,7 +112,7 @@ const {
                     <span class="cell-level">Lv.{{ getUnitAtFrom(activeUnits, x, y)!.level }}</span>
                   </div>
                   <!-- Under-upgrade badge -->
-                  <span v-if="isCellUnderUpgrade(x, y)" class="cell-upgrading-badge" aria-label="Unit is being upgraded">⏳</span>
+                  <span v-if="isCellUnderUpgrade(x, y)" class="cell-upgrading-badge" :aria-label="t('buildingDetail.accessibility.unitBeingUpgraded')">⏳</span>
                   <div v-if="getUnitDisplayLabel(getUnitAtFrom(activeUnits, x, y))" class="cell-item-block" aria-hidden="true">
                     <img v-if="getUnitDisplayImageUrl(getUnitAtFrom(activeUnits, x, y))" class="cell-item-image" :src="getUnitDisplayImageUrl(getUnitAtFrom(activeUnits, x, y))!" alt="" />
                     <span v-else class="cell-item-avatar">{{ getUnitDisplayMonogram(getUnitAtFrom(activeUnits, x, y)) }}</span>

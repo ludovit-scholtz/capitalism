@@ -9,7 +9,12 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
 </script>
 
 <template>
-  <div v-if="building?.type === 'RESEARCH_DEVELOPMENT'" class="research-progress-panel mb-4 rounded-lg border border-divider bg-card p-5" role="region" aria-label="research progress">
+  <div
+    v-if="building?.type === 'RESEARCH_DEVELOPMENT'"
+    class="research-progress-panel mb-4 rounded-lg border border-divider bg-card p-5"
+    role="region"
+    :aria-label="t('buildingDetail.accessibility.researchProgress')"
+  >
     <div class="research-progress-header mb-2 flex items-center justify-between">
       <h2 class="research-progress-title m-0 text-lg font-semibold text-foreground">🔬 {{ t('research.panelTitle') }}</h2>
     </div>
@@ -36,7 +41,7 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
         <div class="research-brand-metrics my-2 flex flex-col gap-2">
           <div v-if="brand.quality > 0" class="research-metric grid grid-cols-[7rem_minmax(0,1fr)_3.5rem] items-center gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
             <span class="research-metric-label whitespace-nowrap text-[0.8125rem] text-muted">{{ t('research.qualityLabel') }}</span>
-            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="`Product quality ${(brand.quality * 100).toFixed(1)}%`">
+            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="t('buildingDetail.accessibility.researchProductQuality', { value: (brand.quality * 100).toFixed(1) })">
               <div
                 class="research-progress-fill research-progress-quality h-full rounded-full bg-primary transition-[width] duration-300"
                 :style="{ width: `${(brand.quality * 100).toFixed(1)}%` }"
@@ -47,7 +52,10 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
 
           <div v-if="brand.marketingEfficiencyMultiplier > 1" class="research-metric grid grid-cols-[7rem_minmax(0,1fr)_3.5rem] items-center gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
             <span class="research-metric-label whitespace-nowrap text-[0.8125rem] text-muted">{{ t('research.marketingEfficiencyLabel') }}</span>
-            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="`Marketing efficiency ${brand.marketingEfficiencyMultiplier.toFixed(2)}x`">
+            <div
+              class="research-progress-bar h-2 overflow-hidden rounded-full bg-border"
+              :aria-label="t('buildingDetail.accessibility.researchMarketingEfficiency', { value: brand.marketingEfficiencyMultiplier.toFixed(2) })"
+            >
               <div
                 class="research-progress-fill research-progress-efficiency h-full rounded-full bg-emerald-500 transition-[width] duration-300"
                 :style="{ width: `${Math.min(100, (brand.marketingEfficiencyMultiplier - 1) * 100).toFixed(1)}%` }"
@@ -58,7 +66,7 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
 
           <div v-if="brand.awareness > 0" class="research-metric grid grid-cols-[7rem_minmax(0,1fr)_3.5rem] items-center gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
             <span class="research-metric-label whitespace-nowrap text-[0.8125rem] text-muted">{{ t('research.awarenessLabel') }}</span>
-            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="`Brand awareness ${(brand.awareness * 100).toFixed(1)}%`">
+            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="t('buildingDetail.accessibility.researchBrandAwareness', { value: (brand.awareness * 100).toFixed(1) })">
               <div
                 class="research-progress-fill research-progress-awareness h-full rounded-full bg-violet-500 transition-[width] duration-300"
                 :style="{ width: `${(brand.awareness * 100).toFixed(1)}%` }"

@@ -91,7 +91,7 @@ const {
         <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
       </div>
       <!-- Unit detail tab navigation -->
-      <nav class="unit-detail-tabs" aria-label="Unit detail sections" v-if="unitDetailTabs.length > 0">
+      <nav class="unit-detail-tabs" :aria-label="t('buildingDetail.accessibility.unitDetailSections')" v-if="unitDetailTabs.length > 0">
         <button v-for="tab in unitDetailTabs" :key="tab.key" class="unit-tab-btn" :class="{ 'unit-tab-btn--active': selectedUnitTab === tab.key }" @click="selectedUnitTab = tab.key">
           {{ t(`buildingDetail.unitTabs.${tab.key}`) }}
         </button>
@@ -148,7 +148,7 @@ const {
             v-if="selectedActiveUnitOperationalStatus"
             class="unit-insight-card operational-status-card"
             :data-status="selectedActiveUnitOperationalStatus.status"
-            aria-label="Unit operational status"
+            :aria-label="t('buildingDetail.accessibility.unitOperationalStatus')"
           >
             <h5>{{ t('buildingDetail.operationalStatus.title') }}</h5>
             <div class="operational-status-row">
@@ -178,14 +178,14 @@ const {
         </template>
         <!-- ── Quick Actions tab (PUBLIC_SALES only) ──────────── -->
         <template v-else-if="selectedUnitTab === 'quickActions'">
-          <div class="unit-insight-card" aria-label="Quick Actions">
+          <div class="unit-insight-card" :aria-label="t('buildingDetail.accessibility.quickActions')">
             <h5>{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
             <p class="unit-desc">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
             <div v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null" class="quick-action-current-price">
               <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
               <strong class="mi-metric-value">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
             </div>
-            <div aria-label="Quick Price Update">
+            <div :aria-label="t('buildingDetail.accessibility.quickPriceUpdate')">
               <!-- Directional impact hint derived from elasticity -->
               <div
                 v-if="publicSalesAnalytics && publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
@@ -477,7 +477,7 @@ const {
           <div
             v-if="selectedPurchaseUnit && (selectedPurchaseUnit.resourceTypeId || selectedPurchaseUnit.productTypeId)"
             class="sourcing-comparison unit-insight-card"
-            aria-label="Sourcing Comparison"
+            :aria-label="t('buildingDetail.accessibility.sourcingComparison')"
           >
             <h5 class="sourcing-comparison-title">{{ t('buildingDetail.sourcingComparison.title') }}</h5>
             <p class="sourcing-comparison-subtitle config-help">{{ t('buildingDetail.sourcingComparison.subtitle') }}</p>
@@ -559,12 +559,12 @@ const {
               {{ t('buildingDetail.sourcingComparison.empty') }}
             </div>
           </div>
-          <div v-if="selectedPublicSalesUnit" class="unit-insight-card market-intelligence-panel" aria-label="Market Intelligence">
+          <div v-if="selectedPublicSalesUnit" class="unit-insight-card market-intelligence-panel" :aria-label="t('buildingDetail.accessibility.marketIntelligence')">
             <h5>{{ t('buildingDetail.marketIntelligence.title') }}</h5>
 
             <!-- Product identity + data window row -->
             <div class="mi-context-row">
-              <span v-if="publicSalesAnalytics?.productName" class="mi-product-chip" aria-label="Currently selling product">
+              <span v-if="publicSalesAnalytics?.productName" class="mi-product-chip" :aria-label="t('buildingDetail.accessibility.currentlySellingProduct')">
                 {{ publicSalesAnalytics.productName }}
               </span>
               <span v-if="publicSalesAnalytics && publicSalesAnalytics.dataFromTick > 0" class="mi-tick-window" :title="`T${publicSalesAnalytics.dataFromTick}–T${publicSalesAnalytics.dataToTick}`">
@@ -739,7 +739,7 @@ const {
               </div>
 
               <!-- Demand Drivers -->
-              <div v-if="publicSalesAnalytics.demandDrivers.length > 0" class="mi-demand-drivers" aria-label="Demand Drivers">
+              <div v-if="publicSalesAnalytics.demandDrivers.length > 0" class="mi-demand-drivers" :aria-label="t('buildingDetail.accessibility.demandDrivers')">
                 <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.demandDrivers.title') }}</span>
                 <div class="mi-driver-list">
                   <div v-for="driver in publicSalesAnalytics.demandDrivers" :key="driver.factor" class="mi-driver-entry" :class="`mi-driver-${driver.impact.toLowerCase()}`">
@@ -824,13 +824,13 @@ const {
           <div
             v-if="selectedManufacturingUnit && (selectedManufacturingUnit.productTypeId || unitProductAnalytics)"
             class="unit-insight-card unit-product-analytics-panel"
-            aria-label="Product Performance Analytics"
+            :aria-label="t('buildingDetail.accessibility.productPerformanceAnalytics')"
           >
             <h5>{{ t('buildingDetail.unitProductAnalytics.title') }}</h5>
 
             <!-- Product identity + data window row -->
             <div class="mi-context-row">
-              <span v-if="unitProductAnalytics?.productName" class="mi-product-chip" aria-label="Currently producing product">
+              <span v-if="unitProductAnalytics?.productName" class="mi-product-chip" :aria-label="t('buildingDetail.accessibility.currentlyProducingProduct')">
                 {{ unitProductAnalytics.productName }}
               </span>
               <span v-else-if="selectedManufacturingUnit.productTypeId" class="mi-product-chip">
@@ -935,7 +935,7 @@ const {
         </template>
         <!-- ── Recent Activity tab ─────────────────────────────── -->
         <template v-else-if="selectedUnitTab === 'recentActivity'">
-          <div class="unit-insight-card recent-activity-panel" aria-label="Recent Activity">
+          <div class="unit-insight-card recent-activity-panel" :aria-label="t('buildingDetail.accessibility.recentActivity')">
             <h5>{{ t('buildingDetail.recentActivity.title') }}</h5>
             <p class="config-help">{{ t('buildingDetail.recentActivity.subtitle') }}</p>
             <p v-if="recentActivityLoading" class="config-help">…</p>

@@ -12,7 +12,12 @@ const { shopChainDisplayUnits, shopChainStatus, showSalesChainPanel, getResource
   <!-- Production chain status panel: shown for factories with the starter layout saved -->
 
   <!-- Sales chain status panel: shown for sales shops with units saved -->
-  <div v-if="showSalesChainPanel" class="production-chain-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5" role="region" aria-label="sales chain status">
+  <div
+    v-if="showSalesChainPanel"
+    class="production-chain-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5"
+    role="region"
+    :aria-label="t('buildingDetail.accessibility.salesChainStatus')"
+  >
     <div class="chain-panel-header mb-4 flex flex-wrap items-center gap-2">
       <h3 class="chain-panel-title text-lg font-semibold text-foreground">🏪 {{ t('buildingDetail.salesChain.title') }}</h3>
       <span
@@ -34,7 +39,7 @@ const { shopChainDisplayUnits, shopChainStatus, showSalesChainPanel, getResource
       </button>
     </div>
 
-    <div class="chain-flow flex flex-wrap items-center gap-2 sm:gap-3" role="list" aria-label="sales chain steps">
+    <div class="chain-flow flex flex-wrap items-center gap-2 sm:gap-3" role="list" :aria-label="t('buildingDetail.accessibility.salesChainSteps')">
       <!-- PURCHASE step -->
       <div
         class="chain-step min-w-[180px] flex-1 rounded-lg border p-3"

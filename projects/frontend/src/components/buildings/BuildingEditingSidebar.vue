@@ -265,7 +265,7 @@ const {
           <!-- B2B Sales unit config -->
           <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'B2B_SALES'">
             <!-- No-source warning: shown when no MANUFACTURING or MINING unit has an item configured -->
-            <div v-if="!b2bHasUpstreamSource" class="b2b-no-source-warning" role="alert" aria-label="No upstream source">
+            <div v-if="!b2bHasUpstreamSource" class="b2b-no-source-warning" role="alert" :aria-label="t('buildingDetail.accessibility.noUpstreamSource')">
               <span class="b2b-no-source-icon" aria-hidden="true">⚠</span>
               <div class="b2b-no-source-content">
                 <p class="b2b-no-source-title">{{ t('buildingDetail.config.b2bNoSourceTitle') }}</p>
@@ -719,7 +719,7 @@ const {
         </div>
 
         <!-- Unit Upgrade Panel (edit-mode only) -->
-        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" aria-label="Unit Upgrade">
+        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
           <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
           <!-- Upgrade in progress (from pending configuration) -->
@@ -761,7 +761,7 @@ const {
               <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
             </div>
             <!-- Full before/after stat table -->
-            <div class="unit-upgrade-stats" aria-label="Upgrade impact">
+            <div class="unit-upgrade-stats" :aria-label="t('buildingDetail.accessibility.upgradeImpact')">
               <div class="unit-upgrade-stat-row">
                 <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
                 <span class="unit-upgrade-stat-values">
@@ -771,7 +771,7 @@ const {
                 </span>
               </div>
               <!-- Storage capacity row — shown for all unit types that buffer inventory -->
-              <div class="unit-upgrade-stat-row" aria-label="Storage capacity delta">
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.storageCapacityDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ selectedCellUpgradeInfo.currentStorageCapacity.toFixed(0) }}</span>
@@ -780,7 +780,7 @@ const {
                   <span class="stat-delta stat-delta-positive">+{{ (selectedCellUpgradeInfo.nextStorageCapacity - selectedCellUpgradeInfo.currentStorageCapacity).toFixed(0) }}</span>
                 </span>
               </div>
-              <div class="unit-upgrade-stat-row" aria-label="Labor cost delta">
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.laborCostDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
@@ -789,7 +789,7 @@ const {
                   <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick - selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
                 </span>
               </div>
-              <div class="unit-upgrade-stat-row" aria-label="Energy cost delta">
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.energyCostDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>

@@ -31,7 +31,7 @@ function fmtProfit(value: number | null): string {
 </script>
 
 <template>
-  <div class="building-header-financials" aria-label="Building financial summary">
+  <div class="building-header-financials" :aria-label="t('buildingDetail.accessibility.financialSummary')">
     <template v-if="loading">
       <div class="bh-metric">
         <span class="bh-label bh-skeleton bh-skeleton-label"></span>

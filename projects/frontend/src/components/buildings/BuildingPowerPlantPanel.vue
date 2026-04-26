@@ -9,7 +9,12 @@ const { building, powerPlantAnalytics, powerPlantAnalyticsLoading, formatCurrenc
 </script>
 
 <template>
-  <div v-if="building?.type === 'POWER_PLANT'" class="power-plant-analytics-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5" role="region" aria-label="power plant analytics">
+  <div
+    v-if="building?.type === 'POWER_PLANT'"
+    class="power-plant-analytics-panel mb-4 rounded-xl border border-divider bg-card p-4 sm:p-5"
+    role="region"
+    :aria-label="t('buildingDetail.accessibility.powerPlantAnalytics')"
+  >
     <div class="power-plant-analytics-header mb-3 flex flex-wrap items-center justify-between gap-2">
       <h2 class="power-plant-analytics-title text-lg font-semibold text-foreground">{{ t('powerPlant.analytics.panelTitle') }}</h2>
       <span class="meta-pill inline-flex items-center gap-1.5 rounded-full border border-divider bg-surface px-3 py-1.5 text-xs font-medium text-muted">
@@ -66,7 +71,13 @@ const { building, powerPlantAnalytics, powerPlantAnalyticsLoading, formatCurrenc
           v-for="snap in powerPlantAnalytics.timeline"
           :key="snap.tick"
           class="ppa-bar-group flex min-w-[2px] flex-1 items-end gap-px"
-          :title="`Tick ${snap.tick}: +${formatCurrency(snap.surplusIncome)} income, -${formatCurrency(snap.gridFine + snap.operatingCosts)} costs`"
+          :title="
+            t('powerPlant.analytics.tickTooltip', {
+              tick: snap.tick,
+              income: formatCurrency(snap.surplusIncome),
+              costs: formatCurrency(snap.gridFine + snap.operatingCosts),
+            })
+          "
         >
           <div
             v-if="snap.surplusIncome > 0"
