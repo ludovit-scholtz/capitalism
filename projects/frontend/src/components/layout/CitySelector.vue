@@ -16,9 +16,7 @@ async function loadCities() {
   loading.value = true
   error.value = null
   try {
-    const data = await gqlRequest<{ cities: City[] }>(
-      `{ cities { id name countryCode currencyCode latitude longitude population } }`,
-    )
+    const data = await gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode currencyCode latitude longitude population } }`)
     if (data?.cities) {
       cities.value = data.cities
     }
@@ -56,17 +54,9 @@ onMounted(() => {
     <label for="city-select" class="city-selector-label"
       ><span>{{ $t('common.city') }}</span></label
     >
-    <select
-      id="city-select"
-      :value="selectedCityId || ''"
-      @change="handleCityChange"
-      :disabled="loading || error !== null"
-      class="city-selector-select"
-    >
+    <select id="city-select" :value="selectedCityId || ''" @change="handleCityChange" :disabled="loading || error !== null" class="city-selector-select">
       <option v-if="!selectedCityId" value="">{{ $t('common.selectCity') }}</option>
-      <option v-for="city in cities" :key="city.id" :value="city.id">
-        {{ city.name }} ({{ city.currencyCode }})
-      </option>
+      <option v-for="city in cities" :key="city.id" :value="city.id">{{ city.name }} ({{ city.currencyCode }})</option>
     </select>
     <div v-if="error" class="city-selector-error">{{ error }}</div>
   </div>

@@ -86,9 +86,7 @@ async function loadCompanies() {
   if (!auth.isAuthenticated) return
   try {
     // Load cities for city-name mapping
-    const citiesData = await gqlRequest<{ cities: Array<{ id: string; name: string }> }>(
-      `{ cities { id name } }`
-    )
+    const citiesData = await gqlRequest<{ cities: Array<{ id: string; name: string }> }>(`{ cities { id name } }`)
     cities.value = citiesData.cities
 
     const data = await gqlRequest<{ myCompanies: Company[] }>(MY_COMPANIES_QUERY)
@@ -217,18 +215,16 @@ const filteredAnalyticsRows = computed<CampaignAnalyticsRow[]>(() => {
   if (!selectedCityId.value) {
     return analytics.value.rows
   }
-  
+
   // Map city ID to city name
-  const selectedCity = cities.value.find(c => c.id === selectedCityId.value)
+  const selectedCity = cities.value.find((c) => c.id === selectedCityId.value)
   const selectedCityName = selectedCity?.name
-  
+
   if (!selectedCityName) {
     return analytics.value.rows
   }
-  
-  return analytics.value.rows.filter(
-    (row) => typeof row.cityName === 'string' && row.cityName.toLowerCase() === selectedCityName.toLowerCase()
-  )
+
+  return analytics.value.rows.filter((row) => typeof row.cityName === 'string' && row.cityName.toLowerCase() === selectedCityName.toLowerCase())
 })
 function formatPct(val: number | null): string {
   if (val === null || val === undefined) return '—'

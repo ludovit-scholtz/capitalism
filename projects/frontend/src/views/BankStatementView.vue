@@ -50,7 +50,7 @@ const isPersonalContext = computed(() => auth.player?.activeAccountType === 'PER
 
 const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
   let filtered: PlayerBankAccountSummary[] = []
-  
+
   if (isPersonalContext.value) {
     filtered = accounts.value.filter((account) => account.ownerType === 'PERSON')
   } else {
@@ -60,12 +60,12 @@ const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
     }
     filtered = accounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === activeCompanyId)
   }
-  
+
   // Filter by selected city if available
   if (selectedCityId.value) {
     filtered = filtered.filter((account) => account.cityId === selectedCityId.value)
   }
-  
+
   return filtered
 })
 

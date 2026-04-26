@@ -254,18 +254,18 @@ const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.v
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 const visibleBankAccounts = computed(() => {
   let accounts: PlayerBankAccountSummary[] = []
-  
+
   if (auth.player?.activeAccountType === 'COMPANY' && auth.player.activeCompanyId) {
     accounts = myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === auth.player?.activeCompanyId)
   } else {
     accounts = myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
   }
-  
+
   // Filter by selected city if available
   if (selectedCityId.value) {
     accounts = accounts.filter((account) => account.cityId === selectedCityId.value)
   }
-  
+
   return accounts
 })
 
@@ -283,17 +283,17 @@ const availableBankCities = computed(() => {
 
 const filteredAndSortedBanks = computed(() => {
   let banks = allBanks.value
-  
+
   // Filter by selected city from navbar
   if (selectedCityId.value) {
     banks = banks.filter((b) => b.cityId === selectedCityId.value)
   }
-  
+
   // Filter by manual city filter if set
   if (bankCityFilter.value) {
     banks = banks.filter((b) => b.cityName === bankCityFilter.value)
   }
-  
+
   if (bankShowAvailableOnly.value) {
     banks = banks.filter((b) => b.availableLendingCapacity > 0)
   }
@@ -338,12 +338,12 @@ function navigateToAcquireBank() {
 // Banks sorted for the borrow section: all open banks sorted by lowest lending rate, filtered by selected city
 const sortedBanksForBorrow = computed(() => {
   let banks = allBanks.value.filter((b) => b.baseCapitalDeposited)
-  
+
   // Filter by selected city from navbar
   if (selectedCityId.value) {
     banks = banks.filter((b) => b.cityId === selectedCityId.value)
   }
-  
+
   return [...banks].sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent)
 })
 

@@ -164,10 +164,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(
-        MASTER_REGISTER_MUTATION,
-        { input: { email, displayName, password } },
-      )
+      const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input: { email, displayName, password } })
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
       await fetchCurrentPlayer()
@@ -183,10 +180,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(
-        MASTER_LOGIN_MUTATION,
-        { input: { email, password } },
-      )
+      const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(MASTER_LOGIN_MUTATION, { input: { email, password } })
       player.value = null
       applyStoredSession(data.login.token, data.login.expiresAtUtc)
       await fetchCurrentPlayer()
