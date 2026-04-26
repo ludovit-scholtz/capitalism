@@ -379,12 +379,7 @@ const {
                   @change="updateSelectedUnitConfig('mediaHouseBuildingId', ($event.target as HTMLSelectElement).value || null)"
                 >
                   <option value="">{{ t('buildingDetail.config.noMediaHouse') }}</option>
-                  <option
-                    v-for="mh in cityMediaHouses"
-                    :key="mh.id"
-                    :value="mh.id"
-                    :disabled="mh.isUnderConstruction || mh.powerStatus === 'OFFLINE'"
-                  >
+                  <option v-for="mh in cityMediaHouses" :key="mh.id" :value="mh.id" :disabled="mh.isUnderConstruction || mh.powerStatus === 'OFFLINE'">
                     {{ mh.name }} · {{ mh.mediaType ?? '?' }} · ×{{ mh.effectivenessMultiplier.toFixed(1) }} · {{ t('buildingDetail.config.contentRanking') }} {{ mh.contentRanking.toFixed(0) }}%
                     {{ mh.isGovernmentOwned ? ` · ${t('buildingDetail.config.govBadge')}` : '' }}
                     {{ mh.ownerCompanyId === building?.companyId ? ` · ${t('buildingDetail.config.yourStation')}` : '' }}
