@@ -30,6 +30,10 @@ const PLAYER_SELECTION = `
     cash
     foundedAtUtc
     foundedAtTick
+    buildings {
+      id
+      cityId
+    }
   }
 `
 
