@@ -25,6 +25,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
 - [ ] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
+- [ ] In the context selection is the company cash visible. But there is error that the currency is not correct. 
 
 ### Government company
 

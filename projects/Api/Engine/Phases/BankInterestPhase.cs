@@ -100,11 +100,15 @@ public sealed class BankInterestPhase : ITickPhase
                 }
 
                 // Ledger – bank pays deposit interest (expense)
+                var bankFundingAccount = context.GetBuildingFundingAccount(bank);
+                var depositorFundingAccount = context.GetCompanyFundingAccount(depositor.Id);
+
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
                     Id = Guid.NewGuid(),
                     CompanyId = bank.CompanyId,
                     BuildingId = bank.Id,
+                    BankAccountId = bankFundingAccount?.Id,
                     Category = LedgerCategory.DepositInterestPaid,
                     Description = $"Deposit interest to {depositor.Name}",
                     Amount = -interestThisTick,
@@ -118,6 +122,7 @@ public sealed class BankInterestPhase : ITickPhase
                     Id = Guid.NewGuid(),
                     CompanyId = depositor.Id,
                     BuildingId = bank.Id,
+                    BankAccountId = depositorFundingAccount?.Id,
                     Category = LedgerCategory.DepositInterestReceived,
                     Description = $"Deposit interest from {bank.Name}",
                     Amount = interestThisTick,
@@ -133,6 +138,7 @@ public sealed class BankInterestPhase : ITickPhase
                         Id = Guid.NewGuid(),
                         CompanyId = bank.CompanyId,
                         BuildingId = bank.Id,
+                        BankAccountId = bankFundingAccount?.Id,
                         Category = LedgerCategory.CentralBankBorrow,
                         Description = $"Central bank emergency funding for interest shortfall to {depositor.Name}",
                         Amount = -shortfall,

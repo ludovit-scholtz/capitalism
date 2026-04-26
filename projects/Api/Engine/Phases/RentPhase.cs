@@ -62,6 +62,7 @@ public sealed class RentPhase : ITickPhase
                     Id = Guid.NewGuid(),
                     CompanyId = company.Id,
                     BuildingId = building.Id,
+                    BankAccountId = fundingAccount?.Id,
                     Category = LedgerCategory.RentIncome,
                     Description = $"Rent income – {building.Name}",
                     Amount = rentIncome,

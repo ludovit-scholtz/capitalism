@@ -45,10 +45,14 @@ public sealed class TaxPhase : ITickPhase
 
             CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(company.Id), settledTax);
 
+            // Get the company's preferred bank account for the ledger entry.
+            var fundingAccount = context.GetCompanyFundingAccount(company.Id);
+
             context.Db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
                 CompanyId = company.Id,
+                BankAccountId = fundingAccount?.Id,
                 Category = LedgerCategory.Tax,
                 Description = $"Income tax for game year {settledGameYear} ({gs.TaxRate}% rate)",
                 Amount = -settledTax,

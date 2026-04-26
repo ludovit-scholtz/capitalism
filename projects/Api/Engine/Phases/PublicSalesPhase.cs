@@ -272,13 +272,22 @@ public sealed class PublicSalesPhase : ITickPhase
 
                 groupTotalSold += sold;
 
-                // Record ledger entry.
+                // Determine the funding account that will receive the revenue.
+                var fundingAccount = context.GetBuildingFundingAccount(offer.Building);
+                if (fundingAccount is null)
+                {
+                    // Cannot allocate revenue without a destination account; skip this sale.
+                    continue;
+                }
+
+                // Record ledger entry with the correct bank account ID.
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
                     Id = Guid.NewGuid(),
                     CompanyId = offer.Company.Id,
                     BuildingId = offer.Building.Id,
                     BuildingUnitId = offer.Unit.Id,
+                    BankAccountId = fundingAccount.Id,
                     Category = LedgerCategory.Revenue,
                     Description = offer.ProductName is not null ? $"Public sales: {offer.ProductName}" : "Public sales",
                     Amount = sold * offer.Price,
@@ -315,11 +324,7 @@ public sealed class PublicSalesPhase : ITickPhase
                     offer.Inventory.ProductTypeId,
                     outflowQuantity: sold);
                 context.WithdrawInventory(offer.Inventory, sold);
-                var fundingAccount = context.GetBuildingFundingAccount(offer.Building);
-                if (fundingAccount is not null)
-                {
-                    fundingAccount.Balance += sold * offer.Price;
-                }
+                fundingAccount.Balance += sold * offer.Price;
                 unitSoldTotals[offer.Unit.Id] = unitSoldSoFar + sold;
             }
 
