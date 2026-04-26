@@ -475,8 +475,7 @@ function buildRouteQuery() {
 }
 
 function isRouteQuerySynced(nextQuery: Record<string, string>): boolean {
-  return Object.entries(nextQuery).every(([key, value]) => route.query[key] === value)
-    && Object.keys(route.query).every((key) => nextQuery[key] !== undefined)
+  return Object.entries(nextQuery).every(([key, value]) => route.query[key] === value) && Object.keys(route.query).every((key) => nextQuery[key] !== undefined)
 }
 
 watch([step, selectedIndustry, selectedProductId, selectedCityId, selectedIpoRaiseTarget, selectedFactoryLotId, selectedShopLotId], async () => {
@@ -1409,9 +1408,14 @@ useTickRefresh(async () => {
         </div>
       </div>
 
-      <div v-if="step === 7 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)" class="step-content completion-step bg-card border border-divider rounded-xl p-8 flex flex-col gap-6 text-center">
+      <div
+        v-if="step === 7 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)"
+        class="step-content completion-step bg-card border border-divider rounded-xl p-8 flex flex-col gap-6 text-center"
+      >
         <div>
-          <h2 class="completion-title text-[1.75rem] font-bold mb-3 bg-gradient-to-br from-[var(--color-secondary)] to-brand bg-clip-text text-transparent">{{ t(isGuestMode ? 'onboarding.guestCompletionTitle' : 'onboarding.completionTitle') }}</h2>
+          <h2 class="completion-title text-[1.75rem] font-bold mb-3 bg-gradient-to-br from-[var(--color-secondary)] to-brand bg-clip-text text-transparent">
+            {{ t(isGuestMode ? 'onboarding.guestCompletionTitle' : 'onboarding.completionTitle') }}
+          </h2>
           <p class="text-muted mx-auto max-w-[480px] leading-relaxed">{{ t(isGuestMode ? 'onboarding.guestCompletionDesc' : 'onboarding.completionDesc') }}</p>
         </div>
 
@@ -1455,8 +1459,8 @@ useTickRefresh(async () => {
           <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
             <span class="text-2xl shrink-0">💰</span>
             <div class="flex flex-col gap-1">
-                <strong class="text-sm">{{ formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }}</strong>
-                <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }) }}</span>
+              <strong class="text-sm">{{ formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }) }}</span>
             </div>
           </div>
         </div>
@@ -1503,7 +1507,12 @@ useTickRefresh(async () => {
         </div>
 
         <!-- Guest simulated profit preview -->
-        <div v-if="isGuestMode && simulatedProfit" class="guest-profit-preview bg-gradient-to-br from-[rgba(0,200,83,0.08)] to-[rgba(0,71,255,0.04)] border border-[rgba(0,200,83,0.4)] rounded-xl p-5 flex flex-col gap-4 text-left" role="region" aria-label="Simulated first profit">
+        <div
+          v-if="isGuestMode && simulatedProfit"
+          class="guest-profit-preview bg-gradient-to-br from-[rgba(0,200,83,0.08)] to-[rgba(0,71,255,0.04)] border border-[rgba(0,200,83,0.4)] rounded-xl p-5 flex flex-col gap-4 text-left"
+          role="region"
+          aria-label="Simulated first profit"
+        >
           <div class="flex gap-3 items-start">
             <span class="text-2xl shrink-0">📈</span>
             <div>
@@ -1522,15 +1531,18 @@ useTickRefresh(async () => {
             </div>
             <div class="flex justify-between items-center text-sm font-semibold border-t border-[rgba(0,200,83,0.25)] pt-2">
               <span class="text-muted">{{ t('onboarding.guestProfitNet') }}</span>
-              <span :class="simulatedProfit.profit >= 0 ? 'text-good' : 'text-bad'">
-                {{ simulatedProfit.profit >= 0 ? '+' : '' }}{{ formatCurrency(simulatedProfit.profit) }}
-              </span>
+              <span :class="simulatedProfit.profit >= 0 ? 'text-good' : 'text-bad'"> {{ simulatedProfit.profit >= 0 ? '+' : '' }}{{ formatCurrency(simulatedProfit.profit) }} </span>
             </div>
           </div>
         </div>
 
         <!-- Guest pricing explanation -->
-        <div v-if="isGuestMode && selectedProduct && guestConfiguredShopPrice" class="guest-price-panel bg-gradient-to-br from-[rgba(0,71,255,0.06)] to-[rgba(0,200,83,0.04)] border border-[rgba(0,71,255,0.3)] rounded-xl p-5 flex flex-col gap-3 text-left" role="region" aria-label="Configured sale price">
+        <div
+          v-if="isGuestMode && selectedProduct && guestConfiguredShopPrice"
+          class="guest-price-panel bg-gradient-to-br from-[rgba(0,71,255,0.06)] to-[rgba(0,200,83,0.04)] border border-[rgba(0,71,255,0.3)] rounded-xl p-5 flex flex-col gap-3 text-left"
+          role="region"
+          aria-label="Configured sale price"
+        >
           <div class="flex gap-3 items-start">
             <span class="text-2xl shrink-0">💲</span>
             <div>
@@ -1550,7 +1562,11 @@ useTickRefresh(async () => {
         </div>
 
         <!-- Guest save-progress section -->
-        <section v-if="isGuestMode" class="guest-save-progress bg-gradient-to-br from-[rgba(0,71,255,0.06)] to-[rgba(0,200,83,0.04)] border-2 border-brand rounded-xl p-7 flex flex-col gap-5 text-left" aria-labelledby="guest-save-title">
+        <section
+          v-if="isGuestMode"
+          class="guest-save-progress bg-gradient-to-br from-[rgba(0,71,255,0.06)] to-[rgba(0,200,83,0.04)] border-2 border-brand rounded-xl p-7 flex flex-col gap-5 text-left"
+          aria-labelledby="guest-save-title"
+        >
           <div class="flex gap-4 items-start">
             <span class="text-3xl shrink-0">🔐</span>
             <div>
@@ -1560,29 +1576,68 @@ useTickRefresh(async () => {
           </div>
 
           <ul class="guest-keeps-list list-none p-0 m-0 flex flex-col gap-1.5 text-sm text-muted" aria-label="What you keep when you save">
-            <li>✅ <strong class="text-body">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong> — {{ t('onboarding.guestSaveKeepsCompany') }}</li>
-            <li v-if="selectedCity">✅ <strong class="text-body">{{ selectedCity.name }}</strong> — {{ t('onboarding.guestSaveKeepsCity') }}</li>
-            <li v-if="selectedProduct">✅ <strong class="text-body">{{ getProductName(selectedProduct) }}</strong> — {{ t('onboarding.guestSaveKeepsProduct') }}</li>
+            <li>
+              ✅ <strong class="text-body">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong> — {{ t('onboarding.guestSaveKeepsCompany') }}
+            </li>
+            <li v-if="selectedCity">
+              ✅ <strong class="text-body">{{ selectedCity.name }}</strong> — {{ t('onboarding.guestSaveKeepsCity') }}
+            </li>
+            <li v-if="selectedProduct">
+              ✅ <strong class="text-body">{{ getProductName(selectedProduct) }}</strong> — {{ t('onboarding.guestSaveKeepsProduct') }}
+            </li>
             <li>✅ {{ t('onboarding.guestSaveKeepsSetup') }}</li>
           </ul>
 
           <div class="guest-auth-toggle flex border-2 border-divider rounded-lg overflow-hidden w-fit">
-            <button class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors" :class="{ active: guestAuthMode === 'register' }" @click="guestAuthMode = 'register'">{{ t('onboarding.guestRegister') }}</button>
-            <button class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors" :class="{ active: guestAuthMode === 'login' }" @click="guestAuthMode = 'login'">{{ t('onboarding.guestLogin') }}</button>
+            <button
+              class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors"
+              :class="{ active: guestAuthMode === 'register' }"
+              @click="guestAuthMode = 'register'"
+            >
+              {{ t('onboarding.guestRegister') }}
+            </button>
+            <button
+              class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors"
+              :class="{ active: guestAuthMode === 'login' }"
+              @click="guestAuthMode = 'login'"
+            >
+              {{ t('onboarding.guestLogin') }}
+            </button>
           </div>
 
           <div class="flex flex-col gap-3 max-w-[420px]">
             <div class="flex flex-col gap-1.5">
               <label for="guestEmail" class="text-sm font-semibold">{{ t('auth.email') }}</label>
-              <input id="guestEmail" v-model="guestEmail" type="email" autocomplete="email" :placeholder="t('auth.emailPlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand" />
+              <input
+                id="guestEmail"
+                v-model="guestEmail"
+                type="email"
+                autocomplete="email"
+                :placeholder="t('auth.emailPlaceholder')"
+                class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
+              />
             </div>
             <div v-if="guestAuthMode === 'register'" class="flex flex-col gap-1.5">
               <label for="guestDisplayName" class="text-sm font-semibold">{{ t('auth.displayName') }}</label>
-              <input id="guestDisplayName" v-model="guestDisplayName" type="text" autocomplete="name" :placeholder="companyName || t('auth.displayNamePlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand" />
+              <input
+                id="guestDisplayName"
+                v-model="guestDisplayName"
+                type="text"
+                autocomplete="name"
+                :placeholder="companyName || t('auth.displayNamePlaceholder')"
+                class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
+              />
             </div>
             <div class="flex flex-col gap-1.5">
               <label for="guestPassword" class="text-sm font-semibold">{{ t('auth.password') }}</label>
-              <input id="guestPassword" v-model="guestPassword" type="password" autocomplete="current-password" :placeholder="t('auth.passwordPlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand" />
+              <input
+                id="guestPassword"
+                v-model="guestPassword"
+                type="password"
+                autocomplete="current-password"
+                :placeholder="t('auth.passwordPlaceholder')"
+                class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
+              />
             </div>
 
             <p v-if="guestSaveError" class="text-bad text-sm m-0" role="alert">{{ guestSaveError }}</p>
@@ -1655,7 +1710,11 @@ useTickRefresh(async () => {
           </div>
         </div>
 
-        <section v-if="!isGuestMode" class="startup-pack-panel text-left border border-[rgba(255,109,0,0.35)] rounded-xl p-6 bg-gradient-to-br from-[rgba(255,109,0,0.12)] to-[rgba(0,71,255,0.1)]" aria-labelledby="startup-pack-title">
+        <section
+          v-if="!isGuestMode"
+          class="startup-pack-panel text-left border border-[rgba(255,109,0,0.35)] rounded-xl p-6 bg-gradient-to-br from-[rgba(255,109,0,0.12)] to-[rgba(0,71,255,0.1)]"
+          aria-labelledby="startup-pack-title"
+        >
           <div class="flex justify-between items-start gap-4">
             <div>
               <span class="startup-pack-eyebrow inline-block mb-1.5 text-xs font-bold tracking-widest uppercase text-[var(--color-tertiary)]">{{ t('proAccess.eyebrow') }}</span>
@@ -1701,11 +1760,7 @@ useTickRefresh(async () => {
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPrice') }}</strong>
                 <p class="text-muted text-xs m-0">
-                  {{
-                    configureGuideBasePrice === null
-                      ? t('onboarding.configureStepPriceDesc')
-                      : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice) })
-                  }}
+                  {{ configureGuideBasePrice === null ? t('onboarding.configureStepPriceDesc') : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice) }) }}
                 </p>
               </div>
             </article>
@@ -1737,9 +1792,7 @@ useTickRefresh(async () => {
           </div>
 
           <div class="flex justify-center mb-6">
-            <RouterLink v-if="shopBuildingId" :to="'/building/' + shopBuildingId" class="btn btn-primary btn-lg">
-              {{ t('onboarding.configureShopCta') }} <span class="ml-1">🏪</span>
-            </RouterLink>
+            <RouterLink v-if="shopBuildingId" :to="'/building/' + shopBuildingId" class="btn btn-primary btn-lg"> {{ t('onboarding.configureShopCta') }} <span class="ml-1">🏪</span> </RouterLink>
           </div>
 
           <!-- Mission readiness status -->
@@ -1785,7 +1838,11 @@ useTickRefresh(async () => {
         </section>
 
         <!-- Business live panel: shown after marking milestone complete -->
-        <section v-if="!isGuestMode && milestoneCompleted" class="business-live-panel bg-gradient-to-br from-[rgba(0,200,83,0.08)] to-[rgba(0,71,255,0.04)] border border-[rgba(0,200,83,0.4)] rounded-xl p-6 flex flex-col gap-5 text-left" aria-labelledby="business-live-title">
+        <section
+          v-if="!isGuestMode && milestoneCompleted"
+          class="business-live-panel bg-gradient-to-br from-[rgba(0,200,83,0.08)] to-[rgba(0,71,255,0.04)] border border-[rgba(0,200,83,0.4)] rounded-xl p-6 flex flex-col gap-5 text-left"
+          aria-labelledby="business-live-title"
+        >
           <div class="flex gap-4 items-start">
             <span class="text-3xl shrink-0">🎉</span>
             <div>
@@ -1795,7 +1852,12 @@ useTickRefresh(async () => {
           </div>
 
           <!-- First-sale celebration -->
-          <div v-if="firstSaleMission && firstSaleMission.firstSaleRevenue !== null" class="first-sale-celebration bg-[rgba(0,200,83,0.08)] border border-[rgba(0,200,83,0.3)] rounded-xl p-4 flex flex-col gap-3" role="region" aria-label="First sale details">
+          <div
+            v-if="firstSaleMission && firstSaleMission.firstSaleRevenue !== null"
+            class="first-sale-celebration bg-[rgba(0,200,83,0.08)] border border-[rgba(0,200,83,0.3)] rounded-xl p-4 flex flex-col gap-3"
+            role="region"
+            aria-label="First sale details"
+          >
             <h4 class="font-bold text-base m-0">{{ t('onboarding.firstSaleCelebrationTitle') }}</h4>
             <p class="text-sm text-muted m-0">{{ t('onboarding.firstSaleCelebrationDesc') }}</p>
             <dl class="grid grid-cols-2 gap-2 m-0 max-sm:grid-cols-1">
@@ -1823,7 +1885,9 @@ useTickRefresh(async () => {
           </div>
 
           <div v-if="gameState" class="flex flex-col gap-1">
-            <p class="tick-status text-sm text-muted m-0" :title="'tick #' + gameState.currentTick">{{ t('onboarding.businessLiveTickInfo', { time: formatGameTickTime(gameState.currentTick, locale) }) }}</p>
+            <p class="tick-status text-sm text-muted m-0" :title="'tick #' + gameState.currentTick">
+              {{ t('onboarding.businessLiveTickInfo', { time: formatGameTickTime(gameState.currentTick, locale) }) }}
+            </p>
             <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good" role="timer">{{ tickCountdown }}</p>
           </div>
 
@@ -1957,7 +2021,9 @@ useTickRefresh(async () => {
 .product-card.selected {
   border-color: var(--color-primary);
   background: rgba(0, 71, 255, 0.08);
-  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 16px rgba(0, 71, 255, 0.15);
+  box-shadow:
+    0 0 0 1px var(--color-primary),
+    0 4px 16px rgba(0, 71, 255, 0.15);
 }
 
 .card-first-product {
@@ -1992,7 +2058,9 @@ useTickRefresh(async () => {
 .ipo-card.selected {
   border-color: var(--color-primary);
   background: rgba(0, 71, 255, 0.08);
-  box-shadow: 0 0 0 1px var(--color-primary), 0 4px 16px rgba(0, 71, 255, 0.15);
+  box-shadow:
+    0 0 0 1px var(--color-primary),
+    0 4px 16px rgba(0, 71, 255, 0.15);
 }
 
 /* Budget warning state */

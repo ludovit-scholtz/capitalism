@@ -31,10 +31,7 @@ type OnboardingRouteChoiceOptions = {
   ipoPlan?: string
 }
 
-async function chooseOnboardingRouteChoices(
-  page: Page,
-  { industry, product, city = 'Bratislava', ipoPlan = 'Starter IPO' }: OnboardingRouteChoiceOptions,
-) {
+async function chooseOnboardingRouteChoices(page: Page, { industry, product, city = 'Bratislava', ipoPlan = 'Starter IPO' }: OnboardingRouteChoiceOptions) {
   await page.locator('.industry-card', { hasText: industry }).click()
   await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
 

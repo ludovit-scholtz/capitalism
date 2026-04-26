@@ -155,9 +155,7 @@ describe('getMaxReachableStep', () => {
   })
 
   it('returns 3 when a product is selected', () => {
-    expect(
-      getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE', selectedProductId: 'prod-1' }),
-    ).toBe(3)
+    expect(getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE', selectedProductId: 'prod-1' })).toBe(3)
   })
 
   it('returns 4 when a city is selected', () => {
@@ -313,11 +311,7 @@ describe('getRecommendedFactoryLotIds', () => {
   })
 
   it('falls back to cheapest available lots when no industrial lots exist', () => {
-    const lots = [
-      makeLot({ id: 'a', district: 'Downtown', price: 150_000 }),
-      makeLot({ id: 'b', district: 'Suburbs', price: 90_000 }),
-      makeLot({ id: 'c', district: 'Waterfront', price: 120_000 }),
-    ]
+    const lots = [makeLot({ id: 'a', district: 'Downtown', price: 150_000 }), makeLot({ id: 'b', district: 'Suburbs', price: 90_000 }), makeLot({ id: 'c', district: 'Waterfront', price: 120_000 })]
     expect(getRecommendedFactoryLotIds(lots)).toEqual(['b', 'c'])
   })
 
@@ -370,26 +364,17 @@ describe('getRecommendedShopLotIds', () => {
   })
 
   it('falls back to cheapest available lots when no commercial lots exist', () => {
-    const lots = [
-      makeLot({ id: 'a', district: 'Industrial', price: 80_000 }),
-      makeLot({ id: 'b', district: 'Suburban', price: 60_000 }),
-    ]
+    const lots = [makeLot({ id: 'a', district: 'Industrial', price: 80_000 }), makeLot({ id: 'b', district: 'Suburban', price: 60_000 })]
     expect(getRecommendedShopLotIds(lots)).toEqual(['b', 'a'])
   })
 
   it('excludes already-owned lots', () => {
-    const lots = [
-      makeLot({ id: 'owned', district: 'Business Park', price: 80_000, ownerCompanyId: 'co-1' }),
-      makeLot({ id: 'free', district: 'Commercial Avenue', price: 90_000 }),
-    ]
+    const lots = [makeLot({ id: 'owned', district: 'Business Park', price: 80_000, ownerCompanyId: 'co-1' }), makeLot({ id: 'free', district: 'Commercial Avenue', price: 90_000 })]
     expect(getRecommendedShopLotIds(lots)).toEqual(['free'])
   })
 
   it('matches "business" district pattern', () => {
-    const lots = [
-      makeLot({ id: 'biz', district: 'Business Quarter', price: 90_000 }),
-      makeLot({ id: 'res', district: 'Residential', price: 70_000 }),
-    ]
+    const lots = [makeLot({ id: 'biz', district: 'Business Quarter', price: 90_000 }), makeLot({ id: 'res', district: 'Residential', price: 70_000 })]
     expect(getRecommendedShopLotIds(lots)).toEqual(['biz'])
   })
 

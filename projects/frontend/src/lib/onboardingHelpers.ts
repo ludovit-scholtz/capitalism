@@ -102,14 +102,9 @@ export function getAvailableLots(lots: BuildingLot[], buildingType: string): Bui
  * @param availableFactoryLots - Lots already filtered to FACTORY-suitable, unowned lots
  * @param count - Maximum number of IDs to return (default 2)
  */
-export function getRecommendedFactoryLotIds(
-  availableFactoryLots: BuildingLot[],
-  count = 2,
-): string[] {
+export function getRecommendedFactoryLotIds(availableFactoryLots: BuildingLot[], count = 2): string[] {
   const unowned = availableFactoryLots.filter((lot) => !lot.ownerCompanyId)
-  const industrial = unowned
-    .filter((lot) => /industrial/i.test(lot.district))
-    .sort((a, b) => a.price - b.price)
+  const industrial = unowned.filter((lot) => /industrial/i.test(lot.district)).sort((a, b) => a.price - b.price)
 
   if (industrial.length > 0) {
     return industrial.slice(0, count).map((lot) => lot.id)
@@ -131,9 +126,7 @@ export function getRecommendedFactoryLotIds(
  */
 export function getRecommendedShopLotIds(availableShopLots: BuildingLot[], count = 2): string[] {
   const unowned = availableShopLots.filter((lot) => !lot.ownerCompanyId)
-  const commercial = unowned
-    .filter((lot) => /(commercial|business)/i.test(lot.district))
-    .sort((a, b) => a.price - b.price)
+  const commercial = unowned.filter((lot) => /(commercial|business)/i.test(lot.district)).sort((a, b) => a.price - b.price)
 
   if (commercial.length > 0) {
     return commercial.slice(0, count).map((lot) => lot.id)
@@ -158,11 +151,7 @@ export function canProceedStep3(selectedFactoryLot: BuildingLot | null, starting
 }
 
 /** Returns true when the player may proceed past step 4 (shop selection). */
-export function canProceedStep4(
-  selectedProductId: string,
-  selectedShopLot: BuildingLot | null,
-  availableCash: number,
-): boolean {
+export function canProceedStep4(selectedProductId: string, selectedShopLot: BuildingLot | null, availableCash: number): boolean {
   if (!selectedProductId) return false
   if (!selectedShopLot) return false
   if (selectedShopLot.ownerCompanyId) return false
