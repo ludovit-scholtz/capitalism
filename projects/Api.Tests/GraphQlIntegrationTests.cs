@@ -539,9 +539,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                     buildingId,
                     units = new[]
                     {
-                        new { unitType = "PURCHASE", gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)null },
+                        new { unitType = "PURCHASE", gridX = 0, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = (string?)chairProductId, minPrice = (decimal?)null },
                         new { unitType = "STORAGE", gridX = 1, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = true, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = (string?)null, minPrice = (decimal?)null },
-                        new { unitType = "PUBLIC_SALES", gridX = 2, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = chairProductId, minPrice = (decimal?)45m },
+                        new { unitType = "PUBLIC_SALES", gridX = 2, gridY = 0, linkUp = false, linkDown = false, linkLeft = false, linkRight = false, linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false, resourceTypeId = (string?)null, productTypeId = (string?)chairProductId, minPrice = (decimal?)45m },
                     }
                 }
             },
@@ -4539,9 +4539,9 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var result = await ExecuteGraphQlAsync(isolatedClient,
             "mutation SBC($i:StoreBuildingConfigurationInput!){storeBuildingConfiguration(input:$i){id}}",
             new { i = new { buildingId, units = new[] {
-                new { unitType="PURCHASE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+                new { unitType="PURCHASE", gridX=0, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=(string?)chairId.ToString() },
                 new { unitType="STORAGE", gridX=1, gridY=0, linkRight=true, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=(string?)null },
-                new { unitType="B2B_SALES", gridX=2, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=chairId.ToString() },
+                new { unitType="B2B_SALES", gridX=2, gridY=0, linkRight=false, linkLeft=false, linkUp=false, linkDown=false, linkUpLeft=false, linkUpRight=false, linkDownLeft=false, linkDownRight=false, productTypeId=(string?)chairId.ToString() },
             }}},
             token);
 
