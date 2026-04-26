@@ -24,6 +24,7 @@ public sealed partial class Query
         var player = await db.Players
             .AsNoTracking()
             .Include(p => p.Companies)
+                .ThenInclude(c => c.Buildings)
             .FirstOrDefaultAsync(p => p.Id == userId);
 
         return ApplyImpersonationAccountContext(player, principal);

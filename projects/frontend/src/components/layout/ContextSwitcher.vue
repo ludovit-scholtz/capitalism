@@ -192,11 +192,7 @@ defineExpose({ closePanel })
           </span>
           <!-- Spacer so badge + count sit at the right -->
           <span class="ctx-city-right">
-            <span
-              v-if="buildingCountByCity[city.id]"
-              class="ctx-city-building-count"
-              :title="t('dashboard.buildings')"
-            >
+            <span v-if="buildingCountByCity[city.id]" class="ctx-city-building-count" :title="t('dashboard.buildings')">
               <font-awesome-icon :icon="['fas', 'building']" aria-hidden="true" />
               {{ buildingCountByCity[city.id] }}
             </span>
@@ -293,7 +289,7 @@ defineExpose({ closePanel })
   width: 1.5rem;
   height: 1.125rem;
   border-radius: 3px;
-  background: var(--color-surface-raised, rgba(255,255,255,0.08));
+  background: var(--color-surface-raised, rgba(255, 255, 255, 0.08));
   border: 1px solid var(--color-border);
   font-size: 0.5625rem;
   font-weight: 800;
