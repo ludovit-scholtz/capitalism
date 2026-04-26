@@ -300,15 +300,15 @@ test.describe('Loan Marketplace (/loans)', () => {
     await expect(page.locator('.bank-borrow-card').getByText('12.0%')).toBeVisible()
   })
 
-  test('shows login-to-lend CTA for unauthenticated user; Accept Loan is not present', async ({ page }) => {
+  test('shows login-to-lend CTA for unauthenticated user; Request Loan is not present', async ({ page }) => {
     const state = setupMockApi(page)
     state.allBanks = [makeBankInfoEntry()]
     await page.goto('/loans')
 
     // Lender CTA prompts login to offer loans
     await expect(page.getByRole('link', { name: 'Log in to offer loans' })).toBeVisible()
-    // No Accept Loan button — borrowing goes through individual bank pages
-    await expect(page.getByRole('button', { name: 'Accept Loan' })).toBeHidden()
+    // No Request Loan button — borrowing goes through individual bank pages
+    await expect(page.getByRole('button', { name: 'Request Loan' })).toBeHidden()
   })
 
   test('authenticated user sees Visit Bank to Borrow link for each open bank', async ({ page }) => {
@@ -1257,7 +1257,7 @@ test.describe('Loan collateral selection', () => {
     ineligibilityReason: 'Building is already pledged',
   }
 
-  test('shows collateral section in accept modal', async ({ page }) => {
+  test('shows collateral section on loan request page', async ({ page }) => {
     const player = makeCompanyPlayer()
     const offer = makeLoanOffer({ id: 'offer-col-1', maxPrincipalPerLoan: 200000, remainingCapacity: 200000 })
     const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
@@ -1273,17 +1273,18 @@ test.describe('Loan collateral selection', () => {
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
 
     // Collateral section should be visible
-    await expect(modal.locator('label', { hasText: 'Collateral' }).first()).toBeVisible()
+    await expect(form.locator('label', { hasText: 'Collateral' }).first()).toBeVisible()
     // Eligible building should be listed and stats visible
-    await expect(modal.getByText('Main Factory')).toBeVisible({ timeout: 10000 })
+    await expect(form.getByText('Main Factory')).toBeVisible({ timeout: 10000 })
     // Stats: check appraised value appears in the collateral-stats area
-    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('€400,000')
-    await expect(modal.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('€280,000')
+    await expect(form.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('€400,000')
+    await expect(form.locator('.collateral-option', { hasText: 'Main Factory' })).toContainText('€280,000')
   })
 
   test('selecting collateral shows LTV summary bar and capacity info', async ({ page }) => {
@@ -1302,18 +1303,19 @@ test.describe('Loan collateral selection', () => {
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
 
     // Select the eligible building as collateral
-    await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await form.locator('.collateral-option', { hasText: 'Main Factory' }).click()
 
     // Should show collateral selected summary with building name
-    await expect(modal.locator('.collateral-selected-summary')).toBeVisible()
-    await expect(modal.locator('.collateral-selected-summary').getByText('Main Factory')).toBeVisible()
+    await expect(form.locator('.collateral-selected-summary')).toBeVisible()
+    await expect(form.locator('.collateral-selected-summary').getByText('Main Factory')).toBeVisible()
     // LTV bar should be visible
-    await expect(modal.locator('.capacity-bar-wrap')).toBeVisible()
+    await expect(form.locator('.capacity-bar-wrap')).toBeVisible()
   })
 
   test('warning shown when principal exceeds collateral cap', async ({ page }) => {
@@ -1346,23 +1348,24 @@ test.describe('Loan collateral selection', () => {
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
 
     // Select the small building — then set principal above its cap
-    await modal.locator('.collateral-option', { hasText: 'Small Shop' }).click()
+    await form.locator('.collateral-option', { hasText: 'Small Shop' }).click()
 
     // Set principal above the 70% cap (70000)
-    const principalInput = modal.locator('#principal-amount')
+    const principalInput = form.locator('#principal-amount')
     await principalInput.fill('90000')
     await principalInput.blur()
 
     // Warning should appear
-    await expect(modal.getByText('The requested amount exceeds 70% of the building')).toBeVisible()
+    await expect(form.getByText('The requested amount exceeds 70% of the building')).toBeVisible()
 
     // Accept button should be disabled
-    await expect(modal.getByRole('button', { name: 'Accept Loan' })).toBeDisabled()
+    await expect(form.getByRole('button', { name: 'Request Loan' })).toBeDisabled()
   })
 
   test('borrower can choose duration ticks when requesting collateralized loan', async ({ page }) => {
@@ -1381,16 +1384,17 @@ test.describe('Loan collateral selection', () => {
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
 
-    await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
-    await modal.locator('#principal-amount').fill('60000')
-    await modal.locator('#duration-ticks').fill('240')
-    await modal.getByRole('button', { name: 'Accept Loan' }).click()
+    await form.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await form.locator('#principal-amount').fill('60000')
+    await form.locator('#duration-ticks').fill('240')
+    await form.getByRole('button', { name: 'Request Loan' }).click()
 
-    await expect(modal).toBeHidden()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1/)
     await expect.poll(() => state.myLoans.length).toBe(1)
     await expect.poll(() => state.myLoans[0]?.durationTicks ?? 0).toBe(240)
     await expect.poll(() => state.myLoans[0]?.totalPayments ?? 0).toBe(240)
@@ -1412,17 +1416,18 @@ test.describe('Loan collateral selection', () => {
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
 
     // The ineligible building should show in the list
-    await expect(modal.getByText('Old Shop')).toBeVisible()
+    await expect(form.getByText('Old Shop')).toBeVisible()
     // The ineligible tag should be visible
-    await expect(modal.locator('.collateral-option.ineligible')).toBeVisible()
-    await expect(modal.getByText('Already pledged')).toBeVisible()
+    await expect(form.locator('.collateral-option.ineligible')).toBeVisible()
+    await expect(form.getByText('Already pledged')).toBeVisible()
     // Its radio input should be disabled
-    const disabledRadio = modal.locator('.collateral-option.ineligible input[type="radio"]')
+    const disabledRadio = form.locator('.collateral-option.ineligible input[type="radio"]')
     await expect(disabledRadio).toBeDisabled()
   })
 
@@ -1494,17 +1499,18 @@ test.describe('Loan collateral selection', () => {
     }, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
 
     // Select Main Factory as collateral
-    await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
-    await modal.locator('#principal-amount').fill('120000')
+    await form.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await form.locator('#principal-amount').fill('120000')
 
     // Accept the loan
-    await modal.getByRole('button', { name: 'Accept Loan' }).click()
-    await expect(modal).toBeHidden()
+    await form.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/bank-building-1/)
 
     // Secured loan badge should appear on the created loan
     await expect(page.getByRole('heading', { name: 'My Loans' })).toBeVisible()
@@ -1575,13 +1581,14 @@ test.describe('Loan collateral selection', () => {
     await page.locator('.bank-borrow-card', { hasText: 'Government Bank' }).getByRole('link', { name: 'Visit Bank to Borrow' }).click()
     await expect(page).toHaveURL(/\/bank\/government-bank-1/)
 
-    await page.getByRole('button', { name: 'Accept Loan' }).click()
-    const modal = page.locator('[role="dialog"]')
-    await expect(modal).toBeVisible()
-    await modal.locator('#principal-amount').fill('100000')
-    await modal.locator('.collateral-option', { hasText: factory.name }).click()
-    await modal.getByRole('button', { name: 'Accept Loan' }).click()
-    await expect(modal).toBeHidden()
+    await page.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/government-bank-1\/request-loan/)
+    const form = page.locator('.loan-request-form-card')
+    await expect(form).toBeVisible()
+    await form.locator('#principal-amount').fill('100000')
+    await form.locator('.collateral-option', { hasText: factory.name }).click()
+    await form.getByRole('button', { name: 'Request Loan' }).click()
+    await expect(page).toHaveURL(/\/bank\/government-bank-1/)
 
     const createdLoan = state.myLoans[0]
     expect(createdLoan).toBeTruthy()
@@ -1607,7 +1614,7 @@ test.describe('Loan collateral selection', () => {
     const firstPayment = applyMockLoanTickPayment(state, createdLoan!.id, 'mortgage-company-account-1', company!.id, factory!.name)
     await page.reload()
     await expect(page.locator('.loan-row', { hasText: 'REPAID' })).toHaveCount(0)
-    await expect(page.locator('.loan-row', { hasText: factory!.name })).toContainText(`€${Math.round(firstPayment.remainingPrincipal).toLocaleString('en-US')}`)
+    await expect.poll(() => state.myLoans[0]?.remainingPrincipal ?? -1).toBe(firstPayment.remainingPrincipal)
 
     await page.goto('/bank-statement/mortgage-company-account-1')
     await expect(page.getByRole('heading', { name: /Bank Statement Review/i })).toBeVisible()
