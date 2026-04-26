@@ -2172,7 +2172,7 @@ export default {
     yourDepositsHere: 'Your bank accounts at this bank',
     noOffersFromBank: 'This bank cannot issue new loans right now.',
     borrowFromThisBank: 'Borrow from This Bank',
-    directBorrowingHint: 'Loans are issued directly against the bank\'s current deposits. Select a company building as collateral before submitting the request.',
+    directBorrowingHint: "Loans are issued directly against the bank's current deposits. Select a company building as collateral before submitting the request.",
     noCapacityAvailable: 'No lending capacity available',
     // Liquidity / capitalization (owner view)
     liquidityHealth: 'Liquidity Health',

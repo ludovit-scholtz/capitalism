@@ -181,13 +181,7 @@ function appendBankStatementRow(
   })
 }
 
-function applyMockLoanTickPayment(
-  state: ReturnType<typeof setupMockApi>,
-  loanId: string,
-  accountId: string,
-  companyId: string,
-  buildingName: string,
-) {
+function applyMockLoanTickPayment(state: ReturnType<typeof setupMockApi>, loanId: string, accountId: string, companyId: string, buildingName: string) {
   const loan = state.myLoans.find((candidate) => candidate.id === loanId)
   const account = state.myBankAccounts.find((candidate) => candidate.id === accountId)
   if (!loan || !account) {

@@ -6286,12 +6286,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const annualInterestRatePercent = offer?.annualInterestRatePercent ?? directBank?.lendingInterestRatePercent ?? 10
       const durationTicks = offer?.durationTicks ?? 8760
       const periodicRate = annualInterestRatePercent <= 0 ? 0 : annualInterestRatePercent / 100 / 8760
-      const paymentAmount =
-        durationTicks <= 0
-          ? principal
-          : periodicRate <= 0
-            ? principal / durationTicks
-            : (principal * periodicRate) / (1 - (1 + periodicRate) ** -durationTicks)
+      const paymentAmount = durationTicks <= 0 ? principal : periodicRate <= 0 ? principal / durationTicks : (principal * periodicRate) / (1 - (1 + periodicRate) ** -durationTicks)
       const newLoan: MockLoan = {
         id: `loan-${Date.now()}`,
         loanOfferId: input.loanOfferId ?? '',
