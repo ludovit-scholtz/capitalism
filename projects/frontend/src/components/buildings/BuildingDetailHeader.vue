@@ -78,5 +78,4 @@ const { building, showSaleDialog, salePrice, savingSale, openSaleDialog, closeSa
       </div>
     </div>
   </div>
-
 </template>
