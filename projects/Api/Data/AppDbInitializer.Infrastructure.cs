@@ -363,6 +363,7 @@ public sealed partial class AppDbInitializer
                     'MinQuality',
                     'AskingPrice',
                     'PricePerUnit',
+                    'QuantitySold',
                     'RemainingQuantity',
                     'Amount',
                     'Demand',
