@@ -1,7 +1,9 @@
 export type OnboardingAnalyticsEvent =
   | 'onboarding_start'
   | 'industry_selected'
+  | 'product_selected'
   | 'city_selected'
+  | 'ipo_selected'
   | 'factory_configured'
   | 'shop_configured'
   | 'save_prompt_shown'

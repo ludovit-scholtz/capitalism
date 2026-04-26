@@ -45,25 +45,33 @@ describe('stepToKey', () => {
     expect(stepToKey(1)).toBe('industry')
   })
 
-  it('maps step 2 to "city"', () => {
-    expect(stepToKey(2)).toBe('city')
+  it('maps step 2 to "product"', () => {
+    expect(stepToKey(2)).toBe('product')
   })
 
-  it('maps step 3 to "factory"', () => {
-    expect(stepToKey(3)).toBe('factory')
+  it('maps step 3 to "city"', () => {
+    expect(stepToKey(3)).toBe('city')
   })
 
-  it('maps step 4 to "shop"', () => {
-    expect(stepToKey(4)).toBe('shop')
+  it('maps step 4 to "ipo"', () => {
+    expect(stepToKey(4)).toBe('ipo')
   })
 
-  it('maps step 5 to "complete"', () => {
-    expect(stepToKey(5)).toBe('complete')
+  it('maps step 5 to "factory"', () => {
+    expect(stepToKey(5)).toBe('factory')
+  })
+
+  it('maps step 6 to "shop"', () => {
+    expect(stepToKey(6)).toBe('shop')
+  })
+
+  it('maps step 7 to "complete"', () => {
+    expect(stepToKey(7)).toBe('complete')
   })
 
   it('falls back to "industry" for unknown step values', () => {
     expect(stepToKey(0)).toBe('industry')
-    expect(stepToKey(6)).toBe('industry')
+    expect(stepToKey(8)).toBe('industry')
     expect(stepToKey(-1)).toBe('industry')
   })
 })
@@ -77,20 +85,28 @@ describe('keyToStep', () => {
     expect(keyToStep('industry')).toBe(1)
   })
 
-  it('maps "city" to 2', () => {
-    expect(keyToStep('city')).toBe(2)
+  it('maps "product" to 2', () => {
+    expect(keyToStep('product')).toBe(2)
   })
 
-  it('maps "factory" to 3', () => {
-    expect(keyToStep('factory')).toBe(3)
+  it('maps "city" to 3', () => {
+    expect(keyToStep('city')).toBe(3)
   })
 
-  it('maps "shop" to 4', () => {
-    expect(keyToStep('shop')).toBe(4)
+  it('maps "ipo" to 4', () => {
+    expect(keyToStep('ipo')).toBe(4)
   })
 
-  it('maps "complete" to 5', () => {
-    expect(keyToStep('complete')).toBe(5)
+  it('maps "factory" to 5', () => {
+    expect(keyToStep('factory')).toBe(5)
+  })
+
+  it('maps "shop" to 6', () => {
+    expect(keyToStep('shop')).toBe(6)
+  })
+
+  it('maps "complete" to 7', () => {
+    expect(keyToStep('complete')).toBe(7)
   })
 
   it('falls back to 1 for unknown keys', () => {
@@ -107,8 +123,8 @@ describe('keyToStep', () => {
 // ---------------------------------------------------------------------------
 
 describe('stepToKey / keyToStep round-trip', () => {
-  it('round-trips for all valid steps 1-5', () => {
-    for (let step = 1; step <= 5; step++) {
+  it('round-trips for all valid steps 1-7', () => {
+    for (let step = 1; step <= 7; step++) {
       expect(keyToStep(stepToKey(step))).toBe(step)
     }
   })
@@ -124,8 +140,10 @@ describe('getMaxReachableStep', () => {
     isResumingConfigureStep: false,
     onboardingCurrentStep: null,
     hasLocalFactoryProgress: false,
-    selectedCityId: '',
     selectedIndustry: '',
+    selectedProductId: '',
+    selectedCityId: '',
+    hasSelectedIpoPlan: false,
   }
 
   it('returns 1 when nothing is selected', () => {
@@ -136,40 +154,66 @@ describe('getMaxReachableStep', () => {
     expect(getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE' })).toBe(2)
   })
 
-  it('returns 3 when a city is selected', () => {
+  it('returns 3 when a product is selected', () => {
     expect(
-      getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE', selectedCityId: 'city-1' }),
+      getMaxReachableStep({ ...baseState, selectedIndustry: 'FURNITURE', selectedProductId: 'prod-1' }),
     ).toBe(3)
   })
 
-  it('returns 4 when onboarding is in SHOP_SELECTION step', () => {
+  it('returns 4 when a city is selected', () => {
     expect(
       getMaxReachableStep({
         ...baseState,
         selectedIndustry: 'FURNITURE',
+        selectedProductId: 'prod-1',
+        selectedCityId: 'city-1',
+      }),
+    ).toBe(4)
+  })
+
+  it('returns 5 when an IPO plan is selected', () => {
+    expect(
+      getMaxReachableStep({
+        ...baseState,
+        selectedIndustry: 'FURNITURE',
+        selectedProductId: 'prod-1',
+        selectedCityId: 'city-1',
+        hasSelectedIpoPlan: true,
+      }),
+    ).toBe(5)
+  })
+
+  it('returns 6 when onboarding is in SHOP_SELECTION step', () => {
+    expect(
+      getMaxReachableStep({
+        ...baseState,
+        selectedIndustry: 'FURNITURE',
+        selectedProductId: 'prod-1',
         selectedCityId: 'city-1',
         onboardingCurrentStep: 'SHOP_SELECTION',
       }),
-    ).toBe(4)
+    ).toBe(6)
   })
 
-  it('returns 4 when local factory progress exists after a reload', () => {
+  it('returns 6 when local factory progress exists after a reload', () => {
     expect(
       getMaxReachableStep({
         ...baseState,
         selectedIndustry: 'FURNITURE',
+        selectedProductId: 'prod-1',
         selectedCityId: 'city-1',
+        hasSelectedIpoPlan: true,
         hasLocalFactoryProgress: true,
       }),
-    ).toBe(4)
+    ).toBe(6)
   })
 
-  it('returns 5 when there is a completion result', () => {
-    expect(getMaxReachableStep({ ...baseState, hasCompletionResult: true })).toBe(5)
+  it('returns 7 when there is a completion result', () => {
+    expect(getMaxReachableStep({ ...baseState, hasCompletionResult: true })).toBe(7)
   })
 
-  it('returns 5 when resuming configure step', () => {
-    expect(getMaxReachableStep({ ...baseState, isResumingConfigureStep: true })).toBe(5)
+  it('returns 7 when resuming configure step', () => {
+    expect(getMaxReachableStep({ ...baseState, isResumingConfigureStep: true })).toBe(7)
   })
 
   it('completion result takes precedence over everything else', () => {
@@ -180,9 +224,11 @@ describe('getMaxReachableStep', () => {
         isResumingConfigureStep: true,
         onboardingCurrentStep: 'SHOP_SELECTION',
         selectedIndustry: 'HEALTHCARE',
+        selectedProductId: 'prod-2',
         selectedCityId: 'city-x',
+        hasSelectedIpoPlan: true,
       }),
-    ).toBe(5)
+    ).toBe(7)
   })
 })
 
@@ -362,29 +408,24 @@ describe('canProceedStep3', () => {
   const expensiveLot = makeLot({ ownerCompanyId: null, price: 600_000 })
 
   it('returns true when all conditions are met', () => {
-    expect(canProceedStep3('Acme Corp', freeLot, 500_000)).toBe(true)
-  })
-
-  it('returns false when company name is empty', () => {
-    expect(canProceedStep3('', freeLot, 500_000)).toBe(false)
-    expect(canProceedStep3('   ', freeLot, 500_000)).toBe(false)
+    expect(canProceedStep3(freeLot, 500_000)).toBe(true)
   })
 
   it('returns false when no lot is selected', () => {
-    expect(canProceedStep3('Acme Corp', null, 500_000)).toBe(false)
+    expect(canProceedStep3(null, 500_000)).toBe(false)
   })
 
   it('returns false when the lot is already owned', () => {
-    expect(canProceedStep3('Acme Corp', ownedLot, 500_000)).toBe(false)
+    expect(canProceedStep3(ownedLot, 500_000)).toBe(false)
   })
 
   it('returns false when starting cash is insufficient', () => {
-    expect(canProceedStep3('Acme Corp', expensiveLot, 500_000)).toBe(false)
+    expect(canProceedStep3(expensiveLot, 500_000)).toBe(false)
   })
 
   it('returns true at exact budget boundary', () => {
     const exactLot = makeLot({ ownerCompanyId: null, price: 500_000 })
-    expect(canProceedStep3('Acme Corp', exactLot, 500_000)).toBe(true)
+    expect(canProceedStep3(exactLot, 500_000)).toBe(true)
   })
 })
 

@@ -40,11 +40,11 @@ public sealed partial class Mutation
     private const decimal DefaultDividendPayoutRatio = 0.2m;
     private const decimal DefaultCompanyShareCount = 10_000m;
 
-    private static readonly IReadOnlyDictionary<string, string> StarterOnboardingProductByIndustry = new Dictionary<string, string>
+    private static readonly IReadOnlyDictionary<string, string[]> StarterOnboardingProductsByIndustry = new Dictionary<string, string[]>
     {
-        [Industry.Furniture] = "wooden-chair",
-        [Industry.FoodProcessing] = "bread",
-        [Industry.Healthcare] = "basic-medicine"
+        [Industry.Furniture] = ["wooden-chair", "wooden-table", "wooden-bed"],
+        [Industry.FoodProcessing] = ["bread", "pasta", "crackers"],
+        [Industry.Healthcare] = ["basic-medicine", "bandages", "first-aid-kit"]
     };
 
 

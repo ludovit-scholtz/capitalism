@@ -19,8 +19,8 @@ public sealed partial class Mutation
 {
     private static bool IsStarterOnboardingProduct(ProductType product)
     {
-        return StarterOnboardingProductByIndustry.TryGetValue(product.Industry, out var starterSlug)
-            && string.Equals(product.Slug, starterSlug, StringComparison.Ordinal);
+        return StarterOnboardingProductsByIndustry.TryGetValue(product.Industry, out var starterSlugs)
+            && starterSlugs.Contains(product.Slug, StringComparer.Ordinal);
     }
 
     private static void ClearOnboardingProgress(Player player)

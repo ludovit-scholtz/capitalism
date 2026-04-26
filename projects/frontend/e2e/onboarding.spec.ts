@@ -24,23 +24,41 @@ async function authenticateViaLocalStorage(page: Page, token: string) {
   }, token)
 }
 
+type OnboardingRouteChoiceOptions = {
+  industry: string
+  product: string
+  city?: string
+  ipoPlan?: string
+}
+
+async function chooseOnboardingRouteChoices(
+  page: Page,
+  { industry, product, city = 'Bratislava', ipoPlan = 'Starter IPO' }: OnboardingRouteChoiceOptions,
+) {
+  await page.locator('.industry-card', { hasText: industry }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+
+  await page.locator('.product-card', { hasText: product }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+
+  await page.locator('.city-card', { hasText: city }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+
+  await page.locator('.ipo-card', { hasText: ipoPlan }).click()
+}
+
 /**
  * Drives the guest wizard through steps 1–4 for a given industry and product,
  * then returns the text content of `.profit-stat-revenue` on the step-5 screen.
  * Used by the revenue-comparison test to avoid duplicating navigation logic.
  */
-async function getGuestProfitRevenue(page: Page, industry: string, productName: string, companyName = `${industry} Revenue Corp`): Promise<number> {
+async function getGuestProfitRevenue(page: Page, industry: string, productName: string, _companyName = `${industry} Revenue Corp`): Promise<number> {
   setupMockApi(page)
   await page.goto('/onboarding')
-  await page.locator('.industry-card', { hasText: industry }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.getByLabel('Company Name').fill(companyName)
+  await chooseOnboardingRouteChoices(page, { industry, product: productName })
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-  await page.locator('.product-card', { hasText: productName }).click()
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -49,37 +67,27 @@ async function getGuestProfitRevenue(page: Page, industry: string, productName: 
   return parseInt(text.replace(/[^0-9]/g, ''), 10)
 }
 
-/** Drives the guest wizard through steps 1–4 (no auth) and lands on the step-5 save-progress screen. */
-async function completeGuestSteps1to4(page: Page, companyName = 'Guest Corp') {
-  await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.getByLabel('Company Name').fill(companyName)
+/** Drives the guest wizard through the lot-purchase steps (no auth) and lands on the save-progress screen. */
+async function completeGuestSteps1to4(page: Page, _companyName = 'Guest Corp') {
+  await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-  await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
   await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
 }
 
-async function completeGuidedOnboarding(page: Page, companyName: string) {
-  await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
+async function completeGuidedOnboarding(page: Page, _companyName: string) {
+  await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
 
   await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-  await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-  await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -89,20 +97,15 @@ async function completeGuidedOnboarding(page: Page, companyName: string) {
  * Drives the authenticated guided onboarding wizard with a specified industry and product.
  * Used by configure-guide price tests to validate industry-specific benchmark prices.
  */
-async function completeGuidedOnboardingForIndustry(page: Page, companyName: string, industryLabel: string, productLabel: string) {
-  await page.locator('.industry-card', { hasText: industryLabel }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
+async function completeGuidedOnboardingForIndustry(page: Page, _companyName: string, industryLabel: string, productLabel: string) {
+  await chooseOnboardingRouteChoices(page, { industry: industryLabel, product: productLabel })
 
   await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-  await page.getByLabel('Company Name').fill(companyName)
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterFactoryLot(page)
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-  await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-  await page.locator('.product-card', { hasText: productLabel }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
   await page.getByRole('button', { name: 'List View' }).click()
   await chooseStarterShopLot(page)
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -206,15 +209,15 @@ test.describe('Dashboard account switcher', () => {
     await expect(page.locator('.company-card')).toHaveCount(1)
     await expect(page.getByRole('heading', { name: 'Bravo Foods' })).toBeVisible()
 
-    await page.getByRole('button', { name: /Switch account/i }).click()
-    await page.locator('.account-option', { hasText: player.displayName }).click()
+    await page.locator('.ctx-trigger').click()
+    await page.locator('.ctx-account-option', { hasText: player.displayName }).click()
 
     await expect(page.locator('.person-account-panel')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Founder view' })).toBeVisible()
     await expect(page.locator('.company-card')).toHaveCount(0)
 
-    await page.getByRole('button', { name: /Switch account/i }).click()
-    await page.locator('.account-option', { hasText: 'Alpha Manufacturing' }).click()
+    await page.locator('.ctx-trigger').click()
+    await page.locator('.ctx-account-option', { hasText: 'Alpha Manufacturing' }).click()
 
     await expect(page.locator('.company-card')).toHaveCount(1)
     await expect(page.getByRole('heading', { name: 'Alpha Manufacturing' })).toBeVisible()
@@ -243,7 +246,7 @@ test.describe('Dashboard account switcher', () => {
     await expect(page.locator('.person-account-panel')).toHaveCount(0)
     await expect(page.locator('.company-card')).toHaveCount(1)
     await expect(page.getByRole('heading', { name: 'Delta Ventures' })).toBeVisible()
-    await expect(page.locator('.account-trigger')).toContainText('Delta Ventures')
+    await expect(page.locator('.ctx-trigger')).toContainText('Delta Ventures')
   })
 })
 
@@ -262,29 +265,20 @@ test.describe('Onboarding wizard', () => {
     await expect(page.getByRole('heading', { name: 'Start Your Empire' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    // Select Furniture industry
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 2: Choose city
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
 
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByLabel('Company Name').fill('My Empire Inc')
     await expect(page.getByText('Starting cash')).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await expect(page.locator('.budget-card').getByText('Cash after purchase')).toBeVisible()
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
     await expect(page.getByText('Factory secured')).toBeVisible()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
-    await expect(page.locator('.summary', { hasText: 'My Empire Inc' })).toBeVisible()
+    await expect(page.locator('.summary')).toContainText('Wooden Chair')
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
 
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
@@ -311,20 +305,18 @@ test.describe('Onboarding wizard', () => {
     await page.goto('/onboarding')
 
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
+    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
     await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
     await expect(page.locator('.budget-card', { hasText: 'Personal cash after contribution' })).toContainText('€0')
 
     const growthIpoCard = page.locator('.ipo-card', { hasText: 'Growth IPO' })
-    await growthIpoCard.click()
     await expect(growthIpoCard).toContainText('€600,000')
     await expect(growthIpoCard).toContainText('33.3%')
+    await growthIpoCard.click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
     await expect(page.locator('.budget-card', { hasText: 'Starting cash' })).toContainText('€800,000')
 
-    await page.getByLabel('Company Name').fill('Growth Capital Works')
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await expect(page.locator('.budget-card', { hasText: 'Cash after purchase' })).toContainText('€710,000')
@@ -408,20 +400,23 @@ test.describe('Onboarding wizard', () => {
 
     await page.goto('/onboarding')
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.getByLabel('Company Name').fill('Mixed Recipe Corp')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
     await expect(page.locator('.product-card')).toHaveCount(1)
     await expect(page.locator('.product-card', { hasText: 'Wooden Chair' })).toBeVisible()
     expect(pageErrors).toEqual([])
 
     await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+    await page.locator('.ipo-card', { hasText: 'Starter IPO' }).click()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await chooseStarterFactoryLot(page)
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+    expect(pageErrors).toEqual([])
+
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -432,7 +427,7 @@ test.describe('Onboarding wizard', () => {
     expect(pageErrors).toEqual([])
   })
 
-  test('step 1 Next button disabled until industry selected', async ({ page }) => {
+  test('industry selection advances directly to product step', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -443,15 +438,11 @@ test.describe('Onboarding wizard', () => {
     await page.goto('/onboarding')
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    // Next button should be disabled
-    await expect(page.getByRole('button', { name: 'Next' })).toBeDisabled()
-
-    // Select industry
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await expect(page.getByRole('button', { name: 'Next' })).toBeEnabled()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
   })
 
-  test('shows only the simple starter product for the selected industry', async ({ page }) => {
+  test('shows three starter products for the selected industry', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -461,21 +452,14 @@ test.describe('Onboarding wizard', () => {
 
     await page.goto('/onboarding')
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    await page.getByLabel('Company Name').fill('Starter Product Co')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-
-    await expect(page.locator('.product-card')).toHaveCount(1)
-    await expect(page.locator('.product-card')).toContainText('Wooden Chair')
-    await expect(page.getByText('Your starter company uses the free catalog.')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+    await expect(page.locator('.product-card')).toHaveCount(3)
+    await expect(page.locator('.product-card', { hasText: 'Wooden Chair' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Wooden Table' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Wooden Bed' })).toBeVisible()
   })
 
-  test('step 4 shows only Bread for Food Processing industry (AC3/AC5)', async ({ page }) => {
+  test('product step shows the Food Processing starter set (AC3/AC5)', async ({ page }) => {
     // AC3: Each starter industry presents a viable starter product/path.
     // AC5: The onboarding flow prepares an initial factory layout appropriate to the selected industry.
     // Verifies that selecting Food Processing in step 1 results in only the Bread product card
@@ -489,25 +473,15 @@ test.describe('Onboarding wizard', () => {
 
     await page.goto('/onboarding')
     await page.locator('.industry-card', { hasText: 'Food Processing' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    await page.getByLabel('Company Name').fill('Food Processing Co')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-
-    // Only the industry-appropriate product should be shown
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await expect(page.locator('.product-card')).toHaveCount(1)
-    await expect(page.locator('.product-card')).toContainText('Bread')
-    // Furniture and Healthcare products must NOT appear
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Bread' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Pasta' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Crackers' })).toBeVisible()
     await expect(page.locator('.product-card', { hasText: 'Wooden Chair' })).toHaveCount(0)
     await expect(page.locator('.product-card', { hasText: 'Basic Medicine' })).toHaveCount(0)
   })
 
-  test('step 4 shows only Basic Medicine for Healthcare industry (AC3/AC5)', async ({ page }) => {
+  test('product step shows the Healthcare starter set (AC3/AC5)', async ({ page }) => {
     // AC3: Each starter industry presents a viable starter product/path.
     // AC5: The onboarding flow prepares an initial factory layout appropriate to the selected industry.
     // Verifies that selecting Healthcare in step 1 results in only the Basic Medicine product card
@@ -521,20 +495,10 @@ test.describe('Onboarding wizard', () => {
 
     await page.goto('/onboarding')
     await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    await page.getByLabel('Company Name').fill('Pharma Co')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-
-    // Only the industry-appropriate product should be shown
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await expect(page.locator('.product-card')).toHaveCount(1)
-    await expect(page.locator('.product-card')).toContainText('Basic Medicine')
-    // Furniture and Food Processing products must NOT appear
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Basic Medicine' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'Bandages' })).toBeVisible()
+    await expect(page.locator('.product-card', { hasText: 'First Aid Kit' })).toBeVisible()
     await expect(page.locator('.product-card', { hasText: 'Wooden Chair' })).toHaveCount(0)
     await expect(page.locator('.product-card', { hasText: 'Bread' })).toHaveCount(0)
   })
@@ -549,13 +513,10 @@ test.describe('Onboarding wizard', () => {
 
     await page.goto('/onboarding')
 
-    // Go to step 2
     await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
 
-    // Back to step 1
-    await page.getByRole('button', { name: 'Back' }).click()
+    await page.getByRole('button', { name: /Back/i }).click()
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
   })
 
@@ -608,25 +569,13 @@ test.describe('Onboarding wizard', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    // Select Food Processing industry
-    await page.locator('.industry-card', { hasText: 'Food Processing' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 2: choose city
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 3: choose factory lot
+    await chooseOnboardingRouteChoices(page, { industry: 'Food Processing', product: 'Bread' })
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByLabel('Company Name').fill('Bread Empire Inc')
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-    // Step 4: choose product (Bread) and shop lot
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await page.locator('.product-card', { hasText: 'Bread' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -648,25 +597,13 @@ test.describe('Onboarding wizard', () => {
 
     await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
 
-    // Select Healthcare industry
-    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 2: choose city
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 3: choose factory lot
+    await chooseOnboardingRouteChoices(page, { industry: 'Healthcare', product: 'Basic Medicine' })
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByLabel('Company Name').fill('Pharma Corp')
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-    // Step 4: choose product (Basic Medicine) and shop lot
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -681,32 +618,8 @@ test.describe('Guest onboarding wizard', () => {
   test('unauthenticated visitor can complete steps 1-4 without login', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
+    await completeGuestSteps1to4(page)
 
-    // Step 1: Choose industry
-    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 2: Choose city
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 3: Choose factory lot (no company created on backend)
-    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByLabel('Company Name').fill('Guest Corp')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-
-    // Step 4: Choose product and shop lot (no backend call)
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
-    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
-
-    // Step 5: Guest save-progress screen
     await expect(page.getByRole('heading', { name: /Your Empire Preview is Ready/i })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Save & Launch' })).toBeVisible()
@@ -718,26 +631,13 @@ test.describe('Guest onboarding wizard', () => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
-    // Step 1: Select Food Processing
-    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
-    await page.locator('.industry-card', { hasText: 'Food Processing' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 2: Choose city
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 3: Choose factory lot (no backend call in guest mode)
+    await chooseOnboardingRouteChoices(page, { industry: 'Food Processing', product: 'Bread' })
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByLabel('Company Name').fill('Bread Factory Guest')
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-    // Step 4: Choose Bread product and shop lot
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await page.locator('.product-card', { hasText: 'Bread' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -755,26 +655,13 @@ test.describe('Guest onboarding wizard', () => {
     setupMockApi(page)
     await page.goto('/onboarding')
 
-    // Step 1: Select Healthcare
-    await expect(page.getByRole('heading', { name: 'Choose Your Industry' })).toBeVisible()
-    await page.locator('.industry-card', { hasText: 'Healthcare' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 2: Choose city
-    await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-
-    // Step 3: Choose factory lot (no backend call in guest mode)
+    await chooseOnboardingRouteChoices(page, { industry: 'Healthcare', product: 'Basic Medicine' })
     await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
-    await page.getByLabel('Company Name').fill('Pharma Guest Corp')
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-    // Step 4: Choose Basic Medicine product and shop lot
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-    await page.locator('.product-card', { hasText: 'Basic Medicine' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -789,20 +676,7 @@ test.describe('Guest onboarding wizard', () => {
   test('guest save-progress form shows register and login tabs', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/onboarding')
-
-    // Quick completion through steps 1-4
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.getByLabel('Company Name').fill('Guest Corp')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
-    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+    await completeGuestSteps1to4(page)
 
     // Save-progress section should show register/login tabs
     await expect(page.locator('.btn-tab', { hasText: 'Create Account' })).toBeVisible()
@@ -817,20 +691,7 @@ test.describe('Guest onboarding wizard', () => {
   test('guest can register and migrate progress', async ({ page }) => {
     const state = setupMockApi(page)
     await page.goto('/onboarding')
-
-    // Complete steps 1-4 as guest
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.getByLabel('Company Name').fill('Guest Corp')
-    await page.getByRole('button', { name: 'List View' }).click()
-    await chooseStarterFactoryLot(page)
-    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
-    await page.getByRole('button', { name: 'List View' }).click()
-    await page.getByRole('button', { name: /High Street Retail Space/i }).click()
-    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+    await completeGuestSteps1to4(page)
 
     // Fill register form and submit
     await expect(page.getByRole('heading', { name: 'Save Your Progress' })).toBeVisible()
@@ -1050,28 +911,31 @@ test.describe('Guest onboarding wizard', () => {
     expect(mutationNames).not.toContain('FinishOnboarding')
   })
 
-  test('localStorage progress is cleared after successful guest migration', async ({ page }) => {
+  test('guest progress is stored in the route query instead of localStorage', async ({ page }) => {
     // AC: "The product never silently drops guest progress without telling the player what happened."
-    // After a successful handoff the stale guest progress key must be removed from localStorage
-    // so the player starts fresh if they ever navigate back.
+    // Guest progress now lives in the URL query so links can deep-link into the current choice state.
     setupMockApi(page)
     await page.goto('/onboarding')
     await completeGuestSteps1to4(page)
 
-    // Confirm localStorage has onboarding progress saved before migration
     const progressBefore = await page.evaluate(() => localStorage.getItem('onboarding_progress'))
-    expect(progressBefore).not.toBeNull()
+    expect(progressBefore).toBeNull()
 
-    // Register to trigger migration
+    await expect(page).toHaveURL(/step=complete/)
+    await expect(page).toHaveURL(/industry=FURNITURE/)
+    await expect(page).toHaveURL(/productId=prod-chair/)
+    await expect(page).toHaveURL(/cityId=city-ba/)
+    await expect(page).toHaveURL(/factoryLotId=lot-industrial-2/)
+    await expect(page).toHaveURL(/shopLotId=lot-commercial-1/)
+    await expect(page).toHaveURL(/ipoRaiseTarget=400000/)
+
     await page.locator('#guestEmail').fill('clear@test.com')
     await page.locator('#guestDisplayName').fill('Clear Test')
     await page.locator('#guestPassword').fill('ClearPass1!')
     await page.getByRole('button', { name: 'Save & Launch' }).click()
 
-    // Wait for migration to complete
     await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
 
-    // The onboarding_progress key should now be absent from localStorage
     const progressAfter = await page.evaluate(() => localStorage.getItem('onboarding_progress'))
     expect(progressAfter).toBeNull()
   })
@@ -1095,26 +959,25 @@ test.describe('Guest onboarding wizard', () => {
   test('guest progress survives page refresh and can still be migrated', async ({ page }) => {
     // AC: "Support the minimum state required to complete the opening product loop."
     // After a page refresh mid-onboarding as a guest, the player should be able to resume
-    // and migrate successfully — confirming the localStorage-based persistence works end-to-end.
+    // and migrate successfully using URL-routed onboarding state.
     setupMockApi(page)
     await page.goto('/onboarding')
 
-    // Complete steps 1-3 only
-    await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-    await page.getByRole('button', { name: 'Next' }).click()
-    await page.getByLabel('Company Name').fill('Refresh Corp')
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair' })
+    await expect(page).toHaveURL(/step=factory/)
+    await expect(page).toHaveURL(/industry=FURNITURE/)
+    await expect(page).toHaveURL(/productId=prod-chair/)
+    await expect(page).toHaveURL(/cityId=city-ba/)
+    await expect(page).toHaveURL(/ipoRaiseTarget=400000/)
+
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+
     await page.getByRole('button', { name: 'List View' }).click()
     await chooseStarterFactoryLot(page)
     await page.getByRole('button', { name: 'Purchase First Factory' }).click()
 
-    // Refresh on step 4 as a guest — should resume at step 4
-    await page.reload()
-    await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-
-    // Complete step 4 and migrate
-    await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
     await page.getByRole('button', { name: 'List View' }).click()
     await page.getByRole('button', { name: /High Street Retail Space/i }).click()
     await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()

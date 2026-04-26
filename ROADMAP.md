@@ -48,11 +48,16 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
 - [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
-### Onboarding (0% complete)
+### Onboarding (80% complete)
 
-- [ ] Make the onboarding more user friendly. For example make industry selection on one click. When person clicks on the industry do not request the click on the next button. Also when person selects a city progress further on that click. Create IPO the custom page, and allow do select IPO plan on one click as well. Remove Company Name selection from the the onboarding phase, use some nice generated company name, and allow user to change it later. For each product category show at least 3 products to produce do selection on one click to progress the onboarding.  Add the product selection right after the product category selection. Do not store the state of the onboarding to localstorage. Use the url routing to store the onboarding state so that the links link to specific selection can be created easily.
-- [ ] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
-- [ ] For each product category show at least 3 products to produce
+- [x] Onboarding now uses one-click progression for industry, product, city, and IPO plan selection without extra Next-button confirmation.
+- [x] Product selection is now positioned immediately after industry selection.
+- [x] Company name entry was removed from onboarding and the flow uses generated defaults that can be adjusted later.
+- [x] Onboarding state is URL-query driven and no longer persisted in localStorage for progress recovery.
+- [x] Starter product cards expose at least three options per starter category flow.
+- [x] Product price display in onboarding uses FX-aware local currency formatting.
+- [ ] Finish full Playwright migration of onboarding spec to the new URL-driven 7-step flow and remove remaining stale assertions.
+- [ ] Add complete regression coverage for guest refresh/resume in full-suite execution (not only targeted test runs).
 
 ### Number formatting (80% complete)
 
@@ -70,7 +75,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Units
 
-- [ ]  In the grid show the picture of the product
+- [ ]  In the grid show the picture of the product instead of cell-item-avatar
 
 #### B2B sales unit
 

@@ -22,6 +22,7 @@ import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector
 import { useAuthStore } from '@/stores/auth'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
+import { generateOnboardingCompanyName } from '@/lib/onboardingCompanyName'
 import type { BuildingLot, City, EurFxRate, FirstSaleMission, GameState, OnboardingResult, OnboardingStartResult, ProductType } from '@/types'
 
 const { t, locale } = useI18n()
@@ -57,7 +58,6 @@ function hasStoredSessionToken() {
 
 const hasAuthenticatedSession = computed(() => auth.isAuthenticated || !!auth.player || hasStoredSessionToken())
 
-const PROGRESS_KEY = 'onboarding_progress'
 const PERSONAL_STARTING_CASH = 200_000
 const FOUNDER_CONTRIBUTION = 200_000
 const DEFAULT_IPO_RAISE_TARGET = 400_000
@@ -175,9 +175,9 @@ const PRODUCTS_QUERY = `
 `
 
 const starterProductSlugByIndustry: Record<string, string[]> = {
-  FURNITURE: ['wooden-chair'],
-  FOOD_PROCESSING: ['bread'],
-  HEALTHCARE: ['basic-medicine'],
+  FURNITURE: ['wooden-chair', 'wooden-table', 'wooden-bed'],
+  FOOD_PROCESSING: ['bread', 'pasta', 'crackers'],
+  HEALTHCARE: ['basic-medicine', 'bandages', 'first-aid-kit'],
 }
 
 const step = ref(1)
@@ -216,8 +216,8 @@ const selectedCityId = ref('')
 const selectedProductId = ref('')
 const selectedFactoryLotId = ref('')
 const selectedShopLotId = ref('')
-const selectedIpoRaiseTarget = ref(DEFAULT_IPO_RAISE_TARGET)
-const companyName = ref('')
+const selectedIpoRaiseTarget = ref<number | null>(null)
+const isRouteStateReady = ref(false)
 
 const completionResult = ref<OnboardingResult | null>(null)
 const gameState = ref<GameState | null>(null)
@@ -230,6 +230,7 @@ const selectedCity = computed(() => cities.value.find((city) => city.id === sele
 const selectedProduct = computed(() => products.value.find((product) => product.id === selectedProductId.value) ?? null)
 const selectedFactoryLot = computed(() => cityLots.value.find((lot) => lot.id === selectedFactoryLotId.value) ?? null)
 const selectedShopLot = computed(() => cityLots.value.find((lot) => lot.id === selectedShopLotId.value) ?? null)
+const companyName = computed(() => generateOnboardingCompanyName(selectedIndustry.value, selectedCity.value?.name))
 const starterCompany = computed(() => {
   const companyId = auth.player?.onboardingCompanyId
   if (!companyId) {
@@ -242,7 +243,15 @@ const selectedIpoOption = computed(() => ipoOptions.find((option) => option.rais
 /** Company starting cash in the selected city's local currency. */
 const companyStartingCash = computed(() => Math.round((FOUNDER_CONTRIBUTION + selectedIpoOption.value.raiseTarget) * cityFxRate.value))
 const remainingPersonalCash = computed(() => PERSONAL_STARTING_CASH - FOUNDER_CONTRIBUTION)
-const starterCash = computed(() => onboardingCompanyCash.value ?? starterCompany.value?.cash ?? companyStartingCash.value)
+const hasGuestFactoryPurchaseInRoute = computed(() => isGuestMode.value && (route.query.step === 'shop' || route.query.step === 'complete'))
+const effectiveOnboardingCompanyCash = computed(() => {
+  if (onboardingCompanyCash.value !== null) return onboardingCompanyCash.value
+  if (hasGuestFactoryPurchaseInRoute.value && selectedFactoryLot.value) {
+    return Math.max(companyStartingCash.value - selectedFactoryLot.value.price, 0)
+  }
+  return null
+})
+const starterCash = computed(() => effectiveOnboardingCompanyCash.value ?? starterCompany.value?.cash ?? companyStartingCash.value)
 
 const availableFactoryLots = computed(() => getAvailableLots(cityLots.value, 'FACTORY'))
 const availableShopLots = computed(() => getAvailableLots(cityLots.value, 'SALES_SHOP'))
@@ -261,9 +270,7 @@ const sortedProducts = computed(() => {
   return prods
 })
 
-const canProceedStep1 = computed(() => !!selectedIndustry.value)
-const canProceedStep2 = computed(() => !!selectedCityId.value)
-const canProceedStep3 = computed(() => checkCanProceedStep3(companyName.value, selectedFactoryLot.value, companyStartingCash.value))
+const canProceedStep3 = computed(() => checkCanProceedStep3(selectedFactoryLot.value, companyStartingCash.value))
 const canProceedStep4 = computed(() => checkCanProceedStep4(selectedProductId.value, selectedShopLot.value, starterCash.value))
 const canShowStep4Summary = computed(() => !!selectedProduct.value && !!selectedFactoryLot.value && !!selectedShopLot.value)
 
@@ -285,10 +292,10 @@ const configureGuideCash = computed(() => {
 
 /**
  * The auto-configured public sale price for the guest's shop.
- * The backend sets MinPrice = basePrice × 1.5 for the PUBLIC_SALES unit during FinishOnboarding.
+ * The backend sets MinPrice = local basePrice × 1.5 for the PUBLIC_SALES unit during FinishOnboarding.
  */
 const guestConfiguredShopPrice = computed(() => {
-  const base = selectedProduct.value?.basePrice
+  const base = selectedProduct.value ? getProductLocalPrice(selectedProduct.value) : null
   if (!base) return null
   return Math.round(base * 1.5 * 100) / 100
 })
@@ -297,10 +304,10 @@ const guestConfiguredShopPrice = computed(() => {
 const simulatedProfit = computed(() => {
   if (!selectedProduct.value) return null
   const recipeCost = selectedProduct.value.recipes.reduce((sum, r) => {
-    const unitCost = r.resourceType?.basePrice ?? 0
+    const unitCost = (r.resourceType?.basePrice ?? 0) * cityFxRate.value
     return sum + unitCost * r.quantity
   }, 0)
-  return computeSimulatedProfit(selectedProduct.value.basePrice, selectedProduct.value.outputQuantity, recipeCost > 0 ? recipeCost : undefined)
+  return computeSimulatedProfit(getProductLocalPrice(selectedProduct.value), selectedProduct.value.outputQuantity, recipeCost > 0 ? recipeCost : undefined)
 })
 
 function findResumedShopBasePrice(): number | null {
@@ -311,11 +318,11 @@ function findResumedShopBasePrice(): number | null {
 
 const configureGuideBasePrice = computed(() => {
   if (completionResult.value?.selectedProduct.basePrice) {
-    return completionResult.value.selectedProduct.basePrice
+    return getProductLocalPrice(completionResult.value.selectedProduct)
   }
 
   if (selectedProduct.value?.basePrice) {
-    return selectedProduct.value.basePrice
+    return getProductLocalPrice(selectedProduct.value)
   }
 
   return findResumedShopBasePrice()
@@ -357,7 +364,7 @@ const completionShopUnits = computed(() => {
  * Matches the ConfigureStarterFactory backend output: PURCHASE → MANUFACTURING → STORAGE → B2B_SALES.
  */
 const guestFactoryLayout = computed(() => {
-  if (!isGuestMode.value || step.value !== 5) return null
+  if (!isGuestMode.value || step.value !== 7) return null
   return [
     { unitType: 'PURCHASE', gridX: 0 },
     { unitType: 'MANUFACTURING', gridX: 1 },
@@ -371,7 +378,7 @@ const guestFactoryLayout = computed(() => {
  * Matches the AddStarterShop backend output: PURCHASE → PUBLIC_SALES.
  */
 const guestShopLayout = computed(() => {
-  if (!isGuestMode.value || step.value !== 5) return null
+  if (!isGuestMode.value || step.value !== 7) return null
   return [
     { unitType: 'PURCHASE', gridX: 0 },
     { unitType: 'PUBLIC_SALES', gridX: 1 },
@@ -406,28 +413,31 @@ const industryWhyKeys: Record<string, string> = {
 }
 
 function resolveMaxReachableStep(): number {
-  // In guest mode, if factory lot is selected (simulated purchase complete), step 4 is reachable.
-  // If shop lot AND product are also selected (guest completed step 4), step 5 is reachable.
   if (isGuestMode.value) {
-    const guestCompletedAllSteps = !!selectedFactoryLotId.value && onboardingCompanyCash.value !== null && !!selectedShopLotId.value && !!selectedProductId.value
-    if (guestCompletedAllSteps) return 5
-    if (selectedFactoryLotId.value && onboardingCompanyCash.value !== null) return 4
+    const guestCompletedAllSteps = !!selectedFactoryLotId.value && effectiveOnboardingCompanyCash.value !== null && !!selectedShopLotId.value && !!selectedProductId.value
+    if (guestCompletedAllSteps) return 7
+    if (selectedFactoryLotId.value && effectiveOnboardingCompanyCash.value !== null) return 6
     return getMaxReachableStep({
       hasCompletionResult: false,
       isResumingConfigureStep: false,
       onboardingCurrentStep: null,
       hasLocalFactoryProgress: false,
-      selectedCityId: selectedCityId.value,
       selectedIndustry: selectedIndustry.value,
+      selectedProductId: selectedProductId.value,
+      selectedCityId: selectedCityId.value,
+      hasSelectedIpoPlan: selectedIpoRaiseTarget.value !== null,
     })
   }
+
   return getMaxReachableStep({
     hasCompletionResult: !!completionResult.value,
     isResumingConfigureStep: isResumingConfigureStep.value,
     onboardingCurrentStep: auth.player?.onboardingCurrentStep,
     hasLocalFactoryProgress: !!selectedFactoryLotId.value && onboardingCompanyCash.value !== null,
-    selectedCityId: selectedCityId.value,
     selectedIndustry: selectedIndustry.value,
+    selectedProductId: selectedProductId.value,
+    selectedCityId: selectedCityId.value,
+    hasSelectedIpoPlan: selectedIpoRaiseTarget.value !== null,
   })
 }
 
@@ -435,68 +445,48 @@ function resolveClampStep(requestedStep: number): number {
   return clampStep(requestedStep, resolveMaxReachableStep())
 }
 
-function saveProgress() {
-  try {
-    localStorage.setItem(
-      PROGRESS_KEY,
-      JSON.stringify({
-        step: step.value,
-        industry: selectedIndustry.value,
-        cityId: selectedCityId.value,
-        productId: selectedProductId.value,
-        ipoRaiseTarget: selectedIpoRaiseTarget.value,
-        companyName: companyName.value,
-        factoryLotId: selectedFactoryLotId.value,
-        shopLotId: selectedShopLotId.value,
-        companyCash: onboardingCompanyCash.value ?? undefined,
-        guestCash: isGuestMode.value ? (onboardingCompanyCash.value ?? undefined) : undefined,
-      }),
-    )
-  } catch {
-    // localStorage unavailable — ignore
-  }
+function parseIpoRaiseTarget(value: unknown): number | null {
+  const parsed = Number(value)
+  return [400000, 600000, 800000].includes(parsed) ? parsed : null
 }
 
-function clearProgress() {
-  try {
-    localStorage.removeItem(PROGRESS_KEY)
-  } catch {
-    // ignore
-  }
+function applyRouteSelections() {
+  selectedIndustry.value = typeof route.query.industry === 'string' ? route.query.industry : ''
+  selectedProductId.value = typeof route.query.productId === 'string' ? route.query.productId : ''
+  selectedCityId.value = typeof route.query.cityId === 'string' ? route.query.cityId : ''
+  selectedFactoryLotId.value = typeof route.query.factoryLotId === 'string' ? route.query.factoryLotId : ''
+  selectedShopLotId.value = typeof route.query.shopLotId === 'string' ? route.query.shopLotId : ''
+  selectedIpoRaiseTarget.value = parseIpoRaiseTarget(route.query.ipoRaiseTarget)
 }
 
-function restoreProgress() {
-  if (auth.player?.onboardingCompletedAtUtc) {
-    clearProgress()
+function buildRouteQuery() {
+  const query: Record<string, string> = {
+    step: stepToKey(step.value),
+  }
+
+  if (selectedIndustry.value) query.industry = selectedIndustry.value
+  if (selectedProductId.value) query.productId = selectedProductId.value
+  if (selectedCityId.value) query.cityId = selectedCityId.value
+  if (selectedIpoRaiseTarget.value !== null) query.ipoRaiseTarget = String(selectedIpoRaiseTarget.value)
+  if (selectedFactoryLotId.value) query.factoryLotId = selectedFactoryLotId.value
+  if (selectedShopLotId.value) query.shopLotId = selectedShopLotId.value
+
+  return query
+}
+
+function isRouteQuerySynced(nextQuery: Record<string, string>): boolean {
+  return Object.entries(nextQuery).every(([key, value]) => route.query[key] === value)
+    && Object.keys(route.query).every((key) => nextQuery[key] !== undefined)
+}
+
+watch([step, selectedIndustry, selectedProductId, selectedCityId, selectedIpoRaiseTarget, selectedFactoryLotId, selectedShopLotId], async () => {
+  if (!isRouteStateReady.value) {
     return
   }
 
-  try {
-    const raw = localStorage.getItem(PROGRESS_KEY)
-    if (!raw) return
-
-    const saved = JSON.parse(raw)
-    if (typeof saved.industry === 'string') selectedIndustry.value = saved.industry
-    if (typeof saved.cityId === 'string') selectedCityId.value = saved.cityId
-    if (typeof saved.productId === 'string') selectedProductId.value = saved.productId
-    if ([400000, 600000, 800000].includes(saved.ipoRaiseTarget)) selectedIpoRaiseTarget.value = saved.ipoRaiseTarget
-    if (typeof saved.companyName === 'string') companyName.value = saved.companyName
-    if (typeof saved.factoryLotId === 'string') selectedFactoryLotId.value = saved.factoryLotId
-    if (typeof saved.shopLotId === 'string') selectedShopLotId.value = saved.shopLotId
-    if (typeof saved.companyCash === 'number') onboardingCompanyCash.value = saved.companyCash
-    if (typeof saved.guestCash === 'number') onboardingCompanyCash.value = saved.guestCash
-    if (typeof saved.step === 'number') step.value = resolveClampStep(saved.step)
-  } catch {
-    // corrupted data — ignore
-  }
-}
-
-watch([step, selectedIndustry, selectedCityId, selectedProductId, selectedIpoRaiseTarget, companyName, selectedFactoryLotId, selectedShopLotId], saveProgress)
-
-watch(step, async (currentStep) => {
-  const currentKey = stepToKey(currentStep)
-  if (route.query.step !== currentKey) {
-    await router.replace({ query: { ...route.query, step: currentKey } })
+  const nextQuery = buildRouteQuery()
+  if (!isRouteQuerySynced(nextQuery)) {
+    await router.replace({ query: nextQuery })
   }
 })
 
@@ -539,7 +529,7 @@ async function syncOngoingOnboardingState() {
     return
   }
 
-  if (auth.player?.onboardingCurrentStep !== 'SHOP_SELECTION') {
+  if (auth.player.onboardingCurrentStep !== 'SHOP_SELECTION') {
     onboardingCompanyCash.value = null
     return
   }
@@ -547,49 +537,42 @@ async function syncOngoingOnboardingState() {
   selectedIndustry.value = auth.player.onboardingIndustry ?? selectedIndustry.value
   selectedCityId.value = auth.player.onboardingCityId ?? selectedCityId.value
   selectedFactoryLotId.value = auth.player.onboardingFactoryLotId ?? selectedFactoryLotId.value
+  selectedIpoRaiseTarget.value ??= DEFAULT_IPO_RAISE_TARGET
 
   const ongoingCompany = auth.player.companies.find((company) => company.id === auth.player?.onboardingCompanyId)
   if (ongoingCompany) {
-    companyName.value = ongoingCompany.name
     onboardingCompanyCash.value = ongoingCompany.cash
   }
 
-  step.value = 4
+  step.value = 6
 }
 
 onMounted(async () => {
-  // Track onboarding start event
   trackOnboardingEvent('onboarding_start', { authenticated: hasAuthenticatedSession.value })
 
-  // Authenticated users: check onboarding completion state first
   if (hasAuthenticatedSession.value) {
     if (!auth.player) {
       await auth.fetchMe()
     }
 
     if (auth.player?.onboardingFirstSaleCompletedAtUtc) {
-      // Fully done with onboarding — go straight to dashboard
       router.push('/dashboard')
       return
     }
 
     if (auth.player?.onboardingCompletedAtUtc && !auth.player.onboardingShopBuildingId) {
-      // Legacy players who completed before shop-building tracking was added,
-      // or players whose milestone shop is gone
       router.push('/dashboard')
       return
     }
 
     if (isResumingConfigureStep.value) {
-      // Player completed the lot flow but hasn't finished the configure-guide step.
-      // Resume at step 5 with the guidance panel visible.
       await Promise.all([loadGameState(), loadFirstSaleMission()])
-      step.value = 5
+      step.value = 7
+      isRouteStateReady.value = true
       return
     }
   }
 
-  // Load public data (works for both guests and authenticated users)
   try {
     loading.value = true
     const [industriesData, citiesData, fxRatesData] = await Promise.all([
@@ -602,21 +585,31 @@ onMounted(async () => {
     cities.value = citiesData.cities
     eurFxRates.value = fxRatesData.eurFxRates
 
-    restoreProgress()
+    applyRouteSelections()
+
+    if (selectedIndustry.value) {
+      await loadProducts()
+      if (!products.value.some((product) => product.id === selectedProductId.value)) {
+        selectedProductId.value = ''
+      }
+    }
+
+    if (selectedCityId.value) {
+      await loadLots()
+      if (!cityLots.value.some((lot) => lot.id === selectedFactoryLotId.value)) {
+        selectedFactoryLotId.value = ''
+      }
+      if (!cityLots.value.some((lot) => lot.id === selectedShopLotId.value)) {
+        selectedShopLotId.value = ''
+      }
+    }
 
     if (hasAuthenticatedSession.value) {
       await syncOngoingOnboardingState()
     }
 
-    if (selectedIndustry.value) {
-      await loadProducts()
-    }
-
-    if (selectedCityId.value) {
-      await loadLots()
-    }
-
     step.value = resolveClampStep(keyToStep(route.query.step))
+    isRouteStateReady.value = true
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load data'
   } finally {
@@ -624,21 +617,54 @@ onMounted(async () => {
   }
 })
 
-async function nextStep() {
+async function selectIndustry(industry: string) {
   error.value = null
+  selectedIndustry.value = industry
+  selectedProductId.value = ''
+  selectedCityId.value = ''
+  selectedIpoRaiseTarget.value = null
+  selectedFactoryLotId.value = ''
+  selectedShopLotId.value = ''
+  onboardingCompanyCash.value = null
+  cityLots.value = []
+  await loadProducts()
+  step.value = 2
+  trackOnboardingEvent('industry_selected', { industry })
+}
 
-  if (step.value === 1 && canProceedStep1.value) {
-    trackOnboardingEvent('industry_selected', { industry: selectedIndustry.value })
-    await loadProducts()
-    step.value = 2
-    return
-  }
+function selectProduct(productId: string) {
+  error.value = null
+  selectedProductId.value = productId
+  selectedCityId.value = ''
+  selectedIpoRaiseTarget.value = null
+  selectedFactoryLotId.value = ''
+  selectedShopLotId.value = ''
+  onboardingCompanyCash.value = null
+  cityLots.value = []
+  step.value = 3
+  trackOnboardingEvent('product_selected', { productId, industry: selectedIndustry.value })
+}
 
-  if (step.value === 2 && canProceedStep2.value) {
-    trackOnboardingEvent('city_selected', { cityId: selectedCityId.value })
-    await loadLots()
-    step.value = 3
-  }
+async function selectCity(cityId: string) {
+  error.value = null
+  selectedCityId.value = cityId
+  selectedIpoRaiseTarget.value = null
+  selectedFactoryLotId.value = ''
+  selectedShopLotId.value = ''
+  onboardingCompanyCash.value = null
+  await loadLots()
+  step.value = 4
+  trackOnboardingEvent('city_selected', { cityId })
+}
+
+function selectIpoPlan(raiseTarget: number) {
+  error.value = null
+  selectedIpoRaiseTarget.value = raiseTarget
+  selectedFactoryLotId.value = ''
+  selectedShopLotId.value = ''
+  onboardingCompanyCash.value = null
+  step.value = 5
+  trackOnboardingEvent('ipo_selected', { raiseTarget })
 }
 
 function prevStep() {
@@ -650,7 +676,6 @@ function prevStep() {
 async function startOnboardingCompany() {
   if (!canProceedStep3.value || !selectedFactoryLot.value) return
 
-  // Guest mode: simulate factory purchase locally without backend call
   if (isGuestMode.value) {
     onboardingCompanyCash.value = companyStartingCash.value - selectedFactoryLot.value.price
     trackOnboardingEvent('factory_configured', {
@@ -661,7 +686,7 @@ async function startOnboardingCompany() {
       ipoRaiseTarget: selectedIpoRaiseTarget.value,
     })
     await loadLots()
-    step.value = 4
+    step.value = 6
     return
   }
 
@@ -687,8 +712,8 @@ async function startOnboardingCompany() {
         input: {
           industry: selectedIndustry.value,
           cityId: selectedCityId.value,
-          ipoRaiseTarget: selectedIpoRaiseTarget.value,
-          companyName: companyName.value.trim(),
+          ipoRaiseTarget: selectedIpoRaiseTarget.value ?? DEFAULT_IPO_RAISE_TARGET,
+          companyName: companyName.value,
           factoryLotId: selectedFactoryLotId.value,
         },
       },
@@ -705,7 +730,7 @@ async function startOnboardingCompany() {
     })
     await auth.fetchMe()
     await loadLots()
-    step.value = 4
+    step.value = 6
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('onboarding.lotUnavailableBody')
     await loadLots()
@@ -718,10 +743,8 @@ async function startOnboardingCompany() {
 }
 
 async function completeOnboarding() {
-  // Guest mode: simulate shop purchase locally, then show save-progress prompt
   if (isGuestMode.value) {
     onboardingCompanyCash.value = Math.max(starterCash.value - (selectedShopLot.value?.price ?? 0), 0)
-    clearProgress()
     trackOnboardingEvent('shop_configured', {
       guest: true,
       lotId: selectedShopLotId.value,
@@ -738,7 +761,7 @@ async function completeOnboarding() {
         productId: selectedProductId.value,
       })
     }
-    step.value = 5
+    step.value = 7
     await loadGameState()
     return
   }
@@ -766,7 +789,6 @@ async function completeOnboarding() {
 
     completionResult.value = result.finishOnboarding
     onboardingCompanyCash.value = result.finishOnboarding.company.cash
-    clearProgress()
     trackOnboardingEvent('shop_configured', {
       guest: false,
       productId: selectedProductId.value,
@@ -774,7 +796,7 @@ async function completeOnboarding() {
     })
     trackOnboardingEvent('completed', { guest: false })
     await auth.fetchMe()
-    step.value = 5
+    step.value = 7
     await Promise.all([loadGameState(), loadFirstSaleMission()])
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('onboarding.lotUnavailableBody')
@@ -816,18 +838,12 @@ async function saveGuestProgress() {
       await auth.fetchMe()
     }
 
-    if (auth.player?.onboardingFirstSaleCompletedAtUtc) {
+    if (auth.player?.onboardingFirstSaleCompletedAtUtc || auth.player?.onboardingCompletedAtUtc) {
       router.push('/dashboard')
       return
     }
 
-    if (auth.player?.onboardingCompletedAtUtc) {
-      router.push('/dashboard')
-      return
-    }
-
-    // Try to run the real mutations with the saved guest choices
-    if (selectedIndustry.value && selectedCityId.value && companyName.value && selectedFactoryLotId.value && selectedProductId.value && selectedShopLotId.value) {
+    if (selectedIndustry.value && selectedCityId.value && selectedFactoryLotId.value && selectedProductId.value && selectedShopLotId.value) {
       try {
         loading.value = true
         error.value = null
@@ -850,8 +866,8 @@ async function saveGuestProgress() {
             input: {
               industry: selectedIndustry.value,
               cityId: selectedCityId.value,
-              ipoRaiseTarget: selectedIpoRaiseTarget.value,
-              companyName: companyName.value.trim(),
+              ipoRaiseTarget: selectedIpoRaiseTarget.value ?? DEFAULT_IPO_RAISE_TARGET,
+              companyName: companyName.value,
               factoryLotId: selectedFactoryLotId.value,
             },
           },
@@ -881,9 +897,7 @@ async function saveGuestProgress() {
         completionResult.value = finishResult.finishOnboarding
         onboardingCompanyCash.value = finishResult.finishOnboarding.company.cash
         await auth.fetchMe()
-        // Guest progress has been successfully persisted to the backend — clear local state
-        // so stale sandbox choices don't persist in localStorage or confuse future sessions.
-        clearProgress()
+        step.value = 7
         trackOnboardingEvent('onboarding_converted', {
           industry: selectedIndustry.value,
           cityId: selectedCityId.value,
@@ -894,7 +908,6 @@ async function saveGuestProgress() {
         if (code === 'LOT_ALREADY_OWNED') {
           // A lot was taken between the guest simulation and the real purchase — restart
           // wizard from step 1 so the player can pick fresh lots.
-          clearProgress()
           onboardingCompanyCash.value = null
           completionResult.value = null
           selectedFactoryLotId.value = ''
@@ -911,8 +924,6 @@ async function saveGuestProgress() {
         loading.value = false
       }
     } else {
-      // Not enough guest data — restart from step 1 with auth
-      clearProgress()
       step.value = 1
     }
   } catch (e: unknown) {
@@ -924,6 +935,27 @@ async function saveGuestProgress() {
 
 function formatIndustry(industry: string): string {
   return industry.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
+function getFxRateForCurrency(currencyCode = 'EUR'): number {
+  if (currencyCode === 'EUR') return 1
+  const rate = eurFxRates.value.find((entry) => entry.currencyCode === currencyCode)
+  return rate?.rate ?? 1
+}
+
+function getProductLocalPrice(product: Pick<ProductType, 'basePrice'>, currencyCode = selectedCity.value?.currencyCode ?? 'EUR'): number {
+  return Math.round(product.basePrice * getFxRateForCurrency(currencyCode) * 100) / 100
+}
+
+function getProductPriceSummary(product: ProductType): string {
+  if (selectedCity.value) {
+    return formatCurrency(getProductLocalPrice(product, selectedCity.value.currencyCode), selectedCity.value.currencyCode)
+  }
+
+  return cities.value
+    .slice(0, 3)
+    .map((city) => `${city.name}: ${formatCurrency(getProductLocalPrice(product, city.currencyCode), city.currencyCode)}`)
+    .join(' · ')
 }
 
 function getProductName(product: ProductType): string {
@@ -1062,7 +1094,7 @@ onUnmounted(() => {
 })
 
 useTickRefresh(async () => {
-  if (step.value !== 5) {
+  if (step.value !== 7) {
     return
   }
 
@@ -1078,12 +1110,12 @@ useTickRefresh(async () => {
 <template>
   <div class="min-h-[calc(100vh-112px)] bg-gradient-to-b from-page to-[rgba(0,71,255,0.04)] py-8 px-4">
     <div class="container max-w-[1120px]">
-      <div v-if="step < 4" class="text-center mb-8">
+      <div v-if="step < 7" class="text-center mb-8">
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
       </div>
 
-      <div v-if="step < 5" class="flex items-start mb-10 px-4">
+      <div v-if="step < 7" class="flex items-start mb-10 px-4 overflow-x-auto">
         <div class="progress-segment" :class="{ active: step >= 1, done: step > 1 }">
           <div class="progress-step"><span v-if="step > 1" class="check-icon text-lg">✓</span><span v-else>1</span></div>
           <span class="progress-label">{{ t('onboarding.step1Title') }}</span>
@@ -1099,9 +1131,19 @@ useTickRefresh(async () => {
           <span class="progress-label">{{ t('onboarding.step3Title') }}</span>
         </div>
         <div class="progress-line" :class="{ active: step > 3 }"></div>
-        <div class="progress-segment" :class="{ active: step >= 4 }">
-          <div class="progress-step">4</div>
+        <div class="progress-segment" :class="{ active: step >= 4, done: step > 4 }">
+          <div class="progress-step"><span v-if="step > 4" class="check-icon text-lg">✓</span><span v-else>4</span></div>
           <span class="progress-label">{{ t('onboarding.step4Title') }}</span>
+        </div>
+        <div class="progress-line" :class="{ active: step > 4 }"></div>
+        <div class="progress-segment" :class="{ active: step >= 5, done: step > 5 }">
+          <div class="progress-step"><span v-if="step > 5" class="check-icon text-lg">✓</span><span v-else>5</span></div>
+          <span class="progress-label">{{ t('onboarding.step5Title') }}</span>
+        </div>
+        <div class="progress-line" :class="{ active: step > 5 }"></div>
+        <div class="progress-segment" :class="{ active: step >= 6 }">
+          <div class="progress-step">6</div>
+          <span class="progress-label">{{ t('onboarding.step6Title') }}</span>
         </div>
       </div>
 
@@ -1113,7 +1155,7 @@ useTickRefresh(async () => {
           <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
-          <button v-for="ind in industries" :key="ind" class="industry-card" :class="{ selected: selectedIndustry === ind }" @click="selectedIndustry = ind">
+          <button v-for="ind in industries" :key="ind" class="industry-card" :class="{ selected: selectedIndustry === ind }" @click="selectIndustry(ind)">
             <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span>
             <span class="font-bold text-base">{{ formatIndustry(ind) }}</span>
             <span class="card-first-product">{{ t(industryFirstProductKeys[ind] || '') }}</span>
@@ -1121,20 +1163,42 @@ useTickRefresh(async () => {
             <span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
           </button>
         </div>
-        <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-primary btn-lg" :disabled="!canProceedStep1" @click="nextStep">
-            {{ t('common.next') }} <span class="ml-1">→</span>
-          </button>
-        </div>
       </div>
 
-      <div v-if="step === 2" class="step-content bg-card border border-divider rounded-xl p-8">
-        <div class="mb-4">
+      <div v-if="step === 2" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+        <div>
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
         </div>
+
+        <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
+          <button v-for="prod in sortedProducts" :key="prod.id" class="product-card" :class="{ selected: selectedProductId === prod.id }" @click="selectProduct(prod.id)">
+            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" />
+            <span class="font-bold text-base">{{ getProductName(prod) }}</span>
+            <span class="text-[1rem] font-bold text-[var(--color-secondary)]">{{ getProductPriceSummary(prod) }}</span>
+            <span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
+            <span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
+            <div class="flex flex-col gap-1 text-xs text-muted">
+              <span class="font-medium">{{ t('onboarding.requires') }}:</span>
+              <span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium">
+                {{ getRecipeIngredientLabel(prod, index) }}
+              </span>
+            </div>
+          </button>
+        </div>
+
+        <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
+        </div>
+      </div>
+
+      <div v-if="step === 3" class="step-content bg-card border border-divider rounded-xl p-8">
+        <div class="mb-4">
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
+        </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
-          <button v-for="city in cities" :key="city.id" class="city-card" :class="{ selected: selectedCityId === city.id }" @click="selectedCityId = city.id">
+          <button v-for="city in cities" :key="city.id" class="city-card" :class="{ selected: selectedCityId === city.id }" @click="selectCity(city.id)">
             <div class="flex items-center gap-2">
               <span class="text-2xl">🏙️</span>
               <span class="font-bold text-base">{{ city.name }}</span>
@@ -1154,22 +1218,19 @@ useTickRefresh(async () => {
         </div>
         <div class="step-actions flex gap-3 justify-end mt-2">
           <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
-          <button class="btn btn-primary btn-lg" :disabled="!canProceedStep2" @click="nextStep">
-            {{ t('common.next') }} <span class="ml-1">→</span>
-          </button>
         </div>
       </div>
 
-      <div v-if="step === 3" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+      <div v-if="step === 4" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
-          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
-          <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step4Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step4Desc') }}</p>
         </div>
 
         <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.startingCash') }}</span>
-            <strong>{{ formatCurrency(companyStartingCash) }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span>
+            <strong>{{ companyName }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
             <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span>
@@ -1179,35 +1240,48 @@ useTickRefresh(async () => {
             <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span>
             <strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
           </article>
+        </div>
+
+        <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+          <button
+            v-for="option in ipoOptions"
+            :key="option.raiseTarget"
+            class="ipo-card"
+            :class="{ selected: selectedIpoRaiseTarget === option.raiseTarget }"
+            @click="selectIpoPlan(option.raiseTarget)"
+          >
+            <span class="font-bold text-sm">{{ t(option.titleKey) }}</span>
+            <span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span>
+            <span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
+            <span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
+            <span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>
+          </button>
+        </div>
+
+        <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
+        </div>
+      </div>
+
+      <div v-if="step === 5" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+        <div>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step5Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step5Desc') }}</p>
+        </div>
+
+        <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span>
+            <strong>{{ companyName }}</strong>
+          </article>
+          <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.startingCash') }}</span>
+            <strong>{{ formatCurrency(companyStartingCash) }}</strong>
+          </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
             <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span>
             <strong>{{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
           </article>
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <span class="text-sm font-semibold">{{ t('onboarding.ipoTitle') }}</span>
-          <p class="text-muted text-[0.8125rem] m-0">{{ t('onboarding.ipoDesc') }}</p>
-          <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
-            <button
-              v-for="option in ipoOptions"
-              :key="option.raiseTarget"
-              class="ipo-card"
-              :class="{ selected: selectedIpoRaiseTarget === option.raiseTarget }"
-              @click="selectedIpoRaiseTarget = option.raiseTarget"
-            >
-              <span class="font-bold text-sm">{{ t(option.titleKey) }}</span>
-              <span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span>
-              <span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
-              <span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
-              <span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>
-            </button>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-2 max-w-[420px]">
-          <label for="companyName" class="text-sm font-semibold">{{ t('onboarding.companyName') }}</label>
-          <input id="companyName" v-model="companyName" type="text" required maxlength="200" :placeholder="t('onboarding.companyNamePlaceholder')" class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand focus:ring-2 focus:ring-[rgba(0,71,255,0.15)]" />
         </div>
 
         <div class="bg-card-raised border border-divider rounded-lg p-4">
@@ -1243,10 +1317,10 @@ useTickRefresh(async () => {
         </div>
       </div>
 
-      <div v-if="step === 4" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
+      <div v-if="step === 6" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
-          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step4Title') }}</h2>
-          <p class="text-muted text-sm">{{ t('onboarding.step4Desc') }}</p>
+          <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step6Title') }}</h2>
+          <p class="text-muted text-sm">{{ t('onboarding.step6Desc') }}</p>
         </div>
 
         <div class="bg-card-raised border border-divider rounded-lg p-4" role="status">
@@ -1266,6 +1340,11 @@ useTickRefresh(async () => {
             <span class="text-muted text-xs">{{ t('onboarding.availableCash') }}</span>
             <strong>{{ formatCurrency(starterCash) }}</strong>
           </article>
+          <article v-if="selectedProduct" class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
+            <span class="text-muted text-xs">{{ t('onboarding.selectProduct') }}</span>
+            <strong>{{ getProductName(selectedProduct) }}</strong>
+            <span class="text-xs text-muted">{{ getProductPriceSummary(selectedProduct) }}</span>
+          </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedShopLot && starterCash < selectedShopLot.price }">
             <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span>
             <strong>{{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
@@ -1275,28 +1354,6 @@ useTickRefresh(async () => {
         <div class="bg-card-raised border border-divider rounded-lg p-4">
           <h3 class="font-semibold text-sm mb-2">{{ t('onboarding.shopGuideTitle') }}</h3>
           <p class="text-muted text-sm m-0">{{ t('onboarding.shopGuideBody') }}</p>
-        </div>
-
-        <div class="flex flex-col gap-2">
-          <span class="text-sm font-semibold">{{ t('onboarding.selectProduct') }}</span>
-          <p class="text-muted text-xs m-0">
-            {{ auth.isProSubscriber ? t('onboarding.proCatalogUnlocked') : t('onboarding.proCatalogNote') }}
-          </p>
-          <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4">
-            <button v-for="prod in sortedProducts" :key="prod.id" class="product-card" :class="{ selected: selectedProductId === prod.id }" @click="selectedProductId = prod.id">
-              <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" />
-              <span class="font-bold text-base">{{ getProductName(prod) }}</span>
-              <span class="text-[1.125rem] font-bold text-[var(--color-secondary)]">{{ formatCurrency(prod.basePrice) }}{{ t('onboarding.perUnit') }}</span>
-              <span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
-              <span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
-              <div class="flex flex-col gap-1 text-xs text-muted">
-                <span class="font-medium">{{ t('onboarding.requires') }}:</span>
-                <span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium">
-                  {{ getRecipeIngredientLabel(prod, index) }}
-                </span>
-              </div>
-            </button>
-          </div>
         </div>
 
         <p v-if="availableShopLots.length === 0" class="empty-state-message text-muted text-sm m-0">
@@ -1344,6 +1401,7 @@ useTickRefresh(async () => {
         </div>
 
         <div class="step-actions flex gap-3 justify-end mt-2">
+          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button>
           <button class="btn btn-primary btn-lg" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
             {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }}
             <span v-if="!loading" class="ml-1">🏪</span>
@@ -1351,7 +1409,7 @@ useTickRefresh(async () => {
         </div>
       </div>
 
-      <div v-if="step === 5 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)" class="step-content completion-step bg-card border border-divider rounded-xl p-8 flex flex-col gap-6 text-center">
+      <div v-if="step === 7 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)" class="step-content completion-step bg-card border border-divider rounded-xl p-8 flex flex-col gap-6 text-center">
         <div>
           <h2 class="completion-title text-[1.75rem] font-bold mb-3 bg-gradient-to-br from-[var(--color-secondary)] to-brand bg-clip-text text-transparent">{{ t(isGuestMode ? 'onboarding.guestCompletionTitle' : 'onboarding.completionTitle') }}</h2>
           <p class="text-muted mx-auto max-w-[480px] leading-relaxed">{{ t(isGuestMode ? 'onboarding.guestCompletionDesc' : 'onboarding.completionDesc') }}</p>
@@ -1397,8 +1455,8 @@ useTickRefresh(async () => {
           <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
             <span class="text-2xl shrink-0">💰</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ formatCurrency(onboardingCompanyCash ?? companyStartingCash) }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(onboardingCompanyCash ?? companyStartingCash) }) }}</span>
+                <strong class="text-sm">{{ formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }}</strong>
+                <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }) }}</span>
             </div>
           </div>
         </div>
@@ -1482,7 +1540,7 @@ useTickRefresh(async () => {
                   t('onboarding.guestPriceDesc', {
                     product: getProductName(selectedProduct),
                     price: formatCurrency(guestConfiguredShopPrice),
-                    basePrice: formatCurrency(selectedProduct.basePrice),
+                    basePrice: formatCurrency(getProductLocalPrice(selectedProduct)),
                   })
                 }}
               </p>
