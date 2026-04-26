@@ -140,7 +140,7 @@ const normalizedDurationTicks = computed(() => {
     return 8760
   }
 
-  return Math.min(87600, Math.max(24, Math.round(value)))
+  return Math.min(87600, Math.max(1, Math.round(value)))
 })
 
 const collateralRequiredWarning = computed(() => {
@@ -165,7 +165,7 @@ const settlementAccountsForCity = computed(() => settlementAccounts.value.filter
 
 const canContinueFromStep1 = computed(() => !!selectedCollateral.value)
 const canContinueFromStep2 = computed(() => principalAmount.value > 0 && principalAmount.value <= collateralMaxPrincipal.value)
-const canContinueFromStep3 = computed(() => normalizedDurationTicks.value >= 24 && normalizedDurationTicks.value <= 87600)
+const canContinueFromStep3 = computed(() => normalizedDurationTicks.value >= 1 && normalizedDurationTicks.value <= 87600)
 const canSubmit = computed(
   () => auth.isAuthenticated && isCompanyAccountActive.value && canContinueFromStep1.value && canContinueFromStep2.value && canContinueFromStep3.value && !!selectedBankAccountId.value,
 )
@@ -383,15 +383,19 @@ function previousStep() {
             id="duration-ticks"
             v-model.number="durationTicks"
             type="number"
-            min="24"
+            min="1"
             max="87600"
-            step="24"
+            step="1"
             class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
           />
         </div>
 
         <div class="repayment-summary rounded-2xl border border-divider bg-card-raised p-4">
           <div class="summary-row flex items-center justify-between gap-4 text-sm">
+            <span>{{ t('bank.principalAmount') }}</span>
+            <strong>{{ fmt(principalAmount) }}</strong>
+          </div>
+          <div class="summary-row mt-2 flex items-center justify-between gap-4 text-sm">
             <span>{{ t('bank.paymentAmount') }}</span>
             <strong>{{ fmt(estimatedPaymentAmount) }} × {{ estimatedTotalPayments }}</strong>
           </div>

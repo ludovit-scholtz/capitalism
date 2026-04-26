@@ -782,7 +782,7 @@ test.describe('Bank borrowing display details', () => {
     await page.goto('/bank/bank-building-1')
 
     await expect(page.getByRole('heading', { name: 'Borrow from This Bank' })).toBeVisible()
-    await expect(page.getByText('1 year')).toBeVisible()
+    await expect(page.getByText('8760 hours')).toBeVisible()
   })
 
   test('shows city name on borrow tab bank card', async ({ page }) => {

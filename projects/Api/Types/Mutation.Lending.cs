@@ -472,7 +472,7 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             CompanyId = borrower.Id,
             Category = LedgerCategory.LoanOrigination,
-            Description = $"Loan received from {offer.LenderCompany.Name} – {offer.AnnualInterestRatePercent}% p.a. over {offer.DurationTicks} ticks{collateralNote}",
+            Description = $"Loan received from {offer.LenderCompany.Name} – {offer.AnnualInterestRatePercent}% p.a. over {offer.DurationTicks} hours{collateralNote}",
             Amount = input.PrincipalAmount,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow
@@ -521,11 +521,11 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (input.DurationTicks.HasValue && (input.DurationTicks.Value < 24 || input.DurationTicks.Value > 87_600))
+        if (input.DurationTicks.HasValue && (input.DurationTicks.Value < 1 || input.DurationTicks.Value > 87_600))
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Loan duration must be between 24 ticks (1 in-game day) and 87,600 ticks (10 in-game years).")
+                    .SetMessage("Loan duration must be between 1 tick (1 in-game hour) and 87,600 ticks (10 in-game years).")
                     .SetCode("INVALID_DURATION")
                     .Build());
         }
@@ -660,7 +660,7 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             CompanyId = borrower.Id,
             Category = LedgerCategory.LoanOrigination,
-            Description = $"Loan received from {bank.Company.Name} via {bank.Name} - {annualRate}% p.a. over {durationTicks} ticks (secured against {collateralBuilding.Name})",
+            Description = $"Loan received from {bank.Company.Name} via {bank.Name} - {annualRate}% p.a. over {durationTicks} hours (secured against {collateralBuilding.Name})",
             Amount = input.PrincipalAmount,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow,

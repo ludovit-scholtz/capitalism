@@ -15,7 +15,6 @@ import {
   formatCurrency,
   formatPercent,
   TICKS_PER_YEAR,
-  TICKS_PER_DAY,
 } from '../loanHelpers'
 import type { LoanSummary, LoanOfferSummary } from '@/types'
 
@@ -85,11 +84,11 @@ describe('loanHelpers', () => {
   })
 
   describe('formatLoanDuration', () => {
-    it('formats 1 day', () => expect(formatLoanDuration(TICKS_PER_DAY)).toBe('1 day'))
-    it('formats 30 days', () => expect(formatLoanDuration(720)).toBe('30 days'))
-    it('formats 1 year', () => expect(formatLoanDuration(TICKS_PER_YEAR)).toBe('1 year'))
-    it('formats 2 years', () => expect(formatLoanDuration(TICKS_PER_YEAR * 2)).toBe('2 years'))
-    it('formats 0 ticks as 0 days', () => expect(formatLoanDuration(0)).toBe('0 days'))
+    it('formats 1 tick as 1 hour', () => expect(formatLoanDuration(1)).toBe('1 hour'))
+    it('formats 720 ticks as 720 hours', () => expect(formatLoanDuration(720)).toBe('720 hours'))
+    it('formats 1 year in hours', () => expect(formatLoanDuration(TICKS_PER_YEAR)).toBe('8760 hours'))
+    it('formats 2 years in hours', () => expect(formatLoanDuration(TICKS_PER_YEAR * 2)).toBe('17520 hours'))
+    it('formats 0 ticks as 0 hours', () => expect(formatLoanDuration(0)).toBe('0 hours'))
   })
 
   describe('computeTotalInterest', () => {

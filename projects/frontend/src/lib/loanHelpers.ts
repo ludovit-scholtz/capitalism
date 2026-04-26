@@ -28,17 +28,12 @@ export function ticksToYears(ticks: number): number {
 }
 
 /**
- * Formats a tick-duration as a human-readable in-game time string.
- * E.g. 720 ticks → "30 days", 8760 ticks → "1 year"
+ * Formats a tick-duration as in-game hours.
+ * E.g. 1 tick → "1 hour", 8760 ticks → "8760 hours"
  */
 export function formatLoanDuration(ticks: number): string {
-  const years = ticks / TICKS_PER_YEAR
-  if (years >= 1) {
-    const rounded = Math.round(years * 10) / 10
-    return rounded === 1 ? '1 year' : `${rounded} years`
-  }
-  const days = Math.round(ticks / TICKS_PER_DAY)
-  return days === 1 ? '1 day' : `${days} days`
+  const hours = Math.max(0, Math.round(ticks))
+  return hours === 1 ? '1 hour' : `${hours} hours`
 }
 
 /**
@@ -57,8 +52,8 @@ export function computeTotalRepayment(principal: number, annualRatePercent: numb
 }
 
 /**
- * Computes estimated periodic payment amount.
- * Payments are made every 720 ticks (30 in-game days).
+ * Computes estimated periodic payment amount for tick-based repayment.
+ * One scheduled payment is made every tick (game hour).
  */
 export function computePaymentAmount(principal: number, annualRatePercent: number, durationTicks: number): number {
   const totalPayments = Math.max(1, Math.floor(durationTicks))

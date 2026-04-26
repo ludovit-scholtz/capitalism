@@ -25471,7 +25471,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
                     loanOfferId = bank.Id.ToString(),
                     borrowerCompanyId = borrowerCompany.Id.ToString(),
                     principalAmount = 20_000m,
-                    durationTicks = 12,
+                    durationTicks = 0,
                     collateralBuildingId = collateralFactory.Id.ToString(),
                 }
             },
