@@ -357,6 +357,7 @@ public sealed partial class AppDbInitializer
                     'MarketingEfficiencyMultiplier',
                     'ContentValue',
                     'ContentBudgetPerTick',
+                    'AccumulatedBudget',
                     'Budget',
                     'MinPrice',
                     'MaxPrice',
