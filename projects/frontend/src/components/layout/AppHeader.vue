@@ -9,6 +9,7 @@ import { useNewsStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import AccountSwitcher from '@/components/layout/AccountSwitcher.vue'
+import CitySelector from '@/components/layout/CitySelector.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 import { useThemeStore } from '@/stores/theme'
 
@@ -158,6 +159,7 @@ function handleChatToggle() {
         </div>
 
         <template v-if="auth.isAuthenticated">
+          <CitySelector />
           <AccountSwitcher @switched="closeMenu" />
           <button
             class="btn btn-secondary"

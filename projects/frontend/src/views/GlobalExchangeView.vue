@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -49,6 +50,7 @@ type MarketMode = 'resources' | 'products'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const gameStateStore = useGameStateStore()
 const route = useRoute()
 const router = useRouter()
@@ -64,7 +66,6 @@ const products = ref<ProductType[]>([])
 const allOffers = ref<GlobalExchangeOffer[]>([])
 const allProductListings = ref<GlobalExchangeProductListing[]>([])
 
-const selectedCityId = ref<string | null>(null)
 const search = ref('')
 const selectedCategory = ref('ALL')
 const marketMode = ref<MarketMode>('resources')
@@ -172,12 +173,12 @@ async function loadCitiesAndResources() {
   if (!deepEqual(products.value, productsData.productTypes)) {
     products.value = productsData.productTypes
   }
-  if (citiesData.cities.length > 0 && !selectedCityId.value) {
-    // If a city was pre-selected via query param (?city=<id>), use it; otherwise default to first city
-    const queryCityId = typeof route.query.city === 'string' ? route.query.city : null
-    const matchedCity = queryCityId ? citiesData.cities.find((c) => c.id === queryCityId) : null
+  // If no city is selected in the auth store, select the first city
+  if (!selectedCityId.value && citiesData?.cities && citiesData.cities.length > 0) {
     const firstCity = citiesData.cities[0]
-    selectedCityId.value = (matchedCity ?? firstCity)?.id ?? null
+    if (firstCity) {
+      auth.switchCity(firstCity.id)
+    }
   }
   // Pre-fill search from ?resource=<slug> query param
   if (!search.value) {
@@ -253,9 +254,10 @@ onMounted(async () => {
 })
 
 watch(selectedCityId, async (cityId) => {
-  // Persist selected city in the URL so page reload restores the same city
-  void router.replace({ query: { ...route.query, city: cityId ?? undefined } })
-  await loadOffers()
+  // When the city selection changes in the navbar, reload exchange offers
+  if (cityId) {
+    await loadOffers()
+  }
 })
 
 watch(marketMode, (mode) => {
@@ -409,21 +411,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 
       <!-- ── Resources mode ── -->
       <template v-if="marketMode === 'resources'">
-        <!-- City selector -->
-        <div class="city-tabs" role="tablist" :aria-label="t('globalExchange.cityTabsLabel')">
-          <button
-            v-for="city in cities"
-            :key="city.id"
-            role="tab"
-            :aria-selected="selectedCityId === city.id"
-            :class="['city-tab', { active: selectedCityId === city.id }]"
-            @click="selectedCityId = city.id"
-          >
-            {{ city.name }}
-            <span class="city-tab-code">{{ city.countryCode }}</span>
-          </button>
-        </div>
-
+        <!-- City selection is now in the navbar via CitySelector component -->
         <!-- Search and filter row -->
         <div class="exchange-filters">
           <div class="search-wrapper">
@@ -724,48 +712,6 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 }
 
 /* City tabs */
-.city-tabs {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 1.5rem;
-}
-
-.city-tab {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 8px);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s;
-}
-
-.city-tab:hover {
-  background: color-mix(in srgb, var(--color-surface) 85%, white 15%);
-  color: var(--color-text);
-}
-
-.city-tab.active {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-.city-tab-code {
-  font-size: 0.7rem;
-  opacity: 0.75;
-  font-weight: 400;
-}
-
 /* Filters */
 .exchange-filters {
   display: flex;

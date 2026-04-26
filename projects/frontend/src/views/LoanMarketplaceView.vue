@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -13,6 +14,7 @@ import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, comput
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const router = useRouter()
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 const loading = ref(true)
@@ -169,6 +171,7 @@ const MY_BANK_ACCOUNTS_QUERY = `
       companyName
       ownerType
       ownerDisplayName
+      cityId
     }
   }
 `
@@ -250,11 +253,20 @@ const activeLoans = computed(() => myLoans.value.filter((l) => l.status === 'ACT
 const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 const visibleBankAccounts = computed(() => {
+  let accounts: PlayerBankAccountSummary[] = []
+  
   if (auth.player?.activeAccountType === 'COMPANY' && auth.player.activeCompanyId) {
-    return myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === auth.player?.activeCompanyId)
+    accounts = myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === auth.player?.activeCompanyId)
+  } else {
+    accounts = myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
   }
-
-  return myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
+  
+  // Filter by selected city if available
+  if (selectedCityId.value) {
+    accounts = accounts.filter((account) => account.cityId === selectedCityId.value)
+  }
+  
+  return accounts
 })
 
 // Lender eligibility: detect BANK buildings across all companies
@@ -271,9 +283,17 @@ const availableBankCities = computed(() => {
 
 const filteredAndSortedBanks = computed(() => {
   let banks = allBanks.value
+  
+  // Filter by selected city from navbar
+  if (selectedCityId.value) {
+    banks = banks.filter((b) => b.cityId === selectedCityId.value)
+  }
+  
+  // Filter by manual city filter if set
   if (bankCityFilter.value) {
     banks = banks.filter((b) => b.cityName === bankCityFilter.value)
   }
+  
   if (bankShowAvailableOnly.value) {
     banks = banks.filter((b) => b.availableLendingCapacity > 0)
   }
@@ -315,8 +335,17 @@ function navigateToAcquireBank() {
   }
 }
 
-// Banks sorted for the borrow section: all open banks sorted by lowest lending rate
-const sortedBanksForBorrow = computed(() => [...allBanks.value].filter((b) => b.baseCapitalDeposited).sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent))
+// Banks sorted for the borrow section: all open banks sorted by lowest lending rate, filtered by selected city
+const sortedBanksForBorrow = computed(() => {
+  let banks = allBanks.value.filter((b) => b.baseCapitalDeposited)
+  
+  // Filter by selected city from navbar
+  if (selectedCityId.value) {
+    banks = banks.filter((b) => b.cityId === selectedCityId.value)
+  }
+  
+  return [...banks].sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent)
+})
 
 function navigateToManageBank() {
   if (firstBankBuilding.value) {

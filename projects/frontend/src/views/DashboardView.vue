@@ -31,6 +31,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
 const { gameState } = storeToRefs(gameStateStore)
+const { selectedCityId } = storeToRefs(auth)
 
 const companies = ref<Company[]>([])
 const loading = ref(true)
@@ -88,6 +89,13 @@ const visibleCompanies = computed(() => (activeCompany.value ? [activeCompany.va
 const formattedGameTime = computed(() =>
   gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : '',
 )
+
+const filteredBuildingsByCity = computed(() => {
+  if (!activeCompany.value || !selectedCityId.value) {
+    return activeCompany.value?.buildings ?? []
+  }
+  return activeCompany.value.buildings.filter((b) => b.cityId === selectedCityId.value)
+})
 
 function tabsForCompany(company: Company) {
   return [
@@ -624,15 +632,16 @@ async function createCompany() {
 
           <!-- ── Buildings tab ─────────────────────────────────────────── -->
           <div v-show="activeTab === 'buildings'" class="tab-panel pt-5" role="tabpanel" aria-label="Buildings">
-            <div v-if="company.buildings.length === 0" class="no-buildings text-center p-6 text-muted flex flex-col items-center gap-4">
-              <p>{{ t('dashboard.noBuildings') }}</p>
+            <div v-if="filteredBuildingsByCity.length === 0" class="no-buildings text-center p-6 text-muted flex flex-col items-center gap-4">
+              <p v-if="selectedCityId">{{ t('dashboard.noBuildingsInCity') }}</p>
+              <p v-else>{{ t('dashboard.noBuildings') }}</p>
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
                 {{ t('dashboard.buyBuilding') }}
               </RouterLink>
             </div>
 
             <div v-else class="buildings-grid grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
-              <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper flex flex-col mb-1">
+              <div v-for="building in filteredBuildingsByCity" :key="building.id" class="building-card-wrapper flex flex-col mb-1">
                 <RouterLink :to="building.type === 'BANK' ? `/bank/${building.id}` : `/building/${building.id}`" class="building-card flex items-center gap-3 p-4 bg-page border border-divider rounded-t-lg border-b-0 no-underline text-body transition-all duration-200 hover:border-brand hover:bg-[rgba(0,71,255,0.04)] hover:-translate-y-px">
                   <div class="text-[1.75rem] flex-shrink-0">{{ getBuildingIcon(building.type) }}</div>
                   <div class="flex-1 flex flex-col gap-0.5">
@@ -660,8 +669,8 @@ async function createCompany() {
             </div>
 
             <!-- City power summary -->
-            <div v-if="company.buildings.length > 0 && company.buildings[0]" class="mt-3 flex flex-wrap gap-2">
-              <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
+            <div v-if="filteredBuildingsByCity.length > 0 && filteredBuildingsByCity[0]" class="mt-3 flex flex-wrap gap-2">
+              <template v-for="cityId in [...new Set(filteredBuildingsByCity.map((b) => b.cityId))]" :key="cityId">
                 <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
                   <span class="flex-shrink-0">⚡</span>
                   <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>

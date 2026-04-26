@@ -50,6 +50,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Onboarding
 
+- [ ] Make the onboarding more user friendly. For example make industry selection on one click. When person clicks on the industry do not request the click on the next button. Also when person selects a city progress further on that click. Create IPO the custom page, and allow do select IPO plan on one click as well. Remove Company Name selection from the the onboarding phase, use some nice generated company name, and allow user to change it later. For each product category show at least 3 products to produce do selection on one click to progress the onboarding.  Add the product selection right after the product category selection. Do not store the state of the onboarding to localstorage. Use the url routing to store the onboarding state so that the links link to specific selection can be created easily.
 - [ ] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
 - [ ] For each product category show at least 3 products to produce
 
@@ -587,6 +588,14 @@ Flow of the resources is following:
 The power plant as a building as a whole has configuration for planned output. If the output is oversupplied, the powerplant do not receive money for the oversupply. If the powerplant is undersupply, it receives the government fines for not generating enough of energy.
 
 Make sure to show the powerplant P&L chart in the building overview.
+
+### City selection
+
+- In the top menu where company is selected add selection also for the city
+- In the player dashboard filter only buildings in the selected city
+- In the banking page show only banks in the selected city
+- In the global exchange remove the city selection and use the selection from the navbar
+- In the marketing analytics page show only data related to selected the city
 
 # Technical implementation
 

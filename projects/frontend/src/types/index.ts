@@ -1781,6 +1781,7 @@ export interface PlayerBankAccountSummary {
   ownerType: 'PERSON' | 'COMPANY'
   ownerDisplayName: string
   bankBuildingId: string | null
+  cityId: string | null
 }
 
 /** Result from the `fundBuildingBankAccount` mutation. */

@@ -202,6 +202,7 @@ public sealed partial class Query
             OwnerType = a.CompanyId.HasValue ? "COMPANY" : "PERSON",
             OwnerDisplayName = a.Company?.Name ?? a.Player?.DisplayName ?? string.Empty,
             BankBuildingId = ResolveBankBuildingId(a),
+            CityId = ResolveCityId(a),
         }).ToList();
 
         Guid? ResolveBankBuildingId(BankAccount account)
@@ -223,6 +224,40 @@ public sealed partial class Query
                 if (governmentBankByCurrency.TryGetValue(currencyCode, out var bankIdByCurrency))
                 {
                     return bankIdByCurrency;
+                }
+            }
+
+            return null;
+        }
+
+        Guid? ResolveCityId(BankAccount account)
+        {
+            if (account.BankBuildingId.HasValue)
+            {
+                var building = companyPrimaryCityByCurrency.FirstOrDefault(x => x.Value == account.BankBuildingId.Value).Key;
+                // Actually the mapping is not direct, we need to find the building with this ID
+                // Let me get it from governmentBanks
+                var bankCity = governmentBanks.FirstOrDefault(x => x.Id == account.BankBuildingId.Value);
+                if (bankCity != null)
+                {
+                    return bankCity.CityId;
+                }
+                return null;
+            }
+
+            if (account.CompanyId.HasValue)
+            {
+                var currencyCode = (account.CurrencyCode ?? "EUR").ToUpperInvariant();
+                if (companyPrimaryCityByCurrency.TryGetValue((account.CompanyId.Value, currencyCode), out var cityId))
+                {
+                    return cityId;
+                }
+
+                // Try to find government bank by currency
+                var bankByCurrency = governmentBanks.FirstOrDefault(x => x.CurrencyCode!.Equals(currencyCode, StringComparison.OrdinalIgnoreCase));
+                if (bankByCurrency != null)
+                {
+                    return bankByCurrency.CityId;
                 }
             }
 
