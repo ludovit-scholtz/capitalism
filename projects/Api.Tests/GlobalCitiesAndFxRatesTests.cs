@@ -1044,7 +1044,7 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.Contains(accA.Id, ids);
         Assert.Contains(accB.Id, ids);
 
-        var eurAcc = accounts.EnumerateArray().First(a => a.GetProperty("currencyCode").GetString() == "EUR");
+        var eurAcc = accounts.EnumerateArray().First(a => Guid.Parse(a.GetProperty("id").GetString()!) == accA.Id);
         Assert.Equal("€", eurAcc.GetProperty("currencySymbol").GetString());
         Assert.Equal(5000m, eurAcc.GetProperty("balance").GetDecimal());
         Assert.Equal("Alpha Co", eurAcc.GetProperty("companyName").GetString());

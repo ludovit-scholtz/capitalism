@@ -20,14 +20,29 @@ public sealed class ConstructionPhase : ITickPhase
 
     public async Task ProcessAsync(TickContext context)
     {
-        // Perform the state transition in a single database UPDATE rather than loading
-        // all completing buildings into memory.
-        await context.Db.Buildings
+        // Prefer set-based update on relational providers, with an InMemory-safe fallback.
+        if (context.Db.Database.IsRelational())
+        {
+            await context.Db.Buildings
+                .Where(b => b.IsUnderConstruction
+                            && b.ConstructionCompletesAtTick.HasValue
+                            && b.ConstructionCompletesAtTick.Value <= context.CurrentTick)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(b => b.IsUnderConstruction, false)
+                    .SetProperty(b => b.ConstructionCompletesAtTick, (long?)null));
+            return;
+        }
+
+        var completingBuildings = await context.Db.Buildings
             .Where(b => b.IsUnderConstruction
                         && b.ConstructionCompletesAtTick.HasValue
                         && b.ConstructionCompletesAtTick.Value <= context.CurrentTick)
-            .ExecuteUpdateAsync(setters => setters
-                .SetProperty(b => b.IsUnderConstruction, false)
-                .SetProperty(b => b.ConstructionCompletesAtTick, (long?)null));
+            .ToListAsync();
+
+        foreach (var building in completingBuildings)
+        {
+            building.IsUnderConstruction = false;
+            building.ConstructionCompletesAtTick = null;
+        }
     }
 }

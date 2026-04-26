@@ -145,11 +145,33 @@ public sealed class BuildingBankAccountTests
             Id = Guid.NewGuid(),
             PlayerId = playerId,
             Name = "Fund Test Co",
-            Cash = 500_000m,
             FoundedAtUtc = DateTime.UtcNow,
             FoundedAtTick = 1,
         };
         db.Companies.Add(company);
+
+        var buildingAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            Balance = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+
+        var fundingAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            Balance = 500_000m,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+        db.BankAccounts.AddRange(buildingAccount, fundingAccount);
 
         var building = new Building
         {
@@ -162,6 +184,7 @@ public sealed class BuildingBankAccountTests
             Longitude = city.Longitude,
             PowerConsumption = 10,
             BuiltAtUtc = DateTime.UtcNow,
+            BankAccountId = buildingAccount.Id,
         };
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
@@ -192,8 +215,8 @@ public sealed class BuildingBankAccountTests
         Assert.Equal(10_000m, bankAccount.GetProperty("balance").GetDecimal());
         Assert.False(bankAccount.GetProperty("isSuspendedForFunds").GetBoolean());
 
-        // Company cash reduced.
-        Assert.Equal(490_000m, fund.GetProperty("remainingCompanyCash").GetDecimal());
+        // Total company liquidity is unchanged by internal account-to-account transfer.
+        Assert.Equal(500_000m, fund.GetProperty("remainingCompanyCash").GetDecimal());
     }
 
     [Fact]
@@ -293,7 +316,6 @@ public sealed class BuildingBankAccountTests
             Id = Guid.NewGuid(),
             PlayerId = playerId,
             Name = "Account Creator Co",
-            Cash = 100_000m,
             FoundedAtUtc = DateTime.UtcNow,
             FoundedAtTick = 1,
         };
@@ -314,11 +336,11 @@ public sealed class BuildingBankAccountTests
                 }
             }
             """,
-            new { input = new { companyId = company.Id, currencyCode = "EUR" } },
+            new { input = new { companyId = company.Id, currencyCode = "CZK" } },
             token);
 
         var account = result.GetProperty("data").GetProperty("createCompanyBankAccount").GetProperty("account");
-        Assert.Equal("EUR", account.GetProperty("currencyCode").GetString());
+        Assert.Equal("CZK", account.GetProperty("currencyCode").GetString());
         Assert.Equal(0m, account.GetProperty("balance").GetDecimal());
         Assert.Equal(16, account.GetProperty("accountNumber").GetString()!.Length);
     }

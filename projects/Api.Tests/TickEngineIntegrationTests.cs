@@ -1308,8 +1308,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var company = await db.Companies.FindAsync(companyId);
-        var cashBefore = company!.Cash;
+        var bankAccountsBefore = await db.BankAccounts
+            .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
+            .ToListAsync();
+        var cashBefore = bankAccountsBefore.Sum(a => a.Balance);
         var processor = await CreateProcessorAsync(scope);
 
         await processor.ProcessTickAsync();
@@ -1322,9 +1324,15 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
                 && entry.Category == LedgerCategory.ShippingCost)
             .ToListAsync();
 
+        var bankAccountsAfter = await db.BankAccounts
+            .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
+            .AsNoTracking()
+            .ToListAsync();
+        var cashAfter = bankAccountsAfter.Sum(a => a.Balance);
+
         Assert.NotEmpty(shippingEntries);
         Assert.All(shippingEntries, entry => Assert.True(entry.Amount < 0m));
-        Assert.True(company.Cash < cashBefore, "Shipping should reduce company cash even for inter-building transfers.");
+        Assert.True(cashAfter < cashBefore, "Shipping should reduce company cash even for inter-building transfers.");
     }
 
     [Fact]
@@ -4385,7 +4393,9 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     {
         // A company with non-zero overhead should have manufacturing units pay a higher effective
         // hourly rate than non-manufacturing units in the same building.
-        await using var scope = _factory.Services.CreateAsyncScope();
+        // Use isolated factory so maxCompanyAssetValue is deterministic.
+        await using var isolated = new ApiWebApplicationFactory();
+        await using var scope = isolated.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var currentTick = (await db.GameStates.FirstAsync()).CurrentTick;
@@ -4395,10 +4405,21 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         db.Players.Add(player);
 
         // Set FoundedAtTick 1 full year in the past so ageFactor = 0.5 (halfway to max),
-        // which ensures overhead > 0 (ageFactor * assetFactor > 0 since company has cash).
+        // which ensures overhead > 0 (ageFactor * assetFactor > 0 since company has cash in bank).
         var ticksPerYear = Engine.GameConstants.TicksPerYear;
-        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Overhead Corp", Cash = 1_000_000m, FoundedAtTick = currentTick - ticksPerYear };
+        var companyId = Guid.NewGuid();
+        var company = new Company { Id = companyId, PlayerId = player.Id, Name = "Overhead Corp", FoundedAtTick = currentTick - ticksPerYear };
         db.Companies.Add(company);
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234567890123456",
+            CurrencyCode = "EUR",
+            Balance = 10_000_000_000m,  // 10B - large enough to be the max company by asset value
+            CompanyId = companyId,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
 
         var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = BuildingType.Factory, Name = "OH Factory", Level = 1 };
         db.Buildings.Add(building);

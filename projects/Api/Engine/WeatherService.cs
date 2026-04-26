@@ -71,9 +71,22 @@ public static class WeatherService
         if (cityIds.Count == 0) return;
 
         // Prune expired rows (ticks strictly before current).
-        await db.CityWeatherForecasts
-            .Where(f => cityIds.Contains(f.CityId) && f.Tick < currentTick)
-            .ExecuteDeleteAsync(ct);
+        if (db.Database.IsRelational())
+        {
+            await db.CityWeatherForecasts
+                .Where(f => cityIds.Contains(f.CityId) && f.Tick < currentTick)
+                .ExecuteDeleteAsync(ct);
+        }
+        else
+        {
+            var expiredRows = await db.CityWeatherForecasts
+                .Where(f => cityIds.Contains(f.CityId) && f.Tick < currentTick)
+                .ToListAsync(ct);
+            if (expiredRows.Count > 0)
+            {
+                db.CityWeatherForecasts.RemoveRange(expiredRows);
+            }
+        }
 
         // Determine which cities already have rows in the window.
         var existingCityIds = await db.CityWeatherForecasts
