@@ -146,13 +146,7 @@ const {
 
         <div class="unit-insight-card">
           <h5>{{ t('buildingBankAccount.assignmentTitle') }}</h5>
-          <BuildingBankAccountPanel
-            :building-id="building?.id ?? ''"
-            :company-id="building?.companyId ?? ''"
-            :currency-code="cityCurrencyCode"
-            :loading="false"
-            @updated="loadBuilding"
-          />
+          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="false" @updated="loadBuilding" />
         </div>
 
         <!-- Unit-specific configuration -->

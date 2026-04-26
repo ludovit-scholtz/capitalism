@@ -204,10 +204,7 @@ function operationalStatusBadgeClass(status: string): string {
               >
                 {{ t(`buildingDetail.operationalStatus.${selectedActiveUnitOperationalStatus.status}`) }}
               </span>
-              <span
-                v-if="selectedActiveUnitOperationalStatus.idleTicks > 0"
-                class="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-1 text-xs font-medium text-muted"
-              >
+              <span v-if="selectedActiveUnitOperationalStatus.idleTicks > 0" class="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-1 text-xs font-medium text-muted">
                 {{ t('buildingDetail.operationalStatus.idleTicks', { count: selectedActiveUnitOperationalStatus.idleTicks }) }}
               </span>
             </div>
