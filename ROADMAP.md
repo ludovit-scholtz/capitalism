@@ -69,7 +69,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Units
 
-- [ ]  Add tab routing in unit details to the route, so that when person click on one unit in the grid and he is in quick actions does not change the tab when he clicks another unit in the grid
+- [ ]  In the grid show the picture of the product
 
 #### B2B sales unit
 
