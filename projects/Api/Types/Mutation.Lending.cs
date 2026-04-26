@@ -523,6 +523,15 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        if (input.DurationTicks.HasValue && (input.DurationTicks.Value < 24 || input.DurationTicks.Value > 87_600))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Loan duration must be between 24 ticks (1 in-game day) and 87,600 ticks (10 in-game years).")
+                    .SetCode("INVALID_DURATION")
+                    .Build());
+        }
+
         var outstandingPrincipal = await db.Loans
             .Where(l => l.BankBuildingId == bank.Id && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
             .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
@@ -587,7 +596,7 @@ public sealed partial class Mutation
         }
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
-        var durationTicks = GameConstants.TicksPerYear;
+        var durationTicks = input.DurationTicks ?? GameConstants.TicksPerYear;
         var annualRate = bank.LendingInterestRatePercent ?? 8m;
 
         var ticksPerPayment = 720L;

@@ -25311,6 +25311,177 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(errors.GetArrayLength() > 0, "Should return error when bank capacity is insufficient.");
     }
 
+    [Fact]
+    public async Task AcceptLoan_DirectBank_UsesBorrowerRequestedDuration()
+    {
+        var lenderEmail = $"directdur-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"directdur-borrower-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "DirectDurLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "DirectDurBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "DirectDurLenderCo", Cash = 0m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "DirectDurBorrowerCo", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "Direct Duration Bank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 1_000_000m,
+            LendingInterestRatePercent = 7.5m,
+        };
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "Collateral Factory",
+            Level = 1,
+        };
+        db.Buildings.AddRange(bank, collateralFactory);
+
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+            CurrencyCode = city.CurrencyCode,
+            Balance = 500_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+
+        const long requestedDurationTicks = 240;
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id
+                durationTicks
+                dueTick
+                startTick
+                collateralBuildingId
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    loanOfferId = bank.Id.ToString(),
+                    borrowerCompanyId = borrowerCompany.Id.ToString(),
+                    principalAmount = 50_000m,
+                    durationTicks = requestedDurationTicks,
+                    collateralBuildingId = collateralFactory.Id.ToString(),
+                }
+            },
+            borrowerToken);
+
+        Assert.False(result.TryGetProperty("errors", out _), result.ToString());
+        var loanData = result.GetProperty("data").GetProperty("acceptLoan");
+        Assert.Equal(requestedDurationTicks, loanData.GetProperty("durationTicks").GetInt64());
+        Assert.Equal(requestedDurationTicks, loanData.GetProperty("dueTick").GetInt64() - loanData.GetProperty("startTick").GetInt64());
+        Assert.Equal(collateralFactory.Id.ToString(), loanData.GetProperty("collateralBuildingId").GetString());
+
+        var persistedLoanId = Guid.Parse(loanData.GetProperty("id").GetString()!);
+        var persistedLoan = await db.Loans.FirstAsync(l => l.Id == persistedLoanId);
+        Assert.Equal(requestedDurationTicks, persistedLoan.DurationTicks);
+    }
+
+    [Fact]
+    public async Task AcceptLoan_DirectBank_InvalidDuration_ReturnsError()
+    {
+        var lenderEmail = $"directinvalid-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"directinvalid-borrower-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "DirectInvalidLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "DirectInvalidBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "DirectInvalidLenderCo", Cash = 0m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "DirectInvalidBorrowerCo", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "Invalid Duration Bank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 1_000_000m,
+            LendingInterestRatePercent = 8m,
+        };
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "Invalid Duration Collateral",
+            Level = 1,
+        };
+        db.Buildings.AddRange(bank, collateralFactory);
+
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+            CurrencyCode = city.CurrencyCode,
+            Balance = 500_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    loanOfferId = bank.Id.ToString(),
+                    borrowerCompanyId = borrowerCompany.Id.ToString(),
+                    principalAmount = 20_000m,
+                    durationTicks = 12,
+                    collateralBuildingId = collateralFactory.Id.ToString(),
+                }
+            },
+            borrowerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0);
+        Assert.Equal("INVALID_DURATION", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
     // ── Collateral tests ──────────────────────────────────────────────────────────
 
     [Fact]

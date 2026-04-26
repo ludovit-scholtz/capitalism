@@ -430,6 +430,12 @@ public sealed class AcceptLoanInput
     public decimal PrincipalAmount { get; set; }
 
     /// <summary>
+    /// Optional duration in ticks for direct bank borrowing.
+    /// When omitted, the backend uses its default loan duration.
+    /// </summary>
+    public long? DurationTicks { get; set; }
+
+    /// <summary>
     /// Optional: ID of a building owned by the borrower to pledge as collateral.
     /// When provided, the loan is secured and the principal is capped at 70% of the
     /// building's appraised value minus any existing secured exposure on the same asset.

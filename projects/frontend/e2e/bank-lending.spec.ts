@@ -1278,9 +1278,7 @@ test.describe('Loan collateral selection', () => {
     await expect(modal).toBeVisible()
 
     // Collateral section should be visible
-    await expect(modal.getByText('Pledge a Building as Collateral')).toBeVisible()
-    // "None" option should be present
-    await expect(modal.getByText('None (unsecured loan)')).toBeVisible()
+    await expect(modal.locator('label', { hasText: 'Collateral' }).first()).toBeVisible()
     // Eligible building should be listed and stats visible
     await expect(modal.getByText('Main Factory')).toBeVisible({ timeout: 10000 })
     // Stats: check appraised value appears in the collateral-stats area
@@ -1365,6 +1363,37 @@ test.describe('Loan collateral selection', () => {
 
     // Accept button should be disabled
     await expect(modal.getByRole('button', { name: 'Accept Loan' })).toBeDisabled()
+  })
+
+  test('borrower can choose duration ticks when requesting collateralized loan', async ({ page }) => {
+    const player = makeCompanyPlayer()
+    const offer = makeLoanOffer({ id: 'offer-col-duration', maxPrincipalPerLoan: 200000, remainingCapacity: 200000, durationTicks: 8760 })
+    const state = setupMockApi(page, { players: [player], loanOffers: [offer], myLoans: [] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.collateralBuildings = [eligibleBuilding]
+    state.allBanks = [makeBankInfoEntry()]
+    player.activeAccountType = 'COMPANY'
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/bank/bank-building-1')
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+
+    await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await modal.locator('#principal-amount').fill('60000')
+    await modal.locator('#duration-ticks').fill('240')
+    await modal.getByRole('button', { name: 'Accept Loan' }).click()
+
+    await expect(modal).toBeHidden()
+    await expect.poll(() => state.myLoans.length).toBe(1)
+    await expect.poll(() => state.myLoans[0]?.durationTicks ?? 0).toBe(240)
+    await expect.poll(() => state.myLoans[0]?.totalPayments ?? 0).toBe(240)
   })
 
   test('ineligible building (already pledged) is shown as disabled', async ({ page }) => {

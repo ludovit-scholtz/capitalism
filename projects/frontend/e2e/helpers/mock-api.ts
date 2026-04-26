@@ -6273,6 +6273,30 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const input = body.variables?.input ?? {}
       const offer = state.loanOffers.find((o) => o.id === input.loanOfferId)
       const directBank = state.allBanks.find((bank) => bank.bankBuildingId === input.loanOfferId)
+
+      if (directBank && !input.collateralBuildingId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'A collateral building is required for bank loan requests.', extensions: { code: 'COLLATERAL_REQUIRED' } }] }),
+        })
+      }
+
+      if (
+        input.collateralBuildingId &&
+        state.myLoans.some(
+          (loan) =>
+            loan.collateralBuildingId === input.collateralBuildingId &&
+            (loan.status === 'ACTIVE' || loan.status === 'OVERDUE'),
+        )
+      ) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'This building is already pledged as collateral for another active loan.', extensions: { code: 'COLLATERAL_ALREADY_PLEDGED' } }] }),
+        })
+      }
+
       const principal = input.principalAmount ?? 0
       if (offer) {
         offer.usedCapacity += principal
@@ -6284,7 +6308,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       const borrowerCompany = state.players.flatMap((player) => player.companies).find((company) => company.id === input.borrowerCompanyId)
       const annualInterestRatePercent = offer?.annualInterestRatePercent ?? directBank?.lendingInterestRatePercent ?? 10
-      const durationTicks = offer?.durationTicks ?? 8760
+      const durationTicks = input.durationTicks ?? offer?.durationTicks ?? 8760
       const periodicRate = annualInterestRatePercent <= 0 ? 0 : annualInterestRatePercent / 100 / 8760
       const paymentAmount = durationTicks <= 0 ? principal : periodicRate <= 0 ? principal / durationTicks : (principal * periodicRate) / (1 - (1 + periodicRate) ** -durationTicks)
       const newLoan: MockLoan = {

@@ -53,6 +53,7 @@ const withdrawSuccess = ref(false)
 const showLoanModal = ref(false)
 const customerLoanOffer = ref<LoanOfferSummary | null>(null)
 const customerLoanPrincipal = ref(0)
+const customerLoanDurationTicks = ref(8760)
 const customerLoanLoading = ref(false)
 const customerLoanError = ref<string | null>(null)
 const customerLoanSuccess = ref(false)
@@ -547,6 +548,7 @@ async function submitCustomerLoan() {
         loanOfferId: customerLoanOffer.value.id,
         borrowerCompanyId: activeCompany.value.id,
         principalAmount: customerLoanPrincipal.value,
+        durationTicks: normalizedCustomerLoanDurationTicks.value,
         collateralBuildingId: selectedCollateralBuildingId.value,
       },
     })
@@ -566,6 +568,7 @@ async function submitCustomerLoan() {
 async function selectLoanOffer(offer: LoanOfferSummary) {
   customerLoanOffer.value = offer
   customerLoanPrincipal.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
+  customerLoanDurationTicks.value = offer.durationTicks > 0 ? offer.durationTicks : 8760
   customerLoanError.value = null
   selectedCollateralBuildingId.value = null
   collateralBuildings.value = []
@@ -589,6 +592,7 @@ function closeLoanModal() {
   showLoanModal.value = false
   customerLoanOffer.value = null
   customerLoanError.value = null
+  customerLoanDurationTicks.value = 8760
   selectedCollateralBuildingId.value = null
   collateralBuildings.value = []
   collateralBuildingsLoading.value = false
@@ -615,19 +619,27 @@ const collateralRequiredWarning = computed(() => {
   return null
 })
 
+const normalizedCustomerLoanDurationTicks = computed(() => {
+  const duration = Number(customerLoanDurationTicks.value)
+  if (!Number.isFinite(duration)) {
+    return 8760
+  }
+
+  return Math.min(87600, Math.max(24, Math.round(duration)))
+})
+
 const estimatedCustomerTotalRepayment = computed(() => {
   if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
-  return computeTotalRepayment(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, customerLoanOffer.value.durationTicks)
+  return computeTotalRepayment(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, normalizedCustomerLoanDurationTicks.value)
 })
 
 const estimatedCustomerPaymentAmount = computed(() => {
   if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
-  return computePaymentAmount(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, customerLoanOffer.value.durationTicks)
+  return computePaymentAmount(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, normalizedCustomerLoanDurationTicks.value)
 })
 
 const estimatedCustomerTotalPayments = computed(() => {
-  if (!customerLoanOffer.value) return 0
-  return computeTotalPayments(customerLoanOffer.value.durationTicks)
+  return computeTotalPayments(normalizedCustomerLoanDurationTicks.value)
 })
 </script>
 
@@ -1118,7 +1130,7 @@ const estimatedCustomerTotalPayments = computed(() => {
             </div>
             <div class="summary-row">
               <span>{{ t('bank.duration') }}</span>
-              <strong>{{ formatLoanDuration(customerLoanOffer.durationTicks) }}</strong>
+              <strong>{{ formatLoanDuration(normalizedCustomerLoanDurationTicks) }}</strong>
             </div>
           </div>
 
@@ -1132,6 +1144,20 @@ const estimatedCustomerTotalPayments = computed(() => {
               :min="1000"
               :max="Math.min(customerLoanOffer.maxPrincipalPerLoan, customerLoanOffer.remainingCapacity)"
               step="1000"
+              class="form-input"
+            />
+          </div>
+
+          <!-- Borrower-selected duration -->
+          <div class="form-group">
+            <label for="duration-ticks">{{ t('bank.durationTicks') }}</label>
+            <input
+              id="duration-ticks"
+              v-model.number="customerLoanDurationTicks"
+              type="number"
+              min="24"
+              max="87600"
+              step="24"
               class="form-input"
             />
           </div>
@@ -1150,17 +1176,12 @@ const estimatedCustomerTotalPayments = computed(() => {
 
           <!-- Collateral selection -->
           <div class="form-group collateral-group">
-            <label>{{ t('bank.collateralOptional') }}</label>
+            <label>{{ t('bank.collateral') }}</label>
             <p class="form-hint">{{ t('bank.collateralHint') }}</p>
             <div v-if="collateralBuildingsLoading" class="form-hint muted-hint">{{ t('common.loading') }}</div>
             <div v-else-if="collateralLoadError" class="form-hint error-inline">{{ collateralLoadError }}</div>
             <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
             <div v-else class="collateral-list">
-              <!-- None option -->
-              <label class="collateral-option" :class="{ selected: selectedCollateralBuildingId === null }">
-                <input type="radio" :value="null" v-model="selectedCollateralBuildingId" class="collateral-radio" />
-                <span class="collateral-option-name">{{ t('bank.collateralNone') }}</span>
-              </label>
               <!-- Building options -->
               <label v-for="b in collateralBuildings" :key="b.buildingId" class="collateral-option" :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }">
                 <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" class="collateral-radio" :disabled="!b.isEligible" />
@@ -1196,7 +1217,18 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeLoanModal">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralRequiredWarning || !!collateralCapacityWarning" @click="submitCustomerLoan">
+          <button
+            class="btn btn-primary"
+            :disabled="
+              customerLoanLoading ||
+              customerLoanPrincipal <= 0 ||
+              customerLoanDurationTicks < 24 ||
+              customerLoanDurationTicks > 87600 ||
+              !!collateralRequiredWarning ||
+              !!collateralCapacityWarning
+            "
+            @click="submitCustomerLoan"
+          >
             {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
           </button>
         </div>
