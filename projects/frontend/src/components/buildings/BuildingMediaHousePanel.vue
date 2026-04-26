@@ -17,6 +17,11 @@ const {
   saveContentBudget,
   formatCurrency,
 } = bd
+
+const saveContentBudgetClick = async () => {
+  contentBudgetInput.value = 0
+  await saveContentBudget()
+}
 </script>
 
 <template>
@@ -119,15 +124,7 @@ const {
         <button class="btn btn-primary mt-1" :disabled="savingContentBudget" @click="saveContentBudget">
           {{ savingContentBudget ? t('common.saving') : t('mediaHouse.saveBudgetBtn') }}
         </button>
-        <button
-          v-if="building?.contentBudgetPerTick"
-          class="btn btn-secondary"
-          :disabled="savingContentBudget"
-          @click="
-            contentBudgetInput = 0
-            saveContentBudget()
-          "
-        >
+        <button v-if="building?.contentBudgetPerTick" class="btn btn-secondary" :disabled="savingContentBudget" @click="saveContentBudgetClick">
           {{ t('mediaHouse.stopInvestmentBtn') }}
         </button>
       </div>
