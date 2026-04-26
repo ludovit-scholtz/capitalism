@@ -276,7 +276,10 @@ const {
                 <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.distinctItems') }}</span>
                 <strong class="text-sm text-foreground">{{ getUnitInventoryItemCount(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
               </div>
-              <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality != null" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+              <div
+                v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality != null"
+                class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5"
+              >
                 <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.averageQuality') }}</span>
                 <strong class="text-sm text-foreground">{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality) }}</strong>
               </div>
@@ -292,9 +295,18 @@ const {
                 <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.quality') }}</span>
                 <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
               </div>
-              <div v-for="inventory in getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))" :key="inventory.id" class="grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 border-b border-divider last:border-b-0 items-center">
+              <div
+                v-for="inventory in getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))"
+                :key="inventory.id"
+                class="grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 border-b border-divider last:border-b-0 items-center"
+              >
                 <div class="flex items-center gap-3 min-w-0">
-                  <img v-if="getInventoryItemImageUrl(inventory)" class="w-8 h-8 rounded object-cover flex-shrink-0" :src="getInventoryItemImageUrl(inventory)!" :alt="getInventoryItemName(inventory)" />
+                  <img
+                    v-if="getInventoryItemImageUrl(inventory)"
+                    class="w-8 h-8 rounded object-cover flex-shrink-0"
+                    :src="getInventoryItemImageUrl(inventory)!"
+                    :alt="getInventoryItemName(inventory)"
+                  />
                   <span v-else class="inline-flex items-center justify-center w-8 h-8 text-sm font-bold rounded-md bg-primary text-white flex-shrink-0">{{ getInventoryItemMonogram(inventory) }}</span>
                   <div class="flex flex-col gap-0.5 min-w-0">
                     <span class="font-semibold text-foreground truncate">{{ getInventoryItemName(inventory) }}</span>
@@ -674,7 +686,11 @@ const {
                 <!-- Revenue mini chart -->
                 <div class="mt-4">
                   <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.revenueChart') }}</span>
-                  <div class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface" role="img" :aria-label="t('buildingDetail.marketIntelligence.revenueChart')">
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.revenueChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.revenueHistory"
                       :key="snap.tick"
@@ -690,7 +706,11 @@ const {
                 <!-- Quantity mini chart -->
                 <div class="mt-4">
                   <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.quantityChart') }}</span>
-                  <div class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface" role="img" :aria-label="t('buildingDetail.marketIntelligence.quantityChart')">
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.quantityChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.revenueHistory"
                       :key="snap.tick"
@@ -706,7 +726,11 @@ const {
                 <!-- Price history chart -->
                 <div v-if="publicSalesAnalytics.priceHistory.length > 0" class="mt-4">
                   <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.priceChart') }}</span>
-                  <div class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface" role="img" :aria-label="t('buildingDetail.marketIntelligence.priceChart')">
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.priceChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.priceHistory"
                       :key="snap.tick"
@@ -722,7 +746,11 @@ const {
                 <!-- Profit history chart -->
                 <div v-if="publicSalesAnalytics.profitHistory && publicSalesAnalytics.profitHistory.length > 0" class="mt-4">
                   <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.profitChart') }}</span>
-                  <div class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface" role="img" :aria-label="t('buildingDetail.marketIntelligence.profitChart')">
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.profitChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.profitHistory"
                       :key="snap.tick"
@@ -744,13 +772,10 @@ const {
                   {{ t('buildingDetail.marketIntelligence.noMarketShare') }}
                 </p>
                 <div v-else class="flex flex-col gap-2 mt-2">
-                  <div
-                    v-for="entry in publicSalesAnalytics.marketShare"
-                    :key="entry.label"
-                    class="flex items-center gap-2"
-                    :class="{ 'opacity-60': entry.isUnmet }"
-                  >
-                    <span class="text-[0.7rem] font-semibold flex-shrink-0 w-24 truncate"> {{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}{{ entry.isUnmet ? ' ⬚' : '' }} </span>
+                  <div v-for="entry in publicSalesAnalytics.marketShare" :key="entry.label" class="flex items-center gap-2" :class="{ 'opacity-60': entry.isUnmet }">
+                    <span class="text-[0.7rem] font-semibold flex-shrink-0 w-24 truncate">
+                      {{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}{{ entry.isUnmet ? ' ⬚' : '' }}
+                    </span>
                     <div class="flex-1 h-2 rounded-full bg-surface border border-divider overflow-hidden">
                       <div class="h-full bg-primary transition-all duration-300" :style="{ width: `${(entry.share * 100).toFixed(1)}%` }"></div>
                     </div>
@@ -763,10 +788,20 @@ const {
               <div v-if="publicSalesAnalytics.demandDrivers.length > 0" class="mt-4" :aria-label="t('buildingDetail.accessibility.demandDrivers')">
                 <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.demandDrivers.title') }}</span>
                 <div class="flex flex-col gap-2 mt-2">
-                  <div v-for="driver in publicSalesAnalytics.demandDrivers" :key="driver.factor" class="flex gap-2 px-2 py-1.5 rounded-md border border-divider text-xs"
-                    :class="driver.impact === 'POSITIVE' ? 'border-emerald-500/30 bg-emerald-500/10' : driver.impact === 'NEGATIVE' ? 'border-red-500/30 bg-red-500/10' : 'border-neutral-500/30 bg-neutral-500/10'"
+                  <div
+                    v-for="driver in publicSalesAnalytics.demandDrivers"
+                    :key="driver.factor"
+                    class="flex gap-2 px-2 py-1.5 rounded-md border border-divider text-xs"
+                    :class="
+                      driver.impact === 'POSITIVE'
+                        ? 'border-emerald-500/30 bg-emerald-500/10'
+                        : driver.impact === 'NEGATIVE'
+                          ? 'border-red-500/30 bg-red-500/10'
+                          : 'border-neutral-500/30 bg-neutral-500/10'
+                    "
                   >
-                    <span class="font-bold flex-shrink-0 w-4 text-center"
+                    <span
+                      class="font-bold flex-shrink-0 w-4 text-center"
                       :class="driver.impact === 'POSITIVE' ? 'text-emerald-500' : driver.impact === 'NEGATIVE' ? 'text-red-500' : 'text-neutral-500'"
                     >
                       {{ driver.impact === 'POSITIVE' ? '↑' : driver.impact === 'NEGATIVE' ? '↓' : '→' }}
@@ -784,10 +819,7 @@ const {
                 <div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
                   <div v-if="publicSalesAnalytics.elasticityIndex !== null" class="flex flex-col gap-0.5">
                     <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.elasticityIndex') }}</span>
-                    <strong
-                      class="text-sm"
-                      :class="{ 'text-red-500': (publicSalesAnalytics.elasticityIndex ?? 0) < -1.5, 'text-emerald-500': (publicSalesAnalytics.elasticityIndex ?? 0) > -0.5 }"
-                    >
+                    <strong class="text-sm" :class="{ 'text-red-500': (publicSalesAnalytics.elasticityIndex ?? 0) < -1.5, 'text-emerald-500': (publicSalesAnalytics.elasticityIndex ?? 0) > -0.5 }">
                       {{ publicSalesAnalytics.elasticityIndex.toFixed(2) }}
                     </strong>
                     <span class="text-[0.65rem] text-muted">{{ t('buildingDetail.marketIntelligence.elasticityHint') }}</span>
@@ -819,7 +851,9 @@ const {
                       }"
                     >
                       {{ Math.round(publicSalesAnalytics.brandQuality * 100) }}%
-                      <span v-if="publicSalesAnalytics.brandQuality >= 0.5" class="text-[0.6rem] ml-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-semibold">{{ t('buildingDetail.marketIntelligence.brandQualityPremium') }}</span>
+                      <span v-if="publicSalesAnalytics.brandQuality >= 0.5" class="text-[0.6rem] ml-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-semibold">{{
+                        t('buildingDetail.marketIntelligence.brandQualityPremium')
+                      }}</span>
                       <span v-else-if="publicSalesAnalytics.brandQuality >= 0.2" class="text-[0.6rem] ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 font-semibold">{{
                         t('buildingDetail.marketIntelligence.brandQualityGrowing')
                       }}</span>
@@ -830,10 +864,17 @@ const {
               </div>
 
               <!-- Demand signal -->
-              <div class="mt-4 rounded-lg border border-divider px-3 py-2" :class="`${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'high-demand' ? 'bg-emerald-500/10 border-emerald-500/30' : publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'saturation' ? 'bg-red-500/10 border-red-500/30' : 'bg-neutral-500/10 border-neutral-500/30'}`">
+              <div
+                class="mt-4 rounded-lg border border-divider px-3 py-2"
+                :class="`${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'high-demand' ? 'bg-emerald-500/10 border-emerald-500/30' : publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'saturation' ? 'bg-red-500/10 border-red-500/30' : 'bg-neutral-500/10 border-neutral-500/30'}`"
+              >
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.demandSignal.title') }}</span>
-                  <span class="text-[0.65rem] font-bold px-2 py-0.5 rounded" :class="`${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'high-demand' ? 'bg-emerald-500/30 text-emerald-500' : publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'saturation' ? 'bg-red-500/30 text-red-500' : 'bg-neutral-500/30 text-neutral-500'}`">{{ t(`buildingDetail.marketIntelligence.demandSignal.${publicSalesAnalytics.demandSignal}`) }}</span>
+                  <span
+                    class="text-[0.65rem] font-bold px-2 py-0.5 rounded"
+                    :class="`${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'high-demand' ? 'bg-emerald-500/30 text-emerald-500' : publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'saturation' ? 'bg-red-500/30 text-red-500' : 'bg-neutral-500/30 text-neutral-500'}`"
+                    >{{ t(`buildingDetail.marketIntelligence.demandSignal.${publicSalesAnalytics.demandSignal}`) }}</span
+                  >
                 </div>
                 <p v-if="publicSalesAnalytics.actionHint" class="text-[0.75rem] text-muted">
                   <strong>{{ t('buildingDetail.marketIntelligence.actionHint') }}:</strong>
