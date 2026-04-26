@@ -343,9 +343,7 @@ async function loadData(isRefresh = false) {
       const bankCurrency = bankInfo.value?.cityCurrencyCode
       const activeComp = getActiveCompany(auth.player, userCompanies.value)
       const operatingAccounts = (accountsResult.myBankAccounts ?? []).filter(
-        (a) => a.ownerType === 'COMPANY' && a.companyId === activeComp?.id && bankCurrency &&
-          a.currencyCode.toUpperCase() === bankCurrency.toUpperCase() &&
-          a.bankBuildingId === bankBuildingId.value
+        (a) => a.ownerType === 'COMPANY' && a.companyId === activeComp?.id && bankCurrency && a.currencyCode.toUpperCase() === bankCurrency.toUpperCase() && a.bankBuildingId === bankBuildingId.value,
       )
       if (!deepEqual(myOperatingAccountsHere.value, operatingAccounts)) {
         myOperatingAccountsHere.value = operatingAccounts
@@ -856,7 +854,11 @@ function navigateToForexTransfer() {
             <!-- Operating bank accounts for this company in the bank's city currency -->
             <div v-if="myOperatingAccountsHere.length > 0" class="mt-6 flex flex-col gap-3">
               <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">{{ t('bank.operatingAccounts') }}</h3>
-              <div v-for="account in myOperatingAccountsHere" :key="account.id" class="operating-account-row flex items-center justify-between gap-4 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm">
+              <div
+                v-for="account in myOperatingAccountsHere"
+                :key="account.id"
+                class="operating-account-row flex items-center justify-between gap-4 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm"
+              >
                 <div class="flex flex-col gap-0.5">
                   <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
                   <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
