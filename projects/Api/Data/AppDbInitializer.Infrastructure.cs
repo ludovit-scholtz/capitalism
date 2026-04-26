@@ -304,6 +304,7 @@ public sealed partial class AppDbInitializer
         if (dbContext.Database.IsRelational())
         {
             await dbContext.Database.MigrateAsync();
+            await RepairLegacyTextColumnsAsync();
             return;
         }
 
@@ -318,5 +319,171 @@ public sealed partial class AppDbInitializer
         }
 
         return false;
+    }
+
+    private async Task RepairLegacyTextColumnsAsync()
+    {
+        if (!dbContext.Database.IsNpgsql())
+        {
+            return;
+        }
+
+        // Legacy SQLite-generated migrations created many UUID/decimal columns as TEXT.
+        // Keep this idempotent repair in startup so fresh and legacy PostgreSQL databases boot safely.
+        await dbContext.Database.ExecuteSqlRawAsync(
+            """
+            DO $$
+            DECLARE
+                col RECORD;
+                numeric_columns text[] := ARRAY[
+                    'TaxRate',
+                    'AverageRentPerSqm',
+                    'BaseSalaryPerManhour',
+                    'Abundance',
+                    'BasePrice',
+                    'Price',
+                    'PopulationIndex',
+                    'MaterialQuality',
+                    'MaterialQuantity',
+                    'WeightPerUnit',
+                    'BasicLaborHours',
+                    'EnergyConsumptionMwh',
+                    'OutputQuantity',
+                    'PriceElasticity',
+                    'Quantity',
+                    'Quality',
+                    'Awareness',
+                    'MarketingQuality',
+                    'MarketingEfficiencyMultiplier',
+                    'ContentValue',
+                    'ContentBudgetPerTick',
+                    'Budget',
+                    'MinPrice',
+                    'MaxPrice',
+                    'MinQuality',
+                    'AskingPrice',
+                    'PricePerUnit',
+                    'RemainingQuantity',
+                    'Amount',
+                    'Demand',
+                    'Revenue',
+                    'SalesCapacity',
+                    'TrendFactor',
+                    'SharePrice',
+                    'ShareCount',
+                    'TotalValue',
+                    'TotalSharesIssued',
+                    'DividendPayoutRatio',
+                    'SalaryMultiplier',
+                    'PersonalTaxReserve',
+                    'SourcingCostTotal',
+                    'ConsumedQuantity',
+                    'ProducedQuantity',
+                    'InflowQuantity',
+                    'OutflowQuantity',
+                    'AccruedInterest',
+                    'LendingInterestRatePercent',
+                    'DepositInterestRatePercent',
+                    'TotalDeposits',
+                    'CentralBankDebt',
+                    'PowerOutput',
+                    'PowerConsumption',
+                    'TotalAreaSqm',
+                    'PricePerSqm',
+                    'PendingPricePerSqm',
+                    'OccupancyPercent',
+                    'ConstructionCost',
+                    'InterestRate',
+                    'OriginalPrincipal',
+                    'RemainingPrincipal',
+                    'PaymentAmount',
+                    'AccumulatedPenalty',
+                    'CollateralAppraisedValue',
+                    'AnnualInterestRatePercent',
+                    'MaxPrincipalPerLoan',
+                    'TotalCapacity',
+                    'UsedCapacity',
+                    'AmountPerShare',
+                    'TotalAmount',
+                    'ConfigureGuideBasePrice',
+                    'ConfigureGuideTargetPrice'
+                ];
+            BEGIN
+                BEGIN
+                    EXECUTE 'ALTER TABLE "Brands" ADD COLUMN IF NOT EXISTS "MarketingQuality" numeric(18,4) NOT NULL DEFAULT 0';
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+
+                BEGIN
+                    EXECUTE 'ALTER TABLE "Brands" ADD COLUMN IF NOT EXISTS "MarketingEfficiencyMultiplier" numeric(18,4) NOT NULL DEFAULT 1';
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+
+                FOR col IN
+                    SELECT c.table_name, c.column_name
+                    FROM information_schema.columns c
+                    WHERE c.table_schema = 'public'
+                        AND c.data_type = 'text'
+                        AND c.table_name <> '__EFMigrationsHistory'
+                        AND (
+                            c.column_name = 'Id'
+                            OR (c.column_name LIKE '%Id' AND c.column_name <> 'MigrationId')
+                        )
+                LOOP
+                    BEGIN
+                        EXECUTE format(
+                            'ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT',
+                            col.table_name,
+                            col.column_name
+                        );
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+
+                    BEGIN
+                        EXECUTE format(
+                            'ALTER TABLE %I ALTER COLUMN %I TYPE uuid USING NULLIF(%I, '''')::uuid',
+                            col.table_name,
+                            col.column_name,
+                            col.column_name
+                        );
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+                END LOOP;
+
+                FOR col IN
+                    SELECT c.table_name, c.column_name
+                    FROM information_schema.columns c
+                    WHERE c.table_schema = 'public'
+                        AND c.data_type = 'text'
+                        AND c.column_name = ANY(numeric_columns)
+                LOOP
+                    BEGIN
+                        EXECUTE format(
+                            'ALTER TABLE %I ALTER COLUMN %I DROP DEFAULT',
+                            col.table_name,
+                            col.column_name
+                        );
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+
+                    BEGIN
+                        EXECUTE format(
+                            'ALTER TABLE %I ALTER COLUMN %I TYPE numeric(18,4) USING NULLIF(%I, '''')::numeric(18,4)',
+                            col.table_name,
+                            col.column_name,
+                            col.column_name
+                        );
+                    EXCEPTION WHEN OTHERS THEN
+                        NULL;
+                    END;
+                END LOOP;
+            END $$;
+            """
+        );
     }
 }

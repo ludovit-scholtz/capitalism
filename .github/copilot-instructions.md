@@ -270,6 +270,21 @@ dotnet run           # API server on :44364
 dotnet build
 ```
 
+## Docker Compose startup debugging (clean PostgreSQL)
+- Do not use or recreate manual migration scripts (`Manage-ApiMigrations.ps1`, `Manage-MasterMigrations.ps1`). Startup migrations must run from application boot (`MigrateAsync()` in initializers) against PostgreSQL.
+- The canonical clean-start command sequence is:
+```bash
+cd projects
+docker-compose down -v --remove-orphans
+docker-compose up --build -d
+docker-compose ps
+docker-compose logs --no-color --tail=200 postgresmaster masterapi game1
+```
+- `postgresmaster` must be `healthy` before APIs start. Compose health checks are required so APIs do not crash on first boot while PostgreSQL is still initializing.
+- Keep PostgreSQL data mounted at `/var/lib/postgresql/data4` and bootstrap all required databases (`gamemaster`, `game1`) using `docker/postgres-init/01-create-game-databases.sql` for clean-volume startup.
+- For local container-to-container PostgreSQL connections, include `SSL Mode=Disable` in connection strings so containers do not require local TLS certificates.
+- If startup fails, triage in this order: (1) `docker-compose ps -a` container status, (2) PostgreSQL health/log readiness, (3) existence of `gamemaster` and `game1` databases, (4) API migration logs, (5) GraphQL health checks (`https://localhost:44364/graphql`, `https://localhost:44356/healthz`).
+
 ## Validation requirements before reporting completion
 - For backend changes, do not stop at Debug-only targeted tests. Always run the workflow-equivalent Release pipeline locally:
   - `cd projects/Api && dotnet restore Api.slnx && dotnet build Api.slnx --configuration Release --no-restore && dotnet test Api.slnx --configuration Release --no-build`

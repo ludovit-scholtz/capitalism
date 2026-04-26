@@ -1,15 +1,20 @@
-﻿version: '3.8'
-
-services:
+﻿services:
   postgresmaster:
     image: postgres:18
     environment:
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: master
+      POSTGRES_DB: postgres
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data3
+      - postgres_data:/var/lib/postgresql/data4
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
 
   masterapi:
     build:
@@ -18,11 +23,13 @@ services:
     ports:
       - "44364:44364"
     depends_on:
-      - postgresmaster
+      postgresmaster:
+        condition: service_healthy
+    restart: on-failure
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=https://+:44364
-      - ConnectionStrings__MasterCatalog=Host=postgresmaster;Port=5432;Database=gamemaster;Username=postgres;Password=password
+      - ConnectionStrings__MasterCatalog=Host=postgresmaster;Port=5432;Database=gamemaster;Username=postgres;Password=password;SSL Mode=Disable
   game1:
     build:
       context: .
@@ -30,12 +37,15 @@ services:
     ports:
       - "44356:44356"
     depends_on:
-      - postgresmaster
-      - masterapi
+      postgresmaster:
+        condition: service_healthy
+      masterapi:
+        condition: service_started
+    restart: on-failure
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=https://+:44356
-      - ConnectionStrings__GameCatalog=Host=postgresmaster;Port=5432;Database=game1;Username=postgres;Password=password
+      - ConnectionStrings__GameCatalog=Host=postgresmaster;Port=5432;Database=game1;Username=postgres;Password=password;SSL Mode=Disable
       - MasterServer__ApiUrl=https://masterapi:44364/graphql
 
 volumes:
