@@ -91,8 +91,22 @@ const {
         <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
       </div>
       <!-- Unit detail tab navigation -->
-      <nav class="unit-detail-tabs" :aria-label="t('buildingDetail.accessibility.unitDetailSections')" v-if="unitDetailTabs.length > 0">
-        <button v-for="tab in unitDetailTabs" :key="tab.key" class="unit-tab-btn" :class="{ 'unit-tab-btn--active': selectedUnitTab === tab.key }" @click="selectedUnitTab = tab.key">
+      <nav
+        v-if="unitDetailTabs.length > 0"
+        class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-divider bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        :aria-label="t('buildingDetail.accessibility.unitDetailSections')"
+      >
+        <button
+          v-for="tab in unitDetailTabs"
+          :key="tab.key"
+          class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
+          :class="
+            selectedUnitTab === tab.key
+              ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary'
+              : 'hover:border-divider hover:bg-surface'
+          "
+          @click="selectedUnitTab = tab.key"
+        >
           {{ t(`buildingDetail.unitTabs.${tab.key}`) }}
         </button>
       </nav>
@@ -178,60 +192,78 @@ const {
         </template>
         <!-- ── Quick Actions tab (PUBLIC_SALES only) ──────────── -->
         <template v-else-if="selectedUnitTab === 'quickActions'">
-          <div class="unit-insight-card" :aria-label="t('buildingDetail.accessibility.quickActions')">
-            <h5>{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
-            <p class="unit-desc">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
-            <div v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null" class="quick-action-current-price">
-              <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
-              <strong class="mi-metric-value">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
-            </div>
-            <div :aria-label="t('buildingDetail.accessibility.quickPriceUpdate')">
-              <!-- Directional impact hint derived from elasticity -->
+          <div class="unit-insight-card mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.quickActions')">
+            <div class="rounded-xl border border-divider bg-surface p-4 sm:p-5">
+              <h5 class="m-0 text-sm font-semibold text-foreground">{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
+              <p class="unit-desc mt-2 text-sm text-muted">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
+
               <div
-                v-if="publicSalesAnalytics && publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
-                class="mi-price-impact-hint"
-                :class="{
-                  'mi-price-impact-raise': quickPriceInput > currentPublicSalesMinPrice,
-                  'mi-price-impact-lower': quickPriceInput < currentPublicSalesMinPrice,
-                }"
+                v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null"
+                class="quick-action-current-price mt-3 grid gap-1 rounded-lg border border-divider bg-card px-3 py-2"
               >
-                <template v-if="quickPriceInput > currentPublicSalesMinPrice">
-                  {{
-                    t('buildingDetail.marketIntelligence.priceUpdate.raisingHint', {
-                      elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
-                    })
-                  }}
-                </template>
-                <template v-else-if="quickPriceInput < currentPublicSalesMinPrice">
-                  {{
-                    t('buildingDetail.marketIntelligence.priceUpdate.loweringHint', {
-                      elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
-                    })
-                  }}
-                </template>
+                <span class="mi-metric-label text-[0.65rem] font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
+                <strong class="mi-metric-value text-base font-semibold text-foreground">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
               </div>
-              <div class="mi-price-update-row">
-                <label class="mi-price-update-label" for="quick-price-input">
-                  {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
-                  <span class="currency-badge">{{ cityCurrencyCode }}</span>
-                </label>
-                <input
-                  id="quick-price-input"
-                  type="number"
-                  class="mi-price-input"
-                  :placeholder="selectedPublicSalesUnit?.minPrice?.toString() ?? ''"
-                  :min="0.01"
-                  :step="0.01"
-                  v-model.number="quickPriceInput"
-                />
-                <button class="btn btn-primary mi-price-update-btn" :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0" @click="submitQuickPriceUpdate">
-                  {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
-                </button>
+
+              <div class="mt-3" :aria-label="t('buildingDetail.accessibility.quickPriceUpdate')">
+                <!-- Directional impact hint derived from elasticity -->
+                <div
+                  v-if="publicSalesAnalytics && publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
+                  class="mi-price-impact-hint mb-3 rounded-lg border px-3 py-2 text-xs"
+                  :class="
+                    quickPriceInput > currentPublicSalesMinPrice
+                      ? 'mi-price-impact-raise border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                      : quickPriceInput < currentPublicSalesMinPrice
+                        ? 'mi-price-impact-lower border-emerald-400/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        : 'border-divider bg-surface text-muted'
+                  "
+                >
+                  <template v-if="quickPriceInput > currentPublicSalesMinPrice">
+                    {{
+                      t('buildingDetail.marketIntelligence.priceUpdate.raisingHint', {
+                        elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
+                      })
+                    }}
+                  </template>
+                  <template v-else-if="quickPriceInput < currentPublicSalesMinPrice">
+                    {{
+                      t('buildingDetail.marketIntelligence.priceUpdate.loweringHint', {
+                        elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
+                      })
+                    }}
+                  </template>
+                </div>
+
+                <div class="mi-price-update-row grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
+                  <label class="mi-price-update-label flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted" for="quick-price-input">
+                    <span>
+                      {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
+                    </span>
+                    <span class="currency-badge w-fit rounded-full border border-divider bg-bg px-2 py-0.5 text-[0.65rem] text-foreground">{{ cityCurrencyCode }}</span>
+                  </label>
+                  <input
+                    id="quick-price-input"
+                    type="number"
+                    class="mi-price-input form-input"
+                    :placeholder="selectedPublicSalesUnit?.minPrice?.toString() ?? ''"
+                    :min="0.01"
+                    :step="0.01"
+                    v-model.number="quickPriceInput"
+                  />
+                  <button
+                    class="btn btn-primary mi-price-update-btn"
+                    :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0"
+                    @click="submitQuickPriceUpdate"
+                  >
+                    {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
+                  </button>
+                </div>
+
+                <p v-if="quickPriceSuccess" class="mi-price-success mt-2 rounded-md border border-emerald-300/50 bg-emerald-500/10 px-2.5 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                  {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
+                </p>
+                <p v-if="quickPriceError" class="mi-price-error mt-2 rounded-md border border-red-300/50 bg-red-500/10 px-2.5 py-2 text-xs text-red-700 dark:text-red-300">{{ quickPriceError }}</p>
               </div>
-              <p v-if="quickPriceSuccess" class="mi-price-success">
-                {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
-              </p>
-              <p v-if="quickPriceError" class="mi-price-error">{{ quickPriceError }}</p>
             </div>
           </div>
         </template>
