@@ -417,21 +417,18 @@ public sealed partial class Mutation
 
         var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
 
-        // Calculate payment schedule: monthly payments (every 30 in-game days = 720 ticks), minimum 1 payment.
-        var ticksPerPayment = 720L; // 30 in-game days
-        var totalPayments = (int)Math.Max(1, offer.DurationTicks / ticksPerPayment);
+        // Tick-based repayment schedule: principal is paid each tick over the agreed duration.
+        var ticksPerPayment = 1L;
+        var totalPayments = (int)Math.Max(1L, offer.DurationTicks);
         var dueTick = currentTick + offer.DurationTicks;
-
-        // Compute flat equal payment (simple interest, not compound).
-        var totalInterest = input.PrincipalAmount * (offer.AnnualInterestRatePercent / 100m)
-            * ((decimal)offer.DurationTicks / GameConstants.TicksPerYear);
-        var totalRepayment = input.PrincipalAmount + totalInterest;
-        var paymentAmount = decimal.Round(totalRepayment / totalPayments, 4, MidpointRounding.AwayFromZero);
-        var borrowerAccount = await ResolveCompanyTransferAccountAsync(
+        var bankCurrencyCode = offer.BankBuilding?.City?.CurrencyCode ?? "EUR";
+        var borrowerAccount = await ResolveLoanSettlementAccountAsync(
             db,
             borrower.Id,
-            offer.BankBuilding?.City?.CurrencyCode ?? "EUR",
-            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
+            bankCurrencyCode,
+            input.BankAccountId,
+            httpContextAccessor.HttpContext.RequestAborted);
+        var paymentAmount = ComputeEstimatedTickPayment(input.PrincipalAmount, offer.AnnualInterestRatePercent, totalPayments);
 
         // Transfer cash.
         CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
@@ -455,6 +452,7 @@ public sealed partial class Mutation
             PaymentAmount = paymentAmount,
             PaymentsMade = 0,
             TotalPayments = totalPayments,
+            BorrowerBankAccountId = borrowerAccount.Id,
             Status = LoanStatus.Active,
             MissedPayments = 0,
             AccumulatedPenalty = 0m,
@@ -599,18 +597,17 @@ public sealed partial class Mutation
         var durationTicks = input.DurationTicks ?? GameConstants.TicksPerYear;
         var annualRate = bank.LendingInterestRatePercent ?? 8m;
 
-        var ticksPerPayment = 720L;
-        var totalPayments = (int)Math.Max(1, durationTicks / ticksPerPayment);
-        var totalInterest = input.PrincipalAmount * (annualRate / 100m)
-            * ((decimal)durationTicks / GameConstants.TicksPerYear);
-        var totalRepayment = input.PrincipalAmount + totalInterest;
-        var paymentAmount = decimal.Round(totalRepayment / totalPayments, 4, MidpointRounding.AwayFromZero);
+        var ticksPerPayment = 1L;
+        var totalPayments = (int)Math.Max(1L, durationTicks);
+        var bankCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
+        var paymentAmount = ComputeEstimatedTickPayment(input.PrincipalAmount, annualRate, totalPayments);
 
-        var borrowerAccount = await ResolveCompanyTransferAccountAsync(
+        var borrowerAccount = await ResolveLoanSettlementAccountAsync(
             db,
             borrower.Id,
-            bank.City?.CurrencyCode ?? "EUR",
-            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
+            bankCurrencyCode,
+            input.BankAccountId,
+            httpContextAccessor.HttpContext.RequestAborted);
 
         CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
         borrowerAccount.Balance += input.PrincipalAmount;
@@ -647,6 +644,7 @@ public sealed partial class Mutation
             PaymentAmount = paymentAmount,
             PaymentsMade = 0,
             TotalPayments = totalPayments,
+            BorrowerBankAccountId = borrowerAccount.Id,
             Status = LoanStatus.Active,
             MissedPayments = 0,
             AccumulatedPenalty = 0m,
@@ -670,5 +668,58 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
         return loan;
+    }
+
+    private static decimal ComputeEstimatedTickPayment(decimal principalAmount, decimal annualRatePercent, int totalPayments)
+    {
+        var safeTotalPayments = Math.Max(1, totalPayments);
+        var principalPerTick = principalAmount / safeTotalPayments;
+        var firstTickInterest = principalAmount * (annualRatePercent / 100m) / GameConstants.TicksPerYear;
+        return decimal.Round(principalPerTick + firstTickInterest, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private static async Task<BankAccount> ResolveLoanSettlementAccountAsync(
+        AppDbContext db,
+        Guid borrowerCompanyId,
+        string requiredCurrencyCode,
+        Guid? requestedBankAccountId,
+        CancellationToken cancellationToken)
+    {
+        if (requestedBankAccountId.HasValue)
+        {
+            var requestedAccount = await db.BankAccounts
+                .Include(a => a.Company)
+                .FirstOrDefaultAsync(
+                    a => a.Id == requestedBankAccountId.Value
+                        && a.CompanyId == borrowerCompanyId
+                        && a.ClosedAtUtc == null,
+                    cancellationToken);
+
+            if (requestedAccount is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("The selected settlement account was not found for the borrower company.")
+                        .SetCode("ACCOUNT_NOT_FOUND")
+                        .Build());
+            }
+
+            if (!string.Equals(requestedAccount.CurrencyCode, requiredCurrencyCode, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage($"The selected settlement account currency ({requestedAccount.CurrencyCode}) does not match the bank city currency ({requiredCurrencyCode}).")
+                        .SetCode("CURRENCY_MISMATCH")
+                        .Build());
+            }
+
+            return requestedAccount;
+        }
+
+        return await ResolveCompanyTransferAccountAsync(
+            db,
+            borrowerCompanyId,
+            requiredCurrencyCode,
+            cancellationToken: cancellationToken);
     }
 }

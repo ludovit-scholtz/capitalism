@@ -1108,8 +1108,8 @@ test.describe('Bank Management — customer view', () => {
     // New account-style UI: shows "My Bank Account" heading with empty state
     await expect(page.getByRole('heading', { name: 'My Bank Account' })).toBeVisible()
 
-    // The empty-state deposit form is shown (no existing deposits)
-    await page.locator('#customer-deposit-amount').fill('0')
+    // The empty-state open-account action is shown (no existing deposits)
+    await expect(page.getByRole('button', { name: 'Open Account' })).toBeVisible()
 
     // Rate preview is shown (formatPercent gives 1 decimal place) — scope to preview section
     await expect(page.locator('.repayment-preview').getByText('5.0%')).toBeVisible()
@@ -1231,6 +1231,20 @@ test.describe('Loan collateral selection', () => {
     return player
   }
 
+  function addBorrowerSettlementAccount(state: ReturnType<typeof setupMockApi>) {
+    state.myBankAccounts = [
+      {
+        id: 'borrower-settlement-acc-1',
+        accountNumber: '5555000011112222',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 250000,
+        companyId: 'borrower-co-1',
+        companyName: 'My Company',
+      },
+    ]
+  }
+
   const eligibleBuilding: MockCollateralBuilding = {
     buildingId: 'factory-1',
     buildingName: 'Main Factory',
@@ -1340,6 +1354,7 @@ test.describe('Loan collateral selection', () => {
     state.currentToken = `token-${player.id}`
     state.collateralBuildings = [smallCapBuilding]
     state.allBanks = [makeBankInfoEntry()]
+    addBorrowerSettlementAccount(state)
     player.activeAccountType = 'COMPANY'
 
     await page.addInitScript((token) => {
@@ -1355,6 +1370,7 @@ test.describe('Loan collateral selection', () => {
 
     // Select the small building — then set principal above its cap
     await form.locator('.collateral-option', { hasText: 'Small Shop' }).click()
+    await form.getByRole('button', { name: 'Next' }).click()
 
     // Set principal above the 70% cap (70000)
     const principalInput = form.locator('#principal-amount')
@@ -1364,8 +1380,8 @@ test.describe('Loan collateral selection', () => {
     // Warning should appear
     await expect(form.getByText('The requested amount exceeds 70% of the building')).toBeVisible()
 
-    // Accept button should be disabled
-    await expect(form.getByRole('button', { name: 'Request Loan' })).toBeDisabled()
+    // While still on step 2, moving forward must be blocked
+    await expect(form.getByRole('button', { name: 'Next' })).toBeDisabled()
   })
 
   test('borrower can choose duration ticks when requesting collateralized loan', async ({ page }) => {
@@ -1376,6 +1392,7 @@ test.describe('Loan collateral selection', () => {
     state.currentToken = `token-${player.id}`
     state.collateralBuildings = [eligibleBuilding]
     state.allBanks = [makeBankInfoEntry()]
+    addBorrowerSettlementAccount(state)
     player.activeAccountType = 'COMPANY'
 
     await page.addInitScript((token) => {
@@ -1390,8 +1407,11 @@ test.describe('Loan collateral selection', () => {
     await expect(form).toBeVisible()
 
     await form.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await form.getByRole('button', { name: 'Next' }).click()
     await form.locator('#principal-amount').fill('60000')
+    await form.getByRole('button', { name: 'Next' }).click()
     await form.locator('#duration-ticks').fill('240')
+    await form.getByRole('button', { name: 'Next' }).click()
     await form.getByRole('button', { name: 'Request Loan' }).click()
 
     await expect(page).toHaveURL(/\/bank\/bank-building-1/)
@@ -1491,6 +1511,7 @@ test.describe('Loan collateral selection', () => {
     state.currentToken = `token-${player.id}`
     state.collateralBuildings = [eligibleBuilding]
     state.allBanks = [makeBankInfoEntry()]
+    addBorrowerSettlementAccount(state)
     player.activeAccountType = 'COMPANY'
 
     await page.addInitScript((token) => {
@@ -1506,7 +1527,10 @@ test.describe('Loan collateral selection', () => {
 
     // Select Main Factory as collateral
     await form.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await form.getByRole('button', { name: 'Next' }).click()
     await form.locator('#principal-amount').fill('120000')
+    await form.getByRole('button', { name: 'Next' }).click()
+    await form.getByRole('button', { name: 'Next' }).click()
 
     // Accept the loan
     await form.getByRole('button', { name: 'Request Loan' }).click()
@@ -1585,8 +1609,11 @@ test.describe('Loan collateral selection', () => {
     await expect(page).toHaveURL(/\/bank\/government-bank-1\/request-loan/)
     const form = page.locator('.loan-request-form-card')
     await expect(form).toBeVisible()
-    await form.locator('#principal-amount').fill('100000')
     await form.locator('.collateral-option', { hasText: factory.name }).click()
+    await form.getByRole('button', { name: 'Next' }).click()
+    await form.locator('#principal-amount').fill('100000')
+    await form.getByRole('button', { name: 'Next' }).click()
+    await form.getByRole('button', { name: 'Next' }).click()
     await form.getByRole('button', { name: 'Request Loan' }).click()
     await expect(page).toHaveURL(/\/bank\/government-bank-1/)
 

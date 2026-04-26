@@ -441,6 +441,12 @@ public sealed class AcceptLoanInput
     /// building's appraised value minus any existing secured exposure on the same asset.
     /// </summary>
     public Guid? CollateralBuildingId { get; set; }
+
+    /// <summary>
+    /// Optional settlement account to receive disbursement and service repayments.
+    /// When provided, the account must belong to the borrower company and match the bank city currency.
+    /// </summary>
+    public Guid? BankAccountId { get; set; }
 }
 
 /// <summary>Input for instantly updating the minimum sale price on a PUBLIC_SALES unit.</summary>

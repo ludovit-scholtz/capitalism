@@ -124,18 +124,19 @@ describe('loanHelpers', () => {
       const payment = computePaymentAmount(10000, 12, 1440)
       expect(payment).toBeGreaterThan(0)
     })
-    it('handles single payment (short duration)', () => {
+    it('handles per-tick repayment on short duration', () => {
       const payment = computePaymentAmount(1000, 10, 100)
-      expect(payment).toBeGreaterThan(1000) // principal + some interest
+      expect(payment).toBeGreaterThan(10)
+      expect(payment).toBeLessThan(11)
     })
   })
 
   describe('computeTotalPayments', () => {
-    it('returns 2 payments for 1440 ticks (2×720)', () => {
-      expect(computeTotalPayments(1440)).toBe(2)
+    it('returns one payment per tick for 1440 ticks', () => {
+      expect(computeTotalPayments(1440)).toBe(1440)
     })
-    it('returns at least 1 for very short duration', () => {
-      expect(computeTotalPayments(24)).toBe(1)
+    it('returns one payment per tick for short durations', () => {
+      expect(computeTotalPayments(24)).toBe(24)
     })
     it('returns 0 not possible (minimum 1)', () => {
       expect(computeTotalPayments(0)).toBe(1)

@@ -185,10 +185,12 @@ public sealed partial class AppDbContext
             e.Property(l => l.Status).HasMaxLength(20);
             e.HasOne(l => l.LoanOffer).WithMany(o => o.Loans).HasForeignKey(l => l.LoanOfferId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(l => l.BorrowerCompany).WithMany().HasForeignKey(l => l.BorrowerCompanyId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(l => l.BorrowerBankAccount).WithMany().HasForeignKey(l => l.BorrowerBankAccountId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(l => l.BankBuilding).WithMany().HasForeignKey(l => l.BankBuildingId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(l => l.LenderCompany).WithMany().HasForeignKey(l => l.LenderCompanyId).OnDelete(DeleteBehavior.Restrict);
             e.HasIndex(l => new { l.BorrowerCompanyId, l.Status });
             e.HasIndex(l => new { l.LenderCompanyId, l.Status });
+            e.HasIndex(l => l.BorrowerBankAccountId);
             e.HasIndex(l => l.NextPaymentTick);
         });
 

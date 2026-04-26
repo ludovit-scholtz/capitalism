@@ -22,6 +22,15 @@ public sealed class Loan
     /// <summary>Navigation property to the borrower company.</summary>
     public Company BorrowerCompany { get; set; } = null!;
 
+    /// <summary>
+    /// Optional dedicated borrower settlement bank account selected at origination.
+    /// When set, scheduled repayments are debited from this account.
+    /// </summary>
+    public Guid? BorrowerBankAccountId { get; set; }
+
+    /// <summary>Navigation property to the borrower settlement account.</summary>
+    public BankAccount? BorrowerBankAccount { get; set; }
+
     /// <summary>The bank building that issued this loan (denormalised from offer for fast queries).</summary>
     public Guid BankBuildingId { get; set; }
 

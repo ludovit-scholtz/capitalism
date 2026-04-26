@@ -73,18 +73,17 @@ export function computePaymentAmount(
   annualRatePercent: number,
   durationTicks: number,
 ): number {
-  const ticksPerPayment = 720
-  const totalPayments = Math.max(1, Math.floor(durationTicks / ticksPerPayment))
-  const totalRepayment = computeTotalRepayment(principal, annualRatePercent, durationTicks)
-  return totalRepayment / totalPayments
+  const totalPayments = Math.max(1, Math.floor(durationTicks))
+  const principalPerTick = principal / totalPayments
+  const firstTickInterest = principal * (annualRatePercent / 100) / TICKS_PER_YEAR
+  return principalPerTick + firstTickInterest
 }
 
 /**
  * Returns the number of scheduled payments for a loan.
  */
 export function computeTotalPayments(durationTicks: number): number {
-  const ticksPerPayment = 720
-  return Math.max(1, Math.floor(durationTicks / ticksPerPayment))
+  return Math.max(1, Math.floor(durationTicks))
 }
 
 /**

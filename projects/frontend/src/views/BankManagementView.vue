@@ -37,7 +37,6 @@ const isOwner = computed(() => {
 
 // Customer-specific state
 const myDepositsHere = ref<BankDepositSummary[]>([])
-const customerDepositAmount = ref(0)
 const customerDepositLoading = ref(false)
 const customerDepositError = ref<string | null>(null)
 const customerDepositSuccess = ref(false)
@@ -419,6 +418,7 @@ const directBorrowingOption = computed<LoanOfferSummary | null>(() => {
 
 // Account-style aggregation: treat all active non-base-capital deposits from active company as one account
 const myActiveDepositsHere = computed(() => myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital))
+const hasCustomerAccount = computed(() => myActiveDepositsHere.value.length > 0)
 const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
 const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
 // The oldest tranche is used first for partial withdrawals.
@@ -445,7 +445,7 @@ async function submitCustomerDeposit() {
       input: {
         bankBuildingId: bankBuildingId.value,
         depositorCompanyId: activeCompany.value.id,
-        amount: customerDepositAmount.value,
+        amount: 0,
       },
     })
     customerDepositSuccess.value = true
@@ -800,151 +800,141 @@ function navigateToForexTransfer() {
             </div>
           </div>
         </div>
-
-        <!-- Account-style deposit relationship -->
-        <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="account-header-info flex flex-row gap-2">
-              <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
-              <span class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
-                {{ activeCompany?.name }}
-              </span>
-            </div>
-            <div class="account-actions flex flex-wrap gap-3" v-if="myAccountBalance > 0">
-              <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
-                {{ t('bank.addFundsViaForex') }}
-              </button>
-              <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
-                {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Account balance card -->
-          <div v-if="myAccountBalance > 0" class="account-balance-card mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-            <div class="account-balance-main flex flex-col gap-1">
-              <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
-              <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
-            </div>
-            <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
-              <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
-              <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
-            </div>
-          </div>
-
-          <!-- Withdraw form -->
-          <div v-if="showWithdrawForm" class="account-action-form mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-            <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
-            <div class="form-group mt-4 flex flex-col gap-3">
-              <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
-              <input
-                id="withdraw-amount"
-                v-model.number="withdrawAmount"
-                type="number"
-                :min="1"
-                :max="myAccountBalance"
-                step="1000"
-                class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
-              />
-              <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
-            </div>
-            <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
-            <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
-              {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
-            </button>
-          </div>
-
-          <!-- Success messages -->
-          <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
-          <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
-
-          <!-- First deposit (no account yet) -->
-          <div v-if="myAccountBalance === 0 && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-            <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
-            <div class="form-group flex flex-col gap-3">
-              <label for="customer-deposit-amount" class="text-sm font-semibold text-body">{{ t('bank.depositAmount') }}</label>
-              <input
-                id="customer-deposit-amount"
-                v-model.number="customerDepositAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
-              />
-              <span class="form-hint text-sm text-muted">{{ t('bank.depositAmountHint') }}</span>
-              <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
-            </div>
-            <div v-if="bankInfo" class="repayment-preview rounded-2xl border border-divider bg-card px-4 py-4">
-              <div class="preview-row flex items-center justify-between gap-4 text-sm">
-                <span>{{ t('bank.depositInterestRate') }}</span>
-                <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+        <div class="flex flex-row gap-4">
+          <!-- Account-style deposit relationship -->
+          <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+            <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="account-header-info flex flex-row gap-2">
+                <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
+                <span
+                  class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
+                >
+                  {{ activeCompany?.name }}
+                </span>
               </div>
-            </div>
-            <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
-            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount < 0" @click="submitCustomerDeposit">
-              {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
-            </button>
-          </div>
-        </section>
-
-        <!-- Prompt to log in or switch account if not in company mode -->
-        <section v-else class="customer-deposit-form-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
-          <div v-if="!auth.isAuthenticated" class="auth-prompt mt-4 flex flex-col gap-4">
-            <p>{{ t('bank.loginToLendDescription') }}</p>
-            <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
-          </div>
-          <div v-else class="auth-prompt mt-4">
-            <p>{{ t('bank.companyAccountRequired') }}</p>
-          </div>
-        </section>
-
-        <!-- Direct loan request -->
-        <section class="customer-loans-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.borrowFromThisBank') }}</h2>
-          <div v-if="!directBorrowingOption" class="empty-state">
-            <p>{{ t('bank.noOffersFromBank') }}</p>
-          </div>
-          <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <div class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <div class="customer-offer-header">
-                <span class="offer-rate-big">{{ formatPercent(directBorrowingOption.annualInterestRatePercent) }}</span>
-                <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
-              </div>
-              <div class="customer-offer-stats">
-                <div class="offer-stat-row">
-                  <span>{{ t('bank.maxPrincipal') }}</span>
-                  <strong>{{ fmt(directBorrowingOption.maxPrincipalPerLoan) }}</strong>
-                </div>
-                <div class="offer-stat-row">
-                  <span>{{ t('bank.remainingCapacity') }}</span>
-                  <strong :class="directBorrowingOption.remainingCapacity > 0 ? 'positive' : 'muted'">
-                    {{ fmt(directBorrowingOption.remainingCapacity) }}
-                  </strong>
-                </div>
-                <div class="offer-stat-row">
-                  <span>{{ t('bank.duration') }}</span>
-                  <strong>{{ formatLoanDuration(directBorrowingOption.durationTicks) }}</strong>
-                </div>
-              </div>
-              <p class="offer-context-hint">{{ t('bank.directBorrowingHint') }}</p>
-
-              <!-- Loan request: dedicated full-page form -->
-              <div v-if="auth.isAuthenticated && isCompanyAccountActive && directBorrowingOption.remainingCapacity > 0">
-                <button class="btn btn-primary btn-sm" @click="router.push({ name: 'bank-loan-request', params: { buildingId: bankBuildingId } })">
-                  {{ t('bank.acceptLoan') }}
+              <div class="account-actions flex flex-wrap gap-3" v-if="hasCustomerAccount && myAccountBalance > 0">
+                <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
+                  {{ t('bank.addFundsViaForex') }}
+                </button>
+                <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
+                  {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
                 </button>
               </div>
-              <div v-else-if="!auth.isAuthenticated">
-                <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
-              </div>
-              <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
-              <p v-else class="offer-context-hint muted">{{ t('bank.noCapacityAvailable') }}</p>
             </div>
-          </div>
-        </section>
 
+            <!-- Account balance card -->
+            <div v-if="hasCustomerAccount" class="account-balance-card mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+              <div class="account-balance-main flex flex-col gap-1">
+                <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
+                <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
+              </div>
+              <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
+                <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
+                <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
+                <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
+              </div>
+            </div>
+
+            <!-- Withdraw form -->
+            <div v-if="showWithdrawForm" class="account-action-form mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+              <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
+              <div class="form-group mt-4 flex flex-col gap-3">
+                <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
+                <input
+                  id="withdraw-amount"
+                  v-model.number="withdrawAmount"
+                  type="number"
+                  :min="1"
+                  :max="myAccountBalance"
+                  step="1000"
+                  class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
+                />
+                <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
+              </div>
+              <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
+              <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
+                {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
+              </button>
+            </div>
+
+            <!-- Success messages -->
+            <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
+            <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
+
+            <!-- First deposit (no account yet) -->
+            <div v-if="!hasCustomerAccount && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+              <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
+              <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
+              <div v-if="bankInfo" class="repayment-preview rounded-2xl border border-divider bg-card px-4 py-4">
+                <div class="preview-row flex items-center justify-between gap-4 text-sm">
+                  <span>{{ t('bank.depositInterestRate') }}</span>
+                  <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+                </div>
+              </div>
+              <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
+              <button class="btn btn-primary" :disabled="customerDepositLoading" @click="submitCustomerDeposit">
+                {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
+              </button>
+            </div>
+          </section>
+
+          <!-- Prompt to log in or switch account if not in company mode -->
+          <section v-else class="customer-deposit-form-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
+            <div v-if="!auth.isAuthenticated" class="auth-prompt mt-4 flex flex-col gap-4">
+              <p>{{ t('bank.loginToLendDescription') }}</p>
+              <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
+            </div>
+            <div v-else class="auth-prompt mt-4">
+              <p>{{ t('bank.companyAccountRequired') }}</p>
+            </div>
+          </section>
+
+          <!-- Direct loan request -->
+          <section class="customer-loans-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.borrowFromThisBank') }}</h2>
+            <div v-if="!directBorrowingOption" class="empty-state">
+              <p>{{ t('bank.noOffersFromBank') }}</p>
+            </div>
+            <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+                <div class="customer-offer-header">
+                  <span class="offer-rate-big">{{ formatPercent(directBorrowingOption.annualInterestRatePercent) }}</span>
+                  <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
+                </div>
+                <div class="customer-offer-stats">
+                  <div class="offer-stat-row">
+                    <span>{{ t('bank.maxPrincipal') }}</span>
+                    <strong>{{ fmt(directBorrowingOption.maxPrincipalPerLoan) }}</strong>
+                  </div>
+                  <div class="offer-stat-row">
+                    <span>{{ t('bank.remainingCapacity') }}</span>
+                    <strong :class="directBorrowingOption.remainingCapacity > 0 ? 'positive' : 'muted'">
+                      {{ fmt(directBorrowingOption.remainingCapacity) }}
+                    </strong>
+                  </div>
+                  <div class="offer-stat-row">
+                    <span>{{ t('bank.duration') }}</span>
+                    <strong>{{ formatLoanDuration(directBorrowingOption.durationTicks) }}</strong>
+                  </div>
+                </div>
+                <p class="offer-context-hint">{{ t('bank.directBorrowingHint') }}</p>
+
+                <!-- Loan request: dedicated full-page form -->
+                <div v-if="auth.isAuthenticated && isCompanyAccountActive && directBorrowingOption.remainingCapacity > 0">
+                  <button class="btn btn-primary btn-sm" @click="router.push({ name: 'bank-loan-request', params: { buildingId: bankBuildingId } })">
+                    {{ t('bank.acceptLoan') }}
+                  </button>
+                </div>
+                <div v-else-if="!auth.isAuthenticated">
+                  <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
+                </div>
+                <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
+                <p v-else class="offer-context-hint muted">{{ t('bank.noCapacityAvailable') }}</p>
+              </div>
+            </div>
+          </section>
+        </div>
         <!-- My Loans at This Bank -->
         <section v-if="auth.isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
           <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>

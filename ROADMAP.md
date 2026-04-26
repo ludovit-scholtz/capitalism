@@ -39,6 +39,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
 - [ ] Allow to close down bank account if the balance of the account is equal exactly to 0.
 - [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
+- [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
 ### Onboarding
 
