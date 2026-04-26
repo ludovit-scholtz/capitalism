@@ -105,9 +105,7 @@ const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 const maxPrincipal = computed(() => Math.max(bankInfo.value?.availableLendingCapacity ?? 0, 0))
 
-const selectedCollateral = computed<CollateralEligibilitySummary | null>(
-  () => collateralBuildings.value.find((b) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
-)
+const selectedCollateral = computed<CollateralEligibilitySummary | null>(() => collateralBuildings.value.find((b) => b.buildingId === selectedCollateralBuildingId.value) ?? null)
 
 const normalizedDurationTicks = computed(() => {
   const value = Number(durationTicks.value)

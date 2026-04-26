@@ -963,7 +963,6 @@ function navigateToForexTransfer() {
         </section> </template
       ><!-- end customer view -->
     </template>
-
   </main>
 </template>
 
