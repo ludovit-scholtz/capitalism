@@ -100,11 +100,7 @@ const {
           v-for="tab in unitDetailTabs"
           :key="tab.key"
           class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
-          :class="
-            selectedUnitTab === tab.key
-              ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary'
-              : 'hover:border-divider hover:bg-surface'
-          "
+          :class="selectedUnitTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
           @click="selectedUnitTab = tab.key"
         >
           {{ t(`buildingDetail.unitTabs.${tab.key}`) }}
@@ -197,10 +193,7 @@ const {
               <h5 class="m-0 text-sm font-semibold text-foreground">{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
               <p class="unit-desc mt-2 text-sm text-muted">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
 
-              <div
-                v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null"
-                class="quick-action-current-price mt-3 grid gap-1 rounded-lg border border-divider bg-card px-3 py-2"
-              >
+              <div v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null" class="quick-action-current-price mt-3 grid gap-1 rounded-lg border border-divider bg-card px-3 py-2">
                 <span class="mi-metric-label text-[0.65rem] font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
                 <strong class="mi-metric-value text-base font-semibold text-foreground">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
               </div>
@@ -250,11 +243,7 @@ const {
                     :step="0.01"
                     v-model.number="quickPriceInput"
                   />
-                  <button
-                    class="btn btn-primary mi-price-update-btn"
-                    :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0"
-                    @click="submitQuickPriceUpdate"
-                  >
+                  <button class="btn btn-primary mi-price-update-btn" :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0" @click="submitQuickPriceUpdate">
                     {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
                   </button>
                 </div>
