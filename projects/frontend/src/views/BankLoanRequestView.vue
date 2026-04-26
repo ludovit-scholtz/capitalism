@@ -128,6 +128,12 @@ const collateralMaxPrincipal = computed(() => {
 
 const selectedCollateral = computed<CollateralEligibilitySummary | null>(() => collateralBuildings.value.find((b) => b.buildingId === selectedCollateralBuildingId.value) ?? null)
 
+watch(selectedCollateral, () => {
+  if (selectedCollateral.value) {
+    principalAmount.value = collateralMaxPrincipal.value
+  }
+})
+
 const normalizedDurationTicks = computed(() => {
   const value = Number(durationTicks.value)
   if (!Number.isFinite(value)) {
