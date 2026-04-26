@@ -6272,30 +6272,45 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('acceptLoan')) {
       const input = body.variables?.input ?? {}
       const offer = state.loanOffers.find((o) => o.id === input.loanOfferId)
+      const directBank = state.allBanks.find((bank) => bank.bankBuildingId === input.loanOfferId)
       const principal = input.principalAmount ?? 0
       if (offer) {
         offer.usedCapacity += principal
         offer.remainingCapacity -= principal
       }
+      if (directBank) {
+        directBank.outstandingLoanPrincipal += principal
+        directBank.availableLendingCapacity = Math.max(0, directBank.availableLendingCapacity - principal)
+      }
+      const borrowerCompany = state.players.flatMap((player) => player.companies).find((company) => company.id === input.borrowerCompanyId)
+      const annualInterestRatePercent = offer?.annualInterestRatePercent ?? directBank?.lendingInterestRatePercent ?? 10
+      const durationTicks = offer?.durationTicks ?? 8760
+      const periodicRate = annualInterestRatePercent <= 0 ? 0 : annualInterestRatePercent / 100 / 8760
+      const paymentAmount =
+        durationTicks <= 0
+          ? principal
+          : periodicRate <= 0
+            ? principal / durationTicks
+            : (principal * periodicRate) / (1 - (1 + periodicRate) ** -durationTicks)
       const newLoan: MockLoan = {
         id: `loan-${Date.now()}`,
         loanOfferId: input.loanOfferId ?? '',
         borrowerCompanyId: input.borrowerCompanyId ?? '',
-        borrowerCompanyName: 'Borrower Co',
-        lenderCompanyId: offer?.lenderCompanyId ?? '',
-        lenderCompanyName: offer?.lenderCompanyName ?? '',
-        bankBuildingId: offer?.bankBuildingId ?? '',
-        bankBuildingName: offer?.bankBuildingName ?? '',
+        borrowerCompanyName: borrowerCompany?.name ?? 'Borrower Co',
+        lenderCompanyId: offer?.lenderCompanyId ?? directBank?.lenderCompanyId ?? '',
+        lenderCompanyName: offer?.lenderCompanyName ?? directBank?.lenderCompanyName ?? '',
+        bankBuildingId: offer?.bankBuildingId ?? directBank?.bankBuildingId ?? '',
+        bankBuildingName: offer?.bankBuildingName ?? directBank?.bankBuildingName ?? '',
         originalPrincipal: principal,
         remainingPrincipal: principal,
-        annualInterestRatePercent: offer?.annualInterestRatePercent ?? 10,
-        durationTicks: offer?.durationTicks ?? 1440,
+        annualInterestRatePercent,
+        durationTicks,
         startTick: state.gameState.currentTick,
-        dueTick: state.gameState.currentTick + (offer?.durationTicks ?? 1440),
-        nextPaymentTick: state.gameState.currentTick + 720,
-        paymentAmount: principal / 2,
+        dueTick: state.gameState.currentTick + durationTicks,
+        nextPaymentTick: state.gameState.currentTick + 1,
+        paymentAmount: Number(paymentAmount.toFixed(2)),
         paymentsMade: 0,
-        totalPayments: 2,
+        totalPayments: durationTicks,
         status: 'ACTIVE',
         missedPayments: 0,
         accumulatedPenalty: 0,

@@ -1,5 +1,8 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { setupMockApi, makePlayer, type MockLoanOffer, type MockLoan, type MockCollateralBuilding, type MockBankInfo } from './helpers/mock-api'
+
+const STARTER_FACTORY_LOT_NAME = /Factory Site B1/i
+const STARTER_SHOP_LOT_NAME = /High Street Retail Space/i
 
 /** Creates a player who owns a BANK building with id 'bank-building-1'. */
 function makeBankOwnerPlayer() {
@@ -110,6 +113,135 @@ function makeBankInfoEntry(overrides: Partial<MockBankInfo> = {}): MockBankInfo 
     cityCurrencySymbol: '€',
     baseCapitalRequirement: 10_000_000,
     ...overrides,
+  }
+}
+
+async function authenticateViaLocalStorage(page: Page, token: string) {
+  await page.addInitScript((storedToken) => {
+    localStorage.setItem('auth_token', storedToken)
+    localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+  }, token)
+}
+
+async function completeAuthenticatedOnboarding(page: Page, companyName: string) {
+  await page.locator('.industry-card', { hasText: 'Furniture' }).click()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.locator('.city-card', { hasText: 'Bratislava' }).click()
+  await page.getByRole('button', { name: 'Next' }).click()
+  await page.getByLabel('Company Name').fill(companyName)
+  await page.getByRole('button', { name: 'List View' }).click()
+  await page.getByRole('button', { name: STARTER_FACTORY_LOT_NAME }).click()
+  await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
+  await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+  await page.getByRole('button', { name: 'List View' }).click()
+  await page.getByRole('button', { name: STARTER_SHOP_LOT_NAME }).click()
+  await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+  await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+}
+
+function computeAmortizedTickPayment(principal: number, annualInterestRatePercent: number, totalTicks: number) {
+  const periodicRate = annualInterestRatePercent / 100 / 8760
+  if (periodicRate <= 0) {
+    return principal / totalTicks
+  }
+
+  return (principal * periodicRate) / (1 - (1 + periodicRate) ** -totalTicks)
+}
+
+function appendBankStatementRow(
+  rows: Array<{
+    id: string
+    recordedAtTick: number
+    recordedAtUtc: string
+    description: string
+    category: string
+    amount: number
+    runningBalance: number
+    buildingId: string | null
+    buildingName: string | null
+  }>,
+  row: {
+    id: string
+    recordedAtTick: number
+    recordedAtUtc: string
+    description: string
+    category: string
+    amount: number
+    buildingId?: string | null
+    buildingName?: string | null
+  },
+) {
+  const previousBalance = rows.at(-1)?.runningBalance ?? 0
+  rows.push({
+    ...row,
+    runningBalance: Number((previousBalance + row.amount).toFixed(2)),
+    buildingId: row.buildingId ?? null,
+    buildingName: row.buildingName ?? null,
+  })
+}
+
+function applyMockLoanTickPayment(
+  state: ReturnType<typeof setupMockApi>,
+  loanId: string,
+  accountId: string,
+  companyId: string,
+  buildingName: string,
+) {
+  const loan = state.myLoans.find((candidate) => candidate.id === loanId)
+  const account = state.myBankAccounts.find((candidate) => candidate.id === accountId)
+  if (!loan || !account) {
+    throw new Error('Loan or bank account not found for amortization step.')
+  }
+
+  const periodicRate = loan.annualInterestRatePercent / 100 / 8760
+  const interestAmount = Number((loan.remainingPrincipal * periodicRate).toFixed(2))
+  const paymentAmount = Number(loan.paymentAmount.toFixed(2))
+  const principalAmount = Number(Math.min(loan.remainingPrincipal, Number((paymentAmount - interestAmount).toFixed(2))).toFixed(2))
+  const actualPayment = Number((principalAmount + interestAmount).toFixed(2))
+
+  account.balance = Number((account.balance - actualPayment).toFixed(2))
+  loan.remainingPrincipal = Number(Math.max(0, loan.remainingPrincipal - principalAmount).toFixed(2))
+  loan.paymentsMade += 1
+  loan.nextPaymentTick = state.gameState.currentTick + 1
+
+  if (loan.remainingPrincipal <= 0.009 || loan.paymentsMade >= loan.totalPayments) {
+    loan.remainingPrincipal = 0
+    loan.status = 'REPAID'
+    loan.closedAtUtc = new Date().toISOString()
+    loan.nextPaymentTick = loan.dueTick
+  }
+
+  const rows = state.bankStatementRows[companyId] ?? []
+  appendBankStatementRow(rows, {
+    id: `${loan.id}-interest-${loan.paymentsMade}`,
+    recordedAtTick: state.gameState.currentTick,
+    recordedAtUtc: new Date().toISOString(),
+    description: `Loan interest payment ${loan.paymentsMade}`,
+    category: 'LOAN_INTEREST_EXPENSE',
+    amount: -interestAmount,
+    buildingName,
+  })
+  appendBankStatementRow(rows, {
+    id: `${loan.id}-principal-${loan.paymentsMade}`,
+    recordedAtTick: state.gameState.currentTick,
+    recordedAtUtc: new Date().toISOString(),
+    description: `Loan principal payment ${loan.paymentsMade}`,
+    category: 'LOAN_REPAYMENT_PRINCIPAL',
+    amount: -principalAmount,
+    buildingName,
+  })
+  state.bankStatementRows[companyId] = rows
+
+  state.gameState.currentTick += 1
+  state.gameState.lastTickAtUtc = new Date().toISOString()
+
+  return {
+    interestAmount,
+    principalAmount,
+    paymentAmount: actualPayment,
+    remainingPrincipal: loan.remainingPrincipal,
+    status: loan.status,
   }
 }
 
@@ -505,7 +637,6 @@ test.describe('Loan Marketplace (/loans)', () => {
 
 test.describe('Bank Management (/bank/:buildingId)', () => {
   test('shows bank management page for authenticated bank owner', async ({ page }) => {
-    const loanOffer = makeLoanOffer({ bankBuildingId: 'bank-building-1' })
     const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
     player.companies.push({
       id: 'lender-company-1',
@@ -531,17 +662,18 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
         },
       ],
     })
-    const state = setupMockApi(page, { players: [player], loanOffers: [loanOffer] })
+    const state = setupMockApi(page, {
+      players: [player],
+      allBanks: [makeBankInfoEntry({ bankBuildingId: 'bank-building-1', lenderCompanyId: 'lender-company-1', lenderCompanyName: 'Lending Corp' })],
+    })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    await page.addInitScript((token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    }, `token-${player.id}`)
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
     await expect(page.getByRole('heading', { name: 'Configure Bank' })).toBeVisible()
-    await expect(page.getByText('Loan Offers')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Bank Rates Configuration' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Publish Loan Offer' })).toBeHidden()
   })
 
   test('shows bank stats overview', async ({ page }) => {
@@ -560,62 +692,16 @@ test.describe('Bank Management (/bank/:buildingId)', () => {
     await expect(page.getByText('Overdue/Defaulted')).toBeVisible()
   })
 
-  test('shows publish offer form when button clicked', async ({ page }) => {
+  test('owner no longer sees publish-loan-offer controls', async ({ page }) => {
     const player = makeBankOwnerPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    await page.addInitScript((token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    }, `token-${player.id}`)
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
 
-    await page.getByRole('button', { name: 'Publish Loan Offer' }).click()
-    await expect(page.getByRole('heading', { name: 'Publish Loan Offer' }).last()).toBeVisible()
-    // Form fields should be visible
-    await expect(page.getByLabel('Annual Interest Rate (%)')).toBeVisible()
-    await expect(page.getByLabel('Max Principal Per Loan ($)')).toBeVisible()
-    await expect(page.getByLabel('Total Lending Capacity ($)')).toBeVisible()
-  })
-
-  test('cancels publish form when Cancel clicked', async ({ page }) => {
-    const player = makeBankOwnerPlayer()
-    const state = setupMockApi(page, { players: [player] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-    await page.addInitScript((token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    }, `token-${player.id}`)
-    await page.goto('/bank/bank-building-1')
-
-    await page.getByRole('button', { name: 'Publish Loan Offer' }).click()
-    await expect(page.getByLabel('Annual Interest Rate (%)')).toBeVisible()
-
-    await page.getByRole('button', { name: 'Cancel' }).click()
-    await expect(page.getByLabel('Annual Interest Rate (%)')).toBeHidden()
-  })
-
-  test('publishes offer and shows it in the offer list', async ({ page }) => {
-    const player = makeBankOwnerPlayer()
-    const state = setupMockApi(page, { players: [player], loanOffers: [] })
-    state.currentUserId = player.id
-    state.currentToken = `token-${player.id}`
-    await page.addInitScript((token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    }, `token-${player.id}`)
-    await page.goto('/bank/bank-building-1')
-
-    // Open form
-    await page.getByRole('button', { name: 'Publish Loan Offer' }).click()
-
-    // Submit form (default values)
-    await page.getByRole('button', { name: 'Publish Loan Offer' }).last().click()
-
-    // After publishing, form should hide and offers table should show
-    await expect(page.getByLabel('Annual Interest Rate (%)')).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Publish Loan Offer' })).toBeHidden()
+    await expect(page.getByText('Loan Offers')).toBeHidden()
   })
 
   test('shows issued loans in issued loans section', async ({ page }) => {
@@ -683,20 +769,26 @@ test.describe('Loans nav link', () => {
   })
 })
 
-test.describe('Loan offer display details', () => {
-  test('shows formatted duration in days on bank page loan offer', async ({ page }) => {
-    const offer = makeLoanOffer({ durationTicks: 720 }) // 30 days
-    const player = makeBankOwnerPlayer()
-    const state = setupMockApi(page, { players: [player], loanOffers: [offer] })
+test.describe('Bank borrowing display details', () => {
+  test('shows formatted default duration on the direct borrowing card', async ({ page }) => {
+    const player = makePlayer({ onboardingCompletedAtUtc: '2026-01-01T00:00:00Z' })
+    player.companies.push({
+      id: 'borrower-company-1',
+      playerId: player.id,
+      name: 'My Company',
+      cash: 200000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+    const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    await page.addInitScript((token) => {
-      localStorage.setItem('auth_token', token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-    }, `token-${player.id}`)
+    state.allBanks = [makeBankInfoEntry({ bankBuildingId: 'bank-building-1' })]
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/bank/bank-building-1')
-    // 720 ticks = 30 in-game days — visible in loan offer table on bank page
-    await expect(page.getByText('30 days')).toBeVisible()
+
+    await expect(page.getByRole('heading', { name: 'Borrow from This Bank' })).toBeVisible()
+    await expect(page.getByText('1 year')).toBeVisible()
   })
 
   test('shows city name on borrow tab bank card', async ({ page }) => {
@@ -1385,6 +1477,7 @@ test.describe('Loan collateral selection', () => {
 
     // Select Main Factory as collateral
     await modal.locator('.collateral-option', { hasText: 'Main Factory' }).click()
+    await modal.locator('#principal-amount').fill('120000')
 
     // Accept the loan
     await modal.getByRole('button', { name: 'Accept Loan' }).click()
@@ -1394,6 +1487,124 @@ test.describe('Loan collateral selection', () => {
     await expect(page.getByRole('heading', { name: 'My Loans' })).toBeVisible()
     await expect(page.locator('.collateral-badge')).toBeVisible()
     await expect(page.locator('.collateral-badge')).toContainText('Main Factory')
+  })
+
+  test('fresh onboarding company can borrow from the government bank and repay over 10 ticks', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.allBanks = [
+      makeBankInfoEntry({
+        bankBuildingId: 'government-bank-1',
+        bankBuildingName: 'Government Bank',
+        lenderCompanyId: 'government-company',
+        lenderCompanyName: 'Government',
+        annualInterestRatePercent: undefined,
+        lendingInterestRatePercent: 12,
+        availableLendingCapacity: 500000,
+        lendableCapacity: 500000,
+        totalDeposits: 555556,
+        outstandingLoanPrincipal: 0,
+      }),
+    ]
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await completeAuthenticatedOnboarding(page, 'Mortgage Works')
+
+    const company = player.companies[0]
+    expect(company).toBeTruthy()
+    const factory = company!.buildings.find((building) => building.type === 'FACTORY')
+    expect(factory).toBeTruthy()
+
+    state.collateralBuildings = [
+      {
+        buildingId: factory.id,
+        buildingName: factory.name,
+        buildingType: factory.type,
+        level: factory.level,
+        appraisedValue: 180000,
+        maxBorrowable: 126000,
+        existingSecuredExposure: 0,
+        remainingBorrowingCapacity: 126000,
+        isEligible: true,
+        ineligibilityReason: null,
+      },
+    ]
+    state.myBankAccounts = [
+      {
+        id: 'mortgage-company-account-1',
+        accountNumber: '1234567890123456',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 0,
+        companyId: company!.id,
+        companyName: company!.name,
+        ownerType: 'COMPANY',
+        ownerDisplayName: company!.name,
+      },
+    ]
+    state.bankStatementRows[company!.id] = []
+
+    await page.goto('/banking')
+    await expect(page.getByText('Government Bank')).toBeVisible()
+    await page.locator('.bank-borrow-card', { hasText: 'Government Bank' }).getByRole('link', { name: 'Visit Bank to Borrow' }).click()
+    await expect(page).toHaveURL(/\/bank\/government-bank-1/)
+
+    await page.getByRole('button', { name: 'Accept Loan' }).click()
+    const modal = page.locator('[role="dialog"]')
+    await expect(modal).toBeVisible()
+    await modal.locator('#principal-amount').fill('100000')
+    await modal.locator('.collateral-option', { hasText: factory.name }).click()
+    await modal.getByRole('button', { name: 'Accept Loan' }).click()
+    await expect(modal).toBeHidden()
+
+    const createdLoan = state.myLoans[0]
+    expect(createdLoan).toBeTruthy()
+
+    createdLoan!.durationTicks = 10
+    createdLoan!.totalPayments = 10
+    createdLoan!.paymentAmount = Number(computeAmortizedTickPayment(createdLoan!.originalPrincipal, createdLoan!.annualInterestRatePercent, 10).toFixed(2))
+    createdLoan!.dueTick = createdLoan!.startTick + 10
+    createdLoan!.nextPaymentTick = createdLoan!.startTick + 1
+
+    appendBankStatementRow(state.bankStatementRows[company!.id]!, {
+      id: `${createdLoan!.id}-origination`,
+      recordedAtTick: createdLoan!.startTick,
+      recordedAtUtc: createdLoan!.acceptedAtUtc,
+      description: 'Loan origination from Government Bank',
+      category: 'LOAN_ORIGINATION',
+      amount: createdLoan!.originalPrincipal,
+      buildingId: factory!.id,
+      buildingName: factory!.name,
+    })
+    state.myBankAccounts[0]!.balance = createdLoan!.originalPrincipal
+
+    const firstPayment = applyMockLoanTickPayment(state, createdLoan!.id, 'mortgage-company-account-1', company!.id, factory!.name)
+    await page.reload()
+    await expect(page.locator('.loan-row', { hasText: 'REPAID' })).toHaveCount(0)
+    await expect(page.locator('.loan-row', { hasText: factory!.name })).toContainText(`€${Math.round(firstPayment.remainingPrincipal).toLocaleString('en-US')}`)
+
+    await page.goto('/bank-statement/mortgage-company-account-1')
+    await expect(page.getByRole('heading', { name: /Bank Statement Review/i })).toBeVisible()
+    await expect(page.getByText('Loan interest payment 1')).toBeVisible()
+    await expect(page.getByText(`€${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(firstPayment.interestAmount)}`)).toBeVisible()
+    await expect(page.getByText('Loan principal payment 1')).toBeVisible()
+    await expect(page.getByText(`€${new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(firstPayment.principalAmount)}`)).toBeVisible()
+
+    for (let paymentIndex = createdLoan!.paymentsMade; paymentIndex < 10; paymentIndex += 1) {
+      applyMockLoanTickPayment(state, createdLoan!.id, 'mortgage-company-account-1', company!.id, factory!.name)
+    }
+
+    await page.goto('/bank/government-bank-1')
+    expect(state.myLoans[0]?.remainingPrincipal).toBe(0)
+    await expect(page.locator('.loan-row', { hasText: 'REPAID' })).toBeVisible()
+    await expect(page.locator('.loan-row', { hasText: factory!.name })).toContainText('REPAID')
+
+    await page.goto('/bank-statement/mortgage-company-account-1')
+    await expect(page.getByText('Loan principal payment 10')).toBeVisible()
+    await expect(page.getByText('Loan interest payment 10')).toBeVisible()
   })
 })
 
@@ -1467,8 +1678,8 @@ test.describe('Banking ownership — dashboard link and activation flow', () => 
 
     // Rates section is now visible even before activation so the owner can pre-configure
     await expect(page.getByText('Bank Rates Configuration')).toBeVisible()
-    // Loan Offers section still NOT shown (activation required to publish offers)
-    await expect(page.getByText('Loan Offers').first()).toBeHidden()
+    // Legacy loan-offer controls are gone even before activation.
+    await expect(page.getByRole('button', { name: 'Publish Loan Offer' })).toBeHidden()
   })
 
   test('base deposit button activates the bank and shows management view', async ({ page }) => {

@@ -17,7 +17,6 @@ const router = useRouter()
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 const loading = ref(true)
 const error = ref<string | null>(null)
-const offers = ref<LoanOfferSummary[]>([])
 const myLoans = ref<LoanSummary[]>([])
 const myCompanies = ref<Company[]>([])
 
@@ -55,29 +54,6 @@ const acceptError = ref<string | null>(null)
 const collateralBuildings = ref<CollateralEligibilitySummary[]>([])
 const selectedCollateralBuildingId = ref<string | null>(null)
 const collateralLoadError = ref<string | null>(null)
-
-const LOAN_OFFERS_QUERY = `
-  {
-    loanOffers {
-      id
-      bankBuildingId
-      bankBuildingName
-      cityId
-      cityName
-      lenderCompanyId
-      lenderCompanyName
-      annualInterestRatePercent
-      maxPrincipalPerLoan
-      totalCapacity
-      usedCapacity
-      remainingCapacity
-      durationTicks
-      isActive
-      createdAtTick
-      createdAtUtc
-    }
-  }
-`
 
 const MY_LOANS_QUERY = `
   {
@@ -228,11 +204,7 @@ async function loadData(isRefresh = false) {
       await auth.fetchMe()
     }
 
-    const [offersResult, banksResult] = await Promise.all([gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY), gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY)])
-    const newOffers = offersResult.loanOffers ?? []
-    if (!deepEqual(offers.value, newOffers)) {
-      offers.value = newOffers
-    }
+    const banksResult = await gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY)
     const newBanks = banksResult.allBanks ?? []
     if (!deepEqual(allBanks.value, newBanks)) {
       allBanks.value = newBanks

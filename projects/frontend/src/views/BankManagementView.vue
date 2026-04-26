@@ -9,7 +9,7 @@ import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
 import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, CollateralEligibilitySummary } from '@/types'
-import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass, computeCapacityUsedPercent, computeTotalRepayment, computePaymentAmount, computeTotalPayments } from '@/lib/loanHelpers'
+import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass, computeTotalRepayment, computePaymentAmount, computeTotalPayments } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -21,7 +21,6 @@ const bankBuildingId = computed(() => route.params.buildingId as string)
 
 const loading = ref(true)
 const error = ref<string | null>(null)
-const myOffers = ref<LoanOfferSummary[]>([])
 const issuedLoans = ref<LoanSummary[]>([])
 const bankDeposits = ref<BankDepositSummary[]>([])
 const bankInfo = ref<BankInfoSummary | null>(null)
@@ -37,7 +36,6 @@ const isOwner = computed(() => {
 })
 
 // Customer-specific state
-const bankLoanOffers = ref<LoanOfferSummary[]>([])
 const myDepositsHere = ref<BankDepositSummary[]>([])
 const customerDepositAmount = ref(0)
 const customerDepositLoading = ref(false)
@@ -78,40 +76,6 @@ const baseDepositLoading = ref(false)
 const baseDepositError = ref<string | null>(null)
 const baseDepositSuccess = ref(false)
 
-// Publish offer form
-const showPublishForm = ref(false)
-const publishLoading = ref(false)
-const publishError = ref<string | null>(null)
-const offerForm = ref({
-  annualInterestRatePercent: 10,
-  maxPrincipalPerLoan: 50000,
-  totalCapacity: 200000,
-  durationTicks: 1440,
-})
-
-const MY_LOAN_OFFERS_QUERY = `
-  {
-    myLoanOffers {
-      id
-      bankBuildingId
-      bankBuildingName
-      cityId
-      cityName
-      lenderCompanyId
-      lenderCompanyName
-      annualInterestRatePercent
-      maxPrincipalPerLoan
-      totalCapacity
-      usedCapacity
-      remainingCapacity
-      durationTicks
-      isActive
-      createdAtTick
-      createdAtUtc
-    }
-  }
-`
-
 const BANK_LOANS_QUERY = `
   query BankLoans($bankBuildingId: UUID!) {
     bankLoans(bankBuildingId: $bankBuildingId) {
@@ -141,35 +105,6 @@ const BANK_LOANS_QUERY = `
       collateralBuildingId
       collateralBuildingName
       collateralAppraisedValue
-    }
-  }
-`
-
-const PUBLISH_OFFER_MUTATION = `
-  mutation PublishLoanOffer($input: PublishLoanOfferInput!) {
-    publishLoanOffer(input: $input) {
-      id
-      isActive
-      annualInterestRatePercent
-    }
-  }
-`
-
-const UPDATE_OFFER_MUTATION = `
-  mutation UpdateLoanOffer($input: UpdateLoanOfferInput!) {
-    updateLoanOffer(input: $input) {
-      id
-      isActive
-      annualInterestRatePercent
-    }
-  }
-`
-
-const DEACTIVATE_OFFER_MUTATION = `
-  mutation DeactivateLoanOffer($id: UUID!) {
-    deactivateLoanOffer(loanOfferId: $id) {
-      id
-      isActive
     }
   }
 `
@@ -256,25 +191,6 @@ const MY_COMPANIES_QUERY = `
         playerId
         buildings { id type }
       }
-    }
-  }
-`
-
-const PUBLIC_LOAN_OFFERS_QUERY = `
-  {
-    loanOffers {
-      id
-      bankBuildingId
-      bankBuildingName
-      lenderCompanyId
-      lenderCompanyName
-      annualInterestRatePercent
-      maxPrincipalPerLoan
-      totalCapacity
-      usedCapacity
-      remainingCapacity
-      durationTicks
-      isActive
     }
   }
 `
@@ -410,8 +326,7 @@ async function loadData(isRefresh = false) {
 
     if (ownerDetected) {
       // Owner view: load full management data
-      const [offersResult, loansResult, depositsResult] = await Promise.all([
-        gqlRequest<{ myLoanOffers: LoanOfferSummary[] }>(MY_LOAN_OFFERS_QUERY),
+      const [loansResult, depositsResult] = await Promise.all([
         gqlRequest<{ bankLoans: LoanSummary[] }>(BANK_LOANS_QUERY, {
           bankBuildingId: bankBuildingId.value,
         }),
@@ -419,10 +334,6 @@ async function loadData(isRefresh = false) {
           id: bankBuildingId.value,
         }),
       ])
-      const filtered = (offersResult.myLoanOffers ?? []).filter((o) => o.bankBuildingId === bankBuildingId.value)
-      if (!deepEqual(myOffers.value, filtered)) {
-        myOffers.value = filtered
-      }
       const loans = loansResult.bankLoans ?? []
       if (!deepEqual(issuedLoans.value, loans)) {
         issuedLoans.value = loans
@@ -436,16 +347,11 @@ async function loadData(isRefresh = false) {
         ratesForm.value.lendingInterestRatePercent = bankInfo.value.lendingInterestRatePercent
       }
     } else {
-      // Customer view: load public loan offers, my deposits, and my loans at this bank
-      const [offersResult, depositsResult, myLoansResult] = await Promise.all([
-        gqlRequest<{ loanOffers: LoanOfferSummary[] }>(PUBLIC_LOAN_OFFERS_QUERY),
+      // Customer view: load deposit relationship and active loans at this bank.
+      const [depositsResult, myLoansResult] = await Promise.all([
         auth.isAuthenticated ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY) : Promise.resolve({ myDeposits: [] }),
         auth.isAuthenticated ? gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY) : Promise.resolve({ myLoans: [] }),
       ])
-      const bankOffers = (offersResult.loanOffers ?? []).filter((o) => o.bankBuildingId === bankBuildingId.value && o.isActive)
-      if (!deepEqual(bankLoanOffers.value, bankOffers)) {
-        bankLoanOffers.value = bankOffers
-      }
       const myDeposits = (depositsResult.myDeposits ?? []).filter((d) => d.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myDepositsHere.value, myDeposits)) {
         myDepositsHere.value = myDeposits
@@ -481,42 +387,6 @@ const fmt = (amount: number) => formatCurrency(amount, cityCurrency.value)
 const totalIssuedCapacity = computed(() => issuedLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE').reduce((sum, l) => sum + l.remainingPrincipal, 0))
 
 const expectedMonthlyIncome = computed(() => issuedLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE').reduce((sum, l) => sum + l.paymentAmount, 0))
-
-async function publishOffer() {
-  if (!bankBuildingId.value) return
-  publishLoading.value = true
-  publishError.value = null
-  try {
-    await gqlRequest(PUBLISH_OFFER_MUTATION, {
-      input: {
-        bankBuildingId: bankBuildingId.value,
-        ...offerForm.value,
-      },
-    })
-    showPublishForm.value = false
-    offerForm.value = { annualInterestRatePercent: 10, maxPrincipalPerLoan: 50000, totalCapacity: 200000, durationTicks: 1440 }
-    await loadData()
-  } catch (err) {
-    publishError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    publishLoading.value = false
-  }
-}
-
-async function toggleOfferActive(offer: LoanOfferSummary) {
-  try {
-    if (offer.isActive) {
-      await gqlRequest(DEACTIVATE_OFFER_MUTATION, { id: offer.id })
-    } else {
-      await gqlRequest(UPDATE_OFFER_MUTATION, {
-        input: { loanOfferId: offer.id, isActive: true },
-      })
-    }
-    await loadData()
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
-  }
-}
 
 async function saveRates() {
   if (!bankBuildingId.value) return
@@ -562,6 +432,30 @@ async function submitBaseDeposit() {
 
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
+const directBorrowingOption = computed<LoanOfferSummary | null>(() => {
+  if (!bankInfo.value?.baseCapitalDeposited) {
+    return null
+  }
+
+  return {
+    id: bankInfo.value.bankBuildingId,
+    bankBuildingId: bankInfo.value.bankBuildingId,
+    bankBuildingName: bankInfo.value.bankBuildingName,
+    cityId: bankInfo.value.cityId,
+    cityName: bankInfo.value.cityName,
+    lenderCompanyId: bankInfo.value.lenderCompanyId,
+    lenderCompanyName: bankInfo.value.lenderCompanyName,
+    annualInterestRatePercent: bankInfo.value.lendingInterestRatePercent,
+    maxPrincipalPerLoan: Math.max(bankInfo.value.availableLendingCapacity, 0),
+    totalCapacity: bankInfo.value.lendableCapacity,
+    usedCapacity: bankInfo.value.outstandingLoanPrincipal,
+    remainingCapacity: Math.max(bankInfo.value.availableLendingCapacity, 0),
+    durationTicks: 8760,
+    isActive: bankInfo.value.availableLendingCapacity > 0,
+    createdAtTick: 0,
+    createdAtUtc: '',
+  }
+})
 
 // Account-style aggregation: treat all active non-base-capital deposits from active company as one account
 const myActiveDepositsHere = computed(() => myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital))
@@ -978,86 +872,6 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
         </div>
 
-        <!-- Loan Offers Management -->
-        <section v-if="bankInfo?.baseCapitalDeposited" class="offers-section">
-          <div class="section-header">
-            <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
-            <button class="btn btn-primary btn-sm" @click="showPublishForm = !showPublishForm">
-              {{ showPublishForm ? t('common.cancel') : t('bank.publishOffer') }}
-            </button>
-          </div>
-
-          <!-- Publish Form -->
-          <div v-if="showPublishForm" class="publish-form">
-            <h3>{{ t('bank.publishOffer') }}</h3>
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="offer-interest-rate">{{ t('bank.interestRate') }} (%)</label>
-                <input id="offer-interest-rate" v-model.number="offerForm.annualInterestRatePercent" type="number" min="0.1" max="200" step="0.1" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label for="offer-max-principal">{{ t('bank.maxPrincipal') }} ($)</label>
-                <input id="offer-max-principal" v-model.number="offerForm.maxPrincipalPerLoan" type="number" min="1000" step="1000" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label for="offer-total-capacity">{{ t('bank.totalCapacity') }} ($)</label>
-                <input id="offer-total-capacity" v-model.number="offerForm.totalCapacity" type="number" min="1000" step="1000" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label for="offer-duration">{{ t('bank.durationTicks') }}</label>
-                <input id="offer-duration" v-model.number="offerForm.durationTicks" type="number" min="24" max="87600" step="24" class="form-input" />
-                <span class="form-hint">{{ formatLoanDuration(offerForm.durationTicks) }}</span>
-              </div>
-            </div>
-            <div v-if="publishError" class="error-message">{{ publishError }}</div>
-            <button class="btn btn-primary" :disabled="publishLoading" @click="publishOffer">
-              {{ publishLoading ? t('common.loading') : t('bank.publishOffer') }}
-            </button>
-          </div>
-
-          <!-- Offers list -->
-          <div v-if="myOffers.length === 0" class="empty-state">
-            <p>No loan offers published for this bank yet.</p>
-          </div>
-          <div v-else class="offers-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ t('bank.interestRate') }}</th>
-                  <th>{{ t('bank.maxPrincipal') }}</th>
-                  <th>{{ t('bank.remainingCapacity') }}</th>
-                  <th>{{ t('bank.duration') }}</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="offer in myOffers" :key="offer.id">
-                  <td>{{ formatPercent(offer.annualInterestRatePercent) }}</td>
-                  <td>{{ fmt(offer.maxPrincipalPerLoan) }}</td>
-                  <td>
-                    {{ fmt(offer.remainingCapacity) }}
-                    <div class="capacity-bar">
-                      <div class="capacity-fill" :style="{ width: `${computeCapacityUsedPercent(offer)}%` }" />
-                    </div>
-                  </td>
-                  <td>{{ formatLoanDuration(offer.durationTicks) }}</td>
-                  <td>
-                    <span class="status-pill" :class="offer.isActive ? 'status-active' : 'status-inactive'">
-                      {{ offer.isActive ? 'Active' : 'Inactive' }}
-                    </span>
-                  </td>
-                  <td>
-                    <button class="btn btn-sm btn-secondary" @click="toggleOfferActive(offer)">
-                      {{ offer.isActive ? t('bank.deactivateOffer') : t('bank.activateOffer') }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
         <!-- Issued Loans -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
           <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
@@ -1224,38 +1038,39 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
         </section>
 
-        <!-- Available loan offers -->
+        <!-- Direct loan request -->
         <section class="customer-loans-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.loanOffers') }}</h2>
-          <div v-if="bankLoanOffers.length === 0" class="empty-state">
+          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.borrowFromThisBank') }}</h2>
+          <div v-if="!directBorrowingOption" class="empty-state">
             <p>{{ t('bank.noOffersFromBank') }}</p>
           </div>
           <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <div v-for="offer in bankLoanOffers" :key="offer.id" class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+            <div class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
               <div class="customer-offer-header">
-                <span class="offer-rate-big">{{ formatPercent(offer.annualInterestRatePercent) }}</span>
+                <span class="offer-rate-big">{{ formatPercent(directBorrowingOption.annualInterestRatePercent) }}</span>
                 <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
               </div>
               <div class="customer-offer-stats">
                 <div class="offer-stat-row">
                   <span>{{ t('bank.maxPrincipal') }}</span>
-                  <strong>{{ fmt(offer.maxPrincipalPerLoan) }}</strong>
+                  <strong>{{ fmt(directBorrowingOption.maxPrincipalPerLoan) }}</strong>
                 </div>
                 <div class="offer-stat-row">
                   <span>{{ t('bank.remainingCapacity') }}</span>
-                  <strong :class="offer.remainingCapacity > 0 ? 'positive' : 'muted'">
-                    {{ fmt(offer.remainingCapacity) }}
+                  <strong :class="directBorrowingOption.remainingCapacity > 0 ? 'positive' : 'muted'">
+                    {{ fmt(directBorrowingOption.remainingCapacity) }}
                   </strong>
                 </div>
                 <div class="offer-stat-row">
                   <span>{{ t('bank.duration') }}</span>
-                  <strong>{{ formatLoanDuration(offer.durationTicks) }}</strong>
+                  <strong>{{ formatLoanDuration(directBorrowingOption.durationTicks) }}</strong>
                 </div>
               </div>
+              <p class="offer-context-hint">{{ t('bank.directBorrowingHint') }}</p>
 
               <!-- Loan request: just the Accept button (opens modal) -->
-              <div v-if="auth.isAuthenticated && isCompanyAccountActive && offer.remainingCapacity > 0">
-                <button class="btn btn-primary btn-sm" @click="selectLoanOffer(offer)">
+              <div v-if="auth.isAuthenticated && isCompanyAccountActive && directBorrowingOption.remainingCapacity > 0">
+                <button class="btn btn-primary btn-sm" @click="selectLoanOffer(directBorrowingOption)">
                   {{ t('bank.acceptLoan') }}
                 </button>
               </div>
@@ -1263,7 +1078,7 @@ const estimatedCustomerTotalPayments = computed(() => {
                 <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
               </div>
               <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
-              <p v-else class="offer-context-hint muted">No capacity available</p>
+              <p v-else class="offer-context-hint muted">{{ t('bank.noCapacityAvailable') }}</p>
             </div>
           </div>
         </section>
