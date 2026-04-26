@@ -189,7 +189,7 @@ const CLOSE_BANK_ACCOUNT_MUTATION = `
     closeBankAccount(input: $input) {
       id
       isActive
-      closedAtUtc
+      withdrawnAtUtc
     }
   }
 `
@@ -461,7 +461,7 @@ async function closeBankAccount(accountId: string) {
 
 <template>
   <main class="loan-marketplace-view container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
-    <div class="flex flex-col gap-10 lg:gap-12">
+    <div class="flex flex-col">
       <div class="page-header flex flex-col gap-3">
         <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ t('bank.banks') }}</h1>
         <p class="page-subtitle max-w-3xl text-sm text-muted sm:text-base">{{ t('bank.browseBanks') }}</p>

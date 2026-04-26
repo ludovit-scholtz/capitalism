@@ -329,7 +329,18 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        if (input.Amount <= 0m || input.Amount > deposit.Balance)
+        if (deposit.Balance == 0m)
+        {
+            if (input.Amount != 0m)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("Withdrawal amount must be 0 for a zero-balance account closure.")
+                        .SetCode("INVALID_AMOUNT")
+                        .Build());
+            }
+        }
+        else if (input.Amount <= 0m || input.Amount > deposit.Balance)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
@@ -347,12 +358,16 @@ public sealed partial class Mutation
         var bankAccounts = await LoadActiveCompanyBankAccountsAsync(db, bankCompany.Id, httpContextAccessor.HttpContext!.RequestAborted);
         var actualBankPay = Math.Min(payout, Math.Max(0m, CompanyBankingService.GetTotalBalance(bankAccounts)));
         var centralBankCoverage = payout - actualBankPay;
-        var destinationAccount = await ResolveCompanyTransferAccountAsync(
-            db,
-            depositorCompany.Id,
-            deposit.CurrencyCode,
-            deposit.Id,
-            httpContextAccessor.HttpContext.RequestAborted);
+        BankAccount? destinationAccount = null;
+        if (payout > 0m)
+        {
+            destinationAccount = await ResolveCompanyTransferAccountAsync(
+                db,
+                depositorCompany.Id,
+                deposit.CurrencyCode,
+                deposit.Id,
+                httpContextAccessor.HttpContext.RequestAborted);
+        }
 
         // Transfer cash back to depositor
         CompanyBankingService.TryDebit(bankAccounts, actualBankPay, deposit.CurrencyCode);
@@ -361,7 +376,10 @@ public sealed partial class Mutation
             // Central bank injects the shortfall directly — bank owes it back
             bank.CentralBankDebt += centralBankCoverage;
         }
-        destinationAccount.Balance += payout;
+        if (destinationAccount is not null)
+        {
+            destinationAccount.Balance += payout;
+        }
         bank.TotalDeposits -= input.Amount;
         deposit.Balance -= input.Amount;
 
@@ -373,18 +391,21 @@ public sealed partial class Mutation
         }
 
         // Ledger: depositor receives withdrawal
-        db.LedgerEntries.Add(new LedgerEntry
+        if (payout > 0m && destinationAccount is not null)
         {
-            Id = Guid.NewGuid(),
-            CompanyId = deposit.CompanyId!.Value,
-            BuildingId = bank.Id,
-            BankAccountId = destinationAccount.Id,
-            Category = LedgerCategory.DepositWithdrawn,
-            Description = $"Withdrawal from {bank.Name}",
-            Amount = payout,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = DateTime.UtcNow,
-        });
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = deposit.CompanyId!.Value,
+                BuildingId = bank.Id,
+                BankAccountId = destinationAccount.Id,
+                Category = LedgerCategory.DepositWithdrawn,
+                Description = $"Withdrawal from {bank.Name}",
+                Amount = payout,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+        }
 
         // If bank couldn't fully pay from own cash, record central-bank emergency coverage
         if (centralBankCoverage > 0m)

@@ -90,7 +90,7 @@ public sealed partial class Query
             return [];
 
         var accounts = await db.BankAccounts
-            .Where(a => a.CompanyId == companyId)
+            .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
             .AsNoTracking()
             .ToListAsync();
 

@@ -26232,6 +26232,68 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task CloseBankAccount_ZeroBalance_WithZeroAmount_ClosesAccount()
+    {
+        var bankOwnerEmail = $"bank-owner-zero-close-{Guid.NewGuid():N}@test.com";
+        var depositorEmail = $"depositor-zero-close-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(bankOwnerEmail, "ZeroCloseBankOwner");
+        var depositorToken = await RegisterAndGetTokenAsync(depositorEmail, "ZeroCloseDepositor");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
+        var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var bankCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "ZeroCloseBankCo", Cash = 20_000_000m };
+        db.Companies.Add(bankCompany);
+        var depositorCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "ZeroCloseDepCo", Cash = 0m };
+        db.Companies.Add(depositorCompany);
+
+        var bank = CreateTestBank(db, bankCompany, city.Id, 20_050_000m);
+
+        var deposit = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = depositorCompany.Id,
+            BankBuildingId = bank.Id,
+            Balance = 0m,
+            DepositInterestRatePercent = 5m,
+            IsBaseCapitalDeposit = false,
+            DepositedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow,
+            TotalInterestPaid = 0m,
+            IsGovernmentAccount = false,
+        };
+        db.BankAccounts.Add(deposit);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+                        mutation Wd($input: CloseBankAccountInput!) {
+                            closeBankAccount(input: $input) {
+                id
+                amount
+                isActive
+              }
+            }
+            """,
+            new { input = new { depositId = deposit.Id.ToString(), amount = 0m } },
+            depositorToken);
+
+        var data = result.GetProperty("data").GetProperty("closeBankAccount");
+        Assert.Equal(0m, data.GetProperty("amount").GetDecimal());
+        Assert.False(data.GetProperty("isActive").GetBoolean());
+
+        await db.Entry(deposit).ReloadAsync();
+        Assert.Equal(0m, deposit.Balance);
+        Assert.NotNull(deposit.ClosedAtUtc);
+        Assert.NotNull(deposit.ClosedAtTick);
+    }
+
+    [Fact]
     public async Task SetBankRates_ByOwner_UpdatesDepositAndLendingRates()
     {
         var ownerEmail = $"bank-rates-{Guid.NewGuid():N}@test.com";

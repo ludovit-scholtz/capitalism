@@ -125,6 +125,80 @@ public sealed class BuildingBankAccountTests
         Assert.Equal("EUR", info.GetProperty("currencyCode").GetString());
     }
 
+    [Fact]
+    public async Task CompanyBankAccounts_ExcludesClosedAccounts()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-company-accounts-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Company Accounts Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var activeAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            Balance = 1_000m,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+
+        var closedAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            Balance = 0m,
+            CreatedAtUtc = DateTime.UtcNow,
+            ClosedAtTick = 10,
+            ClosedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+
+        db.BankAccounts.AddRange(activeAccount, closedAccount);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query CompanyBankAccounts($companyId: UUID!) {
+              companyBankAccounts(companyId: $companyId) {
+                id
+                accountNumber
+                currencyCode
+                balance
+              }
+            }
+            """,
+            new { companyId = company.Id },
+            token);
+
+        var accounts = result.GetProperty("data").GetProperty("companyBankAccounts").EnumerateArray().ToList();
+        var accountIds = accounts
+            .Select(account => account.GetProperty("id").GetString())
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet();
+
+        Assert.Contains(activeAccount.Id.ToString(), accountIds);
+        Assert.DoesNotContain(closedAccount.Id.ToString(), accountIds);
+    }
+
     // ── fundBuildingBankAccount mutation ──────────────────────────────────────
 
     [Fact]
