@@ -24,16 +24,12 @@ const cities = ref<City[]>([])
 // ── City helpers ──────────────────────────────────────────────────────────────
 
 function countryFlag(code: string): string {
-  return [...code.toUpperCase()]
-    .map((c) => String.fromCodePoint(0x1f1e6 - 65 + c.charCodeAt(0)))
-    .join('')
+  return [...code.toUpperCase()].map((c) => String.fromCodePoint(0x1f1e6 - 65 + c.charCodeAt(0))).join('')
 }
 
 async function loadCities() {
   try {
-    const data = await gqlRequest<{ cities: City[] }>(
-      `{ cities { id name countryCode currencyCode latitude longitude population } }`,
-    )
+    const data = await gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode currencyCode latitude longitude population } }`)
     if (data?.cities) {
       cities.value = data.cities
     }
@@ -53,10 +49,7 @@ const buildingCountByCity = computed<Record<string, number>>(() => {
   const result: Record<string, number> = {}
   const companies = auth.player?.companies ?? []
   const activeCompanyId = auth.player?.activeCompanyId
-  const filtered =
-    auth.player?.activeAccountType === 'COMPANY' && activeCompanyId
-      ? companies.filter((c) => c.id === activeCompanyId)
-      : companies
+  const filtered = auth.player?.activeAccountType === 'COMPANY' && activeCompanyId ? companies.filter((c) => c.id === activeCompanyId) : companies
   for (const company of filtered) {
     for (const b of company.buildings ?? []) {
       result[b.cityId] = (result[b.cityId] ?? 0) + 1
@@ -72,12 +65,8 @@ function selectCity(id: string) {
 // ── Account helpers ───────────────────────────────────────────────────────────
 
 const accountOptions = computed(() => buildAccountOptions(auth.player, auth.player?.companies ?? []))
-const activeAccountName = computed(
-  () => getActiveAccountName(auth.player, auth.player?.companies ?? []) ?? auth.player?.displayName ?? '',
-)
-const activeAccountBadgeKey = computed(() =>
-  auth.player?.activeAccountType === 'COMPANY' ? 'accountSwitcher.companyBadge' : 'accountSwitcher.personBadge',
-)
+const activeAccountName = computed(() => getActiveAccountName(auth.player, auth.player?.companies ?? []) ?? auth.player?.displayName ?? '')
+const activeAccountBadgeKey = computed(() => (auth.player?.activeAccountType === 'COMPANY' ? 'accountSwitcher.companyBadge' : 'accountSwitcher.personBadge'))
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat(locale.value, {
@@ -101,10 +90,7 @@ function getRouteTarget(accountType: 'PERSON' | 'COMPANY', companyId: string | n
 
 async function switchAccount(accountType: 'PERSON' | 'COMPANY', companyId: string | null, key: string) {
   if (!auth.player) return
-  if (
-    auth.player.activeAccountType === accountType &&
-    (accountType !== 'COMPANY' || auth.player.activeCompanyId === companyId)
-  ) {
+  if (auth.player.activeAccountType === accountType && (accountType !== 'COMPANY' || auth.player.activeCompanyId === companyId)) {
     closePanel()
     emit('switched')
     return
@@ -158,14 +144,7 @@ defineExpose({ closePanel })
 <template>
   <div v-if="auth.player" ref="root" class="ctx-switcher">
     <!-- Trigger -->
-    <button
-      type="button"
-      class="ctx-trigger"
-      :aria-expanded="isOpen"
-      aria-haspopup="menu"
-      :aria-label="`${selectedCity?.name ?? '…'} · ${activeAccountName}`"
-      @click="togglePanel"
-    >
+    <button type="button" class="ctx-trigger" :aria-expanded="isOpen" aria-haspopup="menu" :aria-label="`${selectedCity?.name ?? '…'} · ${activeAccountName}`" @click="togglePanel">
       <!-- City segment -->
       <span class="ctx-city-seg">
         <span class="ctx-flag" aria-hidden="true">
@@ -246,11 +225,7 @@ defineExpose({ closePanel })
           <span class="ctx-acc-main">
             <span class="ctx-acc-name">{{ option.name }}</span>
             <span class="ctx-acc-type">
-              {{
-                option.accountType === 'PERSON'
-                  ? t('accountSwitcher.personalAccountHint')
-                  : t('accountSwitcher.companyAccountHint')
-              }}
+              {{ option.accountType === 'PERSON' ? t('accountSwitcher.personalAccountHint') : t('accountSwitcher.companyAccountHint') }}
             </span>
           </span>
           <span class="ctx-acc-meta">
