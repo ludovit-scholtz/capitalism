@@ -21,10 +21,17 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Migrate all views to Tailwind
 - [ ] Update all components to use Tailwind utilities
 
+### City selection
+
+- [ ] In the top menu where company is selected add selection also for the city
+- [ ] In the player dashboard filter only buildings in the selected city
+- [ ] In the banking page show only banks in the selected city
+- [ ] In the global exchange remove the city selection and use the selection from the navbar
+- [ ] In the marketing analytics page show only data related to selected the city
+
 ### Government company
 
 - [ ] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
-- [ ] Create one government bank for each currency
 
 ### Currencies and bank accounts (50% complete)
 
@@ -102,6 +109,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When the current rent is higher then the city accepted rate adjusted to the location index, the residency will slowly decrease to 50%.
 - [ ] When the current rent is lower then the city accepted rate adjusted to the location index, the occupancy will increase. The occupancy can convergate to 100% if the current rate is for long time below 60% of the city rate. If it is at the current city rate adjusted by the location index plus 10%, it can reach maximum 90% of the occupancy.
 - [ ] Every appartment and commercial building bears with it the constant costs which are calculated to be equal to earning if the occupancy is equal to 75%
+
+### News
+
+- [ ] When backend is restarted it must store all news from the changelog csv to the game server database. At the moment i see only few news and changelog csv is not imported.
+- [ ] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports.
 
 ## FX Exahcnge
 

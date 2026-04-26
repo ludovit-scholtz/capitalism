@@ -2652,8 +2652,12 @@ export function useBuildingDetail() {
 
   function getConfiguredItemImageUrl(unit: GridUnit | undefined): string | null {
     const resourceTypeId = unit && 'resourceTypeId' in unit ? unit.resourceTypeId : null
-    if (!resourceTypeId) return null
-    return resourceTypes.value.find((resource) => resource.id === resourceTypeId)?.imageUrl ?? null
+    if (resourceTypeId) {
+      return resourceTypes.value.find((resource) => resource.id === resourceTypeId)?.imageUrl ?? null
+    }
+    const productTypeId = unit && 'productTypeId' in unit ? unit.productTypeId : null
+    if (!productTypeId) return null
+    return productTypes.value.find((product) => product.id === productTypeId)?.imageUrl ?? null
   }
 
   function getConfiguredItemMonogram(unit: GridUnit | undefined): string {
