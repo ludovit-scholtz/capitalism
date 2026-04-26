@@ -123,7 +123,10 @@ const {
           v-if="building?.contentBudgetPerTick"
           class="btn btn-secondary"
           :disabled="savingContentBudget"
-          @click="contentBudgetInput = 0; saveContentBudget()"
+          @click="
+            contentBudgetInput = 0
+            saveContentBudget()
+          "
         >
           {{ t('mediaHouse.stopInvestmentBtn') }}
         </button>

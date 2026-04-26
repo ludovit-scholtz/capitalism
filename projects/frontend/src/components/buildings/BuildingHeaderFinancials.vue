@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  fmtBuildingAmount,
-  fmtBuildingProfit,
-  profitClass,
-  hasFinancialData,
-} from '@/lib/buildingHeaderFormatters'
+import { fmtBuildingAmount, fmtBuildingProfit, profitClass, hasFinancialData } from '@/lib/buildingHeaderFormatters'
 
 interface Props {
   revenue: number | null
@@ -138,12 +133,7 @@ function fmtProfit(value: number | null): string {
 .bh-skeleton {
   display: block;
   border-radius: var(--radius-sm);
-  background: linear-gradient(
-    90deg,
-    var(--color-border) 25%,
-    color-mix(in srgb, var(--color-border) 60%, transparent) 50%,
-    var(--color-border) 75%
-  );
+  background: linear-gradient(90deg, var(--color-border) 25%, color-mix(in srgb, var(--color-border) 60%, transparent) 50%, var(--color-border) 75%);
   background-size: 200% 100%;
   animation: bh-shimmer 1.4s ease-in-out infinite;
 }

@@ -41,7 +41,10 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
         <div class="research-brand-metrics my-2 flex flex-col gap-2">
           <div v-if="brand.quality > 0" class="research-metric grid grid-cols-[7rem_minmax(0,1fr)_3.5rem] items-center gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
             <span class="research-metric-label whitespace-nowrap text-[0.8125rem] text-muted">{{ t('research.qualityLabel') }}</span>
-            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="t('buildingDetail.accessibility.researchProductQuality', { value: (brand.quality * 100).toFixed(1) })">
+            <div
+              class="research-progress-bar h-2 overflow-hidden rounded-full bg-border"
+              :aria-label="t('buildingDetail.accessibility.researchProductQuality', { value: (brand.quality * 100).toFixed(1) })"
+            >
               <div
                 class="research-progress-fill research-progress-quality h-full rounded-full bg-primary transition-[width] duration-300"
                 :style="{ width: `${(brand.quality * 100).toFixed(1)}%` }"
@@ -66,7 +69,10 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
 
           <div v-if="brand.awareness > 0" class="research-metric grid grid-cols-[7rem_minmax(0,1fr)_3.5rem] items-center gap-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
             <span class="research-metric-label whitespace-nowrap text-[0.8125rem] text-muted">{{ t('research.awarenessLabel') }}</span>
-            <div class="research-progress-bar h-2 overflow-hidden rounded-full bg-border" :aria-label="t('buildingDetail.accessibility.researchBrandAwareness', { value: (brand.awareness * 100).toFixed(1) })">
+            <div
+              class="research-progress-bar h-2 overflow-hidden rounded-full bg-border"
+              :aria-label="t('buildingDetail.accessibility.researchBrandAwareness', { value: (brand.awareness * 100).toFixed(1) })"
+            >
               <div
                 class="research-progress-fill research-progress-awareness h-full rounded-full bg-violet-500 transition-[width] duration-300"
                 :style="{ width: `${(brand.awareness * 100).toFixed(1)}%` }"
