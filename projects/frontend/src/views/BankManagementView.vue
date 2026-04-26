@@ -1151,15 +1151,7 @@ const estimatedCustomerTotalPayments = computed(() => {
           <!-- Borrower-selected duration -->
           <div class="form-group">
             <label for="duration-ticks">{{ t('bank.durationTicks') }}</label>
-            <input
-              id="duration-ticks"
-              v-model.number="customerLoanDurationTicks"
-              type="number"
-              min="24"
-              max="87600"
-              step="24"
-              class="form-input"
-            />
+            <input id="duration-ticks" v-model.number="customerLoanDurationTicks" type="number" min="24" max="87600" step="24" class="form-input" />
           </div>
 
           <!-- Repayment preview -->
@@ -1220,12 +1212,7 @@ const estimatedCustomerTotalPayments = computed(() => {
           <button
             class="btn btn-primary"
             :disabled="
-              customerLoanLoading ||
-              customerLoanPrincipal <= 0 ||
-              customerLoanDurationTicks < 24 ||
-              customerLoanDurationTicks > 87600 ||
-              !!collateralRequiredWarning ||
-              !!collateralCapacityWarning
+              customerLoanLoading || customerLoanPrincipal <= 0 || customerLoanDurationTicks < 24 || customerLoanDurationTicks > 87600 || !!collateralRequiredWarning || !!collateralCapacityWarning
             "
             @click="submitCustomerLoan"
           >

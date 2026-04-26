@@ -6282,14 +6282,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
 
-      if (
-        input.collateralBuildingId &&
-        state.myLoans.some(
-          (loan) =>
-            loan.collateralBuildingId === input.collateralBuildingId &&
-            (loan.status === 'ACTIVE' || loan.status === 'OVERDUE'),
-        )
-      ) {
+      if (input.collateralBuildingId && state.myLoans.some((loan) => loan.collateralBuildingId === input.collateralBuildingId && (loan.status === 'ACTIVE' || loan.status === 'OVERDUE'))) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
