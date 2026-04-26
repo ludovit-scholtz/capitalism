@@ -2206,6 +2206,7 @@ export default {
     noBuildingsForCollateral: 'Nemáte žiadne vhodné budovy na zálohovanie.',
     loanAcceptedSuccess: 'Úver bol úspešne prijatý.',
     myAccount: 'Môj bankový účet',
+    operatingAccounts: 'Zúčtovací účet',
     myBankAccounts: 'Moje firemné bankové účty',
     bankAccountsToClose: 'Bankové účty dostupné na zrušenie',
     noBankAccountsYet: 'Zatiaľ neboli nájdené žiadne firemné bankové účty.',

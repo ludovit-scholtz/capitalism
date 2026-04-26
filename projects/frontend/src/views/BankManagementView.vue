@@ -8,7 +8,7 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company } from '@/types'
+import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, PlayerBankAccountSummary } from '@/types'
 import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
@@ -49,6 +49,8 @@ const withdrawError = ref<string | null>(null)
 const withdrawSuccess = ref(false)
 // My active loans at this bank (customer view)
 const myLoansHere = ref<LoanSummary[]>([])
+// Operating bank accounts matching the bank's city currency (customer view)
+const myOperatingAccountsHere = ref<PlayerBankAccountSummary[]>([])
 
 // Rate configuration form
 const showRatesForm = ref(false)
@@ -181,6 +183,23 @@ const MY_COMPANIES_QUERY = `
   }
 `
 
+const MY_BANK_ACCOUNTS_QUERY = `
+  {
+    myBankAccounts {
+      id
+      accountNumber
+      currencyCode
+      currencySymbol
+      balance
+      companyId
+      companyName
+      ownerType
+      ownerDisplayName
+      bankBuildingId
+    }
+  }
+`
+
 const MY_DEPOSITS_QUERY = `
   {
     myDeposits {
@@ -306,10 +325,11 @@ async function loadData(isRefresh = false) {
         ratesForm.value.lendingInterestRatePercent = bankInfo.value.lendingInterestRatePercent
       }
     } else {
-      // Customer view: load deposit relationship and active loans at this bank.
-      const [depositsResult, myLoansResult] = await Promise.all([
+      // Customer view: load deposit relationship, active loans, and operating accounts at this bank.
+      const [depositsResult, myLoansResult, accountsResult] = await Promise.all([
         auth.isAuthenticated ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY) : Promise.resolve({ myDeposits: [] }),
         auth.isAuthenticated ? gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY) : Promise.resolve({ myLoans: [] }),
+        auth.isAuthenticated ? gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(MY_BANK_ACCOUNTS_QUERY) : Promise.resolve({ myBankAccounts: [] }),
       ])
       const myDeposits = (depositsResult.myDeposits ?? []).filter((d) => d.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myDepositsHere.value, myDeposits)) {
@@ -318,6 +338,17 @@ async function loadData(isRefresh = false) {
       const loansHere = (myLoansResult.myLoans ?? []).filter((l: LoanSummary) => l.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myLoansHere.value, loansHere)) {
         myLoansHere.value = loansHere
+      }
+      // Operating accounts for the active company matching this bank's city currency
+      const bankCurrency = bankInfo.value?.cityCurrencyCode
+      const activeComp = getActiveCompany(auth.player, userCompanies.value)
+      const operatingAccounts = (accountsResult.myBankAccounts ?? []).filter(
+        (a) => a.ownerType === 'COMPANY' && a.companyId === activeComp?.id && bankCurrency &&
+          a.currencyCode.toUpperCase() === bankCurrency.toUpperCase() &&
+          a.bankBuildingId === bankBuildingId.value
+      )
+      if (!deepEqual(myOperatingAccountsHere.value, operatingAccounts)) {
+        myOperatingAccountsHere.value = operatingAccounts
       }
     }
   } catch (err) {
@@ -819,6 +850,24 @@ function navigateToForexTransfer() {
                 <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
                   {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
                 </button>
+              </div>
+            </div>
+
+            <!-- Operating bank accounts for this company in the bank's city currency -->
+            <div v-if="myOperatingAccountsHere.length > 0" class="mt-6 flex flex-col gap-3">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">{{ t('bank.operatingAccounts') }}</h3>
+              <div v-for="account in myOperatingAccountsHere" :key="account.id" class="operating-account-row flex items-center justify-between gap-4 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm">
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
+                  <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
+                </div>
+                <div class="flex flex-col items-end gap-0.5">
+                  <span class="text-xs text-muted">{{ t('bank.accountBalance') }}</span>
+                  <span class="text-base font-bold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
+                </div>
+                <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm shrink-0">
+                  {{ t('bankStatement.title') }}
+                </router-link>
               </div>
             </div>
 

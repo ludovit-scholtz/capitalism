@@ -135,6 +135,7 @@ public sealed partial class Query
             CompanyName = a.Company?.Name,
             OwnerType = a.CompanyId.HasValue ? "COMPANY" : "PERSON",
             OwnerDisplayName = a.Company?.Name ?? a.Player?.DisplayName ?? string.Empty,
+            BankBuildingId = a.BankBuildingId,
         }).ToList();
     }
 }

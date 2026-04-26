@@ -2215,6 +2215,7 @@ export default {
     noBuildingsForCollateral: 'Sie haben keine geeigneten Gebäude, die als Sicherheit verpfändet werden können.',
     loanAcceptedSuccess: 'Darlehen erfolgreich angenommen.',
     myAccount: 'Mein Bankkonto',
+    operatingAccounts: 'Abrechnungskonto',
     myBankAccounts: 'Meine Firmenbankkonten',
     bankAccountsToClose: 'Bankkonten, die geschlossen werden können',
     noBankAccountsYet: 'Noch keine Firmenbankkonten gefunden.',

@@ -2218,6 +2218,7 @@ export default {
     loanAcceptedSuccess: 'Loan request submitted successfully.',
     // Account-style deposit management
     myAccount: 'My Bank Account',
+    operatingAccounts: 'Settlement Account',
     myBankAccounts: 'My Company Bank Accounts',
     bankAccountsToClose: 'Bank accounts available to be closed',
     noBankAccountsYet: 'No company bank accounts found yet.',
