@@ -175,7 +175,6 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
 <style scoped>
 .building-detail-view {
   padding: 2rem 1rem;
-  max-width: 1400px;
 }
 
 .page-nav {
