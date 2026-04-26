@@ -394,8 +394,20 @@ const collateralCapacityWarning = computed(() => {
   return null
 })
 
+const collateralRequiredWarning = computed(() => {
+  if (principalAmount.value <= 0) return null
+  if (!selectedCollateralBuildingId.value) {
+    return t('bank.collateralRequired')
+  }
+  return null
+})
+
 async function confirmAcceptLoan() {
   if (!selectedOffer.value || !selectedCompanyId.value || principalAmount.value <= 0) return
+  if (!selectedCollateralBuildingId.value) {
+    acceptError.value = t('bank.collateralRequired')
+    return
+  }
   acceptLoading.value = true
   acceptError.value = null
   try {
@@ -404,7 +416,7 @@ async function confirmAcceptLoan() {
         loanOfferId: selectedOffer.value.id,
         borrowerCompanyId: selectedCompanyId.value,
         principalAmount: principalAmount.value,
-        collateralBuildingId: selectedCollateralBuildingId.value ?? undefined,
+        collateralBuildingId: selectedCollateralBuildingId.value,
       },
     })
     closeAcceptModal()
@@ -661,7 +673,7 @@ async function closeBankAccount(accountId: string) {
         <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
         <div v-if="activeTab === 'deposit'" class="deposit-tab flex flex-col gap-8 lg:gap-10">
           <section v-if="auth.isAuthenticated" class="my-bank-accounts-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.bankAccountsToClose') }}</h2>
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myBankAccounts') }}</h2>
             <div class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div v-for="account in visibleBankAccounts" :key="account.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" data-testid="bank-account-row">
                 <div class="deposit-card-header">
@@ -864,6 +876,7 @@ async function closeBankAccount(accountId: string) {
                 </label>
               </div>
               <!-- Collateral-specific warning -->
+              <p v-if="collateralRequiredWarning" class="risk-warning collateral-warning">⚠ {{ collateralRequiredWarning }}</p>
               <p v-if="collateralCapacityWarning" class="risk-warning collateral-warning">⚠ {{ collateralCapacityWarning }}</p>
               <!-- Selected collateral summary -->
               <div v-if="selectedCollateral" class="collateral-selected-summary">
@@ -890,7 +903,7 @@ async function closeBankAccount(accountId: string) {
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="closeAcceptModal">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0 || !!collateralCapacityWarning" @click="confirmAcceptLoan">
+            <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0 || !!collateralRequiredWarning || !!collateralCapacityWarning" @click="confirmAcceptLoan">
               <span v-if="acceptLoading">{{ t('common.loading') }}</span>
               <span v-else>{{ t('bank.acceptLoan') }}</span>
             </button>

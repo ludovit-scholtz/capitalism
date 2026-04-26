@@ -24910,7 +24910,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task GetLoanOffers_ReturnsActiveOffersExcludingOwn()
+    public async Task GetLoanOffers_ReturnsOpenBanksAsBorrowSources()
     {
         var lenderEmail = $"glo-lender-{Guid.NewGuid():N}@test.com";
         var borrowerEmail = $"glo-borrower-{Guid.NewGuid():N}@test.com";
@@ -24923,23 +24923,19 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var city = await db.Cities.FirstAsync();
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "GloLenderCo", Cash = 500_000m };
         db.Companies.Add(lenderCompany);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "GloBank", Level = 1 };
-        db.Buildings.Add(bank);
-        var offer = new Api.Data.Entities.LoanOffer
+        var bank = new Api.Data.Entities.Building
         {
             Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 15m,
-            MaxPrincipalPerLoan = 25_000m,
-            TotalCapacity = 100_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 720L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
+            CompanyId = lenderCompany.Id,
+            CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "GloBank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 500_000m,
+            LendingInterestRatePercent = 12m,
         };
-        db.LoanOffers.Add(offer);
+        db.Buildings.Add(bank);
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
@@ -24950,18 +24946,18 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             borrowerToken);
 
         var offers = result.GetProperty("data").GetProperty("loanOffers");
-        Assert.True(offers.GetArrayLength() >= 1, "Should see at least one offer.");
+        Assert.True(offers.GetArrayLength() >= 1, "Should see at least one borrow source.");
         var found = false;
         foreach (var o in offers.EnumerateArray())
         {
-            if (o.GetProperty("id").GetString() == offer.Id.ToString())
+            if (o.GetProperty("id").GetString() == bank.Id.ToString())
             {
                 found = true;
-                Assert.Equal(15m, o.GetProperty("annualInterestRatePercent").GetDecimal());
-                Assert.Equal(100_000m, o.GetProperty("remainingCapacity").GetDecimal());
+                Assert.Equal(12m, o.GetProperty("annualInterestRatePercent").GetDecimal());
+                Assert.Equal(450_000m, o.GetProperty("remainingCapacity").GetDecimal());
             }
         }
-        Assert.True(found, "The published offer should appear in the list.");
+        Assert.True(found, "The open bank should appear in the borrow sources list.");
     }
 
     [Fact]

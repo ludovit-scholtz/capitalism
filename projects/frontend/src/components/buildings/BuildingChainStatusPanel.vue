@@ -6,16 +6,12 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
 const {
-  chainDisplayUnits,
-  chainStatus,
-  showProductionChainPanel,
   shopChainDisplayUnits,
   shopChainStatus,
   showSalesChainPanel,
   getResourceName,
   getProductName,
   formatCurrency,
-  dismissProductionChainPanel,
   dismissSalesChainPanel,
 } = bd
 </script>

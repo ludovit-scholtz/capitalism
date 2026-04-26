@@ -277,9 +277,18 @@ public sealed partial class Mutation
         }
 
         // Load the offer with lender company.
+        // Borrower-facing UI now passes bankBuildingId as loanOfferId (direct bank borrowing).
+        // If no explicit offer exists, treat the ID as a bank ID and process directly.
         var offer = await db.LoanOffers
             .Include(o => o.LenderCompany)
+            .Include(o => o.BankBuilding)
+            .ThenInclude(b => b.City)
             .FirstOrDefaultAsync(o => o.Id == input.LoanOfferId);
+
+        if (offer is null)
+        {
+            return await AcceptLoanFromBankDirectAsync(input, borrower, db, httpContextAccessor);
+        }
 
         if (offer is null || !offer.IsActive)
         {
@@ -473,6 +482,184 @@ public sealed partial class Mutation
 
         await db.SaveChangesAsync();
 
+        return loan;
+    }
+
+    private async Task<Loan> AcceptLoanFromBankDirectAsync(
+        AcceptLoanInput input,
+        Company borrower,
+        AppDbContext db,
+        IHttpContextAccessor httpContextAccessor)
+    {
+        var bank = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .FirstOrDefaultAsync(b => b.Id == input.LoanOfferId && b.Type == BuildingType.Bank);
+
+        if (bank is null || !bank.BaseCapitalDeposited)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Bank not found or is not open for lending.")
+                    .SetCode("BANK_NOT_FOUND")
+                    .Build());
+        }
+
+        if (input.PrincipalAmount < 1_000m)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Minimum loan amount is $1,000.")
+                    .SetCode("INVALID_PRINCIPAL")
+                    .Build());
+        }
+
+        if (!input.CollateralBuildingId.HasValue)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A collateral building is required for bank loan requests.")
+                    .SetCode("COLLATERAL_REQUIRED")
+                    .Build());
+        }
+
+        var outstandingPrincipal = await db.Loans
+            .Where(l => l.BankBuildingId == bank.Id && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
+        var availableLendingCapacity = Math.Max(0m, (bank.TotalDeposits * 0.90m) - outstandingPrincipal);
+
+        if (input.PrincipalAmount > availableLendingCapacity)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"The bank only has {availableLendingCapacity:C0} of lending capacity available.")
+                    .SetCode("INSUFFICIENT_CAPACITY")
+                    .Build());
+        }
+
+        var lenderAccounts = await LoadActiveCompanyBankAccountsAsync(
+            db,
+            bank.CompanyId,
+            httpContextAccessor.HttpContext!.RequestAborted);
+
+        if (CompanyBankingService.GetTotalBalance(lenderAccounts) < input.PrincipalAmount)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The lender does not have sufficient funds to cover this loan at this time.")
+                    .SetCode("LENDER_INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        var collateralBuilding = await db.Buildings
+            .FirstOrDefaultAsync(b => b.Id == input.CollateralBuildingId.Value && b.CompanyId == borrower.Id);
+
+        if (collateralBuilding is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Collateral building not found or is not owned by your company.")
+                    .SetCode("COLLATERAL_NOT_OWNED")
+                    .Build());
+        }
+
+        var alreadyPledged = await db.Loans
+            .AnyAsync(l => l.CollateralBuildingId == input.CollateralBuildingId.Value
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
+        if (alreadyPledged)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This building is already pledged as collateral for another active loan.")
+                    .SetCode("COLLATERAL_ALREADY_PLEDGED")
+                    .Build());
+        }
+
+        var collateralAppraisedValue = WealthCalculator.GetBuildingValue(collateralBuilding);
+        var maxBorrowable = decimal.Round(collateralAppraisedValue * 0.70m, 2, MidpointRounding.AwayFromZero);
+        if (input.PrincipalAmount > maxBorrowable)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"The requested principal of {input.PrincipalAmount:C0} exceeds the collateral lending capacity of {maxBorrowable:C0}.")
+                    .SetCode("EXCEEDS_COLLATERAL_LIMIT")
+                    .Build());
+        }
+
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var durationTicks = GameConstants.TicksPerYear;
+        var annualRate = bank.LendingInterestRatePercent ?? 8m;
+
+        var ticksPerPayment = 720L;
+        var totalPayments = (int)Math.Max(1, durationTicks / ticksPerPayment);
+        var totalInterest = input.PrincipalAmount * (annualRate / 100m)
+            * ((decimal)durationTicks / GameConstants.TicksPerYear);
+        var totalRepayment = input.PrincipalAmount + totalInterest;
+        var paymentAmount = decimal.Round(totalRepayment / totalPayments, 4, MidpointRounding.AwayFromZero);
+
+        var borrowerAccount = await ResolveCompanyTransferAccountAsync(
+            db,
+            borrower.Id,
+            bank.City?.CurrencyCode ?? "EUR",
+            cancellationToken: httpContextAccessor.HttpContext.RequestAborted);
+
+        CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
+        borrowerAccount.Balance += input.PrincipalAmount;
+
+        var internalOffer = new LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = bank.CompanyId,
+            AnnualInterestRatePercent = annualRate,
+            MaxPrincipalPerLoan = input.PrincipalAmount,
+            TotalCapacity = input.PrincipalAmount,
+            UsedCapacity = input.PrincipalAmount,
+            DurationTicks = durationTicks,
+            IsActive = false,
+            CreatedAtTick = currentTick,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+
+        var loan = new Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = internalOffer.Id,
+            BorrowerCompanyId = borrower.Id,
+            BankBuildingId = bank.Id,
+            LenderCompanyId = bank.CompanyId,
+            OriginalPrincipal = input.PrincipalAmount,
+            RemainingPrincipal = input.PrincipalAmount,
+            AnnualInterestRatePercent = annualRate,
+            DurationTicks = durationTicks,
+            StartTick = currentTick,
+            DueTick = currentTick + durationTicks,
+            NextPaymentTick = currentTick + ticksPerPayment,
+            PaymentAmount = paymentAmount,
+            PaymentsMade = 0,
+            TotalPayments = totalPayments,
+            Status = LoanStatus.Active,
+            MissedPayments = 0,
+            AccumulatedPenalty = 0m,
+            AcceptedAtUtc = DateTime.UtcNow,
+            CollateralBuildingId = collateralBuilding.Id,
+            CollateralAppraisedValue = collateralAppraisedValue,
+        };
+
+        db.LoanOffers.Add(internalOffer);
+        db.Loans.Add(loan);
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrower.Id,
+            Category = LedgerCategory.LoanOrigination,
+            Description = $"Loan received from {bank.Company.Name} via {bank.Name} - {annualRate}% p.a. over {durationTicks} ticks (secured against {collateralBuilding.Name})",
+            Amount = input.PrincipalAmount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
         return loan;
     }
 }

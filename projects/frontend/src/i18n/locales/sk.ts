@@ -2195,6 +2195,7 @@ export default {
     collateralExistingExposure: 'Existujúci zabezpečený dlh',
     collateralAlreadyPledged: 'Už záložená — vyberte inú budovu',
     collateralNone: 'Žiadna (nezabezpečený úver)',
+    collateralRequired: 'Pred žiadosťou o úver musíte vybrať záložnú budovu.',
     collateralExceedsLimit: 'Požadovaná suma presahuje 70 % odhadovanej hodnoty budovy.',
     pledgedBuilding: 'Záložná budova',
     securedLoan: 'Zabezpečený úver',

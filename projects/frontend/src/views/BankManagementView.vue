@@ -640,6 +640,10 @@ function navigateToForexTransfer() {
 
 async function submitCustomerLoan() {
   if (!customerLoanOffer.value || !activeCompany.value) return
+  if (!selectedCollateralBuildingId.value) {
+    customerLoanError.value = t('bank.collateralRequired')
+    return
+  }
   customerLoanLoading.value = true
   customerLoanError.value = null
   customerLoanSuccess.value = false
@@ -649,7 +653,7 @@ async function submitCustomerLoan() {
         loanOfferId: customerLoanOffer.value.id,
         borrowerCompanyId: activeCompany.value.id,
         principalAmount: customerLoanPrincipal.value,
-        collateralBuildingId: selectedCollateralBuildingId.value ?? undefined,
+        collateralBuildingId: selectedCollateralBuildingId.value,
       },
     })
     customerLoanSuccess.value = true
@@ -705,6 +709,14 @@ const collateralCapacityWarning = computed(() => {
   if (!selectedCollateral.value || customerLoanPrincipal.value <= 0) return null
   if (customerLoanPrincipal.value > selectedCollateral.value.remainingBorrowingCapacity) {
     return t('bank.collateralExceedsLimit')
+  }
+  return null
+})
+
+const collateralRequiredWarning = computed(() => {
+  if (customerLoanPrincipal.value <= 0) return null
+  if (!selectedCollateralBuildingId.value) {
+    return t('bank.collateralRequired')
   }
   return null
 })
@@ -1116,12 +1128,11 @@ const estimatedCustomerTotalPayments = computed(() => {
         <!-- Account-style deposit relationship -->
         <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
           <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="account-header-info flex flex-col gap-2">
-              <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myAccount') }}</h2>
-              <span
-                class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
-                >{{ activeCompany?.name }}</span
-              >
+            <div class="account-header-info flex flex-row gap-2">
+              <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
+              <span class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                {{ activeCompany?.name }}
+              </span>
             </div>
             <div class="account-actions flex flex-wrap gap-3" v-if="myAccountBalance > 0">
               <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
@@ -1361,6 +1372,7 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
 
           <!-- Collateral cap warning -->
+          <div v-if="collateralRequiredWarning" class="error-inline">{{ collateralRequiredWarning }}</div>
           <div v-if="collateralCapacityWarning" class="error-inline">{{ collateralCapacityWarning }}</div>
 
           <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
@@ -1369,7 +1381,7 @@ const estimatedCustomerTotalPayments = computed(() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeLoanModal">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralCapacityWarning" @click="submitCustomerLoan">
+          <button class="btn btn-primary" :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralRequiredWarning || !!collateralCapacityWarning" @click="submitCustomerLoan">
             {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
           </button>
         </div>
@@ -2440,16 +2452,6 @@ th {
   gap: var(--spacing-sm);
 }
 
-.account-header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.account-header-info .section-title {
-  margin: 0;
-}
-
 .account-company-tag {
   font-size: 0.85rem;
   color: var(--color-text-secondary);
@@ -2533,7 +2535,7 @@ th {
 }
 
 .account-empty-state {
-  padding: var(--spacing-md) 0;
+  padding: var(--spacing-md);
 }
 
 .account-empty-hint {

@@ -2204,6 +2204,7 @@ export default {
     collateralExistingExposure: 'Bestehende gesicherte Schulden',
     collateralAlreadyPledged: 'Bereits verpfändet — wählen Sie ein anderes Gebäude',
     collateralNone: 'Keine (ungesichertes Darlehen)',
+    collateralRequired: 'Sie müssen ein Sicherheitengebäude auswählen, bevor Sie ein Darlehen beantragen.',
     collateralExceedsLimit: 'Der angeforderte Betrag übersteigt 70 % des Schätzwerts des Gebäudes.',
     pledgedBuilding: 'Verpfändetes Gebäude',
     securedLoan: 'Gesichertes Darlehen',

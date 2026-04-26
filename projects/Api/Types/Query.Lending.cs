@@ -17,54 +17,64 @@ public sealed partial class Query
     // ── Bank Lending Marketplace ──────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns all active loan offers visible to borrowers.
-    /// Excludes offers from the current player's own companies (self-lending guard).
+    /// Returns borrower-facing lending options for every open bank.
+    /// Loan offers are no longer player-published; each bank is exposed directly.
     /// </summary>
     public async Task<List<LoanOfferSummary>> GetLoanOffers(
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
-        var userId = httpContextAccessor.HttpContext?.User.GetUserId();
+        _ = httpContextAccessor;
 
-        // Get IDs of companies owned by current player (to exclude own offers).
-        ISet<Guid> ownCompanyIds = new HashSet<Guid>();
-        if (userId.HasValue)
-        {
-            ownCompanyIds = (await db.Companies
-                .Where(c => c.PlayerId == userId.Value)
-                .Select(c => c.Id)
-                .ToListAsync()).ToHashSet();
-        }
-
-        var offers = await db.LoanOffers
-            .Include(o => o.LenderCompany)
-            .Include(o => o.BankBuilding)
-            .ThenInclude(b => b.City)
-            .Where(o => o.IsActive && o.TotalCapacity > o.UsedCapacity)
+        var banks = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .Where(b => b.Type == BuildingType.Bank && b.BaseCapitalDeposited)
             .AsNoTracking()
             .ToListAsync();
 
-        return offers
-            .Where(o => !ownCompanyIds.Contains(o.LenderCompanyId))
-            .Select(o => new LoanOfferSummary
+        if (banks.Count == 0)
+            return [];
+
+        var bankIds = banks.Select(b => b.Id).ToList();
+
+        var outstandingByBank = await db.Loans
+            .Where(l => bankIds.Contains(l.BankBuildingId)
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
+            .GroupBy(l => l.BankBuildingId)
+            .Select(g => new { BankBuildingId = g.Key, Outstanding = g.Sum(l => l.RemainingPrincipal) })
+            .ToDictionaryAsync(x => x.BankBuildingId, x => x.Outstanding);
+
+        const long defaultDurationTicks = GameConstants.TicksPerYear;
+        var nowUtc = DateTime.UtcNow;
+
+        return banks.Select(bank =>
+        {
+            var outstanding = outstandingByBank.TryGetValue(bank.Id, out var value) ? value : 0m;
+            var lendable = bank.TotalDeposits * 0.90m;
+            var available = Math.Max(0m, lendable - outstanding);
+
+            return new LoanOfferSummary
             {
-                Id = o.Id,
-                BankBuildingId = o.BankBuildingId,
-                BankBuildingName = o.BankBuilding.Name,
-                CityId = o.BankBuilding.CityId,
-                CityName = o.BankBuilding.City.Name,
-                LenderCompanyId = o.LenderCompanyId,
-                LenderCompanyName = o.LenderCompany.Name,
-                AnnualInterestRatePercent = o.AnnualInterestRatePercent,
-                MaxPrincipalPerLoan = o.MaxPrincipalPerLoan,
-                TotalCapacity = o.TotalCapacity,
-                UsedCapacity = o.UsedCapacity,
-                RemainingCapacity = o.TotalCapacity - o.UsedCapacity,
-                DurationTicks = o.DurationTicks,
-                IsActive = o.IsActive,
-                CreatedAtTick = o.CreatedAtTick,
-                CreatedAtUtc = o.CreatedAtUtc,
-            }).ToList();
+                // Borrower UX now treats banks as direct lending sources.
+                Id = bank.Id,
+                BankBuildingId = bank.Id,
+                BankBuildingName = bank.Name,
+                CityId = bank.CityId,
+                CityName = bank.City.Name,
+                LenderCompanyId = bank.CompanyId,
+                LenderCompanyName = bank.Company.Name,
+                AnnualInterestRatePercent = bank.LendingInterestRatePercent ?? 8m,
+                MaxPrincipalPerLoan = available,
+                TotalCapacity = lendable,
+                UsedCapacity = outstanding,
+                RemainingCapacity = available,
+                DurationTicks = defaultDurationTicks,
+                IsActive = available > 0m,
+                CreatedAtTick = 0,
+                CreatedAtUtc = nowUtc,
+            };
+        }).ToList();
     }
 
     /// <summary>

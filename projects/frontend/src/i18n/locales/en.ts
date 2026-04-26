@@ -2206,6 +2206,7 @@ export default {
     collateralExistingExposure: 'Existing Secured Debt',
     collateralAlreadyPledged: 'Already pledged — choose another building',
     collateralNone: 'None (unsecured loan)',
+    collateralRequired: 'You must select a collateral building before requesting a loan.',
     collateralExceedsLimit: "The requested amount exceeds 70% of the building's appraised value.",
     pledgedBuilding: 'Pledged Building',
     securedLoan: 'Secured Loan',
