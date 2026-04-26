@@ -23,8 +23,9 @@ const cities = ref<City[]>([])
 
 // ── City helpers ──────────────────────────────────────────────────────────────
 
-function countryFlag(code: string): string {
-  return [...code.toUpperCase()].map((c) => String.fromCodePoint(0x1f1e6 - 65 + c.charCodeAt(0))).join('')
+/** Normalise 2-letter country code for display (upper-case, max 2 chars). */
+function ccLabel(code: string): string {
+  return code.toUpperCase().slice(0, 2)
 }
 
 async function loadCities() {
@@ -147,9 +148,7 @@ defineExpose({ closePanel })
     <button type="button" class="ctx-trigger" :aria-expanded="isOpen" aria-haspopup="menu" :aria-label="`${selectedCity?.name ?? '…'} · ${activeAccountName}`" @click="togglePanel">
       <!-- City segment -->
       <span class="ctx-city-seg">
-        <span class="ctx-flag" aria-hidden="true">
-          {{ selectedCity ? countryFlag(selectedCity.countryCode) : '🌍' }}
-        </span>
+        <span class="ctx-cc-badge" aria-hidden="true">{{ selectedCity ? ccLabel(selectedCity.countryCode) : '??' }}</span>
         <span class="ctx-city-name">{{ selectedCity?.name ?? '…' }}</span>
       </span>
 
@@ -186,16 +185,22 @@ defineExpose({ closePanel })
           :aria-checked="city.id === selectedCityId"
           @click="selectCity(city.id)"
         >
-          <span class="ctx-city-flag" aria-hidden="true">{{ countryFlag(city.countryCode) }}</span>
+          <span class="ctx-cc-badge" aria-hidden="true">{{ ccLabel(city.countryCode) }}</span>
           <span class="ctx-city-info">
             <span class="ctx-city-option-name">{{ city.name }}</span>
-            <span class="ctx-city-option-meta">{{ city.countryCode }} · {{ city.currencyCode }}</span>
+            <span class="ctx-city-option-meta">{{ city.currencyCode }}</span>
           </span>
-          <span v-if="buildingCountByCity[city.id]" class="ctx-city-building-count" :title="t('dashboard.buildings')">
-            {{ buildingCountByCity[city.id] }}
-            <font-awesome-icon :icon="['fas', 'building']" class="ctx-city-building-icon" aria-hidden="true" />
+          <!-- Spacer so badge + count sit at the right -->
+          <span class="ctx-city-right">
+            <span
+              v-if="buildingCountByCity[city.id]"
+              class="ctx-city-building-count"
+              :title="t('dashboard.buildings')"
+            >
+              <font-awesome-icon :icon="['fas', 'building']" aria-hidden="true" />
+              {{ buildingCountByCity[city.id] }}
+            </span>
           </span>
-          <span v-if="city.id === selectedCityId" class="ctx-active-dot" aria-hidden="true"></span>
         </button>
       </div>
 
@@ -251,7 +256,8 @@ defineExpose({ closePanel })
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.375rem 0.625rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm, 6px);
   background: var(--color-surface-hover);
@@ -278,10 +284,22 @@ defineExpose({ closePanel })
   min-width: 0;
 }
 
-.ctx-flag {
-  font-size: 1rem;
-  line-height: 1;
+/* Country code badge — replaces emoji flag (unreliable on Windows) */
+.ctx-cc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  width: 1.5rem;
+  height: 1.125rem;
+  border-radius: 3px;
+  background: var(--color-surface-raised, rgba(255,255,255,0.08));
+  border: 1px solid var(--color-border);
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  line-height: 1;
 }
 
 .ctx-city-name {
@@ -385,7 +403,6 @@ defineExpose({ closePanel })
   transition:
     background 0.12s,
     border-color 0.12s;
-  position: relative;
 }
 
 .ctx-city-option:hover,
@@ -397,12 +414,6 @@ defineExpose({ closePanel })
 .ctx-city-option.active {
   background: var(--color-surface-hover);
   border-color: var(--color-primary);
-}
-
-.ctx-city-flag {
-  font-size: 1.1rem;
-  line-height: 1;
-  flex-shrink: 0;
 }
 
 .ctx-city-info {
@@ -425,33 +436,24 @@ defineExpose({ closePanel })
   color: var(--color-text-secondary);
 }
 
-.ctx-active-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  position: absolute;
-  top: 0.4rem;
-  right: 0.4rem;
+.ctx-city-right {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-left: auto;
 }
 
 .ctx-city-building-count {
   display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
+  gap: 0.25rem;
   font-size: 0.6875rem;
   font-weight: 700;
   color: var(--color-primary);
-  background: rgba(var(--color-primary-rgb, 212, 163, 0), 0.12);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
   border-radius: 999px;
-  padding: 0.1rem 0.4rem;
-  flex-shrink: 0;
-  margin-left: auto;
-}
-
-.ctx-city-building-icon {
-  font-size: 0.6rem;
-  opacity: 0.85;
+  padding: 0.15rem 0.45rem;
 }
 
 /* ── Divider ─────────────────────────────────────────────────────────────── */

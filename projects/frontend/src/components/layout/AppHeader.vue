@@ -144,7 +144,7 @@ function handleChatToggle() {
       <!-- Right-side actions -->
       <div class="header-actions flex items-center gap-3 shrink-0">
         <!-- In-game time chip (compact) -->
-        <div v-if="gameState && formattedGameTime" class="game-time-chip hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 border border-divider rounded-md" :title="t('nav.gameTime')">
+        <div v-if="gameState && formattedGameTime" class="game-time-chip hidden sm:inline-flex items-center gap-1.5 px-2.5 border border-divider rounded-md h-9" :title="t('nav.gameTime')">
           <font-awesome-icon :icon="['fas', 'clock']" class="text-muted text-[0.75rem]" />
           <span class="text-[0.75rem] text-muted tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
         </div>
@@ -160,7 +160,7 @@ function handleChatToggle() {
         <template v-if="auth.isAuthenticated">
           <ContextSwitcher @switched="closeMenu" />
           <button
-            class="btn btn-secondary"
+            class="btn btn-secondary h-9 w-9 p-0 justify-center"
             @click="
               () => {
                 auth.logout()
