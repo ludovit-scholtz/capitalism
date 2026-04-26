@@ -23,11 +23,8 @@ It will use real world map. The game will start in single city and later other c
 
 ### City selection
 
-- [ ] In the top menu where company is selected add selection also for the city
-- [ ] In the player dashboard filter only buildings in the selected city
-- [ ] In the banking page show only banks in the selected city
-- [ ] In the global exchange remove the city selection and use the selection from the navbar
-- [ ] In the marketing analytics page show only data related to selected the city
+- [ ] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
+- [ ] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
 
 ### Government company
 
@@ -47,17 +44,6 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Allow to close down bank account if the balance of the account is equal exactly to 0.
 - [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
 - [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
-
-### Onboarding (80% complete)
-
-- [x] Onboarding now uses one-click progression for industry, product, city, and IPO plan selection without extra Next-button confirmation.
-- [x] Product selection is now positioned immediately after industry selection.
-- [x] Company name entry was removed from onboarding and the flow uses generated defaults that can be adjusted later.
-- [x] Onboarding state is URL-query driven and no longer persisted in localStorage for progress recovery.
-- [x] Starter product cards expose at least three options per starter category flow.
-- [x] Product price display in onboarding uses FX-aware local currency formatting.
-- [ ] Finish full Playwright migration of onboarding spec to the new URL-driven 7-step flow and remove remaining stale assertions.
-- [ ] Add complete regression coverage for guest refresh/resume in full-suite execution (not only targeted test runs).
 
 ### Number formatting (80% complete)
 
@@ -99,8 +85,8 @@ It will use real world map. The game will start in single city and later other c
 
 ### Mining (40% complete)
 
-- [ ] When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. ✅ **Shipped**
-- [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined. ✅ **Shipped**
+- [ ] When person goes to buy building and selects the mining, make sure to show in the property which resource it contains.
+- [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
 ### R&D Building (0% complete)
 

@@ -80,6 +80,42 @@ const {
   submitQuickPriceUpdate,
   submitFlushStorage,
 } = bd
+
+function operationalStatusCardClass(status: string): string {
+  const normalizedStatus = status.toLowerCase()
+
+  if (normalizedStatus === 'running' || normalizedStatus === 'active') {
+    return 'border-emerald-400/40 bg-emerald-500/10'
+  }
+
+  if (normalizedStatus === 'blocked' || normalizedStatus === 'offline' || normalizedStatus === 'suspended') {
+    return 'border-rose-400/40 bg-rose-500/10'
+  }
+
+  if (normalizedStatus === 'idle' || normalizedStatus === 'waiting' || normalizedStatus === 'starved') {
+    return 'border-amber-400/40 bg-amber-500/10'
+  }
+
+  return 'border-sky-400/40 bg-sky-500/10'
+}
+
+function operationalStatusBadgeClass(status: string): string {
+  const normalizedStatus = status.toLowerCase()
+
+  if (normalizedStatus === 'running' || normalizedStatus === 'active') {
+    return 'border-emerald-300/60 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+  }
+
+  if (normalizedStatus === 'blocked' || normalizedStatus === 'offline' || normalizedStatus === 'suspended') {
+    return 'border-rose-300/60 bg-rose-500/15 text-rose-700 dark:text-rose-300'
+  }
+
+  if (normalizedStatus === 'idle' || normalizedStatus === 'waiting' || normalizedStatus === 'starved') {
+    return 'border-amber-300/60 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+  }
+
+  return 'border-sky-300/60 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+}
 </script>
 
 <template>
@@ -156,29 +192,38 @@ const {
           <!-- Operational status badge for active units -->
           <div
             v-if="selectedActiveUnitOperationalStatus"
-            class="unit-insight-card operational-status-card"
-            :data-status="selectedActiveUnitOperationalStatus.status"
+            class="unit-insight-card rounded-2xl border p-4 sm:p-5"
+            :class="operationalStatusCardClass(selectedActiveUnitOperationalStatus.status)"
             :aria-label="t('buildingDetail.accessibility.unitOperationalStatus')"
           >
-            <h5>{{ t('buildingDetail.operationalStatus.title') }}</h5>
-            <div class="operational-status-row">
-              <span class="status-badge" :class="`status-${selectedActiveUnitOperationalStatus.status.toLowerCase()}`">
+            <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">{{ t('buildingDetail.operationalStatus.title') }}</h5>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <span
+                class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide"
+                :class="operationalStatusBadgeClass(selectedActiveUnitOperationalStatus.status)"
+              >
                 {{ t(`buildingDetail.operationalStatus.${selectedActiveUnitOperationalStatus.status}`) }}
               </span>
-              <span v-if="selectedActiveUnitOperationalStatus.idleTicks > 0" class="idle-ticks-label">
+              <span
+                v-if="selectedActiveUnitOperationalStatus.idleTicks > 0"
+                class="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-1 text-xs font-medium text-muted"
+              >
                 {{ t('buildingDetail.operationalStatus.idleTicks', { count: selectedActiveUnitOperationalStatus.idleTicks }) }}
               </span>
             </div>
-            <p v-if="selectedActiveUnitOperationalStatus.blockedReason" class="blocked-reason-text">
+            <p v-if="selectedActiveUnitOperationalStatus.blockedReason" class="mt-3 text-sm leading-6 text-foreground/90">
               {{ selectedActiveUnitOperationalStatus.blockedReason }}
             </p>
             <!-- Next-tick operating costs breakdown -->
-            <div v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-costs-row">
-              <span class="operating-cost-label">{{ t('buildingDetail.operatingCost.title') }}</span>
-              <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="operating-cost-item">
+            <div
+              v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null"
+              class="mt-4 grid gap-2 rounded-xl border border-divider bg-card/80 p-3"
+            >
+              <span class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted">{{ t('buildingDetail.operatingCost.title') }}</span>
+              <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="text-sm text-foreground/90">
                 {{ t('buildingDetail.operatingCost.labor', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickLaborCost) }) }}
               </span>
-              <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-cost-item">
+              <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="text-sm text-foreground/90">
                 {{ t('buildingDetail.operatingCost.energy', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickEnergyCost) }) }}
               </span>
             </div>

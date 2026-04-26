@@ -11,9 +11,13 @@ interface Props {
   currencyCode: string
   /** Loading state while the parent fetches building data */
   loading: boolean
+  /** Render the account-assignment controls. */
+  showAssignmentControls?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  showAssignmentControls: true,
+})
 const emit = defineEmits<{
   (e: 'updated'): void
 }>()
@@ -148,6 +152,12 @@ async function fetchAccountInfo() {
 }
 
 async function fetchCompanyAccounts() {
+  if (!props.showAssignmentControls) {
+    companyAccounts.value = []
+    selectedBankAccountId.value = null
+    return
+  }
+
   if (!props.companyId) {
     companyAccounts.value = []
     selectedBankAccountId.value = null
@@ -332,7 +342,7 @@ watch(
         </span>
       </div>
 
-      <div class="bba-manage-panel">
+      <div v-if="props.showAssignmentControls" class="bba-manage-panel">
         <p class="bba-manage-title">{{ t('buildingBankAccount.assignmentTitle') }}</p>
         <p class="bba-manage-hint">{{ t('buildingBankAccount.assignmentHint', { currency: props.currencyCode }) }}</p>
 
