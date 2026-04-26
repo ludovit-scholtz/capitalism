@@ -31,7 +31,10 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
 
     const starterFactoryLot = page.getByRole('button', { name: /Factory Site B1/i })
     await expect(starterFactoryLot).toBeVisible()
@@ -61,7 +64,10 @@ test.describe('Buy Building View', () => {
 
     await page.getByRole('button', { name: /Factory/i }).click()
     await page.getByLabel('Building Name').fill('Danube Works')
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
     await page.getByRole('button', { name: /Factory Site B1/i }).click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
 
@@ -110,7 +116,10 @@ test.describe('Buy Building View', () => {
 
     await page.getByRole('button', { name: /Media House/i }).click()
     await page.getByLabel('Building Name').fill('Pulse TV')
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
     await page.getByRole('button', { name: /Media House Lot A1/i }).click()
 
     const buyNowButton = page.getByRole('button', { name: /^Buy Now$/i })
@@ -180,7 +189,10 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.locator('.type-card', { hasText: 'Bank' }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
 
     // Should show insufficient funds warning
     await expect(page.locator('.capital-warn')).toBeVisible()
@@ -240,7 +252,10 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.locator('.type-card', { hasText: 'Bank' }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
     // Select any lot
     await page.locator('.lot-card').first().click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
@@ -250,9 +265,7 @@ test.describe('Buy Building View', () => {
     await expect(page).toHaveURL(/\/bank\//)
   })
 
-  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({
-    page,
-  }) => {
+  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({ page }) => {
     // AC: Expansion flow detects missing destination-currency bank accounts.
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
@@ -323,9 +336,7 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
   })
 
-  test('shows insufficient-funds warning when CZK balance exists but is below lot total cost', async ({
-    page,
-  }) => {
+  test('shows insufficient-funds warning when CZK balance exists but is below lot total cost', async ({ page }) => {
     // AC: Expansion flow detects insufficient eligible balance in destination currency.
     // Factory lot price = 90,000, construction cost = 15,000 → total = 105,000 CZK
     // Player has only 50,000 CZK → insufficient
@@ -391,7 +402,7 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
   })
 
-    test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
+  test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
     // AC: Expansion succeeds once the player is funded in the destination currency.
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
