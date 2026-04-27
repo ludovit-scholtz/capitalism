@@ -17855,6 +17855,8 @@ test.describe('Unit placement FX pricing in non-EUR city', () => {
     await expect(changeCostEl).not.toContainText('€')
   })
 })
+
+test.describe('Building detail tick-refresh stability', () => {
   test('background tick refresh does not show a loading spinner or reset the building view', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
