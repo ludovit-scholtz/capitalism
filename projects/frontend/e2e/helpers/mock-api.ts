@@ -322,6 +322,35 @@ export type MockFxRate = {
   quoteCurrencySymbol: string
 }
 
+export type MockGoldAmmPosition = {
+  id: string
+  poolId: string
+  currencyCode: string
+  liquidityShares: number
+  sharePercent: number
+  claimableFiat: number
+  claimableGold: number
+  fiatProvided: number
+  goldProvided: number
+}
+
+export type MockGoldAmmPool = {
+  id: string
+  currencyCode: string
+  currencySymbol: string
+  fiatReserve: number
+  goldReserve: number
+  totalLiquidityShares: number
+  impliedGoldPrice: number
+  myPosition: MockGoldAmmPosition | null
+}
+
+export type MockGoldBalance = {
+  balance: number
+  blockedInPools: number
+  availableBalance: number
+}
+
 export type MockBuildingLot = {
   id: string
   cityId: string
@@ -858,6 +887,10 @@ export type MockState = {
     ownerType?: 'PERSON' | 'COMPANY'
     ownerDisplayName?: string
   }>
+  /** Gold AMM pools for the Gold AMM exchange. */
+  goldAmmPools: MockGoldAmmPool[]
+  /** Player gold token balance for the Gold AMM exchange. */
+  goldBalance: MockGoldBalance
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -2095,6 +2128,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     cityMediaHouses: {},
     buildingBankAccounts: {},
     myBankAccounts: [],
+    goldAmmPools: [],
+    goldBalance: { balance: 0, blockedInPools: 0, availableBalance: 0 },
     ...initial,
   }
 
@@ -5465,6 +5500,239 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               currentBalance,
               totalEntries: allRows.length,
               rows,
+            },
+          },
+        }),
+      })
+    }
+
+    // Gold AMM handlers
+    if (query.includes('goldAmmPools') && !query.includes('addGoldAmmLiquidity') && !query.includes('createGoldAmmPool') && !query.includes('removeGoldAmmLiquidity')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { goldAmmPools: state.goldAmmPools } }),
+      })
+    }
+
+    if (query.includes('myGoldBalance')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { myGoldBalance: state.goldBalance } }),
+      })
+    }
+
+    if (query.includes('goldAmmSwapQuote')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { direction: string; currencyCode: string; amount: number } | undefined
+      const direction = vars?.direction ?? 'FIAT_TO_GOLD'
+      const currencyCode = vars?.currencyCode ?? 'EUR'
+      const amount = vars?.amount ?? 0
+      const pool = state.goldAmmPools.find((p) => p.currencyCode === currencyCode)
+      if (!pool) return routeJsonError('No liquidity pool found for this currency pair.', 'POOL_NOT_FOUND')
+      if (pool.fiatReserve <= 0 || pool.goldReserve <= 0) return routeJsonError('Pool has no liquidity.', 'NO_LIQUIDITY')
+      const feeAmount = Math.round(amount * 0.01 * 1e8) / 1e8
+      const netAmount = amount - feeAmount
+      let outputAmount: number
+      if (direction === 'FIAT_TO_GOLD') {
+        outputAmount = (pool.goldReserve * netAmount) / (pool.fiatReserve + netAmount)
+      } else {
+        outputAmount = (pool.fiatReserve * netAmount) / (pool.goldReserve + netAmount)
+      }
+      const impliedPrice = direction === 'FIAT_TO_GOLD' ? amount / outputAmount : outputAmount / amount
+      const slippagePercent = Math.abs((impliedPrice - pool.impliedGoldPrice) / pool.impliedGoldPrice) * 100
+      const availableInputBalance =
+        direction === 'FIAT_TO_GOLD'
+          ? (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0)
+          : state.goldBalance.availableBalance
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            goldAmmSwapQuote: {
+              direction,
+              currencyCode,
+              currencySymbol: pool.currencySymbol,
+              inputAmount: amount,
+              outputAmount: Math.round(outputAmount * 1e8) / 1e8,
+              feeAmount,
+              feePercent: 1,
+              impliedPrice: Math.round(impliedPrice * 1e4) / 1e4,
+              slippagePercent: Math.round(slippagePercent * 1e4) / 1e4,
+              poolFiatReserve: pool.fiatReserve,
+              poolGoldReserve: pool.goldReserve,
+              availableInputBalance,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('executeGoldAmmSwap')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { direction: string; currencyCode: string; amount: number; minOutputAmount?: number } | undefined
+      const direction = vars?.direction ?? 'FIAT_TO_GOLD'
+      const currencyCode = vars?.currencyCode ?? 'EUR'
+      const amount = vars?.amount ?? 0
+      const pool = state.goldAmmPools.find((p) => p.currencyCode === currencyCode)
+      if (!pool) return routeJsonError('No liquidity pool found for this currency pair.', 'POOL_NOT_FOUND')
+      const feeAmount = Math.round(amount * 0.01 * 1e8) / 1e8
+      const netAmount = amount - feeAmount
+      let outputAmount: number
+      if (direction === 'FIAT_TO_GOLD') {
+        outputAmount = (pool.goldReserve * netAmount) / (pool.fiatReserve + netAmount)
+        pool.fiatReserve += amount
+        pool.goldReserve -= outputAmount
+        state.goldBalance.balance += outputAmount
+        state.goldBalance.availableBalance += outputAmount
+        const bal = state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)
+        if (bal) bal.balance -= amount
+      } else {
+        outputAmount = (pool.fiatReserve * netAmount) / (pool.goldReserve + netAmount)
+        pool.goldReserve += amount
+        pool.fiatReserve -= outputAmount
+        state.goldBalance.balance -= amount
+        state.goldBalance.availableBalance -= amount
+        let bal = state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)
+        if (!bal) {
+          bal = { currencyCode, currencySymbol: pool.currencySymbol, balance: 0 }
+          state.playerCurrencyBalances.push(bal)
+        }
+        bal.balance += outputAmount
+      }
+      pool.impliedGoldPrice = pool.fiatReserve / pool.goldReserve
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            executeGoldAmmSwap: {
+              tradeId: `gold-trade-${Date.now()}`,
+              direction,
+              currencyCode,
+              inputAmount: amount,
+              outputAmount: Math.round(outputAmount * 1e8) / 1e8,
+              feeAmount,
+              impliedPrice: pool.impliedGoldPrice,
+              newFiatBalance: direction === 'FIAT_TO_GOLD' ? (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0) : (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0),
+              newGoldBalance: state.goldBalance.balance,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('addGoldAmmLiquidity')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { poolId: string; fiatAmount: number; maxGoldAmount: number } | undefined
+      const pool = state.goldAmmPools.find((p) => p.id === vars?.poolId)
+      if (!pool) return routeJsonError('Pool not found.', 'POOL_NOT_FOUND')
+      const fiatAmount = vars?.fiatAmount ?? 0
+      const goldAmount = (pool.goldReserve > 0 && pool.fiatReserve > 0) ? (fiatAmount * pool.goldReserve) / pool.fiatReserve : (vars?.maxGoldAmount ?? fiatAmount)
+      if (state.goldBalance.availableBalance < goldAmount) return routeJsonError('Insufficient available gold (some may be locked in pools).', 'INSUFFICIENT_GOLD')
+      pool.fiatReserve += fiatAmount
+      pool.goldReserve += goldAmount
+      state.goldBalance.blockedInPools += goldAmount
+      state.goldBalance.availableBalance -= goldAmount
+      const newShares = pool.totalLiquidityShares > 0 ? (fiatAmount / pool.fiatReserve) * pool.totalLiquidityShares : 1000
+      pool.totalLiquidityShares += newShares
+      const posId = `pos-${pool.id}-${state.currentUserId}`
+      const existingPos = pool.myPosition
+      if (existingPos) {
+        existingPos.liquidityShares += newShares
+        existingPos.sharePercent = (existingPos.liquidityShares / pool.totalLiquidityShares) * 100
+        existingPos.fiatProvided += fiatAmount
+        existingPos.goldProvided += goldAmount
+      } else {
+        pool.myPosition = {
+          id: posId, poolId: pool.id, currencyCode: pool.currencyCode,
+          liquidityShares: newShares, sharePercent: (newShares / pool.totalLiquidityShares) * 100,
+          claimableFiat: 0, claimableGold: 0, fiatProvided: fiatAmount, goldProvided: goldAmount,
+        }
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            addGoldAmmLiquidity: {
+              poolId: pool.id, positionId: posId, fiatProvided: fiatAmount, goldProvided: goldAmount,
+              poolFiatReserve: pool.fiatReserve, poolGoldReserve: pool.goldReserve,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('removeGoldAmmLiquidity')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { positionId: string; shareFraction: number } | undefined
+      const pool = state.goldAmmPools.find((p) => p.myPosition?.id === vars?.positionId)
+      if (!pool || !pool.myPosition) return routeJsonError('Position not found.', 'POSITION_NOT_FOUND')
+      const fraction = Math.min(1, Math.max(0, vars?.shareFraction ?? 1))
+      const sharesToRemove = pool.myPosition.liquidityShares * fraction
+      const fiatReturned = (sharesToRemove / pool.totalLiquidityShares) * pool.fiatReserve
+      const goldReturned = (sharesToRemove / pool.totalLiquidityShares) * pool.goldReserve
+      pool.fiatReserve -= fiatReturned
+      pool.goldReserve -= goldReturned
+      pool.totalLiquidityShares -= sharesToRemove
+      pool.myPosition.liquidityShares -= sharesToRemove
+      pool.myPosition.sharePercent = pool.totalLiquidityShares > 0 ? (pool.myPosition.liquidityShares / pool.totalLiquidityShares) * 100 : 0
+      state.goldBalance.blockedInPools -= goldReturned
+      state.goldBalance.availableBalance += goldReturned
+      state.goldBalance.balance = state.goldBalance.availableBalance + state.goldBalance.blockedInPools
+      if (pool.myPosition.liquidityShares <= 0) pool.myPosition = null
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            removeGoldAmmLiquidity: {
+              positionId: vars?.positionId, fiatReturned, goldReturned,
+              remainingShares: pool.myPosition?.liquidityShares ?? 0,
+            },
+          },
+        }),
+      })
+    }
+
+    if (query.includes('createGoldAmmPool')) {
+      if (!state.currentUserId) return routeJsonError('Not authenticated', 'AUTH_NOT_AUTHORIZED')
+      const vars = body.variables?.input as { currencyCode: string; fiatAmount: number; goldAmount: number } | undefined
+      const currencyCode = vars?.currencyCode ?? 'EUR'
+      if (state.goldAmmPools.some((p) => p.currencyCode === currencyCode)) {
+        return routeJsonError('A pool for this currency already exists. Add liquidity instead.', 'POOL_ALREADY_EXISTS')
+      }
+      if (state.goldBalance.availableBalance < (vars?.goldAmount ?? 0)) return routeJsonError('Insufficient available gold.', 'INSUFFICIENT_GOLD')
+      const fiatAmount = vars?.fiatAmount ?? 0
+      const goldAmount = vars?.goldAmount ?? 0
+      const poolId = `pool-${currencyCode}-${Date.now()}`
+      const posId = `pos-${poolId}-${state.currentUserId}`
+      const fxRate = state.fxRates.find((r) => r.quoteCurrencyCode === currencyCode)
+      const currencySymbol = fxRate ? fxRate.quoteCurrencySymbol : currencyCode
+      const newPool: MockGoldAmmPool = {
+        id: poolId, currencyCode, currencySymbol,
+        fiatReserve: fiatAmount, goldReserve: goldAmount,
+        totalLiquidityShares: 1000, impliedGoldPrice: fiatAmount / goldAmount,
+        myPosition: {
+          id: posId, poolId, currencyCode, liquidityShares: 1000, sharePercent: 100,
+          claimableFiat: 0, claimableGold: 0, fiatProvided: fiatAmount, goldProvided: goldAmount,
+        },
+      }
+      state.goldAmmPools.push(newPool)
+      state.goldBalance.blockedInPools += goldAmount
+      state.goldBalance.availableBalance -= goldAmount
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            createGoldAmmPool: {
+              poolId, positionId: posId, currencyCode, fiatProvided: fiatAmount, goldProvided: goldAmount, liquidityShares: 1000,
             },
           },
         }),
