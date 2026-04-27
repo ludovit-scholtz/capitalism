@@ -37,9 +37,10 @@ function seedPersonalUsdSettlementAccount(
   player: { id: string; displayName: string },
   balance = 250_000,
 ) {
+  const accountDigits = makeTestAccountNumber(player.id, '9')
   state.myBankAccounts.push({
     id: `bank-person-usd-${player.id}`,
-    accountNumber: `9000${player.id.replace(/\D/g, '').padStart(12, '0')}`.slice(0, 16),
+    accountNumber: accountDigits,
     currencyCode: 'USD',
     currencySymbol: '$',
     balance,
@@ -53,9 +54,10 @@ function seedCompanyUsdSettlementAccount(
   company: MockCompany,
   balance = 500_000,
 ) {
+  const accountDigits = makeTestAccountNumber(company.id, '8')
   state.myBankAccounts.push({
     id: `bank-company-usd-${company.id}`,
-    accountNumber: `8000${company.id.replace(/\D/g, '').padStart(12, '0')}`.slice(0, 16),
+    accountNumber: accountDigits,
     currencyCode: 'USD',
     currencySymbol: '$',
     balance,
@@ -64,6 +66,16 @@ function seedCompanyUsdSettlementAccount(
     ownerType: 'COMPANY',
     ownerDisplayName: company.name,
   })
+}
+
+function makeTestAccountNumber(seed: string, prefixDigit: string): string {
+  const body = [...seed]
+    .map((char) => String(char.charCodeAt(0) % 10))
+    .join('')
+    .padEnd(15, '0')
+    .slice(0, 15)
+
+  return `${prefixDigit}${body}`
 }
 
 test.describe('Stock exchange', () => {
