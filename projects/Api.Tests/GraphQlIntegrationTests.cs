@@ -29136,6 +29136,143 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Contains("UNIT_ALREADY_UPGRADING", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task ScheduleUnitUpgrade_PragueCity_UsesFxAdjustedCost()
+    {
+        // Prague uses CZK. The upgrade cost should be deducted in CZK (EUR base × FX rate).
+        var email = $"uu-prague-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUPrague");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        // Seed a CZK FX rate so the test is deterministic.
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25.20m,
+            RateDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        const decimal startingBalanceCzk = 500_000m;
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUPragueCo", Cash = startingBalanceCzk };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUPragueFactory",
+            Level = 1, Latitude = prague.Latitude, Longitude = prague.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+        // Pre-create a CZK bank account with sufficient funds.
+        var czkAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234567890123456",
+            CurrencyCode = "CZK",
+            Balance = startingBalanceCzk,
+            CompanyId = company.Id,
+        };
+        db.BankAccounts.Add(czkAccount);
+        building.BankAccountId = czkAccount.Id;
+        await db.SaveChangesAsync();
+
+        var mutation = """
+            mutation SUU($input: ScheduleUnitUpgradeInput!) {
+              scheduleUnitUpgrade(input: $input) {
+                id totalTicksRequired
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, mutation,
+            new { input = new { unitId = unit.Id.ToString() } }, token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Expected no errors");
+        result.GetProperty("data").GetProperty("scheduleUnitUpgrade").GetProperty("id").GetString();
+
+        // The EUR base cost is 8 000. At 25.20 CZK/EUR the expected deduction is 201 600 CZK.
+        const decimal eurBaseCost = 8_000m;
+        const decimal fxRate = 25.20m;
+        var expectedCost = Math.Round(eurBaseCost * fxRate, 2, MidpointRounding.AwayFromZero);
+
+        await db.Entry(czkAccount).ReloadAsync();
+        Assert.Equal(startingBalanceCzk - expectedCost, czkAccount.Balance);
+    }
+
+    [Fact]
+    public async Task UnitUpgradeInfo_PragueCity_ReturnsFxAdjustedCost()
+    {
+        // unitUpgradeInfo should return upgradeCost in the building's city currency (CZK).
+        var email = $"uui-prague-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUIPrague");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25.20m,
+            RateDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUIPragueCo", Cash = 500_000m };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUIPragueFactory",
+            Level = 1, Latitude = prague.Latitude, Longitude = prague.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query UUI($unitId: UUID!) {
+              unitUpgradeInfo(unitId: $unitId) {
+                upgradeCost
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { unitId = unit.Id.ToString() }, token);
+
+        var info = result.GetProperty("data").GetProperty("unitUpgradeInfo");
+        // EUR base cost 8 000 × 25.20 CZK/EUR = 201 600 CZK
+        var expectedCzk = Math.Round(Api.Engine.GameConstants.UnitUpgradeCost(Api.Data.Entities.UnitType.Manufacturing, 1) * 25.20m, 2, MidpointRounding.AwayFromZero);
+        Assert.Equal(expectedCzk, info.GetProperty("upgradeCost").GetDecimal());
+    }
+
     #endregion
 
     #region RankedProductTypes
