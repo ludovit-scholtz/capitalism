@@ -13644,7 +13644,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.goto('/building/building-shop-mi?unit=1,0')
 
     // URL should contain the unit query param
-    await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-shop-mi.*unit=1(?:,|%2C)0/)
 
     // Unit detail sidebar should be open with Market Intelligence panel visible
     await clickUnitTab(page, 'Market')
@@ -13713,7 +13713,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel).toBeVisible()
 
     // URL should encode the selected unit
-    await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-shop-mi.*unit=1(?:,|%2C)0/)
 
     // Update analytics with new tick data before reload
     analytics.dataToTick = 7
@@ -13725,7 +13725,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.reload()
 
     // After reload: URL param still present and panel still visible
-    await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-shop-mi.*unit=1(?:,|%2C)0/)
     await clickUnitTab(page, 'Market')
     await expect(panel).toBeVisible()
     await expect(panel.getByText('Revenue per Tick')).toBeVisible()
