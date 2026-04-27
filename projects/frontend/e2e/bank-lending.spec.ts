@@ -125,15 +125,15 @@ async function authenticateViaLocalStorage(page: Page, token: string) {
 
 async function completeAuthenticatedOnboarding(page: Page, companyName: string) {
   await page.locator('.industry-card', { hasText: 'Furniture' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your First Product' })).toBeVisible()
+  await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
+  await expect(page.getByRole('heading', { name: 'Choose Your City' })).toBeVisible()
   await page.locator('.city-card', { hasText: 'Bratislava' }).click()
-  await page.getByRole('button', { name: 'Next' }).click()
-  await page.getByLabel('Company Name').fill(companyName)
+  await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
+  await page.locator('.ipo-card', { hasText: companyName ? 'Starter IPO' : 'Starter IPO' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
   await page.getByRole('button', { name: STARTER_FACTORY_LOT_NAME }).click()
   await page.getByRole('button', { name: 'Purchase First Factory' }).click()
-  await expect(page.getByRole('heading', { name: 'Choose Product & First Shop Lot' })).toBeVisible()
-  await page.locator('.product-card', { hasText: 'Wooden Chair' }).click()
   await page.getByRole('button', { name: 'List View' }).click()
   await page.getByRole('button', { name: STARTER_SHOP_LOT_NAME }).click()
   await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
@@ -271,6 +271,7 @@ test.describe('Loan Marketplace (/loans)', () => {
         balance: 12_500,
         companyId: 'starter-co-1',
         companyName: 'Starter Corp',
+        cityId: 'city-ba',
       },
     ]
 
@@ -1596,6 +1597,7 @@ test.describe('Loan collateral selection', () => {
         companyName: company!.name,
         ownerType: 'COMPANY',
         ownerDisplayName: company!.name,
+        cityId: 'city-ba',
       },
     ]
     state.bankStatementRows[company!.id] = []

@@ -206,6 +206,12 @@ export type MockBuilding = {
   isSuspendedForFunds?: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
   suspendedReason?: string | null
+  /** City base average rent per m² (APARTMENT/COMMERCIAL only) */
+  cityReferenceRentPerSqm?: number | null
+  /** Location-adjusted market rent per m² = city rate × PopulationIndex (APARTMENT/COMMERCIAL only) */
+  adjustedMarketRentPerSqm?: number | null
+  /** Lot PopulationIndex (APARTMENT/COMMERCIAL only) */
+  populationIndex?: number | null
   units: MockBuildingUnit[]
   pendingConfiguration: MockBuildingConfigurationPlan | null
 }

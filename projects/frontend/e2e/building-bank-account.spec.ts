@@ -294,18 +294,20 @@ test.describe('Building bank account panel', () => {
     await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible({ timeout: 10000 })
     await expect(page.locator('.building-bank-account-panel')).toBeVisible()
 
+    const panel = page.locator('.building-bank-account-panel')
+    const fundPanel = panel.locator('.bba-fund-panel')
+
     // Expand the Fund Account details panel
-    await page.locator('.bba-fund-summary').click()
+    await fundPanel.locator('.bba-fund-summary').click()
 
     // Fill in an amount and submit
-    const amountInput = page.locator('.bba-fund-input')
+    const amountInput = fundPanel.locator('.bba-fund-input')
     await expect(amountInput).toBeVisible()
     await amountInput.fill('10000')
 
-    await page.getByRole('button', { name: /transfer/i }).click()
+    await fundPanel.getByRole('button', { name: /^transfer$/i }).click()
 
-    // Success message should appear
-    await expect(page.locator('.bba-fund-success')).toBeVisible({ timeout: 5000 })
-    await expect(page.locator('.bba-fund-success')).toContainText(/successful/i)
+    await expect(fundPanel.locator('.bba-fund-success')).toBeVisible()
+    await expect(fundPanel.locator('.bba-fund-success')).toContainText(/successful/i)
   })
 })

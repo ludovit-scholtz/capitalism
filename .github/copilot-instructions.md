@@ -186,6 +186,13 @@ For tests that need authentication:
 4. Use `page.addInitScript()` to set localStorage before page load
 5. Navigate with `page.goto()`
 
+### Bank-account + account-context E2E rules
+- For buy-building, bank-capital, loan settlement, and destination-currency affordability tests, seed `state.myBankAccounts` for the active company. Do not rely on legacy `company.cash` or `playerCurrencyBalances` when the shipped UI reads company bank-account balances.
+- Account-management surfaces (`/bank-statement`, the loan marketplace Accounts tab, and the building bank-account panel) must not hide the only seeded account because of navbar city context. If the scenario is city-specific, include `cityId` in the mocked bank account; if the page is account-centric, prefer assertions that do not depend on city filtering.
+- When you seed `state.myBankAccounts`, include realistic metadata such as `ownerType`, `ownerDisplayName`, and `cityId` where relevant. Missing metadata can silently filter a valid fixture out of the rendered UI.
+- When `/buy-building/:companyId?type=BANK` pre-selects the bank type, assert the resulting bank setup UI (capital guidance, rate inputs), not a still-visible type card. That step is intentionally skipped by the query-param flow.
+- The navbar account switcher trigger is the active account button itself (`.account-trigger` / current account name), not a generic “Switch account” button. Update E2E selectors accordingly.
+
 ### Selectors – prefer accessible locators
 Use Playwright's accessible locators in this order of preference:
 1. `page.getByRole('button', { name: '…' })` — preferred for interactive elements
@@ -1116,11 +1123,38 @@ Root-cause of repeated visual regressions (April 2026, landing/auth/forex spacin
 **Rules to prevent recurrence:**
 1. **For any new or migrated frontend page, read and follow `projects/frontend/docs/design-patterns.md` first.** Treat it as the default contract for page shells, cards, heroes, forms, and tables.
 2. **Use the 8px spacing rhythm consistently.** Default to Tailwind values that map cleanly to the scale: `gap-2/3/4/6/8/10/12`, `px-4/6/8`, `py-4/5/6/8/10/12/16/20`.
+
 3. **Every page under the sticky header must create explicit top breathing room.** The default page shell is `pt-6 lg:pt-8` with `pb-16 lg:pb-20` and an inner stack of `gap-10 lg:gap-12`.
 4. **Let the parent own layout rhythm.** Do not rebuild page spacing with scattered child `mb-*` and `mt-*` utilities when a parent `gap-*` or section shell can express the structure more clearly.
 5. **Primary data tables must live inside a table shell with wide gutters.** Default primary-table header/cell spacing is `px-8 py-5`; the first column must never visually touch the card edge.
 6. **Hero and lead sections must be visually separated blocks.** They must not touch the header or the next section; use a dedicated shell, larger vertical padding, and clear CTA spacing.
 7. **When a UI looks technically correct but still feels cramped, make an optical adjustment within the spacing scale instead of inventing arbitrary values.** Increase section separation before increasing tiny internal padding.
+
+## Number-input v-models in Vue forms — never assume `.trim()` is safe
+
+Root-cause of a Playwright failure (April 2026, building bank-account funding follow-up):
+- `BuildingBankAccountPanel.vue` used `<input type="number" v-model="fundAmount">` and later assumed `fundAmount.value` was always a string by calling `.trim()`.
+- In the production-built browser flow, the number input model could be a numeric value, so clicking **Transfer** threw `TypeError: ...trim is not a function` before the GraphQL mutation was sent.
+- The E2E test first looked like a mock-route or selector problem because the button was visible and active, but a temporary debug spec exposed the runtime error and showed the success flow worked once the input was normalized safely.
+
+**Rules to prevent recurrence:**
+1. **For any Vue `v-model` bound to `<input type="number">`, type the ref as `string | number` (or normalize immediately) and never call string-only methods like `.trim()` without a type check.**
+2. **Normalize numeric form values with `typeof value === 'number' ? String(value) : value.trim()` before validation/parsing.**
+3. **When a Playwright form-submit test shows a visible enabled button but no network request is sent, check for `pageerror` / browser console runtime errors before blaming selectors or mock routes.**
+4. **Prefer stable E2E assertions on the panel-scoped control and visible post-submit outcome** (for example a success status inside the funding panel) instead of relying on unscoped repeated button labels elsewhere on the page.
+
+## Stock exchange E2E — seed USD settlement accounts and use current context-switcher selectors
+
+Root-cause of Playwright failures (April 2026, stock exchange follow-up):
+- `StockExchangeView.vue` now requires a USD settlement bank account for the active PERSON or COMPANY trade context before buy/sell actions can succeed.
+- Several `stock-exchange.spec.ts` tests still used the legacy cash-only fixture model and did not seed `state.myBankAccounts`, so the trade panel showed `Select settlement account` and the expected buy/sell success states never appeared.
+- The header account switcher was also migrated to `ContextSwitcher.vue` (`.ctx-switcher`, `.ctx-trigger`, `.ctx-account-name`), but some tests still asserted the old `.account-switcher` / `.account-trigger-name` classes.
+
+**Rules to prevent recurrence:**
+1. **Any stock-trading E2E that expects a successful buy or sell must seed `state.myBankAccounts` with a USD settlement account for the active trade context.** PERSON trades need `ownerType: 'PERSON'`; COMPANY trades need `ownerType: 'COMPANY'` plus the matching `companyId`.
+2. **When a stock-exchange test expects a person-account error like `Not enough personal cash`, still seed a USD personal settlement account.** Otherwise the UI will fail earlier with `Select settlement account`, masking the real scenario under test.
+3. **Navbar account-switcher tests must use the current `ContextSwitcher` selectors** (`.ctx-switcher`, `.ctx-trigger`, `.ctx-account-name`) or an accessible label, not the removed `.account-switcher` / `.account-trigger-name` markup.
+4. **If a stock-exchange trade test unexpectedly shows `Select settlement account`, diagnose fixture drift before touching trade logic.** The likely fix is missing `myBankAccounts` seed data, not the buy/sell mutation path itself.
 
 ## Vue scoped-style extraction — never leave child visuals in a parent `<style scoped>` block
 

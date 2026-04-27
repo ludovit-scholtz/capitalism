@@ -990,12 +990,12 @@ test.describe('Building detail upgrades', () => {
     const activeSection = getGridSection(page, 'Current Configuration')
     await getGridCell(activeSection, 0, 0).click()
 
-    await expect(page).toHaveURL(/\/building\/building-route\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-route.*unit=0(?:,|%2C)0/)
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
 
     await page.reload()
 
-    await expect(page).toHaveURL(/\/building\/building-route\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-route.*unit=0(?:,|%2C)0/)
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
     await expect(page.getByText('Procurement Mode: Global Exchange')).toBeVisible()
   })
@@ -10767,6 +10767,9 @@ function makeApartmentPlayer() {
         totalAreaSqm: 2000,
         pendingPricePerSqm: null,
         pendingPriceActivationTick: null,
+        cityReferenceRentPerSqm: 12,
+        adjustedMarketRentPerSqm: 13.2,
+        populationIndex: 1.1,
       },
     ],
   })
@@ -10774,6 +10777,8 @@ function makeApartmentPlayer() {
 }
 
 test.describe('Property management panel', () => {
+  const PROPERTY_PANEL_SELECTOR = '[aria-label="Property management"]'
+
   test('shows property metrics for apartment building', async ({ page }) => {
     const player = makeApartmentPlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -10786,7 +10791,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const panel = page.locator('[aria-label="property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await expect(panel).toBeVisible()
 
     // Occupancy
@@ -10834,7 +10839,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const panel = page.locator('[aria-label="property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await panel.getByRole('button', { name: /Set Rent/i }).click()
 
     // Dialog should open
@@ -10889,7 +10894,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-fac')
 
-    await expect(page.locator('[aria-label="property management"]')).toBeHidden()
+    await expect(page.locator(PROPERTY_PANEL_SELECTOR)).toBeHidden()
   })
 
   test('commercial building also shows property panel', async ({ page }) => {
@@ -10934,10 +10939,142 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-comm')
 
-    const panel = page.locator('[aria-label="property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await expect(panel).toBeVisible()
     await expect(panel).toContainText('€22 / m²')
     await expect(panel).toContainText('85.0%')
+  })
+
+  test('shows market rate guidance panel with adjusted market rate', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
+    await expect(panel).toBeVisible()
+
+    // Market guidance panel should be present
+    const guidance = panel.locator('.market-guidance')
+    await expect(guidance).toBeVisible()
+
+    // City reference rate displayed
+    await expect(guidance.locator('.market-rate-item').nth(0)).toContainText('€12')
+    // Adjusted market rate displayed (city × location index)
+    await expect(guidance.locator('.market-rate-item').nth(1)).toContainText('€13.2')
+    // Location index badge shown
+    await expect(guidance.locator('.location-index-badge')).toContainText('×1.10')
+    // Your current rent shown
+    await expect(guidance.locator('.market-rate-item').nth(2)).toContainText('€14')
+  })
+
+  test('shows overpriced warning when rent is above +10% of market', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const apt = player.companies.find((c) => c.id === 'company-apt')!.buildings.find((b) => b.id === 'building-apt')!
+    // Set rent to 125% of adjusted market rate (overpriced)
+    apt.pricePerSqm = 16.5
+    apt.adjustedMarketRentPerSqm = 13.2
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const guidance = page.locator(`${PROPERTY_PANEL_SELECTOR} .market-guidance`)
+    await expect(guidance).toBeVisible()
+    // Price position badge should show "Overpriced"
+    await expect(guidance.locator('.price-position-value')).toContainText('Overpriced')
+    // Should have the error color class for overpriced state
+    await expect(guidance.locator('.price-position-value')).toHaveClass(/text-error/)
+  })
+
+  test('shows positive position when rent is below 60% of market', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const apt = player.companies.find((c) => c.id === 'company-apt')!.buildings.find((b) => b.id === 'building-apt')!
+    // 7 / 13.2 ≈ 53% — below 60%, should show "Very attractive"
+    apt.pricePerSqm = 7
+    apt.adjustedMarketRentPerSqm = 13.2
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const guidance = page.locator(`${PROPERTY_PANEL_SELECTOR} .market-guidance`)
+    await expect(guidance).toBeVisible()
+    await expect(guidance.locator('.price-position-value')).toContainText('Very attractive')
+  })
+
+  test('shows breakeven note and occupancy trend note in guidance panel', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const guidance = page.locator(`${PROPERTY_PANEL_SELECTOR} .market-guidance`)
+    await expect(guidance).toBeVisible()
+    await expect(guidance.locator('.market-note').nth(0)).toContainText('gradually')
+    await expect(guidance.locator('.market-note').nth(1)).toContainText('75%')
+  })
+
+  test('rent dialog shows inline market rate hint', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
+    await panel.getByRole('button', { name: /Set Rent/i }).click()
+
+    // Inline hint in dialog shows adjusted market rate
+    await expect(panel.locator('.rent-dialog .rent-dialog-market-hint')).toContainText('€13.2')
+    await expect(panel.locator('.rent-dialog .rent-dialog-market-hint')).toContainText('×1.10')
+  })
+
+  test('apartment building hides grid layout (no unit grid)', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    // The unit grid (factory-style) must NOT be visible for apartment buildings
+    await expect(page.locator('.unit-grid')).toBeHidden()
+    // But the property panel IS visible
+    await expect(page.locator(PROPERTY_PANEL_SELECTOR)).toBeVisible()
   })
 })
 
@@ -13507,7 +13644,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.goto('/building/building-shop-mi?unit=1,0')
 
     // URL should contain the unit query param
-    await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-shop-mi.*unit=1(?:,|%2C)0/)
 
     // Unit detail sidebar should be open with Market Intelligence panel visible
     await clickUnitTab(page, 'Market')
@@ -13576,7 +13713,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await expect(panel).toBeVisible()
 
     // URL should encode the selected unit
-    await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-shop-mi.*unit=1(?:,|%2C)0/)
 
     // Update analytics with new tick data before reload
     analytics.dataToTick = 7
@@ -13588,7 +13725,7 @@ test.describe('Public Sales Market Intelligence panel', () => {
     await page.reload()
 
     // After reload: URL param still present and panel still visible
-    await expect(page).toHaveURL(/\/building\/building-shop-mi\?unit=1(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-shop-mi.*unit=1(?:,|%2C)0/)
     await clickUnitTab(page, 'Market')
     await expect(panel).toBeVisible()
     await expect(panel.getByText('Revenue per Tick')).toBeVisible()
@@ -17507,7 +17644,7 @@ test.describe('Building detail tick-refresh stability', () => {
     const activeSection = getGridSection(page, 'Current Configuration')
     await getGridCell(activeSection, 0, 0).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
-    await expect(page).toHaveURL(/\/building\/building-unit-stable\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-unit-stable.*unit=0(?:,|%2C)0/)
 
     // Simulate a tick advancing
     state.gameState.currentTick = 21
@@ -17515,7 +17652,7 @@ test.describe('Building detail tick-refresh stability', () => {
 
     // Unit Details sidebar must remain visible — context must not be lost
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
-    await expect(page).toHaveURL(/\/building\/building-unit-stable\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-unit-stable.*unit=0(?:,|%2C)0/)
     // Main loading spinner must not appear
     await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
   })
@@ -17661,7 +17798,7 @@ test.describe('Building detail tick-refresh stability', () => {
     // The unit details panel must open automatically from the URL param
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
     // URL must still contain the unit param
-    await expect(page).toHaveURL(/\/building\/building-deeplink\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-deeplink.*unit=0(?:,|%2C)0/)
   })
 })
 

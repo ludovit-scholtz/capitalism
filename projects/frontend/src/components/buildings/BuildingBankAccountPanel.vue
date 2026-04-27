@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
-import type { BuildingBankAccountInfo, CompanyBankAccountSummary } from '@/types'
+import type { BuildingBankAccountInfo, CompanyBankAccountSummary, FundBuildingBankAccountResult } from '@/types'
 
 interface Props {
   buildingId: string
@@ -33,6 +33,11 @@ const assignmentLoading = ref(false)
 const createLoading = ref(false)
 const assignmentError = ref<string | null>(null)
 const assignmentSuccess = ref<string | null>(null)
+const isFundPanelOpen = ref(false)
+const fundAmount = ref<string | number>('')
+const fundLoading = ref(false)
+const fundError = ref<string | null>(null)
+const fundSuccess = ref<string | null>(null)
 
 const suspensionLabel = computed(() => {
   const reason = accountInfo.value?.suspendedReason ?? null
@@ -178,6 +183,8 @@ async function assignBankAccount(bankAccountId: string, successMessage: string) 
   assignmentLoading.value = true
   assignmentError.value = null
   assignmentSuccess.value = null
+  fundError.value = null
+  fundSuccess.value = null
   try {
     const result = await gqlRequest<{ assignBuildingBankAccount: { bankAccount: BuildingBankAccountInfo } }>(
       `mutation AssignBuildingBankAccount($input: AssignBuildingBankAccountInput!) {
@@ -231,6 +238,8 @@ async function createAndAssignCompanyAccount() {
   createLoading.value = true
   assignmentError.value = null
   assignmentSuccess.value = null
+  fundError.value = null
+  fundSuccess.value = null
   try {
     const result = await gqlRequest<{ createCompanyBankAccount: { account: CompanyBankAccountSummary } }>(
       `mutation CreateCompanyBankAccount($input: CreateCompanyBankAccountInput!) {
@@ -254,6 +263,69 @@ async function createAndAssignCompanyAccount() {
     assignmentError.value = error instanceof Error ? error.message : t('common.unknownError')
   } finally {
     createLoading.value = false
+  }
+}
+
+async function fundBuildingAccount() {
+  if (!accountInfo.value?.hasBankAccount) {
+    return
+  }
+
+  const rawAmount = fundAmount.value
+  const normalizedAmount = typeof rawAmount === 'number' ? String(rawAmount) : rawAmount.trim()
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedAmount)) {
+    fundError.value = t('buildingBankAccount.fundInvalidAmount')
+    fundSuccess.value = null
+    return
+  }
+
+  const amount = Number(normalizedAmount)
+  if (!Number.isFinite(amount) || amount <= 0) {
+    fundError.value = t('buildingBankAccount.fundInvalidAmount')
+    fundSuccess.value = null
+    return
+  }
+
+  fundLoading.value = true
+  fundError.value = null
+  fundSuccess.value = null
+  assignmentError.value = null
+  assignmentSuccess.value = null
+  try {
+    const result = await gqlRequest<{ fundBuildingBankAccount: FundBuildingBankAccountResult }>(
+      `mutation FundBuildingBankAccount($input: FundBuildingBankAccountInput!) {
+        fundBuildingBankAccount(input: $input) {
+          bankAccount {
+            buildingId
+            buildingName
+            cityName
+            currencyCode
+            hasBankAccount
+            bankAccountId
+            accountNumber
+            balance
+            isSuspendedForFunds
+            suspendedReason
+          }
+          remainingCompanyCash
+        }
+      }`,
+      { input: { buildingId: props.buildingId, amount } },
+    )
+
+    const fundedAccount = result.fundBuildingBankAccount?.bankAccount
+    if (fundedAccount) {
+      accountInfo.value = fundedAccount
+    } else {
+      await fetchAccountInfo()
+    }
+    isFundPanelOpen.value = true
+    fundAmount.value = ''
+    fundSuccess.value = t('buildingBankAccount.fundSuccess')
+  } catch (error: unknown) {
+    fundError.value = error instanceof Error ? error.message : t('common.unknownError')
+  } finally {
+    fundLoading.value = false
   }
 }
 
@@ -328,6 +400,34 @@ watch(
           {{ t('buildingBankAccount.guidanceBank') }}
         </router-link>
       </div>
+
+      <details
+        v-if="accountInfo.hasBankAccount"
+        class="bba-fund-panel"
+        :open="isFundPanelOpen"
+        @toggle="isFundPanelOpen = ($event.target as HTMLDetailsElement).open"
+      >
+        <summary class="bba-fund-summary">{{ t('buildingBankAccount.fundTitle') }}</summary>
+        <div class="bba-fund-body">
+          <p class="bba-fund-hint">{{ t('buildingBankAccount.fundHint', { currency: props.currencyCode }) }}</p>
+          <form class="bba-fund-form" @submit.prevent="fundBuildingAccount">
+            <input
+              v-model="fundAmount"
+              type="number"
+              min="0"
+              step="0.01"
+              class="bba-fund-input"
+              :placeholder="t('buildingBankAccount.fundAmountPlaceholder')"
+              :aria-label="t('buildingBankAccount.fundAmountLabel')"
+            />
+            <button type="submit" class="btn btn-secondary btn-sm" :disabled="fundLoading">
+              {{ fundLoading ? t('common.loading') : t('buildingBankAccount.fundSubmit') }}
+            </button>
+          </form>
+          <p v-if="fundError" class="bba-fund-error" role="alert">{{ fundError }}</p>
+          <p v-if="fundSuccess" class="bba-fund-success" role="status">{{ fundSuccess }}</p>
+        </div>
+      </details>
     </template>
   </div>
 </template>

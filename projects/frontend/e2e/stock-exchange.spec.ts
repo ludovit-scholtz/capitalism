@@ -27,9 +27,55 @@ async function openTradePanel(page: Page, companyName: string) {
 }
 
 async function switchNavbarAccount(page: Page, accountName: string) {
-  const switcher = page.locator('.account-switcher')
-  await switcher.getByRole('button').click()
+  const switcher = page.locator('.ctx-switcher, .account-switcher')
+  await switcher.locator('.ctx-trigger, .account-trigger').click()
   await switcher.getByRole('menuitemradio', { name: new RegExp(accountName) }).click()
+}
+
+function seedPersonalUsdSettlementAccount(
+  state: ReturnType<typeof setupMockApi>,
+  player: { id: string; displayName: string },
+  balance = 250_000,
+) {
+  const accountDigits = makeTestAccountNumber(player.id, '9')
+  state.myBankAccounts.push({
+    id: `bank-person-usd-${player.id}`,
+    accountNumber: accountDigits,
+    currencyCode: 'USD',
+    currencySymbol: '$',
+    balance,
+    ownerType: 'PERSON',
+    ownerDisplayName: player.displayName,
+  })
+}
+
+function seedCompanyUsdSettlementAccount(
+  state: ReturnType<typeof setupMockApi>,
+  company: MockCompany,
+  balance = 500_000,
+) {
+  const accountDigits = makeTestAccountNumber(company.id, '8')
+  state.myBankAccounts.push({
+    id: `bank-company-usd-${company.id}`,
+    accountNumber: accountDigits,
+    currencyCode: 'USD',
+    currencySymbol: '$',
+    balance,
+    companyId: company.id,
+    companyName: company.name,
+    ownerType: 'COMPANY',
+    ownerDisplayName: company.name,
+  })
+}
+
+function makeTestAccountNumber(seed: string, prefixDigit: string): string {
+  const body = [...seed]
+    .map((char) => String(char.charCodeAt(0) % 10))
+    .join('')
+    .padEnd(15, '0')
+    .slice(0, 15)
+
+  return `${prefixDigit}${body}`
 }
 
 test.describe('Stock exchange', () => {
@@ -416,6 +462,7 @@ test.describe('Stock exchange', () => {
     player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedPersonalUsdSettlementAccount(state, player, 200_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
@@ -468,6 +515,7 @@ test.describe('Stock exchange', () => {
     player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedPersonalUsdSettlementAccount(state, player, 200_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
@@ -517,18 +565,19 @@ test.describe('Stock exchange', () => {
     player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedCompanyUsdSettlementAccount(state, player.companies[0]!, 500_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/dashboard')
 
-    await expect(page.locator('.account-switcher')).toBeVisible()
+    await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await switchNavbarAccount(page, 'Home Holdings')
-    await expect(page.locator('.account-trigger-name')).toContainText('Home Holdings')
+    await expect(page.locator('.ctx-account-name, .account-trigger-name')).toContainText('Home Holdings')
 
     await page.getByTitle('Stocks').click()
     await expect(page).toHaveURL(/\/stocks/)
-    await expect(page.locator('.account-switcher')).toBeVisible()
-    await expect(page.locator('.account-trigger-name')).toContainText('Home Holdings')
+    await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
+    await expect(page.locator('.ctx-account-name, .account-trigger-name')).toContainText('Home Holdings')
 
     await openTradePanel(page, 'AccountTarget Ltd')
 
@@ -580,6 +629,7 @@ test.describe('Stock exchange', () => {
     player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedPersonalUsdSettlementAccount(state, player, 50)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
@@ -638,6 +688,7 @@ test.describe('Stock exchange', () => {
     })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedPersonalUsdSettlementAccount(state, player, 250_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
@@ -688,6 +739,7 @@ test.describe('Stock exchange', () => {
     })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedCompanyUsdSettlementAccount(state, player.companies[0]!, 500_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
@@ -918,13 +970,14 @@ test.describe('Stock exchange', () => {
     })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedCompanyUsdSettlementAccount(state, player.companies[0]!, 500_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
 
     await openTradePanel(page, 'Ledger Target')
     const tradePanel = page.locator('.trade-panel')
-    await expect(page.locator('.account-trigger-name')).toContainText('Ledger Holdings')
+    await expect(page.locator('.ctx-account-name, .account-trigger-name')).toContainText('Ledger Holdings')
     await expect(tradePanel.getByLabel(/Trade with Ledger Target/)).toHaveCount(0)
     await tradePanel.getByLabel(/Share quantity Ledger Target/).fill('100')
     await tradePanel.getByRole('button', { name: /Buy @ / }).click()
@@ -1048,6 +1101,7 @@ test.describe('Stock exchange', () => {
     player.activeCompanyId = null
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    seedPersonalUsdSettlementAccount(state, player, 250_000)
 
     await authenticateViaLocalStorage(page, `token-${player.id}`)
     await page.goto('/stocks')
@@ -2036,10 +2090,10 @@ test.describe('Stock exchange — navbar account switcher', () => {
 
     await restoreMockSession(page, `token-${player.id}`)
     await page.goto('/dashboard')
-    await expect(page.locator('.account-switcher')).toBeVisible()
+    await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await page.getByTitle('Stocks').click()
     await expect(page).toHaveURL(/\/stocks/)
-    await expect(page.locator('.account-switcher')).toBeVisible()
+    await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Stock Exchange' })).toBeVisible()
   })
 })
@@ -2083,7 +2137,7 @@ test.describe('Stock exchange — mobile trading layout (375px)', () => {
     await restoreMockSession(page, `token-${player.id}`)
     await page.goto('/stocks')
 
-    await expect(page.locator('.account-switcher')).toBeVisible()
+    await expect(page.locator('.ctx-switcher, .account-switcher')).toBeVisible()
     await openTradePanel(page, 'Mobile Metals')
 
     const tradePanel = page.locator('.trade-panel')
@@ -2486,6 +2540,7 @@ test.describe('Stock exchange — tax holdback', () => {
     buyer.activeCompanyId = null
     state.currentUserId = buyer.id
     state.currentToken = `token-${buyer.id}`
+    seedPersonalUsdSettlementAccount(state, buyer, 250_000)
 
     await authenticateViaLocalStorage(page, `token-${buyer.id}`)
     await page.goto('/stocks')
@@ -2610,6 +2665,7 @@ test.describe('Stock exchange — tax holdback', () => {
     buyer.activeCompanyId = buyerCompany.id
     state.currentUserId = buyer.id
     state.currentToken = `token-${buyer.id}`
+    seedCompanyUsdSettlementAccount(state, buyerCompany, 250_000)
 
     await authenticateViaLocalStorage(page, `token-${buyer.id}`)
     await page.goto('/stocks')

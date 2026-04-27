@@ -1,11 +1,45 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
 const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent, rentSaveError, openRentDialog, closeRentDialog, saveRentPerSqm, formatCurrency, formatTickDuration } = bd
+
+/** Price ratio of current rent vs. adjusted market rate (location-adjusted). */
+const priceRatio = computed(() => {
+  const price = building.value?.pricePerSqm
+  const market = building.value?.adjustedMarketRentPerSqm
+  if (price == null || market == null || market <= 0) return null
+  return price / market
+})
+
+// Occupancy-cap tier thresholds (aligned with backend RentPhase constants):
+// > 1.1  → overpriced: occupancy drifts to 50% floor
+// 1.0–1.1 → above market: max 90% occupancy
+// 0.6–1.0 → good range: linear interpolation 90%–100%
+// < 0.6  → very attractive: can reach 100% occupancy
+const OVERPRICED_THRESHOLD = 1.1
+const ABOVE_MARKET_THRESHOLD = 1.0
+const GOOD_RANGE_LOWER = 0.6
+const GOOD_RANGE_UPPER = 0.9
+
+/** Human-readable price position label and CSS class. */
+const rentPosition = computed((): { key: string; cls: string } | null => {
+  const r = priceRatio.value
+  if (r === null) return null
+  if (r > OVERPRICED_THRESHOLD) return { key: 'property.rentPositionOverpriced', cls: 'position-overpriced' }
+  if (r > ABOVE_MARKET_THRESHOLD) return { key: 'property.rentPositionAboveMarket', cls: 'position-above' }
+  if (r >= GOOD_RANGE_UPPER) return { key: 'property.rentPositionAtMarket', cls: 'position-good' }
+  if (r >= GOOD_RANGE_LOWER) return { key: 'property.rentPositionGood', cls: 'position-good' }
+  return { key: 'property.rentPositionBelow60', cls: 'position-great' }
+})
+
+const rentVsMarketPct = computed(() => {
+  if (priceRatio.value === null) return null
+  return ((priceRatio.value - 1) * 100).toFixed(0)
+})
 </script>
 
 <template>
@@ -32,7 +66,14 @@ const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent
       </div>
       <div class="property-metric rounded-lg border border-divider bg-surface p-3">
         <span class="property-metric-label text-xs uppercase tracking-wide text-muted">{{ t('property.occupancy') }}</span>
-        <span class="property-metric-value mt-1 block text-sm font-semibold text-foreground" :class="{ 'property-metric-zero text-warning': building?.occupancyPercent === 0 }">
+        <span
+          class="property-metric-value mt-1 block text-sm font-semibold"
+          :class="{
+            'text-warning': building?.occupancyPercent != null && building.occupancyPercent < 60,
+            'text-success': building?.occupancyPercent != null && building.occupancyPercent >= 75,
+            'text-foreground': building?.occupancyPercent == null || (building.occupancyPercent >= 60 && building.occupancyPercent < 75),
+          }"
+        >
           {{ building?.occupancyPercent != null ? building?.occupancyPercent.toFixed(1) + '%' : t('common.notAvailable') }}
         </span>
       </div>
@@ -48,6 +89,81 @@ const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent
           {{ Math.round(building?.totalAreaSqm * (building?.occupancyPercent / 100)).toLocaleString() }} m² / {{ building?.totalAreaSqm.toLocaleString() }} m²
         </span>
       </div>
+    </div>
+
+    <!-- ── Market Rate Guidance ───────────────────────────────────────────── -->
+    <div
+      v-if="building?.adjustedMarketRentPerSqm != null"
+      class="market-guidance mt-5 rounded-xl border border-divider bg-surface p-4"
+      role="region"
+      :aria-label="t('property.marketGuidanceTitle')"
+    >
+      <h3 class="market-guidance-title mb-3 text-sm font-semibold uppercase tracking-wide text-muted">
+        {{ t('property.marketGuidanceTitle') }}
+      </h3>
+
+      <!-- Rate comparison table -->
+      <div class="market-rates grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div class="market-rate-item flex flex-col">
+          <span class="market-rate-label text-xs text-muted">{{ t('property.cityReferenceRate') }}</span>
+          <span class="market-rate-value text-sm font-semibold text-foreground">
+            {{ building?.cityReferenceRentPerSqm != null ? formatCurrency(building.cityReferenceRentPerSqm) + ' / m²' : t('common.notAvailable') }}
+          </span>
+        </div>
+        <div class="market-rate-item flex flex-col">
+          <span class="market-rate-label text-xs text-muted">
+            {{ t('property.adjustedMarketRate') }}
+            <span
+              v-if="building?.populationIndex != null"
+              class="location-index-badge ml-1 rounded bg-surface-muted px-1 text-xs text-muted"
+              :title="t('property.locationIndexTooltip')"
+            >×{{ building.populationIndex.toFixed(2) }}</span>
+          </span>
+          <span class="market-rate-value text-sm font-bold text-foreground">
+            {{ formatCurrency(building.adjustedMarketRentPerSqm) }} / m²
+          </span>
+        </div>
+        <div class="market-rate-item flex flex-col">
+          <span class="market-rate-label text-xs text-muted">{{ t('property.yourRent') }}</span>
+          <span class="market-rate-value text-sm font-semibold text-foreground">
+            {{ building?.pricePerSqm != null ? formatCurrency(building.pricePerSqm) + ' / m²' : t('property.noRentSet') }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Price position indicator -->
+      <div v-if="rentPosition" class="price-position mt-3">
+        <div class="price-position-bar flex items-center gap-3">
+          <span class="price-position-label text-xs text-muted">{{ t('property.rentPositionLabel') }}</span>
+          <span
+            class="price-position-value rounded-full px-2 py-0.5 text-xs font-semibold"
+            :class="{
+              'bg-success/15 text-success': rentPosition.cls === 'position-great',
+              'bg-blue-500/15 text-blue-600 dark:text-blue-400': rentPosition.cls === 'position-good',
+              'bg-warning/15 text-warning': rentPosition.cls === 'position-above',
+              'bg-error/15 text-error': rentPosition.cls === 'position-overpriced',
+            }"
+          >
+            {{ t(rentPosition.key) }}
+          </span>
+          <span v-if="rentVsMarketPct !== null" class="rent-vs-market text-xs text-muted">
+            ({{ rentVsMarketPct }}% {{ t('property.rentVsMarket') }})
+          </span>
+        </div>
+      </div>
+
+      <!-- Breakeven info bar -->
+      <div class="market-guidance-notes mt-3 space-y-1">
+        <p class="market-note text-xs text-muted">{{ t('property.occupancyTrendNote') }}</p>
+        <p class="market-note text-xs text-muted">💡 {{ t('property.breakevenNote') }}</p>
+      </div>
+    </div>
+
+    <div
+      v-else-if="building?.pricePerSqm != null"
+      class="market-guidance-unavailable mt-4 rounded-lg border border-dashed border-divider bg-surface-muted px-3 py-2 text-sm text-muted"
+    >
+      {{ t('property.noMarketDataAvailable') }}
     </div>
 
     <!-- Pending rent change notice -->
@@ -83,6 +199,16 @@ const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent
       </div>
       <div class="rent-dialog-body">
         <p class="rent-dialog-hint">{{ t('property.rentDelayHint') }}</p>
+
+        <!-- Inline market rate hint inside dialog -->
+        <div
+          v-if="building?.adjustedMarketRentPerSqm != null"
+          class="rent-dialog-market-hint mb-3 rounded-lg bg-surface-muted px-3 py-2 text-xs text-muted"
+        >
+          {{ t('property.adjustedMarketRate') }}: <strong>{{ formatCurrency(building.adjustedMarketRentPerSqm) }} / m²</strong>
+          <span v-if="building.populationIndex != null"> ({{ t('property.locationIndex') }}: ×{{ building.populationIndex.toFixed(2) }})</span>
+        </div>
+
         <label class="form-label">{{ t('property.rentLabel') }}</label>
         <input
           type="number"
@@ -104,3 +230,4 @@ const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent
     </div>
   </div>
 </template>
+

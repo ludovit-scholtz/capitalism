@@ -1010,11 +1010,11 @@ test.describe('Global Exchange — Products marketplace tab', () => {
     // Product row should be visible
     await expect(page.locator('.product-row').filter({ hasText: 'Wooden Chair' })).toBeVisible()
 
+    const chairRow = page.locator('.product-row').filter({ hasText: 'Wooden Chair' })
     // Industry badge should show
-    await expect(page.locator('.product-industry-badge', { hasText: 'Furniture' })).toBeVisible()
+    await expect(chairRow.locator('.product-industry-badge', { hasText: 'Furniture' }).first()).toBeVisible()
 
     // Synthetic market quote should still be present above player listings
-    const chairRow = page.locator('.product-row').filter({ hasText: 'Wooden Chair' })
     await expect(chairRow).toContainText('Bid price')
     await expect(chairRow).toContainText('Ask price')
 
@@ -1263,9 +1263,9 @@ test.describe('Global Exchange — Products marketplace tab', () => {
     await expect(page.locator('.product-row').filter({ hasText: 'Basic Medicine' })).toBeVisible()
 
     // Industry badges
-    await expect(page.locator('.product-industry-badge', { hasText: 'Furniture' })).toBeVisible()
-    await expect(page.locator('.product-industry-badge', { hasText: 'Food Processing' })).toBeVisible()
-    await expect(page.locator('.product-industry-badge', { hasText: 'Healthcare' })).toBeVisible()
+    await expect(page.locator('.product-row').filter({ hasText: 'Wooden Chair' }).locator('.product-industry-badge', { hasText: 'Furniture' }).first()).toBeVisible()
+    await expect(page.locator('.product-row').filter({ hasText: 'Bread' }).locator('.product-industry-badge', { hasText: 'Food Processing' }).first()).toBeVisible()
+    await expect(page.locator('.product-row').filter({ hasText: 'Basic Medicine' }).locator('.product-industry-badge', { hasText: 'Healthcare' }).first()).toBeVisible()
   })
 })
 

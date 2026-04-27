@@ -237,6 +237,37 @@ public static class GameConstants
     /// <summary>Rate at which occupancy adjusts per tick toward equilibrium.</summary>
     public const decimal OccupancyAdjustmentRate = 0.5m;
 
+    /// <summary>
+    /// When a property is priced above the location-adjusted market rate, occupancy
+    /// drifts toward this floor value (ROADMAP: "slowly decrease to 50%").
+    /// </summary>
+    public const decimal OccupancyOverpricedFloor = 50m;
+
+    /// <summary>
+    /// Price ratio threshold below which a building can achieve 100% occupancy
+    /// (ROADMAP: "below 60% of the city rate").
+    /// </summary>
+    public const decimal OccupancyFullCapPriceRatio = 0.60m;
+
+    /// <summary>
+    /// Price ratio threshold at which max occupancy is capped at 90%
+    /// (ROADMAP: "current city rate adjusted by the location index plus 10%").
+    /// </summary>
+    public const decimal OccupancyNinetyPctCapPriceRatio = 1.10m;
+
+    /// <summary>
+    /// Maximum occupancy achievable when priced above the 60% threshold but at or below
+    /// the +10% threshold (interpolated from 100% down to 90%).
+    /// </summary>
+    public const decimal OccupancyNinetyPctCap = 90m;
+
+    /// <summary>
+    /// Constant operating cost ratio for APARTMENT and COMMERCIAL buildings.
+    /// Cost per tick = PricePerSqm × TotalAreaSqm × this ratio, which equals
+    /// rent income at 75% occupancy (ROADMAP: "costs equal to earning at 75% occupancy").
+    /// </summary>
+    public const decimal PropertyBreakevenOccupancy = 0.75m;
+
     // ── Power grid constants ──────────────────────────────────────────────────
 
     /// <summary>

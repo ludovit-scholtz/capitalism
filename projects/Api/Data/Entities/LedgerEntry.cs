@@ -49,6 +49,7 @@ public static class LedgerCategory
     public const string Tax = "TAX";
     public const string Dividend = "DIVIDEND";
     public const string RentIncome = "RENT_INCOME";
+    public const string PropertyMaintenance = "PROPERTY_MAINTENANCE";
     public const string Other = "OTHER";
     public const string LoanOrigination = "LOAN_ORIGINATION";
     public const string LoanRepaymentPrincipal = "LOAN_REPAYMENT_PRINCIPAL";

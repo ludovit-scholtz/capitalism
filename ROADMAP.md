@@ -95,13 +95,20 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
 - [ ] For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
 
-### Appartment and commercial buildings (0% complete)
+### Appartment and commercial buildings (70% complete)
 
-- [ ] The appartment and commenrcial buildings layouts must not contain the grid - it is single unit building.
+**Shipped in this increment:**
+- ✅ Grid layout hidden for APARTMENT and COMMERCIAL buildings — these now present as single-unit properties without the factory-style unit grid.
+- ✅ Market Rate Guidance panel added to the property UI: shows city reference rate, location-adjusted market rate (city rate × PopulationIndex), your current rent, price position label (Very Attractive / Good / At Market / Above Market / Overpriced), % vs market, and occupancy expectations per price tier.
+- ✅ Market rate hint shown inline inside the rent-setting dialog so players see the benchmark before entering a new value.
+- ✅ Occupancy caps implemented in backend RentPhase: overpriced (>+10%) → 50% floor; at +10% → max 90%; below 60% of market → max 100%; linear interpolation between 60%–110%.
+- ✅ Location-adjusted market rate: compares rent against `city.AverageRentPerSqm × lot.PopulationIndex`, not just the raw city average.
+- ✅ Constant operating costs: each tick deducts `pricePerSqm × area × 0.75` (PROPERTY_MAINTENANCE ledger entry). Building breaks even at 75% occupancy, profitable above it.
+- ✅ New GraphQL fields on Building: `cityReferenceRentPerSqm`, `adjustedMarketRentPerSqm`, `populationIndex`.
+- ✅ 19 backend tests covering all occupancy/rent rules, price zones, ledger entries, and breakeven profitability.
+
+**Remaining:**
 - [ ] When i want to set a rent i dont see any reference rate. Make sure to show the reference rate chart in the city. The reference rate chart for appartments show in appartments, and reference rate  chart for commenrcial buildings show in the commercial buildings.
-- [ ] When the current rent is higher then the city accepted rate adjusted to the location index, the residency will slowly decrease to 50%.
-- [ ] When the current rent is lower then the city accepted rate adjusted to the location index, the occupancy will increase. The occupancy can convergate to 100% if the current rate is for long time below 60% of the city rate. If it is at the current city rate adjusted by the location index plus 10%, it can reach maximum 90% of the occupancy.
-- [ ] Every appartment and commercial building bears with it the constant costs which are calculated to be equal to earning if the occupancy is equal to 75%
 
 ### News
 

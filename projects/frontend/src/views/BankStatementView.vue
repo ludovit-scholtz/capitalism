@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -10,7 +9,6 @@ import type { PlayerBankAccountSummary } from '@/types'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
-const { selectedCityId } = storeToRefs(auth)
 const route = useRoute()
 const router = useRouter()
 
@@ -59,11 +57,6 @@ const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
       return []
     }
     filtered = accounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === activeCompanyId)
-  }
-
-  // Filter by selected city if available
-  if (selectedCityId.value) {
-    filtered = filtered.filter((account) => account.cityId === selectedCityId.value)
   }
 
   return filtered

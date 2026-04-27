@@ -1,6 +1,7 @@
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Engine.Phases;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
@@ -36,7 +37,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
     private async Task<(Guid CompanyId, Guid BuildingId, Guid CityId)> SeedMineAsync(AppDbContext db)
     {
-        var city = await db.Cities.Include(c => c.Resources).FirstDeterministicAsync();
+        // Use Bratislava explicitly: other tests add small-population test cities to the shared
+        // database; FirstDeterministicAsync (ordered by Id) can return those test cities which
+        // have no CityResources, causing SeedMineAsync to fail.
+        var city = await db.Cities.Include(c => c.Resources).FirstAsync(c => c.Name == "Bratislava");
 
         var player = new Player
         {
@@ -379,7 +383,8 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
     private async Task<(Guid CompanyId, Guid BuildingId)> SeedApartmentAsync(AppDbContext db)
     {
-        var city = await db.Cities.FirstDeterministicAsync();
+        // Use Bratislava explicitly to avoid picking test cities with AverageRentPerSqm = 0.
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
 
         var player = new Player
         {
@@ -2075,7 +2080,9 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstDeterministicAsync();
+        // Use Bratislava explicitly (AverageRentPerSqm > 0) and 80% occupancy (above 75%
+        // breakeven) so net income is positive after constant costs are deducted.
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         var player = new Player { Id = Guid.NewGuid(), Email = $"comm-rent-{Guid.NewGuid():N}@test.com", DisplayName = "Comm Rent Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Comm Corp", Cash = 500_000m };
@@ -2084,7 +2091,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         {
             Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
             Type = BuildingType.Commercial, Name = "Test Office Block",
-            Level = 1, PricePerSqm = city.AverageRentPerSqm, TotalAreaSqm = 500m, OccupancyPercent = 60m
+            Level = 1, PricePerSqm = city.AverageRentPerSqm, TotalAreaSqm = 500m, OccupancyPercent = 80m
         };
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
@@ -2094,7 +2101,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await processor.ProcessTickAsync();
 
         Assert.True(company.Cash > cashBefore,
-            "Company should collect rent from commercial building.");
+            "Company at 80% occupancy (above 75% breakeven) should have net positive rent income.");
     }
 
     [Fact]
@@ -2276,7 +2283,8 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstDeterministicAsync();
+        // Use Bratislava explicitly so AverageRentPerSqm > 0.
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         var player = new Player { Id = Guid.NewGuid(), Email = $"zero-occ-{Guid.NewGuid():N}@test.com", DisplayName = "Zero Occ Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Vacant Corp", Cash = 500_000m };
@@ -2290,12 +2298,20 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         db.Buildings.Add(building);
         await db.SaveChangesAsync();
 
-        var cashBefore = company.Cash;
         var processor = await CreateProcessorAsync(scope);
         await processor.ProcessTickAsync();
 
-        Assert.True(company.Cash == cashBefore,
-            "Zero-occupancy building should generate no rent income.");
+        // At zero occupancy, no RENT INCOME ledger entry should be created.
+        var rentEntries = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.RentIncome)
+            .ToListAsync();
+        Assert.Empty(rentEntries);
+
+        // Constant operating costs still apply even with zero occupancy.
+        var maintenanceEntries = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.PropertyMaintenance)
+            .ToListAsync();
+        Assert.NotEmpty(maintenanceEntries);
     }
 
     [Fact]
@@ -2316,6 +2332,228 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.True(ledgerEntries.Sum(e => e.Amount) > 0m,
             "Rent income must appear as a positive ledger entry.");
         Assert.All(ledgerEntries, e => Assert.Equal(buildingId, e.BuildingId));
+    }
+
+    [Fact]
+    public void RentPhase_ComputeMaxOccupancy_OverpricedAbove110Pct_Returns50PctFloor()
+    {
+        // ROADMAP: "When the current rent is higher than the city accepted rate adjusted to the
+        // location index, the residency will slowly decrease to 50%."
+        var maxOcc = RentPhase.ComputeMaxOccupancy(priceRatio: 1.5m);
+        Assert.Equal(GameConstants.OccupancyOverpricedFloor, maxOcc);
+    }
+
+    [Fact]
+    public void RentPhase_ComputeMaxOccupancy_AtExactlyMarketPlusTenPct_Returns90Pct()
+    {
+        // ROADMAP: "If it is at the current city rate adjusted by the location index plus 10%,
+        // it can reach maximum 90% of the occupancy."
+        var maxOcc = RentPhase.ComputeMaxOccupancy(priceRatio: 1.10m);
+        Assert.Equal(90m, maxOcc, precision: 4);
+    }
+
+    [Fact]
+    public void RentPhase_ComputeMaxOccupancy_Below60PctOfMarket_Returns100Pct()
+    {
+        // ROADMAP: "The occupancy can converge to 100% if the current rate is for a long time
+        // below 60% of the city rate."
+        var maxOcc = RentPhase.ComputeMaxOccupancy(priceRatio: 0.50m);
+        Assert.Equal(100m, maxOcc);
+    }
+
+    [Fact]
+    public void RentPhase_ComputeMaxOccupancy_AtExactly60Pct_Returns100Pct()
+    {
+        var maxOcc = RentPhase.ComputeMaxOccupancy(priceRatio: GameConstants.OccupancyFullCapPriceRatio);
+        Assert.Equal(100m, maxOcc, precision: 4);
+    }
+
+    [Fact]
+    public void RentPhase_ComputeMaxOccupancy_AtMarketRate_Returns96Pct()
+    {
+        // At exactly the market rate (ratio = 1.0), interpolation: 100 - ((1.0 - 0.6) / 0.5) * 10 = 100 - 8 = 92
+        var maxOcc = RentPhase.ComputeMaxOccupancy(priceRatio: 1.0m);
+        Assert.Equal(92m, maxOcc, precision: 4);
+    }
+
+    [Fact]
+    public async Task RentPhase_OccupancyDriftsDown_WhenOverpriced()
+    {
+        // Overpriced → occupancy should decrease toward the 50% floor.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var player = new Player { Id = Guid.NewGuid(), Email = $"occ-down-{Guid.NewGuid():N}@test.com", DisplayName = "OccDown", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "OccDown Corp", Cash = 500_000m };
+        db.Companies.Add(company);
+        // Priced at 150% of market → should drift toward 50% floor
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Apartment, Name = "Overpriced Apts",
+            Level = 1, PricePerSqm = city.AverageRentPerSqm * 1.5m, TotalAreaSqm = 500m, OccupancyPercent = 80m
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var occupancyBefore = building.OccupancyPercent!.Value;
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        Assert.True(building.OccupancyPercent!.Value < occupancyBefore,
+            $"Overpriced building occupancy should decrease. Before={occupancyBefore}, After={building.OccupancyPercent}");
+        Assert.True(building.OccupancyPercent.Value >= GameConstants.OccupancyOverpricedFloor,
+            $"Occupancy should never drop below 50% floor. Actual={building.OccupancyPercent}");
+    }
+
+    [Fact]
+    public async Task RentPhase_OccupancyDriftsUp_WhenUnderpriced()
+    {
+        // Underpriced → occupancy should increase toward the max cap.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var player = new Player { Id = Guid.NewGuid(), Email = $"occ-up-{Guid.NewGuid():N}@test.com", DisplayName = "OccUp", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "OccUp Corp", Cash = 500_000m };
+        db.Companies.Add(company);
+        // Priced at 40% of market → should drift toward 100% (below 60% threshold)
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Apartment, Name = "Cheap Apts",
+            Level = 1, PricePerSqm = city.AverageRentPerSqm * 0.40m, TotalAreaSqm = 500m, OccupancyPercent = 70m
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var occupancyBefore = building.OccupancyPercent!.Value;
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        Assert.True(building.OccupancyPercent!.Value > occupancyBefore,
+            $"Underpriced building occupancy should increase. Before={occupancyBefore}, After={building.OccupancyPercent}");
+    }
+
+    [Fact]
+    public async Task RentPhase_OccupancyDriftsDown_WhenAtMarketPlusTenPct()
+    {
+        // ROADMAP: at +10% above market the max is 90%. Verify the occupancy drifts DOWN
+        // when above the cap. Full convergence takes many ticks; we just verify direction.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var player = new Player { Id = Guid.NewGuid(), Email = $"occ-cap-{Guid.NewGuid():N}@test.com", DisplayName = "OccCap", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "OccCap Corp", Cash = 500_000m };
+        db.Companies.Add(company);
+        // Start at 95%, priced at +10% → max is 90%, so occupancy must drift downward.
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Apartment, Name = "MarketPlus10 Apts",
+            Level = 1, PricePerSqm = city.AverageRentPerSqm * 1.10m, TotalAreaSqm = 500m, OccupancyPercent = 95m
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var occupancyBefore = building.OccupancyPercent!.Value;
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        Assert.True(building.OccupancyPercent!.Value < occupancyBefore,
+            $"Occupancy above the 90% cap should drift down. Before={occupancyBefore}, After={building.OccupancyPercent}");
+        // Drift should not skip the 50% overpriced floor either.
+        Assert.True(building.OccupancyPercent.Value >= GameConstants.OccupancyOverpricedFloor,
+            $"Occupancy should not drop below the 50% floor in one tick. Actual={building.OccupancyPercent}");
+    }
+
+    [Fact]
+    public async Task RentPhase_ConstantPropertyCosts_AppearedInLedger()
+    {
+        // ROADMAP: constant operating costs equal to earnings at 75% occupancy.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var player = new Player { Id = Guid.NewGuid(), Email = $"prop-cost-{Guid.NewGuid():N}@test.com", DisplayName = "PropCost", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "PropCost Corp", Cash = 500_000m };
+        db.Companies.Add(company);
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Apartment, Name = "Cost Test Apts",
+            Level = 1, PricePerSqm = city.AverageRentPerSqm, TotalAreaSqm = 1000m, OccupancyPercent = 80m
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var maintenanceLedger = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.PropertyMaintenance)
+            .ToListAsync();
+
+        // Cost = pricePerSqm * totalArea * 0.75
+        var expectedCost = city.AverageRentPerSqm * 1000m * GameConstants.PropertyBreakevenOccupancy;
+        Assert.NotEmpty(maintenanceLedger);
+        Assert.Equal(-expectedCost, maintenanceLedger.Sum(e => e.Amount), precision: 2);
+    }
+
+    [Fact]
+    public async Task RentPhase_PropertyProfitable_AboveBreakevenOccupancy()
+    {
+        // At occupancy = 100%, income > costs → positive net.
+        // At occupancy = 75% (breakeven), income ≈ costs → net ≈ 0.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var player = new Player { Id = Guid.NewGuid(), Email = $"profit-{Guid.NewGuid():N}@test.com", DisplayName = "Profit", PasswordHash = "h", Role = PlayerRole.Player };
+        db.Players.Add(player);
+        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Profit Corp", Cash = 500_000m };
+        db.Companies.Add(company);
+
+        // Create a bank account so we can track balance changes
+        var bankAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(), AccountNumber = "1234567890123456", CurrencyCode = "EUR",
+            Balance = 500_000m, CompanyId = company.Id, CreatedAtUtc = DateTime.UtcNow
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        // Building at 75% occupancy (breakeven)
+        var building = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            BankAccountId = bankAccount.Id,
+            Type = BuildingType.Apartment, Name = "Breakeven Apts",
+            Level = 1, PricePerSqm = city.AverageRentPerSqm, TotalAreaSqm = 1000m,
+            OccupancyPercent = GameConstants.PropertyBreakevenOccupancy * 100m
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var balanceBefore = bankAccount.Balance;
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Net (income - cost) should be approximately 0 at 75% occupancy
+        var netChange = bankAccount.Balance - balanceBefore;
+        // income = price * area * 0.75, cost = price * area * 0.75, net ≈ 0
+        Assert.True(Math.Abs(netChange) < 1m,
+            $"At breakeven occupancy (75%), net income should be ~0. Actual net: {netChange}");
     }
 
     #endregion

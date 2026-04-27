@@ -150,6 +150,20 @@ test.describe('Buy Building View', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'financial-group-bank-account',
+        accountNumber: '4000000000000001',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 50_000_000,
+        companyId: 'company-1',
+        companyName: 'Financial Group',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Financial Group',
+        cityId: 'city-ba',
+      },
+    ]
 
     await authenticate(page, player.id)
     await page.goto('/buy-building/company-1')
@@ -220,6 +234,20 @@ test.describe('Buy Building View', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'banking-corp-bank-account',
+        accountNumber: '4000000000000002',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 50_000_000,
+        companyId: 'company-1',
+        companyName: 'Banking Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Banking Corp',
+        cityId: 'city-ba',
+      },
+    ]
 
     await authenticate(page, player.id)
     // Navigate with ?type=BANK query param (as "Acquire a Bank" button does)
@@ -227,7 +255,7 @@ test.describe('Buy Building View', () => {
 
     // Bank type should be pre-selected and bank setup UI should be visible immediately
     await expect(page.getByText('Setting up your bank')).toBeVisible()
-    await expect(page.locator('.type-card.selected', { hasText: 'Bank' })).toBeVisible()
+    await expect(page.getByLabel(/Deposit Interest Rate/i)).toBeVisible()
   })
 
   test('purchasing a BANK lot redirects to /bank/:id, not /building/:id', async ({ page }) => {
@@ -247,6 +275,20 @@ test.describe('Buy Building View', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
+    state.myBankAccounts = [
+      {
+        id: 'company-1-eur-bank',
+        accountNumber: '4000000000000003',
+        currencyCode: 'EUR',
+        currencySymbol: '€',
+        balance: 50_000_000,
+        companyId: 'company-1',
+        companyName: 'Capital Bank Group',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Capital Bank Group',
+        cityId: 'city-ba',
+      },
+    ]
 
     await authenticate(page, player.id)
     await page.goto('/buy-building/company-1')
@@ -357,7 +399,20 @@ test.describe('Buy Building View', () => {
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     // Player has some CZK but not enough (50,000 < lot 90,000 + construction 15,000 = 105,000)
-    state.playerCurrencyBalances = [{ currencyCode: 'CZK', currencySymbol: 'Kč', balance: 50_000 }]
+    state.myBankAccounts = [
+      {
+        id: 'company-1-czk-bank-low',
+        accountNumber: '4000000000000004',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 50_000,
+        companyId: 'company-1',
+        companyName: 'Prague Low Funds Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Prague Low Funds Corp',
+        cityId: 'city-pr',
+      },
+    ]
     state.buildingLots.push({
       id: 'lot-prague-factory-cheap',
       cityId: 'city-pr',
@@ -421,7 +476,20 @@ test.describe('Buy Building View', () => {
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
     // Player has sufficient CZK balance
-    state.playerCurrencyBalances = [{ currencyCode: 'CZK', currencySymbol: 'Kč', balance: 5_000_000 }]
+    state.myBankAccounts = [
+      {
+        id: 'company-1-czk-bank-funded',
+        accountNumber: '4000000000000005',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 5_000_000,
+        companyId: 'company-1',
+        companyName: 'Prague Funded Corp',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Prague Funded Corp',
+        cityId: 'city-pr',
+      },
+    ]
     // Add a Prague lot so the player can select it
     state.buildingLots.push({
       id: 'lot-prague-factory',

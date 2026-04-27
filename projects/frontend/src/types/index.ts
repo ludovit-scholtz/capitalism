@@ -113,6 +113,18 @@ export interface Building {
   isSuspendedForFunds: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
   suspendedReason: string | null
+  /**
+   * City base average rent per m² in local currency (APARTMENT/COMMERCIAL only).
+   * Useful as a baseline reference for rent-setting decisions.
+   */
+  cityReferenceRentPerSqm: number | null
+  /**
+   * Location-adjusted market rent per m²: city base rate × lot PopulationIndex
+   * (APARTMENT/COMMERCIAL only). This is the rate players should compare their rent against.
+   */
+  adjustedMarketRentPerSqm: number | null
+  /** Lot PopulationIndex (location quality score, 1.0 = baseline). APARTMENT/COMMERCIAL only. */
+  populationIndex: number | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }

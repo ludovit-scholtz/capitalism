@@ -9,6 +9,7 @@ import BuildingPropertyPanel from '@/components/buildings/BuildingPropertyPanel.
 import BuildingMediaHousePanel from '@/components/buildings/BuildingMediaHousePanel.vue'
 import BuildingPowerPlantPanel from '@/components/buildings/BuildingPowerPlantPanel.vue'
 import BuildingResearchPanel from '@/components/buildings/BuildingResearchPanel.vue'
+import BuildingChainStatusPanel from '@/components/buildings/BuildingChainStatusPanel.vue'
 import BuildingUnitGrid from '@/components/buildings/BuildingUnitGrid.vue'
 import BuildingEditingSidebar from '@/components/buildings/BuildingEditingSidebar.vue'
 import BuildingReadonlySidebar from '@/components/buildings/BuildingReadonlySidebar.vue'
@@ -53,6 +54,11 @@ const showReadonlySidebar = computed(() => {
   return Boolean(bd.getUnitAtFrom(bd.activeUnits.value, selectedCell.x, selectedCell.y))
 })
 const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showReadonlySidebar.value)
+
+/** True for multi-unit building types that should show the factory-style grid editor. */
+const isMultiUnitBuilding = computed(
+  () => building.value?.type !== 'APARTMENT' && building.value?.type !== 'COMMERCIAL',
+)
 </script>
 
 <template>
@@ -162,11 +168,15 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
         </p>
       </div>
 
+      <BuildingChainStatusPanel v-if="isMultiUnitBuilding" />
+
       <div class="main-content">
-        <BuildingUnitGrid />
-        <BuildingEditingSidebar v-if="showEditingSidebar" />
-        <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
-        <BuildingOverviewSidebar v-if="showOverviewSidebar" />
+        <template v-if="isMultiUnitBuilding">
+          <BuildingUnitGrid />
+          <BuildingEditingSidebar v-if="showEditingSidebar" />
+          <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
+          <BuildingOverviewSidebar v-if="showOverviewSidebar" />
+        </template>
       </div>
     </template>
   </div>
