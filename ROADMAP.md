@@ -21,15 +21,12 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Migrate all views to Tailwind
 - [ ] Update all components to use Tailwind utilities
 
-### City selection (100% complete)
+### City selection (10% complete)
 
-- [x] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
-- [x] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
-- [x] In the context selection is the company cash visible. But there is error that the currency is not correct.
+- [ ] After player logs in, make sure to select in the Context switcher state his most active city
+- [ ] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter. Remove the city selection from the new building flow.
 
-**Shipped:** Onboarding now persists the player's chosen city to localStorage after register/login so the active city is correct on all subsequent pages. The buy-building flow pre-selects the active city from the navbar filter instead of requiring a redundant city choice. The context switcher now formats company cash in the selected city's currency (e.g. CZK for Prague) instead of always showing USD.
-
-### Government company
+### Government company (0% complete)
 
 - [ ] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
 
@@ -37,7 +34,8 @@ It will use real world map. The game will start in single city and later other c
 
 - [x] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
 - [x] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
-- [x] Organizie forex exchange to tabs, add to the top forex tabs the amm features like add liquidity, show liquidity, and swap at AMM — Forex Exchange Gold AMM tab now has three inner sub-tabs: AMM Swap (buy/sell XAU via constant-product pools), My Positions (pool share %, claimable fees, remove liquidity), and Add Liquidity (join existing pools or create a new pool). Blocked-gold warning is shown whenever gold is locked in pools so players know they cannot use it for new swaps.
+- [ ] Organizie forex exchange to tabs, add to the top forex tabs the amm features like add liquidity, show liquidity, and swap at AMM — Forex Exchange Gold AMM tab now has three inner sub-tabs: AMM Swap (buy/sell XAU via constant-product pools), My Positions (pool share %, claimable fees, remove liquidity), and Add Liquidity (join existing pools or create a new pool). Blocked-gold warning is shown whenever gold is locked in pools so players know they cannot use it for new swaps.
+- [ ] When i click the Gold AMM button now i get error `42P01: relation \"PlayerGoldBalances\" does not exist\n\nPOSITION: 25`
 - [x] Player cannot go to minus on the bank account unless he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
 - [ ] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
 - [ ] Make the research budget be calculated in USD.
@@ -48,7 +46,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
 - [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
-### Number formatting (80% complete)
+### Number formatting (20% complete)
 
 - [ ] Create a vue component for number formatting in components/numbers folder
 - [ ] Everywhere where the currency is displayed, for example in the units, use the number formatting component
@@ -82,10 +80,6 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (0% complete)
-
-- [ ] When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
-
 ### Mining (40% complete)
 
 - [ ] When person goes to buy building and selects the mining, make sure to show in the property which resource it contains.
@@ -97,20 +91,13 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
 - [ ] For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
 
-### Appartment and commercial buildings (90% complete)
+### Appartment and commercial buildings (50% complete)
 
-**Shipped in this increment:**
-- ✅ Grid layout hidden for APARTMENT and COMMERCIAL buildings — these now present as single-unit properties without the factory-style unit grid.
-- ✅ Market Rate Guidance panel added to the property UI: shows city reference rate, location-adjusted market rate (city rate × PopulationIndex), your current rent, price position label (Very Attractive / Good / At Market / Above Market / Overpriced), % vs market, and occupancy expectations per price tier.
-- ✅ Market rate hint shown inline inside the rent-setting dialog so players see the benchmark before entering a new value.
-- ✅ Occupancy caps implemented in backend RentPhase: overpriced (>+10%) → 50% floor; at +10% → max 90%; below 60% of market → max 100%; linear interpolation between 60%–110%.
-- ✅ Location-adjusted market rate: compares rent against `city.AverageRentPerSqm × lot.PopulationIndex`, not just the raw city average.
-- ✅ Constant operating costs: each tick deducts `pricePerSqm × area × 0.75` (PROPERTY_MAINTENANCE ledger entry). Building breaks even at 75% occupancy, profitable above it.
-- ✅ New GraphQL fields on Building: `cityReferenceRentPerSqm`, `adjustedMarketRentPerSqm`, `populationIndex`.
-- ✅ 19 backend tests covering all occupancy/rent rules, price zones, ledger entries, and breakeven profitability.
-- ✅ Rent reference rate chart added to apartment and commercial building detail screens. The SVG chart shows the full occupancy curve (0–100%), colored pricing zones (Very Attractive / Good / Above Market / Overpriced), a dashed breakeven line at 75%, and interactive markers for the city reference rate, the location-adjusted market rate, and the player's current rent. Apartment buildings show the apartment-focused chart; commercial buildings show the commercial-focused chart. Currency formatting uses the correct city currency.
+- [ ] When I want to buy appartment or commercial building, i do not see how many m^2 there are. Make it clearly visible please.
+- [ ] At the moment i can see in purchased building Total Area - N/A and Occupancy - N/A. Make sure the occupancy works - it should never be N/A.. It should be 0 at the start and increment or decrement according to the rules.
 
-**Remaining:**
+### News
+
 - [ ] When backend is restarted it must store all news from the changelog csv to the game server database. At the moment i see only few news and changelog csv is not imported.
 - [ ] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports.
 
