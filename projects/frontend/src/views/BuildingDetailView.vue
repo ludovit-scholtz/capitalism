@@ -53,6 +53,11 @@ const showReadonlySidebar = computed(() => {
   return Boolean(bd.getUnitAtFrom(bd.activeUnits.value, selectedCell.x, selectedCell.y))
 })
 const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showReadonlySidebar.value)
+
+/** True for multi-unit building types that should show the factory-style grid editor. */
+const isMultiUnitBuilding = computed(
+  () => building.value?.type !== 'APARTMENT' && building.value?.type !== 'COMMERCIAL',
+)
 </script>
 
 <template>
@@ -163,7 +168,7 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
       </div>
 
       <div class="main-content">
-        <template v-if="building.type !== 'APARTMENT' && building.type !== 'COMMERCIAL'">
+        <template v-if="isMultiUnitBuilding">
           <BuildingUnitGrid />
           <BuildingEditingSidebar v-if="showEditingSidebar" />
           <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />

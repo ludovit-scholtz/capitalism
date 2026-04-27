@@ -10777,6 +10777,8 @@ function makeApartmentPlayer() {
 }
 
 test.describe('Property management panel', () => {
+  const PROPERTY_PANEL_SELECTOR = '[aria-label="Property management"]'
+
   test('shows property metrics for apartment building', async ({ page }) => {
     const player = makeApartmentPlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -10789,7 +10791,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const panel = page.locator('[aria-label="Property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await expect(panel).toBeVisible()
 
     // Occupancy
@@ -10837,7 +10839,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const panel = page.locator('[aria-label="Property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await panel.getByRole('button', { name: /Set Rent/i }).click()
 
     // Dialog should open
@@ -10892,7 +10894,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-fac')
 
-    await expect(page.locator('[aria-label="Property management"]')).toBeHidden()
+    await expect(page.locator(PROPERTY_PANEL_SELECTOR)).toBeHidden()
   })
 
   test('commercial building also shows property panel', async ({ page }) => {
@@ -10937,7 +10939,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-comm')
 
-    const panel = page.locator('[aria-label="Property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await expect(panel).toBeVisible()
     await expect(panel).toContainText('€22 / m²')
     await expect(panel).toContainText('85.0%')
@@ -10955,7 +10957,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const panel = page.locator('[aria-label="Property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await expect(panel).toBeVisible()
 
     // Market guidance panel should be present
@@ -10989,7 +10991,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const guidance = page.locator('[aria-label="Property management"] .market-guidance')
+    const guidance = page.locator(`${PROPERTY_PANEL_SELECTOR} .market-guidance`)
     await expect(guidance).toBeVisible()
     // Price position badge should show "Overpriced"
     await expect(guidance.locator('.price-position-value')).toContainText('Overpriced')
@@ -11014,7 +11016,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const guidance = page.locator('[aria-label="Property management"] .market-guidance')
+    const guidance = page.locator(`${PROPERTY_PANEL_SELECTOR} .market-guidance`)
     await expect(guidance).toBeVisible()
     await expect(guidance.locator('.price-position-value')).toContainText('Very attractive')
   })
@@ -11031,7 +11033,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const guidance = page.locator('[aria-label="Property management"] .market-guidance')
+    const guidance = page.locator(`${PROPERTY_PANEL_SELECTOR} .market-guidance`)
     await expect(guidance).toBeVisible()
     await expect(guidance.locator('.market-note').nth(0)).toContainText('gradually')
     await expect(guidance.locator('.market-note').nth(1)).toContainText('75%')
@@ -11049,7 +11051,7 @@ test.describe('Property management panel', () => {
 
     await page.goto('/building/building-apt')
 
-    const panel = page.locator('[aria-label="Property management"]')
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
     await panel.getByRole('button', { name: /Set Rent/i }).click()
 
     // Inline hint in dialog shows adjusted market rate
@@ -11072,7 +11074,7 @@ test.describe('Property management panel', () => {
     // The unit grid (factory-style) must NOT be visible for apartment buildings
     await expect(page.locator('.unit-grid')).toBeHidden()
     // But the property panel IS visible
-    await expect(page.locator('[aria-label="Property management"]')).toBeVisible()
+    await expect(page.locator(PROPERTY_PANEL_SELECTOR)).toBeVisible()
   })
 })
 
