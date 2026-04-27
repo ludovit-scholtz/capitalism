@@ -685,7 +685,7 @@ export function useBuildingDetail() {
           gridY: gy,
           unitType: draft.unitType,
           ticks: UNIT_PLAN_CHANGE_TICKS,
-          cost: getUnitConstructionCost(draft.unitType),
+          cost: Math.round(getUnitConstructionCost(draft.unitType) * cityFxRate.value * 100) / 100,
         })
       } else if (baseline && !draft) {
         // Existing unit removed
@@ -706,7 +706,7 @@ export function useBuildingDetail() {
           unitType: draft.unitType,
           previousUnitType: baseline.unitType,
           ticks: UNIT_PLAN_CHANGE_TICKS,
-          cost: getUnitConstructionCost(draft.unitType),
+          cost: Math.round(getUnitConstructionCost(draft.unitType) * cityFxRate.value * 100) / 100,
         })
       }
     }
@@ -2795,7 +2795,8 @@ export function useBuildingDetail() {
   function getDraftUnitConstructionCost(unit: GridUnit | undefined): number {
     if (!unit) return 0
     const activeUnit = getUnitAtFrom(activeUnits.value, unit.gridX, unit.gridY)
-    return getPlannedUnitConstructionCost(activeUnit, unit)
+    // Apply the building city's FX rate so costs are shown in local currency (e.g. CZK, INR).
+    return Math.round(getPlannedUnitConstructionCost(activeUnit, unit) * cityFxRate.value * 100) / 100
   }
 
   function getDraftUnitConstructionCostLabel(unit: GridUnit | undefined): string | null {

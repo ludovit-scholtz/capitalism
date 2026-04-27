@@ -17782,7 +17782,79 @@ test.describe('Unit upgrade panel', () => {
   })
 })
 
-test.describe('Building detail tick-refresh stability', () => {
+test.describe('Unit placement FX pricing in non-EUR city', () => {
+  test('new unit placement in Prague (CZK) building shows FX-adjusted CZK cost in changes summary', async ({
+    page,
+  }) => {
+    // Proves that when a player in Prague adds a new unit to an empty slot,
+    // the displayed placement cost is in CZK (EUR base × CZK fx rate), not EUR.
+    // MANUFACTURING base cost = 12,000 EUR × 25.19 CZK/EUR ≈ 302,280 CZK.
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-czk-place',
+      playerId: player.id,
+      name: 'Prague Placement Co',
+      cash: 1000000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-czk-place',
+          companyId: 'company-czk-place',
+          cityId: 'city-pr', // Prague (CZK)
+          type: 'FACTORY',
+          name: 'Prague Placement Factory',
+          latitude: 50.0755,
+          longitude: 14.4378,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [], // empty — placing a new unit should show FX-adjusted cost
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-czk-place')
+    await expect(page.getByRole('heading', { name: 'Prague Placement Factory' })).toBeVisible()
+
+    // Enter edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(plannedSection).toBeVisible()
+
+    // Click an empty cell and choose MANUFACTURING
+    const cell00 = plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await cell00.click()
+    await page.locator('.picker-option').filter({ hasText: 'Manufacturing' }).click()
+
+    // The unit-change-cost element should show a CZK-formatted amount, not EUR
+    const changesPanel = page.locator('.unit-changes-summary')
+    await expect(changesPanel).toBeVisible()
+
+    const changeCostEl = changesPanel.locator('.unit-change-cost').first()
+    await expect(changeCostEl).toBeVisible()
+
+    // CZK rate (makeDefaultFxRates) = 25.19; MANUFACTURING base = 12,000 EUR
+    // Expected CZK ≈ 302,280 — the "302" prefix is always present
+    await expect(changeCostEl).toContainText('302')
+    // Must not display the EUR symbol
+    await expect(changeCostEl).not.toContainText('€')
+  })
+})
   test('background tick refresh does not show a loading spinner or reset the building view', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

@@ -29349,6 +29349,186 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(startingBalance, eurAccount.Balance);
     }
 
+    [Fact]
+    public async Task NewUnitPlacement_PragueCity_UsesFxAdjustedConstructionCost()
+    {
+        // When a new unit is placed in a Prague building (CZK city), the construction cost
+        // must be deducted in CZK (baseEurCost × fxRate) rather than the raw EUR amount.
+        // MANUFACTURING base cost = 12_000 EUR × 25.20 CZK/EUR = 302_400 CZK.
+        var email = $"nup-fxczk-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "NUPFxCzk");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        // Seed a CZK FX rate so construction cost is non-trivial.
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25.20m,
+            RateDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        const decimal startingBalance = 1_000_000m;
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "NUPFxCzkCo", Cash = startingBalance };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "NUPFxCzkFactory",
+            Level = 1, Latitude = prague.Latitude, Longitude = prague.Longitude,
+        };
+        db.Buildings.Add(building);
+
+        // Assign a CZK bank account to the building with enough funds.
+        var czkAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234000000000001",
+            CurrencyCode = "CZK",
+            Balance = startingBalance,
+            CompanyId = company.Id,
+        };
+        db.BankAccounts.Add(czkAccount);
+        building.BankAccountId = czkAccount.Id;
+        await db.SaveChangesAsync();
+
+        // Queue a StoreBuildingConfiguration with a new MANUFACTURING unit.
+        var mutation = """
+            mutation SBC($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """;
+        var configResult = await ExecuteGraphQlAsync(isolatedClient, mutation, new
+        {
+            input = new
+            {
+                buildingId = building.Id.ToString(),
+                units = new[]
+                {
+                    new { unitType = "MANUFACTURING", gridX = 0, gridY = 0,
+                          linkRight = false, linkDown = false, linkLeft = false, linkUp = false,
+                          linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false,
+                          resourceTypeId = (string?)null, productTypeId = (string?)null,
+                          minPrice = (decimal?)null, maxPrice = (decimal?)null,
+                          purchaseSource = (string?)null, vendorLockCompanyId = (string?)null },
+                }
+            }
+        }, token);
+
+        Assert.False(configResult.TryGetProperty("errors", out _),
+            $"StoreBuildingConfiguration failed: {configResult}");
+
+        // Apply due plans as if a tick passed (simulate ApplyDuePlansAsync).
+        var gameState = await db.GameStates.FirstAsync();
+        await Utilities.BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick + Api.Utilities.BuildingConfigurationService.UnitPlanChangeTicks + 1);
+        await db.SaveChangesAsync();
+
+        // Expected: 12_000 EUR × 25.20 CZK/EUR = 302_400 CZK deducted.
+        const decimal expectedCost = 12_000m * 25.20m;
+        await db.Entry(czkAccount).ReloadAsync();
+        Assert.Equal(startingBalance - expectedCost, czkAccount.Balance);
+    }
+
+    [Fact]
+    public async Task NewUnitPlacement_EurAccountOnCzkBuilding_DefersActivationWhenBalanceMismatchIsNotBlocked()
+    {
+        // When ApplyDuePlansAsync runs for a Prague building whose bank account is in EUR,
+        // the FX-adjusted CZK cost (302,400 CZK) exceeds the EUR-account balance (1,000 EUR).
+        // The plan must be deferred (AppliesAtTick incremented) rather than corrupting the balance.
+        var email = $"nup-defer-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "NUPDefer");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25.20m,
+            RateDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        const decimal smallEurBalance = 1_000m; // Far less than 302,400 CZK
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "NUPDeferCo", Cash = smallEurBalance };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "NUPDeferFactory",
+            Level = 1, Latitude = prague.Latitude, Longitude = prague.Longitude,
+        };
+        db.Buildings.Add(building);
+
+        // EUR account on a CZK building — insufficient funds scenario after FX adjustment.
+        var eurAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234000000000002",
+            CurrencyCode = "EUR",
+            Balance = smallEurBalance,
+            CompanyId = company.Id,
+        };
+        db.BankAccounts.Add(eurAccount);
+        building.BankAccountId = eurAccount.Id;
+        await db.SaveChangesAsync();
+
+        // Directly seed a due plan (as if StoreBuildingConfiguration was previously submitted).
+        var gameState = await db.GameStates.FirstAsync();
+        var planId = Guid.NewGuid();
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtUtc = DateTime.UtcNow,
+            SubmittedAtTick = gameState.CurrentTick,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        var planUnit = new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+            IsChanged = true,
+            AppliesAtTick = gameState.CurrentTick, // Due immediately
+            TicksRequired = 0,
+        };
+        db.BuildingConfigurationPlanUnits.Add(planUnit);
+        await db.SaveChangesAsync();
+
+        // Apply — FX-adjusted cost (302,400 CZK >> 1,000 EUR) should cause deferral.
+        await Utilities.BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
+        await db.SaveChangesAsync();
+
+        // Balance must be untouched (plan was deferred, not applied).
+        await db.Entry(eurAccount).ReloadAsync();
+        Assert.Equal(smallEurBalance, eurAccount.Balance);
+
+        // Plan unit must have been deferred (AppliesAtTick incremented to currentTick+1).
+        await db.Entry(planUnit).ReloadAsync();
+        Assert.True(planUnit.AppliesAtTick > gameState.CurrentTick,
+            "Plan unit should have been deferred when FX-adjusted cost exceeds balance.");
+    }
+
     #endregion
 
     #region RankedProductTypes
