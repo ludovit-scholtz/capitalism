@@ -6101,8 +6101,16 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       !q.includes('myCollateralBuildings') &&
       // campaignAnalytics has companyName/cityName fields that contain 'me' as substring
       !q.includes('campaignAnalytics') &&
-      // buildingBankAccount contains 'me' as substring in some serializations
+      // buildingBankAccount query contains 'me' as substring (via cityName, buildingName response fields).
+      // NOTE: JavaScript String.includes() is case-sensitive. 'buildingBankAccount' (lowercase 'b') does NOT
+      // appear in 'fundBuildingBankAccount' because the camelCase prefix 'fund' makes 'Building' start with
+      // uppercase 'B'. Therefore mutations with camelCase prefixes need their own explicit exclusions.
       !q.includes('buildingBankAccount') &&
+      // fundBuildingBankAccount/assignBuildingBankAccount mutations contain 'me' via cityName/buildingName
+      // fields. They do NOT match '!q.includes("buildingBankAccount")' above because includes() is
+      // case-sensitive and 'fund'+'Building' has uppercase B — so exclude them explicitly here.
+      !q.includes('fundBuildingBankAccount') &&
+      !q.includes('assignBuildingBankAccount') &&
       // transferFunds mutation response includes companyName/currencySymbol/accountNumber which contain 'me' as substring
       !q.includes('transferFunds')
 

@@ -1193,6 +1193,422 @@ public sealed class BuildingBankAccountTests
         Assert.StartsWith("INSUFFICIENT_FUNDS:", buildingBroke.SuspendedReason);
     }
 
+    // ── Suspension blocking production phases ─────────────────────────────────
+
+    [Fact]
+    public async Task SuspendedBuilding_ManufacturingPhase_DoesNotProduceGoods()
+    {
+        // When a building is suspended for insufficient funds, ManufacturingPhase
+        // must skip it so no goods are produced that tick.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-mfg-sus-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Suspended Mfg Co",
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        // Zero-balance bank account → building will be suspended this tick.
+        var bankAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "5555666677778888",
+            CurrencyCode = "EUR",
+            Balance = 0m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Suspended Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+
+        // Seed a product type with a recipe.
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var chair = await db.ProductTypes.FirstAsync(p => p.Name == "Wooden Chair");
+
+        // Storage unit (inventory source) with wood.
+        var storageUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Storage,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,  // feeds resources into the manufacturing unit on the right
+        };
+        db.BuildingUnits.Add(storageUnit);
+
+        var mfgUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Manufacturing,
+            ProductTypeId = chair.Id,
+            GridX = 1,
+            GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.Add(mfgUnit);
+
+        // Seed enough wood so manufacturing could run if not suspended.
+        var woodInventory = new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuildingUnitId = storageUnit.Id,
+            ResourceTypeId = wood.Id,
+            Quantity = 1000m,
+            Quality = 0.8m,
+        };
+        db.Inventories.Add(woodInventory);
+
+        await db.SaveChangesAsync();
+
+        var processor = CreateTickProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        // Building should be suspended.
+        await db.Entry(building).ReloadAsync();
+        Assert.True(building.IsSuspendedForFunds, "Building with zero balance should be suspended.");
+
+        // Wood inventory should be UNCHANGED — no manufacturing happened.
+        await db.Entry(woodInventory).ReloadAsync();
+        Assert.Equal(1000m, woodInventory.Quantity, 2);
+
+        // No chair inventory should have been produced.
+        var chairInventory = await db.Inventories
+            .Where(inv => inv.BuildingId == building.Id && inv.ProductTypeId == chair.Id)
+            .ToListAsync();
+        Assert.Empty(chairInventory);
+    }
+
+    [Fact]
+    public async Task SuspendedBuilding_PurchasingPhase_SkipsPurchaseOrders()
+    {
+        // When a building is suspended, PurchasingPhase must not process purchasing
+        // so no money is debited and no inventory changes occur.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-pur-sus-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Suspended Purchase Co",
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        // Zero-balance bank account → building will be suspended.
+        var bankAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "4444333322221111",
+            CurrencyCode = "EUR",
+            Balance = 0m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Suspended Purchase Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+
+        var purchaseUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Purchase,
+            ResourceTypeId = wood.Id,
+            MaxPrice = 50m,
+            PurchaseSource = "EXCHANGE",
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.Add(purchaseUnit);
+        await db.SaveChangesAsync();
+
+        var processor = CreateTickProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        // Building should be suspended.
+        await db.Entry(building).ReloadAsync();
+        Assert.True(building.IsSuspendedForFunds, "Building with zero balance should be suspended.");
+
+        // Bank account must remain at 0 (no purchases debited).
+        await db.Entry(bankAccount).ReloadAsync();
+        Assert.Equal(0m, bankAccount.Balance);
+
+        // No wood inventory should have appeared.
+        var woodInventory = await db.Inventories
+            .Where(inv => inv.BuildingId == building.Id && inv.ResourceTypeId == wood.Id)
+            .ToListAsync();
+        Assert.Empty(woodInventory);
+    }
+
+    [Fact]
+    public async Task SuspendedBuilding_AfterFunding_ManufacturingResumes()
+    {
+        // After a player funds the suspended building's bank account the building
+        // should resume manufacturing in the next tick.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-resume-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Resume Mfg Co",
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var bankAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "8877665544332211",
+            CurrencyCode = "EUR",
+            Balance = 0m,     // starts at zero → suspended tick 1
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Resume Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var chair = await db.ProductTypes.FirstAsync(p => p.Name == "Wooden Chair");
+
+        var storageUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Storage,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+            LinkRight = true,  // feeds resources into the manufacturing unit on the right
+        };
+        db.BuildingUnits.Add(storageUnit);
+
+        var mfgUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Manufacturing,
+            ProductTypeId = chair.Id,
+            GridX = 1,
+            GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.Add(mfgUnit);
+
+        var woodInventory = new Inventory
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            BuildingUnitId = storageUnit.Id,
+            ResourceTypeId = wood.Id,
+            Quantity = 1000m,
+            Quality = 0.8m,
+        };
+        db.Inventories.Add(woodInventory);
+        await db.SaveChangesAsync();
+
+        var processor = CreateTickProcessor(scope);
+
+        // Tick 1: building suspended because bank account is empty.
+        await processor.ProcessTickAsync();
+        await db.Entry(building).ReloadAsync();
+        Assert.True(building.IsSuspendedForFunds, "Tick 1: building should be suspended.");
+        await db.Entry(woodInventory).ReloadAsync();
+        Assert.Equal(1000m, woodInventory.Quantity, 2);
+
+        // Simulate player funding the account.
+        bankAccount.Balance = 500_000m;
+        await db.SaveChangesAsync();
+
+        // Tick 2: balance now sufficient, building should resume.
+        await processor.ProcessTickAsync();
+        await db.Entry(building).ReloadAsync();
+        Assert.False(building.IsSuspendedForFunds, "Tick 2: building should be active after funding.");
+        Assert.True(building.SuspendedReason is null or { Length: 0 } or "MISSING_BANK_ACCOUNT"
+            || !building.SuspendedReason!.StartsWith("INSUFFICIENT_FUNDS"),
+            $"Tick 2: expected no INSUFFICIENT_FUNDS reason, got: {building.SuspendedReason}");
+
+        // Manufacturing should have run: some chair inventory should have been produced
+        // OR wood should have decreased (depending on recipe quantities vs batch size).
+        var chairInventory = await db.Inventories
+            .Where(inv => inv.BuildingId == building.Id && inv.ProductTypeId == chair.Id)
+            .ToListAsync();
+        await db.Entry(woodInventory).ReloadAsync();
+
+        // At least one of: wood decreased or chair appeared — proves manufacturing ran.
+        Assert.True(
+            chairInventory.Count > 0 || woodInventory.Quantity < 1000m,
+            "Tick 2: manufacturing should have produced goods after the building was re-funded.");
+    }
+
+    [Fact]
+    public async Task SuspendedBuilding_LedgerEntryRecorded_ForInsufficientFunds()
+    {
+        // When a building is suspended, OperatingCostPhase should record a zero-amount
+        // ledger entry with category OTHER explaining the block.
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, $"bba-ledger-{Guid.NewGuid():N}@test.com");
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var playerId = await GetCurrentPlayerIdAsync(client, token);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Ledger Suspension Co",
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var bankAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1212343456567878",
+            CurrencyCode = "EUR",
+            Balance = 0m,
+            CompanyId = company.Id,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Type = BuildingType.Factory,
+            Name = "Ledger Factory",
+            Latitude = city.Latitude,
+            Longitude = city.Longitude,
+            PowerConsumption = 2,
+            PowerStatus = PowerStatus.Powered,
+            BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+
+        db.BuildingUnits.Add(new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.Manufacturing,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+        });
+        await db.SaveChangesAsync();
+
+        var gameState = await db.GameStates.SingleAsync();
+        var tickBefore = gameState.CurrentTick;
+
+        var processor = CreateTickProcessor(scope);
+        await processor.ProcessTickAsync();
+
+        // A suspension ledger entry should have been recorded.
+        var suspensionEntry = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id
+                     && e.BuildingId == building.Id
+                     && e.Category == "OTHER"
+                     && e.Description.Contains("suspended"))
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(suspensionEntry);
+        Assert.Equal(0m, suspensionEntry.Amount);
+        Assert.Equal(tickBefore + 1, suspensionEntry.RecordedAtTick);
+        Assert.Contains("insufficient funds", suspensionEntry.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── Private helpers ───────────────────────────────────────────────────────
 
     private static async Task<Guid> GetCurrentPlayerIdAsync(HttpClient client, string token)

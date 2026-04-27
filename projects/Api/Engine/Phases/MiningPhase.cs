@@ -26,6 +26,9 @@ public sealed class MiningPhase : ITickPhase
             var efficiency = TickContext.GetPowerEfficiency(building);
             if (efficiency <= 0m) continue;
 
+            // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
+            if (building.IsSuspendedForFunds) continue;
+
             // Get city resource abundances.
             context.ResourcesByCity.TryGetValue(building.CityId, out var cityResources);
             var abundanceMap = cityResources?
