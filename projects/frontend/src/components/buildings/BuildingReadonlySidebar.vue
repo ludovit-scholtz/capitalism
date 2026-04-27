@@ -199,8 +199,8 @@ function operationalStatusBadgeClass(status: string): string {
             <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">{{ t('buildingDetail.operationalStatus.title') }}</h5>
             <div class="flex flex-wrap items-center gap-2.5">
               <span
-                class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide"
-                :class="operationalStatusBadgeClass(selectedActiveUnitOperationalStatus.status)"
+                class="status-badge inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide"
+                :class="[operationalStatusBadgeClass(selectedActiveUnitOperationalStatus.status), `status-${selectedActiveUnitOperationalStatus.status.toLowerCase()}`]"
               >
                 {{ t(`buildingDetail.operationalStatus.${selectedActiveUnitOperationalStatus.status}`) }}
               </span>
@@ -214,13 +214,13 @@ function operationalStatusBadgeClass(status: string): string {
             <!-- Next-tick operating costs breakdown -->
             <div
               v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null"
-              class="mt-4 grid gap-2 rounded-xl border border-divider bg-card/80 p-3"
+              class="operating-costs-row mt-4 grid gap-2 rounded-xl border border-divider bg-card/80 p-3"
             >
               <span class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted">{{ t('buildingDetail.operatingCost.title') }}</span>
-              <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="text-sm text-foreground/90">
+              <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="operating-cost-item text-sm text-foreground/90">
                 {{ t('buildingDetail.operatingCost.labor', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickLaborCost) }) }}
               </span>
-              <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="text-sm text-foreground/90">
+              <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-cost-item text-sm text-foreground/90">
                 {{ t('buildingDetail.operatingCost.energy', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickEnergyCost) }) }}
               </span>
             </div>
@@ -303,7 +303,7 @@ function operationalStatusBadgeClass(status: string): string {
           <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))" class="unit-insight-card">
             <h5>{{ t('buildingDetail.inventory.title') }}</h5>
             <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
-              <div class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+              <div class="inventory-summary-stat rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
                 <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.load') }}</span>
                 <strong class="text-sm text-foreground">
                   {{
@@ -314,24 +314,30 @@ function operationalStatusBadgeClass(status: string): string {
                   }}
                 </strong>
               </div>
-              <div class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+              <div class="inventory-summary-stat rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
                 <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.distinctItems') }}</span>
                 <strong class="text-sm text-foreground">{{ getUnitInventoryItemCount(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
               </div>
               <div
                 v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality != null"
-                class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5"
+                class="inventory-summary-stat rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5"
               >
                 <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.averageQuality') }}</span>
                 <strong class="text-sm text-foreground">{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality) }}</strong>
               </div>
-              <div v-if="getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+              <div
+                v-if="getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))"
+                class="inventory-summary-stat rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5"
+              >
                 <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
                 <strong class="text-sm text-foreground">{{ getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
               </div>
             </div>
-            <div v-if="getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)).length > 0" class="mt-3 border border-divider rounded-md overflow-hidden">
-              <div class="grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 bg-surface border-b border-divider">
+            <div
+              v-if="getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)).length > 0"
+              class="inventory-table mt-3 border border-divider rounded-md overflow-hidden"
+            >
+              <div class="inventory-table-header grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 bg-surface border-b border-divider">
                 <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.item') }}</span>
                 <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.amount') }}</span>
                 <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.quality') }}</span>
@@ -340,7 +346,7 @@ function operationalStatusBadgeClass(status: string): string {
               <div
                 v-for="inventory in getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))"
                 :key="inventory.id"
-                class="grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 border-b border-divider last:border-b-0 items-center"
+                class="inventory-table-row grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 border-b border-divider last:border-b-0 items-center"
               >
                 <div class="flex items-center gap-3 min-w-0">
                   <img
