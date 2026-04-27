@@ -11076,6 +11076,172 @@ test.describe('Property management panel', () => {
     // But the property panel IS visible
     await expect(page.locator(PROPERTY_PANEL_SELECTOR)).toBeVisible()
   })
+
+  test('rent reference chart appears for apartment building with market data', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
+    await expect(panel).toBeVisible()
+
+    // Chart should be present and labelled as apartment-focused
+    const chart = panel.locator('[aria-label="Apartment Rent Reference Chart"]').first()
+    await expect(chart).toBeVisible()
+
+    // The chart SVG should be rendered
+    const svg = chart.locator('svg')
+    await expect(svg).toBeVisible()
+
+    // Hint text referencing occupancy should be present
+    const hint = panel.locator('.rent-chart-hint')
+    await expect(hint).toBeVisible()
+    await expect(hint).toContainText('occupancy')
+
+    // Currency values should appear in the HTML legend (city reference rate)
+    await expect(chart.locator('.rent-chart-legend')).toContainText('€12')
+    // Adjusted market rate value
+    await expect(chart.locator('.rent-chart-legend')).toContainText('€13.2')
+  })
+
+  test('rent reference chart shows correct title for commercial building', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-comm2',
+      playerId: player.id,
+      name: 'Commercial Corp',
+      cash: 800_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-comm2',
+          companyId: 'company-comm2',
+          cityId: 'city-ba',
+          type: 'COMMERCIAL',
+          name: 'Office Park',
+          latitude: 48.15,
+          longitude: 17.1,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+          pricePerSqm: 20,
+          occupancyPercent: 80,
+          totalAreaSqm: 3000,
+          pendingPricePerSqm: null,
+          pendingPriceActivationTick: null,
+          cityReferenceRentPerSqm: 18,
+          adjustedMarketRentPerSqm: 19.8,
+          populationIndex: 1.1,
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-comm2')
+
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
+    await expect(panel).toBeVisible()
+
+    // Chart should use the commercial-focused title
+    const chart = panel.locator('[aria-label="Commercial Rent Reference Chart"]').first()
+    await expect(chart).toBeVisible()
+
+    // SVG renders with commercial currency values in the HTML legend
+    const svg = chart.locator('svg')
+    await expect(svg).toBeVisible()
+    await expect(chart.locator('.rent-chart-legend')).toContainText('€18')
+    await expect(chart.locator('.rent-chart-legend')).toContainText('€19.8')
+  })
+
+  test('rent reference chart shows current-rent marker when rent is set', async ({ page }) => {
+    const player = makeApartmentPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt')
+
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
+    const chart = panel.locator('[aria-label="Apartment Rent Reference Chart"]').first()
+    const svg = chart.locator('svg').first()
+    await expect(svg).toBeVisible()
+
+    // The current rent (€14) should appear in the HTML legend
+    await expect(chart.locator('.rent-chart-legend')).toContainText('€14')
+  })
+
+  test('rent reference chart is not shown when market rate data is missing', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-apt2',
+      playerId: player.id,
+      name: 'Apt Holdings 2',
+      cash: 500_000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-apt2',
+          companyId: 'company-apt2',
+          cityId: 'city-ba',
+          type: 'APARTMENT',
+          name: 'Basic Apartments',
+          latitude: 48.14,
+          longitude: 17.1,
+          level: 1,
+          powerConsumption: 1,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+          pricePerSqm: 10,
+          occupancyPercent: 60,
+          totalAreaSqm: 1000,
+          pendingPricePerSqm: null,
+          pendingPriceActivationTick: null,
+          // No cityReferenceRentPerSqm or adjustedMarketRentPerSqm
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-apt2')
+
+    const panel = page.locator(PROPERTY_PANEL_SELECTOR)
+    await expect(panel).toBeVisible()
+
+    // Chart should not be rendered when there is no market rate data
+    await expect(panel.locator('[aria-label="Apartment Rent Reference Chart"]')).toBeHidden()
+    // But the "no market data" fallback message should appear
+    await expect(panel.locator('.market-guidance-unavailable')).toBeVisible()
+  })
 })
 
 // ── Grid editor: configure + directional link, save, reload, persist ──────────

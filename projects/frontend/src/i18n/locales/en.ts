@@ -2024,6 +2024,15 @@ export default {
     occupancyTrendNote: 'Occupancy adjusts gradually each tick based on price position.',
     breakevenNote: 'Operating costs = rent at 75% occupancy. Profitable above 75%.',
     noMarketDataAvailable: 'Market rate data not available for this building.',
+    rentChartTitleApartment: 'Apartment Rent Reference Chart',
+    rentChartTitleCommercial: 'Commercial Rent Reference Chart',
+    chartCityRateLabel: 'City rate',
+    chartAdjustedRateLabel: 'Location rate',
+    chartRatesLabel: 'Market rate',
+    rentChartHintApartment:
+      'The chart shows maximum achievable occupancy at each rent level. Pricing below the city reference rate gives access to full occupancy; pricing above the adjusted location rate caps occupancy at 90% or lower.',
+    rentChartHintCommercial:
+      'The chart shows maximum achievable occupancy at each rent level. Commercial premises priced below the city reference attract the most tenants; pricing above the adjusted location rate caps occupancy at 90% or lower.',
   },
   research: {
     panelTitle: 'Research Progress',

@@ -2025,6 +2025,15 @@ export default {
     occupancyTrendNote: 'Die Belegung passt sich bei jedem Takt schrittweise basierend auf der Preisposition an.',
     breakevenNote: 'Betriebskosten = Miete bei 75% Belegung. Rentabel über 75%.',
     noMarketDataAvailable: 'Marktdaten für dieses Gebäude nicht verfügbar.',
+    rentChartTitleApartment: 'Referenzmietendiagramm – Wohngebäude',
+    rentChartTitleCommercial: 'Referenzmietendiagramm – Gewerbegebäude',
+    chartCityRateLabel: 'Stadtsatz',
+    chartAdjustedRateLabel: 'Standortsatz',
+    chartRatesLabel: 'Marktsatz',
+    rentChartHintApartment:
+      'Das Diagramm zeigt die maximale erreichbare Belegung bei jedem Mietpreis. Preise unterhalb des städtischen Referenzsatzes ermöglichen volle Belegung; Preise über dem standortbereinigten Satz begrenzen die Belegung auf 90% oder weniger.',
+    rentChartHintCommercial:
+      'Das Diagramm zeigt die maximale erreichbare Belegung bei jedem Mietpreis. Gewerbeflächen mit Preisen unter dem städtischen Referenzsatz ziehen die meisten Mieter an; Preise über dem standortbereinigten Satz begrenzen die Belegung auf 90% oder weniger.',
   },
   research: {
     panelTitle: 'Forschungsfortschritt',

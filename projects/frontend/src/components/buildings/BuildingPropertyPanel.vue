@@ -2,6 +2,7 @@
 import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
+import RentReferenceChart from '@/components/buildings/RentReferenceChart.vue'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
@@ -159,8 +160,22 @@ const rentVsMarketPct = computed(() => {
       </div>
     </div>
 
+    <!-- ── Rent Reference Chart ─────────────────────────────────────────────── -->
+    <RentReferenceChart
+      v-if="
+        building?.adjustedMarketRentPerSqm != null &&
+        building?.cityReferenceRentPerSqm != null &&
+        (building?.type === 'APARTMENT' || building?.type === 'COMMERCIAL')
+      "
+      :city-reference-rent-per-sqm="building.cityReferenceRentPerSqm"
+      :adjusted-market-rent-per-sqm="building.adjustedMarketRentPerSqm"
+      :current-rent-per-sqm="building.pricePerSqm ?? null"
+      :building-type="building.type as 'APARTMENT' | 'COMMERCIAL'"
+      :format-currency="formatCurrency"
+    />
+
     <div
-      v-else-if="building?.pricePerSqm != null"
+      v-else-if="building?.pricePerSqm != null && building?.adjustedMarketRentPerSqm == null"
       class="market-guidance-unavailable mt-4 rounded-lg border border-dashed border-divider bg-surface-muted px-3 py-2 text-sm text-muted"
     >
       {{ t('property.noMarketDataAvailable') }}
