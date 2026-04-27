@@ -1143,6 +1143,19 @@ Root-cause of a Playwright failure (April 2026, building bank-account funding fo
 3. **When a Playwright form-submit test shows a visible enabled button but no network request is sent, check for `pageerror` / browser console runtime errors before blaming selectors or mock routes.**
 4. **Prefer stable E2E assertions on the panel-scoped control and visible post-submit outcome** (for example a success status inside the funding panel) instead of relying on unscoped repeated button labels elsewhere on the page.
 
+## Stock exchange E2E — seed USD settlement accounts and use current context-switcher selectors
+
+Root-cause of Playwright failures (April 2026, stock exchange follow-up):
+- `StockExchangeView.vue` now requires a USD settlement bank account for the active PERSON or COMPANY trade context before buy/sell actions can succeed.
+- Several `stock-exchange.spec.ts` tests still used the legacy cash-only fixture model and did not seed `state.myBankAccounts`, so the trade panel showed `Select settlement account` and the expected buy/sell success states never appeared.
+- The header account switcher was also migrated to `ContextSwitcher.vue` (`.ctx-switcher`, `.ctx-trigger`, `.ctx-account-name`), but some tests still asserted the old `.account-switcher` / `.account-trigger-name` classes.
+
+**Rules to prevent recurrence:**
+1. **Any stock-trading E2E that expects a successful buy or sell must seed `state.myBankAccounts` with a USD settlement account for the active trade context.** PERSON trades need `ownerType: 'PERSON'`; COMPANY trades need `ownerType: 'COMPANY'` plus the matching `companyId`.
+2. **When a stock-exchange test expects a person-account error like `Not enough personal cash`, still seed a USD personal settlement account.** Otherwise the UI will fail earlier with `Select settlement account`, masking the real scenario under test.
+3. **Navbar account-switcher tests must use the current `ContextSwitcher` selectors** (`.ctx-switcher`, `.ctx-trigger`, `.ctx-account-name`) or an accessible label, not the removed `.account-switcher` / `.account-trigger-name` markup.
+4. **If a stock-exchange trade test unexpectedly shows `Select settlement account`, diagnose fixture drift before touching trade logic.** The likely fix is missing `myBankAccounts` seed data, not the buy/sell mutation path itself.
+
 ## Vue scoped-style extraction — never leave child visuals in a parent `<style scoped>` block
 
 Root-cause of a design regression (April 2026, commit `e98acf480601054f251cb66c22441777e1063d82` / building-detail Tailwind migration):
