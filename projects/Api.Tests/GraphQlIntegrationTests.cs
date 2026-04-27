@@ -9450,15 +9450,16 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     [Fact]
     public async Task FinishOnboarding_WithNonStarterProduct_ReturnsInvalidProductError()
     {
-        // Validates that products seeded in the game (e.g. wooden-table) but NOT designated
-        // as the starter product for that industry (starter = wooden-chair) are rejected.
-        // This ensures the IsStarterOnboardingProduct guard in Mutation.cs is exercised.
+        // Validates that a valid FURNITURE product that is NOT in the starter list is rejected.
+        // The StarterOnboardingProductsByIndustry for FURNITURE contains wooden-chair, wooden-table,
+        // and wooden-bed. wood-planks is a legitimate FURNITURE product but is NOT a starter product,
+        // so it should be rejected with INVALID_PRODUCT.
         var token = await RegisterAndGetTokenAsync($"finish-nonstarter-product-{Guid.NewGuid()}@test.com", "NonStarterProduct");
         var (_, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Fancy Furniture Co");
         var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Commercial District", 90_000m);
 
-        // wooden-table is a valid FURNITURE product but is NOT the starter product (wooden-chair is).
-        var nonStarterProductId = await GetStarterProductIdAsync("FURNITURE", "wooden-table");
+        // wood-planks is a valid FURNITURE industry product but is NOT in the starter list.
+        var nonStarterProductId = await GetStarterProductIdAsync("FURNITURE", "wood-planks");
 
         var result = await FinishOnboardingAsync(token, nonStarterProductId, shopLotId);
 
