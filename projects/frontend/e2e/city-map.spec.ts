@@ -62,8 +62,8 @@ test.describe('City Map View', () => {
     await expect(page.getByText('Switch to a company account in the top menu to purchase lots and place buildings.')).toBeVisible()
     await expect(page.getByRole('button', { name: /Purchase Lot/i })).toHaveCount(0)
 
-    await page.getByRole('button', { name: /Switch account/i }).click()
-    await page.locator('.account-option', { hasText: 'Test Empire' }).click()
+    await page.locator('.ctx-trigger').click()
+    await page.locator('.ctx-account-option', { hasText: 'Test Empire' }).click()
 
     await expect(page.getByRole('button', { name: /Purchase Lot/i })).toBeVisible()
     expect(state.players[0]?.activeAccountType).toBe('COMPANY')

@@ -268,14 +268,7 @@ const {
         <!-- ── Bank account panel ── -->
         <div class="unit-insight-card building-bank-account-card">
           <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
-          <BuildingBankAccountPanel
-            :building-id="building?.id ?? ''"
-            :company-id="building?.companyId ?? ''"
-            :currency-code="cityCurrencyCode"
-            :loading="loading"
-            :show-assignment-controls="false"
-            @updated="loadBuilding"
-          />
+          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
         </div>
       </div>
     </div>

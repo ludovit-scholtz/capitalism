@@ -186,6 +186,13 @@ For tests that need authentication:
 4. Use `page.addInitScript()` to set localStorage before page load
 5. Navigate with `page.goto()`
 
+### Bank-account + account-context E2E rules
+- For buy-building, bank-capital, loan settlement, and destination-currency affordability tests, seed `state.myBankAccounts` for the active company. Do not rely on legacy `company.cash` or `playerCurrencyBalances` when the shipped UI reads company bank-account balances.
+- Account-management surfaces (`/bank-statement`, the loan marketplace Accounts tab, and the building bank-account panel) must not hide the only seeded account because of navbar city context. If the scenario is city-specific, include `cityId` in the mocked bank account; if the page is account-centric, prefer assertions that do not depend on city filtering.
+- When you seed `state.myBankAccounts`, include realistic metadata such as `ownerType`, `ownerDisplayName`, and `cityId` where relevant. Missing metadata can silently filter a valid fixture out of the rendered UI.
+- When `/buy-building/:companyId?type=BANK` pre-selects the bank type, assert the resulting bank setup UI (capital guidance, rate inputs), not a still-visible type card. That step is intentionally skipped by the query-param flow.
+- The navbar account switcher trigger is the active account button itself (`.account-trigger` / current account name), not a generic “Switch account” button. Update E2E selectors accordingly.
+
 ### Selectors – prefer accessible locators
 Use Playwright's accessible locators in this order of preference:
 1. `page.getByRole('button', { name: '…' })` — preferred for interactive elements

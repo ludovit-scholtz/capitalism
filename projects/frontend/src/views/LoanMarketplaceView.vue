@@ -261,11 +261,6 @@ const visibleBankAccounts = computed(() => {
     accounts = myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
   }
 
-  // Filter by selected city if available
-  if (selectedCityId.value) {
-    accounts = accounts.filter((account) => account.cityId === selectedCityId.value)
-  }
-
   return accounts
 })
 

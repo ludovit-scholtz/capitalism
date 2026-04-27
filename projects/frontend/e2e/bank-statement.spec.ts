@@ -26,29 +26,31 @@ function makePlayerWithCompany() {
 
 function seedBankAccounts(state: ReturnType<typeof setupMockApi>, playerId: string) {
   state.myBankAccounts = [
-    {
-      id: ACCOUNT_ID,
-      accountNumber: '1111222233334444',
-      currencyCode: 'EUR',
+      {
+        id: ACCOUNT_ID,
+        accountNumber: '1111222233334444',
+        currencyCode: 'EUR',
       currencySymbol: '€',
       balance: 100000,
-      companyId: COMPANY_ID,
-      companyName: 'Test Trading Co.',
-      ownerType: 'COMPANY',
-      ownerDisplayName: 'Test Trading Co.',
-    },
-    {
-      id: ACCOUNT_ID_2,
-      accountNumber: '5555666677778888',
+        companyId: COMPANY_ID,
+        companyName: 'Test Trading Co.',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Test Trading Co.',
+        cityId: 'city-ba',
+      },
+      {
+        id: ACCOUNT_ID_2,
+        accountNumber: '5555666677778888',
       currencyCode: 'CZK',
       currencySymbol: 'Kč',
       balance: 250000,
-      companyId: COMPANY_ID_2,
-      companyName: 'Prague Imports',
-      ownerType: 'COMPANY',
-      ownerDisplayName: 'Prague Imports',
-    },
-  ]
+        companyId: COMPANY_ID_2,
+        companyName: 'Prague Imports',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Prague Imports',
+        cityId: 'city-pr',
+      },
+    ]
 
   const companyTwo = {
     id: COMPANY_ID_2,
@@ -281,8 +283,8 @@ test.describe('Bank Statement Review', () => {
     await expect(selector).toHaveValue(ACCOUNT_ID)
     await expect(selector.locator('option')).toHaveCount(1)
 
-    await page.locator('.account-trigger').click()
-    await page.locator('.account-option').filter({ hasText: 'Prague Imports' }).click()
+    await page.locator('.ctx-trigger').click()
+    await page.locator('.ctx-account-option').filter({ hasText: 'Prague Imports' }).click()
 
     await expect(page.locator('#account-select')).toHaveValue(ACCOUNT_ID_2)
     await expect(page).toHaveURL(/\/bank-statement\/account-test-2/)
@@ -424,8 +426,20 @@ test.describe('Funding guidance in Buy Building', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    // Player has CZK balance
-    state.playerCurrencyBalances = [{ currencyCode: 'CZK', currencySymbol: 'Kč', balance: 50000 }]
+    state.myBankAccounts = [
+      {
+        id: 'account-czk-1',
+        accountNumber: '9999000011112222',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 50000,
+        companyId: COMPANY_ID,
+        companyName: 'Test Trading Co.',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Test Trading Co.',
+        cityId: 'city-pr',
+      },
+    ]
 
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
