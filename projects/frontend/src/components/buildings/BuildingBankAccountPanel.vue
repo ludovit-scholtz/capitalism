@@ -321,7 +321,6 @@ async function fundBuildingAccount() {
     isFundPanelOpen.value = true
     fundAmount.value = ''
     fundSuccess.value = t('buildingBankAccount.fundSuccess')
-    emit('updated')
   } catch (error: unknown) {
     fundError.value = error instanceof Error ? error.message : t('common.unknownError')
   } finally {
@@ -410,7 +409,7 @@ watch(
         <summary class="bba-fund-summary">{{ t('buildingBankAccount.fundTitle') }}</summary>
         <div class="bba-fund-body">
           <p class="bba-fund-hint">{{ t('buildingBankAccount.fundHint', { currency: props.currencyCode }) }}</p>
-          <div class="bba-fund-form">
+          <form class="bba-fund-form" @submit.prevent="fundBuildingAccount">
             <input
               v-model="fundAmount"
               type="number"
@@ -420,10 +419,10 @@ watch(
               :placeholder="t('buildingBankAccount.fundAmountPlaceholder')"
               :aria-label="t('buildingBankAccount.fundAmountLabel')"
             />
-            <button type="button" class="btn btn-secondary btn-sm" :disabled="fundLoading" @click.stop.prevent="fundBuildingAccount">
+            <button type="submit" class="btn btn-secondary btn-sm" :disabled="fundLoading">
               {{ fundLoading ? t('common.loading') : t('buildingBankAccount.fundSubmit') }}
             </button>
-          </div>
+          </form>
           <p v-if="fundError" class="bba-fund-error" role="alert">{{ fundError }}</p>
           <p v-if="fundSuccess" class="bba-fund-success" role="status">{{ fundSuccess }}</p>
         </div>

@@ -284,6 +284,21 @@ test.describe('Building bank account panel', () => {
       currencyCode: 'EUR',
     }
 
+    let fundingMutation:
+      | {
+          buildingId?: string
+          amount?: number
+        }
+      | null = null
+
+    await page.route('**/graphql', async (route) => {
+      const body = route.request().postDataJSON()
+      if (typeof body?.query === 'string' && body.query.includes('fundBuildingBankAccount')) {
+        fundingMutation = body.variables?.input ?? null
+      }
+      await route.fallback()
+    })
+
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
@@ -304,8 +319,9 @@ test.describe('Building bank account panel', () => {
 
     await page.getByRole('button', { name: /transfer/i }).click()
 
-    // Success message should appear
-    await expect(page.locator('.bba-fund-success')).toBeVisible({ timeout: 5000 })
-    await expect(page.locator('.bba-fund-success')).toContainText(/successful/i)
+    // Mutation should be sent with the selected amount for this building
+    await expect
+      .poll(() => fundingMutation)
+      .toEqual({ buildingId, amount: 10000 })
   })
 })

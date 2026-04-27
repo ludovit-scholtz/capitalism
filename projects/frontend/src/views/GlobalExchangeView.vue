@@ -173,8 +173,11 @@ async function loadCitiesAndResources() {
   if (!deepEqual(products.value, productsData.productTypes)) {
     products.value = productsData.productTypes
   }
-  // If no city is selected in the auth store, select the first city
-  if (!selectedCityId.value && citiesData?.cities && citiesData.cities.length > 0) {
+  const queryCity = typeof route.query.city === 'string' ? route.query.city : null
+  const requestedCity = queryCity ? citiesData.cities.find((city) => city.id === queryCity) : null
+  if (requestedCity) {
+    auth.switchCity(requestedCity.id)
+  } else if (citiesData?.cities && citiesData.cities.length > 0 && !selectedCityId.value) {
     const firstCity = citiesData.cities[0]
     if (firstCity) {
       auth.switchCity(firstCity.id)
@@ -256,6 +259,12 @@ onMounted(async () => {
 watch(selectedCityId, async (cityId) => {
   // When the city selection changes in the navbar, reload exchange offers
   if (cityId) {
+    await router.replace({
+      query: {
+        ...route.query,
+        city: cityId,
+      },
+    })
     await loadOffers()
   }
 })
@@ -411,7 +420,19 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
 
       <!-- ── Resources mode ── -->
       <template v-if="marketMode === 'resources'">
-        <!-- City selection is now in the navbar via CitySelector component -->
+        <div v-if="cities.length > 0" class="exchange-city-tabs city-tabs" role="tablist" :aria-label="t('common.city')">
+          <button
+            v-for="city in cities"
+            :key="city.id"
+            role="tab"
+            :aria-selected="selectedCityId === city.id"
+            :class="['exchange-city-tab', 'city-tab', { active: selectedCityId === city.id }]"
+            @click="auth.switchCity(city.id)"
+          >
+            {{ city.name }}
+          </button>
+        </div>
+
         <!-- Search and filter row -->
         <div class="exchange-filters">
           <div class="search-wrapper">
