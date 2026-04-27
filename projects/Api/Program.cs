@@ -125,6 +125,7 @@ public class Program
             .AddQueryType<Query>()
             .AddMutationType<Mutation>()
             .AddTypeExtension<CompanyTypeExtensions>()
+            .AddTypeExtension<BuildingTypeExtensions>()
             .AddTypeExtension<PlayerTypeExtensions>();
 
         builder.Services.AddScoped<IMasterGameAdministrationService, MasterGameAdministrationService>();

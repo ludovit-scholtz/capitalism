@@ -3,9 +3,17 @@ using Api.Data.Entities;
 namespace Api.Engine.Phases;
 
 /// <summary>
-/// Collects rent revenue from APARTMENT and COMMERCIAL buildings and
-/// adjusts occupancy toward equilibrium based on the price-per-sqm
-/// relative to the city average.
+/// Collects rent revenue from APARTMENT and COMMERCIAL buildings, applies constant
+/// operating costs, and adjusts occupancy toward equilibrium.
+///
+/// ROADMAP rules implemented:
+/// • Occupancy never drops below 50% due to overpricing (50% floor).
+/// • Max achievable occupancy is 90% when priced at the location-adjusted market rate
+///   + 10%; drops further to 50% above that threshold.
+/// • Max achievable occupancy is 100% when priced below 60% of the adjusted rate.
+/// • Constant operating costs equal rent income at 75% occupancy, so the property
+///   breaks even at 75% occupancy and is profitable above it.
+/// • The market rate is adjusted for the lot's PopulationIndex (location advantage).
 /// </summary>
 public sealed class RentPhase : ITickPhase
 {
@@ -43,20 +51,53 @@ public sealed class RentPhase : ITickPhase
             if (!context.CitiesById.TryGetValue(building.CityId, out var city))
                 continue;
 
-            // Collect rent for this tick.
+            var cityBaseRate = city.AverageRentPerSqm;
+            if (cityBaseRate <= 0m) continue;
+
+            // Apply the lot's PopulationIndex to derive the location-adjusted market rate.
+            // Buildings in prime locations (high index) have a higher reference rate.
+            var populationIndex = context.LotsByBuildingId.TryGetValue(building.Id, out var lot)
+                && lot.PopulationIndex > 0m ? lot.PopulationIndex : 1m;
+            var adjustedMarketRate = cityBaseRate * populationIndex;
+
+            var fundingAccount = context.GetBuildingFundingAccount(building);
+
+            // ── Constant operating costs ────────────────────────────────────────────
+            // Costs are set equal to rent revenue at 75% occupancy, so the building
+            // breaks even at 75% and is profitable above it.
+            var constantCosts = building.PricePerSqm.Value
+                                * building.TotalAreaSqm.Value
+                                * GameConstants.PropertyBreakevenOccupancy;
+
+            if (constantCosts > 0m && fundingAccount is not null)
+            {
+                fundingAccount.Balance -= constantCosts;
+                context.Db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = building.Id,
+                    BankAccountId = fundingAccount.Id,
+                    Category = LedgerCategory.PropertyMaintenance,
+                    Description = $"Property maintenance – {building.Name}",
+                    Amount = -constantCosts,
+                    RecordedAtTick = context.CurrentTick,
+                    RecordedAtUtc = DateTime.UtcNow
+                });
+            }
+
+            // ── Rent income ─────────────────────────────────────────────────────────
             var rentIncome = building.PricePerSqm.Value
                              * building.TotalAreaSqm.Value
                              * building.OccupancyPercent.Value / 100m;
 
             if (rentIncome > 0m)
             {
-                var fundingAccount = context.GetBuildingFundingAccount(building);
                 if (fundingAccount is not null)
                 {
                     fundingAccount.Balance += rentIncome;
                 }
 
-                // Record rent income in the ledger.
                 context.Db.LedgerEntries.Add(new LedgerEntry
                 {
                     Id = Guid.NewGuid(),
@@ -71,24 +112,53 @@ public sealed class RentPhase : ITickPhase
                 });
             }
 
-            // Adjust occupancy toward equilibrium.
-            var avgRent = city.AverageRentPerSqm;
-            if (avgRent <= 0m) continue;
+            // ── Occupancy adjustment ────────────────────────────────────────────────
+            // Compute the price ratio relative to the location-adjusted market rate.
+            var priceRatio = building.PricePerSqm.Value / adjustedMarketRate;
 
-            var priceDiff = (building.PricePerSqm.Value - avgRent) / avgRent;
+            // Determine the maximum achievable occupancy based on pricing position.
+            decimal maxOccupancy = ComputeMaxOccupancy(priceRatio);
 
-            if (priceDiff > 0m)
+            // Drift toward maxOccupancy at a rate proportional to the price deviation.
+            var gap = maxOccupancy - building.OccupancyPercent.Value;
+            if (Math.Abs(gap) > 0.001m)
             {
-                // Overpriced → occupancy drifts down.
-                building.OccupancyPercent = Math.Max(0m,
-                    building.OccupancyPercent.Value - priceDiff * GameConstants.OccupancyAdjustmentRate);
-            }
-            else
-            {
-                // Underpriced → occupancy drifts up (harder to reach 100%).
-                building.OccupancyPercent = Math.Min(100m,
-                    building.OccupancyPercent.Value - priceDiff * GameConstants.OccupancyAdjustmentRate * 0.5m);
+                // The adjustment speed is slower when going up (filling vacancies is slower
+                // than losing tenants due to overpricing).
+                var adjustmentMultiplier = gap > 0m ? 0.5m : 1.0m;
+                var delta = Math.Abs(priceRatio - 1m) * GameConstants.OccupancyAdjustmentRate * adjustmentMultiplier;
+                delta = Math.Max(delta, GameConstants.OccupancyAdjustmentRate * 0.1m); // minimum drift rate
+
+                if (gap > 0m)
+                    building.OccupancyPercent = Math.Min(maxOccupancy, building.OccupancyPercent.Value + delta);
+                else
+                    building.OccupancyPercent = Math.Max(maxOccupancy, building.OccupancyPercent.Value - delta);
             }
         }
+    }
+
+    /// <summary>
+    /// Returns the maximum achievable occupancy for a building based on the ratio of
+    /// the player's asking rent to the location-adjusted market rate.
+    /// </summary>
+    internal static decimal ComputeMaxOccupancy(decimal priceRatio)
+    {
+        if (priceRatio > GameConstants.OccupancyNinetyPctCapPriceRatio)
+        {
+            // Overpriced: occupancy floors at 50%
+            return GameConstants.OccupancyOverpricedFloor;
+        }
+
+        if (priceRatio <= GameConstants.OccupancyFullCapPriceRatio)
+        {
+            // Below 60% of market: full occupancy possible
+            return 100m;
+        }
+
+        // Between 60% and 110% of market: linear interpolation from 100% down to 90%.
+        // At priceRatio=0.60 → 100%; at priceRatio=1.10 → 90%
+        var range = GameConstants.OccupancyNinetyPctCapPriceRatio - GameConstants.OccupancyFullCapPriceRatio; // 0.50
+        var factor = (priceRatio - GameConstants.OccupancyFullCapPriceRatio) / range;
+        return 100m - factor * (100m - GameConstants.OccupancyNinetyPctCap); // 100 - factor * 10
     }
 }

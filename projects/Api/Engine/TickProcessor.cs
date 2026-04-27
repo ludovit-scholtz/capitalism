@@ -209,6 +209,9 @@ public sealed class TickProcessor(
             LotsByCompany = lots
                 .GroupBy(lot => lot.OwnerCompanyId!.Value)
                 .ToDictionary(g => g.Key, g => g.ToList()),
+            LotsByBuildingId = lots
+                .Where(lot => lot.BuildingId.HasValue)
+                .ToDictionary(lot => lot.BuildingId!.Value),
             ResourcesByCity = cityResources
                 .GroupBy(cr => cr.CityId)
                 .ToDictionary(g => g.Key, g => g.ToList()),

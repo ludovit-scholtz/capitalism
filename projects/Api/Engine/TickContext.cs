@@ -31,6 +31,7 @@ public sealed partial class TickContext
     public Dictionary<Guid, List<CompanyCitySalarySetting>> CitySalarySettingsByCompany { get; init; } = [];
     public Dictionary<Guid, City> CitiesById { get; init; } = [];
     public Dictionary<Guid, List<BuildingLot>> LotsByCompany { get; init; } = [];
+    public Dictionary<Guid, BuildingLot> LotsByBuildingId { get; init; } = [];
     public Dictionary<Guid, List<CityResource>> ResourcesByCity { get; init; } = [];
     public Dictionary<Guid, ResourceType> ResourceTypesById { get; init; } = [];
     public Dictionary<Guid, ProductType> ProductTypesById { get; init; } = [];
