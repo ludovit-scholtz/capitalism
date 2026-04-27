@@ -28,6 +28,9 @@ const accountInfo = ref<BuildingBankAccountInfo | null>(null)
 const companyAccounts = ref<CompanyBankAccountSummary[]>([])
 const accountLoading = ref(false)
 const accountsLoading = ref(false)
+/** Monotonic counter used to discard stale fetchAccountInfo() responses when a
+ * direct mutation result (fund / assign) has already provided fresher data. */
+const accountInfoVersion = ref(0)
 const selectedBankAccountId = ref<string | null>(null)
 const assignmentLoading = ref(false)
 const createLoading = ref(false)
@@ -113,6 +116,7 @@ function syncSelectedAccount() {
 
 async function fetchAccountInfo() {
   if (!props.buildingId) return
+  const v = ++accountInfoVersion.value
   accountLoading.value = true
   try {
     const result = await gqlRequest<{ buildingBankAccount: BuildingBankAccountInfo | null }>(
@@ -132,11 +136,18 @@ async function fetchAccountInfo() {
       }`,
       { buildingId: props.buildingId },
     )
-    accountInfo.value = result.buildingBankAccount
+    // Only apply the response if no fresher data was written while this was in-flight.
+    if (v === accountInfoVersion.value) {
+      accountInfo.value = result.buildingBankAccount
+    }
   } catch {
-    accountInfo.value = null
+    if (v === accountInfoVersion.value) {
+      accountInfo.value = null
+    }
   } finally {
-    accountLoading.value = false
+    if (v === accountInfoVersion.value) {
+      accountLoading.value = false
+    }
   }
 }
 
@@ -210,6 +221,9 @@ async function assignBankAccount(bankAccountId: string, successMessage: string) 
       throw new Error(t('common.unknownError'))
     }
 
+    // Bump version so any in-flight fetchAccountInfo() with stale data is discarded.
+    ++accountInfoVersion.value
+    accountLoading.value = false
     accountInfo.value = nextAccountInfo
     assignmentSuccess.value = successMessage
     await fetchCompanyAccounts()
@@ -315,6 +329,9 @@ async function fundBuildingAccount() {
 
     const fundedAccount = result.fundBuildingBankAccount?.bankAccount
     if (fundedAccount) {
+      // Bump version so any in-flight fetchAccountInfo() with stale data is discarded.
+      ++accountInfoVersion.value
+      accountLoading.value = false
       accountInfo.value = fundedAccount
     } else {
       await fetchAccountInfo()

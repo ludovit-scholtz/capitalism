@@ -32,6 +32,8 @@ public sealed class ResearchPhase : ITickPhase
             {
                 if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units))
                     continue;
+                // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
+                if (building.IsSuspendedForFunds) continue;
 
                 foreach (var unit in units)
                 {

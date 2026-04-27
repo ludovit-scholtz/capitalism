@@ -32,6 +32,9 @@ public sealed class MediaHouseContentPhase : ITickPhase
             // Skip buildings under construction — no production, no decay.
             if (building.IsUnderConstruction) continue;
 
+            // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
+            if (building.IsSuspendedForFunds) continue;
+
             // 1. Decay existing content value.
             if (building.ContentValue > 0m)
             {

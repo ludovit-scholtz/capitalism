@@ -32,6 +32,9 @@ public sealed class ManufacturingPhase : ITickPhase
             var efficiency = TickContext.GetPowerEfficiency(building);
             if (efficiency <= 0m) continue;
 
+            // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
+            if (building.IsSuspendedForFunds) continue;
+
             foreach (var unit in units)
             {
                 if (unit.UnitType != UnitType.Manufacturing) continue;

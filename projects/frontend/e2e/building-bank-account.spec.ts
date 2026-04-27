@@ -310,4 +310,68 @@ test.describe('Building bank account panel', () => {
     await expect(fundPanel.locator('.bba-fund-success')).toBeVisible()
     await expect(fundPanel.locator('.bba-fund-success')).toContainText(/successful/i)
   })
+
+  test('suspension alert clears after funding the building bank account', async ({ page }) => {
+    // Full player flow: building suspended → danger alert visible →
+    // player funds the account → suspension alert disappears (recovery).
+    const player = makePlayer()
+    const companyId = 'company-bba-recovery'
+    const buildingId = 'building-bba-recovery'
+
+    player.companies.push(
+      makeTestCompanyWithBuilding(player.id, companyId, buildingId, {
+        isSuspendedForFunds: true,
+        suspendedReason: 'INSUFFICIENT_FUNDS:150.00',
+        companyCash: 500_000,
+      }),
+    )
+
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    state.buildingBankAccounts[buildingId] = {
+      hasBankAccount: true,
+      bankAccountId: 'acc-bba-recovery',
+      accountNumber: '5555666677778888',
+      balance: 0,
+      isSuspendedForFunds: true,
+      suspendedReason: 'INSUFFICIENT_FUNDS:150.00',
+      currencyCode: 'EUR',
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/building/${buildingId}`)
+    await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible({ timeout: 10000 })
+
+    // Step 1: Verify the suspension alert is visible with insufficient-funds reason.
+    await expect(page.locator('.bba-alert-danger')).toBeVisible()
+    await expect(page.locator('.bba-alert-danger')).toContainText(/suspended/i)
+
+    // Step 2: Fund the account using the panel.
+    const panel = page.locator('.building-bank-account-panel')
+    const fundPanel = panel.locator('.bba-fund-panel')
+    await fundPanel.locator('.bba-fund-summary').click()
+
+    const amountInput = fundPanel.locator('.bba-fund-input')
+    await expect(amountInput).toBeVisible()
+    await amountInput.fill('50000')
+    await fundPanel.getByRole('button', { name: /^transfer$/i }).click()
+
+    // Step 3: Funding should succeed.
+    await expect(fundPanel.locator('.bba-fund-success')).toBeVisible()
+    await expect(fundPanel.locator('.bba-fund-success')).toContainText(/successful/i)
+
+    // Step 4: The danger alert must be gone — the building has recovered.
+    await expect(page.locator('.bba-alert-danger')).toBeHidden()
+  })
 })

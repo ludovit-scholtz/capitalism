@@ -18,6 +18,10 @@ public sealed class ResourceMovementPhase : ITickPhase
     {
         foreach (var (buildingId, units) in context.UnitsByBuilding)
         {
+            // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
+            if (context.BuildingsById.TryGetValue(buildingId, out var building) && building.IsSuspendedForFunds)
+                continue;
+
             var movableQuantities = BuildMovableQuantitiesSnapshot(context, units);
 
             // Sort downstream units first for deterministic end-to-start flow.

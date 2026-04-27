@@ -5,6 +5,10 @@ namespace Api.Engine.Phases;
 
 /// <summary>
 /// Applies per-tick labor and energy costs for active units in powered buildings.
+/// Runs at Order 50 — before all production phases — so that the
+/// <see cref="Building.IsSuspendedForFunds"/> flag is current when
+/// ManufacturingPhase, PublicSalesPhase, PurchasingPhase, and similar phases
+/// decide whether to process a building that tick.
 /// If a building has an assigned bank account, costs are debited from that account and
 /// the building is suspended for the tick when the balance is insufficient.
 /// Buildings without an assigned account fall back to company cash (legacy path) but
@@ -13,7 +17,7 @@ namespace Api.Engine.Phases;
 public sealed class OperatingCostPhase : ITickPhase
 {
     public string Name => "OperatingCosts";
-    public int Order => 450;
+    public int Order => 50;
 
     public Task ProcessAsync(TickContext context)
     {
@@ -100,6 +104,20 @@ public sealed class OperatingCostPhase : ITickPhase
                 {
                     building.IsSuspendedForFunds = true;
                     building.SuspendedReason = $"INSUFFICIENT_FUNDS:{totalBuildingCost:F2}";
+
+                    // Record an audit ledger entry so players can see why the building stopped.
+                    context.Db.LedgerEntries.Add(new LedgerEntry
+                    {
+                        Id = Guid.NewGuid(),
+                        CompanyId = company.Id,
+                        BuildingId = building.Id,
+                        BankAccountId = bankAccount.Id,
+                        Category = LedgerCategory.Other,
+                        Description = $"Building suspended — insufficient funds (needed {totalBuildingCost:F2}, available {bankAccount.Balance:F2})",
+                        Amount = 0m,
+                        RecordedAtTick = context.CurrentTick,
+                        RecordedAtUtc = DateTime.UtcNow,
+                    });
                     continue;
                 }
 

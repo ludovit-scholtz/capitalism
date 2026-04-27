@@ -31,6 +31,8 @@ public sealed partial class PurchasingPhase : ITickPhase
                 continue;
             if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
                 continue;
+            // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
+            if (building.IsSuspendedForFunds) continue;
 
             foreach (var unit in units)
             {
