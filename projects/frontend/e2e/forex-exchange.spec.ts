@@ -74,7 +74,7 @@ test.describe('Forex Exchange page', () => {
     await expect(page.getByRole('heading', { name: 'Swap' })).toBeVisible()
   })
 
-  test('shows live rates on the Rate List tab', async ({ page }) => {
+  test('shows live rates on the Rate List tab with EUR as default base', async ({ page }) => {
     const player = makePlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -88,6 +88,14 @@ test.describe('Forex Exchange page', () => {
         source: 'ECB',
         quoteCurrencySymbol: 'Kč',
       },
+      {
+        baseCurrencyCode: 'EUR',
+        quoteCurrencyCode: 'USD',
+        rate: 1.08,
+        rateDate: '2026-04-22',
+        source: 'ECB',
+        quoteCurrencySymbol: '$',
+      },
     ]
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
@@ -98,8 +106,13 @@ test.describe('Forex Exchange page', () => {
     await page.getByRole('tab', { name: 'Rate List' }).click()
 
     await expect(page.getByRole('heading', { name: 'Live Rate List' })).toBeVisible()
-    await expect(page.locator('.rates-table')).toContainText('EUR/CZK')
-    await expect(page.locator('.rates-table')).toContainText('25.1234')
+    // City rate board context banner is visible
+    await expect(page.locator('.city-rate-context')).toBeVisible()
+    // When Bratislava (EUR) is selected (default), base currency shown is EUR
+    await expect(page.locator('.city-rate-context')).toContainText('EUR')
+    // Table shows target currencies
+    await expect(page.locator('.rates-table')).toContainText('CZK')
+    await expect(page.locator('.rates-table')).toContainText('USD')
   })
 
   test('supports deep links that preselect the destination currency', async ({ page }) => {
@@ -463,5 +476,129 @@ test.describe('Forex Exchange page', () => {
     // The source bank account selector shows the balance
     await expect(page.locator('.forex-ba-selector').first().locator('.balance-display')).toBeVisible()
     await expect(page.locator('.field-hint').filter({ hasText: 'Available balance' })).toBeVisible()
+  })
+
+  // ── City-based FX rate board ──────────────────────────────────────────────
+
+  test('Rate List shows CZK as base currency when Prague is selected city', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.fxRates = [
+      { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25.2, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
+      { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.08, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
+    ]
+    await page.addInitScript(({ token, cityId }) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('selected_city_id', cityId)
+    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+    await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'Rate List' }).click()
+
+    // City rate context banner should show CZK (Prague's currency)
+    await expect(page.locator('.city-rate-context')).toBeVisible()
+    await expect(page.locator('.city-rate-context')).toContainText('CZK')
+    await expect(page.locator('.city-rate-context')).toContainText('Prague')
+
+    // Table should show EUR and USD as targets
+    await expect(page.locator('.rates-table')).toContainText('EUR')
+    await expect(page.locator('.rates-table')).toContainText('USD')
+    // CZK should NOT appear as a target row (it's the base) — verify no tbody row contains only CZK
+    const rows = page.locator('.rates-table tbody tr')
+    await expect(rows).toHaveCount(2) // EUR and USD only
+  })
+
+  test('Rate List shows EUR as base currency when Bratislava is selected city', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.fxRates = [
+      { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25.2, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
+      { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.08, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
+    ]
+    await page.addInitScript(({ token, cityId }) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('selected_city_id', cityId)
+    }, { token: `token-${player.id}`, cityId: 'city-ba' })
+    await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'Rate List' }).click()
+
+    // City context banner shows EUR and Bratislava
+    await expect(page.locator('.city-rate-context')).toBeVisible()
+    await expect(page.locator('.city-rate-context')).toContainText('EUR')
+    await expect(page.locator('.city-rate-context')).toContainText('Bratislava')
+
+    // Table should include CZK and USD as targets
+    await expect(page.locator('.rates-table')).toContainText('CZK')
+    await expect(page.locator('.rates-table')).toContainText('USD')
+  })
+
+  test('cross rate is correctly computed for non-EUR base (CZK base)', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // EUR/CZK = 25, EUR/USD = 1.0 → CZK/USD = 1/25 = 0.04
+    state.fxRates = [
+      { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'CZK', rate: 25, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: 'Kč' },
+      { baseCurrencyCode: 'EUR', quoteCurrencyCode: 'USD', rate: 1.0, rateDate: '2026-04-27', source: 'FALLBACK', quoteCurrencySymbol: '$' },
+    ]
+    await page.addInitScript(({ token, cityId }) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('selected_city_id', cityId)
+    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+    await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'Rate List' }).click()
+
+    // Mid rate for USD row should be 1/25 = 0.04
+    const usdRow = page.locator('.rates-table tbody tr').filter({ hasText: 'USD' })
+    await expect(usdRow).toBeVisible()
+    // The mid rate column should show 0.04
+    await expect(usdRow).toContainText('0.04')
+    // The after-fee column shows 0.04 * 0.99 = 0.0396
+    await expect(usdRow).toContainText('0.0396')
+  })
+
+  test('city context badge is visible on the Swap tab', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript(({ token, cityId }) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('selected_city_id', cityId)
+    }, { token: `token-${player.id}`, cityId: 'city-ba' })
+    await page.goto('/forex')
+
+    // Swap tab is active by default — check city badge is visible
+    await expect(page.locator('.swap-city-badge')).toBeVisible()
+    await expect(page.locator('.swap-city-badge')).toContainText('EUR')
+    await expect(page.locator('.swap-city-badge')).toContainText('Bratislava')
+  })
+
+  test('after-fee note is visible on Rate List tab', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'Rate List' }).click()
+
+    await expect(page.getByText('Mid rate')).toBeVisible()
+    await expect(page.getByText('After 1% fee')).toBeVisible()
   })
 })

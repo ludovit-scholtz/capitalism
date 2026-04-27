@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -8,10 +9,11 @@ import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
 import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
-import type { FxRate, ForexQuote, ForexTradeResult, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary } from '@/types'
+import type { City, FxRate, ForexQuote, ForexTradeResult, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary } from '@/types'
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const route = useRoute()
 const router = useRouter()
 
@@ -22,6 +24,7 @@ const rates = ref<FxRate[]>([])
 const balances = ref<CurrencyBalance[]>([])
 const history = ref<ForexTradeHistoryEntry[]>([])
 const myBankAccounts = ref<PlayerBankAccountSummary[]>([])
+const cities = ref<City[]>([])
 
 const fromCurrency = ref('EUR')
 const toCurrency = ref('CZK')
@@ -55,6 +58,81 @@ const activeTab = ref<ForexTab>(getInitialTab())
 
 /** Whether the player has bank accounts and should use the bank-account-native swap form. */
 const hasBankAccounts = computed(() => myBankAccounts.value.length > 0)
+
+// ── City-based FX rate board ────────────────────────────────────────────────
+
+/** The city currently selected in the navbar. */
+const selectedCity = computed<City | null>(() => {
+  if (!selectedCityId.value) return null
+  return cities.value.find((c) => c.id === selectedCityId.value) ?? null
+})
+
+/** ISO 4217 code of the selected city's currency. Defaults to EUR. */
+const baseCurrencyCode = computed(() => selectedCity.value?.currencyCode ?? 'EUR')
+
+/** Symbol for the base currency (e.g. "€" for EUR). */
+const baseCurrencySymbol = computed(() => {
+  if (baseCurrencyCode.value === 'EUR') return '€'
+  return rates.value.find((r) => r.quoteCurrencyCode === baseCurrencyCode.value)?.quoteCurrencySymbol ?? baseCurrencyCode.value
+})
+
+/** Map of currencyCode → EUR-based rate (units per 1 EUR). EUR itself = 1. */
+const eurRatesMap = computed<Record<string, number>>(() => {
+  const map: Record<string, number> = { EUR: 1 }
+  rates.value.forEach((r) => {
+    if (r.baseCurrencyCode === 'EUR') {
+      map[r.quoteCurrencyCode] = r.rate
+    }
+  })
+  return map
+})
+
+interface CityRateRow {
+  targetCode: string
+  targetSymbol: string
+  /** How many units of targetCode equal 1 unit of baseCurrencyCode. */
+  rate: number
+  /** After-fee rate: rate × (1 - 0.01). */
+  afterFeeRate: number
+  rateDate: string
+}
+
+/**
+ * Cross-rate board relative to the selected city currency.
+ * "1 {baseCurrencyCode} = rate {targetCode}"
+ * Formula: crossRate = eurRates[target] / eurRates[base]
+ */
+const cityRateBoard = computed<CityRateRow[]>(() => {
+  const base = baseCurrencyCode.value
+  const baseEurRate = eurRatesMap.value[base] ?? 1
+  const allCodes = new Set<string>(['EUR'])
+  rates.value.forEach((r) => allCodes.add(r.quoteCurrencyCode))
+
+  return Array.from(allCodes)
+    .filter((code) => code !== base)
+    .map((code) => {
+      const targetEurRate = eurRatesMap.value[code] ?? 1
+      const crossRate = targetEurRate / baseEurRate
+      const symbol =
+        code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
+      const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)
+      return {
+        targetCode: code,
+        targetSymbol: symbol,
+        rate: crossRate,
+        afterFeeRate: crossRate * 0.99,
+        rateDate: rateEntry?.rateDate ?? '',
+      }
+    })
+    .sort((a, b) => a.targetCode.localeCompare(b.targetCode))
+})
+
+/** The most recent date from the loaded rate entries. */
+const rateUpdateDate = computed<string>(() => {
+  const dates = rates.value.map((r) => r.rateDate).filter(Boolean)
+  if (dates.length === 0) return ''
+  return dates.reduce((latest, d) => (d > latest ? d : latest), dates[0] ?? '')
+})
 
 // Derived list of available currencies (EUR + all quoted currencies)
 const availableCurrencies = computed(() => {
@@ -141,19 +219,25 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const ratesResult = await gqlRequest<{ fxRates: FxRate[] }>(`
-      query {
-        fxRates {
-          baseCurrencyCode
-          quoteCurrencyCode
-          rate
-          rateDate
-          source
-          quoteCurrencySymbol
+    const [ratesResult, citiesResult] = await Promise.all([
+      gqlRequest<{ fxRates: FxRate[] }>(`
+        query {
+          fxRates {
+            baseCurrencyCode
+            quoteCurrencyCode
+            rate
+            rateDate
+            source
+            quoteCurrencySymbol
+          }
         }
-      }
-    `)
+      `),
+      gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode currencyCode latitude longitude population } }`),
+    ])
     rates.value = ratesResult.fxRates ?? []
+    if (citiesResult.cities && citiesResult.cities.length > 0) {
+      cities.value = citiesResult.cities
+    }
 
     if (auth.isAuthenticated) {
       const [balancesResult, historyResult, bankAccountsResult] = await Promise.all([
@@ -376,6 +460,17 @@ function formatAmount(val: number): string {
   return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
+/**
+ * Format an FX cross rate with adaptive precision:
+ * - Very small rates (< 0.01): up to 6 decimal places
+ * - Small rates (< 1): 4 decimal places
+ * - Larger rates: 4 decimal places
+ */
+function formatRate(val: number): string {
+  if (val < 0.01) return val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })
+  return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })
+}
+
 function formatTick(tick: number): string {
   return tick.toLocaleString()
 }
@@ -486,9 +581,17 @@ watch(activeTab, async (tab) => {
 
           <!-- Swap Tab -->
           <section v-if="activeTab === 'swap'" class="space-y-6 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Forex Swap">
-            <h2 class="border-b border-divider pb-3 text-lg font-semibold text-body">
-              {{ t('forex.tabSwap') }}
-            </h2>
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-divider pb-3">
+              <h2 class="text-lg font-semibold text-body">
+                {{ t('forex.tabSwap') }}
+              </h2>
+              <!-- City/currency context badge -->
+              <div v-if="selectedCity" class="swap-city-badge flex items-center gap-1.5 rounded-lg border border-divider bg-card-raised px-3 py-1.5 text-xs text-muted">
+                <span class="font-bold text-brand">{{ baseCurrencySymbol }}</span>
+                <span class="font-semibold text-body">{{ baseCurrencyCode }}</span>
+                <span class="text-subtle">— {{ selectedCity.name }}</span>
+              </div>
+            </div>
 
             <!-- Bank account mode notice -->
             <div v-if="hasBankAccounts" class="ba-notice flex items-center gap-2 rounded-lg border border-divider bg-card-raised px-4 py-2.5 text-sm text-muted" role="note">
@@ -717,37 +820,82 @@ watch(activeTab, async (tab) => {
           <BankAccountTransferPanel v-else-if="activeTab === 'transfer'" :accounts="myBankAccounts" @transferred="reloadBankAccountsSilent" />
 
           <!-- Rates Tab -->
-          <section v-else-if="activeTab === 'rates'" class="space-y-4 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Rate List">
+          <section v-else-if="activeTab === 'rates'" class="space-y-6 rounded-2xl border border-divider bg-card p-6 shadow-sm sm:p-8" aria-label="Rate List">
             <h2 class="border-b border-divider pb-3 text-lg font-semibold text-body">
               {{ t('forex.rateListTitle') }}
             </h2>
+
             <div v-if="rates.length === 0" class="text-sm italic text-muted">
               {{ t('forex.rateListEmpty') }}
             </div>
-            <div v-else class="overflow-x-auto">
-              <table class="rates-table w-full border-collapse text-sm">
-                <thead>
-                  <tr>
-                    <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
-                      {{ t('forex.rateListPair') }}
-                    </th>
-                    <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
-                      {{ t('forex.rate') }}
-                    </th>
-                    <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
-                      {{ t('forex.executedAt') }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="rateEntry in rates" :key="`${rateEntry.baseCurrencyCode}-${rateEntry.quoteCurrencyCode}`" class="history-row">
-                    <td class="px-3 py-2.5 font-semibold text-body align-middle">{{ rateEntry.baseCurrencyCode }}/{{ rateEntry.quoteCurrencyCode }}</td>
-                    <td class="px-3 py-2.5 text-muted align-middle">{{ formatAmount(rateEntry.rate) }}</td>
-                    <td class="px-3 py-2.5 text-subtle text-xs align-middle">{{ rateEntry.rateDate }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+
+            <template v-else>
+              <!-- City / base currency context banner -->
+              <div class="city-rate-context flex flex-wrap items-center gap-3 rounded-xl border border-brand/30 bg-brand/5 px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <span class="text-2xl font-bold text-brand">{{ baseCurrencySymbol }}</span>
+                  <div class="flex flex-col">
+                    <span class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('forex.rateBaseCurrency') }}</span>
+                    <span class="font-bold text-body">
+                      {{ baseCurrencyCode }}
+                      <span v-if="selectedCity" class="ml-1 font-normal text-muted">({{ selectedCity.name }})</span>
+                    </span>
+                  </div>
+                </div>
+                <div class="ml-auto text-right text-xs text-muted">
+                  <div v-if="rateUpdateDate">{{ t('forex.rateUpdated') }}: {{ rateUpdateDate }}</div>
+                  <div class="text-subtle">{{ t('forex.rateSourceNote') }}</div>
+                </div>
+              </div>
+
+              <!-- Cross-rate table: 1 base → X target -->
+              <div>
+                <p class="mb-3 text-sm text-muted">
+                  {{ t('forex.rateTableIntro', { base: `1 ${baseCurrencySymbol} ${baseCurrencyCode}` }) }}
+                </p>
+                <div class="overflow-x-auto">
+                  <table class="rates-table w-full border-collapse text-sm">
+                    <thead>
+                      <tr>
+                        <th class="text-left px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                          {{ t('forex.rateTableCurrency') }}
+                        </th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                          {{ t('forex.rateTableMidRate') }}
+                        </th>
+                        <th class="text-right px-3 py-2 text-xs font-semibold text-muted uppercase tracking-wide border-b border-divider">
+                          {{ t('forex.rateTableAfterFee') }}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr
+                        v-for="row in cityRateBoard"
+                        :key="row.targetCode"
+                        class="history-row border-b border-divider/40 last:border-0"
+                      >
+                        <td class="px-3 py-3 align-middle">
+                          <div class="flex items-center gap-2">
+                            <span class="min-w-[2rem] text-base font-bold text-brand">{{ row.targetSymbol }}</span>
+                            <div>
+                              <span class="font-semibold text-body">{{ row.targetCode }}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td class="px-3 py-3 text-right font-mono font-semibold text-body align-middle">
+                          {{ formatRate(row.rate) }}
+                        </td>
+                        <td class="px-3 py-3 text-right font-mono text-muted align-middle">
+                          <span class="text-sm">{{ formatRate(row.afterFeeRate) }}</span>
+                          <span class="ml-1 text-xs text-subtle">−1%</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="mt-3 text-xs text-subtle">{{ t('forex.rateAfterFeeNote') }}</p>
+              </div>
+            </template>
           </section>
 
           <!-- History Tab -->
