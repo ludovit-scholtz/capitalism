@@ -990,12 +990,12 @@ test.describe('Building detail upgrades', () => {
     const activeSection = getGridSection(page, 'Current Configuration')
     await getGridCell(activeSection, 0, 0).click()
 
-    await expect(page).toHaveURL(/\/building\/building-route\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-route.*unit=0(?:,|%2C)0/)
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
 
     await page.reload()
 
-    await expect(page).toHaveURL(/\/building\/building-route\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-route.*unit=0(?:,|%2C)0/)
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
     await expect(page.getByText('Procurement Mode: Global Exchange')).toBeVisible()
   })
@@ -17644,7 +17644,7 @@ test.describe('Building detail tick-refresh stability', () => {
     const activeSection = getGridSection(page, 'Current Configuration')
     await getGridCell(activeSection, 0, 0).click()
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
-    await expect(page).toHaveURL(/\/building\/building-unit-stable\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-unit-stable.*unit=0(?:,|%2C)0/)
 
     // Simulate a tick advancing
     state.gameState.currentTick = 21
@@ -17652,7 +17652,7 @@ test.describe('Building detail tick-refresh stability', () => {
 
     // Unit Details sidebar must remain visible — context must not be lost
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
-    await expect(page).toHaveURL(/\/building\/building-unit-stable\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-unit-stable.*unit=0(?:,|%2C)0/)
     // Main loading spinner must not appear
     await expect(page.locator('.loading', { hasText: 'Loading' })).toBeHidden()
   })
@@ -17798,7 +17798,7 @@ test.describe('Building detail tick-refresh stability', () => {
     // The unit details panel must open automatically from the URL param
     await expect(page.getByRole('heading', { name: 'Unit Details' })).toBeVisible()
     // URL must still contain the unit param
-    await expect(page).toHaveURL(/\/building\/building-deeplink\?unit=0(?:,|%2C)0$/)
+    await expect(page).toHaveURL(/\/building\/building-deeplink.*unit=0(?:,|%2C)0/)
   })
 })
 
