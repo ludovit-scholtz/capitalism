@@ -21,11 +21,13 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Migrate all views to Tailwind
 - [ ] Update all components to use Tailwind utilities
 
-### City selection
+### City selection (100% complete)
 
-- [ ] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
-- [ ] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
-- [ ] In the context selection is the company cash visible. But there is error that the currency is not correct. 
+- [x] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
+- [x] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
+- [x] In the context selection is the company cash visible. But there is error that the currency is not correct.
+
+**Shipped:** Onboarding now persists the player's chosen city to localStorage after register/login so the active city is correct on all subsequent pages. The buy-building flow pre-selects the active city from the navbar filter instead of requiring a redundant city choice. The context switcher now formats company cash in the selected city's currency (e.g. CZK for Prague) instead of always showing USD.
 
 ### Government company
 

@@ -72,7 +72,7 @@ const activeAccountBadgeKey = computed(() => (auth.player?.activeAccountType ===
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat(locale.value, {
     style: 'currency',
-    currency: 'USD',
+    currency: selectedCity.value?.currencyCode ?? 'EUR',
     maximumFractionDigits: 0,
   }).format(value)
 }
