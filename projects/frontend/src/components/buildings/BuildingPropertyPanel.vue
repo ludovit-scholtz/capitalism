@@ -11,18 +11,28 @@ const { locale, building, currentTick, showRentDialog, newRentPerSqm, savingRent
 const priceRatio = computed(() => {
   const price = building.value?.pricePerSqm
   const market = building.value?.adjustedMarketRentPerSqm
-  if (!price || !market || market <= 0) return null
+  if (price == null || market == null || market <= 0) return null
   return price / market
 })
+
+// Occupancy-cap tier thresholds (aligned with backend RentPhase constants):
+// > 1.1  → overpriced: occupancy drifts to 50% floor
+// 1.0–1.1 → above market: max 90% occupancy
+// 0.6–1.0 → good range: linear interpolation 90%–100%
+// < 0.6  → very attractive: can reach 100% occupancy
+const OVERPRICED_THRESHOLD = 1.1
+const ABOVE_MARKET_THRESHOLD = 1.0
+const GOOD_RANGE_LOWER = 0.6
+const GOOD_RANGE_UPPER = 0.9
 
 /** Human-readable price position label and CSS class. */
 const rentPosition = computed((): { key: string; cls: string } | null => {
   const r = priceRatio.value
   if (r === null) return null
-  if (r > 1.1) return { key: 'property.rentPositionOverpriced', cls: 'position-overpriced' }
-  if (r > 1.0) return { key: 'property.rentPositionAboveMarket', cls: 'position-above' }
-  if (r >= 0.9) return { key: 'property.rentPositionAtMarket', cls: 'position-good' }
-  if (r >= 0.6) return { key: 'property.rentPositionGood', cls: 'position-good' }
+  if (r > OVERPRICED_THRESHOLD) return { key: 'property.rentPositionOverpriced', cls: 'position-overpriced' }
+  if (r > ABOVE_MARKET_THRESHOLD) return { key: 'property.rentPositionAboveMarket', cls: 'position-above' }
+  if (r >= GOOD_RANGE_UPPER) return { key: 'property.rentPositionAtMarket', cls: 'position-good' }
+  if (r >= GOOD_RANGE_LOWER) return { key: 'property.rentPositionGood', cls: 'position-good' }
   return { key: 'property.rentPositionBelow60', cls: 'position-great' }
 })
 
