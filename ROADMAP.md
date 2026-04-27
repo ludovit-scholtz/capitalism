@@ -97,7 +97,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
 - [ ] For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
 
-### Appartment and commercial buildings (70% complete)
+### Appartment and commercial buildings (90% complete)
 
 **Shipped in this increment:**
 - ✅ Grid layout hidden for APARTMENT and COMMERCIAL buildings — these now present as single-unit properties without the factory-style unit grid.
@@ -108,12 +108,9 @@ It will use real world map. The game will start in single city and later other c
 - ✅ Constant operating costs: each tick deducts `pricePerSqm × area × 0.75` (PROPERTY_MAINTENANCE ledger entry). Building breaks even at 75% occupancy, profitable above it.
 - ✅ New GraphQL fields on Building: `cityReferenceRentPerSqm`, `adjustedMarketRentPerSqm`, `populationIndex`.
 - ✅ 19 backend tests covering all occupancy/rent rules, price zones, ledger entries, and breakeven profitability.
+- ✅ Rent reference rate chart added to apartment and commercial building detail screens. The SVG chart shows the full occupancy curve (0–100%), colored pricing zones (Very Attractive / Good / Above Market / Overpriced), a dashed breakeven line at 75%, and interactive markers for the city reference rate, the location-adjusted market rate, and the player's current rent. Apartment buildings show the apartment-focused chart; commercial buildings show the commercial-focused chart. Currency formatting uses the correct city currency.
 
 **Remaining:**
-- [ ] When i want to set a rent i dont see any reference rate. Make sure to show the reference rate chart in the city. The reference rate chart for appartments show in appartments, and reference rate  chart for commenrcial buildings show in the commercial buildings.
-
-### News
-
 - [ ] When backend is restarted it must store all news from the changelog csv to the game server database. At the moment i see only few news and changelog csv is not imported.
 - [ ] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports.
 

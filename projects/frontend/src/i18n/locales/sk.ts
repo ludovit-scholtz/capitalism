@@ -2017,6 +2017,15 @@ export default {
     occupancyTrendNote: 'Obsadenosť sa postupne prispôsobuje každý tik podľa cenovej pozície.',
     breakevenNote: 'Prevádzkové náklady = nájom pri 75% obsadenosti. Ziskové nad 75%.',
     noMarketDataAvailable: 'Trhové dáta nie sú dostupné pre túto budovu.',
+    rentChartTitleApartment: 'Graf referenčného nájmu bytov',
+    rentChartTitleCommercial: 'Graf referenčného nájmu komerčných priestorov',
+    chartCityRateLabel: 'Mestská sadzba',
+    chartAdjustedRateLabel: 'Sadzba lokality',
+    chartRatesLabel: 'Trhová sadzba',
+    rentChartHintApartment:
+      'Graf zobrazuje maximálnu dosiahnuteľnú obsadenosť pri každej výške nájmu. Cena pod mestskou referenčnou sadzbou umožňuje plnú obsadenosť; cena nad upravenou sadzbou lokality obmedzuje obsadenosť na 90% a menej.',
+    rentChartHintCommercial:
+      'Graf zobrazuje maximálnu dosiahnuteľnú obsadenosť pri každej výške nájmu. Komerčné priestory s cenou pod mestskou referenčnou sadzbou priťahujú najviac nájomníkov; cena nad upravenou sadzbou lokality obmedzuje obsadenosť na 90% a menej.',
   },
   research: {
     panelTitle: 'Výskumný pokrok',
