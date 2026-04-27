@@ -79,20 +79,39 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var upgradeCost = Engine.GameConstants.UnitUpgradeCost(unit.UnitType, unit.Level);
+        // Apply the city's FX rate so the upgrade cost is expressed in the building's
+        // local currency (e.g. CZK for Prague, INR for Delhi).
+        var cityCurrencyCode = unit.Building.City?.CurrencyCode ?? "EUR";
+        var fxRates = await Utilities.FxRateHelper.BuildEurRatesLookupAsync(db, [cityCurrencyCode]);
+        var fxRate = Utilities.FxRateHelper.GetEurRate(fxRates, cityCurrencyCode);
+        var upgradeCost = decimal.Round(
+            Engine.GameConstants.UnitUpgradeCost(unit.UnitType, unit.Level) * fxRate,
+            2, MidpointRounding.AwayFromZero);
         var company = unit.Building.Company;
         var fundingAccount = unit.Building.BankAccount
             ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
                 db,
                 unit.Building,
-                unit.Building.City?.CurrencyCode,
+                cityCurrencyCode,
                 httpContextAccessor.HttpContext!.RequestAborted);
+
+        // Guard: the assigned account must be in the building's city currency.
+        // A currency mismatch would charge the wrong-currency account by the FX-adjusted amount,
+        // causing a massive over- or under-charge depending on direction.
+        if (!string.Equals(fundingAccount.CurrencyCode, cityCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Building bank account currency ({fundingAccount.CurrencyCode}) must match city currency ({cityCurrencyCode}). Please assign a {cityCurrencyCode} bank account to this building before upgrading.")
+                    .SetCode("CURRENCY_MISMATCH")
+                    .Build());
+        }
 
         if (fundingAccount.Balance < upgradeCost)
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage($"Insufficient funds. Upgrade costs ${upgradeCost.ToString("N0", CultureInfo.InvariantCulture)} but bank account {fundingAccount.AccountNumber} only has ${fundingAccount.Balance.ToString("N0", CultureInfo.InvariantCulture)}.")
+                    .SetMessage($"Insufficient funds. Upgrade costs {upgradeCost.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode} but bank account {fundingAccount.AccountNumber} only has {fundingAccount.Balance.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode}.")
                     .SetCode("INSUFFICIENT_FUNDS")
                     .Build());
         }

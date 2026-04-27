@@ -17672,6 +17672,188 @@ test.describe('Unit upgrade panel', () => {
     const storeBtn = page.locator('.grid-actions .btn-primary')
     await expect(storeBtn).not.toContainText('queued')
   })
+
+  test('upgrade panel in Prague (CZK) building shows FX-adjusted CZK cost', async ({ page }) => {
+    // Proves end-to-end that a player in a non-EUR city sees the upgrade price in local currency.
+    // The backend returns upgradeCost = EUR_base × CZK_rate; the UI formats it in CZK.
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-uu-czk',
+      playerId: player.id,
+      name: 'Prague Factory Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-uu-czk',
+          companyId: 'company-uu-czk',
+          cityId: 'city-pr', // Prague (CZK)
+          type: 'FACTORY',
+          name: 'Prague Upgrade Factory',
+          latitude: 50.0755,
+          longitude: 14.4378,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'unit-uu-czk-1',
+              buildingId: 'building-uu-czk',
+              unitType: 'MANUFACTURING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    // CZK rate comes from makeDefaultFxRates() which seeds CZK at 25.19.
+    // EUR_BASE_UPGRADE_COST mirrors GameConstants.UnitUpgradeCost(MANUFACTURING, 1) = 8 000.
+    // Expected CZK cost: Math.round(8_000 × 25.19) = 201_520 CZK.
+    const EUR_BASE_UPGRADE_COST = 8_000 // matches GameConstants.UnitUpgradeCost(Manufacturing, Lv1)
+    const CZK_FX_RATE = 25.19 // matches makeDefaultFxRates() CZK entry
+    const czkUpgradeCost = Math.round(EUR_BASE_UPGRADE_COST * CZK_FX_RATE) // 201 520 CZK
+    state.unitUpgradeInfoOverrides['unit-uu-czk-1'] = {
+      unitId: 'unit-uu-czk-1',
+      unitType: 'MANUFACTURING',
+      currentLevel: 1,
+      nextLevel: 2,
+      isMaxLevel: false,
+      isUpgradable: true,
+      upgradeCost: czkUpgradeCost,
+      upgradeTicks: 10,
+      currentStat: 1.0,
+      nextStat: 2.0,
+      statLabel: 'Batches/tick',
+      currentLaborHoursPerTick: 0.7,
+      nextLaborHoursPerTick: 1.4,
+      currentEnergyMwhPerTick: 0.12,
+      nextEnergyMwhPerTick: 0.24,
+      currentLaborCostPerTick: 14,
+      nextLaborCostPerTick: 28,
+      currentEnergyCostPerTick: 6.6,
+      nextEnergyCostPerTick: 13.2,
+      currentStorageCapacity: 100,
+      nextStorageCapacity: 250,
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-uu-czk')
+    await expect(page.getByRole('heading', { name: 'Prague Upgrade Factory' })).toBeVisible()
+
+    // Enter edit mode — upgrade panel shows FX-adjusted cost
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+
+    const upgradePanel = page.locator('.unit-upgrade-panel')
+    await expect(upgradePanel).toBeVisible()
+
+    // The cost must be displayed in CZK format ("CZK" or "Kč"), not in EUR ("€").
+    // Intl.NumberFormat(locale, { currency: 'CZK' }) renders as "CZK 201,520" or "201 520 Kč"
+    // depending on browser locale, but never with "€".
+    const costEl = upgradePanel.locator('.unit-upgrade-cost')
+    await expect(costEl).toBeVisible()
+    await expect(costEl).toContainText('201') // the 201 xxx amount is always present
+    await expect(costEl).not.toContainText('€') // EUR symbol must never appear for a CZK building
+    // Either the ISO code or the Kč symbol confirms the CZK currency context
+    const costText = await costEl.textContent()
+    const hasCzkIndicator = costText?.includes('CZK') || costText?.includes('Kč') || costText?.includes('K\u010d')
+    expect(hasCzkIndicator).toBe(true)
+  })
+})
+
+test.describe('Unit placement FX pricing in non-EUR city', () => {
+  test('new unit placement in Prague (CZK) building shows FX-adjusted CZK cost in changes summary', async ({
+    page,
+  }) => {
+    // Proves that when a player in Prague adds a new unit to an empty slot,
+    // the displayed placement cost is in CZK (EUR base × CZK fx rate), not EUR.
+    // MANUFACTURING base cost = 12,000 EUR × 25.19 CZK/EUR ≈ 302,280 CZK.
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-czk-place',
+      playerId: player.id,
+      name: 'Prague Placement Co',
+      cash: 1000000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-czk-place',
+          companyId: 'company-czk-place',
+          cityId: 'city-pr', // Prague (CZK)
+          type: 'FACTORY',
+          name: 'Prague Placement Factory',
+          latitude: 50.0755,
+          longitude: 14.4378,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [], // empty — placing a new unit should show FX-adjusted cost
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-czk-place')
+    await expect(page.getByRole('heading', { name: 'Prague Placement Factory' })).toBeVisible()
+
+    // Enter edit mode
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(plannedSection).toBeVisible()
+
+    // Click an empty cell and choose MANUFACTURING
+    const cell00 = plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await cell00.click()
+    await page.locator('.picker-option').filter({ hasText: 'Manufacturing' }).click()
+
+    // The unit-change-cost element should show a CZK-formatted amount, not EUR
+    const changesPanel = page.locator('.unit-changes-summary')
+    await expect(changesPanel).toBeVisible()
+
+    const changeCostEl = changesPanel.locator('.unit-change-cost').first()
+    await expect(changeCostEl).toBeVisible()
+
+    // CZK rate (makeDefaultFxRates) = 25.19; MANUFACTURING base = 12,000 EUR
+    // Expected CZK ≈ 302,280 — the "302" prefix is always present
+    await expect(changeCostEl).toContainText('302')
+    // Must not display the EUR symbol
+    await expect(changeCostEl).not.toContainText('€')
+  })
 })
 
 test.describe('Building detail tick-refresh stability', () => {

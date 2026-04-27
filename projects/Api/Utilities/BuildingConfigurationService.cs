@@ -146,8 +146,18 @@ public static partial class BuildingConfigurationService
             .AsSplitQuery()
             .ToListAsync();
 
+        // Pre-load FX rates for all city currencies appearing in this batch in one round-trip.
+        var allCurrencyCodes = plans
+            .Select(p => p.Building.City?.CurrencyCode ?? "EUR")
+            .Distinct()
+            .ToList();
+        var fxRatesLookup = await FxRateHelper.BuildEurRatesLookupAsync(db, allCurrencyCodes);
+
         foreach (var plan in plans)
         {
+            var cityCurrencyCode = plan.Building.City?.CurrencyCode ?? "EUR";
+            var fxRate = FxRateHelper.GetEurRate(fxRatesLookup, cityCurrencyCode);
+
             var liveUnitsByPosition = plan.Building.Units.DistinctBy(unit => (unit.GridX, unit.GridY)).ToDictionary(unit => (unit.GridX, unit.GridY));
 
             foreach (var removal in plan.Removals.Where(removal => removal.AppliesAtTick <= currentTick).ToList())
@@ -167,13 +177,17 @@ public static partial class BuildingConfigurationService
                 .Where(unit => unit.IsChanged && unit.AppliesAtTick <= currentTick)
                 .ToList();
 
+            // Apply the building's city FX rate so new-unit placement costs are expressed in
+            // the local currency (e.g. CZK for Prague) rather than the EUR base cost.
             var costfulDueUnits = dueUnits
                 .Select(unit => new
                 {
                     Unit = unit,
-                    Cost = BuildingConfigurationEconomics.CalculateActivationCost(
-                        liveUnitsByPosition.GetValueOrDefault((unit.GridX, unit.GridY)),
-                        unit)
+                    Cost = decimal.Round(
+                        BuildingConfigurationEconomics.CalculateActivationCost(
+                            liveUnitsByPosition.GetValueOrDefault((unit.GridX, unit.GridY)),
+                            unit) * fxRate,
+                        2, MidpointRounding.AwayFromZero)
                 })
                 .Where(entry => entry.Cost > 0m)
                 .ToList();
@@ -183,9 +197,23 @@ public static partial class BuildingConfigurationService
                 ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
                     db,
                     plan.Building,
-                    plan.Building.City?.CurrencyCode);
+                    cityCurrencyCode);
 
-            if (totalActivationCost > 0m && fundingAccount.Balance < totalActivationCost)
+            // Guard: if the assigned account is in a different currency than the building city,
+            // deducting a CZK-adjusted cost from an EUR account (or vice versa) would massively
+            // over- or under-charge the player.  Defer the due units and let the player fix the
+            // account assignment before the next tick.
+            if (totalActivationCost > 0m && fundingAccount.CurrencyCode != cityCurrencyCode)
+            {
+                foreach (var entry in costfulDueUnits)
+                {
+                    entry.Unit.AppliesAtTick = currentTick + 1;
+                    entry.Unit.TicksRequired = Math.Max(entry.Unit.TicksRequired, 1);
+                }
+
+                dueUnits = dueUnits.Except(costfulDueUnits.Select(entry => entry.Unit)).ToList();
+            }
+            else if (totalActivationCost > 0m && fundingAccount.Balance < totalActivationCost)
             {
                 foreach (var entry in costfulDueUnits)
                 {

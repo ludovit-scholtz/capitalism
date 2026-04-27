@@ -61,6 +61,7 @@ import type {
   BuildingRecentActivityEvent,
   City,
   Company,
+  EurFxRate,
   GlobalExchangeOffer,
   PowerPlantAnalytics,
   ProcurementPreview,
@@ -190,6 +191,7 @@ export function useBuildingDetail() {
   const rankedProducts = ref<RankedProductResult[]>([])
   const rankedProductsLoading = ref(false)
   const cities = ref<City[]>([])
+  const eurFxRates = ref<EurFxRate[]>([])
   const unitInventorySummaries = ref<BuildingUnitInventorySummary[]>([])
   const unitInventories = ref<BuildingUnitInventory[]>([])
   const unitResourceHistories = ref<BuildingUnitResourceHistoryPoint[]>([])
@@ -683,7 +685,7 @@ export function useBuildingDetail() {
           gridY: gy,
           unitType: draft.unitType,
           ticks: UNIT_PLAN_CHANGE_TICKS,
-          cost: getUnitConstructionCost(draft.unitType),
+          cost: Math.round(getUnitConstructionCost(draft.unitType) * cityFxRate.value * 100) / 100,
         })
       } else if (baseline && !draft) {
         // Existing unit removed
@@ -704,7 +706,7 @@ export function useBuildingDetail() {
           unitType: draft.unitType,
           previousUnitType: baseline.unitType,
           ticks: UNIT_PLAN_CHANGE_TICKS,
-          cost: getUnitConstructionCost(draft.unitType),
+          cost: Math.round(getUnitConstructionCost(draft.unitType) * cityFxRate.value * 100) / 100,
         })
       }
     }
@@ -762,6 +764,13 @@ export function useBuildingDetail() {
   const cityCurrencyCode = computed(() => {
     if (!building.value?.cityId) return 'EUR'
     return cities.value.find((c) => c.id === building.value!.cityId)?.currencyCode ?? 'EUR'
+  })
+  /** EUR → local currency multiplier for the building's city (e.g. ~25.2 for CZK). */
+  const cityFxRate = computed<number>(() => {
+    const code = cityCurrencyCode.value
+    if (code === 'EUR') return 1
+    const entry = eurFxRates.value.find((r) => r.currencyCode === code)
+    return entry?.rate ?? 1
   })
   const buildingOverviewMapRoute = computed(() => {
     if (!building.value) return null
@@ -2786,7 +2795,8 @@ export function useBuildingDetail() {
   function getDraftUnitConstructionCost(unit: GridUnit | undefined): number {
     if (!unit) return 0
     const activeUnit = getUnitAtFrom(activeUnits.value, unit.gridX, unit.gridY)
-    return getPlannedUnitConstructionCost(activeUnit, unit)
+    // Apply the building city's FX rate so costs are shown in local currency (e.g. CZK, INR).
+    return Math.round(getPlannedUnitConstructionCost(activeUnit, unit) * cityFxRate.value * 100) / 100
   }
 
   function getDraftUnitConstructionCostLabel(unit: GridUnit | undefined): string | null {
@@ -3494,7 +3504,7 @@ export function useBuildingDetail() {
     if (mfgUnit?.productTypeId) {
       const product = productTypes.value.find((p) => p.id === mfgUnit.productTypeId)
       if (product?.basePrice != null) {
-        return { price: product.basePrice, sourceType: 'manufacturing', itemName: product.name ?? null }
+        return { price: Math.round(product.basePrice * cityFxRate.value * 100) / 100, sourceType: 'manufacturing', itemName: product.name ?? null }
       }
     }
     // Fall back to any MANUFACTURING unit in the building with a product
@@ -3502,7 +3512,7 @@ export function useBuildingDetail() {
     if (anyMfg?.productTypeId) {
       const product = productTypes.value.find((p) => p.id === anyMfg.productTypeId)
       if (product?.basePrice != null) {
-        return { price: product.basePrice, sourceType: 'manufacturing', itemName: product.name ?? null }
+        return { price: Math.round(product.basePrice * cityFxRate.value * 100) / 100, sourceType: 'manufacturing', itemName: product.name ?? null }
       }
     }
 
@@ -3511,7 +3521,7 @@ export function useBuildingDetail() {
     if (miningUnit?.resourceTypeId) {
       const resource = resourceTypes.value.find((r) => r.id === miningUnit.resourceTypeId)
       if (resource?.basePrice != null) {
-        return { price: resource.basePrice, sourceType: 'mining', itemName: resource.name ?? null }
+        return { price: Math.round(resource.basePrice * cityFxRate.value * 100) / 100, sourceType: 'mining', itemName: resource.name ?? null }
       }
     }
     // Fall back to any MINING unit in the building with a resource type
@@ -3519,7 +3529,7 @@ export function useBuildingDetail() {
     if (anyMining?.resourceTypeId) {
       const resource = resourceTypes.value.find((r) => r.id === anyMining.resourceTypeId)
       if (resource?.basePrice != null) {
-        return { price: resource.basePrice, sourceType: 'mining', itemName: resource.name ?? null }
+        return { price: Math.round(resource.basePrice * cityFxRate.value * 100) / 100, sourceType: 'mining', itemName: resource.name ?? null }
       }
     }
 
@@ -3697,7 +3707,7 @@ export function useBuildingDetail() {
       error.value = null
       const preserveDraft = options.preserveDraft === true
 
-      const [companiesData, gameStateData, resourceData, productData, citiesData] = await Promise.all([
+      const [companiesData, gameStateData, resourceData, productData, citiesData, fxRatesData] = await Promise.all([
         gqlRequest<{ myCompanies: Company[] }>(
           `{ myCompanies {
             id
@@ -3853,6 +3863,7 @@ export function useBuildingDetail() {
           }
         }`),
         gqlRequest<{ cities: City[] }>(`{ cities { id name currencyCode } }`),
+        gqlRequest<{ eurFxRates: EurFxRate[] }>(`{ eurFxRates { currencyCode rate } }`),
       ])
 
       if (requestId !== activeBuildingLoadRequest) {
@@ -3868,6 +3879,9 @@ export function useBuildingDetail() {
       }
       if (!deepEqual(cities.value, citiesData.cities ?? [])) {
         cities.value = citiesData.cities ?? []
+      }
+      if (!deepEqual(eurFxRates.value, fxRatesData.eurFxRates ?? [])) {
+        eurFxRates.value = fxRatesData.eurFxRates ?? []
       }
       const nextPurchaseVendorCompanies: PurchaseVendorCompanyData[] = companiesData.myCompanies.map((company) => ({
         id: company.id,
@@ -4305,6 +4319,7 @@ export function useBuildingDetail() {
     selectedUnitResourceHistory,
     buildingOverviewCityName,
     cityCurrencyCode,
+    cityFxRate,
     buildingOverviewMapRoute,
     buildingFinancialSnapshots,
     buildingFinancialHasActivity,
