@@ -25,9 +25,12 @@ const emit = defineEmits<{
 
 // ── State ─────────────────────────────────────────────────────────────────────
 
+type AmmTab = 'swap' | 'positions' | 'addLiquidity'
+
 const loading = ref(false)
 const error = ref<string | null>(null)
 
+const activeTab = ref<AmmTab>('swap')
 const goldBalance = ref<GoldBalanceInfo | null>(null)
 const pools = ref<GoldAmmPool[]>([])
 
@@ -44,14 +47,6 @@ const swapResult = ref<GoldAmmSwapResult | null>(null)
 const swapError = ref<string | null>(null)
 const swapLoading = ref(false)
 
-// Create pool
-const createCurrency = ref('EUR')
-const createFiatAmount = ref<number | null>(null)
-const createGoldAmount = ref<number | null>(null)
-const createLoading = ref(false)
-const createError = ref<string | null>(null)
-const createSuccess = ref<string | null>(null)
-
 // Add liquidity
 const addPoolId = ref<string | null>(null)
 const addFiatAmount = ref<number | null>(null)
@@ -59,6 +54,14 @@ const addMaxGold = ref<number | null>(null)
 const addLoading = ref(false)
 const addError = ref<string | null>(null)
 const addSuccess = ref<string | null>(null)
+
+// Create pool
+const createCurrency = ref('EUR')
+const createFiatAmount = ref<number | null>(null)
+const createGoldAmount = ref<number | null>(null)
+const createLoading = ref(false)
+const createError = ref<string | null>(null)
+const createSuccess = ref<string | null>(null)
 
 // Remove liquidity
 const removePositionId = ref<string | null>(null)
@@ -80,12 +83,19 @@ const swapInputBalance = computed(() => {
 const swapValidationError = computed<string | null>(() => {
   if (!swapAmount.value || swapAmount.value <= 0) return t('goldAmm.insufficientFunds')
   if (swapAmount.value > swapInputBalance.value) {
-    return swapDirection.value === 'FIAT_TO_GOLD'
-      ? t('goldAmm.insufficientFunds')
-      : t('goldAmm.insufficientGold')
+    return swapDirection.value === 'FIAT_TO_GOLD' ? t('goldAmm.insufficientFunds') : t('goldAmm.insufficientGold')
   }
   return null
 })
+
+/** Pools with active player positions */
+const myPositions = computed(() => pools.value.filter((p) => p.myPosition != null))
+
+/** Pool selected for adding liquidity */
+const selectedAddPool = computed(() => pools.value.find((p) => p.id === addPoolId.value) ?? null)
+
+/** Whether the addLiquidity tab should show create-pool form */
+const showCreateForm = computed(() => pools.value.length < props.availableCurrencies.length)
 
 // ── Methods ───────────────────────────────────────────────────────────────────
 
@@ -112,6 +122,18 @@ async function loadData() {
     ])
     pools.value = poolsResult.goldAmmPools ?? []
     goldBalance.value = balanceResult.myGoldBalance
+
+    // Default swap/create currency to first available
+    if (!swapCurrency.value && props.availableCurrencies.length > 0) {
+      swapCurrency.value = props.availableCurrencies[0] ?? 'EUR'
+    }
+    if (!createCurrency.value && props.availableCurrencies.length > 0) {
+      createCurrency.value = props.availableCurrencies[0] ?? 'EUR'
+    }
+    // Default add pool to first existing pool
+    if (!addPoolId.value && pools.value.length > 0) {
+      addPoolId.value = pools.value[0]?.id ?? null
+    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -195,40 +217,6 @@ function cancelSwapQuote() {
   swapQuote.value = null
 }
 
-async function createPool() {
-  createLoading.value = true
-  createError.value = null
-  createSuccess.value = null
-
-  try {
-    await gqlRequest<{ createGoldAmmPool: GoldAmmLiquidityResult }>(
-      `
-      mutation CreatePool($input: CreateGoldAmmPoolInput!) {
-        createGoldAmmPool(input: $input) {
-          poolId positionId currencyCode fiatProvided goldProvided liquidityShares
-        }
-      }
-    `,
-      {
-        input: {
-          currencyCode: createCurrency.value,
-          fiatAmount: createFiatAmount.value,
-          goldAmount: createGoldAmount.value,
-        },
-      },
-    )
-    createSuccess.value = t('goldAmm.createPoolSuccess')
-    createFiatAmount.value = null
-    createGoldAmount.value = null
-    await loadData()
-    emit('refresh')
-  } catch (e: unknown) {
-    createError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
-  } finally {
-    createLoading.value = false
-  }
-}
-
 async function addLiquidity() {
   addLoading.value = true
   addError.value = null
@@ -260,6 +248,40 @@ async function addLiquidity() {
     addError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
   } finally {
     addLoading.value = false
+  }
+}
+
+async function createPool() {
+  createLoading.value = true
+  createError.value = null
+  createSuccess.value = null
+
+  try {
+    await gqlRequest<{ createGoldAmmPool: GoldAmmLiquidityResult }>(
+      `
+      mutation CreatePool($input: CreateGoldAmmPoolInput!) {
+        createGoldAmmPool(input: $input) {
+          poolId positionId currencyCode fiatProvided goldProvided liquidityShares
+        }
+      }
+    `,
+      {
+        input: {
+          currencyCode: createCurrency.value,
+          fiatAmount: createFiatAmount.value,
+          goldAmount: createGoldAmount.value,
+        },
+      },
+    )
+    createSuccess.value = t('goldAmm.createPoolSuccess')
+    createFiatAmount.value = null
+    createGoldAmount.value = null
+    await loadData()
+    emit('refresh')
+  } catch (e: unknown) {
+    createError.value = e instanceof Error ? e.message : t('goldAmm.swapFailed')
+  } finally {
+    createLoading.value = false
   }
 }
 
@@ -308,9 +330,9 @@ onMounted(loadData)
 </script>
 
 <template>
-  <section class="mt-8" aria-label="Gold AMM Exchange">
+  <section class="mt-2" aria-label="Gold AMM Exchange">
     <!-- Hero -->
-    <div class="mb-6">
+    <div class="mb-5">
       <h2 class="text-2xl font-bold text-body mb-1">{{ t('goldAmm.title') }}</h2>
       <p class="text-muted text-sm">{{ t('goldAmm.subtitle') }}</p>
     </div>
@@ -319,98 +341,134 @@ onMounted(loadData)
     <div v-else-if="error" class="text-center py-8 text-bad">{{ error }}</div>
 
     <template v-else>
-      <!-- Gold Balance Card -->
+      <!-- Gold Balance Card (always visible) -->
       <div
         v-if="goldBalance"
-        class="rounded-xl p-5 mb-6 text-[#1a1200]"
+        class="rounded-xl p-5 mb-5 text-[#1a1200]"
         style="background: linear-gradient(135deg, #f5c842 0%, #e5a800 100%)"
         aria-label="Gold Balance"
       >
         <span class="inline-block text-xs font-bold uppercase tracking-wide bg-black/15 rounded px-2 py-0.5 mb-3">
           {{ t('goldAmm.goldBadge') }}
         </span>
-        <div class="flex justify-between items-center mb-1">
-          <span class="font-semibold">{{ t('goldAmm.goldBalance') }}</span>
-          <span class="font-bold text-lg">{{ formatGold(goldBalance.balance) }} XAU</span>
+        <div class="flex flex-wrap gap-x-8 gap-y-1">
+          <div class="flex flex-col">
+            <span class="text-xs font-semibold opacity-70">{{ t('goldAmm.goldBalance') }}</span>
+            <span class="font-bold text-lg">{{ formatGold(goldBalance.balance) }} XAU</span>
+          </div>
+          <div class="flex flex-col">
+            <span class="text-xs font-semibold opacity-70">{{ t('goldAmm.availableGold') }}</span>
+            <span class="font-bold text-[#1a5c00]">{{ formatGold(goldBalance.availableBalance) }} XAU</span>
+          </div>
+          <div v-if="goldBalance.blockedInPools > 0" class="flex flex-col">
+            <span class="text-xs font-semibold opacity-70">{{ t('goldAmm.blockedInPools') }}</span>
+            <span class="font-bold">{{ formatGold(goldBalance.blockedInPools) }} XAU</span>
+          </div>
         </div>
-        <div class="flex justify-between items-center opacity-80 text-sm mb-1">
-          <span class="font-semibold">{{ t('goldAmm.availableGold') }}</span>
-          <span class="font-bold text-[#1a5c00]">{{ formatGold(goldBalance.availableBalance) }} XAU</span>
-        </div>
-        <div v-if="goldBalance.blockedInPools > 0" class="flex justify-between items-center opacity-80 text-sm">
-          <span class="font-semibold">{{ t('goldAmm.blockedInPools') }}</span>
-          <span class="font-bold">{{ formatGold(goldBalance.blockedInPools) }} XAU</span>
+        <div v-if="goldBalance.blockedInPools > 0" class="mt-3 text-xs font-semibold bg-black/15 rounded px-2 py-1.5">
+          ⚠️ {{ t('goldAmm.blockedGoldWarning') }}
         </div>
       </div>
 
-      <!-- ── Swap ─────────────────────────────────────────────────────────── -->
-      <div class="bg-card border border-divider rounded-xl p-6 mb-6" aria-label="Gold Swap">
-        <h3 class="text-base font-semibold text-body mb-4 pb-3 border-b border-divider">
+      <!-- Inner Tab Bar -->
+      <div class="flex flex-wrap gap-2 mb-5" role="tablist" :aria-label="t('goldAmm.title')">
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'swap'"
+          class="amm-tab border rounded-full px-4 py-1.5 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'swap' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'swap'"
+        >
+          {{ t('goldAmm.tabSwap') }}
+        </button>
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'positions'"
+          class="amm-tab border rounded-full px-4 py-1.5 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'positions' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'positions'"
+        >
+          {{ t('goldAmm.tabPositions') }}
+          <span v-if="myPositions.length > 0" class="ml-1 inline-flex items-center justify-center w-4 h-4 text-xs rounded-full bg-good text-white">{{ myPositions.length }}</span>
+        </button>
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'addLiquidity'"
+          class="amm-tab border rounded-full px-4 py-1.5 text-sm font-semibold cursor-pointer transition-colors"
+          :class="activeTab === 'addLiquidity' ? 'bg-brand border-brand text-white' : 'bg-card border-divider text-muted hover:bg-card-raised hover:text-body'"
+          @click="activeTab = 'addLiquidity'"
+        >
+          {{ t('goldAmm.tabAddLiquidity') }}
+        </button>
+      </div>
+
+      <!-- ── Swap Tab ─────────────────────────────────────────────────────── -->
+      <div v-if="activeTab === 'swap'" class="bg-card border border-divider rounded-xl p-6" aria-label="Gold Swap">
+        <h3 class="text-base font-semibold text-body mb-1 pb-3 border-b border-divider">
           {{ t('goldAmm.swapTitle') }}
         </h3>
+        <p class="text-xs text-muted mb-4">{{ t('goldAmm.swapHint') }}</p>
 
-        <!-- Success banner -->
         <div v-if="swapResult" class="bg-good/10 border border-good text-good font-semibold rounded-lg px-4 py-3 mb-4" role="status">
           ✓ {{ t('goldAmm.swapSuccess') }}
-          <span v-if="swapResult.direction === 'FIAT_TO_GOLD'">
-            +{{ formatGold(swapResult.outputAmount) }} XAU
-          </span>
-          <span v-else>
-            +{{ formatFiat(swapResult.outputAmount) }} {{ swapResult.currencyCode }}
-          </span>
+          <span v-if="swapResult.direction === 'FIAT_TO_GOLD'"> +{{ formatGold(swapResult.outputAmount) }} XAU</span>
+          <span v-else> +{{ formatFiat(swapResult.outputAmount) }} {{ swapResult.currencyCode }}</span>
         </div>
 
-        <div class="flex flex-col gap-1.5 mb-4">
-          <label class="text-sm font-medium text-muted">{{ t('goldAmm.direction') }}</label>
-          <select v-model="swapDirection" class="form-select">
-            <option value="FIAT_TO_GOLD">{{ t('goldAmm.fiatToGold') }}</option>
-            <option value="GOLD_TO_FIAT">{{ t('goldAmm.goldToFiat') }}</option>
-          </select>
-        </div>
+        <div class="flex flex-col gap-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium text-muted">{{ t('goldAmm.direction') }}</label>
+              <select v-model="swapDirection" class="form-select">
+                <option value="FIAT_TO_GOLD">{{ t('goldAmm.fiatToGold') }}</option>
+                <option value="GOLD_TO_FIAT">{{ t('goldAmm.goldToFiat') }}</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium text-muted">{{ t('goldAmm.currency') }}</label>
+              <select v-model="swapCurrency" class="form-select">
+                <option v-for="c in availableCurrencies" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </div>
+          </div>
 
-        <div class="flex flex-col gap-1.5 mb-4">
-          <label class="text-sm font-medium text-muted">{{ t('goldAmm.currency') }}</label>
-          <select v-model="swapCurrency" class="form-select">
-            <option v-for="c in availableCurrencies" :key="c" :value="c">{{ c }}</option>
-          </select>
-        </div>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-sm font-medium text-muted">
+              {{ t('goldAmm.amount') }}
+              <span class="text-xs font-normal opacity-70 ml-1">
+                ({{ t('goldAmm.availableGold') }}: {{ formatFiat(swapInputBalance) }}
+                {{ swapDirection === 'FIAT_TO_GOLD' ? swapCurrency : 'XAU' }})
+              </span>
+            </label>
+            <input
+              v-model.number="swapAmount"
+              type="number"
+              min="0"
+              step="any"
+              class="form-input"
+              :placeholder="t('goldAmm.amountPlaceholder')"
+            />
+          </div>
 
-        <div class="flex flex-col gap-1.5 mb-4">
-          <label class="text-sm font-medium text-muted">
-            {{ t('goldAmm.amount') }}
-            <span class="text-xs font-normal opacity-70 ml-1">
-              ({{ t('goldAmm.availableGold') }}: {{ formatFiat(swapInputBalance) }}
-              {{ swapDirection === 'FIAT_TO_GOLD' ? swapCurrency : 'XAU' }})
-            </span>
-          </label>
-          <input
-            v-model.number="swapAmount"
-            type="number"
-            min="0"
-            step="any"
-            class="form-input"
-            :placeholder="t('goldAmm.amountPlaceholder')"
-          />
-        </div>
+          <div v-if="swapQuoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
+            {{ swapQuoteError }}
+          </div>
 
-        <div v-if="swapQuoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md mb-3" role="alert">
-          {{ swapQuoteError }}
-        </div>
-
-        <div v-if="!swapShowConfirm" class="flex gap-3 mt-2">
-          <button
-            class="btn btn-primary"
-            :disabled="swapQuoteLoading || !!swapValidationError || !swapAmount"
-            @click="fetchSwapQuote"
-          >
-            {{ swapQuoteLoading ? t('common.loading') : t('goldAmm.getQuote') }}
-          </button>
+          <div v-if="!swapShowConfirm">
+            <button
+              class="btn btn-primary"
+              :disabled="swapQuoteLoading || !!swapValidationError || !swapAmount"
+              @click="fetchSwapQuote"
+            >
+              {{ swapQuoteLoading ? t('common.loading') : t('goldAmm.getQuote') }}
+            </button>
+          </div>
         </div>
 
         <!-- Quote confirmation -->
         <div
           v-if="swapShowConfirm && swapQuote"
-          class="bg-card-raised border border-divider rounded-lg p-4 mt-4"
+          class="bg-card-raised border border-divider rounded-lg p-4 mt-5"
           role="region"
           aria-label="Swap Quote"
         >
@@ -420,17 +478,13 @@ onMounted(loadData)
               <tr>
                 <td class="py-1.5 text-muted w-[45%]">{{ t('goldAmm.inputAmount') }}</td>
                 <td class="py-1.5 font-semibold text-body">
-                  {{ swapQuote.direction === 'FIAT_TO_GOLD'
-                    ? `${formatFiat(swapQuote.inputAmount)} ${swapQuote.currencyCode}`
-                    : `${formatGold(swapQuote.inputAmount)} XAU` }}
+                  {{ swapQuote.direction === 'FIAT_TO_GOLD' ? `${formatFiat(swapQuote.inputAmount)} ${swapQuote.currencyCode}` : `${formatGold(swapQuote.inputAmount)} XAU` }}
                 </td>
               </tr>
               <tr>
                 <td class="py-1.5 text-muted">{{ t('goldAmm.outputAmount') }}</td>
                 <td class="py-1.5 font-semibold text-good">
-                  {{ swapQuote.direction === 'FIAT_TO_GOLD'
-                    ? `${formatGold(swapQuote.outputAmount)} XAU`
-                    : `${formatFiat(swapQuote.outputAmount)} ${swapQuote.currencyCode}` }}
+                  {{ swapQuote.direction === 'FIAT_TO_GOLD' ? `${formatGold(swapQuote.outputAmount)} XAU` : `${formatFiat(swapQuote.outputAmount)} ${swapQuote.currencyCode}` }}
                 </td>
               </tr>
               <tr>
@@ -443,10 +497,7 @@ onMounted(loadData)
               </tr>
               <tr>
                 <td class="py-1.5 text-muted">{{ t('goldAmm.slippage') }}</td>
-                <td
-                  class="py-1.5 font-semibold"
-                  :class="swapQuote.slippagePercent > 1 ? 'text-bad' : 'text-body'"
-                >
+                <td class="py-1.5 font-semibold" :class="swapQuote.slippagePercent > 1 ? 'text-bad' : 'text-body'">
                   {{ swapQuote.slippagePercent.toFixed(2) }}%
                 </td>
               </tr>
@@ -468,156 +519,185 @@ onMounted(loadData)
         </div>
       </div>
 
-      <!-- ── Liquidity Pools ──────────────────────────────────────────────── -->
-      <div class="bg-card border border-divider rounded-xl p-6 mb-6" aria-label="Liquidity Pools">
-        <h3 class="text-base font-semibold text-body mb-4 pb-3 border-b border-divider">
-          {{ t('goldAmm.liquidityTitle') }}
+      <!-- ── My Positions Tab ─────────────────────────────────────────────── -->
+      <div v-else-if="activeTab === 'positions'" class="bg-card border border-divider rounded-xl p-6" aria-label="My Liquidity Positions">
+        <h3 class="text-base font-semibold text-body mb-1 pb-3 border-b border-divider">
+          {{ t('goldAmm.myPositionsTitle') }}
         </h3>
+        <p class="text-xs text-muted mb-4">{{ t('goldAmm.feeAccrual') }}</p>
 
-        <div v-if="pools.length === 0" class="text-sm text-muted italic py-4">
-          {{ t('goldAmm.noPools') }}
+        <div v-if="myPositions.length === 0" class="py-8 text-center">
+          <p class="text-sm text-muted italic mb-3">{{ t('goldAmm.noPositions') }}</p>
+          <button class="btn btn-primary" @click="activeTab = 'addLiquidity'">
+            {{ t('goldAmm.tabAddLiquidity') }} →
+          </button>
         </div>
-        <div v-else class="flex flex-col gap-4">
+
+        <div v-else class="flex flex-col gap-5">
           <div
-            v-for="pool in pools"
+            v-for="pool in myPositions"
             :key="pool.id"
             class="border border-divider rounded-lg p-4"
           >
-            <div class="flex justify-between items-center mb-2">
+            <div class="flex justify-between items-center mb-3">
               <span class="text-base font-bold text-body">{{ pool.currencyCode }}/XAU</span>
-              <span class="text-xs text-muted">
-                {{ t('goldAmm.poolImpliedPrice') }}: {{ formatFiat(pool.impliedGoldPrice) }} {{ pool.currencyCode }}/XAU
+              <span class="text-xs bg-brand/10 text-brand rounded-full px-2.5 py-0.5 font-semibold">
+                {{ pool.myPosition!.sharePercent.toFixed(2) }}% {{ t('goldAmm.positionShares') }}
               </span>
             </div>
-            <div class="flex gap-6 text-sm text-muted mb-3">
-              <span>{{ pool.currencyCode }}: {{ formatFiat(pool.fiatReserve) }}</span>
-              <span>XAU: {{ formatGold(pool.goldReserve) }}</span>
+
+            <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+              <div>
+                <span class="text-xs text-muted uppercase">{{ pool.currencyCode }} {{ t('goldAmm.poolFiatReserve') }}</span>
+                <div class="font-semibold">{{ formatFiat(pool.fiatReserve) }}</div>
+              </div>
+              <div>
+                <span class="text-xs text-muted uppercase">{{ t('goldAmm.poolGoldReserve') }}</span>
+                <div class="font-semibold">{{ formatGold(pool.goldReserve) }} XAU</div>
+              </div>
+              <div>
+                <span class="text-xs text-muted uppercase">{{ t('goldAmm.impliedPrice') }}</span>
+                <div class="font-semibold">{{ formatFiat(pool.impliedGoldPrice) }} {{ pool.currencyCode }}/XAU</div>
+              </div>
             </div>
 
-            <!-- Player's position -->
-            <div
-              v-if="pool.myPosition"
-              class="bg-[rgba(245,200,66,0.08)] border border-[#f5c842] rounded-lg p-3 mb-3"
-            >
-              <div class="text-xs font-bold uppercase text-[#b45309] mb-1">
-                {{ t('goldAmm.positionShares') }}: {{ pool.myPosition.sharePercent.toFixed(2) }}%
+            <div class="bg-[rgba(245,200,66,0.08)] border border-[#f5c842] rounded-lg p-3 mb-4">
+              <div class="text-xs font-bold uppercase text-[#b45309] mb-2">{{ t('goldAmm.positionClaimable') }}</div>
+              <div class="flex gap-6 text-sm">
+                <div>
+                  <span class="text-muted">{{ pool.currencyCode }}:</span>
+                  <span class="font-semibold ml-1">{{ formatFiat(pool.myPosition!.claimableFiat) }}</span>
+                </div>
+                <div>
+                  <span class="text-muted">XAU:</span>
+                  <span class="font-semibold ml-1">{{ formatGold(pool.myPosition!.claimableGold) }}</span>
+                </div>
               </div>
-              <div class="text-sm text-body mb-3">
-                {{ t('goldAmm.positionClaimable') }}:
-                {{ formatFiat(pool.myPosition.claimableFiat) }} {{ pool.currencyCode }} +
-                {{ formatGold(pool.myPosition.claimableGold) }} XAU
-              </div>
-              <div class="flex flex-col gap-1.5 mb-2">
-                <label class="text-sm font-medium text-muted">{{ t('goldAmm.removeFraction') }}</label>
+              <div class="mt-1 text-xs text-muted">{{ t('goldAmm.claimableHint') }}</div>
+            </div>
+
+            <div class="flex flex-wrap items-end gap-3">
+              <div class="flex flex-col gap-1">
+                <label class="text-xs font-medium text-muted">{{ t('goldAmm.removeFraction') }}</label>
                 <input
                   v-model.number="removeFraction"
                   type="number"
                   min="0.01"
                   max="1"
                   step="0.01"
-                  class="form-input max-w-[160px]"
+                  class="form-input w-28"
                 />
               </div>
-              <div v-if="removeSuccess" class="text-sm text-good my-2">{{ removeSuccess }}</div>
-              <div v-if="removeError" class="text-sm text-bad my-2">{{ removeError }}</div>
               <button
                 class="btn btn-danger"
-                :disabled="removeLoading"
-                @click="removeLiquidity(pool.myPosition.id)"
+                :disabled="removeLoading && removePositionId === pool.myPosition!.id"
+                @click="removeLiquidity(pool.myPosition!.id)"
               >
-                {{ removeLoading ? t('common.loading') : t('goldAmm.removeLiquidity') }}
+                {{ removeLoading && removePositionId === pool.myPosition!.id ? t('common.loading') : t('goldAmm.removeLiquidity') }}
               </button>
             </div>
-
-            <!-- Add liquidity -->
-            <details class="mt-2">
-              <summary class="text-sm text-brand cursor-pointer select-none mb-2">
-                {{ t('goldAmm.addLiquidityTitle') }}
-              </summary>
-              <div class="pt-3 flex flex-col gap-3">
-                <div class="flex flex-col gap-1.5">
-                  <label class="text-sm font-medium text-muted">
-                    {{ t('goldAmm.addLiquidityFiat') }} ({{ pool.currencyCode }})
-                  </label>
-                  <input
-                    v-model.number="addFiatAmount"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="form-input max-w-[160px]"
-                    @focus="addPoolId = pool.id"
-                  />
-                </div>
-                <div class="flex flex-col gap-1.5">
-                  <label class="text-sm font-medium text-muted">{{ t('goldAmm.addLiquidityMaxGold') }}</label>
-                  <input
-                    v-model.number="addMaxGold"
-                    type="number"
-                    min="0"
-                    step="any"
-                    class="form-input max-w-[160px]"
-                  />
-                </div>
-                <div v-if="addSuccess && addPoolId === pool.id" class="text-sm text-good">{{ addSuccess }}</div>
-                <div v-if="addError && addPoolId === pool.id" class="text-sm text-bad">{{ addError }}</div>
-                <button
-                  class="btn btn-primary self-start"
-                  :disabled="addLoading || !addFiatAmount"
-                  @click="addPoolId = pool.id; addLiquidity()"
-                >
-                  {{ addLoading ? t('common.loading') : t('goldAmm.addLiquidity') }}
-                </button>
-              </div>
-            </details>
+            <div v-if="removeSuccess && removePositionId === null" class="text-sm text-good mt-2" role="status">{{ removeSuccess }}</div>
+            <div v-if="removeError && removePositionId === null" class="text-sm text-bad mt-2" role="alert">{{ removeError }}</div>
           </div>
         </div>
       </div>
 
-      <!-- ── Create New Pool ─────────────────────────────────────────────── -->
-      <div class="bg-card border border-divider rounded-xl p-6 mb-6" aria-label="Create Pool">
-        <h3 class="text-base font-semibold text-body mb-4 pb-3 border-b border-divider">
-          {{ t('goldAmm.createPoolTitle') }}
-        </h3>
-        <div class="flex flex-col gap-1.5 mb-4">
-          <label class="text-sm font-medium text-muted">{{ t('goldAmm.createPoolCurrency') }}</label>
-          <select v-model="createCurrency" class="form-select">
-            <option v-for="c in availableCurrencies" :key="c" :value="c">{{ c }}</option>
-          </select>
+      <!-- ── Add Liquidity Tab ────────────────────────────────────────────── -->
+      <div v-else-if="activeTab === 'addLiquidity'" class="flex flex-col gap-5" aria-label="Add Liquidity">
+
+        <!-- Add to existing pool -->
+        <div v-if="pools.length > 0" class="bg-card border border-divider rounded-xl p-6">
+          <h3 class="text-base font-semibold text-body mb-1 pb-3 border-b border-divider">
+            {{ t('goldAmm.addLiquidityTitle') }}
+          </h3>
+          <p class="text-xs text-muted mb-4">{{ t('goldAmm.addLiquidityHint') }}</p>
+
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium text-muted">{{ t('goldAmm.addLiquidityPool') }}</label>
+              <select v-model="addPoolId" class="form-select">
+                <option v-for="p in pools" :key="p.id" :value="p.id">
+                  {{ p.currencyCode }}/XAU — {{ formatFiat(p.fiatReserve) }} {{ p.currencyCode }} + {{ formatGold(p.goldReserve) }} XAU
+                </option>
+              </select>
+            </div>
+
+            <div v-if="selectedAddPool" class="text-xs text-muted rounded-lg border border-divider bg-card-raised px-3 py-2">
+              {{ t('goldAmm.impliedPrice') }}: {{ formatFiat(selectedAddPool.impliedGoldPrice) }} {{ selectedAddPool.currencyCode }}/XAU
+              <span v-if="selectedAddPool.myPosition"> · {{ t('goldAmm.positionShares') }}: {{ selectedAddPool.myPosition.sharePercent.toFixed(2) }}%</span>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-muted">
+                  {{ t('goldAmm.addLiquidityFiat') }}<span v-if="selectedAddPool"> ({{ selectedAddPool.currencyCode }})</span>
+                </label>
+                <input v-model.number="addFiatAmount" type="number" min="0" step="any" class="form-input" :placeholder="t('goldAmm.amountPlaceholder')" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-muted">{{ t('goldAmm.addLiquidityMaxGold') }}</label>
+                <input v-model.number="addMaxGold" type="number" min="0" step="any" class="form-input" :placeholder="t('goldAmm.amountPlaceholder')" />
+              </div>
+            </div>
+
+            <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">
+              ⚠️ {{ t('goldAmm.blockedGoldWarning') }}
+            </div>
+
+            <div v-if="addSuccess" class="text-sm text-good" role="status">{{ addSuccess }}</div>
+            <div v-if="addError" class="text-sm text-bad" role="alert">{{ addError }}</div>
+
+            <div>
+              <button class="btn btn-primary" :disabled="addLoading || !addFiatAmount || !addPoolId" @click="addLiquidity">
+                {{ addLoading ? t('common.loading') : t('goldAmm.addLiquidity') }}
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="flex flex-col gap-1.5 mb-4">
-          <label class="text-sm font-medium text-muted">
-            {{ t('goldAmm.createPoolFiat') }} ({{ createCurrency }})
-          </label>
-          <input
-            v-model.number="createFiatAmount"
-            type="number"
-            min="0"
-            step="any"
-            class="form-input"
-            :placeholder="t('goldAmm.amountPlaceholder')"
-          />
+
+        <!-- Create new pool -->
+        <div v-if="showCreateForm" class="bg-card border border-divider rounded-xl p-6">
+          <h3 class="text-base font-semibold text-body mb-1 pb-3 border-b border-divider">
+            {{ t('goldAmm.createPoolTitle') }}
+          </h3>
+          <p class="text-xs text-muted mb-4">{{ t('goldAmm.createPoolHint') }}</p>
+
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-1.5">
+              <label class="text-sm font-medium text-muted">{{ t('goldAmm.createPoolCurrency') }}</label>
+              <select v-model="createCurrency" class="form-select">
+                <option v-for="c in availableCurrencies" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-muted">{{ t('goldAmm.createPoolFiat') }} ({{ createCurrency }})</label>
+                <input v-model.number="createFiatAmount" type="number" min="0" step="any" class="form-input" :placeholder="t('goldAmm.amountPlaceholder')" />
+              </div>
+              <div class="flex flex-col gap-1.5">
+                <label class="text-sm font-medium text-muted">{{ t('goldAmm.createPoolGold') }}</label>
+                <input v-model.number="createGoldAmount" type="number" min="0" step="any" class="form-input" :placeholder="t('goldAmm.amountPlaceholder')" />
+              </div>
+            </div>
+
+            <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">
+              ⚠️ {{ t('goldAmm.blockedGoldWarning') }}
+            </div>
+
+            <div v-if="createSuccess" class="text-sm text-good" role="status">{{ createSuccess }}</div>
+            <div v-if="createError" class="text-sm text-bad" role="alert">{{ createError }}</div>
+
+            <div>
+              <button class="btn btn-primary" :disabled="createLoading || !createFiatAmount || !createGoldAmount" @click="createPool">
+                {{ createLoading ? t('common.loading') : t('goldAmm.createPool') }}
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="flex flex-col gap-1.5 mb-4">
-          <label class="text-sm font-medium text-muted">{{ t('goldAmm.createPoolGold') }}</label>
-          <input
-            v-model.number="createGoldAmount"
-            type="number"
-            min="0"
-            step="any"
-            class="form-input"
-            :placeholder="t('goldAmm.amountPlaceholder')"
-          />
-        </div>
-        <div v-if="createSuccess" class="text-sm text-good mb-3" role="status">{{ createSuccess }}</div>
-        <div v-if="createError" class="text-sm text-bad mb-3" role="alert">{{ createError }}</div>
-        <div class="flex gap-3 mt-2">
-          <button
-            class="btn btn-primary"
-            :disabled="createLoading || !createFiatAmount || !createGoldAmount"
-            @click="createPool"
-          >
-            {{ createLoading ? t('common.loading') : t('goldAmm.createPool') }}
-          </button>
+
+        <div v-if="pools.length === 0 && !showCreateForm" class="text-center py-8 text-muted italic text-sm">
+          {{ t('goldAmm.noPools') }}
         </div>
       </div>
     </template>

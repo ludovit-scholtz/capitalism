@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { setupMockApi, makePlayer } from './helpers/mock-api'
+import type { MockGoldAmmPool } from './helpers/mock-api'
 
 // ── Forex Exchange page ───────────────────────────────────────────────────────
 
@@ -600,5 +601,271 @@ test.describe('Forex Exchange page', () => {
 
     await expect(page.getByText('Mid rate')).toBeVisible()
     await expect(page.getByText('After 1% fee')).toBeVisible()
+  })
+
+  // ── Gold AMM tab ──────────────────────────────────────────────────────────
+
+  test('shows Gold AMM tab and navigates to it', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 5.0, blockedInPools: 0, availableBalance: 5.0 }
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex')
+
+    await page.getByRole('tab', { name: 'Gold AMM' }).click()
+
+    await expect(page.getByRole('heading', { name: '🥇 Gold Token Exchange (AMM)' })).toBeVisible()
+    await expect(page.getByText('XAU Gold', { exact: true })).toBeVisible()
+  })
+
+  test('Gold AMM swap tab shows direction and currency selectors', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 2.5, blockedInPools: 0, availableBalance: 2.5 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-eur', currencyCode: 'EUR', currencySymbol: '€',
+        fiatReserve: 10000, goldReserve: 5.0, totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000, myPosition: null,
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    const swapPanel = page.locator('[aria-label="Gold Swap"]')
+    // Two selects: direction and currency
+    await expect(swapPanel.locator('select').first()).toBeVisible()
+    await expect(swapPanel.locator('select').nth(1)).toBeVisible()
+  })
+
+  test('Gold AMM My Positions tab shows empty state and CTA when no positions', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 0, blockedInPools: 0, availableBalance: 0 }
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    // Navigate to positions sub-tab
+    await page.getByRole('tab', { name: 'My Positions' }).click()
+
+    await expect(page.locator('[aria-label="My Liquidity Positions"]')).toBeVisible()
+    await expect(page.getByText('You have no open liquidity positions.')).toBeVisible()
+    // CTA button to add liquidity
+    await expect(page.getByRole('button', { name: /Add Liquidity/ })).toBeVisible()
+  })
+
+  test('Gold AMM My Positions tab shows existing position with share percentage', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 3.0, blockedInPools: 1.0, availableBalance: 2.0 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-czk', currencyCode: 'CZK', currencySymbol: 'Kč',
+        fiatReserve: 50000, goldReserve: 2.0, totalLiquidityShares: 500,
+        impliedGoldPrice: 25000,
+        myPosition: {
+          id: 'pos-czk-1', poolId: 'pool-czk', currencyCode: 'CZK',
+          liquidityShares: 250, sharePercent: 50,
+          claimableFiat: 12.5, claimableGold: 0.0005,
+          fiatProvided: 25000, goldProvided: 1.0,
+        },
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    await page.getByRole('tab', { name: 'My Positions' }).click()
+
+    // Position card visible
+    await expect(page.locator('[aria-label="My Liquidity Positions"]').getByText('CZK/XAU', { exact: true })).toBeVisible()
+    await expect(page.getByText('50.00% Your share')).toBeVisible()
+    // Claimable fees section visible
+    await expect(page.getByText('Claimable', { exact: true })).toBeVisible()
+    // Remove button visible
+    await expect(page.getByRole('button', { name: 'Remove' })).toBeVisible()
+  })
+
+  test('Gold AMM blocked gold shows warning in gold balance card', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 5.0, blockedInPools: 2.0, availableBalance: 3.0 }
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    const goldCard = page.locator('[aria-label="Gold Balance"]')
+    await expect(goldCard).toBeVisible()
+    await expect(goldCard.getByText('Locked in pools', { exact: true })).toBeVisible()
+    // Blocked warning message visible
+    await expect(goldCard.getByText(/Some of your gold is locked/)).toBeVisible()
+  })
+
+  test('Gold AMM Add Liquidity tab shows pool selector when pools exist', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 10.0, blockedInPools: 0, availableBalance: 10.0 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-eur-add', currencyCode: 'EUR', currencySymbol: '€',
+        fiatReserve: 20000, goldReserve: 10.0, totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000, myPosition: null,
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    await page.getByRole('tab', { name: 'Add Liquidity' }).click()
+
+    const addSection = page.locator('[aria-label="Add Liquidity"]')
+    await expect(addSection).toBeVisible()
+    await expect(addSection.getByText('Add Liquidity').first()).toBeVisible()
+    // Pool selector shows the EUR/XAU pool
+    await expect(addSection.locator('select').first()).toBeVisible()
+    await expect(addSection.locator('select').filter({ hasText: 'EUR/XAU' })).toBeVisible()
+  })
+
+  test('Gold AMM Add Liquidity succeeds and shows success message', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.playerCurrencyBalances = [
+      { currencyCode: 'EUR', currencySymbol: '€', balance: 50000 },
+    ]
+    state.goldBalance = { balance: 10.0, blockedInPools: 0, availableBalance: 10.0 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-eur-liq', currencyCode: 'EUR', currencySymbol: '€',
+        fiatReserve: 40000, goldReserve: 20.0, totalLiquidityShares: 2000,
+        impliedGoldPrice: 2000, myPosition: null,
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    await page.getByRole('tab', { name: 'Add Liquidity' }).click()
+
+    const addSection = page.locator('[aria-label="Add Liquidity"]')
+    await addSection.locator('select').filter({ hasText: 'EUR/XAU' }).selectOption('pool-eur-liq')
+
+    const inputs = addSection.locator('input[type="number"]')
+    await inputs.nth(0).fill('2000')
+    await inputs.nth(1).fill('1.0')
+
+    await addSection.getByRole('button', { name: 'Add Liquidity' }).click()
+
+    // After successful add, navigate to My Positions to confirm the position was created
+    await page.getByRole('tab', { name: 'My Positions' }).click()
+    await expect(page.locator('[aria-label="My Liquidity Positions"]').getByText('EUR/XAU', { exact: true })).toBeVisible()
+  })
+
+  test('Gold AMM blocked-funds rejection: locked gold shows warning when adding liquidity', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // All gold is locked — none available for adding liquidity
+    state.goldBalance = { balance: 5.0, blockedInPools: 5.0, availableBalance: 0 }
+    state.goldAmmPools = [
+      {
+        id: 'pool-eur-blocked', currencyCode: 'EUR', currencySymbol: '€',
+        fiatReserve: 10000, goldReserve: 5.0, totalLiquidityShares: 1000,
+        impliedGoldPrice: 2000, myPosition: null,
+      } satisfies MockGoldAmmPool,
+    ]
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    await page.getByRole('tab', { name: 'Add Liquidity' }).click()
+
+    const addSection = page.locator('[aria-label="Add Liquidity"]')
+    // Warning about blocked gold is visible (first occurrence in the locked gold header section)
+    await expect(addSection.locator('[role="note"]').first()).toBeVisible()
+    await expect(addSection.locator('[role="note"]').first()).toContainText('Some of your gold is locked')
+  })
+
+  test('Gold AMM Create Pool form shown when no pools exist', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 10.0, blockedInPools: 0, availableBalance: 10.0 }
+    // No pools exist
+    state.goldAmmPools = []
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    await page.getByRole('tab', { name: 'Add Liquidity' }).click()
+
+    const addSection = page.locator('[aria-label="Add Liquidity"]')
+    await expect(addSection.getByText('Create New Pool')).toBeVisible()
+    await expect(addSection.getByRole('button', { name: 'Create Pool' })).toBeVisible()
+  })
+
+  test('Gold AMM inner tabs switch correctly', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.goldBalance = { balance: 0, blockedInPools: 0, availableBalance: 0 }
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/forex?tab=gold')
+
+    // Default: AMM Swap tab
+    await expect(page.getByRole('tab', { name: 'AMM Swap' })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('[aria-label="Gold Swap"]')).toBeVisible()
+
+    // Switch to My Positions
+    await page.getByRole('tab', { name: 'My Positions' }).click()
+    await expect(page.locator('[aria-label="My Liquidity Positions"]')).toBeVisible()
+
+    // Switch to Add Liquidity
+    await page.getByRole('tab', { name: 'Add Liquidity' }).click()
+    await expect(page.locator('[aria-label="Add Liquidity"]')).toBeVisible()
+
+    // Switch back to AMM Swap
+    await page.getByRole('tab', { name: 'AMM Swap' }).click()
+    await expect(page.locator('[aria-label="Gold Swap"]')).toBeVisible()
   })
 })
