@@ -3730,6 +3730,9 @@ export function useBuildingDetail() {
               contentBudgetPerTick
               isSuspendedForFunds
               suspendedReason
+              cityReferenceRentPerSqm
+              adjustedMarketRentPerSqm
+              populationIndex
               units {
                 id
                 buildingId

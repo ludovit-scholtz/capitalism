@@ -163,10 +163,12 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
       </div>
 
       <div class="main-content">
-        <BuildingUnitGrid />
-        <BuildingEditingSidebar v-if="showEditingSidebar" />
-        <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
-        <BuildingOverviewSidebar v-if="showOverviewSidebar" />
+        <template v-if="building.type !== 'APARTMENT' && building.type !== 'COMMERCIAL'">
+          <BuildingUnitGrid />
+          <BuildingEditingSidebar v-if="showEditingSidebar" />
+          <BuildingReadonlySidebar v-else-if="showReadonlySidebar" />
+          <BuildingOverviewSidebar v-if="showOverviewSidebar" />
+        </template>
       </div>
     </template>
   </div>
