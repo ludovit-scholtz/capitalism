@@ -41,6 +41,11 @@ const rentVsMarketPct = computed(() => {
   if (priceRatio.value === null) return null
   return ((priceRatio.value - 1) * 100).toFixed(0)
 })
+
+/** Narrowed type for the RentReferenceChart component (avoids template-level `|` pipe). */
+const propertyBuildingType = computed((): 'APARTMENT' | 'COMMERCIAL' => {
+  return (building.value?.type === 'COMMERCIAL' ? 'COMMERCIAL' : 'APARTMENT')
+})
 </script>
 
 <template>
@@ -170,7 +175,7 @@ const rentVsMarketPct = computed(() => {
       :city-reference-rent-per-sqm="building.cityReferenceRentPerSqm"
       :adjusted-market-rent-per-sqm="building.adjustedMarketRentPerSqm"
       :current-rent-per-sqm="building.pricePerSqm ?? null"
-      :building-type="building.type as 'APARTMENT' | 'COMMERCIAL'"
+      :building-type="propertyBuildingType"
       :format-currency="formatCurrency"
     />
 
