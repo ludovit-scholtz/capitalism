@@ -271,7 +271,14 @@ async function fundBuildingAccount() {
     return
   }
 
-  const amount = Number.parseFloat(fundAmount.value)
+  const normalizedAmount = fundAmount.value.trim()
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedAmount)) {
+    fundError.value = t('buildingBankAccount.fundInvalidAmount')
+    fundSuccess.value = null
+    return
+  }
+
+  const amount = Number(normalizedAmount)
   if (!Number.isFinite(amount) || amount <= 0) {
     fundError.value = t('buildingBankAccount.fundInvalidAmount')
     fundSuccess.value = null
@@ -413,7 +420,7 @@ watch(
               :placeholder="t('buildingBankAccount.fundAmountPlaceholder')"
               :aria-label="t('buildingBankAccount.fundAmountLabel')"
             />
-            <button class="btn btn-secondary btn-sm" :disabled="fundLoading" @click="fundBuildingAccount">
+            <button type="button" class="btn btn-secondary btn-sm" :disabled="fundLoading" @click.stop.prevent="fundBuildingAccount">
               {{ fundLoading ? t('common.loading') : t('buildingBankAccount.fundSubmit') }}
             </button>
           </div>

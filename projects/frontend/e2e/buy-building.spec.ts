@@ -26,34 +26,6 @@ test.describe('Buy Building View', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    state.myBankAccounts = [
-      {
-        id: 'financial-group-bank-account',
-        accountNumber: '4000000000000001',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        balance: 50_000_000,
-        companyId: 'company-1',
-        companyName: 'Financial Group',
-        ownerType: 'COMPANY',
-        ownerDisplayName: 'Financial Group',
-        cityId: 'city-ba',
-      },
-    ]
-    state.myBankAccounts = [
-      {
-        id: 'company-1-eur-bank',
-        accountNumber: '4000000000000001',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        balance: 50_000_000,
-        companyId: 'company-1',
-        companyName: 'Financial Group',
-        ownerType: 'COMPANY',
-        ownerDisplayName: 'Financial Group',
-        cityId: 'city-ba',
-      },
-    ]
 
     await authenticate(page, player.id)
     await page.goto('/buy-building/company-1')
@@ -86,34 +58,6 @@ test.describe('Buy Building View', () => {
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
     state.currentToken = `token-${player.id}`
-    state.myBankAccounts = [
-      {
-        id: 'banking-corp-bank-account',
-        accountNumber: '4000000000000002',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        balance: 50_000_000,
-        companyId: 'company-1',
-        companyName: 'Banking Corp',
-        ownerType: 'COMPANY',
-        ownerDisplayName: 'Banking Corp',
-        cityId: 'city-ba',
-      },
-    ]
-    state.myBankAccounts = [
-      {
-        id: 'company-1-eur-bank',
-        accountNumber: '4000000000000002',
-        currencyCode: 'EUR',
-        currencySymbol: '€',
-        balance: 50_000_000,
-        companyId: 'company-1',
-        companyName: 'Banking Corp',
-        ownerType: 'COMPANY',
-        ownerDisplayName: 'Banking Corp',
-        cityId: 'city-ba',
-      },
-    ]
 
     await authenticate(page, player.id)
     await page.goto('/buy-building/company-1')
