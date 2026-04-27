@@ -480,3 +480,194 @@ test.describe('Forex page bank statement link', () => {
     await expect(stmtLink).toContainText('View Bank Statement')
   })
 })
+
+// ── Opening capital entries (FOUNDER_CONTRIBUTION + IPO_RAISE) ────────────────
+
+test.describe('Opening capital bank statement entries', () => {
+  test('EUR city: shows FOUNDER_CONTRIBUTION and IPO_RAISE rows in bank statement', async ({
+    page,
+  }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
+
+    const foundedAt = new Date().toISOString()
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-ipo',
+        recordedAtTick: 1,
+        recordedAtUtc: foundedAt,
+        description: 'IPO public shareholder investment: 400,000 EUR raised (50% founder equity)',
+        category: 'IPO_RAISE',
+        amount: 400000,
+        runningBalance: 600000,
+        buildingId: null,
+        buildingName: null,
+      },
+      {
+        id: 'row-founder',
+        recordedAtTick: 1,
+        recordedAtUtc: foundedAt,
+        description: 'Founder contribution: 200,000 EUR government starter deposit',
+        category: 'FOUNDER_CONTRIBUTION',
+        amount: 200000,
+        runningBalance: 200000,
+        buildingId: null,
+        buildingName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${ACCOUNT_ID}`)
+
+    const rows = page.locator('.statement-row')
+    await expect(rows).toHaveCount(2)
+
+    // IPO_RAISE row — credit, positive amount
+    const ipoRow = rows.first()
+    await expect(ipoRow.locator('.credit-cell')).toContainText('400,000')
+    await expect(ipoRow).toContainText('IPO Investment')
+    await expect(ipoRow).toContainText('IPO public shareholder investment')
+
+    // FOUNDER_CONTRIBUTION row — credit, positive amount
+    const founderRow = rows.nth(1)
+    await expect(founderRow.locator('.credit-cell')).toContainText('200,000')
+    await expect(founderRow).toContainText('Founder Contribution')
+    await expect(founderRow).toContainText('government starter deposit')
+  })
+
+  test('non-EUR city (CZK): opening capital entries show FX-converted amounts and CZK description', async ({
+    page,
+  }) => {
+    const player = makePlayerWithCompany()
+    // Swap the company to a CZK city
+    player.companies[0]!.cash = 17244000
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    // Prague CZK bank account
+    state.myBankAccounts = [
+      {
+        id: 'account-czk-open',
+        accountNumber: '3333444455556666',
+        currencyCode: 'CZK',
+        currencySymbol: 'Kč',
+        balance: 17244000,
+        companyId: COMPANY_ID,
+        companyName: 'Test Trading Co.',
+        ownerType: 'COMPANY',
+        ownerDisplayName: 'Test Trading Co.',
+        cityId: 'city-pr',
+      },
+    ]
+
+    const foundedAt = new Date().toISOString()
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-ipo-czk',
+        recordedAtTick: 1,
+        recordedAtUtc: foundedAt,
+        description:
+          'IPO public shareholder investment: 400,000 EUR → 11,496,000 CZK (50% founder equity, FX 28.7400)',
+        category: 'IPO_RAISE',
+        amount: 11496000,
+        runningBalance: 17244000,
+        buildingId: null,
+        buildingName: null,
+      },
+      {
+        id: 'row-founder-czk',
+        recordedAtTick: 1,
+        recordedAtUtc: foundedAt,
+        description: 'Founder contribution: 200,000 EUR → 5,748,000 CZK (FX 28.7400)',
+        category: 'FOUNDER_CONTRIBUTION',
+        amount: 5748000,
+        runningBalance: 5748000,
+        buildingId: null,
+        buildingName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/account-czk-open`)
+
+    const rows = page.locator('.statement-row')
+    await expect(rows).toHaveCount(2)
+
+    // IPO_RAISE row — CZK amount
+    const ipoRow = rows.first()
+    await expect(ipoRow.locator('.credit-cell')).toContainText('11,496,000')
+    await expect(ipoRow).toContainText('IPO Investment')
+    await expect(ipoRow).toContainText('CZK')
+    await expect(ipoRow).toContainText('FX')
+
+    // FOUNDER_CONTRIBUTION row — CZK amount with FX description
+    const founderRow = rows.nth(1)
+    await expect(founderRow.locator('.credit-cell')).toContainText('5,748,000')
+    await expect(founderRow).toContainText('Founder Contribution')
+    await expect(founderRow).toContainText('CZK')
+    await expect(founderRow).toContainText('FX')
+  })
+
+  test('opening capital rows are both shown as credits (+)', async ({ page }) => {
+    const player = makePlayerWithCompany()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    seedBankAccounts(state, player.id)
+
+    const now = new Date().toISOString()
+    state.bankStatementRows[COMPANY_ID] = [
+      {
+        id: 'row-ipo',
+        recordedAtTick: 1,
+        recordedAtUtc: now,
+        description: 'IPO public shareholder investment: 400,000 EUR raised (50% founder equity)',
+        category: 'IPO_RAISE',
+        amount: 400000,
+        runningBalance: 600000,
+        buildingId: null,
+        buildingName: null,
+      },
+      {
+        id: 'row-founder',
+        recordedAtTick: 1,
+        recordedAtUtc: now,
+        description: 'Founder contribution: 200,000 EUR government starter deposit',
+        category: 'FOUNDER_CONTRIBUTION',
+        amount: 200000,
+        runningBalance: 200000,
+        buildingId: null,
+        buildingName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/bank-statement/${ACCOUNT_ID}`)
+
+    const rows = page.locator('.statement-row')
+    await expect(rows).toHaveCount(2)
+
+    // Both rows must be credits — credit-cell has amount, debit-cell shows dash
+    for (let i = 0; i < 2; i++) {
+      const row = rows.nth(i)
+      await expect(row.locator('.credit-cell .empty-cell-dash')).toHaveCount(0)
+      await expect(row.locator('.debit-cell .empty-cell-dash')).toBeVisible()
+    }
+  })
+})
