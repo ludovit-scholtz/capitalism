@@ -131,7 +131,7 @@ const cityRateBoard = computed<CityRateRow[]>(() => {
 const rateUpdateDate = computed<string>(() => {
   const dates = rates.value.map((r) => r.rateDate).filter(Boolean)
   if (dates.length === 0) return ''
-  return dates.reduce((latest, d) => (d > latest ? d : latest), dates[0] ?? '')
+  return dates.reduce((latest, d) => (d > latest ? d : latest), dates[0]!)
 })
 
 // Derived list of available currencies (EUR + all quoted currencies)
@@ -463,8 +463,7 @@ function formatAmount(val: number): string {
 /**
  * Format an FX cross rate with adaptive precision:
  * - Very small rates (< 0.01): up to 6 decimal places
- * - Small rates (< 1): 4 decimal places
- * - Larger rates: 4 decimal places
+ * - All other rates: 2-4 decimal places
  */
 function formatRate(val: number): string {
   if (val < 0.01) return val.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 6 })
