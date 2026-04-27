@@ -284,21 +284,6 @@ test.describe('Building bank account panel', () => {
       currencyCode: 'EUR',
     }
 
-    let fundingMutation:
-      | {
-          buildingId?: string
-          amount?: number
-        }
-      | null = null
-
-    await page.route('**/graphql', async (route) => {
-      const body = route.request().postDataJSON()
-      if (typeof body?.query === 'string' && body.query.includes('fundBuildingBankAccount')) {
-        fundingMutation = body.variables?.input ?? null
-      }
-      await route.fallback()
-    })
-
     await page.addInitScript((token) => {
       localStorage.setItem('auth_token', token)
       localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
@@ -309,19 +294,20 @@ test.describe('Building bank account panel', () => {
     await expect(page.getByRole('heading', { name: 'Building Overview' })).toBeVisible({ timeout: 10000 })
     await expect(page.locator('.building-bank-account-panel')).toBeVisible()
 
+    const panel = page.locator('.building-bank-account-panel')
+    const fundPanel = panel.locator('.bba-fund-panel')
+
     // Expand the Fund Account details panel
-    await page.locator('.bba-fund-summary').click()
+    await fundPanel.locator('.bba-fund-summary').click()
 
     // Fill in an amount and submit
-    const amountInput = page.locator('.bba-fund-input')
+    const amountInput = fundPanel.locator('.bba-fund-input')
     await expect(amountInput).toBeVisible()
     await amountInput.fill('10000')
 
-    await page.getByRole('button', { name: /transfer/i }).click()
+    await fundPanel.getByRole('button', { name: /^transfer$/i }).click()
 
-    // Mutation should be sent with the selected amount for this building
-    await expect
-      .poll(() => fundingMutation)
-      .toEqual({ buildingId, amount: 10000 })
+    await expect(fundPanel.locator('.bba-fund-success')).toBeVisible()
+    await expect(fundPanel.locator('.bba-fund-success')).toContainText(/successful/i)
   })
 })

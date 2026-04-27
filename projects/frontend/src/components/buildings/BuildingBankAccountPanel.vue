@@ -34,7 +34,7 @@ const createLoading = ref(false)
 const assignmentError = ref<string | null>(null)
 const assignmentSuccess = ref<string | null>(null)
 const isFundPanelOpen = ref(false)
-const fundAmount = ref('')
+const fundAmount = ref<string | number>('')
 const fundLoading = ref(false)
 const fundError = ref<string | null>(null)
 const fundSuccess = ref<string | null>(null)
@@ -271,7 +271,8 @@ async function fundBuildingAccount() {
     return
   }
 
-  const normalizedAmount = fundAmount.value.trim()
+  const rawAmount = fundAmount.value
+  const normalizedAmount = typeof rawAmount === 'number' ? String(rawAmount) : rawAmount.trim()
   if (!/^\d+(?:\.\d{1,2})?$/.test(normalizedAmount)) {
     fundError.value = t('buildingBankAccount.fundInvalidAmount')
     fundSuccess.value = null

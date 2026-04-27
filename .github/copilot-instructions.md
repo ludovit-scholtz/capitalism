@@ -1123,6 +1123,19 @@ Root-cause of repeated visual regressions (April 2026, landing/auth/forex spacin
 **Rules to prevent recurrence:**
 1. **For any new or migrated frontend page, read and follow `projects/frontend/docs/design-patterns.md` first.** Treat it as the default contract for page shells, cards, heroes, forms, and tables.
 2. **Use the 8px spacing rhythm consistently.** Default to Tailwind values that map cleanly to the scale: `gap-2/3/4/6/8/10/12`, `px-4/6/8`, `py-4/5/6/8/10/12/16/20`.
+
+## Number-input v-models in Vue forms — never assume `.trim()` is safe
+
+Root-cause of a Playwright failure (April 2026, PR #130 / building bank-account funding):
+- `BuildingBankAccountPanel.vue` used `<input type="number" v-model="fundAmount">` and later assumed `fundAmount.value` was always a string by calling `.trim()`.
+- In the production-built browser flow, the number input model could be a numeric value, so clicking **Transfer** threw `TypeError: ...trim is not a function` before the GraphQL mutation was sent.
+- The E2E test first looked like a mock-route or selector problem because the button was visible and active, but a temporary debug spec exposed the runtime error and showed the success flow worked once the input was normalized safely.
+
+**Rules to prevent recurrence:**
+1. **For any Vue `v-model` bound to `<input type="number">`, type the ref as `string | number` (or normalize immediately) and never call string-only methods like `.trim()` without a type check.**
+2. **Normalize numeric form values with `typeof value === 'number' ? String(value) : value.trim()` before validation/parsing.**
+3. **When a Playwright form-submit test shows a visible enabled button but no network request is sent, check for `pageerror` / browser console runtime errors before blaming selectors or mock routes.**
+4. **Prefer stable E2E assertions on the panel-scoped control and visible post-submit outcome** (for example a success status inside the funding panel) instead of relying on unscoped repeated button labels elsewhere on the page.
 3. **Every page under the sticky header must create explicit top breathing room.** The default page shell is `pt-6 lg:pt-8` with `pb-16 lg:pb-20` and an inner stack of `gap-10 lg:gap-12`.
 4. **Let the parent own layout rhythm.** Do not rebuild page spacing with scattered child `mb-*` and `mt-*` utilities when a parent `gap-*` or section shell can express the structure more clearly.
 5. **Primary data tables must live inside a table shell with wide gutters.** Default primary-table header/cell spacing is `px-8 py-5`; the first column must never visually touch the card edge.
