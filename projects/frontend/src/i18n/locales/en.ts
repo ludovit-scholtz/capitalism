@@ -2402,6 +2402,8 @@ export default {
       centralBankRepay: 'CB Repay',
       stockPurchase: 'Stock Purchase',
       stockSale: 'Stock Sale',
+      founderContribution: 'Founder Contribution',
+      ipoRaise: 'IPO Investment',
     },
   },
   goldAmm: {

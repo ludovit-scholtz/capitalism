@@ -2399,6 +2399,8 @@ export default {
       centralBankRepay: 'ZB-Rückzahlung',
       stockPurchase: 'Aktienkauf',
       stockSale: 'Aktienverkauf',
+      founderContribution: 'Gründerbeitrag',
+      ipoRaise: 'IPO-Investment',
     },
   },
   goldAmm: {

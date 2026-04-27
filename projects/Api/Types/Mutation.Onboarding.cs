@@ -144,6 +144,36 @@ public sealed partial class Mutation
             httpContextAccessor.HttpContext!.RequestAborted);
         fundingAccount.Balance += founderContributionLocal + ipoRaiseLocal;
         await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
+
+        // Record the two opening capital events in the company ledger so the bank statement
+        // shows a clear audit trail: government starter deposit and IPO public investment.
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = fundingAccount.Id,
+            Category = LedgerCategory.FounderContribution,
+            Description = city.CurrencyCode == "EUR"
+                ? $"Founder contribution: {StarterFounderContribution:N0} EUR government starter deposit"
+                : $"Founder contribution: {StarterFounderContribution:N0} EUR → {founderContributionLocal:N0} {city.CurrencyCode} (FX {fxRate:F4})",
+            Amount = founderContributionLocal,
+            RecordedAtTick = company.FoundedAtTick,
+            RecordedAtUtc = nowUtc,
+        });
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = fundingAccount.Id,
+            Category = LedgerCategory.IpoRaise,
+            Description = city.CurrencyCode == "EUR"
+                ? $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR raised ({ipoSelection.FounderOwnershipRatio:P0} founder equity)"
+                : $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR → {ipoRaiseLocal:N0} {city.CurrencyCode} ({ipoSelection.FounderOwnershipRatio:P0} founder equity, FX {fxRate:F4})",
+            Amount = ipoRaiseLocal,
+            RecordedAtTick = company.FoundedAtTick,
+            RecordedAtUtc = nowUtc,
+        });
+
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = company.Id;
         db.Shareholdings.Add(new Shareholding
@@ -304,6 +334,36 @@ public sealed partial class Mutation
             httpContextAccessor.HttpContext!.RequestAborted);
         fundingAccount.Balance += founderContributionLocal + ipoRaiseLocal;
         await PersonalBankAccountService.DebitTrackedGrossCashAsync(db, player, StarterFounderContribution, httpContextAccessor.HttpContext!.RequestAborted);
+
+        // Record the two opening capital events in the company ledger so the bank statement
+        // shows a clear audit trail: government starter deposit and IPO public investment.
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = fundingAccount.Id,
+            Category = LedgerCategory.FounderContribution,
+            Description = city.CurrencyCode == "EUR"
+                ? $"Founder contribution: {StarterFounderContribution:N0} EUR government starter deposit"
+                : $"Founder contribution: {StarterFounderContribution:N0} EUR → {founderContributionLocal:N0} {city.CurrencyCode} (FX {fxRate:F4})",
+            Amount = founderContributionLocal,
+            RecordedAtTick = company.FoundedAtTick,
+            RecordedAtUtc = nowUtc,
+        });
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = fundingAccount.Id,
+            Category = LedgerCategory.IpoRaise,
+            Description = city.CurrencyCode == "EUR"
+                ? $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR raised ({ipoSelection.FounderOwnershipRatio:P0} founder equity)"
+                : $"IPO public shareholder investment: {ipoSelection.RaiseTarget:N0} EUR → {ipoRaiseLocal:N0} {city.CurrencyCode} ({ipoSelection.FounderOwnershipRatio:P0} founder equity, FX {fxRate:F4})",
+            Amount = ipoRaiseLocal,
+            RecordedAtTick = company.FoundedAtTick,
+            RecordedAtUtc = nowUtc,
+        });
+
         player.ActiveAccountType = AccountContextType.Company;
         player.ActiveCompanyId = company.Id;
         db.Shareholdings.Add(new Shareholding

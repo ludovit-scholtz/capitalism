@@ -5963,6 +5963,144 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.Equal(0m, afterResult.GetProperty("data").GetProperty("personAccount").GetProperty("personalCash").GetDecimal());
     }
 
+    [Fact]
+    public async Task StartOnboardingCompany_CreatesFounderContributionAndIpoRaiseLedgerEntries_EurCity()
+    {
+        // ROADMAP "Currencies and bank accounts": opening capital events must be visible in the bank statement
+        // for a EUR city (Bratislava), both FOUNDER_CONTRIBUTION and IPO_RAISE ledger entries must exist.
+        var token = await RegisterAndGetTokenAsync($"onboard-ledger-eur-{Guid.NewGuid():N}@test.com", "Ledger EUR");
+        var (companyId, _, _, _) = await StartOnboardingCompanyAsync(token, "Ledger EUR Co");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cId = Guid.Parse(companyId);
+
+        var ledgerEntries = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => e.CompanyId == cId)
+            .ToListAsync();
+
+        var founderEntry = ledgerEntries.FirstOrDefault(e => e.Category == "FOUNDER_CONTRIBUTION");
+        var ipoEntry = ledgerEntries.FirstOrDefault(e => e.Category == "IPO_RAISE");
+
+        Assert.NotNull(founderEntry);
+        Assert.NotNull(ipoEntry);
+
+        // EUR city: founder contribution must equal exactly 200,000 (no FX conversion).
+        Assert.Equal(200_000m, founderEntry.Amount);
+        Assert.Contains("200,000", founderEntry.Description);
+        Assert.Contains("EUR", founderEntry.Description);
+
+        // Default IPO raise target is 400,000 EUR, no FX conversion in EUR city.
+        Assert.Equal(400_000m, ipoEntry.Amount);
+        Assert.Contains("400,000", ipoEntry.Description);
+        Assert.Contains("EUR", ipoEntry.Description);
+
+        // Both entries must be linked to the company's bank account.
+        Assert.NotNull(founderEntry.BankAccountId);
+        Assert.NotNull(ipoEntry.BankAccountId);
+        Assert.Equal(founderEntry.BankAccountId, ipoEntry.BankAccountId);
+    }
+
+    [Fact]
+    public async Task StartOnboardingCompany_CreatesFounderContributionAndIpoRaiseLedgerEntries_NonEurCity()
+    {
+        // ROADMAP "Currencies and bank accounts": for a non-EUR city (Prague, CZK) both opening capital
+        // ledger entries must be FX-converted to the city currency and reference the FX rate.
+        var token = await RegisterAndGetTokenAsync($"onboard-ledger-czk-{Guid.NewGuid():N}@test.com", "Ledger CZK");
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(pragueId, "FACTORY,MINE", "Prague Ledger District");
+
+        var startResult = await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+                startOnboardingCompany(input: $input) {
+                    company { id cash }
+                }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId = pragueId, companyName = "Prague Ledger Co", factoryLotId } },
+            token);
+
+        Assert.False(startResult.TryGetProperty("errors", out _), "StartOnboardingCompany for Prague should succeed");
+        var companyId = Guid.Parse(startResult.GetProperty("data").GetProperty("startOnboardingCompany").GetProperty("company").GetProperty("id").GetString()!);
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var ledgerEntries = await db.LedgerEntries
+            .AsNoTracking()
+            .Where(e => e.CompanyId == companyId)
+            .ToListAsync();
+
+        var founderEntry = ledgerEntries.FirstOrDefault(e => e.Category == "FOUNDER_CONTRIBUTION");
+        var ipoEntry = ledgerEntries.FirstOrDefault(e => e.Category == "IPO_RAISE");
+
+        Assert.NotNull(founderEntry);
+        Assert.NotNull(ipoEntry);
+
+        // Non-EUR city: amounts must be FX-converted (CZK >> EUR, so amounts must be far above 200,000 and 400,000).
+        Assert.True(founderEntry.Amount > 200_000m,
+            $"Founder contribution in CZK ({founderEntry.Amount}) should exceed 200,000 EUR after FX conversion");
+        Assert.True(ipoEntry.Amount > 400_000m,
+            $"IPO raise in CZK ({ipoEntry.Amount}) should exceed 400,000 EUR after FX conversion");
+
+        // Descriptions must mention CZK and the EUR source amounts.
+        Assert.Contains("CZK", founderEntry.Description);
+        Assert.Contains("200,000", founderEntry.Description);
+        Assert.Contains("FX", founderEntry.Description);
+
+        Assert.Contains("CZK", ipoEntry.Description);
+        Assert.Contains("400,000", ipoEntry.Description);
+        Assert.Contains("FX", ipoEntry.Description);
+
+        // Both entries must be linked to the company's CZK bank account.
+        Assert.NotNull(founderEntry.BankAccountId);
+        Assert.NotNull(ipoEntry.BankAccountId);
+
+        var fundingAccount = await db.BankAccounts.AsNoTracking().FirstAsync(a => a.Id == founderEntry.BankAccountId!.Value);
+        Assert.Equal("CZK", fundingAccount.CurrencyCode);
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_LedgerEntriesSurvivedFromStartOnboarding_BankStatementShowsOpeningCapital()
+    {
+        // Proves that after full onboarding the company bank statement includes both FOUNDER_CONTRIBUTION
+        // and IPO_RAISE entries, making the opening capital history clearly visible.
+        var token = await RegisterAndGetTokenAsync($"onboard-stmt-{Guid.NewGuid():N}@test.com", "Statement Tester");
+        var (companyId, _, cityId, _) = await StartOnboardingCompanyAsync(token, "Statement Corp");
+        var productId = await GetStarterProductIdAsync();
+        var shopLotId = await GetAvailableLotIdAsync(cityId, "SALES_SHOP");
+
+        var finishResult = await FinishOnboardingAsync(token, productId, shopLotId);
+        Assert.False(finishResult.TryGetProperty("errors", out _), "FinishOnboarding must succeed");
+
+        // Query the bank statement via GraphQL and assert founding entries appear.
+        var statementResult = await ExecuteGraphQlAsync(
+            """
+            query BankStatement($companyId: UUID!) {
+                bankStatement(companyId: $companyId, limit: 50) {
+                    rows { category description amount }
+                }
+            }
+            """,
+            new { companyId },
+            token);
+
+        Assert.False(statementResult.TryGetProperty("errors", out _), "bankStatement must succeed");
+
+        var rows = statementResult.GetProperty("data").GetProperty("bankStatement").GetProperty("rows").EnumerateArray().ToList();
+
+        var founderRow = rows.FirstOrDefault(r => r.GetProperty("category").GetString() == "FOUNDER_CONTRIBUTION");
+        var ipoRow = rows.FirstOrDefault(r => r.GetProperty("category").GetString() == "IPO_RAISE");
+
+        Assert.True(founderRow.ValueKind != JsonValueKind.Undefined, "Bank statement must contain a FOUNDER_CONTRIBUTION row");
+        Assert.True(ipoRow.ValueKind != JsonValueKind.Undefined, "Bank statement must contain an IPO_RAISE row");
+
+        Assert.True(founderRow.GetProperty("amount").GetDecimal() > 0m, "Founder contribution must be a positive credit");
+        Assert.True(ipoRow.GetProperty("amount").GetDecimal() > 0m, "IPO raise must be a positive credit");
+    }
+
         [Fact]
         public async Task UpdateCompanySettings_PersistsDividendPayoutRatio()
         {

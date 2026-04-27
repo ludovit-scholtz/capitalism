@@ -75,4 +75,8 @@ public static class LedgerCategory
     public const string BankAccountTransferOut = "BANK_ACCOUNT_TRANSFER_OUT";
     /// <summary>Incoming leg of a player-initiated transfer between two of their own bank accounts.</summary>
     public const string BankAccountTransferIn = "BANK_ACCOUNT_TRANSFER_IN";
+    /// <summary>Initial founder contribution from the player's personal government starter deposit into the company account.</summary>
+    public const string FounderContribution = "FOUNDER_CONTRIBUTION";
+    /// <summary>IPO public shareholder investment credited to the company account at formation.</summary>
+    public const string IpoRaise = "IPO_RAISE";
 }

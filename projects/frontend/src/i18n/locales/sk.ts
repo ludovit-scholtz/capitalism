@@ -2390,6 +2390,8 @@ export default {
       centralBankRepay: 'Splatenie CB',
       stockPurchase: 'Nákup akcií',
       stockSale: 'Predaj akcií',
+      founderContribution: 'Vklad zakladateľa',
+      ipoRaise: 'IPO investícia',
     },
   },
   goldAmm: {
