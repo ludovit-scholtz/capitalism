@@ -205,6 +205,9 @@ onMounted(async () => {
   const cityParam = route.query.city as string | undefined
   if (cityParam && cities.value.find((c) => c.id === cityParam)) {
     selectedCityId.value = cityParam
+  } else if (auth.selectedCityId && cities.value.find((c) => c.id === auth.selectedCityId)) {
+    // Fall back to the active city from the city navbar/filter so the player doesn't need to choose again.
+    selectedCityId.value = auth.selectedCityId
   }
 })
 

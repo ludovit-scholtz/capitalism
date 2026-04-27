@@ -832,6 +832,11 @@ async function saveGuestProgress() {
       await auth.login(guestEmail.value, guestPassword.value)
     }
 
+    // Persist the onboarding city so it survives login and is the active city after authentication.
+    if (selectedCityId.value) {
+      auth.switchCity(selectedCityId.value)
+    }
+
     // Now authenticated — check if this player already completed onboarding
     if (!auth.player) {
       await auth.fetchMe()

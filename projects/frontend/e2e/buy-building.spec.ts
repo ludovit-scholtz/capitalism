@@ -555,4 +555,108 @@ test.describe('Buy Building View', () => {
     // No funding gap warning for EUR city
     await expect(page.locator('.funding-guidance')).toBeHidden()
   })
+
+  test('pre-selects active city from navbar when selected_city_id is stored', async ({ page }) => {
+    // AC: Buy-building uses the active city from the city navbar/filter by default
+    // instead of asking the user to choose the city again.
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Prague Auto Corp',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Seed a Prague factory lot so lots load for Prague
+    state.buildingLots.push({
+      id: 'lot-prague-auto',
+      cityId: 'city-pr',
+      name: 'Prague Auto Factory',
+      description: 'Industrial site in Prague.',
+      district: 'Industrial Zone',
+      latitude: 50.08,
+      longitude: 14.44,
+      populationIndex: 0.7,
+      basePrice: 90000,
+      price: 90000,
+      suitableTypes: 'FACTORY',
+      ownerCompanyId: null,
+      buildingId: null,
+      ownerCompany: null,
+      building: null,
+      resourceType: null,
+      materialQuality: null,
+      materialQuantity: null,
+    })
+
+    // Set Prague as the active city in localStorage before the page loads
+    await page.addInitScript((params) => {
+      localStorage.setItem('auth_token', params.token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('selected_city_id', params.cityId)
+    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+
+    await page.goto('/buy-building/company-1')
+
+    // Select Factory type — city should already be pre-selected as Prague
+    await page.getByRole('button', { name: /Factory/i }).click()
+
+    // Prague city button should appear as selected in the city grid
+    const pragueButton = page.locator('.city-select-grid').getByRole('button', { name: /Prague/i })
+    await expect(pragueButton).toBeVisible()
+    await expect(pragueButton).toHaveClass(/selected/)
+
+    // Lots for Prague should load automatically without manual city click
+    await expect(page.getByRole('button', { name: /Prague Auto Factory/i })).toBeVisible()
+  })
+
+  test('active city currency is displayed correctly in context switcher', async ({ page }) => {
+    // AC: Context selection shows the correct currency for the active city (Prague = CZK, not USD).
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Prague Corp',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    // Set Prague as the active city
+    await page.addInitScript((params) => {
+      localStorage.setItem('auth_token', params.token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+      localStorage.setItem('selected_city_id', params.cityId)
+    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+
+    await page.goto('/dashboard')
+
+    // Open the context switcher panel
+    await page.locator('.ctx-trigger').click()
+
+    // The company cash must be formatted in CZK, not USD
+    const companyOption = page.locator('.ctx-account-option', { hasText: 'Prague Corp' })
+    await expect(companyOption).toBeVisible()
+    const cashLabel = companyOption.locator('.ctx-acc-cash')
+    await expect(cashLabel).toBeVisible()
+    // CZK amounts are displayed with Kč or CZK symbol, not $
+    const cashText = await cashLabel.textContent()
+    expect(cashText).not.toMatch(/\$/)
+    expect(cashText).toMatch(/CZK|Kč/)
+  })
 })
