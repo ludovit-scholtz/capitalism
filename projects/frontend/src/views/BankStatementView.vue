@@ -266,12 +266,14 @@ function categoryLabel(cat: string): string {
     CENTRAL_BANK_REPAY: t('bankStatement.category.centralBankRepay'),
     STOCK_PURCHASE: t('bankStatement.category.stockPurchase'),
     STOCK_SALE: t('bankStatement.category.stockSale'),
+    FOUNDER_CONTRIBUTION: t('bankStatement.category.founderContribution'),
+    IPO_RAISE: t('bankStatement.category.ipoRaise'),
   }
   return map[cat] ?? cat
 }
 
 function categoryIcon(cat: string): string {
-  if (['REVENUE', 'MEDIA_HOUSE_INCOME', 'RENT_INCOME', 'DEPOSIT_INTEREST_RECEIVED', 'LOAN_INTEREST_INCOME', 'STOCK_SALE'].includes(cat)) return '+'
+  if (['REVENUE', 'MEDIA_HOUSE_INCOME', 'RENT_INCOME', 'DEPOSIT_INTEREST_RECEIVED', 'LOAN_INTEREST_INCOME', 'STOCK_SALE', 'FOUNDER_CONTRIBUTION', 'IPO_RAISE'].includes(cat)) return '+'
   if (
     [
       'PURCHASING_COST',
