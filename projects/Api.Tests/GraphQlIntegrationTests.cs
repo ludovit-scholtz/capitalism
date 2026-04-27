@@ -29273,6 +29273,82 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(expectedCzk, info.GetProperty("upgradeCost").GetDecimal());
     }
 
+    [Fact]
+    public async Task ScheduleUnitUpgrade_EurAccountOnCzkBuilding_ReturnsCurrencyMismatchError()
+    {
+        // A Prague (CZK) building with an EUR-denominated bank account must not be charged.
+        // The mutation must return CURRENCY_MISMATCH so the economy stays correct.
+        var email = $"uu-mismatch-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "UUMismatch");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        // Seed a CZK FX rate so upgrade cost is non-trivial.
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25.20m,
+            RateDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        const decimal startingBalance = 1_000_000m;
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "UUMismatchCo", Cash = startingBalance };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "UUMismatchFactory",
+            Level = 1, Latitude = prague.Latitude, Longitude = prague.Longitude,
+        };
+        db.Buildings.Add(building);
+        var unit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = building.Id, UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+
+        // Deliberately assign an EUR account to a CZK building — the exploit scenario.
+        var eurAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "9876543210123456",
+            CurrencyCode = "EUR",   // ← MISMATCH: building is in Prague (CZK)
+            Balance = startingBalance,
+            CompanyId = company.Id,
+        };
+        db.BankAccounts.Add(eurAccount);
+        building.BankAccountId = eurAccount.Id;
+        await db.SaveChangesAsync();
+
+        var mutation = """
+            mutation SUU($input: ScheduleUnitUpgradeInput!) {
+              scheduleUnitUpgrade(input: $input) { id }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, mutation,
+            new { input = new { unitId = unit.Id.ToString() } }, token);
+
+        // Must be rejected with CURRENCY_MISMATCH.
+        Assert.True(result.TryGetProperty("errors", out var errors), "Expected errors array");
+        var errorCode = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("CURRENCY_MISMATCH", errorCode);
+
+        // Balance must be untouched — no money was moved.
+        await db.Entry(eurAccount).ReloadAsync();
+        Assert.Equal(startingBalance, eurAccount.Balance);
+    }
+
     #endregion
 
     #region RankedProductTypes

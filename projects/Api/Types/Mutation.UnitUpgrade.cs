@@ -95,6 +95,18 @@ public sealed partial class Mutation
                 cityCurrencyCode,
                 httpContextAccessor.HttpContext!.RequestAborted);
 
+        // Guard: the assigned account must be in the building's city currency.
+        // A currency mismatch would charge the wrong-currency account by the FX-adjusted amount,
+        // causing a massive over- or under-charge depending on direction.
+        if (!string.Equals(fundingAccount.CurrencyCode, cityCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Building bank account currency ({fundingAccount.CurrencyCode}) must match city currency ({cityCurrencyCode}). Please assign a {cityCurrencyCode} bank account to this building before upgrading.")
+                    .SetCode("CURRENCY_MISMATCH")
+                    .Build());
+        }
+
         if (fundingAccount.Balance < upgradeCost)
         {
             throw new GraphQLException(
