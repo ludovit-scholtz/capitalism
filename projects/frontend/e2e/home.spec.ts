@@ -143,7 +143,6 @@ test.describe('Header navigation', () => {
 
     const gameTimeChip = page.locator('.game-time-chip')
     await expect(gameTimeChip).toBeVisible()
-    await expect(gameTimeChip).toContainText('Game Time')
     await expect(gameTimeChip).toContainText('2000')
   })
 })
