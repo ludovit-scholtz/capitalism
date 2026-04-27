@@ -364,10 +364,19 @@ public sealed partial class Query
         var unit = await db.BuildingUnits
             .Include(u => u.Building)
             .ThenInclude(b => b.Company)
+            .Include(u => u.Building)
+            .ThenInclude(b => b.City)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(u => u.Id == unitId);
 
         if (unit is null || unit.Building.Company.PlayerId != userId)
             return null;
+
+        // Look up the FX rate for the building's city so the upgrade cost is shown
+        // in the city's local currency (e.g. CZK for Prague, INR for Delhi).
+        var cityCurrencyCode = unit.Building.City?.CurrencyCode ?? "EUR";
+        var fxRates = await Utilities.FxRateHelper.BuildEurRatesLookupAsync(db, [cityCurrencyCode]);
+        var fxRate = Utilities.FxRateHelper.GetEurRate(fxRates, cityCurrencyCode);
 
         var isUpgradable = Engine.GameConstants.IsUpgradableUnitType(unit.UnitType);
         var isMaxLevel = unit.Level >= Engine.GameConstants.MaxUnitLevel;
@@ -391,7 +400,7 @@ public sealed partial class Query
             IsMaxLevel = isMaxLevel,
             IsUpgradable = isUpgradable,
             UpgradeCost = isUpgradable && !isMaxLevel
-                ? Engine.GameConstants.UnitUpgradeCost(unit.UnitType, unit.Level)
+                ? decimal.Round(Engine.GameConstants.UnitUpgradeCost(unit.UnitType, unit.Level) * fxRate, 2, MidpointRounding.AwayFromZero)
                 : 0m,
             UpgradeTicks = isUpgradable && !isMaxLevel
                 ? Engine.GameConstants.UnitUpgradeTicks(unit.Level)
