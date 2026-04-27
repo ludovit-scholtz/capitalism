@@ -25,7 +25,7 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync()
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync()
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Game state is not initialized.")

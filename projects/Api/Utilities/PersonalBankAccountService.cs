@@ -9,6 +9,9 @@ public static class PersonalBankAccountService
 {
     public const string SettlementCurrencyCode = "EUR";
 
+    private static bool UsePostgresCompatPath(AppDbContext db)
+        => db.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true;
+
     public static async Task<BankAccount?> GetTrackedAccountAsync(
         AppDbContext db,
         Guid playerId,
@@ -24,6 +27,19 @@ public static class PersonalBankAccountService
         if (tracked is not null)
         {
             return tracked;
+        }
+
+        if (UsePostgresCompatPath(db))
+        {
+            var accountsInCurrency = await db.BankAccounts
+                .AsNoTracking()
+                .Where(account => account.PlayerId.HasValue
+                    && account.CurrencyCode != null
+                    && account.CurrencyCode.ToUpper() == normalizedCurrencyCode)
+                .OrderBy(account => account.CreatedAtUtc)
+                .ToListAsync(cancellationToken);
+
+            return accountsInCurrency.FirstOrDefault(account => account.PlayerId == playerId);
         }
 
         return await db.BankAccounts
@@ -75,11 +91,21 @@ public static class PersonalBankAccountService
         Guid playerId,
         string currencyCode,
         CancellationToken cancellationToken = default)
-        => await db.BankAccounts
+    {
+        var normalizedCurrencyCode = currencyCode.ToUpperInvariant();
+
+        if (UsePostgresCompatPath(db))
+        {
+            var trackedAccount = await GetTrackedAccountAsync(db, playerId, normalizedCurrencyCode, cancellationToken);
+            return trackedAccount?.Balance ?? 0m;
+        }
+
+        return await db.BankAccounts
             .AsNoTracking()
-            .Where(account => account.PlayerId == playerId && account.CurrencyCode == currencyCode.ToUpperInvariant())
+            .Where(account => account.PlayerId == playerId && account.CurrencyCode == normalizedCurrencyCode)
             .Select(account => (decimal?)account.Balance)
             .FirstOrDefaultAsync(cancellationToken) ?? 0m;
+    }
 
     public static async Task<decimal> DebitTrackedBalanceAsync(
         AppDbContext db,
@@ -129,6 +155,12 @@ public static class PersonalBankAccountService
         Player player,
         CancellationToken cancellationToken = default)
     {
+        if (UsePostgresCompatPath(db))
+        {
+            var trackedSettlementAccount = await GetTrackedAccountAsync(db, player.Id, SettlementCurrencyCode, cancellationToken);
+            return trackedSettlementAccount?.Balance ?? 0m;
+        }
+
         var settlementAccount = await db.BankAccounts
             .FirstOrDefaultAsync(
                 account => account.PlayerId == player.Id && account.CurrencyCode == SettlementCurrencyCode,
@@ -191,6 +223,29 @@ public static class PersonalBankAccountService
         }
 
         var balances = distinctPlayerIds.ToDictionary(playerId => playerId, _ => 0m);
+
+        if (UsePostgresCompatPath(db))
+        {
+            var playerIdsByText = distinctPlayerIds
+                .ToDictionary(playerId => playerId.ToString("D"), playerId => playerId, StringComparer.OrdinalIgnoreCase);
+
+            var trackedSettlementAccounts = await db.BankAccounts
+                .AsNoTracking()
+                .Where(account => account.PlayerId.HasValue && account.CurrencyCode == SettlementCurrencyCode)
+                .Select(account => new { PlayerId = account.PlayerId!.Value, account.Balance })
+                .ToListAsync(cancellationToken);
+
+            foreach (var account in trackedSettlementAccounts)
+            {
+                var playerIdText = account.PlayerId.ToString("D");
+                if (playerIdsByText.TryGetValue(playerIdText, out var playerId))
+                {
+                    balances[playerId] = account.Balance;
+                }
+            }
+
+            return balances;
+        }
 
         var settlementAccounts = await db.BankAccounts
             .AsNoTracking()

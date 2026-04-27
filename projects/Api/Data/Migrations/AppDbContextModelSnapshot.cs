@@ -17,7 +17,7 @@ namespace Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "10.0.5")
+                .HasAnnotation("ProductVersion", "10.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -1428,6 +1428,9 @@ namespace Api.Data.Migrations
                     b.Property<Guid>("BankBuildingId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("BorrowerBankAccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("BorrowerCompanyId")
                         .HasColumnType("uuid");
 
@@ -1487,6 +1490,8 @@ namespace Api.Data.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("BankBuildingId");
+
+                    b.HasIndex("BorrowerBankAccountId");
 
                     b.HasIndex("CollateralBuildingId");
 
@@ -2467,6 +2472,11 @@ namespace Api.Data.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Api.Data.Entities.BankAccount", "BorrowerBankAccount")
+                        .WithMany()
+                        .HasForeignKey("BorrowerBankAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("Api.Data.Entities.Company", "BorrowerCompany")
                         .WithMany()
                         .HasForeignKey("BorrowerCompanyId")
@@ -2490,6 +2500,8 @@ namespace Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("BankBuilding");
+
+                    b.Navigation("BorrowerBankAccount");
 
                     b.Navigation("BorrowerCompany");
 

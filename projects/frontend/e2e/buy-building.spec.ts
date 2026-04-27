@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { setupMockApi, makePlayer } from './helpers/mock-api'
+import { setupMockApi, makePlayer, makeDefaultBuildingLots } from './helpers/mock-api'
 
 async function authenticate(page: Parameters<typeof test>[0]['page'], playerId: string) {
   await page.addInitScript((token) => {
@@ -31,7 +31,10 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
 
     const starterFactoryLot = page.getByRole('button', { name: /Factory Site B1/i })
     await expect(starterFactoryLot).toBeVisible()
@@ -61,12 +64,73 @@ test.describe('Buy Building View', () => {
 
     await page.getByRole('button', { name: /Factory/i }).click()
     await page.getByLabel('Building Name').fill('Danube Works')
-    await page.getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
     await page.getByRole('button', { name: /Factory Site B1/i }).click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
 
     await page.waitForURL(/\/building\//)
     await expect(page.getByRole('heading', { name: /Danube Works/i })).toBeVisible()
+  })
+
+  test('requires media channel selection before buying a media house', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Broadcast Group',
+          cash: 5000000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingLots = [
+      ...makeDefaultBuildingLots(),
+      {
+        id: 'lot-media-house-1',
+        cityId: 'city-ba',
+        name: 'Media House Lot A1',
+        description: 'Purpose-built media complex for broadcast operations.',
+        district: 'OldTown',
+        latitude: 48.1492,
+        longitude: 17.1077,
+        populationIndex: 1.85,
+        price: 120000,
+        basePrice: 90000,
+        suitableTypes: 'MEDIA_HOUSE',
+        ownerCompanyId: null,
+        buildingId: null,
+      },
+    ]
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Media House/i }).click()
+    await page.getByLabel('Building Name').fill('Pulse TV')
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
+    await page.getByRole('button', { name: /Media House Lot A1/i }).click()
+
+    const buyNowButton = page.getByRole('button', { name: /^Buy Now$/i })
+    await expect(buyNowButton).toBeDisabled()
+
+    await page.locator('#mediaType').selectOption('TV')
+    await expect(buyNowButton).toBeEnabled()
+
+    await buyNowButton.click()
+    await page.waitForURL(/\/building\//)
+    await expect(page.getByRole('heading', { name: /Pulse TV/i })).toBeVisible()
   })
 
   test('shows bank setup info panel, capital check, and rate fields when BANK type is selected', async ({ page }) => {
@@ -125,7 +189,10 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.locator('.type-card', { hasText: 'Bank' }).click()
-    await page.getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
 
     // Should show insufficient funds warning
     await expect(page.locator('.capital-warn')).toBeVisible()
@@ -185,7 +252,10 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.locator('.type-card', { hasText: 'Bank' }).click()
-    await page.getByRole('button', { name: /Bratislava/i }).click()
+    await page
+      .locator('.city-select-grid')
+      .getByRole('button', { name: /Bratislava/i })
+      .click()
     // Select any lot
     await page.locator('.lot-card').first().click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
@@ -195,9 +265,7 @@ test.describe('Buy Building View', () => {
     await expect(page).toHaveURL(/\/bank\//)
   })
 
-  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({
-    page,
-  }) => {
+  test('shows funding gap warning when selecting Prague (CZK) with no CZK balance', async ({ page }) => {
     // AC: Expansion flow detects missing destination-currency bank accounts.
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
@@ -268,9 +336,7 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
   })
 
-  test('shows insufficient-funds warning when CZK balance exists but is below lot total cost', async ({
-    page,
-  }) => {
+  test('shows insufficient-funds warning when CZK balance exists but is below lot total cost', async ({ page }) => {
     // AC: Expansion flow detects insufficient eligible balance in destination currency.
     // Factory lot price = 90,000, construction cost = 15,000 → total = 105,000 CZK
     // Player has only 50,000 CZK → insufficient
@@ -336,7 +402,7 @@ test.describe('Buy Building View', () => {
     await expect(page.getByRole('button', { name: /^Buy Now$/i })).toBeDisabled()
   })
 
-    test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
+  test('Buy Now is enabled after player has sufficient CZK balance', async ({ page }) => {
     // AC: Expansion succeeds once the player is funded in the destination currency.
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',

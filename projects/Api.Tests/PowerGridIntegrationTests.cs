@@ -95,7 +95,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"PoweredCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -143,7 +143,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"ShortCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -196,8 +196,8 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
-        var gameState = await db.GameStates.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"SolarCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -256,7 +256,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"LegacyCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -293,7 +293,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // 1 MW supply / 5 MW demand = 20% → OFFLINE (below 50%).
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"OfflineCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -439,7 +439,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"BalCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -500,7 +500,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"ShortCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -547,7 +547,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         // cityPowerBalance is a public query — no token should be required.
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         // Execute WITHOUT a bearer token.
         var result = await ExecuteGraphQlAsync(
@@ -565,7 +565,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"CritCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -609,7 +609,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"CritOff_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -704,7 +704,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         // Add a building directly to the DB so we can assert on powerStatus.
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var building = new Building
         {
             Id = Guid.NewGuid(), CompanyId = companyId, CityId = city.Id,
@@ -847,7 +847,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"SurplusCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -910,7 +910,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"ShortageCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -972,7 +972,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"SplitCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -1041,7 +1041,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"BoostCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -1100,7 +1100,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var player = await db.Players.FirstAsync();
+        var player = await db.Players.FirstDeterministicAsync();
         var city = new City
         {
             Id = Guid.NewGuid(), Name = $"BattCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
@@ -1167,7 +1167,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         var token = await RegisterAndGetTokenAsync($"ppa_{Guid.NewGuid():N}@test.com");
 
         // Resolve newly registered player
-        var email = await db.Players.OrderByDescending(p => p.CreatedAtUtc).Select(p => p.Email).FirstAsync();
+        var email = await db.Players.OrderByDescending(p => p.CreatedAtUtc).Select(p => p.Email).FirstDeterministicAsync();
         var player = await db.Players.FirstAsync(p => p.Email == email);
 
         var city = new City

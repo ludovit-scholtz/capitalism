@@ -115,7 +115,7 @@ public sealed class BankingIntegrationTests
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Undercap Corp", Cash = 5_000_000m };
         db.Companies.Add(company);
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var bank = new Building
         {
             Id = Guid.NewGuid(),
@@ -249,9 +249,12 @@ public sealed class BankingIntegrationTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Seed bank with zero cash — cannot pay any deposit interest
+        // Seed bank with zero liquidity account balance — cannot pay any deposit interest.
         var (_, bankCompany, bank) = SeedBank(db, suffix: "illiquid", companyCash: 0m, deposits: 10_000_000m);
+        await db.SaveChangesAsync();
+
         var bankCity = await db.Cities.FirstAsync(c => c.Id == bank.CityId);
+        SeedCompanyBankAccount(db, bankCompany.Id, bankCity.CurrencyCode, 0m);
 
         // Seed a customer depositor
         var customerPlayer = new Player { Id = Guid.NewGuid(), Email = $"cust-{Guid.NewGuid():N}@test.com", DisplayName = "Customer", PasswordHash = "h", Role = PlayerRole.Player };
@@ -281,18 +284,18 @@ public sealed class BankingIntegrationTests
 
         // Reload entities
         var updatedBank = await db.Buildings.FindAsync(bank.Id);
-        var updatedCustomer = await db.Companies.FindAsync(customerCompany.Id);
+        var updatedDeposit = await db.BankAccounts.FindAsync(deposit.Id);
 
         Assert.NotNull(updatedBank);
-        Assert.NotNull(updatedCustomer);
+        Assert.NotNull(updatedDeposit);
 
         // Bank should have accumulated central-bank debt
         Assert.True(updatedBank.CentralBankDebt > 0m,
             $"Bank should have central-bank debt after illiquid tick, but CentralBankDebt = {updatedBank.CentralBankDebt}");
 
-        // Depositor should still receive the full interest (central bank covered it)
-        Assert.True(updatedCustomer.Cash > 0m,
-            $"Depositor should have received interest even from illiquid bank, but cash = {updatedCustomer.Cash}");
+        // Depositor should still receive the full interest in the deposit balance
+        Assert.True(updatedDeposit.Balance > 1_000_000m,
+            $"Depositor deposit balance should include accrued interest even from illiquid bank, but balance = {updatedDeposit.Balance}");
 
         // A CentralBankBorrow ledger entry should exist
         var cbBorrow = await db.LedgerEntries
@@ -448,9 +451,9 @@ public sealed class BankingIntegrationTests
 
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
-        // Bank starts under reserve: $80K cash, $1M deposits, $500K CB debt
+        // Bank starts under reserve: $80K liquidity, $1M deposits, $500K CB debt
         var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "PressuredBankCo", Cash = 80_000m };
         var depositorCompany = new Company { Id = Guid.NewGuid(), PlayerId = depositor.Id, Name = "NewDepositorCo", Cash = 500_000m };
         db.Companies.AddRange(bankCompany, depositorCompany);
@@ -466,6 +469,14 @@ public sealed class BankingIntegrationTests
         db.Buildings.Add(bank);
         await db.SaveChangesAsync();
 
+        var bankLiquidity = SeedCompanyBankAccount(db, bankCompany.Id, city.CurrencyCode, 80_000m);
+        SeedCompanyBankAccount(db, depositorCompany.Id, city.CurrencyCode, 500_000m);
+        await db.SaveChangesAsync();
+
+        var bankLiquidityBeforeDeposit = await db.BankAccounts
+            .Where(account => account.CompanyId == bankCompany.Id && account.ClosedAtUtc == null)
+            .SumAsync(account => account.Balance);
+
         // Customer deposits $200K
         var result = await ExecuteAsync(client,
             """
@@ -479,28 +490,31 @@ public sealed class BankingIntegrationTests
         var depositData = result.GetProperty("data").GetProperty("openBankAccount");
         Assert.Equal(200_000m, depositData.GetProperty("amount").GetDecimal());
 
-        await db.Entry(bankCompany).ReloadAsync();
         await db.Entry(bank).ReloadAsync();
+        await db.Entry(bankLiquidity).ReloadAsync();
 
-        // After deposit: bank cash = 80K + 200K = 280K; deposits = 1.2M; reserve = 120K
-        // Surplus = 280K - 120K = 160K → repayment = 160K
-        // Bank cash after repayment = 120K (exactly at reserve — not below it!)
+        // After deposit: total bank-company liquidity increases by the incoming amount.
+        // Auto-repayment must only use surplus above reserve and never push liquidity below reserve.
         const decimal expectedDeposits = 1_200_000m;
-        const decimal expectedReserve = expectedDeposits * 0.10m;  // = 120,000
-        const decimal expectedSurplus = 280_000m - expectedReserve; // = 160,000
-        const decimal expectedCbDebt = 500_000m - expectedSurplus;  // = 340,000
-        const decimal expectedCash = expectedReserve;               // = 120,000 (all surplus repaid)
+        const decimal expectedReserve = expectedDeposits * 0.10m; // = 120,000
+        var liquidityAfterIncomingDeposit = bankLiquidityBeforeDeposit + 200_000m;
+        var expectedRepayment = Math.Min(500_000m, Math.Max(0m, liquidityAfterIncomingDeposit - expectedReserve));
+        var expectedCbDebt = 500_000m - expectedRepayment;
+        var expectedLiquidity = liquidityAfterIncomingDeposit - expectedRepayment;
+
+        var totalBankLiquidity = await db.BankAccounts
+            .Where(account => account.CompanyId == bankCompany.Id && account.ClosedAtUtc == null)
+            .SumAsync(account => account.Balance);
 
         Assert.Equal(expectedDeposits, bank.TotalDeposits);
-        // Bank cash should equal the reserve floor after surplus repayment (not drain below it)
-        Assert.Equal(expectedCash, bankCompany.Cash);
-        // CB debt should decrease by exactly the surplus, not by the full available cash
+        Assert.Equal(expectedLiquidity, totalBankLiquidity);
+        // CB debt should decrease exactly by the surplus available above reserve.
         Assert.Equal(expectedCbDebt, bank.CentralBankDebt);
 
-        // Bank cash must be >= reserve requirement (the key invariant)
+        // Bank liquidity must be >= reserve requirement (the key invariant)
         var reserveNeeded = bank.TotalDeposits * 0.10m;
-        Assert.True(bankCompany.Cash >= reserveNeeded,
-            $"Bank cash ({bankCompany.Cash:C}) must not fall below reserve requirement ({reserveNeeded:C}) after OpenBankAccount.");
+        Assert.True(totalBankLiquidity >= reserveNeeded,
+            $"Bank liquidity ({totalBankLiquidity:C}) must not fall below reserve requirement ({reserveNeeded:C}) after OpenBankAccount.");
     }
 
     /// <summary>
@@ -529,7 +543,7 @@ public sealed class BankingIntegrationTests
 
         var bankOwner = await db.Players.FirstAsync(p => p.Email == bankOwnerEmail);
         var depositor = await db.Players.FirstAsync(p => p.Email == depositorEmail);
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         // Bank: 5M deposits, cash=400K (below reserve of 500K), CB debt=1M → CRITICAL
         var bankCompany = new Company { Id = Guid.NewGuid(), PlayerId = bankOwner.Id, Name = "ConsistencyBankCo", Cash = 400_000m };
@@ -613,7 +627,7 @@ public sealed class BankingIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var ownerUser = await db.Players.FirstAsync(p => p.Email == "rateowner@test.com");
         var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Rate Bank Co", Cash = 50_000_000m };
@@ -660,7 +674,7 @@ public sealed class BankingIntegrationTests
 
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var ownerUser = await db.Players.FirstAsync(p => p.Email == "rateowner2@test.com");
         var ownerCompany = new Company { Id = Guid.NewGuid(), PlayerId = ownerUser.Id, Name = "Rate Bank Co 2", Cash = 50_000_000m };
@@ -704,8 +718,8 @@ public sealed class BankingIntegrationTests
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var processor = await CreateProcessorAsync(scope);
-        var city = await db.Cities.FirstAsync();
-        var gs = await db.GameStates.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
 
         // Bank owner
         var bankOwner = new Player { Id = Guid.NewGuid(), Email = "selfint@test.com", DisplayName = "Self Int", PasswordHash = "x", Role = PlayerRole.Player };
@@ -932,6 +946,7 @@ public sealed class BankingIntegrationTests
         // Company with only 10M cash — not enough for 240M CZK requirement
         var insufficientCompany = new Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "CZK Insufficient Co", Cash = 10_000_000m };
         db.Companies.Add(insufficientCompany);
+        SeedCompanyBankAccount(db, insufficientCompany.Id, czkCity.CurrencyCode, 10_000_000m);
 
         var bankInsufficient = new Building
         {
@@ -956,6 +971,7 @@ public sealed class BankingIntegrationTests
         // Company with 240M cash — enough
         var sufficientCompany = new Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "CZK Sufficient Co", Cash = 240_000_000m };
         db.Companies.Add(sufficientCompany);
+        SeedCompanyBankAccount(db, sufficientCompany.Id, czkCity.CurrencyCode, 240_000_000m);
 
         var bankSufficient = new Building
         {
@@ -980,6 +996,7 @@ public sealed class BankingIntegrationTests
             new { id = bankSufficient.Id.ToString() },
             token: ownerToken);
 
+        Assert.False(successResult.TryGetProperty("errors", out _), "Sufficient CZK funding account should allow base deposit initiation.");
         var data = successResult.GetProperty("data").GetProperty("initiateBaseDeposit");
         Assert.True(data.GetProperty("baseCapitalDeposited").GetBoolean());
         Assert.Equal(240_000_000m, data.GetProperty("totalDeposits").GetDecimal());
@@ -1099,6 +1116,27 @@ public sealed class BankingIntegrationTests
         db.Buildings.Add(bank);
 
         return (player, company, bank);
+    }
+
+    private static BankAccount SeedCompanyBankAccount(
+        AppDbContext db,
+        Guid companyId,
+        string currencyCode,
+        decimal balance)
+    {
+        var account = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = currencyCode,
+            CompanyId = companyId,
+            Balance = balance,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+
+        db.BankAccounts.Add(account);
+        return account;
     }
 
     private static async Task<string> RegisterAsync(HttpClient client, string email, string displayName)

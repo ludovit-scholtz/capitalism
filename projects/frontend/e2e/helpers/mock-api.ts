@@ -1833,6 +1833,38 @@ export function makeDefaultProducts(): MockProductType[] {
   return [
     makeChairProduct(),
     {
+      id: 'prod-table',
+      name: 'Wooden Table',
+      slug: 'wooden-table',
+      industry: 'FURNITURE',
+      basePrice: 120,
+      baseCraftTicks: 3,
+      outputQuantity: 10,
+      energyConsumptionMwh: 0.8,
+      basicLaborHours: 1.4,
+      unitName: 'Table',
+      unitSymbol: 'tables',
+      isProOnly: false,
+      description: 'Classic wooden table.',
+      recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Log', unitSymbol: 'logs' }, inputProductType: null, quantity: 2 }],
+    },
+    {
+      id: 'prod-bed',
+      name: 'Wooden Bed',
+      slug: 'wooden-bed',
+      industry: 'FURNITURE',
+      basePrice: 200,
+      baseCraftTicks: 4,
+      outputQuantity: 6,
+      energyConsumptionMwh: 1.1,
+      basicLaborHours: 1.8,
+      unitName: 'Bed',
+      unitSymbol: 'beds',
+      isProOnly: false,
+      description: 'Comfortable wooden bed frame.',
+      recipes: [{ resourceType: { id: 'res-wood', name: 'Wood', slug: 'wood', unitName: 'Log', unitSymbol: 'logs' }, inputProductType: null, quantity: 3 }],
+    },
+    {
       id: 'prod-bread',
       name: 'Bread',
       slug: 'bread',
@@ -1846,6 +1878,38 @@ export function makeDefaultProducts(): MockProductType[] {
       unitSymbol: 'loaves',
       isProOnly: false,
       description: 'Basic wheat bread.',
+      recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+    },
+    {
+      id: 'prod-pasta',
+      name: 'Pasta',
+      slug: 'pasta',
+      industry: 'FOOD_PROCESSING',
+      basePrice: 9,
+      baseCraftTicks: 2,
+      outputQuantity: 16,
+      energyConsumptionMwh: 0.7,
+      basicLaborHours: 1.1,
+      unitName: 'Pack',
+      unitSymbol: 'packs',
+      isProOnly: false,
+      description: 'Dry pasta made from grain flour.',
+      recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 2 }],
+    },
+    {
+      id: 'prod-crackers',
+      name: 'Crackers',
+      slug: 'crackers',
+      industry: 'FOOD_PROCESSING',
+      basePrice: 6,
+      baseCraftTicks: 2,
+      outputQuantity: 20,
+      energyConsumptionMwh: 0.6,
+      basicLaborHours: 1.0,
+      unitName: 'Pack',
+      unitSymbol: 'packs',
+      isProOnly: false,
+      description: 'Baked snack crackers.',
       recipes: [{ resourceType: { id: 'res-grain', name: 'Grain', slug: 'grain', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
     },
     {
@@ -1863,6 +1927,38 @@ export function makeDefaultProducts(): MockProductType[] {
       isProOnly: false,
       description: 'Essential pharma product.',
       recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+    },
+    {
+      id: 'prod-bandages',
+      name: 'Bandages',
+      slug: 'bandages',
+      industry: 'HEALTHCARE',
+      basePrice: 15,
+      baseCraftTicks: 1,
+      outputQuantity: 18,
+      energyConsumptionMwh: 0.4,
+      basicLaborHours: 1.1,
+      unitName: 'Pack',
+      unitSymbol: 'packs',
+      isProOnly: false,
+      description: 'Basic wound care bandages.',
+      recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 1 }],
+    },
+    {
+      id: 'prod-first-aid-kit',
+      name: 'First Aid Kit',
+      slug: 'first-aid-kit',
+      industry: 'HEALTHCARE',
+      basePrice: 42,
+      baseCraftTicks: 2,
+      outputQuantity: 10,
+      energyConsumptionMwh: 0.9,
+      basicLaborHours: 1.7,
+      unitName: 'Kit',
+      unitSymbol: 'kits',
+      isProOnly: false,
+      description: 'Retail first aid kit.',
+      recipes: [{ resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals', unitName: 'Ton', unitSymbol: 't' }, inputProductType: null, quantity: 2 }],
     },
   ]
 }
@@ -3809,6 +3905,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           body: JSON.stringify({ errors: [{ message: `Building type ${input.buildingType} is not suitable for this lot.`, extensions: { code: 'UNSUITABLE_BUILDING_TYPE' } }] }),
         })
       }
+      if (input.buildingType === 'MEDIA_HOUSE') {
+        const validMediaTypes = ['NEWSPAPER', 'RADIO', 'TV']
+        if (!input.mediaType || !validMediaTypes.includes(input.mediaType)) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [
+                {
+                  message: `A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: '${input.mediaType ?? ''}'.`,
+                  extensions: { code: 'INVALID_MEDIA_TYPE' },
+                },
+              ],
+            }),
+          })
+        }
+      }
       const constructionCostsByType: Record<string, number> = {
         MINE: 5000,
         FACTORY: 15000,
@@ -3874,6 +3987,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         powerOutput: isPowerPlant ? (defaultOutputByType[plantType ?? ''] ?? 30) : null,
         powerStatus: 'POWERED',
         isForSale: false,
+        mediaType: input.buildingType === 'MEDIA_HOUSE' ? input.mediaType : null,
         builtAtUtc: new Date().toISOString(),
         isUnderConstruction: true,
         constructionCompletesAtTick: currentTick + constructionTicks,
@@ -6272,30 +6386,57 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('acceptLoan')) {
       const input = body.variables?.input ?? {}
       const offer = state.loanOffers.find((o) => o.id === input.loanOfferId)
+      const directBank = state.allBanks.find((bank) => bank.bankBuildingId === input.loanOfferId)
+
+      if (directBank && !input.collateralBuildingId) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'A collateral building is required for bank loan requests.', extensions: { code: 'COLLATERAL_REQUIRED' } }] }),
+        })
+      }
+
+      if (input.collateralBuildingId && state.myLoans.some((loan) => loan.collateralBuildingId === input.collateralBuildingId && (loan.status === 'ACTIVE' || loan.status === 'OVERDUE'))) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'This building is already pledged as collateral for another active loan.', extensions: { code: 'COLLATERAL_ALREADY_PLEDGED' } }] }),
+        })
+      }
+
       const principal = input.principalAmount ?? 0
       if (offer) {
         offer.usedCapacity += principal
         offer.remainingCapacity -= principal
       }
+      if (directBank) {
+        directBank.outstandingLoanPrincipal += principal
+        directBank.availableLendingCapacity = Math.max(0, directBank.availableLendingCapacity - principal)
+      }
+      const borrowerCompany = state.players.flatMap((player) => player.companies).find((company) => company.id === input.borrowerCompanyId)
+      const annualInterestRatePercent = offer?.annualInterestRatePercent ?? directBank?.lendingInterestRatePercent ?? 10
+      const durationTicks = input.durationTicks ?? offer?.durationTicks ?? 8760
+      const periodicRate = annualInterestRatePercent <= 0 ? 0 : annualInterestRatePercent / 100 / 8760
+      const paymentAmount = durationTicks <= 0 ? principal : periodicRate <= 0 ? principal / durationTicks : (principal * periodicRate) / (1 - (1 + periodicRate) ** -durationTicks)
       const newLoan: MockLoan = {
         id: `loan-${Date.now()}`,
         loanOfferId: input.loanOfferId ?? '',
         borrowerCompanyId: input.borrowerCompanyId ?? '',
-        borrowerCompanyName: 'Borrower Co',
-        lenderCompanyId: offer?.lenderCompanyId ?? '',
-        lenderCompanyName: offer?.lenderCompanyName ?? '',
-        bankBuildingId: offer?.bankBuildingId ?? '',
-        bankBuildingName: offer?.bankBuildingName ?? '',
+        borrowerCompanyName: borrowerCompany?.name ?? 'Borrower Co',
+        lenderCompanyId: offer?.lenderCompanyId ?? directBank?.lenderCompanyId ?? '',
+        lenderCompanyName: offer?.lenderCompanyName ?? directBank?.lenderCompanyName ?? '',
+        bankBuildingId: offer?.bankBuildingId ?? directBank?.bankBuildingId ?? '',
+        bankBuildingName: offer?.bankBuildingName ?? directBank?.bankBuildingName ?? '',
         originalPrincipal: principal,
         remainingPrincipal: principal,
-        annualInterestRatePercent: offer?.annualInterestRatePercent ?? 10,
-        durationTicks: offer?.durationTicks ?? 1440,
+        annualInterestRatePercent,
+        durationTicks,
         startTick: state.gameState.currentTick,
-        dueTick: state.gameState.currentTick + (offer?.durationTicks ?? 1440),
-        nextPaymentTick: state.gameState.currentTick + 720,
-        paymentAmount: principal / 2,
+        dueTick: state.gameState.currentTick + durationTicks,
+        nextPaymentTick: state.gameState.currentTick + 1,
+        paymentAmount: Number(paymentAmount.toFixed(2)),
         paymentsMade: 0,
-        totalPayments: 2,
+        totalPayments: durationTicks,
         status: 'ACTIVE',
         missedPayments: 0,
         accumulatedPenalty: 0,

@@ -11,10 +11,14 @@ namespace Api.Data.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            var boolType = ActiveProvider.Contains("Npgsql", System.StringComparison.OrdinalIgnoreCase)
+                ? "boolean"
+                : "INTEGER";
+
             migrationBuilder.AddColumn<bool>(
                 name: "IsInvisibleInChat",
                 table: "Players",
-                type: "INTEGER",
+                type: boolType,
                 nullable: false,
                 defaultValue: false);
 

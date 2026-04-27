@@ -28,63 +28,45 @@ export function ticksToYears(ticks: number): number {
 }
 
 /**
- * Formats a tick-duration as a human-readable in-game time string.
- * E.g. 720 ticks → "30 days", 8760 ticks → "1 year"
+ * Formats a tick-duration as in-game hours.
+ * E.g. 1 tick → "1 hour", 8760 ticks → "8760 hours"
  */
 export function formatLoanDuration(ticks: number): string {
-  const years = ticks / TICKS_PER_YEAR
-  if (years >= 1) {
-    const rounded = Math.round(years * 10) / 10
-    return rounded === 1 ? '1 year' : `${rounded} years`
-  }
-  const days = Math.round(ticks / TICKS_PER_DAY)
-  return days === 1 ? '1 day' : `${days} days`
+  const hours = Math.max(0, Math.round(ticks))
+  return hours === 1 ? '1 hour' : `${hours} hours`
 }
 
 /**
  * Computes total interest cost for a loan given principal, rate, and duration.
  * Uses simple (flat) interest: interest = principal × rate × (ticks / ticksPerYear).
  */
-export function computeTotalInterest(
-  principal: number,
-  annualRatePercent: number,
-  durationTicks: number,
-): number {
+export function computeTotalInterest(principal: number, annualRatePercent: number, durationTicks: number): number {
   return principal * (annualRatePercent / 100) * (durationTicks / TICKS_PER_YEAR)
 }
 
 /**
  * Computes total repayment (principal + interest).
  */
-export function computeTotalRepayment(
-  principal: number,
-  annualRatePercent: number,
-  durationTicks: number,
-): number {
+export function computeTotalRepayment(principal: number, annualRatePercent: number, durationTicks: number): number {
   return principal + computeTotalInterest(principal, annualRatePercent, durationTicks)
 }
 
 /**
- * Computes estimated periodic payment amount.
- * Payments are made every 720 ticks (30 in-game days).
+ * Computes estimated periodic payment amount for tick-based repayment.
+ * One scheduled payment is made every tick (game hour).
  */
-export function computePaymentAmount(
-  principal: number,
-  annualRatePercent: number,
-  durationTicks: number,
-): number {
-  const ticksPerPayment = 720
-  const totalPayments = Math.max(1, Math.floor(durationTicks / ticksPerPayment))
-  const totalRepayment = computeTotalRepayment(principal, annualRatePercent, durationTicks)
-  return totalRepayment / totalPayments
+export function computePaymentAmount(principal: number, annualRatePercent: number, durationTicks: number): number {
+  const totalPayments = Math.max(1, Math.floor(durationTicks))
+  const principalPerTick = principal / totalPayments
+  const firstTickInterest = (principal * (annualRatePercent / 100)) / TICKS_PER_YEAR
+  return principalPerTick + firstTickInterest
 }
 
 /**
  * Returns the number of scheduled payments for a loan.
  */
 export function computeTotalPayments(durationTicks: number): number {
-  const ticksPerPayment = 720
-  return Math.max(1, Math.floor(durationTicks / ticksPerPayment))
+  return Math.max(1, Math.floor(durationTicks))
 }
 
 /**

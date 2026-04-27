@@ -31,6 +31,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - **SQLite is forbidden in this repository.** Do not add `UseSqlite`, `Microsoft.Data.Sqlite`, or SQLite-specific schema/query logic.
 - **All automated tests must use EF Core InMemory provider** (unique database name per test scope/factory) instead of SQLite files or `:memory:` connections.
 - **SQL commands are allowed only inside EF migration files.** In runtime services/initializers/tests, use LINQ and EF APIs only.
+- **Do not use `FromSqlInterpolated`, `FromSqlRaw`, or `ExecuteSql*` in runtime services/initializers/tests.** Use LINQ and EF APIs only; if legacy schema drift requires compatibility filtering, materialize with LINQ and perform safe in-memory matching rather than raw SQL.
 - When a backend model changes, always add the corresponding EF migration and make the startup upgrade path safe for a server restart onto the new build.
 - Never swallow `MigrateAsync()` failures for the game API. If schema upgrade fails, startup must fail so the server does not continue running with runtime `column does not exist` errors.
 - For every API model/migration change, add or update regression tests using EF InMemory to verify initialization and runtime behavior (idempotent startup, seeded data, and updated domain flow).
@@ -268,6 +269,21 @@ cd projects/MasterApi
 dotnet run           # API server on :44364
 dotnet build
 ```
+
+## Docker Compose startup debugging (clean PostgreSQL)
+- Do not use or recreate manual migration scripts (`Manage-ApiMigrations.ps1`, `Manage-MasterMigrations.ps1`). Startup migrations must run from application boot (`MigrateAsync()` in initializers) against PostgreSQL.
+- The canonical clean-start command sequence is:
+```bash
+cd projects
+docker-compose down -v --remove-orphans
+docker-compose up --build -d
+docker-compose ps
+docker-compose logs --no-color --tail=200 postgresmaster masterapi game1
+```
+- `postgresmaster` must be `healthy` before APIs start. Compose health checks are required so APIs do not crash on first boot while PostgreSQL is still initializing.
+- Keep PostgreSQL data mounted at `/var/lib/postgresql/data4` and bootstrap all required databases (`gamemaster`, `game1`) using `docker/postgres-init/01-create-game-databases.sql` for clean-volume startup.
+- For local container-to-container PostgreSQL connections, include `SSL Mode=Disable` in connection strings so containers do not require local TLS certificates.
+- If startup fails, triage in this order: (1) `docker-compose ps -a` container status, (2) PostgreSQL health/log readiness, (3) existence of `gamemaster` and `game1` databases, (4) API migration logs, (5) GraphQL health checks (`https://localhost:44364/graphql`, `https://localhost:44356/healthz`).
 
 ## Validation requirements before reporting completion
 - For backend changes, do not stop at Debug-only targeted tests. Always run the workflow-equivalent Release pipeline locally:

@@ -19,7 +19,7 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync()
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync()
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Game state is not initialized.")
@@ -59,7 +59,7 @@ public sealed partial class Mutation
         var subscriptionEndsAtUtc = await db.Players
             .Where(player => player.Id == userId)
             .Select(player => player.ProSubscriptionEndsAtUtc)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var hasActiveProSubscription = ProductAccessService.HasActiveProSubscription(subscriptionEndsAtUtc, DateTime.UtcNow);
         await EnsureSubmittedProductsAreAccessibleAsync(db, building, input.Units, hasActiveProSubscription);
         await ValidateMediaHouseReferencesAsync(db, building, input.Units);
@@ -83,7 +83,7 @@ public sealed partial class Mutation
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync()
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync()
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Game state is not initialized.")

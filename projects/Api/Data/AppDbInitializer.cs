@@ -51,7 +51,7 @@ public sealed partial class AppDbInitializer(
         }
         else
         {
-            var gameState = await dbContext.GameStates.FirstAsync();
+            var gameState = await dbContext.GameStates.FirstDeterministicAsync();
             if (gameState.TickIntervalSeconds <= 0)
             {
                 gameState.TickIntervalSeconds = seedOptions.Value.TickIntervalSeconds;
@@ -113,7 +113,7 @@ public sealed partial class AppDbInitializer(
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         await LandService.EnsureMinimumAvailableLotsAsync(dbContext, currentTick);
         await dbContext.SaveChangesAsync();
 
@@ -264,7 +264,7 @@ public sealed partial class AppDbInitializer(
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
             .Select(state => state.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var cities = await dbContext.Cities.AsNoTracking().ToListAsync();
 
         foreach (var city in cities)
@@ -343,8 +343,19 @@ public sealed partial class AppDbInitializer(
             await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(dbContext, govPlayer, 0m);
         }
 
-        var govCompany = await dbContext.Companies
-            .FirstOrDefaultAsync(company => company.PlayerId == govPlayer.Id && company.Name == GovDisplayName);
+        Company? govCompany;
+        if (dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            var companiesByName = await dbContext.Companies
+                .Where(company => company.Name == GovDisplayName)
+                .ToListAsync();
+            govCompany = companiesByName.FirstOrDefault(company => company.PlayerId == govPlayer.Id);
+        }
+        else
+        {
+            govCompany = await dbContext.Companies
+                .FirstOrDefaultAsync(company => company.PlayerId == govPlayer.Id && company.Name == GovDisplayName);
+        }
 
         if (govCompany is null)
         {

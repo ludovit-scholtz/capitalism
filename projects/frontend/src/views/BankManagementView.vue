@@ -8,8 +8,8 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
-import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, CollateralEligibilitySummary } from '@/types'
-import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass, computeCapacityUsedPercent, computeTotalRepayment, computePaymentAmount, computeTotalPayments } from '@/lib/loanHelpers'
+import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, PlayerBankAccountSummary } from '@/types'
+import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass } from '@/lib/loanHelpers'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -21,23 +21,22 @@ const bankBuildingId = computed(() => route.params.buildingId as string)
 
 const loading = ref(true)
 const error = ref<string | null>(null)
-const myOffers = ref<LoanOfferSummary[]>([])
 const issuedLoans = ref<LoanSummary[]>([])
 const bankDeposits = ref<BankDepositSummary[]>([])
 const bankInfo = ref<BankInfoSummary | null>(null)
 const userCompanies = ref<Company[]>([])
 
-// Ownership detection — check if any user company owns this bank building
-// (uses company buildings from me query, not bankInfo.lenderCompanyId)
+// Ownership detection uses the navbar-selected company and bank owner company id.
 const isOwner = computed(() => {
   if (!auth.isAuthenticated) return false
-  return userCompanies.value.some((c) => (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'))
+  const selectedCompany = getActiveCompany(auth.player, userCompanies.value)
+  const bankOwnerCompanyId = bankInfo.value?.lenderCompanyId
+  if (!selectedCompany || !bankOwnerCompanyId) return false
+  return selectedCompany.id === bankOwnerCompanyId
 })
 
 // Customer-specific state
-const bankLoanOffers = ref<LoanOfferSummary[]>([])
 const myDepositsHere = ref<BankDepositSummary[]>([])
-const customerDepositAmount = ref(0)
 const customerDepositLoading = ref(false)
 const customerDepositError = ref<string | null>(null)
 const customerDepositSuccess = ref(false)
@@ -48,21 +47,10 @@ const withdrawAmount = ref(0)
 const withdrawLoading = ref(false)
 const withdrawError = ref<string | null>(null)
 const withdrawSuccess = ref(false)
-
-// Loan acceptance modal state
-const showLoanModal = ref(false)
-const customerLoanOffer = ref<LoanOfferSummary | null>(null)
-const customerLoanPrincipal = ref(0)
-const customerLoanLoading = ref(false)
-const customerLoanError = ref<string | null>(null)
-const customerLoanSuccess = ref(false)
-// Collateral
-const collateralBuildings = ref<CollateralEligibilitySummary[]>([])
-const collateralBuildingsLoading = ref(false)
-const selectedCollateralBuildingId = ref<string | null>(null)
-const collateralLoadError = ref<string | null>(null)
 // My active loans at this bank (customer view)
 const myLoansHere = ref<LoanSummary[]>([])
+// Operating bank accounts matching the bank's city currency (customer view)
+const myOperatingAccountsHere = ref<PlayerBankAccountSummary[]>([])
 
 // Rate configuration form
 const showRatesForm = ref(false)
@@ -75,40 +63,6 @@ const ratesSuccess = ref(false)
 const baseDepositLoading = ref(false)
 const baseDepositError = ref<string | null>(null)
 const baseDepositSuccess = ref(false)
-
-// Publish offer form
-const showPublishForm = ref(false)
-const publishLoading = ref(false)
-const publishError = ref<string | null>(null)
-const offerForm = ref({
-  annualInterestRatePercent: 10,
-  maxPrincipalPerLoan: 50000,
-  totalCapacity: 200000,
-  durationTicks: 1440,
-})
-
-const MY_LOAN_OFFERS_QUERY = `
-  {
-    myLoanOffers {
-      id
-      bankBuildingId
-      bankBuildingName
-      cityId
-      cityName
-      lenderCompanyId
-      lenderCompanyName
-      annualInterestRatePercent
-      maxPrincipalPerLoan
-      totalCapacity
-      usedCapacity
-      remainingCapacity
-      durationTicks
-      isActive
-      createdAtTick
-      createdAtUtc
-    }
-  }
-`
 
 const BANK_LOANS_QUERY = `
   query BankLoans($bankBuildingId: UUID!) {
@@ -139,35 +93,6 @@ const BANK_LOANS_QUERY = `
       collateralBuildingId
       collateralBuildingName
       collateralAppraisedValue
-    }
-  }
-`
-
-const PUBLISH_OFFER_MUTATION = `
-  mutation PublishLoanOffer($input: PublishLoanOfferInput!) {
-    publishLoanOffer(input: $input) {
-      id
-      isActive
-      annualInterestRatePercent
-    }
-  }
-`
-
-const UPDATE_OFFER_MUTATION = `
-  mutation UpdateLoanOffer($input: UpdateLoanOfferInput!) {
-    updateLoanOffer(input: $input) {
-      id
-      isActive
-      annualInterestRatePercent
-    }
-  }
-`
-
-const DEACTIVATE_OFFER_MUTATION = `
-  mutation DeactivateLoanOffer($id: UUID!) {
-    deactivateLoanOffer(loanOfferId: $id) {
-      id
-      isActive
     }
   }
 `
@@ -258,21 +183,19 @@ const MY_COMPANIES_QUERY = `
   }
 `
 
-const PUBLIC_LOAN_OFFERS_QUERY = `
+const MY_BANK_ACCOUNTS_QUERY = `
   {
-    loanOffers {
+    myBankAccounts {
       id
+      accountNumber
+      currencyCode
+      currencySymbol
+      balance
+      companyId
+      companyName
+      ownerType
+      ownerDisplayName
       bankBuildingId
-      bankBuildingName
-      lenderCompanyId
-      lenderCompanyName
-      annualInterestRatePercent
-      maxPrincipalPerLoan
-      totalCapacity
-      usedCapacity
-      remainingCapacity
-      durationTicks
-      isActive
     }
   }
 `
@@ -360,33 +283,6 @@ const INITIATE_BASE_DEPOSIT_MUTATION = `
   }
 `
 
-const ACCEPT_LOAN_MUTATION = `
-  mutation AcceptLoan($input: AcceptLoanInput!) {
-    acceptLoan(input: $input) {
-      id
-      status
-      originalPrincipal
-    }
-  }
-`
-
-const MY_COLLATERAL_BUILDINGS_QUERY = `
-  {
-    myCollateralBuildings {
-      buildingId
-      buildingName
-      buildingType
-      level
-      appraisedValue
-      maxBorrowable
-      existingSecuredExposure
-      remainingBorrowingCapacity
-      isEligible
-      ineligibilityReason
-    }
-  }
-`
-
 async function loadData(isRefresh = false) {
   if (!isRefresh) {
     loading.value = true
@@ -403,12 +299,12 @@ async function loadData(isRefresh = false) {
     bankInfo.value = infoResult.bankInfo ?? null
     userCompanies.value = companiesResult.me?.companies ?? []
 
-    const ownerDetected = userCompanies.value.some((c) => (c.buildings ?? []).some((b) => b.id === bankBuildingId.value && b.type === 'BANK'))
+    const selectedCompany = getActiveCompany(auth.player, userCompanies.value)
+    const ownerDetected = !!selectedCompany && selectedCompany.id === bankInfo.value?.lenderCompanyId
 
     if (ownerDetected) {
       // Owner view: load full management data
-      const [offersResult, loansResult, depositsResult] = await Promise.all([
-        gqlRequest<{ myLoanOffers: LoanOfferSummary[] }>(MY_LOAN_OFFERS_QUERY),
+      const [loansResult, depositsResult] = await Promise.all([
         gqlRequest<{ bankLoans: LoanSummary[] }>(BANK_LOANS_QUERY, {
           bankBuildingId: bankBuildingId.value,
         }),
@@ -416,10 +312,6 @@ async function loadData(isRefresh = false) {
           id: bankBuildingId.value,
         }),
       ])
-      const filtered = (offersResult.myLoanOffers ?? []).filter((o) => o.bankBuildingId === bankBuildingId.value)
-      if (!deepEqual(myOffers.value, filtered)) {
-        myOffers.value = filtered
-      }
       const loans = loansResult.bankLoans ?? []
       if (!deepEqual(issuedLoans.value, loans)) {
         issuedLoans.value = loans
@@ -433,16 +325,12 @@ async function loadData(isRefresh = false) {
         ratesForm.value.lendingInterestRatePercent = bankInfo.value.lendingInterestRatePercent
       }
     } else {
-      // Customer view: load public loan offers, my deposits, and my loans at this bank
-      const [offersResult, depositsResult, myLoansResult] = await Promise.all([
-        gqlRequest<{ loanOffers: LoanOfferSummary[] }>(PUBLIC_LOAN_OFFERS_QUERY),
+      // Customer view: load deposit relationship, active loans, and operating accounts at this bank.
+      const [depositsResult, myLoansResult, accountsResult] = await Promise.all([
         auth.isAuthenticated ? gqlRequest<{ myDeposits: BankDepositSummary[] }>(MY_DEPOSITS_QUERY) : Promise.resolve({ myDeposits: [] }),
         auth.isAuthenticated ? gqlRequest<{ myLoans: LoanSummary[] }>(MY_LOANS_QUERY) : Promise.resolve({ myLoans: [] }),
+        auth.isAuthenticated ? gqlRequest<{ myBankAccounts: PlayerBankAccountSummary[] }>(MY_BANK_ACCOUNTS_QUERY) : Promise.resolve({ myBankAccounts: [] }),
       ])
-      const bankOffers = (offersResult.loanOffers ?? []).filter((o) => o.bankBuildingId === bankBuildingId.value && o.isActive)
-      if (!deepEqual(bankLoanOffers.value, bankOffers)) {
-        bankLoanOffers.value = bankOffers
-      }
       const myDeposits = (depositsResult.myDeposits ?? []).filter((d) => d.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myDepositsHere.value, myDeposits)) {
         myDepositsHere.value = myDeposits
@@ -450,6 +338,15 @@ async function loadData(isRefresh = false) {
       const loansHere = (myLoansResult.myLoans ?? []).filter((l: LoanSummary) => l.bankBuildingId === bankBuildingId.value)
       if (!deepEqual(myLoansHere.value, loansHere)) {
         myLoansHere.value = loansHere
+      }
+      // Operating accounts for the active company matching this bank's city currency
+      const bankCurrency = bankInfo.value?.cityCurrencyCode
+      const activeComp = getActiveCompany(auth.player, userCompanies.value)
+      const operatingAccounts = (accountsResult.myBankAccounts ?? []).filter(
+        (a) => a.ownerType === 'COMPANY' && a.companyId === activeComp?.id && bankCurrency && a.currencyCode.toUpperCase() === bankCurrency.toUpperCase() && a.bankBuildingId === bankBuildingId.value,
+      )
+      if (!deepEqual(myOperatingAccountsHere.value, operatingAccounts)) {
+        myOperatingAccountsHere.value = operatingAccounts
       }
     }
   } catch (err) {
@@ -478,42 +375,6 @@ const fmt = (amount: number) => formatCurrency(amount, cityCurrency.value)
 const totalIssuedCapacity = computed(() => issuedLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE').reduce((sum, l) => sum + l.remainingPrincipal, 0))
 
 const expectedMonthlyIncome = computed(() => issuedLoans.value.filter((l) => l.status === 'ACTIVE' || l.status === 'OVERDUE').reduce((sum, l) => sum + l.paymentAmount, 0))
-
-async function publishOffer() {
-  if (!bankBuildingId.value) return
-  publishLoading.value = true
-  publishError.value = null
-  try {
-    await gqlRequest(PUBLISH_OFFER_MUTATION, {
-      input: {
-        bankBuildingId: bankBuildingId.value,
-        ...offerForm.value,
-      },
-    })
-    showPublishForm.value = false
-    offerForm.value = { annualInterestRatePercent: 10, maxPrincipalPerLoan: 50000, totalCapacity: 200000, durationTicks: 1440 }
-    await loadData()
-  } catch (err) {
-    publishError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    publishLoading.value = false
-  }
-}
-
-async function toggleOfferActive(offer: LoanOfferSummary) {
-  try {
-    if (offer.isActive) {
-      await gqlRequest(DEACTIVATE_OFFER_MUTATION, { id: offer.id })
-    } else {
-      await gqlRequest(UPDATE_OFFER_MUTATION, {
-        input: { loanOfferId: offer.id, isActive: true },
-      })
-    }
-    await loadData()
-  } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
-  }
-}
 
 async function saveRates() {
   if (!bankBuildingId.value) return
@@ -559,9 +420,34 @@ async function submitBaseDeposit() {
 
 const activeCompany = computed(() => getActiveCompany(auth.player, userCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
+const directBorrowingOption = computed<LoanOfferSummary | null>(() => {
+  if (!bankInfo.value?.baseCapitalDeposited) {
+    return null
+  }
+
+  return {
+    id: bankInfo.value.bankBuildingId,
+    bankBuildingId: bankInfo.value.bankBuildingId,
+    bankBuildingName: bankInfo.value.bankBuildingName,
+    cityId: bankInfo.value.cityId,
+    cityName: bankInfo.value.cityName,
+    lenderCompanyId: bankInfo.value.lenderCompanyId,
+    lenderCompanyName: bankInfo.value.lenderCompanyName,
+    annualInterestRatePercent: bankInfo.value.lendingInterestRatePercent,
+    maxPrincipalPerLoan: Math.max(bankInfo.value.availableLendingCapacity, 0),
+    totalCapacity: bankInfo.value.lendableCapacity,
+    usedCapacity: bankInfo.value.outstandingLoanPrincipal,
+    remainingCapacity: Math.max(bankInfo.value.availableLendingCapacity, 0),
+    durationTicks: 8760,
+    isActive: bankInfo.value.availableLendingCapacity > 0,
+    createdAtTick: 0,
+    createdAtUtc: '',
+  }
+})
 
 // Account-style aggregation: treat all active non-base-capital deposits from active company as one account
 const myActiveDepositsHere = computed(() => myDepositsHere.value.filter((d) => d.isActive && !d.isBaseCapital))
+const hasCustomerAccount = computed(() => myActiveDepositsHere.value.length > 0)
 const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
 const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
 // The oldest tranche is used first for partial withdrawals.
@@ -588,7 +474,7 @@ async function submitCustomerDeposit() {
       input: {
         bankBuildingId: bankBuildingId.value,
         depositorCompanyId: activeCompany.value.id,
-        amount: customerDepositAmount.value,
+        amount: 0,
       },
     })
     customerDepositSuccess.value = true
@@ -634,92 +520,6 @@ async function submitWithdraw() {
 function navigateToForexTransfer() {
   router.push('/forex?tab=transfer')
 }
-
-async function submitCustomerLoan() {
-  if (!customerLoanOffer.value || !activeCompany.value) return
-  customerLoanLoading.value = true
-  customerLoanError.value = null
-  customerLoanSuccess.value = false
-  try {
-    await gqlRequest(ACCEPT_LOAN_MUTATION, {
-      input: {
-        loanOfferId: customerLoanOffer.value.id,
-        borrowerCompanyId: activeCompany.value.id,
-        principalAmount: customerLoanPrincipal.value,
-        collateralBuildingId: selectedCollateralBuildingId.value ?? undefined,
-      },
-    })
-    customerLoanSuccess.value = true
-    closeLoanModal()
-    await loadData()
-    setTimeout(() => {
-      customerLoanSuccess.value = false
-    }, 3000)
-  } catch (err) {
-    customerLoanError.value = err instanceof Error ? err.message : String(err)
-  } finally {
-    customerLoanLoading.value = false
-  }
-}
-
-async function selectLoanOffer(offer: LoanOfferSummary) {
-  customerLoanOffer.value = offer
-  customerLoanPrincipal.value = Math.min(offer.maxPrincipalPerLoan, offer.remainingCapacity)
-  customerLoanError.value = null
-  selectedCollateralBuildingId.value = null
-  collateralBuildings.value = []
-  collateralLoadError.value = null
-  showLoanModal.value = true
-  // Load eligible collateral buildings asynchronously (modal shows loading state)
-  if (auth.isAuthenticated) {
-    collateralBuildingsLoading.value = true
-    try {
-      const result = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY)
-      collateralBuildings.value = result.myCollateralBuildings ?? []
-    } catch (err) {
-      collateralLoadError.value = err instanceof Error ? err.message : String(err)
-    } finally {
-      collateralBuildingsLoading.value = false
-    }
-  }
-}
-
-function closeLoanModal() {
-  showLoanModal.value = false
-  customerLoanOffer.value = null
-  customerLoanError.value = null
-  selectedCollateralBuildingId.value = null
-  collateralBuildings.value = []
-  collateralBuildingsLoading.value = false
-  collateralLoadError.value = null
-}
-
-const selectedCollateral = computed<CollateralEligibilitySummary | null>(
-  () => collateralBuildings.value.find((b: CollateralEligibilitySummary) => b.buildingId === selectedCollateralBuildingId.value) ?? null,
-)
-
-const collateralCapacityWarning = computed(() => {
-  if (!selectedCollateral.value || customerLoanPrincipal.value <= 0) return null
-  if (customerLoanPrincipal.value > selectedCollateral.value.remainingBorrowingCapacity) {
-    return t('bank.collateralExceedsLimit')
-  }
-  return null
-})
-
-const estimatedCustomerTotalRepayment = computed(() => {
-  if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
-  return computeTotalRepayment(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, customerLoanOffer.value.durationTicks)
-})
-
-const estimatedCustomerPaymentAmount = computed(() => {
-  if (!customerLoanOffer.value || customerLoanPrincipal.value <= 0) return 0
-  return computePaymentAmount(customerLoanPrincipal.value, customerLoanOffer.value.annualInterestRatePercent, customerLoanOffer.value.durationTicks)
-})
-
-const estimatedCustomerTotalPayments = computed(() => {
-  if (!customerLoanOffer.value) return 0
-  return computeTotalPayments(customerLoanOffer.value.durationTicks)
-})
 </script>
 
 <template>
@@ -963,86 +763,6 @@ const estimatedCustomerTotalPayments = computed(() => {
           </div>
         </div>
 
-        <!-- Loan Offers Management -->
-        <section v-if="bankInfo?.baseCapitalDeposited" class="offers-section">
-          <div class="section-header">
-            <h2 class="section-title">{{ t('bank.loanOffers') }}</h2>
-            <button class="btn btn-primary btn-sm" @click="showPublishForm = !showPublishForm">
-              {{ showPublishForm ? t('common.cancel') : t('bank.publishOffer') }}
-            </button>
-          </div>
-
-          <!-- Publish Form -->
-          <div v-if="showPublishForm" class="publish-form">
-            <h3>{{ t('bank.publishOffer') }}</h3>
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="offer-interest-rate">{{ t('bank.interestRate') }} (%)</label>
-                <input id="offer-interest-rate" v-model.number="offerForm.annualInterestRatePercent" type="number" min="0.1" max="200" step="0.1" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label for="offer-max-principal">{{ t('bank.maxPrincipal') }} ($)</label>
-                <input id="offer-max-principal" v-model.number="offerForm.maxPrincipalPerLoan" type="number" min="1000" step="1000" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label for="offer-total-capacity">{{ t('bank.totalCapacity') }} ($)</label>
-                <input id="offer-total-capacity" v-model.number="offerForm.totalCapacity" type="number" min="1000" step="1000" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label for="offer-duration">{{ t('bank.durationTicks') }}</label>
-                <input id="offer-duration" v-model.number="offerForm.durationTicks" type="number" min="24" max="87600" step="24" class="form-input" />
-                <span class="form-hint">{{ formatLoanDuration(offerForm.durationTicks) }}</span>
-              </div>
-            </div>
-            <div v-if="publishError" class="error-message">{{ publishError }}</div>
-            <button class="btn btn-primary" :disabled="publishLoading" @click="publishOffer">
-              {{ publishLoading ? t('common.loading') : t('bank.publishOffer') }}
-            </button>
-          </div>
-
-          <!-- Offers list -->
-          <div v-if="myOffers.length === 0" class="empty-state">
-            <p>No loan offers published for this bank yet.</p>
-          </div>
-          <div v-else class="offers-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>{{ t('bank.interestRate') }}</th>
-                  <th>{{ t('bank.maxPrincipal') }}</th>
-                  <th>{{ t('bank.remainingCapacity') }}</th>
-                  <th>{{ t('bank.duration') }}</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="offer in myOffers" :key="offer.id">
-                  <td>{{ formatPercent(offer.annualInterestRatePercent) }}</td>
-                  <td>{{ fmt(offer.maxPrincipalPerLoan) }}</td>
-                  <td>
-                    {{ fmt(offer.remainingCapacity) }}
-                    <div class="capacity-bar">
-                      <div class="capacity-fill" :style="{ width: `${computeCapacityUsedPercent(offer)}%` }" />
-                    </div>
-                  </td>
-                  <td>{{ formatLoanDuration(offer.durationTicks) }}</td>
-                  <td>
-                    <span class="status-pill" :class="offer.isActive ? 'status-active' : 'status-inactive'">
-                      {{ offer.isActive ? 'Active' : 'Inactive' }}
-                    </span>
-                  </td>
-                  <td>
-                    <button class="btn btn-sm btn-secondary" @click="toggleOfferActive(offer)">
-                      {{ offer.isActive ? t('bank.deactivateOffer') : t('bank.activateOffer') }}
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
         <!-- Issued Loans -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
           <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
@@ -1109,151 +829,163 @@ const estimatedCustomerTotalPayments = computed(() => {
             </div>
           </div>
         </div>
-
-        <!-- Account-style deposit relationship -->
-        <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div class="account-header-info flex flex-col gap-2">
-              <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myAccount') }}</h2>
-              <span
-                class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
-                >{{ activeCompany?.name }}</span
-              >
-            </div>
-            <div class="account-actions flex flex-wrap gap-3" v-if="myAccountBalance > 0">
-              <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
-                {{ t('bank.addFundsViaForex') }}
-              </button>
-              <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
-                {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
-              </button>
-            </div>
-          </div>
-
-          <!-- Account balance card -->
-          <div v-if="myAccountBalance > 0" class="account-balance-card mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-            <div class="account-balance-main flex flex-col gap-1">
-              <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
-              <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
-            </div>
-            <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
-              <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
-              <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
-              <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
-            </div>
-          </div>
-
-          <!-- Withdraw form -->
-          <div v-if="showWithdrawForm" class="account-action-form mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-            <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
-            <div class="form-group mt-4 flex flex-col gap-3">
-              <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
-              <input
-                id="withdraw-amount"
-                v-model.number="withdrawAmount"
-                type="number"
-                :min="1"
-                :max="myAccountBalance"
-                step="1000"
-                class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
-              />
-              <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
-            </div>
-            <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
-            <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
-              {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
-            </button>
-          </div>
-
-          <!-- Success messages -->
-          <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
-          <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
-
-          <!-- First deposit (no account yet) -->
-          <div v-if="myAccountBalance === 0 && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-            <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
-            <div class="form-group flex flex-col gap-3">
-              <label for="customer-deposit-amount" class="text-sm font-semibold text-body">{{ t('bank.depositAmount') }}</label>
-              <input
-                id="customer-deposit-amount"
-                v-model.number="customerDepositAmount"
-                type="number"
-                min="0"
-                step="0.01"
-                class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
-              />
-              <span class="form-hint text-sm text-muted">{{ t('bank.depositAmountHint') }}</span>
-              <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
-            </div>
-            <div v-if="bankInfo" class="repayment-preview rounded-2xl border border-divider bg-card px-4 py-4">
-              <div class="preview-row flex items-center justify-between gap-4 text-sm">
-                <span>{{ t('bank.depositInterestRate') }}</span>
-                <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+        <div class="flex flex-row gap-4">
+          <!-- Account-style deposit relationship -->
+          <section v-if="auth.isAuthenticated && isCompanyAccountActive" class="customer-account-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+            <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div class="account-header-info flex flex-row gap-2">
+                <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
+                <span
+                  class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
+                >
+                  {{ activeCompany?.name }}
+                </span>
               </div>
-            </div>
-            <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
-            <button class="btn btn-primary" :disabled="customerDepositLoading || customerDepositAmount < 0" @click="submitCustomerDeposit">
-              {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
-            </button>
-          </div>
-        </section>
-
-        <!-- Prompt to log in or switch account if not in company mode -->
-        <section v-else class="customer-deposit-form-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
-          <div v-if="!auth.isAuthenticated" class="auth-prompt mt-4 flex flex-col gap-4">
-            <p>{{ t('bank.loginToLendDescription') }}</p>
-            <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
-          </div>
-          <div v-else class="auth-prompt mt-4">
-            <p>{{ t('bank.companyAccountRequired') }}</p>
-          </div>
-        </section>
-
-        <!-- Available loan offers -->
-        <section class="customer-loans-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-          <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.loanOffers') }}</h2>
-          <div v-if="bankLoanOffers.length === 0" class="empty-state">
-            <p>{{ t('bank.noOffersFromBank') }}</p>
-          </div>
-          <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            <div v-for="offer in bankLoanOffers" :key="offer.id" class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
-              <div class="customer-offer-header">
-                <span class="offer-rate-big">{{ formatPercent(offer.annualInterestRatePercent) }}</span>
-                <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
-              </div>
-              <div class="customer-offer-stats">
-                <div class="offer-stat-row">
-                  <span>{{ t('bank.maxPrincipal') }}</span>
-                  <strong>{{ fmt(offer.maxPrincipalPerLoan) }}</strong>
-                </div>
-                <div class="offer-stat-row">
-                  <span>{{ t('bank.remainingCapacity') }}</span>
-                  <strong :class="offer.remainingCapacity > 0 ? 'positive' : 'muted'">
-                    {{ fmt(offer.remainingCapacity) }}
-                  </strong>
-                </div>
-                <div class="offer-stat-row">
-                  <span>{{ t('bank.duration') }}</span>
-                  <strong>{{ formatLoanDuration(offer.durationTicks) }}</strong>
-                </div>
-              </div>
-
-              <!-- Loan request: just the Accept button (opens modal) -->
-              <div v-if="auth.isAuthenticated && isCompanyAccountActive && offer.remainingCapacity > 0">
-                <button class="btn btn-primary btn-sm" @click="selectLoanOffer(offer)">
-                  {{ t('bank.acceptLoan') }}
+              <div class="account-actions flex flex-wrap gap-3" v-if="hasCustomerAccount && myAccountBalance > 0">
+                <button class="btn btn-secondary btn-sm" @click="navigateToForexTransfer">
+                  {{ t('bank.addFundsViaForex') }}
+                </button>
+                <button class="btn btn-outline btn-sm" @click="showWithdrawForm = !showWithdrawForm">
+                  {{ showWithdrawForm ? t('common.cancel') : t('bank.withdraw') }}
                 </button>
               </div>
-              <div v-else-if="!auth.isAuthenticated">
-                <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
-              </div>
-              <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
-              <p v-else class="offer-context-hint muted">No capacity available</p>
             </div>
-          </div>
-        </section>
 
+            <!-- Operating bank accounts for this company in the bank's city currency -->
+            <div v-if="myOperatingAccountsHere.length > 0" class="mt-6 flex flex-col gap-3">
+              <h3 class="text-sm font-semibold uppercase tracking-wide text-muted">{{ t('bank.operatingAccounts') }}</h3>
+              <div
+                v-for="account in myOperatingAccountsHere"
+                :key="account.id"
+                class="operating-account-row flex items-center justify-between gap-4 rounded-2xl border border-divider bg-card-raised px-5 py-4 shadow-sm"
+              >
+                <div class="flex flex-col gap-0.5">
+                  <span class="text-xs text-muted">{{ t('bank.accountNumber') }}</span>
+                  <span class="font-mono text-sm font-semibold text-body">{{ account.accountNumber }}</span>
+                </div>
+                <div class="flex flex-col items-end gap-0.5">
+                  <span class="text-xs text-muted">{{ t('bank.accountBalance') }}</span>
+                  <span class="text-base font-bold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
+                </div>
+                <router-link :to="`/bank-statement/${account.companyId}`" class="btn btn-outline btn-sm shrink-0">
+                  {{ t('bankStatement.title') }}
+                </router-link>
+              </div>
+            </div>
+
+            <!-- Account balance card -->
+            <div v-if="hasCustomerAccount" class="account-balance-card mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+              <div class="account-balance-main flex flex-col gap-1">
+                <span class="account-balance-label">{{ t('bank.accountBalance') }}</span>
+                <span class="account-balance-value">{{ fmt(myAccountBalance) }}</span>
+              </div>
+              <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
+                <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
+                <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
+                <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
+              </div>
+            </div>
+
+            <!-- Withdraw form -->
+            <div v-if="showWithdrawForm" class="account-action-form mt-6 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+              <h3 class="action-form-title text-lg font-semibold text-body">{{ t('bank.withdraw') }}</h3>
+              <div class="form-group mt-4 flex flex-col gap-3">
+                <label for="withdraw-amount" class="text-sm font-semibold text-body">{{ t('bank.withdrawAmount') }}</label>
+                <input
+                  id="withdraw-amount"
+                  v-model.number="withdrawAmount"
+                  type="number"
+                  :min="1"
+                  :max="myAccountBalance"
+                  step="1000"
+                  class="form-input rounded-2xl border border-divider bg-card px-4 py-3 text-base text-body"
+                />
+                <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
+              </div>
+              <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
+              <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
+                {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
+              </button>
+            </div>
+
+            <!-- Success messages -->
+            <div v-if="withdrawSuccess" class="success-message">{{ t('bank.withdrawSuccess') }}</div>
+            <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
+
+            <!-- First deposit (no account yet) -->
+            <div v-if="!hasCustomerAccount && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+              <p class="account-empty-hint text-sm text-muted sm:text-base">{{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}</p>
+              <p class="rounded-2xl border border-divider bg-card px-4 py-3 text-sm text-muted">{{ t('bank.zeroBalanceFundingHint') }}</p>
+              <div v-if="bankInfo" class="repayment-preview rounded-2xl border border-divider bg-card px-4 py-4">
+                <div class="preview-row flex items-center justify-between gap-4 text-sm">
+                  <span>{{ t('bank.depositInterestRate') }}</span>
+                  <strong>{{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
+                </div>
+              </div>
+              <div v-if="customerDepositError" class="error-message">{{ customerDepositError }}</div>
+              <button class="btn btn-primary" :disabled="customerDepositLoading" @click="submitCustomerDeposit">
+                {{ customerDepositLoading ? t('common.loading') : t('bank.openAccount') }}
+              </button>
+            </div>
+          </section>
+
+          <!-- Prompt to log in or switch account if not in company mode -->
+          <section v-else class="customer-deposit-form-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
+            <div v-if="!auth.isAuthenticated" class="auth-prompt mt-4 flex flex-col gap-4">
+              <p>{{ t('bank.loginToLendDescription') }}</p>
+              <router-link to="/login" class="btn btn-primary">{{ t('auth.login') }}</router-link>
+            </div>
+            <div v-else class="auth-prompt mt-4">
+              <p>{{ t('bank.companyAccountRequired') }}</p>
+            </div>
+          </section>
+
+          <!-- Direct loan request -->
+          <section class="customer-loans-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.borrowFromThisBank') }}</h2>
+            <div v-if="!directBorrowingOption" class="empty-state">
+              <p>{{ t('bank.noOffersFromBank') }}</p>
+            </div>
+            <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              <div class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
+                <div class="customer-offer-header">
+                  <span class="offer-rate-big">{{ formatPercent(directBorrowingOption.annualInterestRatePercent) }}</span>
+                  <span class="offer-rate-hint">{{ t('bank.perYear') }}</span>
+                </div>
+                <div class="customer-offer-stats">
+                  <div class="offer-stat-row">
+                    <span>{{ t('bank.maxPrincipal') }}</span>
+                    <strong>{{ fmt(directBorrowingOption.maxPrincipalPerLoan) }}</strong>
+                  </div>
+                  <div class="offer-stat-row">
+                    <span>{{ t('bank.remainingCapacity') }}</span>
+                    <strong :class="directBorrowingOption.remainingCapacity > 0 ? 'positive' : 'muted'">
+                      {{ fmt(directBorrowingOption.remainingCapacity) }}
+                    </strong>
+                  </div>
+                  <div class="offer-stat-row">
+                    <span>{{ t('bank.duration') }}</span>
+                    <strong>{{ formatLoanDuration(directBorrowingOption.durationTicks) }}</strong>
+                  </div>
+                </div>
+                <p class="offer-context-hint">{{ t('bank.directBorrowingHint') }}</p>
+
+                <!-- Loan request: dedicated full-page form -->
+                <div v-if="auth.isAuthenticated && isCompanyAccountActive && directBorrowingOption.remainingCapacity > 0">
+                  <button class="btn btn-primary btn-sm" @click="router.push({ name: 'bank-loan-request', params: { buildingId: bankBuildingId } })">
+                    {{ t('bank.acceptLoan') }}
+                  </button>
+                </div>
+                <div v-else-if="!auth.isAuthenticated">
+                  <router-link to="/login" class="btn btn-secondary btn-sm">{{ t('auth.login') }}</router-link>
+                </div>
+                <p v-else-if="!isCompanyAccountActive" class="offer-context-hint">{{ t('bank.companyAccountRequired') }}</p>
+                <p v-else class="offer-context-hint muted">{{ t('bank.noCapacityAvailable') }}</p>
+              </div>
+            </div>
+          </section>
+        </div>
         <!-- My Loans at This Bank -->
         <section v-if="auth.isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
           <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>
@@ -1272,106 +1004,6 @@ const estimatedCustomerTotalPayments = computed(() => {
         </section> </template
       ><!-- end customer view -->
     </template>
-
-    <!-- Accept Loan Modal (with collateral selection) -->
-    <div v-if="showLoanModal && customerLoanOffer" class="modal-overlay" @click.self="closeLoanModal">
-      <div class="modal" role="dialog" :aria-label="t('bank.confirmAccept')">
-        <div class="modal-header">
-          <h2>{{ t('bank.confirmAccept') }}</h2>
-          <button class="modal-close" @click="closeLoanModal" :aria-label="t('common.close')">✕</button>
-        </div>
-        <div class="modal-body">
-          <!-- Loan summary -->
-          <div class="loan-summary">
-            <div class="summary-row">
-              <span>{{ t('bank.interestRate') }}</span>
-              <strong>{{ formatPercent(customerLoanOffer.annualInterestRatePercent) }} {{ t('bank.perYear') }}</strong>
-            </div>
-            <div class="summary-row">
-              <span>{{ t('bank.duration') }}</span>
-              <strong>{{ formatLoanDuration(customerLoanOffer.durationTicks) }}</strong>
-            </div>
-          </div>
-
-          <!-- Principal amount -->
-          <div class="form-group">
-            <label for="principal-amount">{{ t('bank.principalAmount') }}</label>
-            <input
-              id="principal-amount"
-              v-model.number="customerLoanPrincipal"
-              type="number"
-              :min="1000"
-              :max="Math.min(customerLoanOffer.maxPrincipalPerLoan, customerLoanOffer.remainingCapacity)"
-              step="1000"
-              class="form-input"
-            />
-          </div>
-
-          <!-- Repayment preview -->
-          <div class="repayment-summary">
-            <div class="summary-row">
-              <span>{{ t('bank.paymentAmount') }}</span>
-              <strong>{{ fmt(estimatedCustomerPaymentAmount) }} × {{ estimatedCustomerTotalPayments }}</strong>
-            </div>
-            <div class="summary-row total-row">
-              <span>{{ t('bank.totalRepayment') }}</span>
-              <strong>{{ fmt(estimatedCustomerTotalRepayment) }}</strong>
-            </div>
-          </div>
-
-          <!-- Collateral selection -->
-          <div class="form-group collateral-group">
-            <label>{{ t('bank.collateralOptional') }}</label>
-            <p class="form-hint">{{ t('bank.collateralHint') }}</p>
-            <div v-if="collateralBuildingsLoading" class="form-hint muted-hint">{{ t('common.loading') }}</div>
-            <div v-else-if="collateralLoadError" class="form-hint error-inline">{{ collateralLoadError }}</div>
-            <div v-else-if="collateralBuildings.length === 0" class="form-hint muted-hint">{{ t('bank.noBuildingsForCollateral') }}</div>
-            <div v-else class="collateral-list">
-              <!-- None option -->
-              <label class="collateral-option" :class="{ selected: selectedCollateralBuildingId === null }">
-                <input type="radio" :value="null" v-model="selectedCollateralBuildingId" class="collateral-radio" />
-                <span class="collateral-option-name">{{ t('bank.collateralNone') }}</span>
-              </label>
-              <!-- Building options -->
-              <label v-for="b in collateralBuildings" :key="b.buildingId" class="collateral-option" :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }">
-                <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" class="collateral-radio" :disabled="!b.isEligible" />
-                <div class="collateral-option-info">
-                  <span class="collateral-option-name">{{ b.buildingName }}</span>
-                  <span v-if="!b.isEligible" class="ineligible-tag">{{ b.ineligibilityReason ?? t('bank.collateralAlreadyPledged') }}</span>
-                  <div class="collateral-stats">
-                    <span>{{ t('bank.collateralAppraisedValue') }}: {{ fmt(b.appraisedValue) }}</span>
-                    <span>{{ t('bank.collateralMaxBorrowable') }}: {{ fmt(b.maxBorrowable) }}</span>
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          <!-- Selected collateral summary -->
-          <div v-if="selectedCollateral" class="collateral-selected-summary">
-            <strong>{{ selectedCollateral.buildingName }}</strong>
-            <span>{{ t('bank.remainingCapacity') }}: {{ fmt(selectedCollateral.remainingBorrowingCapacity) }}</span>
-            <!-- LTV capacity bar -->
-            <div class="capacity-bar-wrap">
-              <div class="capacity-bar" :style="{ width: Math.min(100, (customerLoanPrincipal / selectedCollateral.maxBorrowable) * 100) + '%' }"></div>
-            </div>
-          </div>
-
-          <!-- Collateral cap warning -->
-          <div v-if="collateralCapacityWarning" class="error-inline">{{ collateralCapacityWarning }}</div>
-
-          <p class="risk-warning">⚠ {{ t('bank.riskWarning') }}</p>
-          <div v-if="customerLoanSuccess" class="success-message">{{ t('bank.loanAcceptedSuccess') }}</div>
-          <div v-if="customerLoanError" class="error-message">{{ customerLoanError }}</div>
-        </div>
-        <div class="modal-footer">
-          <button class="btn btn-secondary" @click="closeLoanModal">{{ t('common.cancel') }}</button>
-          <button class="btn btn-primary" :disabled="customerLoanLoading || customerLoanPrincipal <= 0 || !!collateralCapacityWarning" @click="submitCustomerLoan">
-            {{ customerLoanLoading ? t('common.loading') : t('bank.acceptLoan') }}
-          </button>
-        </div>
-      </div>
-    </div>
   </main>
 </template>
 
@@ -2236,106 +1868,6 @@ th {
   padding: var(--spacing-sm) var(--spacing-lg);
 }
 
-/* ── Accept Loan Modal ─────────────────────────────────────────────────────── */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: var(--color-surface, #fff);
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 560px;
-  max-height: 90vh;
-  overflow-y: auto;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--spacing-lg);
-  border-bottom: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.15rem;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  font-size: 1.25rem;
-  cursor: pointer;
-  color: var(--color-text-muted);
-  padding: 0.25rem;
-}
-
-.modal-body {
-  padding: var(--spacing-lg);
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.modal-footer {
-  display: flex;
-  gap: var(--spacing-sm);
-  justify-content: flex-end;
-  padding: var(--spacing-lg);
-  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
-}
-
-.collateral-group {
-  border-top: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
-  padding-top: var(--spacing-md);
-}
-
-.collateral-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  margin-top: var(--spacing-sm);
-}
-
-.collateral-option {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm);
-  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.1));
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.collateral-option.selected {
-  border-color: var(--color-primary, #3b82f6);
-  background: rgba(59, 130, 246, 0.06);
-}
-
-.collateral-option.ineligible {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.collateral-option-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.collateral-option-name {
-  font-weight: 600;
-}
-
 .ineligible-tag {
   font-size: 0.78rem;
   color: var(--color-danger, #ef4444);
@@ -2437,16 +1969,6 @@ th {
   gap: var(--spacing-sm);
 }
 
-.account-header-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.account-header-info .section-title {
-  margin: 0;
-}
-
 .account-company-tag {
   font-size: 0.85rem;
   color: var(--color-text-secondary);
@@ -2530,7 +2052,7 @@ th {
 }
 
 .account-empty-state {
-  padding: var(--spacing-md) 0;
+  padding: var(--spacing-md);
 }
 
 .account-empty-hint {

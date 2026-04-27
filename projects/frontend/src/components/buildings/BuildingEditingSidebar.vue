@@ -5,6 +5,7 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import type { EditableGridUnit } from '@/composables/useBuildingDetail'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
+import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
 import ProductPicker from '@/components/buildings/ProductPicker.vue'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
 
@@ -83,6 +84,7 @@ const {
   getUnitInventoryCostLabel,
   getUnitConstructionCost,
   getLocalizedIndustry,
+  loadBuilding,
   submitUnitUpgrade,
   SUPPORTED_INDUSTRIES,
 } = bd
@@ -140,6 +142,11 @@ const {
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
+        </div>
+
+        <div class="unit-insight-card">
+          <h5>{{ t('buildingBankAccount.assignmentTitle') }}</h5>
+          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="false" @updated="loadBuilding" />
         </div>
 
         <!-- Unit-specific configuration -->
@@ -265,7 +272,7 @@ const {
           <!-- B2B Sales unit config -->
           <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'B2B_SALES'">
             <!-- No-source warning: shown when no MANUFACTURING or MINING unit has an item configured -->
-            <div v-if="!b2bHasUpstreamSource" class="b2b-no-source-warning" role="alert" aria-label="No upstream source">
+            <div v-if="!b2bHasUpstreamSource" class="b2b-no-source-warning" role="alert" :aria-label="t('buildingDetail.accessibility.noUpstreamSource')">
               <span class="b2b-no-source-icon" aria-hidden="true">⚠</span>
               <div class="b2b-no-source-content">
                 <p class="b2b-no-source-title">{{ t('buildingDetail.config.b2bNoSourceTitle') }}</p>
@@ -372,40 +379,26 @@ const {
               <div v-else-if="cityMediaHouses.length === 0" class="config-hint">
                 {{ t('buildingDetail.config.noMediaHouseAvailable') }}
               </div>
-              <div v-else class="media-house-picker">
-                <!-- None option -->
-                <div
-                  class="media-house-option"
-                  :class="{ selected: !getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId }"
-                  @click="updateSelectedUnitConfig('mediaHouseBuildingId', null)"
+              <div v-else class="media-house-picker flex flex-col gap-2">
+                <select
+                  class="form-input media-house-combobox"
+                  :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId ?? ''"
+                  @change="updateSelectedUnitConfig('mediaHouseBuildingId', ($event.target as HTMLSelectElement).value || null)"
                 >
-                  <span class="mh-option-name">{{ t('buildingDetail.config.noMediaHouse') }}</span>
-                </div>
-                <!-- Picker items sorted by server (player-owned first, then by ranking) -->
-                <div
-                  v-for="mh in cityMediaHouses"
-                  :key="mh.id"
-                  class="media-house-option"
-                  :class="{
-                    selected: getDraftUnitAt(selectedCell.x, selectedCell.y)!.mediaHouseBuildingId === mh.id,
-                    'mh-disabled': mh.isUnderConstruction || mh.powerStatus === 'OFFLINE',
-                    'mh-own': mh.ownerCompanyId === building?.companyId,
-                  }"
-                  @click="!(mh.isUnderConstruction || mh.powerStatus === 'OFFLINE') && updateSelectedUnitConfig('mediaHouseBuildingId', mh.id)"
-                >
-                  <div class="mh-option-row">
-                    <span class="mh-option-name">{{ mh.name }}</span>
-                    <span class="mh-badge mh-type-badge">{{ mh.mediaType ?? '?' }}</span>
-                    <span v-if="mh.isGovernmentOwned" class="mh-badge mh-gov-badge" :title="t('buildingDetail.config.governmentOwned')">{{ t('buildingDetail.config.govBadge') }}</span>
-                    <span v-else-if="mh.ownerCompanyId === building?.companyId" class="mh-badge mh-own-badge">{{ t('buildingDetail.config.yourStation') }}</span>
-                  </div>
-                  <div class="mh-option-meta">
-                    <span class="mh-meta-city">{{ mh.cityName }}</span>
-                    <span class="mh-meta-reach">×{{ mh.effectivenessMultiplier.toFixed(1) }}</span>
-                    <span class="mh-meta-ranking"> {{ t('buildingDetail.config.contentRanking') }}: {{ mh.contentRanking.toFixed(0) }}% </span>
-                    <span v-if="mh.isUnderConstruction" class="mh-meta-status mh-status-construction">{{ t('buildingDetail.config.underConstruction') }}</span>
-                    <span v-else-if="mh.powerStatus === 'OFFLINE'" class="mh-meta-status mh-status-offline">{{ t('buildingDetail.config.offline') }}</span>
-                  </div>
+                  <option value="">{{ t('buildingDetail.config.noMediaHouse') }}</option>
+                  <option v-for="mh in cityMediaHouses" :key="mh.id" :value="mh.id" :disabled="mh.isUnderConstruction || mh.powerStatus === 'OFFLINE'">
+                    {{ mh.name }} · {{ mh.mediaType ?? '?' }} · ×{{ mh.effectivenessMultiplier.toFixed(1) }} · {{ t('buildingDetail.config.contentRanking') }} {{ mh.contentRanking.toFixed(0) }}%
+                    {{ mh.isGovernmentOwned ? ` · ${t('buildingDetail.config.govBadge')}` : '' }}
+                    {{ mh.ownerCompanyId === building?.companyId ? ` · ${t('buildingDetail.config.yourStation')}` : '' }}
+                    {{ mh.isUnderConstruction ? ` · ${t('buildingDetail.config.underConstruction')}` : '' }}
+                    {{ mh.powerStatus === 'OFFLINE' ? ` · ${t('buildingDetail.config.offline')}` : '' }}
+                  </option>
+                </select>
+
+                <div v-if="selectedDraftMediaHouse" class="rounded-lg border border-divider bg-surface p-2 text-xs text-muted">
+                  <p class="font-medium text-foreground">{{ selectedDraftMediaHouse.name }} ({{ selectedDraftMediaHouse.mediaType ?? '?' }})</p>
+                  <p>{{ selectedDraftMediaHouse.cityName }} · ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
+                  <p>{{ t('buildingDetail.config.contentRanking') }}: {{ selectedDraftMediaHouse.contentRanking.toFixed(0) }}%</p>
                 </div>
               </div>
               <p v-if="selectedDraftMediaHouse" class="config-hint">{{ t('buildingDetail.config.channelEffect') }} ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
@@ -719,7 +712,7 @@ const {
         </div>
 
         <!-- Unit Upgrade Panel (edit-mode only) -->
-        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" aria-label="Unit Upgrade">
+        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
           <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
 
           <!-- Upgrade in progress (from pending configuration) -->
@@ -761,7 +754,7 @@ const {
               <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
             </div>
             <!-- Full before/after stat table -->
-            <div class="unit-upgrade-stats" aria-label="Upgrade impact">
+            <div class="unit-upgrade-stats" :aria-label="t('buildingDetail.accessibility.upgradeImpact')">
               <div class="unit-upgrade-stat-row">
                 <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
                 <span class="unit-upgrade-stat-values">
@@ -771,7 +764,7 @@ const {
                 </span>
               </div>
               <!-- Storage capacity row — shown for all unit types that buffer inventory -->
-              <div class="unit-upgrade-stat-row" aria-label="Storage capacity delta">
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.storageCapacityDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ selectedCellUpgradeInfo.currentStorageCapacity.toFixed(0) }}</span>
@@ -780,7 +773,7 @@ const {
                   <span class="stat-delta stat-delta-positive">+{{ (selectedCellUpgradeInfo.nextStorageCapacity - selectedCellUpgradeInfo.currentStorageCapacity).toFixed(0) }}</span>
                 </span>
               </div>
-              <div class="unit-upgrade-stat-row" aria-label="Labor cost delta">
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.laborCostDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
@@ -789,7 +782,7 @@ const {
                   <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick - selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
                 </span>
               </div>
-              <div class="unit-upgrade-stat-row" aria-label="Energy cost delta">
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.energyCostDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>

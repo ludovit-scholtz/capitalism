@@ -90,7 +90,7 @@ public sealed partial class Query
             return [];
 
         var accounts = await db.BankAccounts
-            .Where(a => a.CompanyId == companyId)
+            .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
             .AsNoTracking()
             .ToListAsync();
 
@@ -125,6 +125,72 @@ public sealed partial class Query
             .ThenBy(a => a.CurrencyCode)
             .ToListAsync();
 
+        var companyIds = accounts
+            .Where(a => a.CompanyId.HasValue)
+            .Select(a => a.CompanyId!.Value)
+            .Distinct()
+            .ToList();
+
+        var companyPrimaryCityByCurrency = new Dictionary<(Guid CompanyId, string CurrencyCode), Guid>();
+
+        if (companyIds.Count > 0)
+        {
+            var companyBuildingCities = await db.Buildings
+                .AsNoTracking()
+                .Where(building => companyIds.Contains(building.CompanyId))
+                .Join(
+                    db.Cities.AsNoTracking(),
+                    building => building.CityId,
+                    city => city.Id,
+                    (building, city) => new
+                    {
+                        building.CompanyId,
+                        building.CityId,
+                        CurrencyCode = city.CurrencyCode,
+                        building.BuiltAtUtc,
+                        building.Id,
+                    })
+                .Where(x => x.CurrencyCode != null)
+                .OrderBy(x => x.BuiltAtUtc)
+                .ThenBy(x => x.Id)
+                .ToListAsync();
+
+            foreach (var item in companyBuildingCities)
+            {
+                var key = (item.CompanyId, item.CurrencyCode!.ToUpperInvariant());
+                if (!companyPrimaryCityByCurrency.ContainsKey(key))
+                {
+                    companyPrimaryCityByCurrency[key] = item.CityId;
+                }
+            }
+        }
+
+        var governmentBanks = await db.Buildings
+            .AsNoTracking()
+            .Where(building => building.IsGovernmentOwned && building.Type == BuildingType.Bank)
+            .Join(
+                db.Cities.AsNoTracking(),
+                building => building.CityId,
+                city => city.Id,
+                (building, city) => new
+                {
+                    building.Id,
+                    building.CityId,
+                    CurrencyCode = city.CurrencyCode,
+                    city.Name,
+                })
+            .Where(x => x.CurrencyCode != null)
+            .OrderBy(x => x.Name)
+            .ToListAsync();
+
+        var governmentBankByCity = governmentBanks
+            .GroupBy(x => x.CityId)
+            .ToDictionary(group => group.Key, group => group.First().Id);
+
+        var governmentBankByCurrency = governmentBanks
+            .GroupBy(x => x.CurrencyCode!.ToUpperInvariant())
+            .ToDictionary(group => group.Key, group => group.First().Id);
+
         return accounts.Select(a => new PlayerBankAccountSummary
         {
             Id = a.Id,
@@ -135,6 +201,67 @@ public sealed partial class Query
             CompanyName = a.Company?.Name,
             OwnerType = a.CompanyId.HasValue ? "COMPANY" : "PERSON",
             OwnerDisplayName = a.Company?.Name ?? a.Player?.DisplayName ?? string.Empty,
+            BankBuildingId = ResolveBankBuildingId(a),
+            CityId = ResolveCityId(a),
         }).ToList();
+
+        Guid? ResolveBankBuildingId(BankAccount account)
+        {
+            if (account.BankBuildingId.HasValue)
+            {
+                return account.BankBuildingId.Value;
+            }
+
+            if (account.CompanyId.HasValue)
+            {
+                var currencyCode = (account.CurrencyCode ?? "EUR").ToUpperInvariant();
+                if (companyPrimaryCityByCurrency.TryGetValue((account.CompanyId.Value, currencyCode), out var cityId)
+                    && governmentBankByCity.TryGetValue(cityId, out var bankIdByCity))
+                {
+                    return bankIdByCity;
+                }
+
+                if (governmentBankByCurrency.TryGetValue(currencyCode, out var bankIdByCurrency))
+                {
+                    return bankIdByCurrency;
+                }
+            }
+
+            return null;
+        }
+
+        Guid? ResolveCityId(BankAccount account)
+        {
+            if (account.BankBuildingId.HasValue)
+            {
+                var building = companyPrimaryCityByCurrency.FirstOrDefault(x => x.Value == account.BankBuildingId.Value).Key;
+                // Actually the mapping is not direct, we need to find the building with this ID
+                // Let me get it from governmentBanks
+                var bankCity = governmentBanks.FirstOrDefault(x => x.Id == account.BankBuildingId.Value);
+                if (bankCity != null)
+                {
+                    return bankCity.CityId;
+                }
+                return null;
+            }
+
+            if (account.CompanyId.HasValue)
+            {
+                var currencyCode = (account.CurrencyCode ?? "EUR").ToUpperInvariant();
+                if (companyPrimaryCityByCurrency.TryGetValue((account.CompanyId.Value, currencyCode), out var cityId))
+                {
+                    return cityId;
+                }
+
+                // Try to find government bank by currency
+                var bankByCurrency = governmentBanks.FirstOrDefault(x => x.CurrencyCode!.Equals(currencyCode, StringComparison.OrdinalIgnoreCase));
+                if (bankByCurrency != null)
+                {
+                    return bankByCurrency.CityId;
+                }
+            }
+
+            return null;
+        }
     }
 }

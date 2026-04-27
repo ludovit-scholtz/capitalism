@@ -39,7 +39,7 @@ public sealed partial class Mutation
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(gs => gs.CurrentTick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         ForexTradeRecord tradeRecord;
         try
@@ -207,7 +207,7 @@ public sealed partial class Mutation
             newFromBalance = await db.BankAccounts
                 .Where(a => a.Id == input.FromBankAccountId.Value)
                 .Select(a => a.Balance)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
         }
         else
         {
@@ -219,7 +219,7 @@ public sealed partial class Mutation
             newToBalance = await db.BankAccounts
                 .Where(a => a.Id == input.ToBankAccountId.Value)
                 .Select(a => a.Balance)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
         }
         else
         {

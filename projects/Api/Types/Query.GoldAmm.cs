@@ -218,7 +218,7 @@ public sealed partial class Query
             .AsNoTracking()
             .Where(g => g.PlayerId == playerId)
             .Select(g => g.Balance)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
     internal static async Task<decimal> GetBlockedGoldAsync(AppDbContext db, Guid playerId)
         => await db.GoldAmmPositions

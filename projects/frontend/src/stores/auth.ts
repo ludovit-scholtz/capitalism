@@ -30,6 +30,10 @@ const PLAYER_SELECTION = `
     cash
     foundedAtUtc
     foundedAtTick
+    buildings {
+      id
+      cityId
+    }
   }
 `
 
@@ -61,6 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const selectedCityId = ref<string | null>(null)
 
   function getCookieValue(name: string) {
     if (typeof document === 'undefined') {
@@ -77,6 +82,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('auth_token')
       localStorage.removeItem('auth_expires')
+      localStorage.removeItem('selected_city_id')
     }
 
     if (typeof document !== 'undefined') {
@@ -108,6 +114,24 @@ export const useAuthStore = defineStore('auth', () => {
     return null
   }
 
+  function getStoredCityId() {
+    if (typeof localStorage === 'undefined') {
+      return null
+    }
+    return localStorage.getItem('selected_city_id')
+  }
+
+  function setStoredCityId(cityId: string | null) {
+    if (typeof localStorage === 'undefined') {
+      return
+    }
+    if (cityId) {
+      localStorage.setItem('selected_city_id', cityId)
+    } else {
+      localStorage.removeItem('selected_city_id')
+    }
+  }
+
   const isAuthenticated = computed(() => !!token.value || !!getStoredToken())
   const isAdmin = computed(() => player.value?.role === 'ADMIN')
   const isProSubscriber = computed(() => !!player.value?.proSubscriptionEndsAtUtc && new Date(player.value.proSubscriptionEndsAtUtc).getTime() > Date.now())
@@ -115,6 +139,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   function initFromStorage() {
     token.value = getStoredToken()
+    selectedCityId.value = getStoredCityId()
   }
 
   function setSession(auth: AuthPayload) {
@@ -143,10 +168,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(
-        MASTER_REGISTER_MUTATION,
-        { input: { email, displayName, password } },
-      )
+      const data = await gqlMasterRequest<{ register: MasterSessionPayload }>(MASTER_REGISTER_MUTATION, { input: { email, displayName, password } })
       player.value = null
       applyStoredSession(data.register.token, data.register.expiresAtUtc)
       await fetchCurrentPlayer()
@@ -162,10 +184,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(
-        MASTER_LOGIN_MUTATION,
-        { input: { email, password } },
-      )
+      const data = await gqlMasterRequest<{ login: MasterSessionPayload }>(MASTER_LOGIN_MUTATION, { input: { email, password } })
       player.value = null
       applyStoredSession(data.login.token, data.login.expiresAtUtc)
       await fetchCurrentPlayer()
@@ -226,6 +245,11 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function switchCity(cityId: string) {
+    selectedCityId.value = cityId
+    setStoredCityId(cityId)
+  }
+
   function logout() {
     token.value = null
     player.value = null
@@ -237,6 +261,7 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     loading,
     error,
+    selectedCityId,
     isAuthenticated,
     isAdmin,
     isProSubscriber,
@@ -247,6 +272,7 @@ export const useAuthStore = defineStore('auth', () => {
     applyAuthPayload: setSession,
     fetchMe,
     switchAccountContext,
+    switchCity,
     logout,
   }
 })

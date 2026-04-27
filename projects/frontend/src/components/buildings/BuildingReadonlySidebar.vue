@@ -80,6 +80,42 @@ const {
   submitQuickPriceUpdate,
   submitFlushStorage,
 } = bd
+
+function operationalStatusCardClass(status: string): string {
+  const normalizedStatus = status.toLowerCase()
+
+  if (normalizedStatus === 'running' || normalizedStatus === 'active') {
+    return 'border-emerald-400/40 bg-emerald-500/10'
+  }
+
+  if (normalizedStatus === 'blocked' || normalizedStatus === 'offline' || normalizedStatus === 'suspended') {
+    return 'border-rose-400/40 bg-rose-500/10'
+  }
+
+  if (normalizedStatus === 'idle' || normalizedStatus === 'waiting' || normalizedStatus === 'starved') {
+    return 'border-amber-400/40 bg-amber-500/10'
+  }
+
+  return 'border-sky-400/40 bg-sky-500/10'
+}
+
+function operationalStatusBadgeClass(status: string): string {
+  const normalizedStatus = status.toLowerCase()
+
+  if (normalizedStatus === 'running' || normalizedStatus === 'active') {
+    return 'border-emerald-300/60 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
+  }
+
+  if (normalizedStatus === 'blocked' || normalizedStatus === 'offline' || normalizedStatus === 'suspended') {
+    return 'border-rose-300/60 bg-rose-500/15 text-rose-700 dark:text-rose-300'
+  }
+
+  if (normalizedStatus === 'idle' || normalizedStatus === 'waiting' || normalizedStatus === 'starved') {
+    return 'border-amber-300/60 bg-amber-500/15 text-amber-700 dark:text-amber-300'
+  }
+
+  return 'border-sky-300/60 bg-sky-500/15 text-sky-700 dark:text-sky-300'
+}
 </script>
 
 <template>
@@ -91,8 +127,18 @@ const {
         <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
       </div>
       <!-- Unit detail tab navigation -->
-      <nav class="unit-detail-tabs" aria-label="Unit detail sections" v-if="unitDetailTabs.length > 0">
-        <button v-for="tab in unitDetailTabs" :key="tab.key" class="unit-tab-btn" :class="{ 'unit-tab-btn--active': selectedUnitTab === tab.key }" @click="selectedUnitTab = tab.key">
+      <nav
+        v-if="unitDetailTabs.length > 0"
+        class="unit-detail-tabs flex flex-nowrap items-center gap-1 overflow-x-auto border-b border-divider bg-bg px-4 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        :aria-label="t('buildingDetail.accessibility.unitDetailSections')"
+      >
+        <button
+          v-for="tab in unitDetailTabs"
+          :key="tab.key"
+          class="unit-tab-btn inline-flex shrink-0 items-center rounded-md border border-transparent px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted transition-colors hover:text-foreground"
+          :class="selectedUnitTab === tab.key ? 'unit-tab-btn--active border-primary/40 bg-primary/10 text-primary' : 'hover:border-divider hover:bg-surface'"
+          @click="selectedUnitTab = tab.key"
+        >
           {{ t(`buildingDetail.unitTabs.${tab.key}`) }}
         </button>
       </nav>
@@ -146,29 +192,35 @@ const {
           <!-- Operational status badge for active units -->
           <div
             v-if="selectedActiveUnitOperationalStatus"
-            class="unit-insight-card operational-status-card"
-            :data-status="selectedActiveUnitOperationalStatus.status"
-            aria-label="Unit operational status"
+            class="unit-insight-card rounded-2xl border p-4 sm:p-5"
+            :class="operationalStatusCardClass(selectedActiveUnitOperationalStatus.status)"
+            :aria-label="t('buildingDetail.accessibility.unitOperationalStatus')"
           >
-            <h5>{{ t('buildingDetail.operationalStatus.title') }}</h5>
-            <div class="operational-status-row">
-              <span class="status-badge" :class="`status-${selectedActiveUnitOperationalStatus.status.toLowerCase()}`">
+            <h5 class="mb-3 text-sm font-semibold uppercase tracking-wide text-foreground">{{ t('buildingDetail.operationalStatus.title') }}</h5>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <span
+                class="inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold uppercase tracking-wide"
+                :class="operationalStatusBadgeClass(selectedActiveUnitOperationalStatus.status)"
+              >
                 {{ t(`buildingDetail.operationalStatus.${selectedActiveUnitOperationalStatus.status}`) }}
               </span>
-              <span v-if="selectedActiveUnitOperationalStatus.idleTicks > 0" class="idle-ticks-label">
+              <span v-if="selectedActiveUnitOperationalStatus.idleTicks > 0" class="inline-flex items-center rounded-full border border-divider bg-card px-2.5 py-1 text-xs font-medium text-muted">
                 {{ t('buildingDetail.operationalStatus.idleTicks', { count: selectedActiveUnitOperationalStatus.idleTicks }) }}
               </span>
             </div>
-            <p v-if="selectedActiveUnitOperationalStatus.blockedReason" class="blocked-reason-text">
+            <p v-if="selectedActiveUnitOperationalStatus.blockedReason" class="mt-3 text-sm leading-6 text-foreground/90">
               {{ selectedActiveUnitOperationalStatus.blockedReason }}
             </p>
             <!-- Next-tick operating costs breakdown -->
-            <div v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-costs-row">
-              <span class="operating-cost-label">{{ t('buildingDetail.operatingCost.title') }}</span>
-              <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="operating-cost-item">
+            <div
+              v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null || selectedActiveUnitOperationalStatus.nextTickEnergyCost != null"
+              class="mt-4 grid gap-2 rounded-xl border border-divider bg-card/80 p-3"
+            >
+              <span class="text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted">{{ t('buildingDetail.operatingCost.title') }}</span>
+              <span v-if="selectedActiveUnitOperationalStatus.nextTickLaborCost != null" class="text-sm text-foreground/90">
                 {{ t('buildingDetail.operatingCost.labor', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickLaborCost) }) }}
               </span>
-              <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="operating-cost-item">
+              <span v-if="selectedActiveUnitOperationalStatus.nextTickEnergyCost != null" class="text-sm text-foreground/90">
                 {{ t('buildingDetail.operatingCost.energy', { cost: formatCurrency(selectedActiveUnitOperationalStatus.nextTickEnergyCost) }) }}
               </span>
             </div>
@@ -178,60 +230,71 @@ const {
         </template>
         <!-- ── Quick Actions tab (PUBLIC_SALES only) ──────────── -->
         <template v-else-if="selectedUnitTab === 'quickActions'">
-          <div class="unit-insight-card" aria-label="Quick Actions">
-            <h5>{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
-            <p class="unit-desc">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
-            <div v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null" class="quick-action-current-price">
-              <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
-              <strong class="mi-metric-value">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
-            </div>
-            <div aria-label="Quick Price Update">
-              <!-- Directional impact hint derived from elasticity -->
-              <div
-                v-if="publicSalesAnalytics && publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
-                class="mi-price-impact-hint"
-                :class="{
-                  'mi-price-impact-raise': quickPriceInput > currentPublicSalesMinPrice,
-                  'mi-price-impact-lower': quickPriceInput < currentPublicSalesMinPrice,
-                }"
-              >
-                <template v-if="quickPriceInput > currentPublicSalesMinPrice">
-                  {{
-                    t('buildingDetail.marketIntelligence.priceUpdate.raisingHint', {
-                      elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
-                    })
-                  }}
-                </template>
-                <template v-else-if="quickPriceInput < currentPublicSalesMinPrice">
-                  {{
-                    t('buildingDetail.marketIntelligence.priceUpdate.loweringHint', {
-                      elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
-                    })
-                  }}
-                </template>
+          <div class="unit-insight-card mt-0 border-0 pt-0" :aria-label="t('buildingDetail.accessibility.quickActions')">
+            <div class="rounded-xl border border-divider bg-surface p-4 sm:p-5">
+              <h5 class="m-0 text-sm font-semibold text-foreground">{{ t('buildingDetail.unitTabs.quickActionsHeading') }}</h5>
+              <p class="unit-desc mt-2 text-sm text-muted">{{ t('buildingDetail.unitTabs.quickActionsDesc') }}</p>
+
+              <div v-if="selectedPublicSalesUnit && selectedPublicSalesUnit.minPrice != null" class="quick-action-current-price mt-3 grid gap-1 rounded-lg border border-divider bg-card px-3 py-2">
+                <span class="mi-metric-label text-[0.65rem] font-semibold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
+                <strong class="mi-metric-value text-base font-semibold text-foreground">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
               </div>
-              <div class="mi-price-update-row">
-                <label class="mi-price-update-label" for="quick-price-input">
-                  {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
-                  <span class="currency-badge">{{ cityCurrencyCode }}</span>
-                </label>
-                <input
-                  id="quick-price-input"
-                  type="number"
-                  class="mi-price-input"
-                  :placeholder="selectedPublicSalesUnit?.minPrice?.toString() ?? ''"
-                  :min="0.01"
-                  :step="0.01"
-                  v-model.number="quickPriceInput"
-                />
-                <button class="btn btn-primary mi-price-update-btn" :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0" @click="submitQuickPriceUpdate">
-                  {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
-                </button>
+
+              <div class="mt-3" :aria-label="t('buildingDetail.accessibility.quickPriceUpdate')">
+                <!-- Directional impact hint derived from elasticity -->
+                <div
+                  v-if="publicSalesAnalytics && publicSalesAnalytics.elasticityIndex !== null && quickPriceInput !== null && currentPublicSalesMinPrice > 0"
+                  class="mi-price-impact-hint mb-3 rounded-lg border px-3 py-2 text-xs"
+                  :class="
+                    quickPriceInput > currentPublicSalesMinPrice
+                      ? 'mi-price-impact-raise border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+                      : quickPriceInput < currentPublicSalesMinPrice
+                        ? 'mi-price-impact-lower border-emerald-400/50 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                        : 'border-divider bg-surface text-muted'
+                  "
+                >
+                  <template v-if="quickPriceInput > currentPublicSalesMinPrice">
+                    {{
+                      t('buildingDetail.marketIntelligence.priceUpdate.raisingHint', {
+                        elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
+                      })
+                    }}
+                  </template>
+                  <template v-else-if="quickPriceInput < currentPublicSalesMinPrice">
+                    {{
+                      t('buildingDetail.marketIntelligence.priceUpdate.loweringHint', {
+                        elasticity: Math.abs(publicSalesAnalytics.elasticityIndex).toFixed(1),
+                      })
+                    }}
+                  </template>
+                </div>
+
+                <div class="mi-price-update-row grid gap-2 md:grid-cols-[minmax(0,1fr)_180px_auto] md:items-end">
+                  <label class="mi-price-update-label flex flex-col gap-1 text-xs font-semibold uppercase tracking-wide text-muted" for="quick-price-input">
+                    <span>
+                      {{ t('buildingDetail.marketIntelligence.priceUpdate.newPrice') }}
+                    </span>
+                    <span class="currency-badge w-fit rounded-full border border-divider bg-bg px-2 py-0.5 text-[0.65rem] text-foreground">{{ cityCurrencyCode }}</span>
+                  </label>
+                  <input
+                    id="quick-price-input"
+                    type="number"
+                    class="mi-price-input form-input"
+                    :placeholder="selectedPublicSalesUnit?.minPrice?.toString() ?? ''"
+                    :min="0.01"
+                    :step="0.01"
+                    v-model.number="quickPriceInput"
+                  />
+                  <button class="btn btn-primary mi-price-update-btn" :disabled="quickPriceSaving || quickPriceInput === null || quickPriceInput <= 0" @click="submitQuickPriceUpdate">
+                    {{ quickPriceSaving ? t('buildingDetail.marketIntelligence.priceUpdate.saving') : t('buildingDetail.marketIntelligence.priceUpdate.apply') }}
+                  </button>
+                </div>
+
+                <p v-if="quickPriceSuccess" class="mi-price-success mt-2 rounded-md border border-emerald-300/50 bg-emerald-500/10 px-2.5 py-2 text-xs text-emerald-800 dark:text-emerald-300">
+                  {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
+                </p>
+                <p v-if="quickPriceError" class="mi-price-error mt-2 rounded-md border border-red-300/50 bg-red-500/10 px-2.5 py-2 text-xs text-red-700 dark:text-red-300">{{ quickPriceError }}</p>
               </div>
-              <p v-if="quickPriceSuccess" class="mi-price-success">
-                {{ t('buildingDetail.marketIntelligence.priceUpdate.success') }}
-              </p>
-              <p v-if="quickPriceError" class="mi-price-error">{{ quickPriceError }}</p>
             </div>
           </div>
         </template>
@@ -239,10 +302,10 @@ const {
         <template v-else-if="selectedUnitTab === 'inventory'">
           <div v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))" class="unit-insight-card">
             <h5>{{ t('buildingDetail.inventory.title') }}</h5>
-            <div class="inventory-summary-grid">
-              <div class="inventory-summary-stat">
-                <span class="inventory-summary-label">{{ t('buildingDetail.inventory.load') }}</span>
-                <strong>
+            <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
+              <div class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.load') }}</span>
+                <strong class="text-sm text-foreground">
                   {{
                     t('buildingDetail.inventory.quantity', {
                       quantity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.quantity),
@@ -251,49 +314,61 @@ const {
                   }}
                 </strong>
               </div>
-              <div class="inventory-summary-stat">
-                <span class="inventory-summary-label">{{ t('buildingDetail.inventory.distinctItems') }}</span>
-                <strong>{{ getUnitInventoryItemCount(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
+              <div class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.distinctItems') }}</span>
+                <strong class="text-sm text-foreground">{{ getUnitInventoryItemCount(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
               </div>
-              <div class="inventory-summary-stat" v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality != null">
-                <span class="inventory-summary-label">{{ t('buildingDetail.inventory.averageQuality') }}</span>
-                <strong>{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality) }}</strong>
+              <div
+                v-if="getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality != null"
+                class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5"
+              >
+                <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.averageQuality') }}</span>
+                <strong class="text-sm text-foreground">{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))!.averageQuality) }}</strong>
               </div>
-              <div class="inventory-summary-stat" v-if="getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))">
-                <span class="inventory-summary-label">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
-                <strong>{{ getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
+              <div v-if="getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
+                <strong class="text-sm text-foreground">{{ getUnitInventoryCostLabel(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)) }}</strong>
               </div>
             </div>
-            <div v-if="getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)).length > 0" class="inventory-table">
-              <div class="inventory-table-header">
-                <span class="inventory-col-item">{{ t('buildingDetail.inventory.item') }}</span>
-                <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.amount') }}</span>
-                <span class="inventory-col-quality">{{ t('buildingDetail.inventory.quality') }}</span>
-                <span class="inventory-col-cost">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
+            <div v-if="getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y)).length > 0" class="mt-3 border border-divider rounded-md overflow-hidden">
+              <div class="grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 bg-surface border-b border-divider">
+                <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.item') }}</span>
+                <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.amount') }}</span>
+                <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.quality') }}</span>
+                <span class="text-[0.75rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
               </div>
-              <div v-for="inventory in getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))" :key="inventory.id" class="inventory-table-row">
-                <div class="inventory-col-item">
-                  <img v-if="getInventoryItemImageUrl(inventory)" class="inventory-item-image" :src="getInventoryItemImageUrl(inventory)!" :alt="getInventoryItemName(inventory)" />
-                  <span v-else class="inventory-item-avatar">{{ getInventoryItemMonogram(inventory) }}</span>
-                  <div class="inventory-item-stack">
-                    <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
+              <div
+                v-for="inventory in getUnitInventories(getUnitAtFrom(activeUnits, selectedCell!.x, selectedCell!.y))"
+                :key="inventory.id"
+                class="grid grid-cols-[minmax(0,1.4fr)_90px_90px_minmax(110px,0.9fr)] gap-2 px-3 py-2 border-b border-divider last:border-b-0 items-center"
+              >
+                <div class="flex items-center gap-3 min-w-0">
+                  <img
+                    v-if="getInventoryItemImageUrl(inventory)"
+                    class="w-8 h-8 rounded object-cover flex-shrink-0"
+                    :src="getInventoryItemImageUrl(inventory)!"
+                    :alt="getInventoryItemName(inventory)"
+                  />
+                  <span v-else class="inline-flex items-center justify-center w-8 h-8 text-sm font-bold rounded-md bg-primary text-white flex-shrink-0">{{ getInventoryItemMonogram(inventory) }}</span>
+                  <div class="flex flex-col gap-0.5 min-w-0">
+                    <span class="font-semibold text-foreground truncate">{{ getInventoryItemName(inventory) }}</span>
                   </div>
                 </div>
-                <div class="inventory-col-quantity">
-                  <span class="inventory-item-quantity">{{ formatUnitQuantity(inventory.quantity) }}</span>
+                <div class="text-[0.8125rem] text-muted">
+                  <span>{{ formatUnitQuantity(inventory.quantity) }}</span>
                 </div>
-                <div class="inventory-col-quality">
-                  <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
+                <div class="text-[0.8125rem] text-muted">
+                  <span>{{ formatPercent(inventory.quality) }}</span>
                 </div>
-                <div class="inventory-col-cost">
-                  <span class="inventory-item-cost">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
-                  <span v-if="getInventoryItemSourcingCostPerUnitLabel(inventory)" class="inventory-item-secondary">
+                <div class="flex flex-col items-end gap-0.5">
+                  <span class="font-bold text-foreground">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
+                  <span v-if="getInventoryItemSourcingCostPerUnitLabel(inventory)" class="text-[0.75rem] text-muted">
                     {{ getInventoryItemSourcingCostPerUnitLabel(inventory) }}
                   </span>
                 </div>
               </div>
             </div>
-            <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
+            <p v-else class="mt-3 rounded-md bg-surface border border-divider px-3 py-2 text-xs text-muted">{{ t('buildingDetail.inventory.empty') }}</p>
             <div class="detail-capacity">
               <span class="detail-capacity-fill" :style="{ width: `${selectedActiveUnitFlowSegments.fillWidth}%` }"></span>
               <span
@@ -477,7 +552,7 @@ const {
           <div
             v-if="selectedPurchaseUnit && (selectedPurchaseUnit.resourceTypeId || selectedPurchaseUnit.productTypeId)"
             class="sourcing-comparison unit-insight-card"
-            aria-label="Sourcing Comparison"
+            :aria-label="t('buildingDetail.accessibility.sourcingComparison')"
           >
             <h5 class="sourcing-comparison-title">{{ t('buildingDetail.sourcingComparison.title') }}</h5>
             <p class="sourcing-comparison-subtitle config-help">{{ t('buildingDetail.sourcingComparison.subtitle') }}</p>
@@ -559,12 +634,12 @@ const {
               {{ t('buildingDetail.sourcingComparison.empty') }}
             </div>
           </div>
-          <div v-if="selectedPublicSalesUnit" class="unit-insight-card market-intelligence-panel" aria-label="Market Intelligence">
+          <div v-if="selectedPublicSalesUnit" class="unit-insight-card market-intelligence-panel" :aria-label="t('buildingDetail.accessibility.marketIntelligence')">
             <h5>{{ t('buildingDetail.marketIntelligence.title') }}</h5>
 
             <!-- Product identity + data window row -->
             <div class="mi-context-row">
-              <span v-if="publicSalesAnalytics?.productName" class="mi-product-chip" aria-label="Currently selling product">
+              <span v-if="publicSalesAnalytics?.productName" class="mi-product-chip" :aria-label="t('buildingDetail.accessibility.currentlySellingProduct')">
                 {{ publicSalesAnalytics.productName }}
               </span>
               <span v-if="publicSalesAnalytics && publicSalesAnalytics.dataFromTick > 0" class="mi-tick-window" :title="`T${publicSalesAnalytics.dataFromTick}–T${publicSalesAnalytics.dataToTick}`">
@@ -576,47 +651,47 @@ const {
 
             <template v-else-if="publicSalesAnalytics">
               <!-- Summary metrics -->
-              <div class="mi-summary-grid">
-                <div class="mi-metric">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.totalRevenue') }}</span>
-                  <strong class="mi-metric-value">{{ formatCurrency(publicSalesAnalytics.totalRevenue) }}</strong>
+              <div class="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3 mb-4">
+                <div class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.totalRevenue') }}</span>
+                  <strong class="text-sm text-foreground">{{ formatCurrency(publicSalesAnalytics.totalRevenue) }}</strong>
                 </div>
-                <div class="mi-metric" v-if="publicSalesAnalytics.totalProfit !== null">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.totalProfit') }}</span>
+                <div v-if="publicSalesAnalytics.totalProfit !== null" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.totalProfit') }}</span>
                   <strong
-                    class="mi-metric-value"
+                    class="text-sm"
                     :class="{
-                      'building-profit-positive-text': publicSalesAnalytics.totalProfit >= 0,
-                      'building-profit-negative-text': publicSalesAnalytics.totalProfit < 0,
+                      'text-emerald-500': publicSalesAnalytics.totalProfit >= 0,
+                      'text-red-500': publicSalesAnalytics.totalProfit < 0,
                     }"
                     >{{ formatCurrency(publicSalesAnalytics.totalProfit) }}</strong
                   >
                 </div>
-                <div class="mi-metric">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.totalSold') }}</span>
-                  <strong class="mi-metric-value">{{ formatUnitQuantity(publicSalesAnalytics.totalQuantitySold) }}</strong>
+                <div class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.totalSold') }}</span>
+                  <strong class="text-sm text-foreground">{{ formatUnitQuantity(publicSalesAnalytics.totalQuantitySold) }}</strong>
                 </div>
-                <div class="mi-metric" v-if="publicSalesAnalytics.averagePricePerUnit > 0">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.avgPrice') }}</span>
-                  <strong class="mi-metric-value">{{ formatCurrency(publicSalesAnalytics.averagePricePerUnit) }}</strong>
+                <div v-if="publicSalesAnalytics.averagePricePerUnit > 0" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.avgPrice') }}</span>
+                  <strong class="text-sm text-foreground">{{ formatCurrency(publicSalesAnalytics.averagePricePerUnit) }}</strong>
                 </div>
-                <div class="mi-metric" v-if="selectedPublicSalesUnit.minPrice != null">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
-                  <strong class="mi-metric-value">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
+                <div v-if="selectedPublicSalesUnit.minPrice != null" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.configuredPrice') }}</span>
+                  <strong class="text-sm text-foreground">{{ formatCurrency(currentPublicSalesMinPrice) }}</strong>
                 </div>
-                <div class="mi-metric" v-if="publicSalesAnalytics.revenueHistory.length > 0">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.recentUtilization') }}</span>
-                  <strong class="mi-metric-value">{{ Math.round(publicSalesAnalytics.recentUtilization * 100) }}%</strong>
+                <div v-if="publicSalesAnalytics.revenueHistory.length > 0" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.recentUtilization') }}</span>
+                  <strong class="text-sm text-foreground">{{ Math.round(publicSalesAnalytics.recentUtilization * 100) }}%</strong>
                 </div>
                 <!-- Trend direction (only shown when there are at least 2 ticks of history) -->
-                <div v-if="publicSalesAnalytics.trendDirection && publicSalesAnalytics.trendDirection !== 'NO_DATA'" class="mi-metric">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.trend') }}</span>
+                <div v-if="publicSalesAnalytics.trendDirection && publicSalesAnalytics.trendDirection !== 'NO_DATA'" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.trend') }}</span>
                   <strong
-                    class="mi-metric-value mi-trend"
+                    class="text-sm"
                     :class="{
-                      'mi-trend-up': publicSalesAnalytics.trendDirection === 'UP',
-                      'mi-trend-down': publicSalesAnalytics.trendDirection === 'DOWN',
-                      'mi-trend-flat': publicSalesAnalytics.trendDirection === 'FLAT',
+                      'text-emerald-500': publicSalesAnalytics.trendDirection === 'UP',
+                      'text-red-500': publicSalesAnalytics.trendDirection === 'DOWN',
+                      'text-neutral-500': publicSalesAnalytics.trendDirection === 'FLAT',
                     }"
                   >
                     {{
@@ -629,14 +704,14 @@ const {
                   </strong>
                 </div>
                 <!-- Market trend factor (live trend multiplier from the simulation) -->
-                <div v-if="publicSalesAnalytics.trendFactor !== null" class="mi-metric">
-                  <span class="mi-metric-label">{{ t('buildingDetail.marketIntelligence.trendFactor') }}</span>
+                <div v-if="publicSalesAnalytics.trendFactor !== null" class="rounded-lg border border-divider bg-card px-3 py-2 flex flex-col gap-0.5">
+                  <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.trendFactor') }}</span>
                   <strong
-                    class="mi-metric-value mi-trend"
+                    class="text-sm"
                     :class="{
-                      'mi-trend-up': publicSalesAnalytics.trendFactor > 1.05,
-                      'mi-trend-down': publicSalesAnalytics.trendFactor < 0.95,
-                      'mi-trend-flat': publicSalesAnalytics.trendFactor >= 0.95 && publicSalesAnalytics.trendFactor <= 1.05,
+                      'text-emerald-500': publicSalesAnalytics.trendFactor > 1.05,
+                      'text-red-500': publicSalesAnalytics.trendFactor < 0.95,
+                      'text-neutral-500': publicSalesAnalytics.trendFactor >= 0.95 && publicSalesAnalytics.trendFactor <= 1.05,
                     }"
                   >
                     {{ publicSalesAnalytics.trendFactor > 1 ? '+' : '' }}{{ ((publicSalesAnalytics.trendFactor - 1) * 100).toFixed(0) }}%
@@ -651,15 +726,19 @@ const {
 
               <template v-else>
                 <!-- Revenue mini chart -->
-                <div class="mi-chart-section">
-                  <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.revenueChart') }}</span>
-                  <div class="mi-bar-chart" role="img" :aria-label="t('buildingDetail.marketIntelligence.revenueChart')">
+                <div class="mt-4">
+                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.revenueChart') }}</span>
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.revenueChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.revenueHistory"
                       :key="snap.tick"
-                      class="mi-bar mi-bar-revenue"
+                      class="flex-1 bg-blue-500 rounded-sm transition-all duration-300"
                       :style="{
-                        height: `${Math.max(2, miMaxRevenue > 0 ? (snap.revenue / miMaxRevenue) * 100 : 0).toFixed(1)}%`,
+                        height: `${Math.max(4, miMaxRevenue > 0 ? (snap.revenue / miMaxRevenue) * 100 : 0).toFixed(1)}%`,
                       }"
                       :title="`T${snap.tick}: ${formatCurrency(snap.revenue)}`"
                     ></div>
@@ -667,15 +746,19 @@ const {
                 </div>
 
                 <!-- Quantity mini chart -->
-                <div class="mi-chart-section">
-                  <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.quantityChart') }}</span>
-                  <div class="mi-bar-chart" role="img" :aria-label="t('buildingDetail.marketIntelligence.quantityChart')">
+                <div class="mt-4">
+                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.quantityChart') }}</span>
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.quantityChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.revenueHistory"
                       :key="snap.tick"
-                      class="mi-bar mi-bar-quantity"
+                      class="flex-1 bg-amber-500 rounded-sm transition-all duration-300"
                       :style="{
-                        height: `${Math.max(2, miMaxQuantitySold > 0 ? (snap.quantitySold / miMaxQuantitySold) * 100 : 0).toFixed(1)}%`,
+                        height: `${Math.max(4, miMaxQuantitySold > 0 ? (snap.quantitySold / miMaxQuantitySold) * 100 : 0).toFixed(1)}%`,
                       }"
                       :title="`T${snap.tick}: ${formatUnitQuantity(snap.quantitySold)}`"
                     ></div>
@@ -683,15 +766,19 @@ const {
                 </div>
 
                 <!-- Price history chart -->
-                <div v-if="publicSalesAnalytics.priceHistory.length > 0" class="mi-chart-section">
-                  <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.priceChart') }}</span>
-                  <div class="mi-bar-chart mi-bar-chart-price" role="img" :aria-label="t('buildingDetail.marketIntelligence.priceChart')">
+                <div v-if="publicSalesAnalytics.priceHistory.length > 0" class="mt-4">
+                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.priceChart') }}</span>
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.priceChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.priceHistory"
                       :key="snap.tick"
-                      class="mi-bar mi-bar-price"
+                      class="flex-1 bg-purple-500 rounded-sm transition-all duration-300"
                       :style="{
-                        height: `${Math.max(2, miMaxPricePerUnit > 0 ? (snap.pricePerUnit / miMaxPricePerUnit) * 100 : 0).toFixed(1)}%`,
+                        height: `${Math.max(4, miMaxPricePerUnit > 0 ? (snap.pricePerUnit / miMaxPricePerUnit) * 100 : 0).toFixed(1)}%`,
                       }"
                       :title="`T${snap.tick}: ${formatCurrency(snap.pricePerUnit)}`"
                     ></div>
@@ -699,16 +786,20 @@ const {
                 </div>
 
                 <!-- Profit history chart -->
-                <div v-if="publicSalesAnalytics.profitHistory && publicSalesAnalytics.profitHistory.length > 0" class="mi-chart-section">
-                  <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.profitChart') }}</span>
-                  <div class="mi-bar-chart mi-bar-chart-profit" role="img" :aria-label="t('buildingDetail.marketIntelligence.profitChart')">
+                <div v-if="publicSalesAnalytics.profitHistory && publicSalesAnalytics.profitHistory.length > 0" class="mt-4">
+                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.profitChart') }}</span>
+                  <div
+                    class="flex items-end justify-center gap-0.5 mt-2 h-16 p-1 rounded-md border border-divider bg-surface"
+                    role="img"
+                    :aria-label="t('buildingDetail.marketIntelligence.profitChart')"
+                  >
                     <div
                       v-for="snap in publicSalesAnalytics.profitHistory"
                       :key="snap.tick"
-                      class="mi-bar"
-                      :class="snap.profit >= 0 ? 'mi-bar-profit-positive' : 'mi-bar-profit-negative'"
+                      :class="snap.profit >= 0 ? 'bg-emerald-500' : 'bg-red-500'"
+                      class="flex-1 rounded-sm transition-all duration-300"
                       :style="{
-                        height: `${Math.max(2, miMaxAbsProfit > 0 ? (Math.abs(snap.profit) / miMaxAbsProfit) * 100 : 0).toFixed(1)}%`,
+                        height: `${Math.max(4, miMaxAbsProfit > 0 ? (Math.abs(snap.profit) / miMaxAbsProfit) * 100 : 0).toFixed(1)}%`,
                       }"
                       :title="`T${snap.tick}: ${formatCurrency(snap.profit)}${snap.grossMarginPct !== null ? ` (${snap.grossMarginPct.toFixed(1)}% margin)` : ''}`"
                     ></div>
@@ -717,100 +808,117 @@ const {
               </template>
 
               <!-- Market share -->
-              <div class="mi-section">
-                <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.marketShare') }}</span>
-                <p v-if="publicSalesAnalytics.marketShare.length === 0" class="config-help">
+              <div class="mt-4">
+                <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.marketShare') }}</span>
+                <p v-if="publicSalesAnalytics.marketShare.length === 0" class="text-xs text-muted mt-2">
                   {{ t('buildingDetail.marketIntelligence.noMarketShare') }}
                 </p>
-                <div v-else class="mi-market-share">
-                  <div
-                    v-for="entry in publicSalesAnalytics.marketShare"
-                    :key="entry.label"
-                    class="mi-share-row"
-                    :class="{ 'mi-share-row-you': entry.companyId === building?.companyId, 'mi-share-row-unmet': entry.isUnmet }"
-                  >
-                    <span class="mi-share-label"> {{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}{{ entry.isUnmet ? ' ⬚' : '' }} </span>
-                    <div class="mi-share-bar-wrap">
-                      <div class="mi-share-bar" :class="{ 'mi-share-bar-unmet': entry.isUnmet }" :style="{ width: `${(entry.share * 100).toFixed(1)}%` }"></div>
+                <div v-else class="flex flex-col gap-2 mt-2">
+                  <div v-for="entry in publicSalesAnalytics.marketShare" :key="entry.label" class="flex items-center gap-2" :class="{ 'opacity-60': entry.isUnmet }">
+                    <span class="text-[0.7rem] font-semibold flex-shrink-0 w-24 truncate">
+                      {{ entry.label }}{{ entry.companyId === building?.companyId ? ' ★' : '' }}{{ entry.isUnmet ? ' ⬚' : '' }}
+                    </span>
+                    <div class="flex-1 h-2 rounded-full bg-surface border border-divider overflow-hidden">
+                      <div class="h-full bg-primary transition-all duration-300" :style="{ width: `${(entry.share * 100).toFixed(1)}%` }"></div>
                     </div>
-                    <span class="mi-share-pct">{{ (entry.share * 100).toFixed(1) }}%</span>
+                    <span class="text-[0.7rem] text-muted flex-shrink-0 w-10 text-right">{{ (entry.share * 100).toFixed(1) }}%</span>
                   </div>
                 </div>
               </div>
 
               <!-- Demand Drivers -->
-              <div v-if="publicSalesAnalytics.demandDrivers.length > 0" class="mi-demand-drivers" aria-label="Demand Drivers">
-                <span class="mi-chart-label">{{ t('buildingDetail.marketIntelligence.demandDrivers.title') }}</span>
-                <div class="mi-driver-list">
-                  <div v-for="driver in publicSalesAnalytics.demandDrivers" :key="driver.factor" class="mi-driver-entry" :class="`mi-driver-${driver.impact.toLowerCase()}`">
-                    <span class="mi-driver-icon">
+              <div v-if="publicSalesAnalytics.demandDrivers.length > 0" class="mt-4" :aria-label="t('buildingDetail.accessibility.demandDrivers')">
+                <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.demandDrivers.title') }}</span>
+                <div class="flex flex-col gap-2 mt-2">
+                  <div
+                    v-for="driver in publicSalesAnalytics.demandDrivers"
+                    :key="driver.factor"
+                    class="flex gap-2 px-2 py-1.5 rounded-md border border-divider text-xs"
+                    :class="
+                      driver.impact === 'POSITIVE'
+                        ? 'border-emerald-500/30 bg-emerald-500/10'
+                        : driver.impact === 'NEGATIVE'
+                          ? 'border-red-500/30 bg-red-500/10'
+                          : 'border-neutral-500/30 bg-neutral-500/10'
+                    "
+                  >
+                    <span
+                      class="font-bold flex-shrink-0 w-4 text-center"
+                      :class="driver.impact === 'POSITIVE' ? 'text-emerald-500' : driver.impact === 'NEGATIVE' ? 'text-red-500' : 'text-neutral-500'"
+                    >
                       {{ driver.impact === 'POSITIVE' ? '↑' : driver.impact === 'NEGATIVE' ? '↓' : '→' }}
                     </span>
-                    <div class="mi-driver-content">
-                      <strong class="mi-driver-factor">{{ t(`buildingDetail.marketIntelligence.demandDrivers.factor_${driver.factor}`) }}</strong>
-                      <span class="mi-driver-desc">{{ driver.description }}</span>
+                    <div class="flex flex-col gap-0.5 flex-1 min-w-0">
+                      <strong class="text-[0.7rem] font-semibold">{{ t(`buildingDetail.marketIntelligence.demandDrivers.factor_${driver.factor}`) }}</strong>
+                      <span class="text-[0.65rem] text-muted">{{ driver.description }}</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <!-- Elasticity index + context card -->
-              <div class="mi-context-card">
-                <div class="mi-context-grid">
-                  <div v-if="publicSalesAnalytics.elasticityIndex !== null" class="mi-context-item">
-                    <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.elasticityIndex') }}</span>
-                    <strong
-                      class="mi-context-value"
-                      :class="{ 'mi-elastic-high': (publicSalesAnalytics.elasticityIndex ?? 0) < -1.5, 'mi-elastic-low': (publicSalesAnalytics.elasticityIndex ?? 0) > -0.5 }"
-                    >
+              <div class="mt-4 rounded-lg border border-divider bg-card p-3">
+                <div class="grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-3">
+                  <div v-if="publicSalesAnalytics.elasticityIndex !== null" class="flex flex-col gap-0.5">
+                    <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.elasticityIndex') }}</span>
+                    <strong class="text-sm" :class="{ 'text-red-500': (publicSalesAnalytics.elasticityIndex ?? 0) < -1.5, 'text-emerald-500': (publicSalesAnalytics.elasticityIndex ?? 0) > -0.5 }">
                       {{ publicSalesAnalytics.elasticityIndex.toFixed(2) }}
                     </strong>
-                    <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.elasticityHint') }}</span>
+                    <span class="text-[0.65rem] text-muted">{{ t('buildingDetail.marketIntelligence.elasticityHint') }}</span>
                   </div>
-                  <div v-if="publicSalesAnalytics.populationIndex !== null" class="mi-context-item">
-                    <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.populationIndex') }}</span>
-                    <strong class="mi-context-value">{{ publicSalesAnalytics.populationIndex.toFixed(2) }}×</strong>
-                    <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.populationIndexHint') }}</span>
+                  <div v-if="publicSalesAnalytics.populationIndex !== null" class="flex flex-col gap-0.5">
+                    <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.populationIndex') }}</span>
+                    <strong class="text-sm text-foreground">{{ publicSalesAnalytics.populationIndex.toFixed(2) }}×</strong>
+                    <span class="text-[0.65rem] text-muted">{{ t('buildingDetail.marketIntelligence.populationIndexHint') }}</span>
                   </div>
-                  <div v-if="publicSalesAnalytics.inventoryQuality !== null" class="mi-context-item">
-                    <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.productQuality') }}</span>
-                    <strong class="mi-context-value" :class="{ 'mi-quality-high': publicSalesAnalytics.inventoryQuality >= 0.7, 'mi-quality-low': publicSalesAnalytics.inventoryQuality < 0.4 }">
+                  <div v-if="publicSalesAnalytics.inventoryQuality !== null" class="flex flex-col gap-0.5">
+                    <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.productQuality') }}</span>
+                    <strong class="text-sm" :class="{ 'text-emerald-500': publicSalesAnalytics.inventoryQuality >= 0.7, 'text-red-500': publicSalesAnalytics.inventoryQuality < 0.4 }">
                       {{ Math.round(publicSalesAnalytics.inventoryQuality * 100) }}%
                     </strong>
-                    <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.productQualityHint') }}</span>
+                    <span class="text-[0.65rem] text-muted">{{ t('buildingDetail.marketIntelligence.productQualityHint') }}</span>
                   </div>
-                  <div v-if="publicSalesAnalytics.brandAwareness !== null" class="mi-context-item">
-                    <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.brandAwareness') }}</span>
-                    <strong class="mi-context-value" :class="{ 'mi-quality-high': publicSalesAnalytics.brandAwareness >= 0.6 }"> {{ Math.round(publicSalesAnalytics.brandAwareness * 100) }}% </strong>
-                    <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.brandAwarenessHint') }}</span>
+                  <div v-if="publicSalesAnalytics.brandAwareness !== null" class="flex flex-col gap-0.5">
+                    <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.brandAwareness') }}</span>
+                    <strong class="text-sm" :class="{ 'text-emerald-500': publicSalesAnalytics.brandAwareness >= 0.6 }"> {{ Math.round(publicSalesAnalytics.brandAwareness * 100) }}% </strong>
+                    <span class="text-[0.65rem] text-muted">{{ t('buildingDetail.marketIntelligence.brandAwarenessHint') }}</span>
                   </div>
-                  <div v-if="publicSalesAnalytics.brandQuality !== null" class="mi-context-item">
-                    <span class="mi-context-label">{{ t('buildingDetail.marketIntelligence.brandQuality') }}</span>
+                  <div v-if="publicSalesAnalytics.brandQuality !== null" class="flex flex-col gap-0.5">
+                    <span class="text-[0.7rem] font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.brandQuality') }}</span>
                     <strong
-                      class="mi-context-value"
+                      class="text-sm"
                       :class="{
-                        'mi-quality-high': publicSalesAnalytics.brandQuality >= 0.5,
-                        'mi-quality-low': publicSalesAnalytics.brandQuality < 0.2,
+                        'text-emerald-500': publicSalesAnalytics.brandQuality >= 0.5,
+                        'text-red-500': publicSalesAnalytics.brandQuality < 0.2,
                       }"
                     >
                       {{ Math.round(publicSalesAnalytics.brandQuality * 100) }}%
-                      <span v-if="publicSalesAnalytics.brandQuality >= 0.5" class="mi-quality-badge mi-quality-badge-premium">{{ t('buildingDetail.marketIntelligence.brandQualityPremium') }}</span>
-                      <span v-else-if="publicSalesAnalytics.brandQuality >= 0.2" class="mi-quality-badge mi-quality-badge-growing">{{
+                      <span v-if="publicSalesAnalytics.brandQuality >= 0.5" class="text-[0.6rem] ml-1 px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-500 font-semibold">{{
+                        t('buildingDetail.marketIntelligence.brandQualityPremium')
+                      }}</span>
+                      <span v-else-if="publicSalesAnalytics.brandQuality >= 0.2" class="text-[0.6rem] ml-1 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-500 font-semibold">{{
                         t('buildingDetail.marketIntelligence.brandQualityGrowing')
                       }}</span>
                     </strong>
-                    <span class="mi-context-hint">{{ t('buildingDetail.marketIntelligence.brandQualityHint') }}</span>
+                    <span class="text-[0.65rem] text-muted">{{ t('buildingDetail.marketIntelligence.brandQualityHint') }}</span>
                   </div>
                 </div>
               </div>
 
               <!-- Demand signal -->
-              <div class="mi-demand-card" :class="`mi-demand-${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-')}`">
-                <div class="mi-demand-header">
-                  <span class="mi-demand-title">{{ t('buildingDetail.marketIntelligence.demandSignal.title') }}</span>
-                  <span class="mi-demand-badge">{{ t(`buildingDetail.marketIntelligence.demandSignal.${publicSalesAnalytics.demandSignal}`) }}</span>
+              <div
+                class="mt-4 rounded-lg border border-divider px-3 py-2"
+                :class="`${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'high-demand' ? 'bg-emerald-500/10 border-emerald-500/30' : publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'saturation' ? 'bg-red-500/10 border-red-500/30' : 'bg-neutral-500/10 border-neutral-500/30'}`"
+              >
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-xs font-bold uppercase tracking-wide text-muted">{{ t('buildingDetail.marketIntelligence.demandSignal.title') }}</span>
+                  <span
+                    class="text-[0.65rem] font-bold px-2 py-0.5 rounded"
+                    :class="`${publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'high-demand' ? 'bg-emerald-500/30 text-emerald-500' : publicSalesAnalytics.demandSignal.toLowerCase().replace(/_/g, '-') === 'saturation' ? 'bg-red-500/30 text-red-500' : 'bg-neutral-500/30 text-neutral-500'}`"
+                    >{{ t(`buildingDetail.marketIntelligence.demandSignal.${publicSalesAnalytics.demandSignal}`) }}</span
+                  >
                 </div>
-                <p class="mi-action-hint" v-if="publicSalesAnalytics.actionHint">
+                <p v-if="publicSalesAnalytics.actionHint" class="text-[0.75rem] text-muted">
                   <strong>{{ t('buildingDetail.marketIntelligence.actionHint') }}:</strong>
                   {{ publicSalesAnalytics.actionHint }}
                 </p>
@@ -824,13 +932,13 @@ const {
           <div
             v-if="selectedManufacturingUnit && (selectedManufacturingUnit.productTypeId || unitProductAnalytics)"
             class="unit-insight-card unit-product-analytics-panel"
-            aria-label="Product Performance Analytics"
+            :aria-label="t('buildingDetail.accessibility.productPerformanceAnalytics')"
           >
             <h5>{{ t('buildingDetail.unitProductAnalytics.title') }}</h5>
 
             <!-- Product identity + data window row -->
             <div class="mi-context-row">
-              <span v-if="unitProductAnalytics?.productName" class="mi-product-chip" aria-label="Currently producing product">
+              <span v-if="unitProductAnalytics?.productName" class="mi-product-chip" :aria-label="t('buildingDetail.accessibility.currentlyProducingProduct')">
                 {{ unitProductAnalytics.productName }}
               </span>
               <span v-else-if="selectedManufacturingUnit.productTypeId" class="mi-product-chip">
@@ -935,24 +1043,23 @@ const {
         </template>
         <!-- ── Recent Activity tab ─────────────────────────────── -->
         <template v-else-if="selectedUnitTab === 'recentActivity'">
-          <div class="unit-insight-card recent-activity-panel" aria-label="Recent Activity">
-            <h5>{{ t('buildingDetail.recentActivity.title') }}</h5>
-            <p class="config-help">{{ t('buildingDetail.recentActivity.subtitle') }}</p>
-            <p v-if="recentActivityLoading" class="config-help">…</p>
+          <div class="unit-insight-card recent-activity-panel" :aria-label="t('buildingDetail.accessibility.recentActivity')">
+            <h5 class="mb-2">{{ t('buildingDetail.recentActivity.title') }}</h5>
+            <p class="text-xs text-muted mb-3">{{ t('buildingDetail.recentActivity.subtitle') }}</p>
+            <p v-if="recentActivityLoading" class="text-xs text-muted">…</p>
             <template v-else-if="recentActivity.length > 0">
-              <ul class="activity-list">
+              <ul class="flex flex-col gap-2 list-none m-0 p-0">
                 <li
                   v-for="(event, idx) in recentActivity"
                   :key="`${event.tick}-${event.buildingUnitId}-${event.eventType}-${idx}`"
-                  class="activity-item"
-                  :class="`activity-${event.eventType.toLowerCase()}`"
+                  class="flex gap-2 py-2 px-2 rounded-md border border-divider text-xs"
                 >
-                  <span class="activity-tick" :title="t('buildingDetail.recentActivity.tickLabel', { tick: event.tick })">{{ formatGameTickTime(event.tick, locale) }}</span>
-                  <span class="activity-desc">{{ event.description }}</span>
+                  <span class="font-semibold text-muted flex-shrink-0" :title="t('buildingDetail.recentActivity.tickLabel', { tick: event.tick })">{{ formatGameTickTime(event.tick, locale) }}</span>
+                  <span class="text-foreground">{{ event.description }}</span>
                 </li>
               </ul>
             </template>
-            <p v-else class="config-help">{{ t('buildingDetail.recentActivity.empty') }}</p>
+            <p v-else class="text-xs text-muted py-2 px-2 rounded-md bg-surface">{{ t('buildingDetail.recentActivity.empty') }}</p>
           </div>
         </template>
       </div>

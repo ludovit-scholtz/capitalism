@@ -358,11 +358,23 @@ public sealed partial class Mutation
     {
         if (!bankAccountId.HasValue)
         {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("A settlement bank account must be selected for stock trades.")
-                    .SetCode("BANK_ACCOUNT_REQUIRED")
-                    .Build());
+            // Auto-resolve: personal accounts use the player EUR settlement account;
+            // company accounts use the company EUR settlement account.
+            if (account.Company is null)
+            {
+                return await PersonalBankAccountService.EnsureTrackedSettlementAccountAsync(db, player);
+            }
+            var companyEurAccount = await db.BankAccounts
+                .FirstOrDefaultAsync(a => a.CompanyId == account.Company.Id && a.CurrencyCode == "EUR" && a.ClosedAtUtc == null);
+            if (companyEurAccount is null)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage("The active company does not have a EUR settlement account for stock trades.")
+                        .SetCode("BANK_ACCOUNT_REQUIRED")
+                        .Build());
+            }
+            return companyEurAccount;
         }
 
         var settlementAccount = await db.BankAccounts
@@ -421,7 +433,7 @@ public sealed partial class Mutation
             .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "USD")
             .OrderByDescending(r => r.RateDate)
             .Select(r => r.Rate)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         return rate > 0 ? rate : 1.08m;
     }
 
@@ -501,7 +513,7 @@ public sealed partial class Mutation
         var latestEntryForTick = await db.SharePriceHistoryEntries
             .Where(entry => entry.CompanyId == companyId && entry.RecordedAtTick == currentTick)
             .OrderByDescending(entry => entry.RecordedAtUtc)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         if (latestEntryForTick is null)
         {

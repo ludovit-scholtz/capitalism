@@ -150,11 +150,10 @@ export type EditableGridUnit = {
   isReverting?: boolean
 }
 
-
 // ──────────────────────────────────────────────────────────────────────────────
 // Injection key for the building detail composable (provide/inject pattern)
 // ──────────────────────────────────────────────────────────────────────────────
- 
+
 export const BUILDING_DETAIL_KEY = Symbol('buildingDetail') as InjectionKey<ReturnType<typeof useBuildingDetail>>
 
 export function useBuildingDetail() {
@@ -210,6 +209,11 @@ export function useBuildingDetail() {
     return { x, y }
   }
 
+  function parseUnitTabQuery(value: unknown): string | null {
+    if (typeof value !== 'string' || value.length === 0) return null
+    return value
+  }
+
   function syncSelectedCellQuery(cell: GridCellSelection | null) {
     const nextUnit = cell ? `${cell.x},${cell.y}` : undefined
     const currentUnit = typeof route.query.unit === 'string' ? route.query.unit : undefined
@@ -223,15 +227,38 @@ export function useBuildingDetail() {
     })
   }
 
+  function syncSelectedUnitTabQuery(tab: string | null) {
+    const nextTab = tab ?? undefined
+    const currentTab = typeof route.query.unitTab === 'string' ? route.query.unitTab : undefined
+    if (currentTab === nextTab) return
+
+    void router.replace({
+      query: {
+        ...route.query,
+        unitTab: nextTab,
+      },
+    })
+  }
+
   function setReadOnlySelectedCell(cell: GridCellSelection | null) {
     selectedCell.value = cell
     syncSelectedCellQuery(cell)
+    if (!cell) {
+      syncSelectedUnitTabQuery(null)
+    }
   }
 
   function restoreReadOnlySelectedCell(units: GridUnit[]) {
     const requestedCell = parseUnitQuery(route.query.unit)
     if (!requestedCell) {
       selectedCell.value = null
+      return
+    }
+
+    // During live refreshes there can be a brief empty-state before units repopulate.
+    // Keep the requested selection in that window so route-driven state does not get lost.
+    if (units.length === 0) {
+      selectedCell.value = requestedCell
       return
     }
 
@@ -814,10 +841,55 @@ export function useBuildingDetail() {
     return tabs
   })
 
-  /** Reset to Basic Info whenever the user selects a different unit. */
-  watch(selectedDisplayUnit, () => {
-    selectedUnitTab.value = 'basicInfo'
-  })
+  function restoreSelectedUnitTabFromRoute() {
+    if (isEditing.value || unitDetailTabs.value.length === 0) {
+      selectedUnitTab.value = 'basicInfo'
+      syncSelectedUnitTabQuery(null)
+      return
+    }
+
+    const availableKeys = new Set(unitDetailTabs.value.map((tab) => tab.key))
+    const requestedTab = parseUnitTabQuery(route.query.unitTab)
+
+    if (requestedTab && availableKeys.has(requestedTab)) {
+      if (selectedUnitTab.value !== requestedTab) {
+        selectedUnitTab.value = requestedTab
+      }
+      return
+    }
+
+    if (!availableKeys.has(selectedUnitTab.value)) {
+      selectedUnitTab.value = 'basicInfo'
+    }
+
+    syncSelectedUnitTabQuery(selectedUnitTab.value)
+  }
+
+  watch(
+    () => selectedUnitTab.value,
+    (tab) => {
+      if (isEditing.value || unitDetailTabs.value.length === 0) {
+        syncSelectedUnitTabQuery(null)
+        return
+      }
+      const isValid = unitDetailTabs.value.some((t) => t.key === tab)
+      syncSelectedUnitTabQuery(isValid ? tab : 'basicInfo')
+    },
+  )
+
+  watch(
+    () => route.query.unitTab,
+    () => {
+      restoreSelectedUnitTabFromRoute()
+    },
+  )
+
+  watch(
+    () => unitDetailTabs.value.map((tab) => tab.key).join(','),
+    () => {
+      restoreSelectedUnitTabFromRoute()
+    },
+  )
 
   let activeBuildingFinancialTimelineRequest = 0
   let activePowerPlantAnalyticsRequest = 0
@@ -2580,8 +2652,12 @@ export function useBuildingDetail() {
 
   function getConfiguredItemImageUrl(unit: GridUnit | undefined): string | null {
     const resourceTypeId = unit && 'resourceTypeId' in unit ? unit.resourceTypeId : null
-    if (!resourceTypeId) return null
-    return resourceTypes.value.find((resource) => resource.id === resourceTypeId)?.imageUrl ?? null
+    if (resourceTypeId) {
+      return resourceTypes.value.find((resource) => resource.id === resourceTypeId)?.imageUrl ?? null
+    }
+    const productTypeId = unit && 'productTypeId' in unit ? unit.productTypeId : null
+    if (!productTypeId) return null
+    return productTypes.value.find((product) => product.id === productTypeId)?.imageUrl ?? null
   }
 
   function getConfiguredItemMonogram(unit: GridUnit | undefined): string {
@@ -3956,6 +4032,7 @@ export function useBuildingDetail() {
     () => {
       if (!isEditing.value) {
         restoreReadOnlySelectedCell(activeUnits.value)
+        restoreSelectedUnitTabFromRoute()
       }
     },
   )
@@ -3974,6 +4051,8 @@ export function useBuildingDetail() {
   watch(
     () => selectedCell.value,
     () => {
+      if (isEditing.value) return
+      syncSelectedCellQuery(selectedCell.value)
       flushStorageError.value = null
       flushStorageSuccess.value = false
       showFlushConfirmDialog.value = false
@@ -4096,128 +4175,316 @@ export function useBuildingDetail() {
 
   return {
     locale,
-    building, currentTick, loading, saving, error, saveError, companyCash,
-    isEditing, selectedCell, showUnitPicker, draftUnits, editBaselineUnits,
-    resourceTypes, productTypes, rankedProducts, rankedProductsLoading,
-    cities, unitInventorySummaries, unitInventories, unitResourceHistories,
-    exchangeOffers, exchangeOffersLoading, exchangeSortBy,
-    procurementPreview, procurementPreviewLoading,
-    sourcingCandidates, sourcingCandidatesLoading,
-    purchaseVendorCompanies, showPurchaseSelector,
-    unitOperationalStatuses, unitOperationalStatusesLoading,
-    recentActivity, recentActivityLoading,
-    buildingFinancialTimeline, buildingFinancialTimelineLoading,
-    powerPlantAnalytics, powerPlantAnalyticsLoading,
-    researchBrands, researchBrandsLoading,
-    cityMediaHouses, cityMediaHousesLoading,
-    publicSalesAnalytics, publicSalesAnalyticsLoading,
-    unitProductAnalytics, unitProductAnalyticsLoading,
-    quickPriceInput, quickPriceSaving, quickPriceSuccess, quickPriceError,
-    showSaleDialog, salePrice, savingSale,
-    cancellingPlan, cancelPlanError,
-    layoutName, layoutDescription,
-    masterLayouts, masterLayoutsLoading, masterLayoutsError,
-    localLayouts, layoutSaving, layoutSaveError, layoutSaveSuccess, layoutDeleteError,
-    overwriteConfirmPending, selectedHistoryItemKey,
-    showRentDialog, newRentPerSqm, savingRent, rentSaveError,
-    contentBudgetInput, savingContentBudget, contentBudgetError, contentBudgetSuccess,
-    showFlushConfirmDialog, flushingStorage, flushStorageError, flushStorageSuccess,
-    schedulingUpgrade, unitUpgradeError, unitUpgradeInfoCache, draftUpgradeUnitIds,
-    productionChainPanelDismissed, salesChainPanelDismissed, selectedUnitTab,
-    buildingId, activeUnits, pendingConfiguration, pendingUnits, pendingRemovals,
-    plannedUnits, allowedUnits, showStarterSetupBanner,
-    intermediateProductIds, allSelectableItems,
-    lockedConfiguredProducts, lockedConfiguredProductNames,
-    isUpgradeInProgress, showPlanningSection, hasConfiguredRdUnits,
-    remainingUpgradeTicks, draftTotalTicks, hasDraftChanges,
-    draftConstructionCost, projectedCompanyCashAfterApply,
-    chainDisplayUnits, chainStatus, showProductionChainPanel,
-    showSalesShopStarterBanner, shopChainDisplayUnits, shopChainStatus, showSalesChainPanel,
-    draftLinkChanges, draftUnitChanges,
-    selectedDisplayUnit, selectedPurchaseUnit, selectedPublicSalesUnit,
-    selectedManufacturingUnit, selectedDraftPurchaseUnit,
-    selectedDraftPublicSalesUnit, selectedDraftB2bSalesUnit,
-    publicSalesFilteredRankedProducts, b2bSalesFilteredRankedProducts,
-    selectedHistoryItemOptions, selectedUnitResourceHistory,
-    buildingOverviewCityName, cityCurrencyCode, buildingOverviewMapRoute,
-    buildingFinancialSnapshots, buildingFinancialHasActivity,
-    b2bPriceSource, b2bSuggestedPrice, b2bHasUpstreamSource,
-    miMaxRevenue, miMaxQuantitySold, miMaxPricePerUnit, miMaxAbsProfit,
-    upaMaxAbsProfit, upaMaxCost, upaMaxEstRevenue,
-    currentPublicSalesMinPrice, unitDetailTabs,
-    annotatedExchangeOffers, exchangeOfferItems,
-    allExchangeOffersBlocked, bestExchangeOfferCityId, logisticsTrapWarning,
+    building,
+    currentTick,
+    loading,
+    saving,
+    error,
+    saveError,
+    companyCash,
+    isEditing,
+    selectedCell,
+    showUnitPicker,
+    draftUnits,
+    editBaselineUnits,
+    resourceTypes,
+    productTypes,
+    rankedProducts,
+    rankedProductsLoading,
+    cities,
+    unitInventorySummaries,
+    unitInventories,
+    unitResourceHistories,
+    exchangeOffers,
+    exchangeOffersLoading,
+    exchangeSortBy,
+    procurementPreview,
+    procurementPreviewLoading,
+    sourcingCandidates,
+    sourcingCandidatesLoading,
+    purchaseVendorCompanies,
+    showPurchaseSelector,
+    unitOperationalStatuses,
+    unitOperationalStatusesLoading,
+    recentActivity,
+    recentActivityLoading,
+    buildingFinancialTimeline,
+    buildingFinancialTimelineLoading,
+    powerPlantAnalytics,
+    powerPlantAnalyticsLoading,
+    researchBrands,
+    researchBrandsLoading,
+    cityMediaHouses,
+    cityMediaHousesLoading,
+    publicSalesAnalytics,
+    publicSalesAnalyticsLoading,
+    unitProductAnalytics,
+    unitProductAnalyticsLoading,
+    quickPriceInput,
+    quickPriceSaving,
+    quickPriceSuccess,
+    quickPriceError,
+    showSaleDialog,
+    salePrice,
+    savingSale,
+    cancellingPlan,
+    cancelPlanError,
+    layoutName,
+    layoutDescription,
+    masterLayouts,
+    masterLayoutsLoading,
+    masterLayoutsError,
+    localLayouts,
+    layoutSaving,
+    layoutSaveError,
+    layoutSaveSuccess,
+    layoutDeleteError,
+    overwriteConfirmPending,
+    selectedHistoryItemKey,
+    showRentDialog,
+    newRentPerSqm,
+    savingRent,
+    rentSaveError,
+    contentBudgetInput,
+    savingContentBudget,
+    contentBudgetError,
+    contentBudgetSuccess,
+    showFlushConfirmDialog,
+    flushingStorage,
+    flushStorageError,
+    flushStorageSuccess,
+    schedulingUpgrade,
+    unitUpgradeError,
+    unitUpgradeInfoCache,
+    draftUpgradeUnitIds,
+    productionChainPanelDismissed,
+    salesChainPanelDismissed,
+    selectedUnitTab,
+    buildingId,
+    activeUnits,
+    pendingConfiguration,
+    pendingUnits,
+    pendingRemovals,
+    plannedUnits,
+    allowedUnits,
+    showStarterSetupBanner,
+    intermediateProductIds,
+    allSelectableItems,
+    lockedConfiguredProducts,
+    lockedConfiguredProductNames,
+    isUpgradeInProgress,
+    showPlanningSection,
+    hasConfiguredRdUnits,
+    remainingUpgradeTicks,
+    draftTotalTicks,
+    hasDraftChanges,
+    draftConstructionCost,
+    projectedCompanyCashAfterApply,
+    chainDisplayUnits,
+    chainStatus,
+    showProductionChainPanel,
+    showSalesShopStarterBanner,
+    shopChainDisplayUnits,
+    shopChainStatus,
+    showSalesChainPanel,
+    draftLinkChanges,
+    draftUnitChanges,
+    selectedDisplayUnit,
+    selectedPurchaseUnit,
+    selectedPublicSalesUnit,
+    selectedManufacturingUnit,
+    selectedDraftPurchaseUnit,
+    selectedDraftPublicSalesUnit,
+    selectedDraftB2bSalesUnit,
+    publicSalesFilteredRankedProducts,
+    b2bSalesFilteredRankedProducts,
+    selectedHistoryItemOptions,
+    selectedUnitResourceHistory,
+    buildingOverviewCityName,
+    cityCurrencyCode,
+    buildingOverviewMapRoute,
+    buildingFinancialSnapshots,
+    buildingFinancialHasActivity,
+    b2bPriceSource,
+    b2bSuggestedPrice,
+    b2bHasUpstreamSource,
+    miMaxRevenue,
+    miMaxQuantitySold,
+    miMaxPricePerUnit,
+    miMaxAbsProfit,
+    upaMaxAbsProfit,
+    upaMaxCost,
+    upaMaxEstRevenue,
+    currentPublicSalesMinPrice,
+    unitDetailTabs,
+    annotatedExchangeOffers,
+    exchangeOfferItems,
+    allExchangeOffersBlocked,
+    bestExchangeOfferCityId,
+    logisticsTrapWarning,
     sourcingCheapestStickerDiffersFromBestLanded,
-    selectedPurchaseResourceSlug, purchaseSelectorItems,
-    selectedPurchaseSelection, sameCityVendorItemKeys,
-    resourceTypesById, productTypesById,
-    purchaseVendorOptions, selectedPurchaseVendorSummary,
-    selectedDraftMediaHouse, configWarnings,
-    selectedActiveUnitOperationalStatus, selectedCellPendingUpgrade,
-    selectedCellUpgradeInfo, isSelectedCellStaged, allUnitsUnderUpgrade,
-    selectedActiveUnitFlowSegments, selectedPlannedUnitFlowSegments,
-    masterConnected, masterUserEmail,
-    parseUnitQuery, syncSelectedCellQuery,
-    setReadOnlySelectedCell, restoreReadOnlySelectedCell,
-    clickReadOnlyCell, clickDraftCell,
-    placeUnit, removeDraftUnit, clearConnectionsAround,
-    toggleHorizontalLink, toggleVerticalLink,
-    togglePrimaryDiagonalLink, toggleSecondaryDiagonalLink,
-    isHorizontalLinkActiveFor, isVerticalLinkActiveFor,
-    canToggleHorizontalLink, canToggleVerticalLink,
-    canTogglePrimaryDiagonalLink, canToggleSecondaryDiagonalLink,
-    getHorizontalLinkStateFor, getVerticalLinkStateFor,
-    getPrimaryDiagonalLinkStateFor, getSecondaryDiagonalLinkStateFor,
-    getHorizontalLinkArrow, getVerticalLinkArrow,
-    getDraftUnitAt, getDraftTicksForUnit, getDraftTicksAt, getDisplayedTicks,
-    areUnitsEquivalent, areUnitCollectionsEqual,
-    startEditing, cancelEditing, applyStarterLayout, applyShopStarterLayout,
-    storeConfiguration, cancelPlan, getLinkedUnits, isUnitReverting,
-    openSaleDialog, closeSaleDialog, setBuildingForSale,
-    openRentDialog, closeRentDialog, saveRentPerSqm,
-    initContentBudgetInput, saveContentBudget,
-    getDraftLayoutUnits, refreshLocalLayouts, refreshMasterLayouts,
-    saveLayout, requestLoadLayout, confirmOverwrite, cancelOverwrite,
-    applyLayout, deleteLayout, layoutStructureSummary,
-    getItemSelection, setItemSelection,
-    openPurchaseSelector, closePurchaseSelector, applyPurchaseSelection, selectPurchaseVendor,
-    getFactoryPurchaseSelectableItems, getManufacturingSelectableItems,
+    selectedPurchaseResourceSlug,
+    purchaseSelectorItems,
+    selectedPurchaseSelection,
+    sameCityVendorItemKeys,
+    resourceTypesById,
+    productTypesById,
+    purchaseVendorOptions,
+    selectedPurchaseVendorSummary,
+    selectedDraftMediaHouse,
+    configWarnings,
+    selectedActiveUnitOperationalStatus,
+    selectedCellPendingUpgrade,
+    selectedCellUpgradeInfo,
+    isSelectedCellStaged,
+    allUnitsUnderUpgrade,
+    selectedActiveUnitFlowSegments,
+    selectedPlannedUnitFlowSegments,
+    masterConnected,
+    masterUserEmail,
+    parseUnitQuery,
+    syncSelectedCellQuery,
+    setReadOnlySelectedCell,
+    restoreReadOnlySelectedCell,
+    clickReadOnlyCell,
+    clickDraftCell,
+    placeUnit,
+    removeDraftUnit,
+    clearConnectionsAround,
+    toggleHorizontalLink,
+    toggleVerticalLink,
+    togglePrimaryDiagonalLink,
+    toggleSecondaryDiagonalLink,
+    isHorizontalLinkActiveFor,
+    isVerticalLinkActiveFor,
+    canToggleHorizontalLink,
+    canToggleVerticalLink,
+    canTogglePrimaryDiagonalLink,
+    canToggleSecondaryDiagonalLink,
+    getHorizontalLinkStateFor,
+    getVerticalLinkStateFor,
+    getPrimaryDiagonalLinkStateFor,
+    getSecondaryDiagonalLinkStateFor,
+    getHorizontalLinkArrow,
+    getVerticalLinkArrow,
+    getDraftUnitAt,
+    getDraftTicksForUnit,
+    getDraftTicksAt,
+    getDisplayedTicks,
+    areUnitsEquivalent,
+    areUnitCollectionsEqual,
+    startEditing,
+    cancelEditing,
+    applyStarterLayout,
+    applyShopStarterLayout,
+    storeConfiguration,
+    cancelPlan,
+    getLinkedUnits,
+    isUnitReverting,
+    openSaleDialog,
+    closeSaleDialog,
+    setBuildingForSale,
+    openRentDialog,
+    closeRentDialog,
+    saveRentPerSqm,
+    initContentBudgetInput,
+    saveContentBudget,
+    getDraftLayoutUnits,
+    refreshLocalLayouts,
+    refreshMasterLayouts,
+    saveLayout,
+    requestLoadLayout,
+    confirmOverwrite,
+    cancelOverwrite,
+    applyLayout,
+    deleteLayout,
+    layoutStructureSummary,
+    getItemSelection,
+    setItemSelection,
+    openPurchaseSelector,
+    closePurchaseSelector,
+    applyPurchaseSelection,
+    selectPurchaseVendor,
+    getFactoryPurchaseSelectableItems,
+    getManufacturingSelectableItems,
     getPurchaseVendorTransitLabel,
-    getResourceName, getProductName,
-    getBrandScopeLabel, formatUnitMetric,
-    getUnitConfiguredItemLabel, getUnitPrimaryMetric,
-    getUnitInventorySummary, getUnitInventories,
-    getResolvedLiveUnitId, getUnitResourceHistory,
-    getUnitResourceHistoryItemOptions, getSelectedUnitResourceHistory,
-    getUnitInventoryItemCount, getUnitOperationalStatus,
-    isCellUnderUpgrade, toggleStagedUpgrade, updateSelectedUnitConfig,
-    formatCurrency, formatBuildingType, formatTickDuration, formatGameTickTime,
-    formatPercent, formatUnitQuantity,
-    getUnitColor, getUnitAtFrom, getLayoutCellType,
-    getCityName, formatGpsLocation,
-    getConfiguredItemImageUrl, getInventoryItemImageUrl,
-    getInventoryItemMonogram, getInventoryItemSourcingCostPerUnitLabel,
-    getPrimaryInventoryItem, getUnitDisplayLabel,
-    getInventoryItemName, getInventoryItemSourcingCostLabel,
-    getUnitDisplayImageUrl, getUnitDisplayMonogram,
-    getUnitInventoryCost, getUnitNextTickOperatingCost,
-    getDraftUnitConstructionCost, getDraftUnitConstructionCostLabel,
-    getUnitInventoryCostLabel, getUnitNextTickOperatingCostLabel,
+    getResourceName,
+    getProductName,
+    getBrandScopeLabel,
+    formatUnitMetric,
+    getUnitConfiguredItemLabel,
+    getUnitPrimaryMetric,
+    getUnitInventorySummary,
+    getUnitInventories,
+    getResolvedLiveUnitId,
+    getUnitResourceHistory,
+    getUnitResourceHistoryItemOptions,
+    getSelectedUnitResourceHistory,
+    getUnitInventoryItemCount,
+    getUnitOperationalStatus,
+    isCellUnderUpgrade,
+    toggleStagedUpgrade,
+    updateSelectedUnitConfig,
+    formatCurrency,
+    formatBuildingType,
+    formatTickDuration,
+    formatGameTickTime,
+    formatPercent,
+    formatUnitQuantity,
+    getUnitColor,
+    getUnitAtFrom,
+    getLayoutCellType,
+    getCityName,
+    formatGpsLocation,
+    getConfiguredItemImageUrl,
+    getInventoryItemImageUrl,
+    getInventoryItemMonogram,
+    getInventoryItemSourcingCostPerUnitLabel,
+    getPrimaryInventoryItem,
+    getUnitDisplayLabel,
+    getInventoryItemName,
+    getInventoryItemSourcingCostLabel,
+    getUnitDisplayImageUrl,
+    getUnitDisplayMonogram,
+    getUnitInventoryCost,
+    getUnitNextTickOperatingCost,
+    getDraftUnitConstructionCost,
+    getDraftUnitConstructionCostLabel,
+    getUnitInventoryCostLabel,
+    getUnitNextTickOperatingCostLabel,
     getUnitConstructionCost,
-    getPurchaseUnitResourceTypeId, getPurchaseUnitSource,
-    getUnitFlowSegments, getCellOutflowClass, getCellCapacityTooltip, getGridCellAriaLabel,
-    getFillBucket, getLocalizedIndustry,
-    loadBuilding, loadUnitInventorySummaries, loadUnitInventories,
-    loadUnitResourceHistories, loadGlobalExchangeOffers,
-    loadProcurementPreview, loadSourcingCandidates,
-    loadResearchBrands, loadCityMediaHouses,
-    loadPublicSalesAnalytics, loadUnitProductAnalytics,
-    submitQuickPriceUpdate, submitFlushStorage,
-    fetchUpgradeInfo, submitUnitUpgrade,
-    loadUnitOperationalStatuses, loadRecentActivity,
-    loadBuildingFinancialTimeline, loadPowerPlantAnalytics,
-    fetchRankedProducts, getB2BPriceSource, getB2BSuggestedPrice,
-    dismissProductionChainPanel, dismissSalesChainPanel,
+    getPurchaseUnitResourceTypeId,
+    getPurchaseUnitSource,
+    getUnitFlowSegments,
+    getCellOutflowClass,
+    getCellCapacityTooltip,
+    getGridCellAriaLabel,
+    getFillBucket,
+    getLocalizedIndustry,
+    loadBuilding,
+    loadUnitInventorySummaries,
+    loadUnitInventories,
+    loadUnitResourceHistories,
+    loadGlobalExchangeOffers,
+    loadProcurementPreview,
+    loadSourcingCandidates,
+    loadResearchBrands,
+    loadCityMediaHouses,
+    loadPublicSalesAnalytics,
+    loadUnitProductAnalytics,
+    submitQuickPriceUpdate,
+    submitFlushStorage,
+    fetchUpgradeInfo,
+    submitUnitUpgrade,
+    loadUnitOperationalStatuses,
+    loadRecentActivity,
+    loadBuildingFinancialTimeline,
+    loadPowerPlantAnalytics,
+    fetchRankedProducts,
+    getB2BPriceSource,
+    getB2BSuggestedPrice,
+    dismissProductionChainPanel,
+    dismissSalesChainPanel,
     gridIndexes,
     SUPPORTED_INDUSTRIES,
   }

@@ -39,7 +39,8 @@ public sealed partial class AppDbContext
             return;
         }
 
-        // First pass: fill from the building's assigned bank account when available.
+        // First pass: fill from the building's assigned bank account when available,
+        // but only if the account is owned by the same company as the ledger entry.
         var unresolved = pendingEntries
             .Where(entry => !entry.Entity.BankAccountId.HasValue)
             .ToList();
@@ -55,16 +56,40 @@ public sealed partial class AppDbContext
 
             if (buildingIds.Count > 0)
             {
+                // Load buildings with their bank account info to validate ownership.
                 var buildingAccountLookup = await Buildings
                     .AsNoTracking()
                     .Where(building => buildingIds.Contains(building.Id) && building.BankAccountId.HasValue)
-                    .Select(building => new { building.Id, building.BankAccountId })
-                    .ToDictionaryAsync(item => item.Id, item => item.BankAccountId!.Value, cancellationToken);
+                    .Select(building => new { building.Id, building.CompanyId, building.BankAccountId })
+                    .ToListAsync(cancellationToken);
+
+                // Load the accounts to verify they belong to the correct company.
+                var accountIds = buildingAccountLookup
+                    .Select(b => b.BankAccountId!.Value)
+                    .Distinct()
+                    .ToList();
+
+                var accountCompanyOwnership = await BankAccounts
+                    .AsNoTracking()
+                    .Where(account => accountIds.Contains(account.Id))
+                    .Select(account => new { account.Id, account.CompanyId })
+                    .ToDictionaryAsync(item => item.Id, item => item.CompanyId, cancellationToken);
 
                 foreach (var entry in unresolved)
                 {
                     var buildingId = entry.Entity.BuildingId;
-                    if (buildingId.HasValue && buildingAccountLookup.TryGetValue(buildingId.Value, out var accountId))
+                    if (!buildingId.HasValue)
+                        continue;
+
+                    var buildingMatch = buildingAccountLookup.FirstOrDefault(b => b.Id == buildingId.Value);
+                    if (buildingMatch is null)
+                        continue;
+
+                    var accountId = buildingMatch.BankAccountId!.Value;
+                    // Only assign the building's account if it belongs to the building's company.
+                    if (accountCompanyOwnership.TryGetValue(accountId, out var accountCompanyId)
+                        && accountCompanyId == buildingMatch.CompanyId
+                        && buildingMatch.CompanyId == entry.Entity.CompanyId)
                     {
                         entry.Entity.BankAccountId = accountId;
                     }

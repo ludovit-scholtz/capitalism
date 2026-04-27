@@ -38,7 +38,7 @@ public sealed partial class Query
 
         var safeLimit = Math.Clamp(limit ?? 30, 1, 100);
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync();
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
         var currentTick = gameState?.CurrentTick ?? 0L;
         var windowStart = Math.Max(0L, currentTick - (safeLimit - 1));
 
@@ -181,7 +181,7 @@ public sealed partial class Query
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(state => (long?)state.CurrentTick)
-            .FirstOrDefaultAsync() ?? 0L;
+            .FirstOrDefaultDeterministicAsync() ?? 0L;
         var windowStart = Math.Max(0L, currentTick - (safeLimit - 1L));
 
         var entries = await db.LedgerEntries

@@ -135,4 +135,10 @@ public sealed class PlayerBankAccountSummary
 
     /// <summary>Human-readable owner display name (player display name or company name).</summary>
     public string OwnerDisplayName { get; set; } = string.Empty;
+
+    /// <summary>ID of the bank building this account is registered at. Null for free-floating company operating accounts.</summary>
+    public Guid? BankBuildingId { get; set; }
+
+    /// <summary>ID of the city where the bank building is located. Resolved from bank building, primary city, or government bank.</summary>
+    public Guid? CityId { get; set; }
 }

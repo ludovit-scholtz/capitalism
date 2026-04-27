@@ -26,6 +26,6 @@ public sealed class CompanyTypeExtensions
             .AsNoTracking()
             .Where(building => building.CompanyId == company.Id)
             .Select(building => building.City != null ? building.City.CurrencyCode : "EUR")
-            .FirstOrDefaultAsync() ?? "EUR";
+            .FirstOrDefaultDeterministicAsync() ?? "EUR";
     }
 }

@@ -156,7 +156,7 @@ public sealed partial class Query
         var currentTick = await db.GameStates
             .AsNoTracking()
             .Select(gameState => (long?)gameState.CurrentTick)
-            .FirstOrDefaultAsync() ?? 0L;
+            .FirstOrDefaultDeterministicAsync() ?? 0L;
 
         var priceHistory = await db.SharePriceHistoryEntries
             .AsNoTracking()

@@ -338,7 +338,7 @@ public sealed partial class Mutation
                 ? Math.Round(outputAmount / input.Amount, 4)
                 : 0m;
 
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultAsync();
+        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
         var tradeRecord = new GoldAmmTradeRecord
         {
             Id = Guid.NewGuid(),

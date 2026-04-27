@@ -564,7 +564,7 @@ public sealed class GlobalCitiesAndFxRatesTests
             .Where(account => account.PlayerId == playerId
                 && account.CurrencyCode == PersonalBankAccountService.SettlementCurrencyCode)
             .Select(account => account.Balance)
-            .FirstAsync();
+            .FirstDeterministicAsync();
 
     #endregion
 
@@ -1044,10 +1044,93 @@ public sealed class GlobalCitiesAndFxRatesTests
         Assert.Contains(accA.Id, ids);
         Assert.Contains(accB.Id, ids);
 
-        var eurAcc = accounts.EnumerateArray().First(a => a.GetProperty("currencyCode").GetString() == "EUR");
+        var eurAcc = accounts.EnumerateArray().First(a => Guid.Parse(a.GetProperty("id").GetString()!) == accA.Id);
         Assert.Equal("€", eurAcc.GetProperty("currencySymbol").GetString());
         Assert.Equal(5000m, eurAcc.GetProperty("balance").GetDecimal());
         Assert.Equal("Alpha Co", eurAcc.GetProperty("companyName").GetString());
+    }
+
+    [Fact]
+    public async Task MyBankAccounts_LegacyNullBankBuildingId_ResolvesToGovernmentBankForCompanyCity()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        var client = factory.CreateClient();
+        var token = await RegisterAndLoginAsync(client, $"my-ba-legacy-{Guid.NewGuid():N}@example.com");
+
+        Guid companyAccountId;
+        Guid expectedGovernmentBankId;
+
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var meResult = await ExecuteGraphQlAsync(client, "{ me { id } }", token: token);
+            var playerId = Guid.Parse(meResult.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
+
+            var prague = await db.Cities.SingleAsync(city => city.Name == "Prague");
+            var governmentBankInPrague = await db.Buildings.SingleAsync(
+                building => building.IsGovernmentOwned && building.Type == BuildingType.Bank && building.CityId == prague.Id);
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = playerId,
+                Name = "Legacy CZK Co",
+                Cash = 0m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 1,
+            };
+            db.Companies.Add(company);
+
+            // Company has a Prague building, but its CZK account is a legacy row without BankBuildingId.
+            db.Buildings.Add(new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = prague.Id,
+                Type = BuildingType.Factory,
+                Name = "Legacy Prague Factory",
+                Latitude = prague.Latitude,
+                Longitude = prague.Longitude,
+                Level = 1,
+                BuiltAtUtc = DateTime.UtcNow,
+            });
+
+            var legacyCzkAccount = new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                AccountNumber = "9999999999999999",
+                CurrencyCode = "CZK",
+                Balance = 123_000m,
+                BankBuildingId = null,
+                IsGovernmentAccount = false,
+                CreatedAtUtc = DateTime.UtcNow,
+            };
+            db.BankAccounts.Add(legacyCzkAccount);
+            await db.SaveChangesAsync();
+
+            companyAccountId = legacyCzkAccount.Id;
+            expectedGovernmentBankId = governmentBankInPrague.Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(client,
+            """
+            query {
+                myBankAccounts {
+                    id
+                    currencyCode
+                    bankBuildingId
+                }
+            }
+            """,
+            token: token);
+
+        var accounts = result.GetProperty("data").GetProperty("myBankAccounts");
+        var czkAccount = accounts.EnumerateArray().First(account => Guid.Parse(account.GetProperty("id").GetString()!) == companyAccountId);
+
+        Assert.Equal("CZK", czkAccount.GetProperty("currencyCode").GetString());
+        Assert.Equal(expectedGovernmentBankId.ToString(), czkAccount.GetProperty("bankBuildingId").GetString());
     }
 
     [Fact]

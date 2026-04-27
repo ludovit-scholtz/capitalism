@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -13,11 +14,11 @@ import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, comput
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const router = useRouter()
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 const loading = ref(true)
 const error = ref<string | null>(null)
-const offers = ref<LoanOfferSummary[]>([])
 const myLoans = ref<LoanSummary[]>([])
 const myCompanies = ref<Company[]>([])
 
@@ -55,29 +56,6 @@ const acceptError = ref<string | null>(null)
 const collateralBuildings = ref<CollateralEligibilitySummary[]>([])
 const selectedCollateralBuildingId = ref<string | null>(null)
 const collateralLoadError = ref<string | null>(null)
-
-const LOAN_OFFERS_QUERY = `
-  {
-    loanOffers {
-      id
-      bankBuildingId
-      bankBuildingName
-      cityId
-      cityName
-      lenderCompanyId
-      lenderCompanyName
-      annualInterestRatePercent
-      maxPrincipalPerLoan
-      totalCapacity
-      usedCapacity
-      remainingCapacity
-      durationTicks
-      isActive
-      createdAtTick
-      createdAtUtc
-    }
-  }
-`
 
 const MY_LOANS_QUERY = `
   {
@@ -193,6 +171,7 @@ const MY_BANK_ACCOUNTS_QUERY = `
       companyName
       ownerType
       ownerDisplayName
+      cityId
     }
   }
 `
@@ -213,7 +192,7 @@ const CLOSE_BANK_ACCOUNT_MUTATION = `
     closeBankAccount(input: $input) {
       id
       isActive
-      closedAtUtc
+      withdrawnAtUtc
     }
   }
 `
@@ -228,11 +207,7 @@ async function loadData(isRefresh = false) {
       await auth.fetchMe()
     }
 
-    const [offersResult, banksResult] = await Promise.all([gqlRequest<{ loanOffers: LoanOfferSummary[] }>(LOAN_OFFERS_QUERY), gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY)])
-    const newOffers = offersResult.loanOffers ?? []
-    if (!deepEqual(offers.value, newOffers)) {
-      offers.value = newOffers
-    }
+    const banksResult = await gqlRequest<{ allBanks: BankInfoSummary[] }>(ALL_BANKS_QUERY)
     const newBanks = banksResult.allBanks ?? []
     if (!deepEqual(allBanks.value, newBanks)) {
       allBanks.value = newBanks
@@ -278,11 +253,20 @@ const activeLoans = computed(() => myLoans.value.filter((l) => l.status === 'ACT
 const activeCompany = computed(() => getActiveCompany(auth.player, myCompanies.value))
 const isCompanyAccountActive = computed(() => auth.player?.activeAccountType === 'COMPANY' && !!activeCompany.value)
 const visibleBankAccounts = computed(() => {
+  let accounts: PlayerBankAccountSummary[] = []
+
   if (auth.player?.activeAccountType === 'COMPANY' && auth.player.activeCompanyId) {
-    return myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === auth.player?.activeCompanyId)
+    accounts = myBankAccounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === auth.player?.activeCompanyId)
+  } else {
+    accounts = myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
   }
 
-  return myBankAccounts.value.filter((account) => account.ownerType === 'PERSON')
+  // Filter by selected city if available
+  if (selectedCityId.value) {
+    accounts = accounts.filter((account) => account.cityId === selectedCityId.value)
+  }
+
+  return accounts
 })
 
 // Lender eligibility: detect BANK buildings across all companies
@@ -299,9 +283,17 @@ const availableBankCities = computed(() => {
 
 const filteredAndSortedBanks = computed(() => {
   let banks = allBanks.value
+
+  // Filter by selected city from navbar
+  if (selectedCityId.value) {
+    banks = banks.filter((b) => b.cityId === selectedCityId.value)
+  }
+
+  // Filter by manual city filter if set
   if (bankCityFilter.value) {
     banks = banks.filter((b) => b.cityName === bankCityFilter.value)
   }
+
   if (bankShowAvailableOnly.value) {
     banks = banks.filter((b) => b.availableLendingCapacity > 0)
   }
@@ -343,8 +335,17 @@ function navigateToAcquireBank() {
   }
 }
 
-// Banks sorted for the borrow section: all open banks sorted by lowest lending rate
-const sortedBanksForBorrow = computed(() => [...allBanks.value].filter((b) => b.baseCapitalDeposited).sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent))
+// Banks sorted for the borrow section: all open banks sorted by lowest lending rate, filtered by selected city
+const sortedBanksForBorrow = computed(() => {
+  let banks = allBanks.value.filter((b) => b.baseCapitalDeposited)
+
+  // Filter by selected city from navbar
+  if (selectedCityId.value) {
+    banks = banks.filter((b) => b.cityId === selectedCityId.value)
+  }
+
+  return [...banks].sort((a, b) => a.lendingInterestRatePercent - b.lendingInterestRatePercent)
+})
 
 function navigateToManageBank() {
   if (firstBankBuilding.value) {
@@ -394,8 +395,20 @@ const collateralCapacityWarning = computed(() => {
   return null
 })
 
+const collateralRequiredWarning = computed(() => {
+  if (principalAmount.value <= 0) return null
+  if (!selectedCollateralBuildingId.value) {
+    return t('bank.collateralRequired')
+  }
+  return null
+})
+
 async function confirmAcceptLoan() {
   if (!selectedOffer.value || !selectedCompanyId.value || principalAmount.value <= 0) return
+  if (!selectedCollateralBuildingId.value) {
+    acceptError.value = t('bank.collateralRequired')
+    return
+  }
   acceptLoading.value = true
   acceptError.value = null
   try {
@@ -404,7 +417,7 @@ async function confirmAcceptLoan() {
         loanOfferId: selectedOffer.value.id,
         borrowerCompanyId: selectedCompanyId.value,
         principalAmount: principalAmount.value,
-        collateralBuildingId: selectedCollateralBuildingId.value ?? undefined,
+        collateralBuildingId: selectedCollateralBuildingId.value,
       },
     })
     closeAcceptModal()
@@ -477,7 +490,7 @@ async function closeBankAccount(accountId: string) {
 
 <template>
   <main class="loan-marketplace-view container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
-    <div class="flex flex-col gap-10 lg:gap-12">
+    <div class="flex flex-col">
       <div class="page-header flex flex-col gap-3">
         <h1 class="page-title text-4xl font-black tracking-tight text-body">{{ t('bank.banks') }}</h1>
         <p class="page-subtitle max-w-3xl text-sm text-muted sm:text-base">{{ t('bank.browseBanks') }}</p>
@@ -661,7 +674,7 @@ async function closeBankAccount(accountId: string) {
         <!-- ── DEPOSIT TAB ─────────────────────────────────────────────────────── -->
         <div v-if="activeTab === 'deposit'" class="deposit-tab flex flex-col gap-8 lg:gap-10">
           <section v-if="auth.isAuthenticated" class="my-bank-accounts-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
-            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.bankAccountsToClose') }}</h2>
+            <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myBankAccounts') }}</h2>
             <div class="deposits-list mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               <div v-for="account in visibleBankAccounts" :key="account.id" class="deposit-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" data-testid="bank-account-row">
                 <div class="deposit-card-header">
@@ -864,6 +877,7 @@ async function closeBankAccount(accountId: string) {
                 </label>
               </div>
               <!-- Collateral-specific warning -->
+              <p v-if="collateralRequiredWarning" class="risk-warning collateral-warning">⚠ {{ collateralRequiredWarning }}</p>
               <p v-if="collateralCapacityWarning" class="risk-warning collateral-warning">⚠ {{ collateralCapacityWarning }}</p>
               <!-- Selected collateral summary -->
               <div v-if="selectedCollateral" class="collateral-selected-summary">
@@ -890,7 +904,7 @@ async function closeBankAccount(accountId: string) {
           </div>
           <div class="modal-footer">
             <button class="btn btn-secondary" @click="closeAcceptModal">{{ t('common.cancel') }}</button>
-            <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0 || !!collateralCapacityWarning" @click="confirmAcceptLoan">
+            <button class="btn btn-primary" :disabled="acceptLoading || principalAmount <= 0 || !!collateralRequiredWarning || !!collateralCapacityWarning" @click="confirmAcceptLoan">
               <span v-if="acceptLoading">{{ t('common.loading') }}</span>
               <span v-else>{{ t('bank.acceptLoan') }}</span>
             </button>

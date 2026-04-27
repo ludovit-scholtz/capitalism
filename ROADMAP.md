@@ -8,152 +8,105 @@ It will use real world map. The game will start in single city and later other c
 
 ### Architecture optimization (0% complete)
 
-- Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
-- Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
+- [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
+- [ ] Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
 
 ### Archive E2E tests (0% complete)
 
-- Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
-- Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
+- [ ] Optimize test speed so that every tests (.net tests, e2e tests and unit tests) runs faster and takes no more then 10 minutes to run
+- [ ] Pick only the most important tests to keep which allows wider end to end testing and archive all other tests so that the tests will take less then 10 minutes to run
 
-### Tailwind migration (80% complete)
+### Tailwind migration (20% complete)
 
-- [x] Tailwind v4 theme foundation: `@theme inline` in `main.css` maps all game design tokens (bg-card, text-muted, border-divider, bg-brand, text-good, etc.) to CSS custom properties, enabling clean utility-first styling across all migrated components
-- [x] Full light-mode / dark-mode support: CSS variables switch on `[data-theme='light']`; dark remains the game default (system `prefers-color-scheme` is intentionally ignored so new players and CI always start in dark mode)
-- [x] Application shell migrated: `App.vue`, `AppHeader.vue`, `AppFooter.vue` — sticky header, offline/update banners, footer, nav links, notification badges, game-time chip, and mobile menu all use Tailwind utilities
-- [x] `LoginView.vue` migrated: auth card, form fields, error alert, toggle button — clean Tailwind-first form layout
-- [x] `HomeView.vue` migrated: hero section, status cards grid, leaderboard table — responsive Tailwind layout with accessible contrast
-- [x] FX exchange migrated: `ForexExchangeView.vue` — tabs, swap form with currency selectors + amount input, quote confirmation card, rates table, history table all use Tailwind utilities; responsive grid layout for source/destination rows
-- [x] Banking flows migrated: `BankAccountSelector.vue`, `ForexBankAccountSelector.vue` — unified selector pattern with balance display chip; `BankStatementView.vue` — account summary card, transaction table with debit/credit/balance columns, responsive column hiding on mobile
-- [x] Gold AMM migrated: `GoldAmmSection.vue` — gold balance gradient card, swap/liquidity/create-pool sections, quote table, pool position panels — all use Tailwind utilities; removed 330-line scoped style block
-- [x] `OnboardingView.vue` migrated: all wizard steps (industry, city, factory lot, product/shop lot, completion), guest mode, achievement panels, configure guide, mission status, and business-live panel — scoped CSS reduced from 1,366 → 176 lines (87% reduction); all E2E selector hook classes preserved
-- [x] `DashboardView.vue` migrated: power-balance/power-badge scoped CSS block replaced with Tailwind utilities; semantic E2E class hooks (.power-balance--balanced/constrained/critical/legacy, .power-badge--powered/constrained/offline) preserved
-- [x] `BuyBuildingView.vue` migrated: selected-state scoped CSS block (`.type-card.selected`, `.city-option.selected`, `.lot-card.selected`) replaced with Tailwind utilities in `:class` bindings; all E2E class hooks preserved
-- [x] Add `data-theme` toggle in UI: `ThemeToggle.vue` (moon/sun icon button) integrated into `AppHeader` for all users; `useThemeStore` (Pinia) persists choice in `localStorage`; flash-of-wrong-theme prevented by inline script in `index.html`
-- [x] Update copilot instructions with Tailwind design patterns (dark-mode regression prevention, E2E selector class preservation)
-- [ ] Migrate remaining high-traffic views to Tailwind (BuildingDetailView)
-- [ ] Update remaining components (cards, tables, badges, form controls) to use Tailwind utilities
+- [ ] Migrate all views to Tailwind
+- [ ] Update all components to use Tailwind utilities
+
+### City selection
+
+- [ ] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
+- [ ] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
+- [ ] In the context selection is the company cash visible. But there is error that the currency is not correct. 
 
 ### Government company
 
-- Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
-- Create one government bank for each currency
+- [ ] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
 
 ### Currencies and bank accounts (50% complete)
 
-Change cash flow management completely from the onboarding process, through unit calculations, payments in stock exchange up to the ledger calculation
-
-- The only place where user can have money is in the bank account! First create government bank in every city so that every currency has at least one available bank. Remove DbSet PlayerCurrencyBalances, dbset BankDeposits, from Player object remove PersonalCash, from Company model remove Cash and CurrencyCode. Keep all balances in entity BankAccount. BankDeposits and bank accounts is the same thing. Rename deposits in banks to open the bank account, and ability to transfer funds between the player's bank accounts. Find all other cash occurances and replace it with the use of the bank accounts.
-  - [x] Government bank seeded per city/currency on startup (`AppDbInitializer.EnsureGovernmentBankAccountsAsync`).
-  - [x] Player can transfer funds between two of their own bank accounts in the same currency via the new `transferFunds` GraphQL mutation and the Forex page Transfer tab; both legs are recorded as `BANK_ACCOUNT_TRANSFER_OUT`/`BANK_ACCOUNT_TRANSFER_IN` ledger entries.
-  - [x] Company currency is no longer stored on `Company`; API queries and GraphQL derive the primary currency from the company's building city with `EUR` fallback, and the restart path drops the old `Companies.CurrencyCode` column safely.
-  - [x] Remove `Player.PersonalCash`; personal money now lives in player-owned settlement bank accounts (`BankAccount.PlayerId`), with restart-safe migration and legacy startup repair backfilling old balances.
-  - [ ] Remove `PlayerCurrencyBalances`, `BankDeposits`, and `Company.Cash`.
-  - [x] Rename deposit-open/close mutations and banking UI copy to "open/close bank account" terminology.
-- Change the deposits functionality completely where only one bank account per user in one bank is allowed. Remove the minimum deposit from the opening of the bank account so that user can open bank account for currency he does not own any time. Additional deposits to the bank account are handled by the bank transfer at the forex page.
-- Make sure that the user defalt bank account obtained in the onboarding step is visible in the banking section in the Accounts tab.
-- Rename Loan Offers and Browse Loan Marketplace at /banking to Banks
-- Remove from the opening bank account the amount to be deposited, always open the new account with zero balance.
-- Currency can be moved only between the bank accounts. Every money transfer must be visible in the ledger and also in the bank statement review. 
-- Create bank statement review where players can see the transfers in their bank accounts.
-- Every building has the bank account assigned, if it does not have, create one bank account in the government bank for the currency in the building's city. In edit building make sure user can change the building's bank account to different bank account. Allow to change the bank account only if the city's currency is equal to the bank account to which player wants to change the bank account.
-- In forex exchange show the fx rate list table
-- Allow player to select bank account from which he wants to do the swap, and bank account to which he wants to do swap when doing trades in the forex exchange. Make sure to show also the current balance in the bank account selector.
-- Organizie forex exchange to tabs, make sure the default one is the swap tab
-- Player cannot go to minus on the bank account unles he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
-- When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
-- Make the research budget be calculated in USD.
-- Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
-- In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
-- When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
-- If player wants to expand to different city with different currency, he must first open the bank account for that currency and do the fx swap. Otherwise in the buy building guide should be warning that player does not have any money in this currency and steps what he should do with the links.
-- Allow to close down account only if the balance of the account is equal exactly to 0. Do not show 'My Bank Accounts' section in banks page in accounts if there is no account which has to be close. Rename the section to Bank accounts available to be closed.
-- Sort bank accounts by the account balance
-
-### Onboarding
-
-- When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
-- For each product category show at least 3 products to produce
+- [ ] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
+- [ ] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
+- [ ] Organizie forex exchange to tabs, add to the top forex tabs the amm features like add liquidity, show liquidity, and swap at AMM 
+- [ ] Player cannot go to minus on the bank account unless he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
+- [ ] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
+- [ ] Make the research budget be calculated in USD.
+- [ ] Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
+- [ ] In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
+- [ ] When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
+- [ ] Allow to close down bank account if the balance of the account is equal exactly to 0.
+- [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
+- [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
 ### Number formatting (80% complete)
 
-- Everywhere where the currency is displayed, for example in the units, use the number formatting component
-- Add to the title the original number to be formatted and currency after it
+- [ ] Create a vue component for number formatting in components/numbers folder
+- [ ] Everywhere where the currency is displayed, for example in the units, use the number formatting component
+- [ ] Add to the title the original number to be formatted and currency after it
 
 ### Power plants (65% complete)
 
-- Create the powerplant units and implement them on frontend as well
-- Implement everything mentioned in the power plant section below
-
-**Shipped in this increment:**
-- ✅ `CityWeatherForecast` entity stores per-city rolling 50-tick wind and solar forecast maintained by `WeatherUpdatePhase`.
-- ✅ `cityWeatherForecast(cityId)` GraphQL query (public, no auth required) returns `currentWindPercent`, `currentSolarPercent`, and the full rolling `forecast` array.
-- ✅ `cityPowerBalance(cityId)` GraphQL query (public) returns `totalSupplyMw`, `totalDemandMw`, `reserveMw`, `reservePercent`, and `status` (BALANCED / CONSTRAINED / CRITICAL).
-- ✅ Tick engine `WeatherUpdatePhase` maintains the 50-tick rolling forecast window per city.
-- ✅ Power plants (COAL, GAS, SOLAR, WIND, NUCLEAR) purchasable from city map with correct MW defaults.
-- ✅ Solar and wind plant output is weather-adjusted each tick via `WeatherUpdatePhase` factor.
-- ✅ City-level power distribution: buildings are POWERED / CONSTRAINED / OFFLINE based on supply ratio.
-- ✅ 3 new backend tests for `cityWeatherForecast` query: rolling data, public access, null for no-data city.
-
-**Remaining:**
-- Power plant unit grid (purchasing, wind turbine, energy producing, battery, storage units).
-- P&L chart for power plant building detail.
-- Government fine for under-supply / surplus-sale income for over-supply.
+- [ ]  Create the powerplant units and implement them on frontend as well
+- [ ]  Implement everything mentioned in the power plant section below 
+- [ ]  Power plant unit grid (purchasing, wind turbine, energy producing, battery, storage units).
+- [ ]  P&L chart for power plant building detail.
+- [ ]  Government fine for under-supply / surplus-sale income for over-supply.
 
 ### Units
 
-- Add tab routing in unit details to the route, so that when person click on one unit in the grid and he is in quick actions does not change the tab when he clicks another unit in the grid
+- [ ]  In the grid show the picture of the product instead of cell-item-avatar
 
 #### B2B sales unit
 
-- The product selection is not localized
-- Make the sale visibility default to be Group
+- [ ]  The product selection is not localized
+- [ ]  Make the sale visibility default to be Group
 
 #### Public sales unit
 
-- The product selection is not localized
-- Set the min price to be the city average price for the product
-- Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
-- Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
-
-### Banks (35% complete)
-
-**Shipped in this increment:**
-- Fixed "Acquire a Bank" button padding so it matches the surrounding UI quality
-- "Acquire a Bank" button now routes directly to the buy-building form with the Bank type pre-selected (`?type=BANK` query param), removing the extra step of manually selecting bank from the type grid
-- Bank setup section in the buy-building flow now clearly shows the required base capital and whether the selected funding bank account has sufficient balance, with a green ✅ / red ⚠️ capital-check panel
-- Players can now configure their initial deposit (savings) interest rate and lending interest rate directly in the bank setup form before completing the purchase
-- The interest rates (deposit default 3%, lending default 8%) are applied to the bank immediately after purchase via `setBankRates` mutation
-- Invalid bank creation is blocked at the UI level when the selected funding bank account balance is below the base capital requirement
+- [ ]  The product selection is not localized
+- [ ]  Set the min price to be the city average price for the product
+- [ ]  Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
+- [ ]  Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
 
 ### Audits (0% complete)
 
-- In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
+- [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
 ### Media house (0% complete)
 
-- When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
+- [ ] When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
 
 ### Mining (40% complete)
 
-**Shipped:** Mining land now shows deposit details and premium valuation — the lot list items display a resource type badge (e.g. ⛏ Iron Ore) before the player clicks, the detail panel already shows the full raw material panel with quality and estimated reserve, and the purchase form now surfaces a Deposit Investment Summary when Mine building type is selected. Pricing has been reworked so mine lots land in a $20M–$200M band: `ResourcePremiumCaptureRate` is now 100× the market spot value of the deposit, translating typical reserves (Iron Ore 18,000 t at 72% ≈ $32M, Chemical Minerals 12,000 t at 55% ≈ $20M, Gold 3,200 kg at 82% ≈ $131M) into a premium strategic investment range. A new seeded Carpathian Gold Seam lot (Bratislava Extraction Belt) demonstrates the upper end of the range.
-
-- When person goes to buy building and selects the mining, make sure to show in the property which resource it contains. ✅ **Shipped**
-- Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined. ✅ **Shipped**
+- [ ] When person goes to buy building and selects the mining, make sure to show in the property which resource it contains.
+- [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
 ### R&D Building (0% complete)
 
-- When selecting the product, make sure to show at the top the products the company is currently producing.
-- When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
-- For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
+- [ ] When selecting the product, make sure to show at the top the products the company is currently producing.
+- [ ] When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
+- [ ] For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
 
 ### Appartment and commercial buildings (0% complete)
 
-- The appartment and commenrcial buildings layouts must not contain the grid - it is single unit building.
-- When i want to set a rent i dont see any reference rate. Make sure to show the reference rate chart in the city. The reference rate chart for appartments show in appartments, and reference rate  chart for commenrcial buildings show in the commercial buildings.
-- When the current rent is higher then the city accepted rate adjusted to the location index, the residency will slowly decrease to 50%.
-- When the current rent is lower then the city accepted rate adjusted to the location index, the occupancy will increase. The occupancy can convergate to 100% if the current rate is for long time below 60% of the city rate. If it is at the current city rate adjusted by the location index plus 10%, it can reach maximum 90% of the occupancy.
-- Every appartment and commercial building bears with it the constant costs which are calculated to be equal to earning if the occupancy is equal to 75%
+- [ ] The appartment and commenrcial buildings layouts must not contain the grid - it is single unit building.
+- [ ] When i want to set a rent i dont see any reference rate. Make sure to show the reference rate chart in the city. The reference rate chart for appartments show in appartments, and reference rate  chart for commenrcial buildings show in the commercial buildings.
+- [ ] When the current rent is higher then the city accepted rate adjusted to the location index, the residency will slowly decrease to 50%.
+- [ ] When the current rent is lower then the city accepted rate adjusted to the location index, the occupancy will increase. The occupancy can convergate to 100% if the current rate is for long time below 60% of the city rate. If it is at the current city rate adjusted by the location index plus 10%, it can reach maximum 90% of the occupancy.
+- [ ] Every appartment and commercial building bears with it the constant costs which are calculated to be equal to earning if the occupancy is equal to 75%
+
+### News
+
+- [ ] When backend is restarted it must store all news from the changelog csv to the game server database. At the moment i see only few news and changelog csv is not imported.
+- [ ] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports.
 
 ## FX Exahcnge
 
@@ -587,7 +540,11 @@ When player opens a third party bank, he can see the current lending rate and th
 
 Sum of available money to be lended is 90% of the current deposits. Bank must preserve 10% deposit to loan ratio.
 
+Company can request loan from any bank which has available deposits.
+
 User can borrow money only for buildings which are not mortgaged. User can pick a building and he can borrow against it a money up to 70% of the property value.
+
+Borrower decide the amount and duration of the loan. When player goes to the bank, he can request a loan for his own duration and the requested amount. He also deposits a building as a collateral. One building can be used only in one loan.
 
 Creating a loan creates a contract between bank and a player which will hold the interest rate even if the bank player changes the lending interest rate. Each contract has a maturity date. User can see each tick payment amount. The calculation is the same as in the real world mortgage payments with difference that the payment is done on every tick. The borrower pays the interest and principal amount.
 
@@ -623,6 +580,14 @@ Flow of the resources is following:
 The power plant as a building as a whole has configuration for planned output. If the output is oversupplied, the powerplant do not receive money for the oversupply. If the powerplant is undersupply, it receives the government fines for not generating enough of energy.
 
 Make sure to show the powerplant P&L chart in the building overview.
+
+### City selection
+
+- In the top menu where company is selected add selection also for the city
+- In the player dashboard filter only buildings in the selected city
+- In the banking page show only banks in the selected city
+- In the global exchange remove the city selection and use the selection from the navbar
+- In the marketing analytics page show only data related to selected the city
 
 # Technical implementation
 

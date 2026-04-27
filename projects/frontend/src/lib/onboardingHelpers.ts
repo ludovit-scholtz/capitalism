@@ -10,14 +10,17 @@ import type { BuildingLot } from '@/types'
 // ---------------------------------------------------------------------------
 
 /**
- * Maps a numeric step value (1-5) to the URL query-param key used for that step.
- * Step 1 → 'industry', Step 2 → 'city', Step 3 → 'factory', Step 4 → 'shop', Step 5 → 'complete'.
+ * Maps a numeric step value (1-7) to the URL query-param key used for that step.
+ * Step 1 → 'industry', Step 2 → 'product', Step 3 → 'city', Step 4 → 'ipo',
+ * Step 5 → 'factory', Step 6 → 'shop', Step 7 → 'complete'.
  */
 export function stepToKey(value: number): string {
-  if (value === 2) return 'city'
-  if (value === 3) return 'factory'
-  if (value === 4) return 'shop'
-  if (value === 5) return 'complete'
+  if (value === 2) return 'product'
+  if (value === 3) return 'city'
+  if (value === 4) return 'ipo'
+  if (value === 5) return 'factory'
+  if (value === 6) return 'shop'
+  if (value === 7) return 'complete'
   return 'industry'
 }
 
@@ -26,10 +29,12 @@ export function stepToKey(value: number): string {
  * Falls back to step 1 for any unknown value (including null/undefined).
  */
 export function keyToStep(value: unknown): number {
-  if (value === 'city') return 2
-  if (value === 'factory') return 3
-  if (value === 'shop') return 4
-  if (value === 'complete') return 5
+  if (value === 'product') return 2
+  if (value === 'city') return 3
+  if (value === 'ipo') return 4
+  if (value === 'factory') return 5
+  if (value === 'shop') return 6
+  if (value === 'complete') return 7
   return 1
 }
 
@@ -43,8 +48,10 @@ export interface OnboardingStepState {
   isResumingConfigureStep: boolean
   onboardingCurrentStep: string | null | undefined
   hasLocalFactoryProgress: boolean
-  selectedCityId: string
   selectedIndustry: string
+  selectedProductId: string
+  selectedCityId: string
+  hasSelectedIpoPlan: boolean
 }
 
 /**
@@ -53,11 +60,13 @@ export interface OnboardingStepState {
  * Vue reactive state.
  */
 export function getMaxReachableStep(state: OnboardingStepState): number {
-  if (state.hasCompletionResult) return 5
-  if (state.isResumingConfigureStep) return 5
-  if (state.onboardingCurrentStep === 'SHOP_SELECTION') return 4
-  if (state.hasLocalFactoryProgress) return 4
-  if (state.selectedCityId) return 3
+  if (state.hasCompletionResult) return 7
+  if (state.isResumingConfigureStep) return 7
+  if (state.onboardingCurrentStep === 'SHOP_SELECTION') return 6
+  if (state.hasLocalFactoryProgress) return 6
+  if (state.hasSelectedIpoPlan) return 5
+  if (state.selectedCityId) return 4
+  if (state.selectedProductId) return 3
   if (state.selectedIndustry) return 2
   return 1
 }
@@ -93,14 +102,9 @@ export function getAvailableLots(lots: BuildingLot[], buildingType: string): Bui
  * @param availableFactoryLots - Lots already filtered to FACTORY-suitable, unowned lots
  * @param count - Maximum number of IDs to return (default 2)
  */
-export function getRecommendedFactoryLotIds(
-  availableFactoryLots: BuildingLot[],
-  count = 2,
-): string[] {
+export function getRecommendedFactoryLotIds(availableFactoryLots: BuildingLot[], count = 2): string[] {
   const unowned = availableFactoryLots.filter((lot) => !lot.ownerCompanyId)
-  const industrial = unowned
-    .filter((lot) => /industrial/i.test(lot.district))
-    .sort((a, b) => a.price - b.price)
+  const industrial = unowned.filter((lot) => /industrial/i.test(lot.district)).sort((a, b) => a.price - b.price)
 
   if (industrial.length > 0) {
     return industrial.slice(0, count).map((lot) => lot.id)
@@ -122,9 +126,7 @@ export function getRecommendedFactoryLotIds(
  */
 export function getRecommendedShopLotIds(availableShopLots: BuildingLot[], count = 2): string[] {
   const unowned = availableShopLots.filter((lot) => !lot.ownerCompanyId)
-  const commercial = unowned
-    .filter((lot) => /(commercial|business)/i.test(lot.district))
-    .sort((a, b) => a.price - b.price)
+  const commercial = unowned.filter((lot) => /(commercial|business)/i.test(lot.district)).sort((a, b) => a.price - b.price)
 
   if (commercial.length > 0) {
     return commercial.slice(0, count).map((lot) => lot.id)
@@ -140,13 +142,8 @@ export function getRecommendedShopLotIds(availableShopLots: BuildingLot[], count
 // CTA enablement helpers
 // ---------------------------------------------------------------------------
 
-/** Returns true when the player may proceed past step 3 (factory selection). */
-export function canProceedStep3(
-  companyName: string,
-  selectedFactoryLot: BuildingLot | null,
-  startingCash: number,
-): boolean {
-  if (!companyName.trim()) return false
+/** Returns true when the player may proceed past the factory-lot step. */
+export function canProceedStep3(selectedFactoryLot: BuildingLot | null, startingCash: number): boolean {
   if (!selectedFactoryLot) return false
   if (selectedFactoryLot.ownerCompanyId) return false
   if (startingCash < selectedFactoryLot.price) return false
@@ -154,11 +151,7 @@ export function canProceedStep3(
 }
 
 /** Returns true when the player may proceed past step 4 (shop selection). */
-export function canProceedStep4(
-  selectedProductId: string,
-  selectedShopLot: BuildingLot | null,
-  availableCash: number,
-): boolean {
+export function canProceedStep4(selectedProductId: string, selectedShopLot: BuildingLot | null, availableCash: number): boolean {
   if (!selectedProductId) return false
   if (!selectedShopLot) return false
   if (selectedShopLot.ownerCompanyId) return false

@@ -430,11 +430,23 @@ public sealed class AcceptLoanInput
     public decimal PrincipalAmount { get; set; }
 
     /// <summary>
+    /// Optional duration in ticks for direct bank borrowing.
+    /// When omitted, the backend uses its default loan duration.
+    /// </summary>
+    public long? DurationTicks { get; set; }
+
+    /// <summary>
     /// Optional: ID of a building owned by the borrower to pledge as collateral.
     /// When provided, the loan is secured and the principal is capped at 70% of the
     /// building's appraised value minus any existing secured exposure on the same asset.
     /// </summary>
     public Guid? CollateralBuildingId { get; set; }
+
+    /// <summary>
+    /// Optional settlement account to receive disbursement and service repayments.
+    /// When provided, the account must belong to the borrower company and match the bank city currency.
+    /// </summary>
+    public Guid? BankAccountId { get; set; }
 }
 
 /// <summary>Input for instantly updating the minimum sale price on a PUBLIC_SALES unit.</summary>

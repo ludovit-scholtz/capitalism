@@ -218,7 +218,7 @@ public sealed partial class Query
             .Where(r => r.BaseCurrencyCode == EurCurrencyCode && r.QuoteCurrencyCode == quoteCurrencyCode)
             .OrderByDescending(r => r.RateDate)
             .Select(r => r.Rate)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         if (rate == 0)
         {

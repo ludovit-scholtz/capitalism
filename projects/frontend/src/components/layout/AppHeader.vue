@@ -8,7 +8,7 @@ import { useGameStateStore } from '@/stores/gameState'
 import { useNewsStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
-import AccountSwitcher from '@/components/layout/AccountSwitcher.vue'
+import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
 import ThemeToggle from '@/components/layout/ThemeToggle.vue'
 import { useThemeStore } from '@/stores/theme'
 
@@ -143,10 +143,10 @@ function handleChatToggle() {
 
       <!-- Right-side actions -->
       <div class="header-actions flex items-center gap-3 shrink-0">
-        <!-- In-game time chip -->
-        <div v-if="gameState && formattedGameTime" class="game-time-chip hidden sm:flex flex-col items-end gap-0.5 px-3 py-1.5 border border-divider rounded-md" :title="t('nav.gameTime')">
-          <span class="text-[0.6875rem] text-muted uppercase tracking-wider">{{ t('nav.gameTime') }}</span>
-          <span class="text-[0.8125rem] text-body tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
+        <!-- In-game time chip (compact) -->
+        <div v-if="gameState && formattedGameTime" class="game-time-chip hidden sm:inline-flex items-center gap-1.5 px-2.5 border border-divider rounded-md h-9" :title="t('nav.gameTime')">
+          <font-awesome-icon :icon="['fas', 'clock']" class="text-muted text-[0.75rem]" />
+          <span class="text-[0.75rem] text-muted tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
         </div>
 
         <!-- Impersonation chip -->
@@ -158,9 +158,9 @@ function handleChatToggle() {
         </div>
 
         <template v-if="auth.isAuthenticated">
-          <AccountSwitcher @switched="closeMenu" />
+          <ContextSwitcher @switched="closeMenu" />
           <button
-            class="btn btn-secondary"
+            class="btn btn-secondary h-9 w-9 p-0 justify-center"
             @click="
               () => {
                 auth.logout()

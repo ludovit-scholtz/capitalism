@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
@@ -12,6 +13,7 @@ import type { CampaignAnalyticsResult, CampaignAnalyticsRow, Company } from '@/t
 
 const { t } = useI18n()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 
 const companies = ref<Company[]>([])
@@ -19,6 +21,7 @@ const selectedCompanyId = ref<string | null>(null)
 const analytics = ref<CampaignAnalyticsResult | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const cities = ref<Array<{ id: string; name: string }>>([])
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -82,6 +85,10 @@ function buildCampaignQuery(): string {
 async function loadCompanies() {
   if (!auth.isAuthenticated) return
   try {
+    // Load cities for city-name mapping
+    const citiesData = await gqlRequest<{ cities: Array<{ id: string; name: string }> }>(`{ cities { id name } }`)
+    cities.value = citiesData.cities
+
     const data = await gqlRequest<{ myCompanies: Company[] }>(MY_COMPANIES_QUERY)
     companies.value = data.myCompanies ?? []
     // Auto-select active company.
@@ -201,7 +208,24 @@ function trendClass(dir: string): string {
       return 'ca-trend-flat'
   }
 }
+const filteredAnalyticsRows = computed<CampaignAnalyticsRow[]>(() => {
+  if (!analytics.value || !analytics.value.rows) {
+    return []
+  }
+  if (!selectedCityId.value) {
+    return analytics.value.rows
+  }
 
+  // Map city ID to city name
+  const selectedCity = cities.value.find((c) => c.id === selectedCityId.value)
+  const selectedCityName = selectedCity?.name
+
+  if (!selectedCityName) {
+    return analytics.value.rows
+  }
+
+  return analytics.value.rows.filter((row) => typeof row.cityName === 'string' && row.cityName.toLowerCase() === selectedCityName.toLowerCase())
+})
 function formatPct(val: number | null): string {
   if (val === null || val === undefined) return '—'
   return Math.round(val * 100) + '%'
@@ -310,7 +334,7 @@ function formatFactor(factor: string | null): string {
 
       <!-- Per-unit analytics cards -->
       <div v-else class="ca-rows">
-        <article v-for="row in analytics.rows" :key="row.buildingUnitId" class="ca-row-card" :aria-label="rowTitle(row)">
+        <article v-for="row in filteredAnalyticsRows" :key="row.buildingUnitId" class="ca-row-card" :aria-label="rowTitle(row)">
           <!-- Card header -->
           <div class="ca-row-header">
             <div class="ca-row-identity">

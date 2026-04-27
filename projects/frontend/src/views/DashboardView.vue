@@ -31,6 +31,7 @@ const router = useRouter()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
 const { gameState } = storeToRefs(gameStateStore)
+const { selectedCityId } = storeToRefs(auth)
 
 const companies = ref<Company[]>([])
 const loading = ref(true)
@@ -55,20 +56,15 @@ const masterPortalUrl = import.meta.env.VITE_MASTER_WEB_URL || 'http://localhost
 
 /** Active dashboard tab. Persisted in sessionStorage so navigation preserves state. */
 const _savedTab = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('dashboard_tab') : null
-const activeTab = ref<'overview' | 'buildings' | 'activity' | 'chat' | 'pro'>(
-  (_savedTab as 'overview' | 'buildings' | 'activity' | 'chat' | 'pro') || 'overview',
-)
+const activeTab = ref<'overview' | 'buildings' | 'activity' | 'chat' | 'pro'>((_savedTab as 'overview' | 'buildings' | 'activity' | 'chat' | 'pro') || 'overview')
 function setActiveTab(tab: 'overview' | 'buildings' | 'activity' | 'chat' | 'pro') {
   activeTab.value = tab
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('dashboard_tab', tab)
 }
 
 /** Active personal-account tab. Persisted in sessionStorage so navigation preserves state. */
-const _savedPersonTab =
-  typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('person_account_tab') : null
-const personAccountTab = ref<'overview' | 'create-company' | 'ledger'>(
-  (_savedPersonTab as 'overview' | 'create-company' | 'ledger') || 'overview',
-)
+const _savedPersonTab = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('person_account_tab') : null
+const personAccountTab = ref<'overview' | 'create-company' | 'ledger'>((_savedPersonTab as 'overview' | 'create-company' | 'ledger') || 'overview')
 function setPersonAccountTab(tab: string) {
   personAccountTab.value = tab as 'overview' | 'create-company' | 'ledger'
   if (typeof sessionStorage !== 'undefined') sessionStorage.setItem('person_account_tab', tab)
@@ -85,9 +81,14 @@ const { saveScrollPosition, restoreScrollPosition } = useScrollPreservation()
 const activeCompany = computed(() => getActiveCompany(auth.player, companies.value))
 const isPersonAccount = computed(() => auth.player?.activeAccountType !== 'COMPANY' || !activeCompany.value)
 const visibleCompanies = computed(() => (activeCompany.value ? [activeCompany.value] : []))
-const formattedGameTime = computed(() =>
-  gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : '',
-)
+const formattedGameTime = computed(() => (gameState.value?.currentGameTimeUtc ? formatInGameTime(gameState.value.currentGameTimeUtc, locale.value) : ''))
+
+const filteredBuildingsByCity = computed(() => {
+  if (!activeCompany.value || !selectedCityId.value) {
+    return activeCompany.value?.buildings ?? []
+  }
+  return activeCompany.value.buildings.filter((b) => b.cityId === selectedCityId.value)
+})
 
 function tabsForCompany(company: Company) {
   return [
@@ -135,12 +136,9 @@ function powerStatusClass(status: string): string {
 
 /** Returns the CSS class for the city power balance status. */
 function powerBalanceClass(status: string): string {
-  const base =
-    'power-balance flex items-center gap-2 px-3 py-2 rounded text-[0.8125rem] flex-wrap border'
-  if (status === 'CRITICAL')
-    return `${base} power-balance--critical bg-red-400/10 border-red-400/25 text-[var(--color-danger)]`
-  if (status === 'CONSTRAINED')
-    return `${base} power-balance--constrained bg-amber-400/15 border-amber-400/30 text-amber-400`
+  const base = 'power-balance flex items-center gap-2 px-3 py-2 rounded text-[0.8125rem] flex-wrap border'
+  if (status === 'CRITICAL') return `${base} power-balance--critical bg-red-400/10 border-red-400/25 text-[var(--color-danger)]`
+  if (status === 'CONSTRAINED') return `${base} power-balance--constrained bg-amber-400/15 border-amber-400/30 text-amber-400`
   return `${base} power-balance--balanced bg-green-500/10 border-green-500/25 text-[var(--color-secondary)]`
 }
 
@@ -471,20 +469,10 @@ async function createCompany() {
         </div>
 
         <!-- Personal-account tab navigation -->
-        <DashboardTabNav
-          :tabs="personAccountTabs"
-          :model-value="personAccountTab"
-          class="mt-1"
-          @update:model-value="setPersonAccountTab"
-        />
+        <DashboardTabNav :tabs="personAccountTabs" :model-value="personAccountTab" class="mt-1" @update:model-value="setPersonAccountTab" />
 
         <!-- ── Overview tab ──────────────────────────────────────────── -->
-        <div
-          v-show="personAccountTab === 'overview'"
-          class="pt-5"
-          role="tabpanel"
-          :aria-label="t('dashboard.personTabOverview')"
-        >
+        <div v-show="personAccountTab === 'overview'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabOverview')">
           <p class="text-muted mb-4">
             {{ companies.length === 0 ? t('dashboard.personModeNoCompanies') : t('dashboard.personModeBody') }}
           </p>
@@ -513,12 +501,7 @@ async function createCompany() {
         </div>
 
         <!-- ── Create company tab ─────────────────────────────────────── -->
-        <div
-          v-show="personAccountTab === 'create-company'"
-          class="pt-5"
-          role="tabpanel"
-          :aria-label="t('dashboard.personTabCreateCompany')"
-        >
+        <div v-show="personAccountTab === 'create-company'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabCreateCompany')">
           <div class="flex flex-col gap-3.5">
             <div>
               <h3 class="text-[0.9375rem] font-bold mb-1">{{ t('dashboard.createCompanyTitle') }}</h3>
@@ -550,12 +533,7 @@ async function createCompany() {
         </div>
 
         <!-- ── Ledger tab ──────────────────────────────────────────────── -->
-        <div
-          v-show="personAccountTab === 'ledger'"
-          class="pt-5"
-          role="tabpanel"
-          :aria-label="t('dashboard.personTabLedger')"
-        >
+        <div v-show="personAccountTab === 'ledger'" class="pt-5" role="tabpanel" :aria-label="t('dashboard.personTabLedger')">
           <p class="text-muted mb-5">
             {{ t('dashboard.personLedgerTabBody') }}
           </p>
@@ -568,9 +546,7 @@ async function createCompany() {
           </div>
 
           <div class="person-account-ledger-link mb-5">
-            <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5">
-              📒 {{ t('dashboard.viewPersonalLedger') }}
-            </RouterLink>
+            <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5"> 📒 {{ t('dashboard.viewPersonalLedger') }} </RouterLink>
           </div>
         </div>
       </section>
@@ -578,7 +554,6 @@ async function createCompany() {
       <!-- Company mode: tabbed dashboard -->
       <div v-if="visibleCompanies.length > 0" class="companies-section flex flex-col gap-6">
         <div v-for="company in visibleCompanies" :key="company.id" class="company-card bg-card border border-divider rounded-xl p-6">
-
           <!-- Always-visible company bar -->
           <div class="company-header flex justify-between items-start max-sm:flex-col max-sm:gap-4 mb-0">
             <div>
@@ -602,9 +577,7 @@ async function createCompany() {
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
                 {{ t('dashboard.buyBuilding') }}
               </RouterLink>
-              <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary">
-                🗺️ {{ t('nav.cityMap') }}
-              </RouterLink>
+              <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary"> 🗺️ {{ t('nav.cityMap') }} </RouterLink>
               <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> 📒 {{ t('dashboard.viewLedger') }} </RouterLink>
               <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ⚙️ {{ t('dashboard.companySettings') }} </RouterLink>
             </div>
@@ -624,16 +597,20 @@ async function createCompany() {
 
           <!-- ── Buildings tab ─────────────────────────────────────────── -->
           <div v-show="activeTab === 'buildings'" class="tab-panel pt-5" role="tabpanel" aria-label="Buildings">
-            <div v-if="company.buildings.length === 0" class="no-buildings text-center p-6 text-muted flex flex-col items-center gap-4">
-              <p>{{ t('dashboard.noBuildings') }}</p>
+            <div v-if="filteredBuildingsByCity.length === 0" class="no-buildings text-center p-6 text-muted flex flex-col items-center gap-4">
+              <p v-if="selectedCityId">{{ t('dashboard.noBuildingsInCity') }}</p>
+              <p v-else>{{ t('dashboard.noBuildings') }}</p>
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
                 {{ t('dashboard.buyBuilding') }}
               </RouterLink>
             </div>
 
             <div v-else class="buildings-grid grid gap-5 [grid-template-columns:repeat(auto-fill,minmax(260px,1fr))]">
-              <div v-for="building in company.buildings" :key="building.id" class="building-card-wrapper flex flex-col mb-1">
-                <RouterLink :to="building.type === 'BANK' ? `/bank/${building.id}` : `/building/${building.id}`" class="building-card flex items-center gap-3 p-4 bg-page border border-divider rounded-t-lg border-b-0 no-underline text-body transition-all duration-200 hover:border-brand hover:bg-[rgba(0,71,255,0.04)] hover:-translate-y-px">
+              <div v-for="building in filteredBuildingsByCity" :key="building.id" class="building-card-wrapper flex flex-col mb-1">
+                <RouterLink
+                  :to="building.type === 'BANK' ? `/bank/${building.id}` : `/building/${building.id}`"
+                  class="building-card flex items-center gap-3 p-4 bg-page border border-divider rounded-t-lg border-b-0 no-underline text-body transition-all duration-200 hover:border-brand hover:bg-[rgba(0,71,255,0.04)] hover:-translate-y-px"
+                >
                   <div class="text-[1.75rem] flex-shrink-0">{{ getBuildingIcon(building.type) }}</div>
                   <div class="flex-1 flex flex-col gap-0.5">
                     <span class="building-name font-semibold text-[0.9375rem]">{{ building.name }}</span>
@@ -660,8 +637,8 @@ async function createCompany() {
             </div>
 
             <!-- City power summary -->
-            <div v-if="company.buildings.length > 0 && company.buildings[0]" class="mt-3 flex flex-wrap gap-2">
-              <template v-for="cityId in [...new Set(company.buildings.map((b) => b.cityId))]" :key="cityId">
+            <div v-if="filteredBuildingsByCity.length > 0 && filteredBuildingsByCity[0]" class="mt-3 flex flex-wrap gap-2">
+              <template v-for="cityId in [...new Set(filteredBuildingsByCity.map((b) => b.cityId))]" :key="cityId">
                 <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
                   <span class="flex-shrink-0">⚡</span>
                   <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
@@ -673,7 +650,10 @@ async function createCompany() {
                   </span>
                   <RouterLink :to="`/city/${cityId}`" class="underline text-xs ml-auto">{{ t('powerGrid.viewDetails') }}</RouterLink>
                 </div>
-                <div v-else class="power-balance power-balance--legacy flex items-center gap-2 px-3 py-2 rounded text-sm border border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)]">
+                <div
+                  v-else
+                  class="power-balance power-balance--legacy flex items-center gap-2 px-3 py-2 rounded text-sm border border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)]"
+                >
                   <span>⚡</span>
                   <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
                   <span>{{ t('powerGrid.powerCardNoPower') }}</span>
@@ -703,9 +683,7 @@ async function createCompany() {
                 </div>
                 <span
                   class="startup-pack-status px-3 py-1.5 rounded-full text-xs font-bold tracking-wide uppercase"
-                  :class="auth.isProSubscriber
-                    ? 'bg-[rgba(0,200,83,0.18)] text-[var(--color-secondary)]'
-                    : 'bg-[rgba(248,113,113,0.12)] text-bad'"
+                  :class="auth.isProSubscriber ? 'bg-[rgba(0,200,83,0.18)] text-[var(--color-secondary)]' : 'bg-[rgba(248,113,113,0.12)] text-bad'"
                 >
                   {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
                 </span>
@@ -724,12 +702,16 @@ async function createCompany() {
               <!-- Benefit cards -->
               <h3 class="text-base font-bold mb-3.5">{{ t('dashboard.proBenefitsHeading') }}</h3>
               <div class="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-6">
-                <article v-for="(benefit, i) in [
-                  { icon: '🏭', title: t('dashboard.proBenefitProducts'), body: t('dashboard.proBenefitProductsBody') },
-                  { icon: '📈', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
-                  { icon: '🔓', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
-                  { icon: '⚡', title: t('dashboard.proBenefitPriority'), body: t('dashboard.proBenefitPriorityBody') },
-                ]" :key="i" class="flex gap-3.5 items-start p-4 rounded-lg bg-[rgba(13,17,23,0.32)] border border-[rgba(48,54,61,0.8)]">
+                <article
+                  v-for="(benefit, i) in [
+                    { icon: '🏭', title: t('dashboard.proBenefitProducts'), body: t('dashboard.proBenefitProductsBody') },
+                    { icon: '📈', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
+                    { icon: '🔓', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
+                    { icon: '⚡', title: t('dashboard.proBenefitPriority'), body: t('dashboard.proBenefitPriorityBody') },
+                  ]"
+                  :key="i"
+                  class="flex gap-3.5 items-start p-4 rounded-lg bg-[rgba(13,17,23,0.32)] border border-[rgba(48,54,61,0.8)]"
+                >
                   <span class="text-2xl flex-shrink-0" aria-hidden="true">{{ benefit.icon }}</span>
                   <div>
                     <strong class="block text-[0.9rem] mb-1">{{ benefit.title }}</strong>
@@ -747,10 +729,8 @@ async function createCompany() {
               </div>
             </section>
           </div>
-
         </div>
       </div>
     </template>
   </div>
 </template>
-

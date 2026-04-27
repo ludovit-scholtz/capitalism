@@ -36,7 +36,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
     private async Task<(Guid CompanyId, Guid BuildingId, Guid CityId)> SeedMineAsync(AppDbContext db)
     {
-        var city = await db.Cities.Include(c => c.Resources).FirstAsync();
+        var city = await db.Cities.Include(c => c.Resources).FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -60,7 +60,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var resourceType = await db.CityResources
             .Where(cr => cr.CityId == city.Id && cr.Abundance > 0)
             .Select(cr => cr.ResourceType)
-            .FirstAsync();
+            .FirstDeterministicAsync();
 
         var building = new Building
         {
@@ -379,7 +379,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
     private async Task<(Guid CompanyId, Guid BuildingId)> SeedApartmentAsync(AppDbContext db)
     {
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -556,7 +556,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var gs = await db.GameStates.FirstAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
         var previousTick = gs.CurrentTick;
 
         var processor = await CreateProcessorAsync(scope);
@@ -1308,8 +1308,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var company = await db.Companies.FindAsync(companyId);
-        var cashBefore = company!.Cash;
+        var bankAccountsBefore = await db.BankAccounts
+            .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
+            .ToListAsync();
+        var cashBefore = bankAccountsBefore.Sum(a => a.Balance);
         var processor = await CreateProcessorAsync(scope);
 
         await processor.ProcessTickAsync();
@@ -1322,9 +1324,15 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
                 && entry.Category == LedgerCategory.ShippingCost)
             .ToListAsync();
 
+        var bankAccountsAfter = await db.BankAccounts
+            .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
+            .AsNoTracking()
+            .ToListAsync();
+        var cashAfter = bankAccountsAfter.Sum(a => a.Balance);
+
         Assert.NotEmpty(shippingEntries);
         Assert.All(shippingEntries, entry => Assert.True(entry.Amount < 0m));
-        Assert.True(company.Cash < cashBefore, "Shipping should reduce company cash even for inter-building transfers.");
+        Assert.True(cashAfter < cashBefore, "Shipping should reduce company cash even for inter-building transfers.");
     }
 
     [Fact]
@@ -1332,7 +1340,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -1477,7 +1485,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var wood = await db.ResourceTypes.FirstAsync(candidate => candidate.Slug == "wood");
 
         var product = new ProductType
@@ -1584,7 +1592,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var product = await db.ProductTypes.FirstAsync(candidate => candidate.Slug == "wooden-chair");
 
         var player = new Player
@@ -1872,7 +1880,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var record = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == unitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         // In a demand-far-exceeding-supply scenario, the model should sell a significant
         // portion of the small stock. The model caps turnover at 50% of stock per tick
@@ -1999,7 +2007,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await db.SaveChangesAsync();
 
         // Retrieve the game state so we know the current tick for seeding the window.
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         // Seed recent salary entries only for the active city (past 5 ticks).
@@ -2067,7 +2075,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"comm-rent-{Guid.NewGuid():N}@test.com", DisplayName = "Comm Rent Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Comm Corp", Cash = 500_000m };
@@ -2095,7 +2103,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"above-rent-{Guid.NewGuid():N}@test.com", DisplayName = "Above Market", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Above Market Corp", Cash = 500_000m };
@@ -2124,7 +2132,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"below-rent-{Guid.NewGuid():N}@test.com", DisplayName = "Below Market", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Below Market Corp", Cash = 500_000m };
@@ -2153,7 +2161,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"full-occ-{Guid.NewGuid():N}@test.com", DisplayName = "Full Occ Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Full Occ Corp", Cash = 500_000m };
@@ -2183,13 +2191,13 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"pending-rent-{Guid.NewGuid():N}@test.com", DisplayName = "Pending Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Pending Corp", Cash = 500_000m };
         db.Companies.Add(company);
 
-        var gs = await db.GameStates.FirstAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
         var startTick = gs.CurrentTick;
         var newRent = city.AverageRentPerSqm + 5m;
 
@@ -2227,13 +2235,13 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"repeat-rent-{Guid.NewGuid():N}@test.com", DisplayName = "Repeat Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Repeat Corp", Cash = 500_000m };
         db.Companies.Add(company);
 
-        var gs = await db.GameStates.FirstAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
         var startTick = gs.CurrentTick;
         var firstPending = city.AverageRentPerSqm + 3m;
         var secondPending = city.AverageRentPerSqm + 7m;
@@ -2268,7 +2276,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var player = new Player { Id = Guid.NewGuid(), Email = $"zero-occ-{Guid.NewGuid():N}@test.com", DisplayName = "Zero Occ Tester", PasswordHash = "hash", Role = PlayerRole.Player };
         db.Players.Add(player);
         var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Vacant Corp", Cash = 500_000m };
@@ -2361,7 +2369,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             });
 
         // Set game state so the next tick is a tax cycle tick.
-        var gs = await db.GameStates.FirstAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
         gs.CurrentTick = gs.TaxCycleTicks - 1; // Next tick will be tax cycle.
         await db.SaveChangesAsync();
 
@@ -2413,7 +2421,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             string purchaseSource = "EXCHANGE",
             string resourceSlug = "wood")
     {
-        var city = await db.Cities.Include(c => c.Resources).ThenInclude(r => r.ResourceType).FirstAsync();
+        var city = await db.Cities.Include(c => c.Resources).ThenInclude(r => r.ResourceType).FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -2655,7 +2663,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Verify the unit has inventory and quality is in valid range.
         var inventory = await db.Inventories
             .Where(i => i.BuildingUnitId == purchaseUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         Assert.NotNull(inventory);
         Assert.True(inventory!.Quantity > 0m);
@@ -2702,8 +2710,8 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
-        var product = await db.ProductTypes.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var product = await db.ProductTypes.FirstDeterministicAsync();
 
         var player = new Api.Data.Entities.Player
         {
@@ -3087,7 +3095,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var inv1 = await db.Inventories
             .Where(i => i.BuildingUnitId == purchaseUnitId && i.Quantity > 0m)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(inv1);
         var quality1 = inv1.Quality;
 
@@ -3100,7 +3108,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var inv2 = await db.Inventories
             .Where(i => i.BuildingUnitId == purchaseUnitId && i.Quantity > 0m)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(inv2);
         var quality2 = inv2.Quality;
 
@@ -3129,7 +3137,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var city = await db.Cities
             .Include(c => c.Resources).ThenInclude(r => r.ResourceType)
-            .FirstAsync();
+            .FirstDeterministicAsync();
         var product = await db.ProductTypes
             .Include(p => p.Recipes)
             .FirstAsync(p => p.Slug == "wooden-chair");
@@ -3270,7 +3278,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     private async Task<(Guid CompanyId, Guid ShopPublicSalesUnitId)> SeedStarterOnboardingChainAsync(
         AppDbContext db, string productSlug, string resourceSlug)
     {
-        var city = await db.Cities.Include(c => c.Resources).ThenInclude(r => r.ResourceType).FirstAsync();
+        var city = await db.Cities.Include(c => c.Resources).ThenInclude(r => r.ResourceType).FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -3471,7 +3479,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     private async Task<(Guid CompanyId, Guid BuildingId, Guid ProductTypeId)> SeedRdBuildingAsync(
         AppDbContext db, string unitType, string? brandScope = null, string productSlug = "wooden-chair")
     {
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -3545,7 +3553,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Verify no research budget exists yet
         var budgetBefore = await db.ProductResearchBudgets
             .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.Null(budgetBefore);
 
         // Process one tick
@@ -3554,7 +3562,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // A research budget record should now exist with accumulated budget > 0
         var budgetAfter = await db.ProductResearchBudgets
             .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(budgetAfter);
         Assert.True(budgetAfter.AccumulatedBudget > 0m,
             "PRODUCT_QUALITY research should accumulate budget > 0 after one tick.");
@@ -3563,7 +3571,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Brand quality should be derived from budget and be > 0.
         var brandAfter = await db.Brands
             .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(brandAfter);
         Assert.True(brandAfter.Quality > 0m,
             "PRODUCT_QUALITY research should produce brand.Quality > 0 after one tick.");
@@ -3630,7 +3638,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Verify no company-scope brand exists yet
         var brandBefore = await db.Brands
             .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Company)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.Null(brandBefore);
 
         await processor.ProcessTickAsync();
@@ -3638,7 +3646,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // After one tick a COMPANY-scope brand should be created with elevated efficiency
         var brandAfter = await db.Brands
             .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Company)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(brandAfter);
         Assert.True(brandAfter.MarketingEfficiencyMultiplier > 1m,
             "BRAND_QUALITY COMPANY scope must increase MarketingEfficiencyMultiplier above 1.0.");
@@ -3705,7 +3713,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using (var seedScope = _factory.Services.CreateAsyncScope())
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var city = await seedDb.Cities.Include(c => c.Resources).ThenInclude(r => r.ResourceType).FirstAsync();
+            var city = await seedDb.Cities.Include(c => c.Resources).ThenInclude(r => r.ResourceType).FirstDeterministicAsync();
             var product = await seedDb.ProductTypes.Include(p => p.Recipes).FirstAsync(p => p.Slug == "wooden-chair");
             var resource = await seedDb.ResourceTypes.FirstAsync(r => r.Slug == "wood");
             productId = product.Id;
@@ -3846,7 +3854,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var brand = await db.Brands
             .Where(b => b.CompanyId == companyId && b.ProductTypeId == productId && b.Scope == BrandScope.Product)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         // R&D increases MarketingEfficiencyMultiplier and must NOT directly add awareness by itself
         Assert.NotNull(brand);
@@ -3881,7 +3889,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Before: no CATEGORY-scope brand should exist
         var brandBefore = await db.Brands
             .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Category)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.Null(brandBefore);
 
         await processor.ProcessTickAsync();
@@ -3889,7 +3897,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // After one tick a CATEGORY-scope brand should be created
         var brandAfter = await db.Brands
             .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Category)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(brandAfter);
         Assert.Equal(productIndustry, brandAfter.IndustryCategory);
         Assert.True(brandAfter.MarketingEfficiencyMultiplier > 1m,
@@ -3965,7 +3973,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var city = await seedDb.Cities.FirstAsync();
+            var city = await seedDb.Cities.FirstDeterministicAsync();
 
             var player = new Player
             {
@@ -4025,7 +4033,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // A CATEGORY-scope brand should exist with the correct industry
         var brandAfter = await db.Brands
             .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Category)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.NotNull(brandAfter);
         Assert.Equal(industry, brandAfter.IndustryCategory);
         Assert.True(brandAfter.MarketingEfficiencyMultiplier > 1m,
@@ -4043,7 +4051,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var city = await seedDb.Cities.FirstAsync();
+            var city = await seedDb.Cities.FirstDeterministicAsync();
 
             var player = new Player
             {
@@ -4104,7 +4112,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // No CATEGORY-scope brand should be created
         var brandAfter = await db.Brands
             .Where(b => b.CompanyId == companyId && b.Scope == BrandScope.Category)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         Assert.Null(brandAfter);
     }
 
@@ -4124,7 +4132,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var city = await seedDb.Cities.FirstAsync();
+            var city = await seedDb.Cities.FirstDeterministicAsync();
             var player = new Player { Id = Guid.NewGuid(), Email = $"decay-test-{Guid.NewGuid():N}@test.com", DisplayName = "Decay Tester", PasswordHash = "hash", Role = PlayerRole.Player };
             var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Decay Corp", Cash = 100_000m };
             var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
@@ -4275,7 +4283,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         {
             var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-            var city = await seedDb.Cities.FirstAsync();
+            var city = await seedDb.Cities.FirstDeterministicAsync();
             var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
             productId = product.Id;
 
@@ -4329,7 +4337,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player1 = new Player { Id = Guid.NewGuid(), Email = $"sal1-{Guid.NewGuid():N}@test.com", DisplayName = "Sal1", PasswordHash = "h", Role = PlayerRole.Player };
         var player2 = new Player { Id = Guid.NewGuid(), Email = $"sal2-{Guid.NewGuid():N}@test.com", DisplayName = "Sal2", PasswordHash = "h", Role = PlayerRole.Player };
@@ -4385,20 +4393,33 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
     {
         // A company with non-zero overhead should have manufacturing units pay a higher effective
         // hourly rate than non-manufacturing units in the same building.
-        await using var scope = _factory.Services.CreateAsyncScope();
+        // Use isolated factory so maxCompanyAssetValue is deterministic.
+        await using var isolated = new ApiWebApplicationFactory();
+        await using var scope = isolated.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var currentTick = (await db.GameStates.FirstAsync()).CurrentTick;
-        var city = await db.Cities.FirstAsync();
+        var currentTick = (await db.GameStates.FirstDeterministicAsync()).CurrentTick;
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player { Id = Guid.NewGuid(), Email = $"overhead-{Guid.NewGuid():N}@test.com", DisplayName = "Overhead", PasswordHash = "h", Role = PlayerRole.Player };
         db.Players.Add(player);
 
         // Set FoundedAtTick 1 full year in the past so ageFactor = 0.5 (halfway to max),
-        // which ensures overhead > 0 (ageFactor * assetFactor > 0 since company has cash).
+        // which ensures overhead > 0 (ageFactor * assetFactor > 0 since company has cash in bank).
         var ticksPerYear = Engine.GameConstants.TicksPerYear;
-        var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Overhead Corp", Cash = 1_000_000m, FoundedAtTick = currentTick - ticksPerYear };
+        var companyId = Guid.NewGuid();
+        var company = new Company { Id = companyId, PlayerId = player.Id, Name = "Overhead Corp", FoundedAtTick = currentTick - ticksPerYear };
         db.Companies.Add(company);
+        db.BankAccounts.Add(new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234567890123456",
+            CurrencyCode = "EUR",
+            Balance = 10_000_000_000m,  // 10B - large enough to be the max company by asset value
+            CompanyId = companyId,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
 
         var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = BuildingType.Factory, Name = "OH Factory", Level = 1 };
         db.Buildings.Add(building);
@@ -4444,9 +4465,9 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
-        var product = await db.ProductTypes.FirstAsync();
-        var gameState = await db.GameStates.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var product = await db.ProductTypes.FirstDeterministicAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         var player = new Player
@@ -4626,7 +4647,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var record = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == unitId)
             .OrderBy(r => r.Tick)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         Assert.NotNull(record);
         Assert.True(record.TrendFactor >= GameConstants.TrendMin
@@ -4816,10 +4837,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var hotRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == hotUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var neutralRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == neutralUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         Assert.NotNull(hotRecord);
         Assert.NotNull(neutralRecord);
@@ -4890,10 +4911,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var coldRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == coldUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var neutralRecord2 = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == neutralUnitId2)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         Assert.NotNull(coldRecord);
         Assert.NotNull(neutralRecord2);
@@ -4940,7 +4961,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var record = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == unitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         // Either no record created or zero sold — hot trend cannot create sales from zero stock.
         Assert.True(record == null || record.QuantitySold == 0m,
@@ -5005,10 +5026,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var coldRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == coldUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var neutralRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == neutralUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         Assert.NotNull(coldRecord);
         Assert.NotNull(neutralRecord);
@@ -5081,10 +5102,10 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var hotRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == hotUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
         var neutralRecord = await db.PublicSalesRecords
             .Where(r => r.BuildingUnitId == neutralUnitId)
-            .FirstOrDefaultAsync();
+            .FirstOrDefaultDeterministicAsync();
 
         // Price floor enforcement: hot trend cannot overcome a zero-priceIndex seller.
         // Either hot record is null (no sales) or it sold less than the fairly-priced neutral.
@@ -5250,7 +5271,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var player = new Player
@@ -5406,7 +5427,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         db.Cities.AddRange(cityA, cityB);
 
         // Create a dummy company and building in city A to anchor the salary ledger entries.
-        var gs = await db.GameStates.FirstAsync();
+        var gs = await db.GameStates.FirstDeterministicAsync();
         var salaryPlayer = new Player
         {
             Id = Guid.NewGuid(),
@@ -5507,7 +5528,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         // Find a city with Wood abundance to lock purchasing to.
-        var lockedCity = await db.Cities.FirstAsync();
+        var lockedCity = await db.Cities.FirstDeterministicAsync();
         var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var (companyId, _, _, purchaseUnitId, _) =
@@ -5565,7 +5586,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // from A(0,0) to B(1,1) after one tick (the ROADMAP diagonal routing requirement).
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var player = new Player
@@ -5660,7 +5681,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // diagonally from A to B(1,0) after one tick (↗ diagonal direction).
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var player = new Player
@@ -5748,7 +5769,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // from A to B(0,0) after one tick (↖ diagonal direction).
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var player = new Player
@@ -5836,7 +5857,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // from A to B(0,1) after one tick (↙ diagonal direction).
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
         var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
 
         var player = new Player
@@ -5938,7 +5959,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         // Save entities first so we can query them and so the plan FK is valid.
         await db.SaveChangesAsync();
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         // Attach a pending upgrade plan to the unit's building — upgrade takes 10 ticks.
@@ -5993,7 +6014,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
-        var city = await db.Cities.Include(c => c.Resources).FirstAsync();
+        var city = await db.Cities.Include(c => c.Resources).FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -6038,7 +6059,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         };
         db.BuildingUnits.Add(purchaseUnit);
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         // Attach a pending upgrade plan.
@@ -6088,7 +6109,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
         var product = await db.ProductTypes.Include(p => p.Recipes).FirstAsync(p => p.Slug == "wooden-chair");
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -6142,7 +6163,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             Quality = 0.7m,
         });
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         // Attach a pending upgrade plan.
@@ -6189,7 +6210,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
         var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -6251,7 +6272,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             Quality = 0.7m,
         });
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         // Pending upgrade on the source unit.
@@ -6324,7 +6345,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var (_, buildingId, unitId) = AddPublicSalesSeller(db, city, product, "PrevSaleUpgrade", stockQuantity: 50m);
         await db.SaveChangesAsync();
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var processor = await CreateProcessorAsync(scope);
 
         // ── TICK 1: no upgrade plan; unit should sell normally ──────────────────────────────────
@@ -6389,7 +6410,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var woodResource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
         var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
-        var city = await db.Cities.FirstAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
 
         var player = new Player
         {
@@ -6450,7 +6471,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             ResourceTypeId = woodResource.Id, Quantity = 100m, Quality = 0.7m,
         });
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;
 
         // One plan covers both upgrading units (A and B).
@@ -6524,7 +6545,7 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var (_, buildingId, unitId) = AddPublicSalesSeller(db, city, product, "BoundarySuspend", stockQuantity: 50m);
         await db.SaveChangesAsync();
 
-        var gameState = await db.GameStates.FirstAsync();
+        var gameState = await db.GameStates.FirstDeterministicAsync();
         var currentTick = gameState.CurrentTick;  // ProcessTickAsync will increment this by 1
 
         // The upgrade plan's AppliesAtTick is set to currentTick + 1, which equals

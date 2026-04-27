@@ -51,23 +51,11 @@ public sealed class LoanRepaymentPhase : ITickPhase
                 var paymentTick = loan.NextPaymentTick;
                 var isLastPayment = loan.PaymentsMade + 1 >= loan.TotalPayments;
 
-                // Compute principal vs interest split for this instalment.
-                // Use flat/amortised split: split interest proportional to remaining principal.
-                var interestPerPayment = ComputeInterestForPayment(loan);
-                var principalPayment = loan.PaymentAmount - interestPerPayment;
+                var interestPerPayment = ComputeTickInterest(loan);
+                var principalPayment = ComputePrincipalForPayment(loan, isLastPayment);
+                var totalPayment = principalPayment + interestPerPayment;
 
-                // For last payment, pay all remaining principal to avoid rounding drift.
-                if (isLastPayment)
-                {
-                    principalPayment = loan.RemainingPrincipal;
-                    // Recalculate total payment for the last instalment.
-                    var lastPayment = principalPayment + interestPerPayment;
-                    ProcessSinglePayment(context, loan, borrower, lender, lastPayment, principalPayment, interestPerPayment, paymentTick, isLastPayment);
-                }
-                else
-                {
-                    ProcessSinglePayment(context, loan, borrower, lender, loan.PaymentAmount, principalPayment, interestPerPayment, paymentTick, false);
-                }
+                ProcessSinglePayment(context, loan, borrower, lender, totalPayment, principalPayment, interestPerPayment, paymentTick, isLastPayment);
 
                 // Stop processing further payments if the loan was closed or defaulted.
                 if (loan.Status == LoanStatus.Repaid || loan.Status == LoanStatus.Defaulted)
@@ -95,14 +83,22 @@ public sealed class LoanRepaymentPhase : ITickPhase
         return Math.Max(1, paymentsDue);
     }
 
-    private static decimal ComputeInterestForPayment(Loan loan)
+    private static decimal ComputeTickInterest(Loan loan)
     {
-        // Simple periodic interest: annualRate / ticksPerYear * remainingPrincipal
-        // Using 365 days × 24 ticks/day = 8760 ticks per year.
-        var ticksPerYear = GameConstants.TicksPerYear;
-        var ticksPerPayment = loan.TotalPayments > 0 ? loan.DurationTicks / loan.TotalPayments : loan.DurationTicks;
-        var periodicRate = (loan.AnnualInterestRatePercent / 100m) * ((decimal)ticksPerPayment / ticksPerYear);
+        var periodicRate = (loan.AnnualInterestRatePercent / 100m) / GameConstants.TicksPerYear;
         return decimal.Round(loan.RemainingPrincipal * periodicRate, 4, MidpointRounding.AwayFromZero);
+    }
+
+    private static decimal ComputePrincipalForPayment(Loan loan, bool isLastPayment)
+    {
+        if (isLastPayment)
+        {
+            return decimal.Round(loan.RemainingPrincipal, 4, MidpointRounding.AwayFromZero);
+        }
+
+        var paymentsRemaining = Math.Max(1, loan.TotalPayments - loan.PaymentsMade);
+        var principal = decimal.Round(loan.RemainingPrincipal / paymentsRemaining, 4, MidpointRounding.AwayFromZero);
+        return Math.Min(principal, loan.RemainingPrincipal);
     }
 
     private static void ProcessSinglePayment(
@@ -117,14 +113,33 @@ public sealed class LoanRepaymentPhase : ITickPhase
         bool isLastPayment)
     {
         var ticksPerPayment = loan.TotalPayments > 0 ? loan.DurationTicks / loan.TotalPayments : loan.DurationTicks;
+        if (ticksPerPayment <= 0)
+        {
+            ticksPerPayment = 1;
+        }
 
-        if (context.GetCompanyBankBalance(borrower.Id) >= totalPayment)
+        var borrowerSettlementAccount = loan.BorrowerBankAccountId.HasValue
+            && context.BankAccountsById.TryGetValue(loan.BorrowerBankAccountId.Value, out var configuredAccount)
+            ? configuredAccount
+            : null;
+        var availableBorrowerBalance = borrowerSettlementAccount?.Balance ?? context.GetCompanyBankBalance(borrower.Id);
+
+        if (availableBorrowerBalance >= totalPayment)
         {
             // Successful payment.
-            CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(borrower.Id), totalPayment);
+            if (borrowerSettlementAccount is not null)
+            {
+                borrowerSettlementAccount.Balance -= totalPayment;
+            }
+            else
+            {
+                CompanyBankingService.TryDebit(context.GetCompanyBankAccounts(borrower.Id), totalPayment);
+            }
+
             CompanyBankingService.TryCredit(context.GetCompanyBankAccounts(lender.Id), totalPayment, null, out _);
             loan.RemainingPrincipal = Math.Max(0m, loan.RemainingPrincipal - principalPayment);
             loan.PaymentsMade++;
+            loan.PaymentAmount = totalPayment;
             loan.NextPaymentTick = paymentTick + ticksPerPayment;
 
             // If borrower was overdue, restore to active.

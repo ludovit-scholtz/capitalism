@@ -11,9 +11,13 @@ interface Props {
   currencyCode: string
   /** Loading state while the parent fetches building data */
   loading: boolean
+  /** Render the account-assignment controls. */
+  showAssignmentControls?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  showAssignmentControls: true,
+})
 const emit = defineEmits<{
   (e: 'updated'): void
 }>()
@@ -24,27 +28,11 @@ const accountInfo = ref<BuildingBankAccountInfo | null>(null)
 const companyAccounts = ref<CompanyBankAccountSummary[]>([])
 const accountLoading = ref(false)
 const accountsLoading = ref(false)
-const fundAmount = ref<number | null>(null)
-const fundLoading = ref(false)
-const fundError = ref<string | null>(null)
-const fundSuccess = ref(false)
 const selectedBankAccountId = ref<string | null>(null)
 const assignmentLoading = ref(false)
 const createLoading = ref(false)
 const assignmentError = ref<string | null>(null)
 const assignmentSuccess = ref<string | null>(null)
-
-const currencySymbol = computed(() => {
-  const code = props.currencyCode ?? accountInfo.value?.currencyCode ?? 'EUR'
-  try {
-    return new Intl.NumberFormat(locale.value, { style: 'currency', currency: code, maximumFractionDigits: 0 })
-      .format(0)
-      .replace(/[\d,.]/g, '')
-      .trim()
-  } catch {
-    return code
-  }
-})
 
 const suspensionLabel = computed(() => {
   const reason = accountInfo.value?.suspendedReason ?? null
@@ -148,6 +136,12 @@ async function fetchAccountInfo() {
 }
 
 async function fetchCompanyAccounts() {
+  if (!props.showAssignmentControls) {
+    companyAccounts.value = []
+    selectedBankAccountId.value = null
+    return
+  }
+
   if (!props.companyId) {
     companyAccounts.value = []
     selectedBankAccountId.value = null
@@ -218,39 +212,6 @@ async function assignBankAccount(bankAccountId: string, successMessage: string) 
     assignmentError.value = error instanceof Error ? error.message : t('common.unknownError')
   } finally {
     assignmentLoading.value = false
-  }
-}
-
-async function fundAccount() {
-  if (!fundAmount.value || fundAmount.value <= 0) return
-  fundLoading.value = true
-  fundError.value = null
-  fundSuccess.value = false
-  try {
-    assignmentError.value = null
-    assignmentSuccess.value = null
-    await gqlRequest(
-      `mutation FundBuildingBankAccount($input: FundBuildingBankAccountInput!) {
-        fundBuildingBankAccount(input: $input) {
-          bankAccount {
-            buildingId
-            balance
-            isSuspendedForFunds
-            suspendedReason
-          }
-          remainingCompanyCash
-        }
-      }`,
-      { input: { buildingId: props.buildingId, amount: fundAmount.value } },
-    )
-    fundSuccess.value = true
-    fundAmount.value = null
-    await refreshPanel()
-    emit('updated')
-  } catch (error: unknown) {
-    fundError.value = error instanceof Error ? error.message : t('common.unknownError')
-  } finally {
-    fundLoading.value = false
   }
 }
 
@@ -332,7 +293,7 @@ watch(
         </span>
       </div>
 
-      <div class="bba-manage-panel">
+      <div v-if="props.showAssignmentControls" class="bba-manage-panel">
         <p class="bba-manage-title">{{ t('buildingBankAccount.assignmentTitle') }}</p>
         <p class="bba-manage-hint">{{ t('buildingBankAccount.assignmentHint', { currency: props.currencyCode }) }}</p>
 
@@ -358,37 +319,6 @@ watch(
         <p v-if="assignmentError" class="bba-manage-error" role="alert">{{ assignmentError }}</p>
         <p v-if="assignmentSuccess" class="bba-manage-success" role="status">{{ assignmentSuccess }}</p>
       </div>
-
-      <details class="bba-fund-panel">
-        <summary class="bba-fund-summary">
-          {{ t('buildingBankAccount.fundAccount') }}
-        </summary>
-        <div class="bba-fund-body">
-          <p class="bba-fund-hint">
-            {{ t('buildingBankAccount.fundHint') }}
-          </p>
-          <div class="bba-fund-form">
-            <input
-              v-model.number="fundAmount"
-              type="number"
-              min="1"
-              step="1000"
-              class="bba-fund-input"
-              :placeholder="t('buildingBankAccount.amountPlaceholder', { symbol: currencySymbol })"
-              :disabled="fundLoading"
-            />
-            <button class="btn btn-primary btn-sm" :disabled="!fundAmount || fundAmount <= 0 || fundLoading" @click="fundAccount">
-              {{ fundLoading ? t('common.loading') : t('buildingBankAccount.transferBtn') }}
-            </button>
-          </div>
-          <p v-if="fundError" class="bba-fund-error" role="alert">{{ fundError }}</p>
-        </div>
-      </details>
-
-      <p v-if="fundSuccess" class="bba-fund-success" role="status">
-        {{ t('buildingBankAccount.fundSuccess') }}
-      </p>
-
       <div v-if="isSuspended || hasMissingAccount" class="bba-guidance">
         <span class="bba-guidance-label">{{ t('buildingBankAccount.guidance') }}</span>
         <router-link to="/forex" class="bba-guidance-link">

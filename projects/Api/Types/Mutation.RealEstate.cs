@@ -83,7 +83,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var gameState = await db.GameStates.FirstOrDefaultAsync()
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync()
             ?? throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("Game state not found.")
@@ -103,7 +103,8 @@ public sealed partial class Mutation
     public async Task<PurchaseLotResult> PurchaseLot(
         PurchaseLotInput input,
         [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
+        [Service] IHttpContextAccessor httpContextAccessor,
+        [Service] IServiceScopeFactory scopeFactory)
     {
         var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
 
@@ -118,6 +119,14 @@ public sealed partial class Mutation
                     .SetCode("COMPANY_NOT_FOUND")
                     .Build());
         }
+
+        var lotPricingPreview = await db.BuildingLots
+            .AsNoTracking()
+            .Include(candidate => candidate.City)
+            .FirstOrDefaultAsync(candidate => candidate.Id == input.LotId);
+        var cityCurrencyCode = lotPricingPreview?.City?.CurrencyCode ?? "EUR";
+        var fundingAccountPreview = await CompanyBankingService.EnsurePreferredAccountAsync(db, company.Id, cityCurrencyCode);
+        var balanceBeforePurchaseAttempt = fundingAccountPreview.Balance;
 
         var (lot, building) = await PrepareLotPurchaseAsync(
             db,
@@ -158,12 +167,23 @@ public sealed partial class Mutation
             var currentTick = await db.GameStates
                 .AsNoTracking()
                 .Select(state => state.CurrentTick)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultDeterministicAsync();
             await LandService.EnsureMinimumAvailableLotsAsync(db, currentTick, [lot.CityId]);
             await db.SaveChangesAsync();
         }
         catch (DbUpdateConcurrencyException)
         {
+            // In high-contention races, the losing request can hit concurrency after balance mutation.
+            // Restore the pre-attempt balance so only the winning company is charged.
+            await using var refundScope = scopeFactory.CreateAsyncScope();
+            var refundDb = refundScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var fundingAccount = await CompanyBankingService.EnsurePreferredAccountAsync(refundDb, company.Id, cityCurrencyCode);
+            if (fundingAccount.Balance < balanceBeforePurchaseAttempt)
+            {
+                fundingAccount.Balance = balanceBeforePurchaseAttempt;
+                await refundDb.SaveChangesAsync();
+            }
+
             throw new GraphQLException(
                 ErrorBuilder.New()
                     .SetMessage("This lot has already been purchased.")

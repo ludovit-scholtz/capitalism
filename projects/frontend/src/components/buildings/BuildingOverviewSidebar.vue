@@ -73,8 +73,13 @@ const {
           </div>
         </div>
 
+        <div class="unit-insight-card building-bank-account-card">
+          <h5>{{ t('buildingBankAccount.assignmentTitle') }}</h5>
+          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
+        </div>
+
         <!-- ── Building Layouts panel ── -->
-        <div class="layout-section" aria-label="Building Layouts">
+        <div class="layout-section" :aria-label="t('buildingDetail.accessibility.buildingLayouts')">
           <div class="layout-header">
             <h4>{{ t('buildingDetail.layouts.title') }}</h4>
           </div>
@@ -263,7 +268,14 @@ const {
         <!-- ── Bank account panel ── -->
         <div class="unit-insight-card building-bank-account-card">
           <h5>{{ t('buildingBankAccount.panelTitle') }}</h5>
-          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="loading" @updated="loadBuilding" />
+          <BuildingBankAccountPanel
+            :building-id="building?.id ?? ''"
+            :company-id="building?.companyId ?? ''"
+            :currency-code="cityCurrencyCode"
+            :loading="loading"
+            :show-assignment-controls="false"
+            @updated="loadBuilding"
+          />
         </div>
       </div>
     </div>

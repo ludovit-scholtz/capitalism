@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -9,6 +10,7 @@ import type { PlayerBankAccountSummary } from '@/types'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const route = useRoute()
 const router = useRouter()
 
@@ -47,16 +49,24 @@ const toTick = ref<number | null>(null)
 const isPersonalContext = computed(() => auth.player?.activeAccountType === 'PERSON')
 
 const contextAccounts = computed<PlayerBankAccountSummary[]>(() => {
+  let filtered: PlayerBankAccountSummary[] = []
+
   if (isPersonalContext.value) {
-    return accounts.value.filter((account) => account.ownerType === 'PERSON')
+    filtered = accounts.value.filter((account) => account.ownerType === 'PERSON')
+  } else {
+    const activeCompanyId = auth.player?.activeCompanyId
+    if (!activeCompanyId) {
+      return []
+    }
+    filtered = accounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === activeCompanyId)
   }
 
-  const activeCompanyId = auth.player?.activeCompanyId
-  if (!activeCompanyId) {
-    return []
+  // Filter by selected city if available
+  if (selectedCityId.value) {
+    filtered = filtered.filter((account) => account.cityId === selectedCityId.value)
   }
 
-  return accounts.value.filter((account) => account.ownerType === 'COMPANY' && account.companyId === activeCompanyId)
+  return filtered
 })
 
 const selectedAccount = computed<PlayerBankAccountSummary | null>(() => contextAccounts.value.find((account) => account.id === routeAccountOrCompanyId.value) ?? null)
@@ -97,6 +107,8 @@ const MY_BANK_ACCOUNTS_QUERY = `
       companyName
       ownerType
       ownerDisplayName
+      bankBuildingId
+      cityId
     }
   }
 `

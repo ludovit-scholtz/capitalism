@@ -15,7 +15,6 @@ import {
   formatCurrency,
   formatPercent,
   TICKS_PER_YEAR,
-  TICKS_PER_DAY,
 } from '../loanHelpers'
 import type { LoanSummary, LoanOfferSummary } from '@/types'
 
@@ -85,11 +84,11 @@ describe('loanHelpers', () => {
   })
 
   describe('formatLoanDuration', () => {
-    it('formats 1 day', () => expect(formatLoanDuration(TICKS_PER_DAY)).toBe('1 day'))
-    it('formats 30 days', () => expect(formatLoanDuration(720)).toBe('30 days'))
-    it('formats 1 year', () => expect(formatLoanDuration(TICKS_PER_YEAR)).toBe('1 year'))
-    it('formats 2 years', () => expect(formatLoanDuration(TICKS_PER_YEAR * 2)).toBe('2 years'))
-    it('formats 0 ticks as 0 days', () => expect(formatLoanDuration(0)).toBe('0 days'))
+    it('formats 1 tick as 1 hour', () => expect(formatLoanDuration(1)).toBe('1 hour'))
+    it('formats 720 ticks as 720 hours', () => expect(formatLoanDuration(720)).toBe('720 hours'))
+    it('formats 1 year in hours', () => expect(formatLoanDuration(TICKS_PER_YEAR)).toBe('8760 hours'))
+    it('formats 2 years in hours', () => expect(formatLoanDuration(TICKS_PER_YEAR * 2)).toBe('17520 hours'))
+    it('formats 0 ticks as 0 hours', () => expect(formatLoanDuration(0)).toBe('0 hours'))
   })
 
   describe('computeTotalInterest', () => {
@@ -124,18 +123,19 @@ describe('loanHelpers', () => {
       const payment = computePaymentAmount(10000, 12, 1440)
       expect(payment).toBeGreaterThan(0)
     })
-    it('handles single payment (short duration)', () => {
+    it('handles per-tick repayment on short duration', () => {
       const payment = computePaymentAmount(1000, 10, 100)
-      expect(payment).toBeGreaterThan(1000) // principal + some interest
+      expect(payment).toBeGreaterThan(10)
+      expect(payment).toBeLessThan(11)
     })
   })
 
   describe('computeTotalPayments', () => {
-    it('returns 2 payments for 1440 ticks (2×720)', () => {
-      expect(computeTotalPayments(1440)).toBe(2)
+    it('returns one payment per tick for 1440 ticks', () => {
+      expect(computeTotalPayments(1440)).toBe(1440)
     })
-    it('returns at least 1 for very short duration', () => {
-      expect(computeTotalPayments(24)).toBe(1)
+    it('returns one payment per tick for short durations', () => {
+      expect(computeTotalPayments(24)).toBe(24)
     })
     it('returns 0 not possible (minimum 1)', () => {
       expect(computeTotalPayments(0)).toBe(1)

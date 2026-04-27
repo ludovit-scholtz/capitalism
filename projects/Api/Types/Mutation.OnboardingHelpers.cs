@@ -19,8 +19,8 @@ public sealed partial class Mutation
 {
     private static bool IsStarterOnboardingProduct(ProductType product)
     {
-        return StarterOnboardingProductByIndustry.TryGetValue(product.Industry, out var starterSlug)
-            && string.Equals(product.Slug, starterSlug, StringComparison.Ordinal);
+        return StarterOnboardingProductsByIndustry.TryGetValue(product.Industry, out var starterSlugs)
+            && starterSlugs.Contains(product.Slug, StringComparer.Ordinal);
     }
 
     private static void ClearOnboardingProgress(Player player)
@@ -153,7 +153,7 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultAsync())?.CurrentTick ?? 0;
+        var currentTick = (await db.GameStates.AsNoTracking().FirstOrDefaultDeterministicAsync())?.CurrentTick ?? 0;
         var constructionCost = applyConstructionDelay ? Engine.GameConstants.ConstructionCost(buildingType) : 0m;
         var totalCost = lot.Price + constructionCost;
 
