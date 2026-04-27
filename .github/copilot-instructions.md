@@ -817,7 +817,24 @@ Root-cause of a latent mock bug (April 2026, PR #261):
 1. **Whenever a query name contains another query name as a substring, the longer name MUST be excluded from the shorter check:** `query.includes('rankings') && !query.includes('companyRankings')`.
 2. **Follow the same guard pattern as `isStandaloneMeQuery`** (already documented above for `me`/`gameServers`). Apply it to any pair where one query name contains another as a substring.
 3. **After adding a new GraphQL query handler to mock-api, check whether the query name is a substring of any other query name** already in the mock. If so, add the exclusion guard immediately.
-4. **Known pairs requiring exclusion guards:** `rankings` must exclude `companyRankings`; `me` must exclude `gameServers`, `mySubscription`, `prolongSubscription`; `rank` must exclude `rankings`; `company` must exclude `companyRankings`.
+4. **Known pairs requiring exclusion guards:** `rankings` must exclude `companyRankings`; `me` must exclude `gameServers`, `mySubscription`, `prolongSubscription`, `fundBuildingBankAccount`, `assignBuildingBankAccount`; `rank` must exclude `rankings`; `company` must exclude `companyRankings`.
+
+## isStandaloneMeQuery camelCase prefix trap — `buildingBankAccount` exclusion does NOT cover mutations with prefixes
+
+Root-cause of a quality failure (April 2026, PR fixing suspension alert race condition):
+- `isStandaloneMeQuery` had `!q.includes('buildingBankAccount')` to exclude the standalone query.
+- `'fundBuildingBankAccount'.includes('buildingBankAccount')` = **FALSE** because after `fund`, the string has an uppercase `B` (`fundBuildingBankAccount` = `fund` + `Building` with capital B).
+- JavaScript `String.includes()` is case-sensitive. The camelCase prefix `fund` makes `Building` start with uppercase `B`, which does NOT match the lowercase `b` in the exclusion string `buildingBankAccount`.
+- Therefore, the `fundBuildingBankAccount` and `assignBuildingBankAccount` mutations fell through to the `me` handler, returning `{ me: {...} }` instead of the real mutation result.
+- In `fundBuildingAccount()`, `result.fundBuildingBankAccount` was `undefined` → fell to `else { await fetchAccountInfo() }` with stale mock state (fund handler never ran) → suspension alert persisted alongside the "Transfer successful" message.
+- The same camelCase-prefix trap applies to any mutation whose name is formed by prepending a verb (fund, assign, create, close, set, ...) to a noun that is an existing query name.
+
+**Rules to prevent recurrence:**
+1. **When adding an exclusion guard for `x` in `isStandaloneMeQuery`, also add explicit exclusions for every mutation of the form `verbX` (e.g., `fundX`, `assignX`, `createX`, `closeX`, `setX`).** The `!q.includes('x')` guard does NOT match `'fundX'` because JavaScript string search is case-sensitive and camelCase creates an uppercase letter at the boundary.
+2. **The correct fix when discovering a new mutation that matches `isStandaloneMeQuery` is to add it as a named exclusion.** For `fundBuildingBankAccount` and `assignBuildingBankAccount`: `!q.includes('fundBuildingBankAccount') && !q.includes('assignBuildingBankAccount')`.
+3. **A symptom of this bug is: clicking a mutation button shows "success" text BUT the reactive state is NOT updated AND a second GraphQL request is fired.** The "success" comes from the unconditional `fundSuccess.value = t(...)` line executing after the `me` response. The second request is `fetchAccountInfo()` called from the `else` branch (because `fundedAccount` is undefined). The stale state comes from the mock never applying the mutation.
+4. **When writing a mock `if` handler for a query `foo`, also check if any mutation `verbFoo` (verb + capitalized foo) would pass your `q.includes('foo')` check.** They won't — but check whether they pass ALL OTHER conditions in `isStandaloneMeQuery`. If so, add explicit exclusions.
+5. **Verify mock handler correctness by running a targeted spec that asserts the post-mutation state**, not just that a "success" UI element appears. E.g., after funding, assert the suspension alert is HIDDEN and the balance shows the new value.
 
 ## Dynamic salary demand signal — "game currency collected by salaries in past 10 ticks"
 
