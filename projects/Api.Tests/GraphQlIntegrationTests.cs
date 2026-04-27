@@ -29529,6 +29529,100 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             "Plan unit should have been deferred when FX-adjusted cost exceeds balance.");
     }
 
+    [Fact]
+    public async Task NewUnitPlacement_EurAccountOnCzkBuilding_BlocksExploitWhenEurAccountHasSufficientBalance()
+    {
+        // Exploit scenario: Prague building (CZK), EUR account with a large enough EUR balance
+        // that the FX-adjusted CZK cost (302,400) would pass the "balance >= cost" check if the
+        // currency were not validated first.  Without the currency-mismatch guard, the code would
+        // deduct 302,400 EUR from the account instead of 302,400 CZK — a ×25 overcharge.
+        // The guard must defer the plan and leave the EUR balance untouched.
+        var email = $"nup-exploit-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        await RegisterAndGetTokenAsync(isolatedClient, email, "NUPExploit");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25.20m,
+            RateDate = DateOnly.FromDateTime(DateTime.UtcNow),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        // Large EUR balance — well above both the EUR base cost (12,000) and the CZK cost (302,400).
+        // Without the guard this deduction would silently go through.
+        const decimal largeEurBalance = 500_000m;
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "NUPExploitCo", Cash = largeEurBalance };
+        db.Companies.Add(company);
+        var building = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "NUPExploitFactory",
+            Level = 1, Latitude = prague.Latitude, Longitude = prague.Longitude,
+        };
+        db.Buildings.Add(building);
+
+        // EUR account on a CZK building — mismatched currency.
+        var eurAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234000000000003",
+            CurrencyCode = "EUR",
+            Balance = largeEurBalance,
+            CompanyId = company.Id,
+        };
+        db.BankAccounts.Add(eurAccount);
+        building.BankAccountId = eurAccount.Id;
+        await db.SaveChangesAsync();
+
+        // Directly seed a due plan.
+        var gameState = await db.GameStates.FirstAsync();
+        var planId = Guid.NewGuid();
+        var plan = new Api.Data.Entities.BuildingConfigurationPlan
+        {
+            Id = planId,
+            BuildingId = building.Id,
+            SubmittedAtUtc = DateTime.UtcNow,
+            SubmittedAtTick = gameState.CurrentTick,
+        };
+        db.BuildingConfigurationPlans.Add(plan);
+        var planUnit = new Api.Data.Entities.BuildingConfigurationPlanUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingConfigurationPlanId = planId,
+            UnitType = Api.Data.Entities.UnitType.Manufacturing,
+            GridX = 0, GridY = 0, Level = 1,
+            IsChanged = true,
+            AppliesAtTick = gameState.CurrentTick,
+            TicksRequired = 0,
+        };
+        db.BuildingConfigurationPlanUnits.Add(planUnit);
+        await db.SaveChangesAsync();
+
+        // Apply — currency-mismatch guard must block deduction even though balance is sufficient.
+        await Utilities.BuildingConfigurationService.ApplyDuePlansAsync(db, gameState.CurrentTick);
+        await db.SaveChangesAsync();
+
+        // EUR balance must be completely untouched — the exploit is closed.
+        await db.Entry(eurAccount).ReloadAsync();
+        Assert.Equal(largeEurBalance, eurAccount.Balance);
+
+        // Plan unit must have been deferred (AppliesAtTick incremented).
+        await db.Entry(planUnit).ReloadAsync();
+        Assert.True(planUnit.AppliesAtTick > gameState.CurrentTick,
+            "Plan unit should have been deferred due to currency mismatch even when balance is sufficient.");
+    }
+
     #endregion
 
     #region RankedProductTypes

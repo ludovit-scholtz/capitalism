@@ -199,7 +199,21 @@ public static partial class BuildingConfigurationService
                     plan.Building,
                     cityCurrencyCode);
 
-            if (totalActivationCost > 0m && fundingAccount.Balance < totalActivationCost)
+            // Guard: if the assigned account is in a different currency than the building city,
+            // deducting a CZK-adjusted cost from an EUR account (or vice versa) would massively
+            // over- or under-charge the player.  Defer the due units and let the player fix the
+            // account assignment before the next tick.
+            if (totalActivationCost > 0m && fundingAccount.CurrencyCode != cityCurrencyCode)
+            {
+                foreach (var entry in costfulDueUnits)
+                {
+                    entry.Unit.AppliesAtTick = currentTick + 1;
+                    entry.Unit.TicksRequired = Math.Max(entry.Unit.TicksRequired, 1);
+                }
+
+                dueUnits = dueUnits.Except(costfulDueUnits.Select(entry => entry.Unit)).ToList();
+            }
+            else if (totalActivationCost > 0m && fundingAccount.Balance < totalActivationCost)
             {
                 foreach (var entry in costfulDueUnits)
                 {
