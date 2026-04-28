@@ -380,11 +380,16 @@ public sealed partial class Query
             .Select(g => new { g.Key, Max = g.Max(rb => rb.AccumulatedBudget) })
             .ToDictionaryAsync(x => x.Key, x => x.Max);
 
+        // Load EUR→USD rate to convert the EUR-denominated baseQualityBudget to USD.
+        // AccumulatedBudget and MaxCompetitorBudget are already stored in USD.
+        var fxRates = await Utilities.FxRateHelper.BuildEurRatesLookupAsync(db, ["USD"]);
+        var usdEurRate = Utilities.FxRateHelper.GetEurRate(fxRates, "USD");
+
         return brands.Select(b =>
         {
             var pt = b.ProductTypeId.HasValue ? productTypes.GetValueOrDefault(b.ProductTypeId.Value) : null;
             decimal? accBudget = b.ProductTypeId.HasValue && ownBudgets.TryGetValue(b.ProductTypeId.Value, out var rb) ? rb.AccumulatedBudget : null;
-            decimal? baseBudget = pt is not null ? Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice) : null;
+            decimal? baseBudget = pt is not null ? Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice) * usdEurRate : null;
             decimal? maxBudget = b.ProductTypeId.HasValue && maxBudgets.TryGetValue(b.ProductTypeId.Value, out var mb) ? mb : null;
             var rdQuality = Math.Clamp(b.Quality, 0m, 1m);
             var mktQuality = Math.Clamp(b.MarketingQuality, 0m, 1m);

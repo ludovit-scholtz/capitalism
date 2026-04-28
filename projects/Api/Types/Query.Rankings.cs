@@ -378,6 +378,11 @@ public sealed partial class Query
                 .ToDictionaryAsync(x => x.ProductTypeId, x => x.MaxBudget)
             : new Dictionary<Guid, decimal>();
 
+        // Load EUR→USD rate to convert the EUR-denominated baseQualityBudget to USD.
+        // AccumulatedBudget and MaxCompetitorBudget are already stored in USD by the tick engine.
+        var fxRates = await Utilities.FxRateHelper.BuildEurRatesLookupAsync(db, ["USD"]);
+        var usdEurRate = Utilities.FxRateHelper.GetEurRate(fxRates, "USD");
+
         var results = brands.Select(b =>
         {
             var pt = b.ProductTypeId.HasValue
@@ -390,7 +395,8 @@ public sealed partial class Query
             if (b.ProductTypeId.HasValue && pt is not null)
             {
                 accBudget = ownResearchBudgets.TryGetValue(b.ProductTypeId.Value, out var rb) ? rb.AccumulatedBudget : null;
-                baseBudget = Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice);
+                // baseResearchBudget is converted from EUR to USD so it matches the USD-denominated AccumulatedBudget.
+                baseBudget = Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice) * usdEurRate;
                 maxBudget = maxBudgetPerProduct.TryGetValue(b.ProductTypeId.Value, out var mb) ? mb : null;
             }
 
@@ -426,7 +432,7 @@ public sealed partial class Query
             if (!allProductTypes.TryGetValue(budget.ProductTypeId, out var pt))
                 continue;
 
-            var baseBudget = Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice);
+            var baseBudget = Engine.GameConstants.ResearchBaseQualityBudget(pt.BasePrice) * usdEurRate;
             var maxBudget = maxBudgetPerProduct.TryGetValue(budget.ProductTypeId, out var mb) ? mb : budget.AccumulatedBudget;
 
             results.Add(new ResearchBrandState

@@ -359,20 +359,23 @@ public sealed class ResearchBrandState
     public decimal CombinedBrandQuality { get; set; }
 
     /// <summary>
-    /// Accumulated R&amp;D research budget (game currency) for this product.
-    /// Grows each tick by a fraction of the PRODUCT_QUALITY unit's operating cost,
+    /// Accumulated R&amp;D research budget in USD for this product.
+    /// Grows each tick by a fraction of the PRODUCT_QUALITY unit's operating cost converted to USD,
     /// and decays by 0.1% per tick.  Null when no research has been done for this product.
+    /// All budget values on this object (AccumulatedResearchBudget, BaseResearchBudget,
+    /// MaxCompetitorBudget) are in USD so the frontend can display consistent dollar amounts
+    /// regardless of which city the R&amp;D building is in.
     /// </summary>
     public decimal? AccumulatedResearchBudget { get; set; }
 
     /// <summary>
-    /// Base research budget required for 100% quality when no competitor exists
-    /// (computed from the product base price).
+    /// Base research budget required for 100% quality when no competitor exists,
+    /// expressed in USD (computed from the product base price converted to USD).
     /// </summary>
     public decimal? BaseResearchBudget { get; set; }
 
     /// <summary>
-    /// Highest research budget across all companies researching this same product.
+    /// Highest research budget (in USD) across all companies researching this same product.
     /// Used as the denominator when computing relative quality.
     /// Null when no research has been done globally for this product.
     /// </summary>

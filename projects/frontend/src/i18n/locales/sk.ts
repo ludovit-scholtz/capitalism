@@ -2031,7 +2031,7 @@ export default {
   research: {
     panelTitle: 'Výskumný pokrok',
     intro:
-      'Výskum postupuje každý tik. Každá jednotka Kvality produktu konvertuje časť prevádzkových nákladov na kumulatívny výskumný rozpočet pre priradený produkt — a tento rozpočet klesá o 0,1 % za tik. Vaša kvalita produktu sa určuje relatívne k najsilnejšiemu konkurentovi investujúcemu do výskumu. Výskum kvality značky zlepšuje efektívnosť marketingového rozpočtu — priamo nezvyšuje povedomie o značke.',
+      'Výskum postupuje každý tik. Každá jednotka Kvality produktu konvertuje časť prevádzkových nákladov na kumulatívny výskumný rozpočet pre priradený produkt — a tento rozpočet klesá o 0,1 % za tik. Výskumné rozpočty sa počítajú v USD, aby spoločnosti v rôznych mestách (EUR, CZK, atď.) súťažili na rovnakej úrovni. Vaša kvalita produktu sa určuje relatívne k najsilnejšiemu konkurentovi investujúcemu do výskumu. Výskum kvality značky zlepšuje efektívnosť marketingového rozpočtu — priamo nezvyšuje povedomie o značke.',
     emptyState: 'Zatiaľ žiadny výskum nezaznamenaný. Nakonfigurujte jednotky Kvality produktu alebo Kvality značky a nechajte simuláciu bežať, aby ste tu videli pokrok.',
     emptyStatePending: 'Výskumné jednotky sú nakonfigurované a čakajú na aktiváciu. Pokrok sa zobrazí tu, akonáhle prebehne simulačný tick a vaša konfigurácia nadobudne účinnosť.',
     qualityLabel: 'Kvalita produktu',
@@ -2041,10 +2041,10 @@ export default {
     awarenessEffect: 'Rozpoznanie značky zákazníkmi: {pct}%.',
     marketingEfficiencyEffect: 'Každá jednotka marketingového rozpočtu produkuje {multiplier}× viac povedomia o značke ako základná hodnota.',
     budget: {
-      accumulated: 'Investovaný výskumný rozpočet',
-      target: 'Rozpočet pre 100 % kvalitu (bez konkurencie)',
-      topCompetitor: 'Najvyšší rozpočet konkurenta',
-      decayHint: 'Váš výskumný rozpočet klesá o 0,1 % za tik. Pokračujte v investíciách, aby ste si udržali alebo zvýšili vedúce postavenie v kvalite.',
+      accumulated: 'Investovaný výskumný rozpočet (USD)',
+      target: 'Cieľ pre 100 % kvalitu – bez konkurencie (USD)',
+      topCompetitor: 'Najvyšší rozpočet konkurenta (USD)',
+      decayHint: 'Výskumné rozpočty sú normalizované v USD pre spravodlivé porovnanie naprieč mestami a klesajú o 0,1 % za tik. Pokračujte v investíciách, aby ste si udržali alebo zvýšili vedúce postavenie v kvalite.',
     },
   },
   supplyChain: {

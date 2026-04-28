@@ -15,6 +15,14 @@ namespace Api.Engine.Phases;
 ///   where baseQualityBudget is the spending needed for 100% quality when uncontested.
 ///   Units whose upgrade is in progress contribute at half-cost (ROADMAP).
 ///
+///   IMPORTANT: Accumulated research budgets are stored and compared in USD.
+///   The local-currency operating cost is converted to USD using the pre-loaded EurFxRates
+///   table before being added to AccumulatedBudget.  This ensures that companies in
+///   CZK, INR, or any other city currency receive exactly the same research progression
+///   as EUR-city companies spending the same USD-equivalent amount, eliminating any
+///   cross-currency R&amp;D advantage.  Similarly, baseQualityBudget thresholds are expressed
+///   in USD so that all comparisons are apples-to-apples.
+///
 /// BRAND_QUALITY — raises the marketing efficiency multiplier on scope-matching brands.
 ///   This means marketing budget becomes more effective; it does NOT directly grant awareness.
 /// </summary>
@@ -96,8 +104,14 @@ public sealed class ResearchPhase : ITickPhase
 
         if (totalCost <= 0m) return;
 
+        // Convert totalCost from local city currency to USD so that the accumulated budget
+        // is always in a single canonical currency regardless of where the R&D building is
+        // located.  This prevents CZK/INR/etc. cities from accumulating proportionally more
+        // or less budget than EUR cities for the same real-value investment.
+        var totalCostUsd = FxRateHelper.ConvertToUsd(totalCost, city.CurrencyCode, context.EurFxRates);
+
         var conversionRate = GameConstants.ResearchBudgetConversionRate(unit.Level);
-        var budgetGain = decimal.Round(totalCost * conversionRate, 4, MidpointRounding.AwayFromZero);
+        var budgetGain = decimal.Round(totalCostUsd * conversionRate, 4, MidpointRounding.AwayFromZero);
 
         var researchBudget = context.GetOrCreateResearchBudget(building.CompanyId, unit.ProductTypeId.Value);
         researchBudget.AccumulatedBudget += budgetGain;
@@ -119,9 +133,10 @@ public sealed class ResearchPhase : ITickPhase
 
     /// <summary>
     /// Derives product brand quality from relative research budget positions.
-    /// For each product: quality = myBudget / max(maxBudgetAcrossAllCompanies, baseQualityBudget).
-    /// A lone researcher with budget >= baseQualityBudget gets 100% quality.
+    /// For each product: quality = myBudget / max(maxBudgetAcrossAllCompanies, baseQualityBudgetUsd).
+    /// A lone researcher with budget >= baseQualityBudgetUsd gets 100% quality.
     /// The top competitor always anchors at quality 1.0 when above baseline.
+    /// All accumulated budgets and the base threshold are in USD for consistent cross-city comparison.
     /// </summary>
     private static void UpdateProductBrandQualityFromBudgets(TickContext context)
     {
@@ -131,14 +146,19 @@ public sealed class ResearchPhase : ITickPhase
             .GroupBy(rb => rb.ProductTypeId)
             .ToDictionary(g => g.Key, g => g.ToList());
 
+        // Convert the EUR-denominated base quality budget to USD for a fair threshold.
+        // Accumulated budgets are already stored in USD; the denominator must match.
+        var usdEurRate = FxRateHelper.GetEurRate(context.EurFxRates, "USD");
+
         foreach (var (productTypeId, budgets) in budgetsByProduct)
         {
             if (!context.ProductTypesById.TryGetValue(productTypeId, out var productType))
                 continue;
 
-            var baseQualityBudget = GameConstants.ResearchBaseQualityBudget(productType.BasePrice);
+            // baseQualityBudget is computed from productType.BasePrice (EUR) — convert to USD.
+            var baseQualityBudgetUsd = GameConstants.ResearchBaseQualityBudget(productType.BasePrice) * usdEurRate;
             var maxBudget = budgets.Max(b => b.AccumulatedBudget);
-            var denominator = Math.Max(maxBudget, baseQualityBudget);
+            var denominator = Math.Max(maxBudget, baseQualityBudgetUsd);
 
             foreach (var budget in budgets)
             {
