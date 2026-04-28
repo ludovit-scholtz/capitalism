@@ -3947,7 +3947,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         })
       }
       const pct = Number(input?.dispatchTargetPercent ?? 100)
-      if (pct < 0 || pct > 100) {
+      if (isNaN(pct) || pct < 0 || pct > 100) {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',

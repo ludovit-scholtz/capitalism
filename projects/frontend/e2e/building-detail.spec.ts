@@ -20636,9 +20636,11 @@ test.describe('Power plant analytics panel', () => {
     // Move slider to 50% and apply
     const slider = analyticsPanel.locator('.dispatch-slider')
     await slider.fill('50')
+    // Verify the badge shows 50% immediately after moving the slider
+    await expect(analyticsPanel.locator('.dispatch-control')).toContainText('50%')
     await analyticsPanel.getByRole('button', { name: 'Apply' }).click()
 
-    // Success message should appear
+    // Success message should appear confirming the mutation was sent
     await expect(analyticsPanel.locator('.dispatch-success')).toBeVisible()
   })
 })

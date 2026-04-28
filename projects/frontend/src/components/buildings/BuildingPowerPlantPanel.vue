@@ -81,6 +81,13 @@ function loadBalanceIfNeeded() {
 
 onMounted(loadBalanceIfNeeded)
 watch(() => building.value?.cityId, loadBalanceIfNeeded)
+
+// Pre-compute the chart scale for the P&L bar chart (avoids O(n²) re-computation in template).
+const chartMaxValue = computed(() => {
+  const tl = powerPlantAnalytics.value?.timeline
+  if (!tl || tl.length === 0) return 1
+  return Math.max(...tl.map((s) => Math.max(s.surplusIncome ?? 0, (s.gridFine ?? 0) + (s.operatingCosts ?? 0) + (s.fuelCosts ?? 0)))) || 1
+})
 </script>
 
 <template>
@@ -284,7 +291,7 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
 
       <!-- Per-tick P&L bar chart -->
       <div
-        v-if="powerPlantAnalytics.timeline.some((s) => s.surplusIncome > 0 || s.gridFine > 0 || s.operatingCosts > 0 || s.fuelCosts > 0)"
+        v-if="powerPlantAnalytics.timeline.some((s) => (s.surplusIncome ?? 0) > 0 || (s.gridFine ?? 0) > 0 || (s.operatingCosts ?? 0) > 0 || (s.fuelCosts ?? 0) > 0)"
         class="ppa-chart mt-4 flex h-14 items-end gap-px overflow-hidden rounded-md border border-divider bg-surface px-1 py-1"
         role="img"
         :aria-label="t('powerPlant.analytics.panelTitle')"
@@ -296,23 +303,23 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
           :title="
             t('powerPlant.analytics.tickTooltip', {
               tick: snap.tick,
-              income: formatCurrency(snap.surplusIncome),
-              costs: formatCurrency(snap.gridFine + snap.operatingCosts + snap.fuelCosts),
+              income: formatCurrency(snap.surplusIncome ?? 0),
+              costs: formatCurrency((snap.gridFine ?? 0) + (snap.operatingCosts ?? 0) + (snap.fuelCosts ?? 0)),
             })
           "
         >
           <div
-            v-if="snap.surplusIncome > 0"
+            v-if="(snap.surplusIncome ?? 0) > 0"
             class="ppa-bar ppa-bar-income min-w-[1px] flex-1 rounded-t-sm"
             :style="{
-              height: `${Math.min(Math.round((snap.surplusIncome / (Math.max(...powerPlantAnalytics.timeline.map((s) => Math.max(s.surplusIncome, s.gridFine + s.operatingCosts + s.fuelCosts))) || 1)) * 50), 50)}px`,
+              height: `${Math.min(Math.round(((snap.surplusIncome ?? 0) / chartMaxValue) * 50), 50)}px`,
             }"
           />
           <div
-            v-if="snap.gridFine + snap.operatingCosts + snap.fuelCosts > 0"
+            v-if="(snap.gridFine ?? 0) + (snap.operatingCosts ?? 0) + (snap.fuelCosts ?? 0) > 0"
             class="ppa-bar ppa-bar-cost min-w-[1px] flex-1 rounded-t-sm"
             :style="{
-              height: `${Math.min(Math.round(((snap.gridFine + snap.operatingCosts + snap.fuelCosts) / (Math.max(...powerPlantAnalytics.timeline.map((s) => Math.max(s.surplusIncome, s.gridFine + s.operatingCosts + s.fuelCosts))) || 1)) * 50), 50)}px`,
+              height: `${Math.min(Math.round((((snap.gridFine ?? 0) + (snap.operatingCosts ?? 0) + (snap.fuelCosts ?? 0)) / chartMaxValue) * 50), 50)}px`,
             }"
           />
         </div>
