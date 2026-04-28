@@ -21574,6 +21574,174 @@ test.describe('Public sales pricing guidance panel', () => {
     await expect(unconnectedCell).not.toHaveClass(/connected/)
   })
 
+  test('secondary diagonal (/) upper-right neighbor shows connected class when link exists', async ({ page }) => {
+    // Selected cell is at (0,1). Candidate is at (1,0) — dx=1, dy=-1.
+    // Secondary diagonal root = (x=0, cy=0) i.e. getSecondaryDiagonalLinkState(units, 0, 0)
+    // which checks topRight=(1,0) linkDownLeft and bottomLeft=(0,1) linkUpRight.
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-sec-diag-ur',
+      playerId: player.id,
+      name: 'SecDiag UR Mine',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-sec-diag-ur',
+          companyId: 'company-sec-diag-ur',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'SecDiag UR Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'sdu-topright',
+              buildingId: 'building-sec-diag-ur',
+              unitType: 'STORAGE',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
+              linkUpLeft: false, linkUpRight: false,
+              linkDownLeft: true,  // topRight links toward bottomLeft
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 20,
+              inventoryQuality: 0.8,
+            },
+            {
+              id: 'sdu-bottomleft',
+              buildingId: 'building-sec-diag-ur',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 1,
+              level: 1,
+              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,  // only topRight side has the link flag
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 40,
+              inventoryQuality: 0.8,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sec-diag-ur')
+    await expect(page.getByRole('heading', { name: 'SecDiag UR Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+
+    // Click the bottomLeft cell at (0,1) — the selected cell
+    await getGridCell(activeSection, 0, 1).click()
+
+    // topRight cell at (1,0) must show connected class (dx=1, dy=-1 path)
+    await expect(getGridCell(activeSection, 1, 0)).toHaveClass(/connected/)
+    // Unrelated cells must NOT be connected
+    await expect(getGridCell(activeSection, 0, 0)).not.toHaveClass(/connected/)
+  })
+
+  test('secondary diagonal (/) lower-left neighbor shows connected class when link exists', async ({ page }) => {
+    // Selected cell is at (1,0). Candidate is at (0,1) — dx=-1, dy=1.
+    // Secondary diagonal root = (cx=0, y=0) i.e. getSecondaryDiagonalLinkState(units, 0, 0)
+    // which checks topRight=(1,0) linkDownLeft and bottomLeft=(0,1) linkUpRight.
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-sec-diag-dl',
+      playerId: player.id,
+      name: 'SecDiag DL Mine',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-sec-diag-dl',
+          companyId: 'company-sec-diag-dl',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'SecDiag DL Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'sdd-topright',
+              buildingId: 'building-sec-diag-dl',
+              unitType: 'MINING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
+              linkUpLeft: false, linkUpRight: false,
+              linkDownLeft: true,  // link from topRight (1,0) toward bottomLeft (0,1)
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 50,
+              inventoryQuality: 0.9,
+            },
+            {
+              id: 'sdd-bottomleft',
+              buildingId: 'building-sec-diag-dl',
+              unitType: 'STORAGE',
+              gridX: 0,
+              gridY: 1,
+              level: 1,
+              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
+              linkUpLeft: false, linkUpRight: false,
+              linkDownLeft: false, linkDownRight: false,
+              resourceTypeId: null,
+              inventoryQuantity: 0,
+              inventoryQuality: 0,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sec-diag-dl')
+    await expect(page.getByRole('heading', { name: 'SecDiag DL Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+
+    // Click the topRight cell at (1,0) — the selected cell
+    await getGridCell(activeSection, 1, 0).click()
+
+    // bottomLeft cell at (0,1) must show connected class (dx=-1, dy=1 path)
+    await expect(getGridCell(activeSection, 0, 1)).toHaveClass(/connected/)
+    // Unrelated cells must NOT be connected
+    await expect(getGridCell(activeSection, 1, 1)).not.toHaveClass(/connected/)
+  })
+
   test('horizontal link title tooltip shows flow context for a factory link', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

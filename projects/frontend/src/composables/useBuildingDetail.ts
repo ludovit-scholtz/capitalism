@@ -1636,8 +1636,8 @@ export function useBuildingDetail() {
     if (dx === 0 && dy === -1) return getVerticalLinkStateFor(units, cx, cy) !== 'none'
     if (dx === 1 && dy === 1) return getPrimaryDiagonalLinkStateFor(units, x, y) !== 'none'
     if (dx === -1 && dy === -1) return getPrimaryDiagonalLinkStateFor(units, cx, cy) !== 'none'
-    if (dx === 1 && dy === -1) return getSecondaryDiagonalLinkStateFor(units, cx, y) !== 'none'
-    if (dx === -1 && dy === 1) return getSecondaryDiagonalLinkStateFor(units, cx, cy) !== 'none'
+    if (dx === 1 && dy === -1) return getSecondaryDiagonalLinkStateFor(units, x, cy) !== 'none'
+    if (dx === -1 && dy === 1) return getSecondaryDiagonalLinkStateFor(units, cx, y) !== 'none'
 
     return false
   }
