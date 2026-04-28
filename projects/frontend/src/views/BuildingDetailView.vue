@@ -57,7 +57,10 @@ const showOverviewSidebar = computed(() => !showEditingSidebar.value && !showRea
 
 /** True for multi-unit building types that should show the factory-style grid editor. */
 const isMultiUnitBuilding = computed(
-  () => building.value?.type !== 'APARTMENT' && building.value?.type !== 'COMMERCIAL',
+  () =>
+    building.value?.type !== 'APARTMENT' &&
+    building.value?.type !== 'COMMERCIAL' &&
+    building.value?.type !== 'MEDIA_HOUSE',
 )
 </script>
 

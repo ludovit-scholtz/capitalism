@@ -20258,6 +20258,27 @@ test.describe('Media house management panel', () => {
     await expect(effectivenessSection).toBeVisible()
     await expect(effectivenessSection.locator('.mh-channel-mult-value').first()).toContainText('×2.0')
   })
+
+  test('renders as single-unit property without factory grid editor', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player], cities: makeDefaultCities() })
+    setupMediaHouseTest(player)
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+    await page.goto('/building/building-mh')
+
+    // Media house management panel must be visible
+    const panel = page.locator('[aria-label="media house management"]')
+    await expect(panel).toBeVisible()
+
+    // Factory-style unit grid must NOT be shown for media houses
+    await expect(page.locator('.unit-grid')).toBeHidden()
+  })
 })
 
 // ── Power plant analytics panel tests ────────────────────────────────────────
