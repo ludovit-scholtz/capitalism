@@ -137,6 +137,22 @@ public static class GameConstants
     public const decimal BrandMarketingQualityDecayRate = 0.0003m;
 
     /// <summary>
+    /// Passive brand awareness gain rate per tick for public sales when product quality
+    /// is above the city average for that product, or when the company is the only seller
+    /// in the city for that product.
+    /// This is much slower than marketing spend so it rewards R&amp;D investment without
+    /// making dedicated marketing redundant.
+    /// </summary>
+    public const decimal PassiveBrandAwarenessGainRate = 0.0005m;
+
+    /// <summary>
+    /// Passive brand awareness decay rate per tick for public sales when product quality
+    /// is below the city average for that product. Inferior products slowly erode
+    /// consumer perception even without active negative signals.
+    /// </summary>
+    public const decimal PassiveBrandAwarenessDecayRate = 0.0003m;
+
+    /// <summary>
     /// Number of recent ticks included in the campaign analytics window.
     /// All revenue, spend, and performance metrics in <c>CampaignAnalyticsResult</c>
     /// are computed over this window so players see current-campaign performance.

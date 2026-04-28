@@ -109,10 +109,14 @@ It will use real world map. The game will start in single city and later other c
 
 #### Public sales unit
 
-- [ ]  The product selection is not localized
-- [ ]  Set the min price to be the city average price for the product
-- [ ]  Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
-- [ ]  Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
+- [x]  The product selection is not localized
+- [x]  Set the min price to be the city average price for the product
+- [x]  Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
+- [x]  Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
+
+**Status: 88% complete** (April 2026)
+
+**Shipped (April 2026):** City-aware pricing guidance panel in the public sales unit editor shows the city market reference price (product base price × FX rate), a below/at/above-market badge with contextual hints, and a brand momentum tip. The minimum price input is now bounded to the city average price. Passive brand awareness mechanics in PublicSalesPhase: superior-quality sellers and sole-city sellers gain small awareness increments each tick; inferior-quality sellers see slow awareness decay. All three backend tests (gain, decay, only-seller) pass. `cityAveragePrice` added to `PublicSalesAnalytics` GraphQL type.
 
 ### Audits (0% complete)
 

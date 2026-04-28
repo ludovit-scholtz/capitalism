@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import type { EditableGridUnit } from '@/composables/useBuildingDetail'
@@ -37,6 +37,7 @@ const {
   selectedHistoryItemOptions,
   selectedUnitResourceHistory,
   cityCurrencyCode,
+  cityFxRate,
   b2bPriceSource,
   b2bSuggestedPrice,
   b2bHasUpstreamSource,
@@ -88,6 +89,29 @@ const {
   submitUnitUpgrade,
   SUPPORTED_INDUSTRIES,
 } = bd
+
+/** City-average reference price for the selected PUBLIC_SALES draft unit's product (local currency). */
+const publicSalesCityAveragePrice = computed<number | null>(() => {
+  if (!selectedCell.value) return null
+  const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+  if (unit?.unitType !== 'PUBLIC_SALES' || !unit.productTypeId) return null
+  const product = rankedProducts.value.find((r) => r.productType.id === unit.productTypeId)?.productType
+  if (!product) return null
+  return Math.round(product.basePrice * cityFxRate.value * 100) / 100
+})
+
+/** Price tier relative to city average for the selected PUBLIC_SALES draft unit. */
+const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
+  if (!selectedCell.value) return null
+  const unit = getDraftUnitAt(selectedCell.value.x, selectedCell.value.y)
+  if (unit?.unitType !== 'PUBLIC_SALES') return null
+  const avg = publicSalesCityAveragePrice.value
+  const price = unit.minPrice
+  if (avg == null || price == null) return null
+  if (price < avg * 0.98) return 'below'
+  if (price > avg * 1.02) return 'above'
+  return 'at'
+})
 </script>
 
 <template>
@@ -354,9 +378,30 @@ const {
                 class="form-input"
                 :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.minPrice"
                 @input="updateSelectedUnitConfig('minPrice', ($event.target as HTMLInputElement).value !== '' ? ($event.target as HTMLInputElement).valueAsNumber : null)"
-                min="0.01"
+                :min="publicSalesCityAveragePrice ?? 0.01"
                 step="0.01"
               />
+            </div>
+
+            <!-- Pricing guidance panel -->
+            <div v-if="publicSalesCityAveragePrice != null" class="public-sales-pricing-guide">
+              <div class="pricing-guide-header">
+                <span class="pricing-guide-label">{{ t('buildingDetail.config.cityAveragePriceLabel') }}</span>
+                <span class="pricing-guide-value">{{ formatCurrency(publicSalesCityAveragePrice) }} {{ cityCurrencyCode }}</span>
+              </div>
+              <div
+                v-if="publicSalesPriceTier != null"
+                class="pricing-tier-badge"
+                :class="`pricing-tier-badge--${publicSalesPriceTier}`"
+              >
+                {{ t(`buildingDetail.config.priceTier.${publicSalesPriceTier}`) }}
+              </div>
+              <p class="pricing-guide-hint">
+                <template v-if="publicSalesPriceTier === 'below'">{{ t('buildingDetail.config.priceTierHint.below') }}</template>
+                <template v-else-if="publicSalesPriceTier === 'above'">{{ t('buildingDetail.config.priceTierHint.above') }}</template>
+                <template v-else>{{ t('buildingDetail.config.priceTierHint.at') }}</template>
+              </p>
+              <p class="pricing-guide-brand-hint">{{ t('buildingDetail.config.brandMomentumHint') }}</p>
             </div>
           </template>
 

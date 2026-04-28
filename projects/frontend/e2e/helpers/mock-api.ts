@@ -508,6 +508,8 @@ export type MockPublicSalesAnalytics = {
   trendFactor?: number | null
   /** ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK"). */
   cityCurrencyCode?: string
+  /** City-average reference price for the product in the city's local currency. Null when no product configured. */
+  cityAveragePrice?: number | null
 }
 
 export type MockUnitProductAnalytics = {

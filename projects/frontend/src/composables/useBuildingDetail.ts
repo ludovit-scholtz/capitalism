@@ -3379,6 +3379,7 @@ export function useBuildingDetail() {
             trendDirection
             trendFactor
             cityCurrencyCode
+            cityAveragePrice
             revenueHistory { tick revenue quantitySold }
             priceHistory { tick pricePerUnit }
             profitHistory { tick profit grossMarginPct }

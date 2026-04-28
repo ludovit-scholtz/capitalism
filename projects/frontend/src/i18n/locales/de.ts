@@ -1067,6 +1067,18 @@ export default {
       publicSalesProductPickerHelp: 'Wählen Sie nur Produkte, die diese Verkaufseinheit über verbundene vorgelagerte Einheiten erreichen können oder hier bereits auf Lager sind.',
       publicSalesProductPickerEmpty:
         'Noch keine verkaufsfähigen Produkte verfügbar. Verbinden Sie eine Einkaufs-, Fertigungs- oder Lagerkette mit dieser Einheit oder lagern Sie die Einheit erneut auf, um vorhandenen Bestand weiter bearbeiten zu können.',
+      cityAveragePriceLabel: 'Referenzpreis am Stadtmarkt',
+      priceTier: {
+        below: 'Unter Markt',
+        at: 'Am Markt',
+        above: 'Über Markt',
+      },
+      priceTierHint: {
+        below: 'Ein Preis unter dem Stadtdurchschnitt zieht mehr Käufer an und steigert das Verkaufsvolumen, reduziert aber Ihre Marge pro Einheit.',
+        at: 'Ein Preis auf dem Stadtdurchschnitt bietet einen ausgewogenen Kompromiss zwischen Verkaufsvolumen und Marge.',
+        above: 'Ein Preis über dem Stadtdurchschnitt verringert die Nachfrage, erhöht aber Ihre Marge pro Einheit. Funktioniert am besten mit überlegener Qualität oder starker Markenbekanntheit.',
+      },
+      brandMomentumHint: 'Markentipp: Wenn die Qualität Ihres Produkts über dem Stadtdurchschnitt liegt oder Sie der einzige Verkäufer in dieser Stadt sind, wird durch den Verkauf hier schrittweise das Markenbewusstsein aufgebaut. Minderwertige Qualität schwächt es langsam.',
       sourceExchange: 'Börse',
       sourceLocal: 'Lokal',
       sourceOptimal: 'Optimaler Preis',

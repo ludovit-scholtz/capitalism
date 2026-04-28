@@ -1065,6 +1065,18 @@ export default {
         'This storage unit is a universal buffer. It automatically accepts any raw material or product that flows into it through linked upstream units — no product selection required.',
       publicSalesProductPickerHelp: 'Choose from products that can reach this sales unit through linked upstream units or that are already stocked here.',
       publicSalesProductPickerEmpty: 'No saleable products are available yet. Link a purchase, manufacturing, or storage chain into this unit, or restock the unit to keep editing existing stock.',
+      cityAveragePriceLabel: 'City market reference price',
+      priceTier: {
+        below: 'Below market',
+        at: 'At market',
+        above: 'Above market',
+      },
+      priceTierHint: {
+        below: 'Pricing below the city average attracts more buyers and increases sales volume, but reduces your margin per unit.',
+        at: 'Pricing at the city average offers a balanced trade-off between sales volume and margin.',
+        above: 'Pricing above the city average reduces demand but increases your margin per unit. Works best with superior quality or strong brand awareness.',
+      },
+      brandMomentumHint: 'Brand tip: If your product quality is above the city average, or you are the only seller in this city, selling here gradually builds brand awareness. Inferior quality slowly erodes it.',
       sourceExchange: 'Exchange',
       sourceLocal: 'Local',
       sourceOptimal: 'Optimal Price',

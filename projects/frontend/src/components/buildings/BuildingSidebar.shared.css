@@ -430,3 +430,71 @@
     order: -1;
   }
 }
+
+/* ── Public sales pricing guidance panel ─────────────────────────────────── */
+.public-sales-pricing-guide {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pricing-guide-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pricing-guide-label {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.pricing-guide-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.pricing-tier-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  width: fit-content;
+}
+
+.pricing-tier-badge--below {
+  background: color-mix(in srgb, var(--color-accent-blue) 15%, transparent);
+  color: var(--color-accent-blue);
+}
+
+.pricing-tier-badge--at {
+  background: color-mix(in srgb, var(--color-accent-green) 15%, transparent);
+  color: var(--color-accent-green);
+}
+
+.pricing-tier-badge--above {
+  background: color-mix(in srgb, var(--color-accent-orange) 15%, transparent);
+  color: var(--color-accent-orange);
+}
+
+.pricing-guide-hint,
+.pricing-guide-brand-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.pricing-guide-brand-hint {
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+}

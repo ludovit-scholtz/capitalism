@@ -322,6 +322,16 @@ public sealed partial class Query
             ?? unit.ProductTypeId
             ?? records.FirstOrDefault()?.ProductTypeId;
 
+        // Compute city-average reference price for the product in this city's local currency.
+        // This is the minimum recommended price shown in the sales unit editor.
+        decimal? cityAveragePrice = null;
+        if (productTypeForAnalytics is not null && city is not null)
+        {
+            var fxRates = await Utilities.FxRateHelper.BuildEurRatesLookupAsync(db, [city.CurrencyCode]);
+            var fxRate = Utilities.FxRateHelper.GetEurRate(fxRates, city.CurrencyCode);
+            cityAveragePrice = Math.Round(productTypeForAnalytics.BasePrice * fxRate, 2);
+        }
+
         return new PublicSalesAnalytics
         {
             BuildingUnitId = unit.Id,
@@ -354,6 +364,7 @@ public sealed partial class Query
             DemandDrivers = demandDrivers,
             TrendFactor = currentTrendFactor,
             CityCurrencyCode = city?.CurrencyCode ?? "EUR",
+            CityAveragePrice = cityAveragePrice,
         };
     }
 
