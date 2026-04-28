@@ -67,6 +67,7 @@ public sealed partial class Query
             .ToListAsync();
 
         var totalRevenue = LedgerCalculator.GetTotalRevenue(entries);
+        var totalMediaHouseIncome = LedgerCalculator.GetTotalMediaHouseIncome(entries);
         var totalPurchasingCosts = LedgerCalculator.GetTotalPurchasingCosts(entries);
         var totalShippingCosts = LedgerCalculator.GetTotalShippingCosts(entries);
         var totalLaborCosts = LedgerCalculator.GetTotalLaborCosts(entries);
@@ -165,6 +166,7 @@ public sealed partial class Query
             PrimaryCurrencyCode = primaryCurrencyCode,
             HasMixedCurrencies = buildingCurrencies.Count > 1,
             TotalRevenue = totalRevenue,
+            TotalMediaHouseIncome = totalMediaHouseIncome,
             TotalPurchasingCosts = totalPurchasingCosts,
             TotalShippingCosts = totalShippingCosts,
             TotalLaborCosts = totalLaborCosts,
@@ -182,7 +184,7 @@ public sealed partial class Query
             TotalDepositInterestPaid = totalDepositInterestPaid,
             TotalLoanInterestIncome = totalLoanInterestIncome,
             TotalLoanInterestExpense = totalLoanInterestExpense,
-            NetIncome = totalRevenue + totalDepositInterestReceived + totalLoanInterestIncome
+            NetIncome = totalRevenue + totalMediaHouseIncome + totalDepositInterestReceived + totalLoanInterestIncome
                 - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
                 - totalMarketingCosts - totalTaxPaid - totalOtherCosts
                 - totalDepositInterestPaid - totalLoanInterestExpense,
@@ -192,7 +194,7 @@ public sealed partial class Query
             InventoryValue = inventoryValue,
             TotalDepositsPlaced = totalDepositsPlaced,
             TotalAssets = currentCash + propertyValue + buildingValue + inventoryValue,
-            CashFromOperations = totalRevenue + totalDepositInterestReceived + totalLoanInterestIncome
+            CashFromOperations = totalRevenue + totalMediaHouseIncome + totalDepositInterestReceived + totalLoanInterestIncome
                 - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts
                 - totalMarketingCosts - totalDepositInterestPaid - totalLoanInterestExpense,
             CashFromInvestments = totalStockSaleCashIn - totalPropertyPurchases - totalStockPurchaseCashOut,
@@ -298,6 +300,7 @@ public sealed partial class Query
         List<(long RecordedAtTick, string Category, decimal Amount)> projections)
     {
         var totalRevenue = projections.Where(e => e.Category == LedgerCategory.Revenue && e.Amount > 0).Sum(e => e.Amount);
+        var totalMediaHouseIncome = projections.Where(e => e.Category == LedgerCategory.MediaHouseIncome && e.Amount > 0).Sum(e => e.Amount);
         var totalPurchasingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.PurchasingCost && e.Amount < 0).Sum(e => e.Amount));
         var totalShippingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.ShippingCost && e.Amount < 0).Sum(e => e.Amount));
         var totalLaborCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.LaborCost && e.Amount < 0).Sum(e => e.Amount));
@@ -305,8 +308,8 @@ public sealed partial class Query
         var totalMarketingCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Marketing && e.Amount < 0).Sum(e => e.Amount));
         var totalTaxPaid = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Tax && e.Amount < 0).Sum(e => e.Amount));
         var totalOtherCosts = Math.Abs(projections.Where(e => e.Category == LedgerCategory.Other && e.Amount < 0).Sum(e => e.Amount));
-        // Taxable income = revenue minus all deductible operating costs (excluding tax itself).
-        var taxableIncome = Math.Max(totalRevenue - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts, 0m);
+        // Taxable income = revenue + media house income minus all deductible operating costs (excluding tax itself).
+        var taxableIncome = Math.Max(totalRevenue + totalMediaHouseIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts, 0m);
         var estimatedIncomeTax = gameYear == currentGameYear
             ? GameTime.ComputeEstimatedIncomeTax(taxableIncome, taxRate)
             : totalTaxPaid;
@@ -318,7 +321,7 @@ public sealed partial class Query
             TotalRevenue = totalRevenue,
             TotalLaborCosts = totalLaborCosts,
             TotalEnergyCosts = totalEnergyCosts,
-            NetIncome = totalRevenue - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
+            NetIncome = totalRevenue + totalMediaHouseIncome - totalPurchasingCosts - totalShippingCosts - totalLaborCosts - totalEnergyCosts - totalMarketingCosts - totalTaxPaid - totalOtherCosts,
             TotalTaxPaid = totalTaxPaid,
             TaxableIncome = taxableIncome,
             EstimatedIncomeTax = estimatedIncomeTax,

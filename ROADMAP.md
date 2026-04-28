@@ -129,7 +129,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (90% complete)
+### Media house (100% complete)
 
 **Shipped in this increment:**
 - ✅ Buying a Media house no longer fails with an empty `mediaType` validation error — the buy-building and city-map flows both require media type selection before purchase.
@@ -146,8 +146,7 @@ It will use real world map. The game will start in single city and later other c
 - ✅ `getMediaHouseAnalytics` GraphQL query exposes upgrade cost, next-level efficiency, advertiser brand effects, income history, and strategy rating (EARLY_STAGE / GROWING / COMPETITIVE / DOMINANT).
 - ✅ Combined effective multiplier visible in the Effectiveness section (channel reach × content ranking bonus).
 - ✅ Backend tests cover `upgradeMediaHouse` validation (wrong type, government-owned, max level), analytics query structure, and that efficiency improves with each level.
-
-- [ ] Show media house income as a dedicated ledger category in the company ledger (currently recorded as `MediaHouseIncome` but not surfaced in the ledger UI drill-down).
+- ✅ `MediaHouseIncome` is now surfaced as a dedicated first-class ledger category in the company ledger UI with full drill-down support. Players can see how much their media houses earned, drill into per-tick entries, and link through to the source building. Media house income is included in net income, cash from operations, and taxable income calculations. All three locales (en/sk/de) include polished category labels.
 
 ### Mining (80% complete)
 

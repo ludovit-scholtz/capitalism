@@ -1710,6 +1710,7 @@ export default {
     loanInterestExpense: 'Kreditzinsaufwand',
     depositsPlaced: 'Gelegte Bankeinlagen',
     cashFromBanking: 'Aus Bankgeschäften',
+    mediaHouseIncome: 'Medienhaus-Einnahmen',
     category: {
       REVENUE: 'Umsatz',
       PURCHASING_COST: 'Einkauf',
@@ -1736,6 +1737,8 @@ export default {
       LOAN_PENALTY: 'Kreditstrafe',
       CENTRAL_BANK_BORROW: 'Zentralbankkredit',
       CENTRAL_BANK_REPAY: 'Rückzahlung Zentralbank',
+      MEDIA_HOUSE_INCOME: 'Medienhaus-Einnahmen',
+      MEDIA_HOUSE_CONTENT: 'Inhaltsinvestition',
     },
     currency: 'Währung',
     mixedCurrencies: 'Mehrwährung',

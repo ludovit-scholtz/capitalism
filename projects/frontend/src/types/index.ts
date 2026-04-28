@@ -748,6 +748,7 @@ export interface CompanyLedgerSummary {
   /** True when the company has buildings in multiple cities with different currencies. */
   hasMixedCurrencies: boolean
   totalRevenue: number
+  totalMediaHouseIncome: number
   totalPurchasingCosts: number
   totalShippingCosts: number
   totalLaborCosts: number
