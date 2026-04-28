@@ -535,6 +535,7 @@ public sealed partial class Query
                     {
                         CityId = city.Id,
                         CityName = city.Name,
+                        CurrencyCode = city.CurrencyCode,
                         BaseSalaryPerManhour = city.BaseSalaryPerManhour,
                         SalaryMultiplier = multiplier,
                         EffectiveSalaryPerManhour = CompanyEconomyCalculator.GetEffectiveHourlyWage(city, multiplier),

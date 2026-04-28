@@ -38,6 +38,7 @@ const SETTINGS_QUERY = `
       citySalarySettings {
         cityId
         cityName
+        currencyCode
         baseSalaryPerManhour
         salaryMultiplier
         effectiveSalaryPerManhour
@@ -222,8 +223,11 @@ onMounted(loadSettings)
             </thead>
             <tbody>
               <tr v-for="entry in settings.citySalarySettings" :key="entry.cityId">
-                <td>{{ entry.cityName }}</td>
-                <td><CurrencyAmount :amount="entry.baseSalaryPerManhour" :currency="settings.currencyCode" /></td>
+                <td>
+                  {{ entry.cityName }}
+                  <span class="city-currency-badge">{{ entry.currencyCode }}</span>
+                </td>
+                <td><CurrencyAmount :amount="entry.baseSalaryPerManhour" :currency="entry.currencyCode" /></td>
                 <td>
                   <input
                     v-model.number="salaryMultipliers[entry.cityId]"
@@ -236,7 +240,7 @@ onMounted(loadSettings)
                   />
                 </td>
                 <td>
-                  <CurrencyAmount :amount="entry.baseSalaryPerManhour * (salaryMultipliers[entry.cityId] ?? entry.salaryMultiplier)" :currency="settings.currencyCode" />
+                  <CurrencyAmount :amount="entry.baseSalaryPerManhour * (salaryMultipliers[entry.cityId] ?? entry.salaryMultiplier)" :currency="entry.currencyCode" />
                 </td>
               </tr>
             </tbody>
@@ -244,6 +248,7 @@ onMounted(loadSettings)
         </div>
 
         <p class="salary-impact-hint">{{ t('companySettings.salaryImpactHint') }}</p>
+        <p class="salary-local-currency-note">{{ t('companySettings.salaryLocalCurrencyNote') }}</p>
 
         <p v-if="success" class="save-message" role="status">{{ success }}</p>
         <p v-if="error" class="save-error" role="alert">{{ error }}</p>
@@ -361,6 +366,26 @@ onMounted(loadSettings)
   font-size: 0.82rem;
   color: var(--color-text-secondary);
   margin: 0.75rem 0 0.25rem;
+}
+
+.salary-local-currency-note {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.25rem;
+}
+
+.city-currency-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: var(--color-surface-elevated, var(--color-surface));
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  margin-left: 0.35rem;
+  vertical-align: middle;
+  letter-spacing: 0.03em;
 }
 
 .settings-field {

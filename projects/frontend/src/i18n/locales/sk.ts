@@ -1702,6 +1702,8 @@ export default {
     overheadDriverScale: 'Faktor rozsahu',
     salaryImpactHint:
       'Vyšší násobok zvyšuje priebežné mzdové náklady v tomto meste, ale môže zlepšiť kvalitu pracovníkov a konkurencieschopnosť. Nižší násobok znižuje náklady, ale môže ovplyvniť výkonnosť.',
+    salaryLocalCurrencyNote:
+      'Mzdy sú denominované v miestnej mene každého mesta. Napríklad mzdy v Prahe sú v CZK a mzdy v New Yorku sú v USD — nie sú prepočítané na primárnu menu vašej firmy.',
     dividendHelp: 'Určite, aká časť ročného zisku po zdanení sa vyplatí akcionárom. 20% je vyvážený základ, ktorý stále ponecháva priestor na reinvestície.',
     baseSalary: 'Základná mzda / hodina',
     salaryMultiplier: 'Mzdový násobok',

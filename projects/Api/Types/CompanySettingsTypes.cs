@@ -22,6 +22,8 @@ public sealed class CompanyCitySalarySettingResult
 {
     public Guid CityId { get; set; }
     public string CityName { get; set; } = string.Empty;
+    /// <summary>ISO 4217 currency code of this city (e.g. "EUR", "CZK", "USD"). Wages are denominated in this currency.</summary>
+    public string CurrencyCode { get; set; } = "EUR";
     public decimal BaseSalaryPerManhour { get; set; }
     public decimal SalaryMultiplier { get; set; }
     public decimal EffectiveSalaryPerManhour { get; set; }

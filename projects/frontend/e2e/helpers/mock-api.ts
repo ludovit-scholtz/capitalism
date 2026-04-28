@@ -4754,6 +4754,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
                 return {
                   cityId: city.id,
                   cityName: city.name,
+                  currencyCode: city.currencyCode ?? 'EUR',
                   baseSalaryPerManhour: city.baseSalaryPerManhour,
                   salaryMultiplier,
                   effectiveSalaryPerManhour: Number((city.baseSalaryPerManhour * salaryMultiplier).toFixed(2)),

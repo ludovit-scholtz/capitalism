@@ -1708,6 +1708,8 @@ export default {
     overheadDriverScale: 'Skalenfaktor',
     salaryImpactHint:
       'Ein höherer Multiplikator erhöht die laufenden Arbeitskosten in dieser Stadt, kann aber die Mitarbeiterqualität und Wettbewerbsfähigkeit verbessern. Ein niedrigerer Multiplikator senkt die Kosten, kann aber die Betriebsleistung beeinträchtigen.',
+    salaryLocalCurrencyNote:
+      'Löhne werden in der Landeswährung jeder Stadt ausgewiesen. Prager Löhne zum Beispiel sind in CZK, New Yorker Löhne in USD — sie werden nicht in die Hauptwährung Ihres Unternehmens umgerechnet.',
     dividendHelp: 'Legen Sie fest, welcher Anteil des jährlichen Gewinns nach Steuern an Aktionäre ausgeschüttet wird. 20% ist ein ausgewogener Standard mit Raum für Reinvestitionen.',
     baseSalary: 'Grundlohn / Stunde',
     salaryMultiplier: 'Lohnmultiplikator',
