@@ -170,6 +170,7 @@ public static class ProcurementPreviewService
         if (unit.VendorLockCompanyId.HasValue)
             query = query.Where(o => o.CompanyId == unit.VendorLockCompanyId.Value);
 
+        var fuelIndex = building.City?.FuelPriceIndex ?? 1.0m;
         var bestOrder = (await query
             .Include(o => o.Company)
             .ToListAsync())
@@ -178,7 +179,8 @@ public static class ProcurementPreviewService
                 o.ExchangeBuilding.Longitude,
                 building.Latitude,
                 building.Longitude,
-                itemWeightPerUnit) * Math.Max(building.City?.FuelPriceIndex ?? 1.0m, 0.1m))
+                itemWeightPerUnit,
+                fuelIndex))
             .FirstOrDefault();
 
         if (bestOrder is null)
@@ -192,13 +194,13 @@ public static class ProcurementPreviewService
             };
         }
 
-        var fuelIndex = building.City?.FuelPriceIndex ?? 1.0m;
         var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
             bestOrder.ExchangeBuilding.Latitude,
             bestOrder.ExchangeBuilding.Longitude,
             building.Latitude,
             building.Longitude,
-            itemWeightPerUnit) * Math.Max(fuelIndex, 0.1m);
+            itemWeightPerUnit,
+            fuelIndex);
         var deliveredPrice = bestOrder.PricePerUnit + transitCost;
         if (deliveredPrice > maxPrice)
         {
@@ -419,7 +421,8 @@ public static class ProcurementPreviewService
                     salesUnit.Building.Longitude,
                     building.Latitude,
                     building.Longitude,
-                    itemWeightPerUnit) * Math.Max(fuelIndex, 0.1m);
+                    itemWeightPerUnit,
+                    fuelIndex);
                 var deliveredPrice = price + transitCost;
                 if (price <= 0m || deliveredPrice > maxPrice) continue;
 

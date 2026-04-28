@@ -644,4 +644,63 @@ public sealed class GlobalExchangeCalculatorUnitTests
         var ratio = czkCost / eurCost;
         Assert.InRange(ratio, 25.0m, 26.0m);
     }
+
+    // ---------------------------------------------------------------------------
+    // Formula consistency: minimum floor must be applied AFTER fuel scaling
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_MinimumAppliedAfterFuel_CoordinateOverload()
+    {
+        // Very short route and low fuel index.
+        // If minimum were applied BEFORE fuel the result would be 0.10 * 0.1 = 0.01.
+        // With the correct formula (max(raw * fuel, minimum)) the minimum floor wins.
+        var nearLat = 48.1500; var nearLon = 17.1100;
+        var farLat  = 48.1501; var farLon  = 17.1101; // ~10 m apart
+        const decimal veryLowFuelIndex = 0.1m;
+
+        var cost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(nearLat, nearLon, farLat, farLon, 5.0m, veryLowFuelIndex);
+
+        // Result must equal MinimumTransitCostPerUnit, not be further reduced by the low fuel index.
+        Assert.Equal(GlobalExchangeCalculator.MinimumTransitCostPerUnit, cost);
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_MinimumAppliedAfterFuel_CityOverload()
+    {
+        // Short route between two different cities and low fuel index.
+        // Correct formula: max(raw * 0.1, MinimumCityTransitCostPerUnit).
+        var cityA = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var cityB = MakeCity(Guid.NewGuid(), 48.16, 17.12); // ~1 km
+        var resource = MakeResource(10m, 0.01m); // negligible weight
+        const decimal veryLowFuelIndex = 0.1m;
+
+        var cost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(cityA, cityB, resource, 1m, veryLowFuelIndex);
+
+        // Result must be at least MinimumCityTransitCostPerUnit even with 0.1× fuel.
+        Assert.True(cost >= GlobalExchangeCalculator.MinimumCityTransitCostPerUnit,
+            $"Expected at least {GlobalExchangeCalculator.MinimumCityTransitCostPerUnit} but got {cost}");
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_CoordinateAndCityOverloads_AreConsistentForLongRoute()
+    {
+        // For a significant route both overloads should agree when using the same raw
+        // inputs (same lat/lon, same weight, same fuel) — the city overload adds only
+        // the fxRate multiplier and the MinimumCity floor (which is dominated here).
+        var prague    = MakeCity(Guid.NewGuid(), 50.08, 14.43);
+        var bratislava = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var resource  = MakeResource(10m, 3.0m); // 3 kg — well above minimum weight
+
+        var coordinateCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
+            prague.Latitude, prague.Longitude,
+            bratislava.Latitude, bratislava.Longitude,
+            resource.WeightPerUnit, fuelPriceIndex: 1.0m);
+
+        var cityCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
+            prague, bratislava, resource, fxRate: 1m, fuelPriceIndex: 1.0m);
+
+        // Both must return the same number (fxRate=1.0, fuel=1.0, route dominated by distance).
+        Assert.Equal(coordinateCost, cityCost);
+    }
 }

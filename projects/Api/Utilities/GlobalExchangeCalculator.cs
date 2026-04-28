@@ -121,19 +121,44 @@ public static class GlobalExchangeCalculator
             return 0m;
         }
 
-        var clampedFuelIndex = Math.Max(fuelPriceIndex, 0.1m);
-        var eurCost = Math.Max(
-            ComputeTransitCostPerUnit(
+        // Compute raw distance-weight cost first, then apply fuel, then floor.
+        // Consistent ordering: max(raw * fuel, minimum) — same as the coordinate overload.
+        var rawCost = ComputeRawTransitCostPerUnit(
             sourceCity.Latitude,
             sourceCity.Longitude,
             destinationCity.Latitude,
             destinationCity.Longitude,
-            resourceType.WeightPerUnit) * clampedFuelIndex,
-            MinimumCityTransitCostPerUnit);
+            resourceType.WeightPerUnit);
+
+        var clampedFuelIndex = Math.Max(fuelPriceIndex, 0.1m);
+        var eurCost = Math.Max(rawCost * clampedFuelIndex, MinimumCityTransitCostPerUnit);
         return decimal.Round(eurCost * fxRate, 2, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// Computes the per-unit transit cost from building coordinates, optionally scaled
+    /// by a fuel price index. Consistent ordering: fuel is applied to the raw
+    /// distance-weight cost, then the minimum floor is enforced.
+    /// Formula: max(raw × clampedFuel, MinimumTransitCostPerUnit)
+    /// </summary>
     public static decimal ComputeTransitCostPerUnit(
+        double latitudeA,
+        double longitudeA,
+        double latitudeB,
+        double longitudeB,
+        decimal weightPerUnit,
+        decimal fuelPriceIndex = 1.0m)
+    {
+        var rawCost = ComputeRawTransitCostPerUnit(latitudeA, longitudeA, latitudeB, longitudeB, weightPerUnit);
+        var clampedFuelIndex = Math.Max(fuelPriceIndex, 0.1m);
+        return decimal.Round(Math.Max(rawCost * clampedFuelIndex, MinimumTransitCostPerUnit), 2, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// Returns the pure distance-weight-rate product with no fuel scaling and no minimum floor.
+    /// Used internally so all public overloads share a single source of truth for the raw cost.
+    /// </summary>
+    private static decimal ComputeRawTransitCostPerUnit(
         double latitudeA,
         double longitudeA,
         double latitudeB,
@@ -141,8 +166,7 @@ public static class GlobalExchangeCalculator
         decimal weightPerUnit)
     {
         var distanceKm = ComputeDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB);
-        var rawTransitCost = (decimal)distanceKm * Math.Max(weightPerUnit, MinimumWeightPerUnit) * TransitCostRatePerKmPerWeightUnit;
-        return decimal.Round(Math.Max(rawTransitCost, MinimumTransitCostPerUnit), 2, MidpointRounding.AwayFromZero);
+        return (decimal)distanceKm * Math.Max(weightPerUnit, MinimumWeightPerUnit) * TransitCostRatePerKmPerWeightUnit;
     }
 
     public static decimal ComputeItemWeightPerUnit(

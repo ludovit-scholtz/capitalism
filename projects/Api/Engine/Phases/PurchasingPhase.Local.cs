@@ -85,12 +85,14 @@ public sealed partial class PurchasingPhase
         decimal itemWeightPerUnit,
         decimal fuelPriceIndex = 1.0m)
     {
-        var rawCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
+        // Delegate to the coordinate overload which applies: max(raw * fuel, minUnit)
+        // Consistent with city-to-city path: max(raw * fuel, minCity).
+        return GlobalExchangeCalculator.ComputeTransitCostPerUnit(
             sourceBuilding.Latitude,
             sourceBuilding.Longitude,
             destinationBuilding.Latitude,
             destinationBuilding.Longitude,
-            itemWeightPerUnit);
-        return decimal.Round(rawCost * Math.Max(fuelPriceIndex, 0.1m), 2, MidpointRounding.AwayFromZero);
+            itemWeightPerUnit,
+            fuelPriceIndex);
     }
 }
