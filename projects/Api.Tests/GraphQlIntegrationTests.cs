@@ -2648,6 +2648,141 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task GetCompanySettings_CitySalarySettings_IncludePerCityCurrencyCode()
+    {
+        // Each city salary setting must include the city's own currency code,
+        // not the company's primary currency. This ensures Prague shows CZK, Delhi shows INR, etc.
+        var ownerToken = await RegisterAndGetTokenAsync("per-city-currency@test.com", "Per City Currency Checker");
+
+        var createResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Multi-City Wages Corp" } },
+            ownerToken);
+        var companyId = createResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GetCompanySettings($companyId: UUID!) {
+              companySettings(companyId: $companyId) {
+                companyId
+                currencyCode
+                citySalarySettings {
+                  cityId
+                  cityName
+                  currencyCode
+                  baseSalaryPerManhour
+                  salaryMultiplier
+                  effectiveSalaryPerManhour
+                }
+              }
+            }
+            """,
+            new { companyId },
+            ownerToken);
+
+        var settings = result.GetProperty("data").GetProperty("companySettings");
+        var citySalaries = settings.GetProperty("citySalarySettings");
+        Assert.True(citySalaries.GetArrayLength() > 0, "Expected at least one city salary setting");
+
+        // Every city salary entry must have a non-empty currency code
+        foreach (var entry in citySalaries.EnumerateArray())
+        {
+            var cityCurrency = entry.GetProperty("currencyCode").GetString();
+            Assert.NotNull(cityCurrency);
+            Assert.NotEmpty(cityCurrency);
+        }
+
+        // Prague specifically must show CZK, not EUR
+        var pragueSetting = citySalaries.EnumerateArray()
+            .FirstOrDefault(entry => entry.GetProperty("cityName").GetString() == "Prague");
+        Assert.NotEqual(default, pragueSetting);
+        Assert.Equal("CZK", pragueSetting.GetProperty("currencyCode").GetString());
+
+        // Bratislava must show EUR
+        var bratislavaSetting = citySalaries.EnumerateArray()
+            .FirstOrDefault(entry => entry.GetProperty("cityName").GetString() == "Bratislava");
+        Assert.NotEqual(default, bratislavaSetting);
+        Assert.Equal("EUR", bratislavaSetting.GetProperty("currencyCode").GetString());
+
+        // Effective wage = base × multiplier (default 1.0), rounded to 4 decimal places
+        var bratislavaBase = bratislavaSetting.GetProperty("baseSalaryPerManhour").GetDecimal();
+        var bratislavaEffective = bratislavaSetting.GetProperty("effectiveSalaryPerManhour").GetDecimal();
+        Assert.Equal(bratislavaBase, bratislavaEffective);
+
+        var pragueBase = pragueSetting.GetProperty("baseSalaryPerManhour").GetDecimal();
+        var pragueEffective = pragueSetting.GetProperty("effectiveSalaryPerManhour").GetDecimal();
+        Assert.Equal(pragueBase, pragueEffective);
+    }
+
+    [Fact]
+    public async Task GetCompanySettings_CitySalarySettings_EffectiveWageMatchesTickEngineFormula()
+    {
+        // Verifies that the effective wage reported by GetCompanySettings matches
+        // CompanyEconomyCalculator.GetEffectiveHourlyWage so the UI and tick engine agree.
+        var ownerToken = await RegisterAndGetTokenAsync("eff-wage-formula@test.com", "Eff Wage Checker");
+
+        var createResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Wage Formula Corp" } },
+            ownerToken);
+        var companyId = createResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        Guid pragueId;
+        decimal pragueBaseSalary;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var prague = await db.Cities.FirstAsync(city => city.Name == "Prague");
+            pragueId = prague.Id;
+            pragueBaseSalary = prague.BaseSalaryPerManhour;
+        }
+
+        // Set Prague multiplier to 1.5
+        await ExecuteGraphQlAsync(
+            """
+            mutation UpdateCompanySettings($input: UpdateCompanySettingsInput!) {
+              updateCompanySettings(input: $input) { id name }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    companyId,
+                    name = "Wage Formula Corp",
+                    citySalarySettings = new[] { new { cityId = pragueId, salaryMultiplier = 1.5 } }
+                }
+            },
+            ownerToken);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GetCompanySettings($companyId: UUID!) {
+              companySettings(companyId: $companyId) {
+                citySalarySettings {
+                  cityName
+                  currencyCode
+                  baseSalaryPerManhour
+                  salaryMultiplier
+                  effectiveSalaryPerManhour
+                }
+              }
+            }
+            """,
+            new { companyId },
+            ownerToken);
+
+        var citySalaries = result.GetProperty("data").GetProperty("companySettings").GetProperty("citySalarySettings");
+        var pragueSetting = citySalaries.EnumerateArray().First(e => e.GetProperty("cityName").GetString() == "Prague");
+
+        Assert.Equal("CZK", pragueSetting.GetProperty("currencyCode").GetString());
+        Assert.Equal(1.5m, pragueSetting.GetProperty("salaryMultiplier").GetDecimal());
+        // effectiveSalaryPerManhour must equal base × 1.5, rounded to 4 d.p.
+        var expectedEffective = decimal.Round(pragueBaseSalary * 1.5m, 4, MidpointRounding.AwayFromZero);
+        Assert.Equal(expectedEffective, pragueSetting.GetProperty("effectiveSalaryPerManhour").GetDecimal());
+    }
+
+    [Fact]
     public async Task PragueOnboarding_CreatesCompanyWithCzkCurrencyAndScaledCash()
     {
         // A company founded in Prague (CZK) should have:

@@ -194,6 +194,57 @@ test.describe('Company Settings – salary multiplier', () => {
     await expect(pragueInput).toHaveValue('0.8')
     await expect(viennaInput).toHaveValue('1.5')
   })
+
+  test('displays currency badge for each city — Prague shows CZK, Bratislava shows EUR', async ({
+    page,
+  }) => {
+    const { company } = await setupPlayerWithCompany(page)
+    await page.goto(`/company/${company.id}/settings`)
+
+    // Prague row must show CZK currency badge
+    const pragueRow = page.locator('tr', { hasText: 'Prague' })
+    await expect(pragueRow.locator('.city-currency-badge')).toBeVisible()
+    await expect(pragueRow.locator('.city-currency-badge')).toHaveText('CZK')
+
+    // Bratislava row must show EUR currency badge
+    const bratislavaRow = page.locator('tr', { hasText: 'Bratislava' })
+    await expect(bratislavaRow.locator('.city-currency-badge')).toBeVisible()
+    await expect(bratislavaRow.locator('.city-currency-badge')).toHaveText('EUR')
+  })
+
+  test('base wage and effective wage for Prague use CZK, not EUR', async ({ page }) => {
+    const { company } = await setupPlayerWithCompany(page)
+    await page.goto(`/company/${company.id}/settings`)
+
+    // Prague baseSalaryPerManhour = 22 CZK. The displayed amount must use CZK formatter (not EUR €).
+    // Intl.NumberFormat with 'CZK' in 'en' locale formats as "CZK 22.00".
+    const pragueRow = page.locator('tr', { hasText: 'Prague' })
+    await expect(pragueRow.locator('td').nth(1)).toContainText('CZK')
+    await expect(pragueRow.locator('td').nth(3)).toContainText('CZK')
+
+    // Bratislava (EUR) must show € sign, not CZK
+    const bratislavaRow = page.locator('tr', { hasText: 'Bratislava' })
+    await expect(bratislavaRow.locator('td').nth(1)).toContainText('€')
+    await expect(bratislavaRow.locator('td').nth(3)).toContainText('€')
+  })
+
+  test('shows local currency note explaining wages are not converted', async ({ page }) => {
+    const { company } = await setupPlayerWithCompany(page)
+    await page.goto(`/company/${company.id}/settings`)
+
+    await expect(page.locator('.salary-local-currency-note')).toBeVisible()
+    await expect(page.locator('.salary-local-currency-note')).toContainText('local currency')
+  })
+
+  test('Delhi shows INR currency in salary row', async ({ page }) => {
+    const { company } = await setupPlayerWithCompany(page)
+    await page.goto(`/company/${company.id}/settings`)
+
+    const delhiRow = page.locator('tr', { hasText: 'Delhi' })
+    await expect(delhiRow.locator('.city-currency-badge')).toHaveText('INR')
+    // Intl.NumberFormat for INR in 'en' locale uses the ₹ symbol
+    await expect(delhiRow.locator('td').nth(1)).toContainText('₹')
+  })
 })
 
 test.describe('Company Settings – dashboard navigation', () => {

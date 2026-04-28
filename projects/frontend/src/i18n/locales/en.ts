@@ -1708,6 +1708,8 @@ export default {
     overheadDriverScale: 'Scale factor',
     salaryImpactHint:
       'Higher multipliers raise ongoing labor costs in that city but can improve worker quality and competitiveness. Lower multipliers reduce costs but may affect operational performance.',
+    salaryLocalCurrencyNote:
+      'Wages are denominated in each city\'s local currency. For example, Prague wages are in CZK and New York wages are in USD — they are not converted to your company\'s primary currency.',
     dividendHelp: 'Choose how much post-tax annual profit is paid out to shareholders. 20% is a balanced default that still leaves room for reinvestment.',
     baseSalary: 'Base wage / hour',
     salaryMultiplier: 'Salary multiplier',

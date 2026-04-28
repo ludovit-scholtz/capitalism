@@ -33,7 +33,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
 
-### Currencies and bank accounts (90% complete)
+### Currencies and bank accounts (93% complete)
 
 - [x] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
 - [x] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
@@ -44,14 +44,16 @@ It will use real world map. The game will start in single city and later other c
 - [x] Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
 - [x] In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
 - [x] When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
+- [x] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
 **Shipped (this PR):** Unit upgrade costs and new unit placement costs are now FX-adjusted to the building's city currency. A building in Prague now shows and charges CZK amounts (e.g. 302,400 CZK for a new MANUFACTURING unit instead of 12,000 EUR). The `ScheduleUnitUpgrade` mutation and `BuildingConfigurationService.ApplyDuePlansAsync` both validate that the assigned bank account currency matches the city currency and reject with `CURRENCY_MISMATCH` on a mismatch. B2B recommended prices are also FX-adjusted via `useBuildingDetail.cityFxRate`. The unit-upgrade query (`unitUpgradeInfo`) returns the FX-adjusted cost for display.
 
 **Shipped (R&D USD normalization):** Research budgets (`ProductResearchBudget.AccumulatedBudget`) are now always stored and compared in USD. The tick engine converts each unit's local-currency operating cost to USD before accumulating it, and the `baseQualityBudget` threshold (used to determine when a company reaches 100% uncontested quality) is also expressed in USD. The R&D panel in the building detail now displays all three budget figures (accumulated, target, top-competitor) formatted as USD amounts. Players in Prague (CZK), Vienna (EUR), New York (USD), and future cities all compete on an equal monetary footing for product-quality rankings.
 
+**Shipped (city-aware salary settings):** Company settings salary table now shows each city's own currency code — Prague wages display as CZK, New York as USD, Delhi as INR, etc. The `CompanyCitySalarySettingResult` GraphQL type now includes a `currencyCode` field per city, and both the base wage and effective wage columns use the city's local currency formatter instead of the company's primary currency. A currency badge next to each city name and a clarifying note below the table make it unambiguous that wages are not cross-currency-converted. Backend and E2E tests verify the per-city currency codes are correct.
+
 - [ ] Allow to close down bank account if the balance of the account is equal exactly to 0.
 - [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
-- [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
 ### Number formatting (100% complete)
 

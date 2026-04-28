@@ -49,6 +49,8 @@ export interface Company {
 export interface CompanyCitySalarySetting {
   cityId: string
   cityName: string
+  /** ISO 4217 currency code of this city. Wages are denominated in this currency. */
+  currencyCode: string
   baseSalaryPerManhour: number
   salaryMultiplier: number
   effectiveSalaryPerManhour: number
