@@ -5951,10 +5951,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           invisiblePlayers: state.players
             .filter((player) => player.email !== 'government@capitalism.game' && player.isInvisibleInChat)
             .map(buildGameAdminPlayer),
-          governmentPlayer:
-            state.players
-              .filter((player) => player.email === 'government@capitalism.game')
-              .map(buildGameAdminPlayer)[0] ?? null,
+          governmentPlayer: (() => {
+            const govPlayer = state.players.find((player) => player.email === 'government@capitalism.game')
+            return govPlayer ? buildGameAdminPlayer(govPlayer) : null
+          })(),
           globalGameAdminGrants: state.globalGameAdminGrants.map((grant) => ({ ...grant })).sort((left, right) => left.email.localeCompare(right.email)),
           recentAuditLogs: [...state.adminAuditLogs].sort((left, right) => right.recordedAtUtc.localeCompare(left.recordedAtUtc)).slice(0, 12),
         },

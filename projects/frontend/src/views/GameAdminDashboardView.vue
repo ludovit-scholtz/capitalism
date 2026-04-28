@@ -385,7 +385,7 @@ onMounted(async () => {
                   :key="company.id"
                   type="button"
                   class="admin-company-pill"
-                  @click="startImpersonation(adminStore.dashboard.governmentPlayer!.id, 'COMPANY', company.id)"
+                  @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'COMPANY', company.id)"
                 >
                   {{ company.name }} · {{ formatCurrency(company.cash) }}
                 </button>
