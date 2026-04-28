@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
@@ -14,6 +14,31 @@ const {
   loadCityPowerBalance,
   formatCurrency,
 } = bd
+
+// Grid economics constants (must match GameConstants.cs)
+const SURPLUS_RATE_PER_MW_TICK = 5
+const FINE_RATE_PER_MW_TICK = 8
+
+// Per-tick projected economics based on current city balance.
+const projected = computed(() => {
+  const balance = cityPowerBalance.value
+  const plantOutput = building.value?.powerOutput ?? 0
+  if (!balance || plantOutput <= 0 || balance.totalSupplyMw <= 0) return null
+
+  const capacityShare = plantOutput / balance.totalSupplyMw
+  const sharePercent = Math.round(capacityShare * 100)
+
+  if (balance.reserveMw > 0) {
+    // Surplus: plant earns proportional to its capacity share of the surplus
+    const surplusIncome = balance.reserveMw * SURPLUS_RATE_PER_MW_TICK * capacityShare
+    return { kind: 'surplus' as const, amount: surplusIncome, sharePercent }
+  } else if (balance.reserveMw < 0) {
+    // Shortage: plant is fined proportional to its capacity share of the shortage
+    const fine = Math.abs(balance.reserveMw) * FINE_RATE_PER_MW_TICK * capacityShare
+    return { kind: 'fine' as const, amount: fine, sharePercent }
+  }
+  return { kind: 'balanced' as const, amount: 0, sharePercent }
+})
 
 function loadBalanceIfNeeded() {
   if (building.value?.type === 'POWER_PLANT' && building.value?.cityId) {
@@ -94,6 +119,36 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
               : t('powerPlant.cityPowerStatus.balancedHint')
         }}
       </p>
+
+      <!-- Projected per-tick economics based on current balance -->
+      <div
+        v-if="projected"
+        class="ppa-projected mt-3 border-t border-divider pt-3"
+      >
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ t('powerPlant.cityPowerStatus.projectedTitle') }}</p>
+        <div v-if="projected.kind === 'surplus'" class="flex flex-wrap items-center gap-3">
+          <div class="rounded-lg bg-green-600/10 px-3 py-1.5 text-sm">
+            <span class="text-muted">{{ t('powerPlant.cityPowerStatus.projectedSurplus') }}: </span>
+            <strong class="text-green-400">+{{ formatCurrency(projected.amount) }}/tick</strong>
+          </div>
+          <p class="text-xs text-muted">
+            {{ t('powerPlant.cityPowerStatus.projectedNote', { share: projected.sharePercent }) }}
+          </p>
+        </div>
+        <div v-else-if="projected.kind === 'fine'" class="flex flex-wrap items-center gap-3">
+          <div class="rounded-lg bg-red-600/10 px-3 py-1.5 text-sm">
+            <span class="text-muted">{{ t('powerPlant.cityPowerStatus.projectedFine') }}: </span>
+            <strong class="text-red-400">−{{ formatCurrency(projected.amount) }}/tick</strong>
+          </div>
+          <p class="text-xs text-muted">
+            {{ t('powerPlant.cityPowerStatus.projectedNote', { share: projected.sharePercent }) }}
+          </p>
+        </div>
+        <p v-else class="text-xs text-muted">{{ t('powerPlant.cityPowerStatus.balancedHint') }}</p>
+      </div>
+      <p v-else-if="cityPowerBalance && (building?.powerOutput ?? 0) <= 0" class="mt-2 text-xs text-muted">
+        {{ t('powerPlant.cityPowerStatus.projectedNoData') }}
+      </p>
     </div>
 
     <div v-if="powerPlantAnalyticsLoading" class="ppa-loading py-2 text-sm text-muted">{{ t('common.loading') }}</div>
@@ -105,13 +160,13 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
 
       <div class="ppa-summary-grid grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
-          <span class="ppa-metric-label" :title="t('powerPlant.analytics.surplusHint', { rate: 5 })">
+          <span class="ppa-metric-label" :title="t('powerPlant.analytics.surplusHint', { rate: SURPLUS_RATE_PER_MW_TICK })">
             {{ t('powerPlant.analytics.surplusIncome') }}
           </span>
           <strong class="ppa-metric-value ppa-income mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalSurplusIncome) }}</strong>
         </div>
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
-          <span class="ppa-metric-label" :title="t('powerPlant.analytics.fineHint', { rate: 8 })">
+          <span class="ppa-metric-label" :title="t('powerPlant.analytics.fineHint', { rate: FINE_RATE_PER_MW_TICK })">
             {{ t('powerPlant.analytics.gridFine') }}
           </span>
           <strong class="ppa-metric-value ppa-fine mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalGridFines) }}</strong>

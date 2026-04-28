@@ -72,30 +72,13 @@ public sealed class PowerDistributionPhase : ITickPhase
                     ? plant.PowerOutput.Value
                     : GameConstants.DefaultPowerOutputMw(plant.PowerPlantType);
 
-                // Apply POWER_GENERATION unit boosts (before weather scaling).
+                // POWER_GENERATION unit boosts are tied to the plant's rated capacity and
+                // are therefore weather-scaled alongside the base output for SOLAR/WIND plants.
                 if (context.UnitsByBuilding.TryGetValue(plant.Id, out var plantUnits))
                 {
                     baseOutput += plantUnits
                         .Where(u => u.UnitType == UnitType.PowerGeneration)
                         .Sum(u => GameConstants.PowerGenerationUnitBoostMwPerLevel * u.Level);
-
-                    // FUEL_PURCHASE units expand fuel procurement capacity → more output for thermal plants.
-                    baseOutput += plantUnits
-                        .Where(u => u.UnitType == UnitType.FuelPurchase)
-                        .Sum(u => GameConstants.FuelPurchaseBoostMwPerLevel * u.Level);
-
-                    // WATER_TURBINE units provide steady hydro output (weather-independent).
-                    baseOutput += plantUnits
-                        .Where(u => u.UnitType == UnitType.WaterTurbine)
-                        .Sum(u => GameConstants.WaterTurbineBoostMwPerLevel * u.Level);
-
-                    // ENERGY_PRODUCING units represent the main conversion stage.
-                    baseOutput += plantUnits
-                        .Where(u => u.UnitType == UnitType.EnergyProducing)
-                        .Sum(u => GameConstants.EnergyProducingBoostMwPerLevel * u.Level);
-
-                    // WIND_TURBINE units contribute weather-scaled wind energy.
-                    // Computed separately below after weather factor is applied.
                 }
 
                 var factor = plant.PowerPlantType switch
@@ -105,11 +88,31 @@ public sealed class PowerDistributionPhase : ITickPhase
                     _                                  => 1m,
                 };
 
+                // Weather scaling applies only to the plant's rated capacity and POWER_GENERATION boosts.
                 var weatherScaledOutput = baseOutput * factor;
 
-                // WIND_TURBINE units are always weather-scaled by wind percent regardless of plant type.
                 if (context.UnitsByBuilding.TryGetValue(plant.Id, out var allPlantUnits))
                 {
+                    // FUEL_PURCHASE units expand fuel (coal/gas) procurement contracts.
+                    // Thermal fuel supply is weather-independent: always adds the full MW capacity.
+                    weatherScaledOutput += allPlantUnits
+                        .Where(u => u.UnitType == UnitType.FuelPurchase)
+                        .Sum(u => GameConstants.FuelPurchaseBoostMwPerLevel * u.Level);
+
+                    // WATER_TURBINE units generate steady hydro-electric power independent of any
+                    // plant-level weather factor — always adds the full rated hydro MW.
+                    weatherScaledOutput += allPlantUnits
+                        .Where(u => u.UnitType == UnitType.WaterTurbine)
+                        .Sum(u => GameConstants.WaterTurbineBoostMwPerLevel * u.Level);
+
+                    // ENERGY_PRODUCING units represent the main conversion stage (fuel/force →
+                    // electricity). Their output is not driven by plant-level solar/wind factors.
+                    weatherScaledOutput += allPlantUnits
+                        .Where(u => u.UnitType == UnitType.EnergyProducing)
+                        .Sum(u => GameConstants.EnergyProducingBoostMwPerLevel * u.Level);
+
+                    // WIND_TURBINE units harvest wind energy and always scale by current wind
+                    // percentage regardless of the plant's primary fuel type.
                     var windPercent = weather is not null ? weather.WindPercent / 100m : 0.5m;
                     weatherScaledOutput += allPlantUnits
                         .Where(u => u.UnitType == UnitType.WindTurbine)

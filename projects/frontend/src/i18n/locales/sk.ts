@@ -2062,6 +2062,13 @@ export default {
       surplusHint: 'Mesto má prebytok kapacity. Vaša elektráreň zarába príjem z prebytku.',
       shortageHint: 'Mesto má nedostatok. Vaša elektráreň je vystavená pokutám siete.',
       balancedHint: 'Dodávka mesta pokrýva dopyt. Žiadne pokuty ani príjem z prebytku.',
+      projectedTitle: 'Odhadovaná ekonomika — nasledujúci tick',
+      projectedSurplus: 'Odhadovaný príjem z prebytku',
+      projectedFine: 'Odhadovaná pokuta siete',
+      projectedNetLabel: 'Est. čistý tento tick',
+      projectedNote: 'Odhad na základe aktuálnej bilancie mesta a vášho podielu kapacity ({share}% celkovej dodávky). Skutočné sumy sú zúčtované každý tick cez účtovníctvo.',
+      projectedNoData: 'Projekcia nie je dostupná — nominálny výkon elektrárne je nula.',
+      capacityShare: 'Váš podiel kapacity',
     },
   },
   property: {

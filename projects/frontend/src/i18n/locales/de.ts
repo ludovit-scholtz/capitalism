@@ -2070,6 +2070,13 @@ export default {
       surplusHint: 'Die Stadt hat Überkapazität. Ihr Kraftwerk verdient Überschusseinnahmen.',
       shortageHint: 'Die Stadt hat einen Mangel. Ihr Kraftwerk ist Netzstrafen ausgesetzt.',
       balancedHint: 'Stadtangebot deckt die Nachfrage. Keine Strafen oder Überschusseinnahmen.',
+      projectedTitle: 'Prognostizierte Wirtschaft — nächster Tick',
+      projectedSurplus: 'Prognostiziertes Überschusseinkommen',
+      projectedFine: 'Prognostizierte Netzstrafe',
+      projectedNetLabel: 'Est. Netto diesen Tick',
+      projectedNote: 'Schätzung basierend auf aktueller Stadtbilanz und Ihrem Kapazitätsanteil ({share}% der Gesamtversorgung). Tatsächliche Beträge werden je Tick über das Hauptbuch verrechnet.',
+      projectedNoData: 'Keine Prognose verfügbar — Nennleistung des Kraftwerks ist null.',
+      capacityShare: 'Ihr Kapazitätsanteil',
     },
   },
   property: {
