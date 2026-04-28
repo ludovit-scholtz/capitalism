@@ -89,9 +89,20 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (0% complete)
+### Media house (65% complete)
 
-- [ ] When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
+**Shipped in this increment:**
+- ✅ Buying a Media house no longer fails with an empty `mediaType` validation error — the buy-building and city-map flows both require media type selection before purchase.
+- ✅ Media type selection (NEWSPAPER ×1.0, RADIO ×1.5, TV ×2.0) is presented clearly in both the buy-building flow and the city-map purchase panel before a lot is purchased.
+- ✅ Selected `mediaType` is persisted by the backend `purchaseLot` mutation and exposed in GraphQL `building { mediaType }` responses.
+- ✅ Purchased media houses render as single-unit specialized properties — the factory-style 4×4 unit grid is now hidden for MEDIA_HOUSE buildings (matching the same treatment as APARTMENT and COMMERCIAL).
+- ✅ The building detail page shows the dedicated Media House Management panel (content value, content budget, city competitor ranking, effectiveness multiplier).
+- ✅ Backend integration tests cover `purchaseLot` with valid mediaType, missing mediaType, and all three media types (NEWSPAPER, RADIO, TV).
+- ✅ E2E tests verify the media house detail renders without the factory grid and shows the management panel.
+
+- [ ] Add detailed media house economy tutorial and in-depth strategic guidance to the purchase flow explaining how content budget, content value, and effectiveness multiplier interact.
+- [ ] Allow upgrading a media house to improve content delivery efficiency.
+- [ ] Show media house influence on brand quality in the brand analytics panel.
 
 ### Mining (80% complete)
 

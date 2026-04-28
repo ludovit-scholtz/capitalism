@@ -12196,6 +12196,115 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task PurchaseLot_MediaHouse_WithValidMediaType_CreatesMediaHouseBuilding()
+    {
+        var token = await RegisterAndGetTokenAsync($"mh-lot-valid-{Guid.NewGuid():N}@test.com", "MH Lot Buyer");
+        var result = await ExecuteGraphQlAsync(
+            """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+            new { input = new { name = "Media Lot Corp" } },
+            token);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var cityId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(cityId, "MEDIA_HOUSE", "Media District");
+
+        await using (var fundScope = _factory.Services.CreateAsyncScope())
+        {
+            var db = fundScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var eur = await CompanyBankingService.EnsurePreferredAccountAsync(db, Guid.Parse(companyId), "EUR");
+            eur.Balance = 500_000m;
+            await db.SaveChangesAsync();
+        }
+
+        var purchaseResult = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                building { id type mediaType }
+                lot { id ownerCompanyId buildingId }
+              }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "MEDIA_HOUSE", buildingName = "City Radio", mediaType = "RADIO" } },
+            token);
+
+        Assert.False(purchaseResult.TryGetProperty("errors", out _), $"Expected no errors but got: {purchaseResult}");
+        var data = purchaseResult.GetProperty("data").GetProperty("purchaseLot");
+        var building = data.GetProperty("building");
+        Assert.Equal("MEDIA_HOUSE", building.GetProperty("type").GetString());
+        Assert.Equal("RADIO", building.GetProperty("mediaType").GetString());
+        Assert.Equal(companyId, data.GetProperty("lot").GetProperty("ownerCompanyId").GetString());
+    }
+
+    [Fact]
+    public async Task PurchaseLot_MediaHouse_WithoutMediaType_ReturnsInvalidMediaTypeError()
+    {
+        var token = await RegisterAndGetTokenAsync($"mh-lot-notype-{Guid.NewGuid():N}@test.com", "MH No Type Buyer");
+        var result = await ExecuteGraphQlAsync(
+            """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+            new { input = new { name = "No Type Media Corp" } },
+            token);
+        var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var cityId = await GetCityIdByNameAsync("Bratislava");
+        var lotId = await CreateTestLotAsync(cityId, "MEDIA_HOUSE", "Media District No Type");
+
+        var purchaseResult = await ExecuteGraphQlAsync(
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) { building { id } }
+            }
+            """,
+            new { input = new { companyId, lotId, buildingType = "MEDIA_HOUSE", buildingName = "Ghost Station", mediaType = (string?)null } },
+            token);
+
+        Assert.True(purchaseResult.TryGetProperty("errors", out var errors), "Expected an error when mediaType is null.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("INVALID_MEDIA_TYPE", code);
+    }
+
+    [Fact]
+    public async Task PurchaseLot_MediaHouse_AllThreeTypes_PersistCorrectMediaType()
+    {
+        foreach (var mediaType in new[] { "NEWSPAPER", "RADIO", "TV" })
+        {
+            var token = await RegisterAndGetTokenAsync($"mh-lot-{mediaType.ToLowerInvariant()}-{Guid.NewGuid():N}@test.com", $"MH {mediaType}");
+            var result = await ExecuteGraphQlAsync(
+                """mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }""",
+                new { input = new { name = $"{mediaType} Corp" } },
+                token);
+            var companyId = result.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+            var cityId = await GetCityIdByNameAsync("Bratislava");
+            var lotId = await CreateTestLotAsync(cityId, "MEDIA_HOUSE", $"{mediaType} District");
+
+            await using (var fundScope = _factory.Services.CreateAsyncScope())
+            {
+                var db = fundScope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var eur = await CompanyBankingService.EnsurePreferredAccountAsync(db, Guid.Parse(companyId), "EUR");
+                eur.Balance = 500_000m;
+                await db.SaveChangesAsync();
+            }
+
+            var purchaseResult = await ExecuteGraphQlAsync(
+                """
+                mutation PurchaseLot($input: PurchaseLotInput!) {
+                  purchaseLot(input: $input) {
+                    building { id type mediaType }
+                  }
+                }
+                """,
+                new { input = new { companyId, lotId, buildingType = "MEDIA_HOUSE", buildingName = $"Test {mediaType}", mediaType } },
+                token);
+
+            Assert.False(purchaseResult.TryGetProperty("errors", out _), $"Expected no errors for {mediaType} but got: {purchaseResult}");
+            var building = purchaseResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+            Assert.Equal("MEDIA_HOUSE", building.GetProperty("type").GetString());
+            Assert.Equal(mediaType, building.GetProperty("mediaType").GetString());
+        }
+    }
+
+    [Fact]
     public async Task GetLot_ReturnsSingleLot()
     {
         var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
