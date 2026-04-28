@@ -1486,6 +1486,162 @@ export function useBuildingDetail() {
     return !!getUnitAtFrom(units, x + 1, y) && !!getUnitAtFrom(units, x, y + 1)
   }
 
+  // ---------------------------------------------------------------------------
+  // Advanced flow visualization helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Returns true when the horizontal link at (x,y)↔(x+1,y) shows real inventory
+   * movement (either adjacent unit had inflow or outflow last tick).
+   * Used to apply the "live" pulse class to the link connector.
+   */
+  function isHorizontalLinkLive(units: GridUnit[], x: number, y: number): boolean {
+    if (getHorizontalLinkStateFor(units, x, y) === 'none') return false
+    const leftInv = getUnitInventorySummary(getUnitAtFrom(units, x, y))
+    const rightInv = getUnitInventorySummary(getUnitAtFrom(units, x + 1, y))
+    return (
+      (leftInv?.lastTickOutflow ?? 0) > 0 ||
+      (leftInv?.lastTickInflow ?? 0) > 0 ||
+      (rightInv?.lastTickOutflow ?? 0) > 0 ||
+      (rightInv?.lastTickInflow ?? 0) > 0
+    )
+  }
+
+  /**
+   * Returns true when the vertical link at (x,y)↔(x,y+1) shows real inventory
+   * movement (either adjacent unit had inflow or outflow last tick).
+   */
+  function isVerticalLinkLive(units: GridUnit[], x: number, y: number): boolean {
+    if (getVerticalLinkStateFor(units, x, y) === 'none') return false
+    const topInv = getUnitInventorySummary(getUnitAtFrom(units, x, y))
+    const bottomInv = getUnitInventorySummary(getUnitAtFrom(units, x, y + 1))
+    return (
+      (topInv?.lastTickOutflow ?? 0) > 0 ||
+      (topInv?.lastTickInflow ?? 0) > 0 ||
+      (bottomInv?.lastTickOutflow ?? 0) > 0 ||
+      (bottomInv?.lastTickInflow ?? 0) > 0
+    )
+  }
+
+  /**
+   * Returns true when a link connector (horizontal or vertical) is adjacent to the
+   * currently selected cell.  Used to apply the "selected-path" highlight class so
+   * players can trace the full connection chain out of the unit they clicked.
+   *
+   * @param direction 'h' for the horizontal link at (lx, ly)↔(lx+1, ly)
+   *                  'v' for the vertical link at (lx, ly)↔(lx, ly+1)
+   */
+  function isLinkConnectedToSelectedCell(direction: 'h' | 'v', lx: number, ly: number): boolean {
+    if (!selectedCell.value) return false
+    const { x, y } = selectedCell.value
+    if (direction === 'h') return (lx === x && ly === y) || (lx + 1 === x && ly === y)
+    return (lx === x && ly === y) || (lx === x && ly + 1 === y)
+  }
+
+  /**
+   * Builds a plain-language flow hint for a horizontal link connector.
+   * Returned as the native `title` attribute of the connector element so players
+   * see context on hover without any custom tooltip component.
+   *
+   * Example: "Iron Ore: Mining → Storage (active last tick)"
+   */
+  function getHorizontalLinkFlowHint(units: GridUnit[], x: number, y: number): string {
+    const state = getHorizontalLinkStateFor(units, x, y)
+    if (state === 'none') return ''
+    const left = getUnitAtFrom(units, x, y)
+    const right = getUnitAtFrom(units, x + 1, y)
+    if (!left || !right) return ''
+
+    const [fromUnit, toUnit] = state === 'backward' ? [right, left] : [left, right]
+    const fromLabel = t(`buildingDetail.unitTypes.${fromUnit.unitType}`)
+    const toLabel = t(`buildingDetail.unitTypes.${toUnit.unitType}`)
+    const itemLabel = getUnitDisplayLabel(fromUnit) ?? getUnitDisplayLabel(toUnit)
+    const status = isHorizontalLinkLive(units, x, y)
+      ? t('buildingDetail.linkFlowLive')
+      : t('buildingDetail.linkFlowConfigured')
+
+    if (state === 'both') {
+      return t('buildingDetail.linkFlowHintBidirectional', {
+        a: fromLabel,
+        b: toLabel,
+        item: itemLabel ?? t('buildingDetail.linkFlowItemGeneric'),
+        status,
+      })
+    }
+    return t('buildingDetail.linkFlowHint', {
+      from: fromLabel,
+      to: toLabel,
+      item: itemLabel ?? t('buildingDetail.linkFlowItemGeneric'),
+      status,
+    })
+  }
+
+  /**
+   * Builds a plain-language flow hint for a vertical link connector.
+   *
+   * Example: "Coal: Fuel Purchase → Energy Producing (active last tick)"
+   */
+  function getVerticalLinkFlowHint(units: GridUnit[], x: number, y: number): string {
+    const state = getVerticalLinkStateFor(units, x, y)
+    if (state === 'none') return ''
+    const top = getUnitAtFrom(units, x, y)
+    const bottom = getUnitAtFrom(units, x, y + 1)
+    if (!top || !bottom) return ''
+
+    const [fromUnit, toUnit] = state === 'backward' ? [bottom, top] : [top, bottom]
+    const fromLabel = t(`buildingDetail.unitTypes.${fromUnit.unitType}`)
+    const toLabel = t(`buildingDetail.unitTypes.${toUnit.unitType}`)
+    const itemLabel = getUnitDisplayLabel(fromUnit) ?? getUnitDisplayLabel(toUnit)
+    const status = isVerticalLinkLive(units, x, y)
+      ? t('buildingDetail.linkFlowLive')
+      : t('buildingDetail.linkFlowConfigured')
+
+    if (state === 'both') {
+      return t('buildingDetail.linkFlowHintBidirectional', {
+        a: fromLabel,
+        b: toLabel,
+        item: itemLabel ?? t('buildingDetail.linkFlowItemGeneric'),
+        status,
+      })
+    }
+    return t('buildingDetail.linkFlowHint', {
+      from: fromLabel,
+      to: toLabel,
+      item: itemLabel ?? t('buildingDetail.linkFlowItemGeneric'),
+      status,
+    })
+  }
+
+  /**
+   * Returns true when the cell at (cx, cy) is directly linked to the currently
+   * selected cell.  Used to apply the "connected" highlight class on grid cells
+   * so players can trace the full chain out of a selected unit at a glance.
+   */
+  function isCellConnectedToSelected(units: GridUnit[], cx: number, cy: number): boolean {
+    if (!selectedCell.value) return false
+    const { x, y } = selectedCell.value
+    if (cx === x && cy === y) return false // the selected cell itself
+
+    // Check if either cell links to the other
+    const selected = getUnitAtFrom(units, x, y)
+    const candidate = getUnitAtFrom(units, cx, cy)
+    if (!selected || !candidate) return false
+
+    const dx = cx - x
+    const dy = cy - y
+
+    if (dx === 1 && dy === 0) return getHorizontalLinkStateFor(units, x, y) !== 'none'
+    if (dx === -1 && dy === 0) return getHorizontalLinkStateFor(units, cx, cy) !== 'none'
+    if (dx === 0 && dy === 1) return getVerticalLinkStateFor(units, x, y) !== 'none'
+    if (dx === 0 && dy === -1) return getVerticalLinkStateFor(units, cx, cy) !== 'none'
+    if (dx === 1 && dy === 1) return getPrimaryDiagonalLinkStateFor(units, x, y) !== 'none'
+    if (dx === -1 && dy === -1) return getPrimaryDiagonalLinkStateFor(units, cx, cy) !== 'none'
+    if (dx === 1 && dy === -1) return getSecondaryDiagonalLinkStateFor(units, x, cy) !== 'none'
+    if (dx === -1 && dy === 1) return getSecondaryDiagonalLinkStateFor(units, cx, y) !== 'none'
+
+    return false
+  }
+
   function getDraftTicksForUnit(unit: EditableGridUnit): number {
     const baselinePendingUnit = getPendingUnitAt(unit.gridX, unit.gridY)
     const baselinePendingRemoval = getPendingRemovalAt(unit.gridX, unit.gridY)
@@ -4548,6 +4704,12 @@ export function useBuildingDetail() {
     getSecondaryDiagonalLinkStateFor,
     getHorizontalLinkArrow,
     getVerticalLinkArrow,
+    isHorizontalLinkLive,
+    isVerticalLinkLive,
+    isLinkConnectedToSelectedCell,
+    isCellConnectedToSelected,
+    getHorizontalLinkFlowHint,
+    getVerticalLinkFlowHint,
     getDraftUnitAt,
     getDraftTicksForUnit,
     getDraftTicksAt,

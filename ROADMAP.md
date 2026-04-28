@@ -96,7 +96,14 @@ It will use real world map. The game will start in single city and later other c
 - **4 additional backend integration tests**: `PowerPlantAnalytics_NuclearPlant_ReturnsEmptyFuelFields` (proves non-thermal plants return zero fuel fields so frontend hides the fuel panel); `FuelReserve_PreSeededReserve_MaintainsStableLevelOverMultipleTicks` (proves procurement and consumption are in balance each tick, with fuel cost entries confirming procurement ran); `DispatchChange_50Pct_HalvesFuelCostAndReducesSurplusIncome` (proves halving dispatch halves fuel cost AND reduces surplus income — directly validates the "dispatch alters output or profitability" scenario); `PowerPlantAnalytics_WhenReserveIsFull_ConstrainedOutputIsZero` (proves fuelConstrainedOutputMw returns 0 when reserve equals max capacity).
 - **7 additional Playwright E2E tests**: green reserve bar (≥50%), red reserve bar (<20%), no-unit guidance empty state, dispatch badge color (yellow 40–79%, green ≥80%), 5-metric P&L grid for thermal plants (Fuel Costs visible), 4-metric P&L grid for non-thermal WIND plant (no Fuel Costs), metric label correctness smoke test.
 
-- [ ]  Advanced grid linking — bidirectional unit-to-unit flow arrows in the building grid editor
+**Shipped (this increment — advanced grid-link flow visualization):**
+- **Live flow pulse on active links**: horizontal and vertical link connectors now carry a `live` CSS class when either adjacent unit had real inventory movement last tick. Active + live links pulse with a subtle keyframe animation so players can immediately see which connections have actual material flowing through them versus which are just configured but idle.
+- **Selection path highlighting**: clicking any unit cell in the active grid highlights all link connectors leading directly out of (or into) that cell with a `selected-path` class, giving them a brighter primary-colored border. Adjacent cells that are linked to the selected cell also get a `connected` border highlight so the player can trace the full chain at a glance.
+- **Flow hint tooltips**: every horizontal and vertical link connector now carries a native `title` attribute with a plain-language description of the flow path, for example "Wood: Purchase → Manufacturing (active last tick)" or "Wooden Chair: Manufacturing → Storage (no recent flow)". The hint adapts to the link direction (forward / backward / bidirectional), shows the configured item name where available, and uses "no recent flow" when no inventory was seen moving last tick.
+- **Localized copy**: three new i18n key groups added in `buildingDetail.linkFlow*` for en, sk, and de.
+- **4 new Playwright E2E tests**: live class on link with real flow, no live class when flow is absent, selected-path class appears on adjacent link when cell is clicked, title tooltip contains correct unit-type labels and arrow symbol.
+
+- [x]  Advanced grid linking — bidirectional unit-to-unit flow arrows in the building grid editor
 
 ### Units
 

@@ -43,6 +43,12 @@ const {
   getSecondaryDiagonalLinkStateFor,
   getHorizontalLinkArrow,
   getVerticalLinkArrow,
+  isHorizontalLinkLive,
+  isVerticalLinkLive,
+  isLinkConnectedToSelectedCell,
+  isCellConnectedToSelected,
+  getHorizontalLinkFlowHint,
+  getVerticalLinkFlowHint,
   getDisplayedTicks,
   startEditing,
   cancelEditing,
@@ -94,6 +100,7 @@ const {
                   occupied: !!getUnitAtFrom(activeUnits, x, y),
                   selected: selectedCell?.x === x && selectedCell?.y === y,
                   'under-upgrade': isCellUnderUpgrade(x, y),
+                  connected: isCellConnectedToSelected(activeUnits, x, y),
                 }"
                 :style="
                   getUnitAtFrom(activeUnits, x, y)
@@ -176,7 +183,16 @@ const {
                 v-if="x < 3"
                 :key="`active-horizontal-${x}-${y}`"
                 class="link-toggle horizontal readonly"
-                :class="[`link-state-${getHorizontalLinkStateFor(activeUnits, x, y)}`, { active: isHorizontalLinkActiveFor(activeUnits, x, y), disabled: !canToggleHorizontalLink(activeUnits, x, y) }]"
+                :class="[
+                  `link-state-${getHorizontalLinkStateFor(activeUnits, x, y)}`,
+                  {
+                    active: isHorizontalLinkActiveFor(activeUnits, x, y),
+                    disabled: !canToggleHorizontalLink(activeUnits, x, y),
+                    live: isHorizontalLinkLive(activeUnits, x, y),
+                    'selected-path': isLinkConnectedToSelectedCell('h', x, y),
+                  },
+                ]"
+                :title="getHorizontalLinkFlowHint(activeUnits, x, y)"
               >
                 <span class="link-line"></span>
                 <span v-if="getHorizontalLinkStateFor(activeUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{
@@ -190,7 +206,16 @@ const {
             <template v-for="x in gridIndexes" :key="`active-connector-${x}-${y}`">
               <div
                 class="link-toggle vertical readonly"
-                :class="[`link-state-${getVerticalLinkStateFor(activeUnits, x, y)}`, { active: isVerticalLinkActiveFor(activeUnits, x, y), disabled: !canToggleVerticalLink(activeUnits, x, y) }]"
+                :class="[
+                  `link-state-${getVerticalLinkStateFor(activeUnits, x, y)}`,
+                  {
+                    active: isVerticalLinkActiveFor(activeUnits, x, y),
+                    disabled: !canToggleVerticalLink(activeUnits, x, y),
+                    live: isVerticalLinkLive(activeUnits, x, y),
+                    'selected-path': isLinkConnectedToSelectedCell('v', x, y),
+                  },
+                ]"
+                :title="getVerticalLinkFlowHint(activeUnits, x, y)"
               >
                 <span class="link-line"></span>
                 <span v-if="getVerticalLinkStateFor(activeUnits, x, y) !== 'none'" class="link-arrow" aria-hidden="true">{{ getVerticalLinkArrow(getVerticalLinkStateFor(activeUnits, x, y)) }}</span>
@@ -403,10 +428,15 @@ const {
                 class="link-toggle horizontal"
                 :class="[
                   `link-state-${getHorizontalLinkStateFor(plannedUnits, x, y)}`,
-                  { active: isHorizontalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleHorizontalLink(plannedUnits, x, y) },
+                  {
+                    active: isHorizontalLinkActiveFor(plannedUnits, x, y),
+                    disabled: !canToggleHorizontalLink(plannedUnits, x, y),
+                    'selected-path': isLinkConnectedToSelectedCell('h', x, y),
+                  },
                 ]"
                 :disabled="!canToggleHorizontalLink(plannedUnits, x, y)"
                 :aria-label="t('buildingDetail.linkHorizontalAriaLabel', { state: getHorizontalLinkStateFor(plannedUnits, x, y) })"
+                :title="getHorizontalLinkFlowHint(plannedUnits, x, y)"
                 @click="toggleHorizontalLink(x, y)"
               >
                 <span class="link-line"></span>
@@ -421,9 +451,17 @@ const {
             <template v-for="x in gridIndexes" :key="`planned-connector-${x}-${y}`">
               <button
                 class="link-toggle vertical"
-                :class="[`link-state-${getVerticalLinkStateFor(plannedUnits, x, y)}`, { active: isVerticalLinkActiveFor(plannedUnits, x, y), disabled: !canToggleVerticalLink(plannedUnits, x, y) }]"
+                :class="[
+                  `link-state-${getVerticalLinkStateFor(plannedUnits, x, y)}`,
+                  {
+                    active: isVerticalLinkActiveFor(plannedUnits, x, y),
+                    disabled: !canToggleVerticalLink(plannedUnits, x, y),
+                    'selected-path': isLinkConnectedToSelectedCell('v', x, y),
+                  },
+                ]"
                 :disabled="!canToggleVerticalLink(plannedUnits, x, y)"
                 :aria-label="t('buildingDetail.linkVerticalAriaLabel', { state: getVerticalLinkStateFor(plannedUnits, x, y) })"
+                :title="getVerticalLinkFlowHint(plannedUnits, x, y)"
                 @click="toggleVerticalLink(x, y)"
               >
                 <span class="link-line"></span>
