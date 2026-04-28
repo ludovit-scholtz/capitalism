@@ -53,8 +53,8 @@ public sealed class PowerGridEconomicsPhase : ITickPhase
             context.WeatherByCity.TryGetValue(cityId, out var weather);
 
             // Compute each plant's raw weather-adjusted output (same logic as PowerDistributionPhase).
-            // BATTERY_STORAGE smoothing is excluded here because it is not real generation —
-            // it only buffers status thresholds. Economics use the raw generation only.
+            // Smoothing-only units (BATTERY_STORAGE, ENERGY_STORAGE) also count for economics —
+            // they represent stored energy being dispatched to fill gaps.
             var plantOutputs = powerPlants
                 .Select(plant =>
                 {
@@ -62,14 +62,16 @@ public sealed class PowerGridEconomicsPhase : ITickPhase
                         ? plant.PowerOutput.Value
                         : GameConstants.DefaultPowerOutputMw(plant.PowerPlantType);
 
+                    // POWER_GENERATION and BATTERY_STORAGE boosts are tied to the plant's rated
+                    // capacity and are weather-scaled alongside the base output for SOLAR/WIND.
                     if (context.UnitsByBuilding.TryGetValue(plant.Id, out var plantUnits))
                     {
                         baseOutput += plantUnits
                             .Where(u => u.UnitType == UnitType.PowerGeneration)
                             .Sum(u => GameConstants.PowerGenerationUnitBoostMwPerLevel * u.Level);
 
-                        // BATTERY_STORAGE smoothing also counts for economics —
-                        // it represents stored energy being dispatched to fill gaps.
+                        // BATTERY_STORAGE dispatches stored energy during gaps; treated as part of
+                        // the plant's effective rated output for economic share calculations.
                         baseOutput += plantUnits
                             .Where(u => u.UnitType == UnitType.BatteryStorage)
                             .Sum(u => GameConstants.BatterySmoothingMwPerLevel * u.Level);
@@ -81,7 +83,42 @@ public sealed class PowerGridEconomicsPhase : ITickPhase
                         PowerPlantType.Wind  => weather is not null ? weather.WindPercent  / 100m : 1m,
                         _                    => 1m,
                     };
-                    return (Plant: plant, OutputMw: baseOutput * factor);
+
+                    // Weather scaling applies only to the plant's rated capacity, POWER_GENERATION,
+                    // and BATTERY_STORAGE. All other unit types are weather-independent.
+                    var weatherScaledOutput = baseOutput * factor;
+
+                    if (context.UnitsByBuilding.TryGetValue(plant.Id, out var allPlantUnits))
+                    {
+                        // FUEL_PURCHASE, WATER_TURBINE, and ENERGY_PRODUCING are weather-independent:
+                        // their contribution must NOT be scaled by the plant's solar/wind factor.
+                        weatherScaledOutput += allPlantUnits
+                            .Where(u => u.UnitType == UnitType.FuelPurchase)
+                            .Sum(u => GameConstants.FuelPurchaseBoostMwPerLevel * u.Level);
+
+                        weatherScaledOutput += allPlantUnits
+                            .Where(u => u.UnitType == UnitType.WaterTurbine)
+                            .Sum(u => GameConstants.WaterTurbineBoostMwPerLevel * u.Level);
+
+                        weatherScaledOutput += allPlantUnits
+                            .Where(u => u.UnitType == UnitType.EnergyProducing)
+                            .Sum(u => GameConstants.EnergyProducingBoostMwPerLevel * u.Level);
+
+                        // ENERGY_STORAGE smoothing buffer: same treatment as BATTERY_STORAGE
+                        // but added after weather scaling since it models a separate mechanical store.
+                        weatherScaledOutput += allPlantUnits
+                            .Where(u => u.UnitType == UnitType.EnergyStorage)
+                            .Sum(u => GameConstants.EnergyStorageSmoothingMwPerLevel * u.Level);
+
+                        // WIND_TURBINE units always scale by current wind percentage regardless of
+                        // the plant's primary fuel type.
+                        var windPercent = weather is not null ? weather.WindPercent / 100m : 0.5m;
+                        weatherScaledOutput += allPlantUnits
+                            .Where(u => u.UnitType == UnitType.WindTurbine)
+                            .Sum(u => GameConstants.WindTurbineBoostMwPerLevel * u.Level * windPercent);
+                    }
+
+                    return (Plant: plant, OutputMw: weatherScaledOutput);
                 })
                 .ToList();
 

@@ -1,11 +1,61 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { computed, inject, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
-const { building, powerPlantAnalytics, powerPlantAnalyticsLoading, formatCurrency } = bd
+const {
+  building,
+  powerPlantAnalytics,
+  powerPlantAnalyticsLoading,
+  cityPowerBalance,
+  cityPowerBalanceLoading,
+  loadCityPowerBalance,
+  formatCurrency,
+} = bd
+
+// Grid economics constants — must be kept manually synchronized with GameConstants.cs.
+// Backend: GameConstants.GridSurplusIncomePerMwTick = 5, GameConstants.GridFinePerMwTick = 8.
+// These are used only for frontend projection estimates; the ledger is the source of truth.
+const SURPLUS_RATE_PER_MW_TICK = 5
+const FINE_RATE_PER_MW_TICK = 8
+
+// Per-tick projected economics based on current city balance.
+// Returns null when projection is unavailable, 'no-supply' when city has no power supply yet.
+type ProjectedResult =
+  | { kind: 'surplus' | 'fine' | 'balanced'; amount: number; sharePercent: number }
+  | { kind: 'no-supply' }
+  | null
+
+const projected = computed<ProjectedResult>(() => {
+  const balance = cityPowerBalance.value
+  const plantOutput = building.value?.powerOutput ?? 0
+  if (!balance) return null
+  if (plantOutput <= 0) return null
+  if (balance.totalSupplyMw <= 0) return { kind: 'no-supply' }
+
+  const capacityShare = plantOutput / balance.totalSupplyMw
+  const sharePercent = Math.round(capacityShare * 100)
+
+  if (balance.reserveMw > 0) {
+    const surplusIncome = balance.reserveMw * SURPLUS_RATE_PER_MW_TICK * capacityShare
+    return { kind: 'surplus', amount: surplusIncome, sharePercent }
+  } else if (balance.reserveMw < 0) {
+    const fine = Math.abs(balance.reserveMw) * FINE_RATE_PER_MW_TICK * capacityShare
+    return { kind: 'fine', amount: fine, sharePercent }
+  }
+  return { kind: 'balanced', amount: 0, sharePercent }
+})
+
+function loadBalanceIfNeeded() {
+  if (building.value?.type === 'POWER_PLANT' && building.value?.cityId) {
+    loadCityPowerBalance(building.value.cityId)
+  }
+}
+
+onMounted(loadBalanceIfNeeded)
+watch(() => building.value?.cityId, loadBalanceIfNeeded)
 </script>
 
 <template>
@@ -22,6 +72,97 @@ const { building, powerPlantAnalytics, powerPlantAnalyticsLoading, formatCurrenc
       </span>
     </div>
 
+    <!-- City power status block -->
+    <div
+      v-if="cityPowerBalanceLoading"
+      class="ppa-city-status mb-3 rounded-lg border border-divider bg-surface px-3 py-2 text-sm text-muted"
+    >{{ t('common.loading') }}</div>
+    <div
+      v-else-if="cityPowerBalance"
+      class="ppa-city-status mb-3 rounded-lg border border-divider bg-surface px-3 py-2"
+      :class="{
+        'border-green-600/40': cityPowerBalance.status === 'BALANCED',
+        'border-yellow-500/40': cityPowerBalance.status === 'CONSTRAINED',
+        'border-red-600/40': cityPowerBalance.status === 'CRITICAL',
+      }"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <span class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('powerPlant.cityPowerStatus.title') }}</span>
+        <span
+          class="rounded-full px-2 py-0.5 text-xs font-bold"
+          :class="{
+            'bg-green-600/20 text-green-400': cityPowerBalance.status === 'BALANCED',
+            'bg-yellow-500/20 text-yellow-400': cityPowerBalance.status === 'CONSTRAINED',
+            'bg-red-600/20 text-red-400': cityPowerBalance.status === 'CRITICAL',
+          }"
+        >
+          {{
+            cityPowerBalance.status === 'BALANCED'
+              ? t('powerPlant.cityPowerStatus.statusPowered')
+              : cityPowerBalance.status === 'CONSTRAINED'
+                ? t('powerPlant.cityPowerStatus.statusConstrained')
+                : t('powerPlant.cityPowerStatus.statusOffline')
+          }}
+        </span>
+      </div>
+      <div class="mt-2 flex flex-wrap gap-4 text-sm">
+        <span>⚡ {{ t('powerPlant.cityPowerStatus.totalSupply') }}: <strong>{{ cityPowerBalance.totalSupplyMw.toFixed(1) }} MW</strong></span>
+        <span>🏭 {{ t('powerPlant.cityPowerStatus.totalDemand') }}: <strong>{{ cityPowerBalance.totalDemandMw.toFixed(1) }} MW</strong></span>
+        <span>
+          {{ t('powerPlant.cityPowerStatus.balance') }}:
+          <strong
+            :class="{
+              'text-green-400': cityPowerBalance.reserveMw >= 0,
+              'text-red-400': cityPowerBalance.reserveMw < 0,
+            }"
+          >{{ cityPowerBalance.reserveMw >= 0 ? '+' : '' }}{{ cityPowerBalance.reserveMw.toFixed(1) }} MW</strong>
+        </span>
+      </div>
+      <p class="ppa-city-hint mt-1.5 text-xs text-muted">
+        {{
+          cityPowerBalance.reserveMw > 0
+            ? t('powerPlant.cityPowerStatus.surplusHint')
+            : cityPowerBalance.reserveMw < 0
+              ? t('powerPlant.cityPowerStatus.shortageHint')
+              : t('powerPlant.cityPowerStatus.balancedHint')
+        }}
+      </p>
+
+      <!-- Projected per-tick economics based on current balance -->
+      <div
+        v-if="projected && projected.kind !== 'no-supply'"
+        class="ppa-projected mt-3 border-t border-divider pt-3"
+      >
+        <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ t('powerPlant.cityPowerStatus.projectedTitle') }}</p>
+        <div v-if="projected.kind === 'surplus'" class="flex flex-wrap items-center gap-3">
+          <div class="rounded-lg bg-green-600/10 px-3 py-1.5 text-sm">
+            <span class="text-muted">{{ t('powerPlant.cityPowerStatus.projectedSurplus') }}: </span>
+            <strong class="text-green-400">+{{ formatCurrency(projected.amount) }}/tick</strong>
+          </div>
+          <p class="text-xs text-muted">
+            {{ t('powerPlant.cityPowerStatus.projectedNote', { share: projected.sharePercent }) }}
+          </p>
+        </div>
+        <div v-else-if="projected.kind === 'fine'" class="flex flex-wrap items-center gap-3">
+          <div class="rounded-lg bg-red-600/10 px-3 py-1.5 text-sm">
+            <span class="text-muted">{{ t('powerPlant.cityPowerStatus.projectedFine') }}: </span>
+            <strong class="text-red-400">−{{ formatCurrency(projected.amount) }}/tick</strong>
+          </div>
+          <p class="text-xs text-muted">
+            {{ t('powerPlant.cityPowerStatus.projectedNote', { share: projected.sharePercent }) }}
+          </p>
+        </div>
+        <p v-else class="text-xs text-muted">{{ t('powerPlant.cityPowerStatus.balancedHint') }}</p>
+      </div>
+      <!-- City has supply data but no plants yet — different message from zero-output plant -->
+      <p v-else-if="projected?.kind === 'no-supply'" class="mt-2 text-xs text-muted">
+        {{ t('powerPlant.cityPowerStatus.projectedNoSupply') }}
+      </p>
+      <p v-else-if="cityPowerBalance && (building?.powerOutput ?? 0) <= 0" class="mt-2 text-xs text-muted">
+        {{ t('powerPlant.cityPowerStatus.projectedNoData') }}
+      </p>
+    </div>
+
     <div v-if="powerPlantAnalyticsLoading" class="ppa-loading py-2 text-sm text-muted">{{ t('common.loading') }}</div>
 
     <template v-else-if="powerPlantAnalytics">
@@ -31,13 +172,13 @@ const { building, powerPlantAnalytics, powerPlantAnalyticsLoading, formatCurrenc
 
       <div class="ppa-summary-grid grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
-          <span class="ppa-metric-label" :title="t('powerPlant.analytics.surplusHint', { rate: 5 })">
+          <span class="ppa-metric-label" :title="t('powerPlant.analytics.surplusHint', { rate: SURPLUS_RATE_PER_MW_TICK })">
             {{ t('powerPlant.analytics.surplusIncome') }}
           </span>
           <strong class="ppa-metric-value ppa-income mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalSurplusIncome) }}</strong>
         </div>
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
-          <span class="ppa-metric-label" :title="t('powerPlant.analytics.fineHint', { rate: 8 })">
+          <span class="ppa-metric-label" :title="t('powerPlant.analytics.fineHint', { rate: FINE_RATE_PER_MW_TICK })">
             {{ t('powerPlant.analytics.gridFine') }}
           </span>
           <strong class="ppa-metric-value ppa-fine mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalGridFines) }}</strong>
@@ -100,20 +241,61 @@ const { building, powerPlantAnalytics, powerPlantAnalyticsLoading, formatCurrenc
 
     <p v-else class="ppa-empty-state mt-3 text-sm text-muted">{{ t('powerPlant.analytics.noData') }}</p>
 
-    <!-- Unit description cards for POWER_GENERATION and BATTERY_STORAGE -->
+    <!-- Unit description cards for all power plant unit types -->
     <div class="ppa-unit-guide mt-4 grid gap-3 border-t border-divider pt-4">
-      <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
-        <span class="ppa-unit-icon text-2xl">⚡</span>
-        <div>
-          <strong>{{ t('powerPlant.units.POWER_GENERATION.label') }}</strong>
-          <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.POWER_GENERATION.description', { boost: 10 }) }}</p>
+      <h3 class="text-xs font-semibold uppercase tracking-wide text-muted">⚡ Generation Units</h3>
+      <div class="grid gap-2 sm:grid-cols-2">
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">⚡</span>
+          <div>
+            <strong>{{ t('powerPlant.units.POWER_GENERATION.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.POWER_GENERATION.description', { boost: 10 }) }}</p>
+          </div>
+        </div>
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">🔥</span>
+          <div>
+            <strong>{{ t('powerPlant.units.ENERGY_PRODUCING.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.ENERGY_PRODUCING.description', { boost: 20 }) }}</p>
+          </div>
+        </div>
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">💨</span>
+          <div>
+            <strong>{{ t('powerPlant.units.WIND_TURBINE.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.WIND_TURBINE.description', { boost: 8 }) }}</p>
+          </div>
+        </div>
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">💧</span>
+          <div>
+            <strong>{{ t('powerPlant.units.WATER_TURBINE.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.WATER_TURBINE.description', { boost: 12 }) }}</p>
+          </div>
         </div>
       </div>
-      <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
-        <span class="ppa-unit-icon text-2xl">🔋</span>
-        <div>
-          <strong>{{ t('powerPlant.units.BATTERY_STORAGE.label') }}</strong>
-          <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.BATTERY_STORAGE.description', { buffer: 5 }) }}</p>
+      <h3 class="mt-1 text-xs font-semibold uppercase tracking-wide text-muted">🔋 Support Units</h3>
+      <div class="grid gap-2 sm:grid-cols-3">
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">🔋</span>
+          <div>
+            <strong>{{ t('powerPlant.units.BATTERY_STORAGE.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.BATTERY_STORAGE.description', { buffer: 5 }) }}</p>
+          </div>
+        </div>
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">🪨</span>
+          <div>
+            <strong>{{ t('powerPlant.units.ENERGY_STORAGE.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.ENERGY_STORAGE.description', { buffer: 8 }) }}</p>
+          </div>
+        </div>
+        <div class="ppa-unit-card flex items-start gap-3 rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-unit-icon text-2xl">⛽</span>
+          <div>
+            <strong>{{ t('powerPlant.units.FUEL_PURCHASE.label') }}</strong>
+            <p class="ppa-unit-desc mt-1 text-sm text-muted">{{ t('powerPlant.units.FUEL_PURCHASE.description', { boost: 10 }) }}</p>
+          </div>
         </div>
       </div>
     </div>

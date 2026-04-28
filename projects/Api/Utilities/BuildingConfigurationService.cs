@@ -295,7 +295,15 @@ public static partial class BuildingConfigurationService
             BuildingType.Factory => [UnitType.Purchase, UnitType.Manufacturing, UnitType.Branding, UnitType.Storage, UnitType.B2BSales],
             BuildingType.SalesShop => [UnitType.Purchase, UnitType.Marketing, UnitType.Storage, UnitType.PublicSales],
             BuildingType.ResearchDevelopment => [UnitType.ProductQuality, UnitType.BrandQuality],
-            BuildingType.PowerPlant => [UnitType.PowerGeneration, UnitType.BatteryStorage],
+            BuildingType.PowerPlant => [
+                UnitType.PowerGeneration,
+                UnitType.BatteryStorage,
+                UnitType.FuelPurchase,
+                UnitType.WindTurbine,
+                UnitType.WaterTurbine,
+                UnitType.EnergyStorage,
+                UnitType.EnergyProducing,
+            ],
             _ => []
         };
     }

@@ -90,6 +90,11 @@ public static class CompanyEconomyCalculator
             UnitType.BrandQuality => 0.55m,
             UnitType.PowerGeneration => 0.4m,
             UnitType.BatteryStorage => 0.2m,
+            UnitType.FuelPurchase => 0.5m,   // procurement staff
+            UnitType.WindTurbine => 0.3m,     // maintenance technicians
+            UnitType.WaterTurbine => 0.35m,   // hydro operations staff
+            UnitType.EnergyStorage => 0.25m,  // storage system operators
+            UnitType.EnergyProducing => 0.45m, // generation engineers
             _ => 0m,
         };
 
@@ -113,6 +118,11 @@ public static class CompanyEconomyCalculator
             UnitType.BrandQuality => 0.09m,
             UnitType.PowerGeneration => 0.05m,
             UnitType.BatteryStorage => 0.03m,
+            UnitType.FuelPurchase => 0.08m,    // fuel processing energy
+            UnitType.WindTurbine => 0.02m,     // low auxiliary power
+            UnitType.WaterTurbine => 0.04m,    // pumping/control systems
+            UnitType.EnergyStorage => 0.06m,   // charging/discharging losses
+            UnitType.EnergyProducing => 0.07m, // conversion auxiliary power
             _ => 0m,
         };
 

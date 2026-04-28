@@ -60,6 +60,7 @@ import type {
   BuildingUnitOperationalStatus,
   BuildingRecentActivityEvent,
   City,
+  CityPowerBalance,
   Company,
   EurFxRate,
   GlobalExchangeOffer,
@@ -304,6 +305,8 @@ export function useBuildingDetail() {
   // Power plant analytics state
   const powerPlantAnalytics = ref<PowerPlantAnalytics | null>(null)
   const powerPlantAnalyticsLoading = ref(false)
+  const cityPowerBalance = ref<CityPowerBalance | null>(null)
+  const cityPowerBalanceLoading = ref(false)
 
   // R&D research progress state
   const researchBrands = ref<ResearchBrandState[]>([])
@@ -3770,6 +3773,35 @@ export function useBuildingDetail() {
     }
   }
 
+  async function loadCityPowerBalance(cityId: string, isRefresh = false) {
+    if (!cityId) return
+    if (!isRefresh || cityPowerBalance.value == null) {
+      cityPowerBalanceLoading.value = true
+    }
+    try {
+      const data = await gqlRequest<{ cityPowerBalance: CityPowerBalance }>(
+        `query CityPowerBalance($cityId: UUID!) {
+          cityPowerBalance(cityId: $cityId) {
+            cityId
+            totalSupplyMw
+            totalDemandMw
+            reserveMw
+            reservePercent
+            status
+            powerPlantCount
+            consumerBuildingCount
+          }
+        }`,
+        { cityId },
+      )
+      cityPowerBalance.value = data.cityPowerBalance
+    } catch {
+      if (!isRefresh) cityPowerBalance.value = null
+    } finally {
+      cityPowerBalanceLoading.value = false
+    }
+  }
+
   async function loadBuilding(options: { preserveDraft?: boolean } = {}) {
     const requestId = ++activeBuildingLoadRequest
     const shouldShowLoading = !building.value
@@ -4307,6 +4339,8 @@ export function useBuildingDetail() {
     buildingFinancialTimelineLoading,
     powerPlantAnalytics,
     powerPlantAnalyticsLoading,
+    cityPowerBalance,
+    cityPowerBalanceLoading,
     researchBrands,
     researchBrandsLoading,
     cityMediaHouses,
@@ -4583,6 +4617,7 @@ export function useBuildingDetail() {
     loadRecentActivity,
     loadBuildingFinancialTimeline,
     loadPowerPlantAnalytics,
+    loadCityPowerBalance,
     fetchRankedProducts,
     getB2BPriceSource,
     getB2BSuggestedPrice,

@@ -1230,4 +1230,492 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         Assert.True(ppa.GetProperty("totalNetProfit").GetDecimal() > 0m, "Net profit should be positive with surplus");
         Assert.True(ppa.GetProperty("timeline").GetArrayLength() > 0, "Timeline should have entries");
     }
+
+    // ── New unit type tests ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// A WIND_TURBINE unit in a WIND plant at full wind (100%) should add
+    /// WindTurbineBoostMwPerLevel MW to the plant's output.
+    /// </summary>
+    [Fact]
+    public async Task WindTurbineUnit_AtFullWind_BoostsOutputCorrectly()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"WindCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 50.0, Longitude = 15.0, Population = 50_000, AverageRentPerSqm = 8m
+        };
+        db.Cities.Add(city);
+
+        // Seed weather with full wind (100%) for the current tick.
+        var gameState = await db.GameStates.FirstAsync();
+        db.CityWeatherForecasts.Add(new CityWeatherForecast
+        {
+            CityId = city.Id, Tick = gameState.CurrentTick,
+            WindPercent = 100, SolarPercent = 50
+        });
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Wind Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // Wind plant base 25 MW + 1×WIND_TURBINE level 1 (8 MW × 100% wind = 8 MW)
+        // Consumer at 30 MW: supply=33 MW > demand → surplus
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Wind Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "WIND", PowerOutput = 25m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 30m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        // Add WIND_TURBINE unit
+        var windUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.WindTurbine, GridX = 0, GridY = 0, Level = 1
+        };
+        db.BuildingUnits.Add(windUnit);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // At full wind: base 25 MW × 1.0 + 8 MW × 1.0 = 33 MW; demand 30 MW → surplus of 3 MW
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        var surplus = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridSurplusIncome)
+            .SumAsync(e => e.Amount);
+        Assert.True(surplus > 0m, $"Wind turbine at full wind should produce surplus income; got {surplus}");
+    }
+
+    /// <summary>
+    /// A WATER_TURBINE unit provides steady hydro output independent of weather.
+    /// Even with no weather seeded (factor defaults to 1.0 for COAL), the WATER_TURBINE
+    /// should add WaterTurbineBoostMwPerLevel MW to a COAL plant.
+    /// </summary>
+    [Fact]
+    public async Task WaterTurbineUnit_AddsStaticBoost_RegardlessOfWeather()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"HydroCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 49.5, Longitude = 17.5, Population = 30_000, AverageRentPerSqm = 7m
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Hydro Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // COAL plant base 50 MW + 1×WATER_TURBINE level 1 (12 MW steady)
+        // Consumer 60 MW: supply=62 MW > demand → surplus
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Hydro-Coal Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 60m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        var waterUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.WaterTurbine, GridX = 0, GridY = 0, Level = 1
+        };
+        db.BuildingUnits.Add(waterUnit);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Base 50 MW + 12 MW water = 62 MW; demand 60 MW → surplus → no fines
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        var fines = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridFine)
+            .SumAsync(e => e.Amount);
+        Assert.Equal(0m, fines);
+    }
+
+    /// <summary>
+    /// An ENERGY_STORAGE unit reduces shortage fine exposure similarly to BATTERY_STORAGE.
+    /// A plant that is 8 MW short without ENERGY_STORAGE should have fewer fines with it.
+    /// </summary>
+    [Fact]
+    public async Task EnergyStorageUnit_SmoothesShortageFines()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"StoreCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.5, Longitude = 16.5, Population = 20_000, AverageRentPerSqm = 6m
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Storage Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // COAL plant 18 MW base + ENERGY_STORAGE level 1 (8 MW smoothing)
+        // Consumer 20 MW: raw shortage 2 MW, but smoothing buffer of 8 MW covers it → no fine
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Store Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 18m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 20m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        var storeUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.EnergyStorage, GridX = 0, GridY = 0, Level = 1
+        };
+        db.BuildingUnits.Add(storeUnit);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // 18 MW raw + 8 MW smoothing = 26 MW effective; demand 20 MW → POWERED, surplus → no fines
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        var fines = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridFine)
+            .SumAsync(e => e.Amount);
+        Assert.Equal(0m, fines);
+    }
+
+    /// <summary>
+    /// ENERGY_PRODUCING unit adds EnergyProducingBoostMwPerLevel MW to plant output.
+    /// A plant that would be short without the unit should be surplus after adding it.
+    /// </summary>
+    [Fact]
+    public async Task EnergyProducingUnit_BoostsOutputByExpectedAmount()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"GenCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 47.8, Longitude = 17.2, Population = 15_000, AverageRentPerSqm = 5m
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Gen Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // COAL plant 10 MW base + 1×ENERGY_PRODUCING level 1 (20 MW boost) = 30 MW
+        // Consumer 25 MW: supply 30 > demand 25 → surplus
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Gen Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 10m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 25m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        var genUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.EnergyProducing, GridX = 0, GridY = 0, Level = 1
+        };
+        db.BuildingUnits.Add(genUnit);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // 10 MW base + 20 MW ENERGY_PRODUCING = 30 MW; demand 25 MW → surplus
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        var surplus = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridSurplusIncome)
+            .SumAsync(e => e.Amount);
+        Assert.True(surplus > 0m, $"ENERGY_PRODUCING should create surplus income; got {surplus}");
+    }
+
+    /// <summary>
+    /// A FUEL_PURCHASE unit adds FuelPurchaseBoostMwPerLevel MW of output capacity.
+    /// A short COAL plant with a FUEL_PURCHASE unit should cover its consumer demand.
+    /// </summary>
+    [Fact]
+    public async Task FuelPurchaseUnit_AddsOutputCapacity()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"FuelCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.2, Longitude = 16.2, Population = 20_000, AverageRentPerSqm = 7m
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Fuel Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // COAL plant 5 MW base + 1×FUEL_PURCHASE level 1 (10 MW capacity boost) = 15 MW
+        // Consumer 12 MW: supply 15 > demand 12 → surplus
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Fuel Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 5m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 12m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        var fuelUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1
+        };
+        db.BuildingUnits.Add(fuelUnit);
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // 5 MW base + 10 MW FUEL_PURCHASE = 15 MW; demand 12 MW → POWERED, surplus
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        var fines = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridFine)
+            .SumAsync(e => e.Amount);
+        Assert.Equal(0m, fines);
+    }
+
+    /// <summary>
+    /// BuildingConfigurationService should allow all 7 power plant unit types for POWER_PLANT buildings.
+    /// </summary>
+    [Fact]
+    public void BuildingConfiguration_PowerPlant_AllowsAllSevenUnitTypes()
+    {
+        var allowedTypes = BuildingConfigurationService.GetAllowedUnitTypes(BuildingType.PowerPlant);
+        Assert.Contains(UnitType.PowerGeneration, allowedTypes);
+        Assert.Contains(UnitType.BatteryStorage, allowedTypes);
+        Assert.Contains(UnitType.FuelPurchase, allowedTypes);
+        Assert.Contains(UnitType.WindTurbine, allowedTypes);
+        Assert.Contains(UnitType.WaterTurbine, allowedTypes);
+        Assert.Contains(UnitType.EnergyStorage, allowedTypes);
+        Assert.Contains(UnitType.EnergyProducing, allowedTypes);
+    }
+
+    /// <summary>
+    /// GameConstants should report correct MW stat labels for all new unit types.
+    /// </summary>
+    [Fact]
+    public void GameConstants_NewUnitTypes_HaveCorrectStatLabels()
+    {
+        Assert.Contains("MW", GameConstants.GetUnitStatLabel(UnitType.FuelPurchase));
+        Assert.Contains("MW", GameConstants.GetUnitStatLabel(UnitType.WindTurbine));
+        Assert.Contains("MW", GameConstants.GetUnitStatLabel(UnitType.WaterTurbine));
+        Assert.Contains("MW", GameConstants.GetUnitStatLabel(UnitType.EnergyStorage));
+        Assert.Contains("MW", GameConstants.GetUnitStatLabel(UnitType.EnergyProducing));
+    }
+
+    /// <summary>
+    /// GameConstants should report correct MW boosts for all new unit types.
+    /// </summary>
+    [Fact]
+    public void GameConstants_NewUnitTypes_HaveCorrectBoostValues()
+    {
+        Assert.Equal(GameConstants.FuelPurchaseBoostMwPerLevel, GameConstants.GetUnitStat(UnitType.FuelPurchase, 1));
+        Assert.Equal(GameConstants.WindTurbineBoostMwPerLevel, GameConstants.GetUnitStat(UnitType.WindTurbine, 1));
+        Assert.Equal(GameConstants.WaterTurbineBoostMwPerLevel, GameConstants.GetUnitStat(UnitType.WaterTurbine, 1));
+        Assert.Equal(GameConstants.EnergyStorageSmoothingMwPerLevel, GameConstants.GetUnitStat(UnitType.EnergyStorage, 1));
+        Assert.Equal(GameConstants.EnergyProducingBoostMwPerLevel, GameConstants.GetUnitStat(UnitType.EnergyProducing, 1));
+    }
+
+    /// <summary>
+    /// CompanyEconomyCalculator must return non-zero labor and energy costs for all new power plant unit types.
+    /// </summary>
+    [Fact]
+    public void CompanyEconomy_NewPowerUnitTypes_HaveNonZeroCosts()
+    {
+        foreach (var unitType in new[]
+        {
+            UnitType.FuelPurchase,
+            UnitType.WindTurbine,
+            UnitType.WaterTurbine,
+            UnitType.EnergyStorage,
+            UnitType.EnergyProducing,
+        })
+        {
+            var labor = CompanyEconomyCalculator.GetBaseUnitLaborHours(unitType, 1);
+            var energy = CompanyEconomyCalculator.GetBaseUnitEnergyMwh(unitType, 1);
+            Assert.True(labor > 0m, $"{unitType} should have labor hours > 0, got {labor}");
+            Assert.True(energy > 0m, $"{unitType} should have energy MWh > 0, got {energy}");
+        }
+    }
+
+    /// <summary>
+    /// Regression test for weather-scaling correctness on mixed-unit setups.
+    ///
+    /// A WIND plant at 50% wind with a WATER_TURBINE unit must NOT have the hydro output
+    /// reduced by the wind factor. The correct calculation is:
+    ///   windBase × windFactor + waterTurbineBoost (unscaled)
+    ///
+    /// Without the fix the (now-incorrect) formula would have been:
+    ///   (windBase + waterTurbineBoost) × windFactor
+    ///
+    /// Setup:
+    ///   WIND plant: base 20 MW, windFactor=0.5 → 10 MW scaled base
+    ///   WATER_TURBINE level 1: +12 MW steady (not scaled)
+    ///   Effective supply = 10 + 12 = 22 MW
+    ///   Consumer demand  = 18 MW
+    ///   Expected result  = POWERED (surplus 4 MW) → surplus income, no fines
+    ///
+    /// Under the old (buggy) logic:
+    ///   Effective supply = (20 + 12) × 0.5 = 16 MW < 18 MW demand → shortage → fine
+    /// </summary>
+    [Fact]
+    public async Task MixedUnitWeatherScaling_WaterTurbineOnWindPlant_HydroNotScaledByWind()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"MixedWind_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 49.8, Longitude = 16.8, Population = 20_000, AverageRentPerSqm = 6m
+        };
+        db.Cities.Add(city);
+
+        // Seed weather: exactly 50% wind for the current tick.
+        var gameState = await db.GameStates.FirstAsync();
+        db.CityWeatherForecasts.Add(new CityWeatherForecast
+        {
+            CityId = city.Id, Tick = gameState.CurrentTick,
+            WindPercent = 50m, SolarPercent = 60m,
+        });
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(), Name = "Mixed Wind-Hydro Corp", Cash = 1_000_000m,
+            PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow
+        };
+        db.Companies.Add(company);
+
+        // WIND plant base 20 MW: at 50% wind → 10 MW scaled base.
+        var windPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Mixed Wind Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "WIND", PowerOutput = 20m, PowerConsumption = 0m,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        // Consumer demanding 18 MW — above the 10 MW scaled base but below 22 MW with hydro.
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer Factory",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 18m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(windPlant, consumer);
+
+        // WATER_TURBINE level 1: +12 MW steady hydro (must NOT be scaled by wind factor).
+        var waterUnit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = windPlant.Id,
+            UnitType = UnitType.WaterTurbine, GridX = 0, GridY = 0, Level = 1
+        };
+        db.BuildingUnits.Add(waterUnit);
+
+        var settlementAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(
+            db, company.Id, city.CurrencyCode ?? "EUR");
+        settlementAccount.Balance = 100_000m;
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // Correct (fixed) behavior: 20×0.5 + 12 = 22 MW supply > 18 MW demand → POWERED.
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        // Also verify surplus income was earned (proves economics phase uses the same correct logic).
+        var fines = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridFine)
+            .SumAsync(e => e.Amount);
+        Assert.Equal(0m, fines);
+
+        var surplusIncome = await db.LedgerEntries
+            .Where(e => e.CompanyId == company.Id && e.Category == LedgerCategory.GridSurplusIncome)
+            .SumAsync(e => e.Amount);
+        Assert.True(surplusIncome > 0m,
+            $"Mixed wind+hydro plant should earn surplus income when WATER_TURBINE output is not wind-scaled. Got {surplusIncome}");
+    }
 }
