@@ -1064,6 +1064,18 @@ export default {
       publicSalesProductPickerHelp: 'Vyberajte len z produktov, ktoré sa do tejto predajnej jednotky dostanú cez prepojené vstupné jednotky, alebo sú tu už naskladnené.',
       publicSalesProductPickerEmpty:
         'Zatiaľ nie sú dostupné žiadne predajné produkty. Prepojte s touto jednotkou nákupný, výrobný alebo skladový reťazec, alebo ju znovu naskladnite, aby ste mohli upravovať existujúci tovar.',
+      cityAveragePriceLabel: 'Referenčná cena na trhu mesta',
+      priceTier: {
+        below: 'Pod trhom',
+        at: 'Na úrovni trhu',
+        above: 'Nad trhom',
+      },
+      priceTierHint: {
+        below: 'Cena pod priemerom mesta pritiahne viac zákazníkov a zvýši objem predaja, ale znižuje maržu na jednotku.',
+        at: 'Cena na úrovni priemeru mesta ponúka vyvážený kompromis medzi objemom predaja a maržou.',
+        above: 'Cena nad priemerom mesta znižuje dopyt, ale zvyšuje maržu na jednotku. Funguje najlepšie pri vynikajúcej kvalite alebo silnom povedomí o značke.',
+      },
+      brandMomentumHint: 'Tip pre značku: Ak je kvalita vášho produktu nad priemerom mesta, alebo ste jediným predajcom v tomto meste, predaj tu postupne buduje povedomie o značke. Nižšia kvalita ho pomaly oslabuje.',
       sourceExchange: 'Burza',
       sourceLocal: 'Lokálny',
       sourceOptimal: 'Optimálna cena',

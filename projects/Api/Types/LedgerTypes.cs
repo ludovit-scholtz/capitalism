@@ -283,6 +283,13 @@ public sealed class PublicSalesAnalytics
     public decimal? TrendFactor { get; set; }
     /// <summary>ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK").</summary>
     public string CityCurrencyCode { get; set; } = "EUR";
+    /// <summary>
+    /// City-average reference price for the product expressed in the city's local currency.
+    /// Computed as product.BasePrice × cityFxRate. Used as the minimum recommended price
+    /// and as the pricing-guidance benchmark shown in the sales unit editor.
+    /// Null when no product is configured on this unit.
+    /// </summary>
+    public decimal? CityAveragePrice { get; set; }
 }
 
 public sealed class ProfitTickSnapshot

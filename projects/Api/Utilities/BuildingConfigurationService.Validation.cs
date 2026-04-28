@@ -227,6 +227,70 @@ public static partial class BuildingConfigurationService
     }
 
     /// <summary>
+    /// Validates that every PUBLIC_SALES unit with a specified minimum price does not
+    /// set that price below the city-average floor for the product in the building's city.
+    /// The floor is defined as <c>product.BasePrice × cityFxRate</c>, consistent with the
+    /// pricing guidance shown in the editor. Submissions below the floor are rejected with
+    /// <c>PRICE_BELOW_CITY_AVERAGE</c> so the rule is enforced at the API/domain level,
+    /// not only in the browser.
+    /// </summary>
+    internal static async Task ValidatePublicSalesPriceFloorAsync(
+        AppDbContext db,
+        Guid cityId,
+        IReadOnlyCollection<BuildingConfigurationUnitInput> submittedUnits)
+    {
+        var publicSalesUnitsWithPrice = submittedUnits
+            .Where(u => u.UnitType == UnitType.PublicSales
+                        && u.ProductTypeId.HasValue
+                        && u.MinPrice.HasValue
+                        && u.MinPrice > 0m)
+            .ToList();
+
+        if (publicSalesUnitsWithPrice.Count == 0)
+            return;
+
+        // Load the city's currency code.
+        var currencyCode = await db.Cities
+            .AsNoTracking()
+            .Where(c => c.Id == cityId)
+            .Select(c => c.CurrencyCode)
+            .FirstOrDefaultAsync() ?? "EUR";
+
+        // Load all product base prices in a single query.
+        var productIds = publicSalesUnitsWithPrice
+            .Select(u => u.ProductTypeId!.Value)
+            .Distinct()
+            .ToList();
+
+        var basePrices = await db.ProductTypes
+            .AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.BasePrice);
+
+        // Resolve FX rate for this city's currency.
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode]);
+        var fxRate = FxRateHelper.GetEurRate(fxRates, currencyCode);
+
+        foreach (var unit in publicSalesUnitsWithPrice)
+        {
+            if (!basePrices.TryGetValue(unit.ProductTypeId!.Value, out var basePrice))
+                continue; // Unknown product — handled by product-access validation elsewhere.
+
+            var floor = Math.Round(basePrice * fxRate, 2);
+            if (unit.MinPrice!.Value < floor)
+            {
+                throw new GraphQLException(
+                    ErrorBuilder.New()
+                        .SetMessage(
+                            $"The minimum price ({unit.MinPrice:F2}) for this product in {currencyCode} is below the city average price ({floor:F2} {currencyCode}). " +
+                            "Set the price at or above the city market reference price.")
+                        .SetCode("PRICE_BELOW_CITY_AVERAGE")
+                        .Build());
+            }
+        }
+    }
+
+    /// <summary>
     /// Validates that no pair of units forms a contradictory bidirectional link.
     /// Per product rules, a link between two units can only flow in one direction.
     /// </summary>

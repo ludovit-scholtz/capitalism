@@ -7138,5 +7138,129 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         Assert.Equal(50m, remainingQty);
     }
 
+    // ── Passive brand awareness from public sales ──────────────────────────────
+
+    [Fact]
+    public async Task PublicSalesPhase_HigherQualitySeller_GainsBrandAwareness()
+    {
+        // When a seller's product quality is above the city average, brand awareness
+        // should increase each tick.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Small population so capacity isn't the binding constraint.
+        var city = CreatePublicSalesTestCity("PassiveBrand-HQ", 40_000);
+        db.Cities.Add(city);
+
+        // High-quality seller (quality 0.9) – above city average.
+        var (highQualityCompanyId, _, _) = AddPublicSalesSeller(
+            db, city, product, "HQ", stockQuantity: 50m, quality: 0.9m);
+
+        // Low-quality seller (quality 0.3) – below city average.
+        var (lowQualityCompanyId, _, _) = AddPublicSalesSeller(
+            db, city, product, "LQ", stockQuantity: 50m, quality: 0.3m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // High-quality seller's brand awareness should have increased.
+        var highQualityBrand = await db.Brands
+            .Where(b => b.CompanyId == highQualityCompanyId && b.ProductTypeId == product.Id)
+            .FirstOrDefaultAsync();
+        var lowQualityBrand = await db.Brands
+            .Where(b => b.CompanyId == lowQualityCompanyId && b.ProductTypeId == product.Id)
+            .FirstOrDefaultAsync();
+
+        // City avg quality ≈ (0.9 + 0.3) / 2 = 0.6. High-quality seller is above → gain.
+        Assert.NotNull(highQualityBrand);
+        Assert.True(
+            highQualityBrand.Awareness > 0m,
+            $"High-quality seller should have gained passive brand awareness. Got {highQualityBrand.Awareness}.");
+
+        // Low-quality seller is below city avg → no gain (may stay 0 or decay from 0).
+        // We only require the high-quality seller gains MORE than the low-quality seller.
+        var lowAwareness = lowQualityBrand?.Awareness ?? 0m;
+        Assert.True(
+            highQualityBrand.Awareness > lowAwareness,
+            $"Higher-quality seller should have more brand awareness than lower-quality seller. High: {highQualityBrand.Awareness}, Low: {lowAwareness}.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_LowerQualitySeller_DoesNotGainBrandAwareness()
+    {
+        // When a seller's product quality is below the city average, brand awareness
+        // should decay (not increase), so after one tick the below-avg seller loses awareness
+        // while the above-avg seller gains it.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("PassiveBrand-LQ", 40_000);
+        db.Cities.Add(city);
+
+        // Seed both sellers with initial brand awareness so we can observe decay.
+        var (highQualityCompanyId, _, _) = AddPublicSalesSeller(
+            db, city, product, "AboveAvg", stockQuantity: 50m, quality: 0.85m, brandAwareness: 0.1m);
+        var (lowQualityCompanyId, _, _) = AddPublicSalesSeller(
+            db, city, product, "BelowAvg", stockQuantity: 50m, quality: 0.15m, brandAwareness: 0.1m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var aboveAvgBrand = await db.Brands
+            .Where(b => b.CompanyId == highQualityCompanyId && b.ProductTypeId == product.Id)
+            .FirstOrDefaultAsync();
+        var belowAvgBrand = await db.Brands
+            .Where(b => b.CompanyId == lowQualityCompanyId && b.ProductTypeId == product.Id)
+            .FirstOrDefaultAsync();
+
+        // Above-average quality seller should have >= initial awareness (0.1 or higher).
+        Assert.NotNull(aboveAvgBrand);
+        Assert.True(aboveAvgBrand.Awareness >= 0.1m,
+            $"Above-avg seller awareness should not have decreased. Got {aboveAvgBrand.Awareness}.");
+
+        // Below-average quality seller should have LESS awareness than initial (0.1).
+        Assert.NotNull(belowAvgBrand);
+        Assert.True(belowAvgBrand.Awareness < 0.1m,
+            $"Below-avg seller awareness should have decayed. Expected < 0.1, got {belowAvgBrand.Awareness}.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_OnlySeller_GainsBrandAwarenessRegardlessOfQuality()
+    {
+        // When a company is the only seller of a product in the city, brand awareness
+        // should increase even if quality is not above average (there's no competition average
+        // to compare against, so the monopoly bonus applies).
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        var city = CreatePublicSalesTestCity("PassiveBrand-Only", 40_000);
+        db.Cities.Add(city);
+
+        // Single seller with moderate quality – no competition, so they get the only-seller bonus.
+        var (onlySellerCompanyId, _, _) = AddPublicSalesSeller(
+            db, city, product, "OnlySeller", stockQuantity: 50m, quality: 0.5m);
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var brand = await db.Brands
+            .Where(b => b.CompanyId == onlySellerCompanyId && b.ProductTypeId == product.Id)
+            .FirstOrDefaultAsync();
+
+        Assert.NotNull(brand);
+        Assert.True(
+            brand.Awareness > 0m,
+            $"Only seller should have gained passive brand awareness. Got {brand.Awareness}.");
+    }
+
     #endregion
 }

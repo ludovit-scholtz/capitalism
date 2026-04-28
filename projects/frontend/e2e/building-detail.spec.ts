@@ -21138,3 +21138,160 @@ test.describe('Power plant analytics panel', () => {
     await expect(analyticsPanel.getByText('Net Profit', { exact: true })).toBeVisible()
   })
 })
+
+// ── Public sales pricing guidance panel ──────────────────────────────────────
+
+test.describe('Public sales pricing guidance panel', () => {
+  function makeShopWithPublicSales({
+    productId = 'prod-chair',
+    minPrice = null as number | null,
+  } = {}) {
+    return makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-ps-guidance',
+          playerId: 'player-1',
+          name: 'Guidance Corp',
+          cash: 500_000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [
+            {
+              id: 'building-ps-guidance',
+              companyId: 'company-ps-guidance',
+              cityId: 'city-ba',
+              type: 'SALES_SHOP' as const,
+              name: 'Guidance Shop',
+              latitude: 48.15,
+              longitude: 17.11,
+              level: 1,
+              powerConsumption: 1,
+              isForSale: false,
+              builtAtUtc: '2026-01-01T00:00:00Z',
+              pendingConfiguration: null,
+              units: [
+                {
+                  id: 'u-ps-guidance',
+                  buildingId: 'building-ps-guidance',
+                  unitType: 'PUBLIC_SALES' as const,
+                  gridX: 0,
+                  gridY: 0,
+                  level: 1,
+                  linkUp: false,
+                  linkDown: false,
+                  linkLeft: false,
+                  linkRight: false,
+                  linkUpLeft: false,
+                  linkUpRight: false,
+                  linkDownLeft: false,
+                  linkDownRight: false,
+                  productTypeId: productId,
+                  minPrice: minPrice,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    })
+  }
+
+  test('pricing guidance panel is shown when product is configured and shows city reference price', async ({
+    page,
+  }) => {
+    const chair = makeChairProduct() // basePrice = 45
+    const player = makeShopWithPublicSales({ productId: chair.id, minPrice: 45 })
+    const state = setupMockApi(page, {
+      players: [player],
+      products: [chair],
+      cities: makeDefaultCities(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ps-guidance')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    // Click the PUBLIC_SALES unit cell to select it
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    const cell = planningSection.locator('.grid-cell').first()
+    await cell.click()
+
+    // Sidebar should show the pricing guidance panel
+    const guidancePanel = page.locator('.public-sales-pricing-guide')
+    await expect(guidancePanel).toBeVisible()
+
+    // Should show the city market reference price label
+    await expect(guidancePanel.getByText('City market reference price', { exact: true })).toBeVisible()
+  })
+
+  test('pricing tier badge shows "At market" when price matches city average', async ({ page }) => {
+    const chair = makeChairProduct() // basePrice = 45; EUR city → cityAvg = 45
+    const player = makeShopWithPublicSales({ productId: chair.id, minPrice: 45 })
+    const state = setupMockApi(page, {
+      players: [player],
+      products: [chair],
+      cities: makeDefaultCities(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ps-guidance')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    const cell = planningSection.locator('.grid-cell').first()
+    await cell.click()
+
+    const guidancePanel = page.locator('.public-sales-pricing-guide')
+    await expect(guidancePanel).toBeVisible()
+
+    // For price = 45 and cityAvg = 45 (EUR city, basePrice = 45) → "At market"
+    await expect(guidancePanel.locator('.pricing-tier-badge--at')).toBeVisible()
+    await expect(guidancePanel.getByText('At market', { exact: true })).toBeVisible()
+  })
+
+  test('brand momentum hint is shown in pricing guidance panel', async ({ page }) => {
+    const chair = makeChairProduct()
+    const player = makeShopWithPublicSales({ productId: chair.id, minPrice: 45 })
+    const state = setupMockApi(page, {
+      players: [player],
+      products: [chair],
+      cities: makeDefaultCities(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-ps-guidance')
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+
+    const planningSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await planningSection.locator('.grid-cell').first().click()
+
+    // Brand momentum hint should mention brand awareness
+    const guidancePanel = page.locator('.public-sales-pricing-guide')
+    await expect(guidancePanel.locator('.pricing-guide-brand-hint')).toBeVisible()
+    await expect(guidancePanel.locator('.pricing-guide-brand-hint')).toContainText(/brand/i)
+  })
+})

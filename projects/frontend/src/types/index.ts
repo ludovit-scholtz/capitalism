@@ -945,6 +945,12 @@ export interface PublicSalesAnalytics {
   trendFactor: number | null
   /** ISO 4217 currency code for the city where this unit is located (e.g. "EUR", "CZK"). */
   cityCurrencyCode: string
+  /**
+   * City-average reference price for the product in the city's local currency (basePrice × fxRate).
+   * Used as the minimum recommended price and the pricing-guidance benchmark.
+   * Null when no product is configured on this unit.
+   */
+  cityAveragePrice: number | null
 }
 
 export interface SalesTickSnapshot {

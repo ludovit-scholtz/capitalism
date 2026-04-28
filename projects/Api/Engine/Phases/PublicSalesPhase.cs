@@ -366,6 +366,39 @@ public sealed class PublicSalesPhase : ITickPhase
 
             trendState.TrendFactor = updatedTrendFactor;
             trendState.LastUpdatedTick = context.CurrentTick;
+
+            // ── Passive brand awareness from public sales ────────────────────────
+            // Each company selling in this city receives a small brand awareness
+            // gain or decay depending on how their product quality compares to
+            // the city average quality for this product.
+            // - Quality > city average OR only seller → small awareness gain
+            // - Quality < city average → small awareness decay
+            // This incentivises R&D investment and rewards market leadership
+            // without requiring dedicated marketing spend.
+            var sellersInGroup = groupList.Count;
+            var cityAvgQuality = groupList.Sum(o => o.CurrentStock) > 0m
+                ? groupList.Sum(o => o.Inventory.Quality * o.CurrentStock) / groupList.Sum(o => o.CurrentStock)
+                : groupList.Average(o => o.Inventory.Quality);
+
+            foreach (var offer in groupList)
+            {
+                if (offer.Inventory.ProductTypeId is null || offer.Industry is null)
+                    continue;
+
+                var brand = context.FindBrand(offer.Building.CompanyId, offer.Inventory.ProductTypeId, offer.Industry)
+                    ?? context.GetOrCreateBrand(offer.Building.CompanyId, offer.Inventory.ProductTypeId.Value,
+                        offer.ProductName ?? offer.Industry);
+
+                var quality = offer.Inventory.Quality;
+                if (sellersInGroup == 1 || quality > cityAvgQuality)
+                {
+                    brand.Awareness = Math.Clamp(brand.Awareness + GameConstants.PassiveBrandAwarenessGainRate, 0m, 1m);
+                }
+                else if (quality < cityAvgQuality)
+                {
+                    brand.Awareness = Math.Clamp(brand.Awareness - GameConstants.PassiveBrandAwarenessDecayRate, 0m, 1m);
+                }
+            }
         }
     }
 
