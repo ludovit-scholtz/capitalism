@@ -6,6 +6,8 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { gqlRequest } from '@/lib/graphql'
 import { formatInGameTime, formatGameTickTime } from '@/lib/gameTime'
+import { formatMoney } from '@/lib/currencyFormat'
+import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
 import type { CompanyLedgerSummary, LedgerEntryResult } from '@/types'
 
 const { t, locale } = useI18n()
@@ -109,12 +111,7 @@ async function selectGameYear(gameYear: number | null) {
 function formatAmount(amount: number, currencyCode?: string): string {
   const code = getEffectiveCurrencyCode(currencyCode)
   if (amount == null || !isFinite(amount) || isNaN(amount)) return '—'
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: code,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount)
+  return formatMoney(amount, code, locale.value)
 }
 
 function getEffectiveCurrencyCode(currencyCode?: string | null): string {
@@ -178,23 +175,33 @@ useTickRefresh(async () => {
         </div>
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.cash') }}</span>
-          <span class="kpi-value" :class="amountClass(ledger.currentCash)">{{ formatAmount(ledger.currentCash) }}</span>
+          <span class="kpi-value" :class="amountClass(ledger.currentCash)">
+            <CurrencyAmount :amount="ledger.currentCash" :currency="ledger.primaryCurrencyCode" />
+          </span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.netIncome') }}</span>
-          <span class="kpi-value" :class="amountClass(ledger.netIncome)">{{ formatAmount(ledger.netIncome) }}</span>
+          <span class="kpi-value" :class="amountClass(ledger.netIncome)">
+            <CurrencyAmount :amount="ledger.netIncome" :currency="ledger.primaryCurrencyCode" />
+          </span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.taxableIncome') }}</span>
-          <span class="kpi-value" :class="amountClass(ledger.taxableIncome)">{{ formatAmount(ledger.taxableIncome) }}</span>
+          <span class="kpi-value" :class="amountClass(ledger.taxableIncome)">
+            <CurrencyAmount :amount="ledger.taxableIncome" :currency="ledger.primaryCurrencyCode" />
+          </span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.estimatedIncomeTax') }}</span>
-          <span class="kpi-value amount-negative">{{ formatAmount(-ledger.estimatedIncomeTax) }}</span>
+          <span class="kpi-value amount-negative">
+            <CurrencyAmount :amount="-ledger.estimatedIncomeTax" :currency="ledger.primaryCurrencyCode" />
+          </span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.totalAssets') }}</span>
-          <span class="kpi-value">{{ formatAmount(ledger.totalAssets) }}</span>
+          <span class="kpi-value">
+            <CurrencyAmount :amount="ledger.totalAssets" :currency="ledger.primaryCurrencyCode" />
+          </span>
         </div>
         <div class="kpi-card">
           <span class="kpi-label">{{ t('ledger.currency') }}</span>
@@ -243,7 +250,9 @@ useTickRefresh(async () => {
               @click="selectGameYear(yearItem.isCurrentGameYear ? null : yearItem.gameYear)"
             >
               <span>{{ t('ledger.gameYearShort', { year: yearItem.gameYear }) }}</span>
-              <span :class="amountClass(yearItem.netIncome)">{{ formatAmount(yearItem.netIncome) }}</span>
+              <span :class="amountClass(yearItem.netIncome)">
+                <CurrencyAmount :amount="yearItem.netIncome" :currency="ledger.primaryCurrencyCode" />
+              </span>
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { RouterLink } from 'vue-router'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useTickRefresh } from '@/composables/useTickRefresh'
+import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
 import type { PersonAccount } from '@/types/index'
 
 const PERSONAL_STOCK_SALE_TAX_RATE = 0.15
@@ -89,14 +90,6 @@ async function loadData(isRefresh = false) {
   }
 }
 
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: 'EUR',
-    maximumFractionDigits: 2,
-  }).format(value)
-}
-
 function formatShares(value: number): string {
   return new Intl.NumberFormat(locale.value, {
     minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
@@ -150,25 +143,33 @@ useTickRefresh(() => loadData(true))
           <div class="wealth-grid">
             <article class="wealth-card wealth-card--primary">
               <span class="wealth-label">{{ t('personalLedger.netWealth') }}</span>
-              <strong class="wealth-amount wealth-amount--hero">{{ formatCurrency(personAccount.totalNetWealth) }}</strong>
+              <strong class="wealth-amount wealth-amount--hero">
+                <CurrencyAmount :amount="personAccount.totalNetWealth" currency="EUR" />
+              </strong>
               <span class="wealth-desc">{{ t('personalLedger.netWealthDesc') }}</span>
             </article>
 
             <article class="wealth-card">
               <span class="wealth-label">{{ t('personalLedger.availableCash') }}</span>
-              <strong class="wealth-amount">{{ formatCurrency(personAccount.availableCash) }}</strong>
+              <strong class="wealth-amount">
+                <CurrencyAmount :amount="personAccount.availableCash" currency="EUR" />
+              </strong>
               <span class="wealth-desc">{{ t('personalLedger.availableCashDesc') }}</span>
             </article>
 
             <article class="wealth-card" :class="{ 'wealth-card--blocked': personAccount.taxReserve > 0 }">
               <span class="wealth-label">{{ t('personalLedger.taxReserve') }}</span>
-              <strong class="wealth-amount wealth-amount--blocked">{{ formatCurrency(personAccount.taxReserve) }}</strong>
+              <strong class="wealth-amount wealth-amount--blocked">
+                <CurrencyAmount :amount="personAccount.taxReserve" currency="EUR" />
+              </strong>
               <span class="wealth-desc">{{ t('personalLedger.taxReserveDesc') }}</span>
             </article>
 
             <article class="wealth-card">
               <span class="wealth-label">{{ t('personalLedger.portfolioValue') }}</span>
-              <strong class="wealth-amount">{{ formatCurrency(portfolioValue) }}</strong>
+              <strong class="wealth-amount">
+                <CurrencyAmount :amount="portfolioValue" currency="EUR" />
+              </strong>
               <span class="wealth-desc">{{ t('personalLedger.portfolioValueDesc') }}</span>
             </article>
           </div>
@@ -186,7 +187,7 @@ useTickRefresh(() => loadData(true))
               <p>{{ t('personalLedger.taxHistoryDesc') }}</p>
             </div>
             <span v-if="personAccount.taxReserve > 0" class="reserve-badge">
-              {{ t('personalLedger.totalReserved') }}: <strong>{{ formatCurrency(personAccount.taxReserve) }}</strong>
+              {{ t('personalLedger.totalReserved') }}: <strong><CurrencyAmount :amount="personAccount.taxReserve" currency="EUR" /></strong>
             </span>
           </div>
 
@@ -209,9 +210,9 @@ useTickRefresh(() => loadData(true))
                 <tr v-for="trade in sellTrades" :key="trade.id">
                   <td>{{ trade.companyName }}</td>
                   <td class="num-cell">{{ formatShares(trade.shareCount) }}</td>
-                  <td class="num-cell">{{ formatCurrency(trade.pricePerShare) }}</td>
-                  <td class="num-cell">{{ formatCurrency(trade.totalValue) }}</td>
-                  <td class="num-cell tax-cell">{{ formatCurrency(trade.totalValue * PERSONAL_STOCK_SALE_TAX_RATE) }}</td>
+                  <td class="num-cell"><CurrencyAmount :amount="trade.pricePerShare" currency="EUR" /></td>
+                  <td class="num-cell"><CurrencyAmount :amount="trade.totalValue" currency="EUR" /></td>
+                  <td class="num-cell tax-cell"><CurrencyAmount :amount="trade.totalValue * PERSONAL_STOCK_SALE_TAX_RATE" currency="EUR" /></td>
                   <td>{{ formatDateTime(trade.recordedAtUtc) }}</td>
                 </tr>
               </tbody>
@@ -255,8 +256,8 @@ useTickRefresh(() => loadData(true))
                     </span>
                   </td>
                   <td class="num-cell">{{ formatShares(trade.shareCount) }}</td>
-                  <td class="num-cell">{{ formatCurrency(trade.pricePerShare) }}</td>
-                  <td class="num-cell">{{ formatCurrency(trade.totalValue) }}</td>
+                  <td class="num-cell"><CurrencyAmount :amount="trade.pricePerShare" currency="EUR" /></td>
+                  <td class="num-cell"><CurrencyAmount :amount="trade.totalValue" currency="EUR" /></td>
                   <td>{{ formatDateTime(trade.recordedAtUtc) }}</td>
                 </tr>
               </tbody>
@@ -293,8 +294,8 @@ useTickRefresh(() => loadData(true))
                   <td>{{ div.companyName }}</td>
                   <td>{{ div.gameYear }}</td>
                   <td class="num-cell">{{ formatShares(div.shareCount) }}</td>
-                  <td class="num-cell">{{ formatCurrency(div.amountPerShare) }}</td>
-                  <td class="num-cell">{{ formatCurrency(div.totalAmount) }}</td>
+                  <td class="num-cell"><CurrencyAmount :amount="div.amountPerShare" currency="EUR" /></td>
+                  <td class="num-cell"><CurrencyAmount :amount="div.totalAmount" currency="EUR" /></td>
                   <td>{{ formatDateTime(div.recordedAtUtc) }}</td>
                 </tr>
               </tbody>

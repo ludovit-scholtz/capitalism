@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatMoney } from '@/lib/currencyFormat'
 import type { PlayerBankAccountSummary } from '@/types'
 
 interface Props {
@@ -22,20 +23,17 @@ const props = withDefaults(defineProps<Props>(), {
 })
 const emit = defineEmits<Emits>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const selectedAccount = computed<PlayerBankAccountSummary | null>(() => props.accounts.find((a) => a.id === props.modelValue) ?? null)
 
-function formatAmount(val: number): string {
-  return new Intl.NumberFormat('en', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(val)
+function formatAmount(val: number, currencyCode: string): string {
+  return formatMoney(val, currencyCode, locale.value)
 }
 
 function accountLabel(a: PlayerBankAccountSummary): string {
   const last4 = a.accountNumber.slice(-4)
-  return `${a.ownerDisplayName} — ${a.currencySymbol}${formatAmount(a.balance)} (${a.currencyCode}) #${last4}`
+  return `${a.ownerDisplayName} — ${formatAmount(a.balance, a.currencyCode)} (${a.currencyCode}) #${last4}`
 }
 
 function onSelect(event: Event) {
@@ -68,7 +66,10 @@ function onSelect(event: Event) {
     </div>
     <div v-if="selectedAccount" class="balance-display inline-flex items-baseline gap-1.5 flex-wrap px-2 py-1 bg-card-raised border border-divider rounded-md w-fit" aria-live="polite">
       <span class="font-bold text-brand text-sm">{{ selectedAccount.currencySymbol }}</span>
-      <span class="font-bold text-body text-sm">{{ formatAmount(selectedAccount.balance) }}</span>
+      <span
+        class="font-bold text-body text-sm"
+        :title="`${formatAmount(selectedAccount.balance, selectedAccount.currencyCode)} ${selectedAccount.currencyCode}`"
+      >{{ formatAmount(selectedAccount.balance, selectedAccount.currencyCode) }}</span>
       <span class="text-xs text-muted font-medium">{{ selectedAccount.currencyCode }}</span>
       <span class="text-xs text-muted ml-1">{{ selectedAccount.ownerDisplayName }}</span>
     </div>

@@ -83,6 +83,29 @@ export function formatMoney(
 }
 
 /**
+ * Returns the full precision formatted string for use in a tooltip/title attribute.
+ * Always uses full notation (never compact) and appends the ISO 4217 currency code.
+ *
+ * @example
+ *   formatCurrencyTitle(1_234_567, 'EUR', 'en')  // "€1,234,567 EUR"
+ *   formatCurrencyTitle(25.42, 'CZK', 'de')       // "25,42 CZK CZK"  (Intl appends code for CZK)
+ */
+export function formatCurrencyTitle(amount: number, currencyCode = 'EUR', locale = 'en'): string {
+  if (!isFinite(amount) || isNaN(amount)) return `— ${currencyCode}`
+  const intlLocale = resolveLocale(locale)
+  const fractionDigits = Number.isInteger(amount) ? 0 : 2
+  const formatted = new Intl.NumberFormat(intlLocale, {
+    style: 'currency',
+    currency: currencyCode,
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(amount)
+  // Only append code when Intl did not already embed it (e.g. EUR → "€…", but CZK → "CZK …")
+  const codeAlreadyPresent = formatted.includes(currencyCode)
+  return codeAlreadyPresent ? formatted : `${formatted} ${currencyCode}`
+}
+
+/**
  * Formats a plain number with thousands/decimal separators for the given locale.
  * No currency symbol. Useful for share counts, percentages, etc.
  *

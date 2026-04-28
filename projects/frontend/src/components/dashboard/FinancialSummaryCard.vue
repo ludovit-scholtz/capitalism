@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
 import type { CompanyLedgerSummary } from '@/types'
 
 interface Props {
@@ -9,7 +10,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const totalCosts = computed(() => {
   if (!props.ledger) return 0
@@ -30,27 +31,7 @@ const netProfit = computed(() => {
   return props.ledger.netIncome ?? 0
 })
 
-function formatAmount(value: number): string {
-  if (!isFinite(value) || isNaN(value)) return '—'
-  const code = props.ledger?.primaryCurrencyCode ?? 'EUR'
-  const sign = value < 0 ? '-' : value > 0 ? '+' : ''
-  const formatted = new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: code,
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value))
-  return `${sign}${formatted}`
-}
-
-function formatAmountPlain(value: number): string {
-  if (!isFinite(value) || isNaN(value)) return '—'
-  const code = props.ledger?.primaryCurrencyCode ?? 'EUR'
-  return new Intl.NumberFormat(locale.value, {
-    style: 'currency',
-    currency: code,
-    maximumFractionDigits: 0,
-  }).format(Math.abs(value))
-}
+const currencyCode = computed(() => props.ledger?.primaryCurrencyCode ?? 'EUR')
 
 function profitClass(value: number): string {
   if (value > 0) return 'amount-positive'
@@ -84,15 +65,21 @@ function profitClass(value: number): string {
     <div v-else class="financial-summary-metrics">
       <div class="metric">
         <span class="metric-label">{{ t('financialSummary.revenue') }}</span>
-        <span class="metric-value amount-positive">{{ formatAmountPlain(ledger.totalRevenue) }}</span>
+        <span class="metric-value amount-positive">
+          <CurrencyAmount :amount="ledger.totalRevenue" :currency="currencyCode" />
+        </span>
       </div>
       <div class="metric">
         <span class="metric-label">{{ t('financialSummary.costs') }}</span>
-        <span class="metric-value amount-negative">{{ formatAmountPlain(totalCosts) }}</span>
+        <span class="metric-value amount-negative">
+          <CurrencyAmount :amount="totalCosts" :currency="currencyCode" />
+        </span>
       </div>
       <div class="metric metric--profit">
         <span class="metric-label">{{ t('financialSummary.netProfit') }}</span>
-        <span class="metric-value" :class="profitClass(netProfit)">{{ formatAmount(netProfit) }}</span>
+        <span class="metric-value" :class="profitClass(netProfit)">
+          <CurrencyAmount :amount="netProfit" :currency="currencyCode" :sign="true" />
+        </span>
       </div>
     </div>
     <RouterLink v-if="ledger" :to="`/ledger/${ledger.companyId}`" class="financial-summary-link">

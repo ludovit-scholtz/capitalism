@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
 import { getOverheadStatus } from '@/lib/companyOverhead'
-import { formatMoney } from '@/lib/currencyFormat'
+import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
 import type { CompanySettings } from '@/types'
 
 const { t, locale } = useI18n()
@@ -113,10 +113,6 @@ async function saveSettings() {
   }
 }
 
-function formatCurrency(value: number): string {
-  return formatMoney(value, settings.value?.currencyCode ?? 'EUR', locale.value)
-}
-
 function formatPercent(value: number): string {
   return `${(value * 100).toFixed(1)}%`
 }
@@ -159,11 +155,11 @@ onMounted(loadSettings)
         <div class="overview-grid">
           <div>
             <span class="overview-label">{{ t('companySettings.assetValue') }}</span>
-            <strong>{{ formatCurrency(settings.assetValue) }}</strong>
+            <strong><CurrencyAmount :amount="settings.assetValue" :currency="settings.currencyCode" /></strong>
           </div>
           <div>
             <span class="overview-label">{{ t('companySettings.cash') }}</span>
-            <strong>{{ formatCurrency(settings.cash) }}</strong>
+            <strong><CurrencyAmount :amount="settings.cash" :currency="settings.currencyCode" /></strong>
           </div>
           <div>
             <span class="overview-label">{{ t('companySettings.foundedTick') }}</span>
@@ -227,7 +223,7 @@ onMounted(loadSettings)
             <tbody>
               <tr v-for="entry in settings.citySalarySettings" :key="entry.cityId">
                 <td>{{ entry.cityName }}</td>
-                <td>{{ formatCurrency(entry.baseSalaryPerManhour) }}</td>
+                <td><CurrencyAmount :amount="entry.baseSalaryPerManhour" :currency="settings.currencyCode" /></td>
                 <td>
                   <input
                     v-model.number="salaryMultipliers[entry.cityId]"
@@ -240,7 +236,7 @@ onMounted(loadSettings)
                   />
                 </td>
                 <td>
-                  {{ formatCurrency(entry.baseSalaryPerManhour * (salaryMultipliers[entry.cityId] ?? entry.salaryMultiplier)) }}
+                  <CurrencyAmount :amount="entry.baseSalaryPerManhour * (salaryMultipliers[entry.cityId] ?? entry.salaryMultiplier)" :currency="settings.currencyCode" />
                 </td>
               </tr>
             </tbody>
