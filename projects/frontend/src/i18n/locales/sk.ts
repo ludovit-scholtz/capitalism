@@ -738,6 +738,7 @@ export default {
     fundingGapShortfall: 'Rozdiel',
     fundingGapGoToForex: '💱 Prejsť na Forex',
     fundingGapViewStatement: '🏦 Zobraziť výpis',
+    resourceDepositPremium: 'Prémia za ložisko surovín',
   },
   buildingDetail: {
     title: 'Detaily budovy',

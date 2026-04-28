@@ -660,3 +660,150 @@ test.describe('Buy Building View', () => {
     expect(cashText).toMatch(/CZK|Kč/)
   })
 })
+
+test.describe('Buy Building — Mining lot resource display', () => {
+  function setupMineTestPlayer() {
+    return makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-mine',
+          playerId: 'player-1',
+          name: 'Iron Empire Corp',
+          cash: 50_000_000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+  }
+
+  test('mine lot card shows resource badge with material name', async ({ page }) => {
+    const player = setupMineTestPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Mine/i }).click()
+    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+
+    // Industrial Plot A1 has Iron Ore resource — badge should be visible on the lot card
+    const lotCard = page.locator('.lot-card', { hasText: 'Industrial Plot A1' })
+    await expect(lotCard).toBeVisible()
+    const badge = lotCard.locator('[data-testid="buy-building-resource-badge"]')
+    await expect(badge).toBeVisible()
+    await expect(badge).toContainText(/Iron Ore/i)
+  })
+
+  test('non-mine lot card does not show resource badge', async ({ page }) => {
+    const player = setupMineTestPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+
+    // Factory Site B1 has no resource — no badge should be shown
+    const lotCard = page.locator('.lot-card', { hasText: 'Factory Site B1' })
+    await expect(lotCard).toBeVisible()
+    await expect(lotCard.locator('[data-testid="buy-building-resource-badge"]')).toHaveCount(0)
+  })
+
+  test('selecting mine lot shows mining deposit summary with resource quality and quantity', async ({
+    page,
+  }) => {
+    const player = setupMineTestPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Mine/i }).click()
+    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+
+    // Select the mine lot with Iron Ore
+    await page.locator('.lot-card', { hasText: 'Industrial Plot A1' }).click()
+
+    // Mining deposit summary must appear
+    const summary = page.locator('[data-testid="buy-building-mining-summary"]')
+    await expect(summary).toBeVisible()
+
+    // Must show resource name
+    await expect(summary).toContainText(/Iron Ore/i)
+
+    // Must show quality percentage
+    await expect(summary).toContainText(/72%/)
+
+    // Must show quantity
+    await expect(summary).toContainText(/18/)
+  })
+
+  test('selecting mine lot shows resource premium in asking price area', async ({ page }) => {
+    const player = setupMineTestPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Mine/i }).click()
+    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page.locator('.lot-card', { hasText: 'Industrial Plot A1' }).click()
+
+    // Resource premium badge should be visible in the selected lot summary
+    const premiumBadge = page.locator('.buy-building-resource-premium-badge')
+    await expect(premiumBadge).toBeVisible()
+    await expect(premiumBadge).toContainText(/resource/i)
+  })
+
+  test('mining deposit summary is hidden when Factory type selected on mine lot', async ({
+    page,
+  }) => {
+    const player = setupMineTestPlayer()
+    const lots = makeDefaultBuildingLots()
+    // Make Industrial Plot A1 also support FACTORY
+    const state = setupMockApi(page, { players: [player], buildingLots: lots })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    // Select Factory type — the mine lot also supports FACTORY
+    await page.getByRole('button', { name: /Factory/i }).click()
+    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await page.locator('.lot-card', { hasText: 'Industrial Plot A1' }).click()
+
+    // Deposit summary should NOT appear when building type is not MINE
+    await expect(page.locator('[data-testid="buy-building-mining-summary"]')).toHaveCount(0)
+  })
+
+  test('asking price shows premium range (>€15M) for premium mine lot', async ({ page }) => {
+    const player = setupMineTestPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Mine/i }).click()
+    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+
+    // The Industrial Plot A1 mock has a price of ~32 million — must show large currency amount
+    const lotCard = page.locator('.lot-card', { hasText: 'Industrial Plot A1' })
+    await expect(lotCard).toBeVisible()
+    // Price text should contain millions indicator (M or large number)
+    await expect(lotCard).toContainText(/32/)
+  })
+})

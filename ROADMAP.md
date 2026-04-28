@@ -93,9 +93,17 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] When person goes to buy building menu, and selects the Media house, and purchase a property for it, he gets the error "A valid mediaType (NEWSPAPER, RADIO, TV) is required for media house buildings. Received: ''."
 
-### Mining (40% complete)
+### Mining (80% complete)
 
-- [ ] When person goes to buy building and selects the mining, make sure to show in the property which resource it contains.
+**Shipped in this increment:**
+- ✅ Mining property purchase UI in BuyBuildingView now shows the raw material present on each relevant land, with resource type badge on lot cards.
+- ✅ Resource quality and quantity are displayed in a Mining Deposit Investment Summary panel when a mine lot is selected and MINE building type is chosen.
+- ✅ Pricing breakdown shows base land value plus resource deposit premium, with a "+ resource" badge when price exceeds appraised land value.
+- ✅ Mining land purchase prices scale to $20M–$200M equivalent range, driven by deposit quality, quantity, and global market value — verified by backend tests.
+- ✅ Invalid mine placement (MINE on a lot without a resource deposit) is now blocked with `MINE_REQUIRES_RESOURCE_DEPOSIT` error code.
+- ✅ Displayed local-currency prices match backend calculations and GraphQL/API responses.
+- ✅ Backend and E2E tests cover resource display, pricing thresholds, and invalid-placement rules.
+
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
 ### R&D Building (0% complete)

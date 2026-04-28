@@ -32903,4 +32903,167 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         return Guid.Parse(result.GetProperty("data").GetProperty("me").GetProperty("id").GetString()!);
     }
 
+    [Fact]
+    public async Task PurchaseLot_Mine_OnLotWithoutResource_ReturnsError()
+    {
+        // AC: Invalid land/resource combinations must be blocked.
+        // Placing a MINE on a lot that has MINE in SuitableTypes but no ResourceTypeId
+        // must return MINE_REQUIRES_RESOURCE_DEPOSIT error.
+        await using var isolated = new ApiWebApplicationFactory();
+        using var isolatedClient = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, $"mine-norc-{Guid.NewGuid():N}@test.com");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}",
+            new { i = new { name = "No Resource Mine Co" } }, token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+
+        var bratislavaId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
+
+        // Create a MINE-suitable lot explicitly WITHOUT a resource deposit
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lot = new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = Guid.Parse(bratislavaId),
+            Name = "Barren Lot",
+            Description = "A lot with no raw material deposit.",
+            District = "Industrial Zone",
+            Latitude = 48.17,
+            Longitude = 17.13,
+            Price = 75_000m,
+            SuitableTypes = "MINE",
+            ConcurrencyToken = Guid.NewGuid(),
+            ResourceTypeId = null, // explicitly no resource
+        };
+        db.BuildingLots.Add(lot);
+        await db.SaveChangesAsync();
+
+        // Ensure company has enough funds
+        var fundingAccount = await db.BankAccounts
+            .FirstOrDefaultAsync(a => a.OwnerType == "COMPANY" && a.CompanyId == Guid.Parse(companyId!));
+        if (fundingAccount is null)
+        {
+            fundingAccount = new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = "9999999999999999",
+                CurrencyCode = "EUR",
+                OwnerType = "COMPANY",
+                CompanyId = Guid.Parse(companyId!),
+                Balance = 10_000_000m,
+            };
+            db.BankAccounts.Add(fundingAccount);
+        }
+        else
+        {
+            fundingAccount.Balance = 10_000_000m;
+        }
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                lot { id }
+              }
+            }
+            """,
+            new { input = new { companyId = Guid.Parse(companyId!), lotId = lot.Id, buildingType = "MINE", buildingName = "Barren Mine" } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            "Placing MINE on a lot with no resource deposit must return an error");
+        var errorCode = errors.EnumerateArray()
+            .Select(e => e.GetProperty("extensions").GetProperty("code").GetString())
+            .FirstOrDefault();
+        Assert.Equal("MINE_REQUIRES_RESOURCE_DEPOSIT", errorCode,
+            "Error code must be MINE_REQUIRES_RESOURCE_DEPOSIT when MINE lot has no resource");
+    }
+
+    [Fact]
+    public async Task PurchaseLot_Mine_OnSeededMineLot_Succeeds()
+    {
+        // AC: A MINE building must succeed on a seeded mine lot that has a resource deposit.
+        // This validates the happy-path purchase flow for the mining investment feature.
+        await using var isolated = new ApiWebApplicationFactory();
+        using var isolatedClient = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, $"mine-ok-{Guid.NewGuid():N}@test.com");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}",
+            new { i = new { name = "Iron Empire Corp" } }, token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+
+        var bratislavaId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
+
+        // Find a seeded mine lot with a resource deposit
+        var lotsResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id suitableTypes resourceType { id name }
+                price
+              }
+            }
+            """,
+            new { cityId = bratislavaId });
+
+        var mineLot = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
+            .FirstOrDefault(l =>
+                l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
+                && l.GetProperty("resourceType").ValueKind != JsonValueKind.Null);
+
+        Assert.NotEqual(default, mineLot);
+        var lotId = mineLot.GetProperty("id").GetString();
+        var lotPrice = mineLot.GetProperty("price").GetDecimal();
+
+        // Ensure company has enough EUR to buy the mine lot
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var fundingAccount = await db.BankAccounts
+            .FirstOrDefaultAsync(a => a.OwnerType == "COMPANY" && a.CompanyId == Guid.Parse(companyId!));
+        if (fundingAccount is null)
+        {
+            fundingAccount = new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                AccountNumber = "8888888888888888",
+                CurrencyCode = "EUR",
+                OwnerType = "COMPANY",
+                CompanyId = Guid.Parse(companyId!),
+                Balance = 500_000_000m, // plenty for a $20M–$200M premium mine
+            };
+            db.BankAccounts.Add(fundingAccount);
+        }
+        else
+        {
+            fundingAccount.Balance = 500_000_000m;
+        }
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            mutation PurchaseLot($input: PurchaseLotInput!) {
+              purchaseLot(input: $input) {
+                lot { id }
+                building { id type }
+              }
+            }
+            """,
+            new { input = new { companyId = Guid.Parse(companyId!), lotId = Guid.Parse(lotId!), buildingType = "MINE", buildingName = "Iron Vein #1" } },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "purchaseLot for a MINE on a seeded resource lot must succeed");
+        var building = result.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+        Assert.Equal("MINE", building.GetProperty("type").GetString());
+    }
+
 }
