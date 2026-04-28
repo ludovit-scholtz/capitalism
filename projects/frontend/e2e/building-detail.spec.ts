@@ -2051,7 +2051,7 @@ test.describe('Building detail upgrades', () => {
     await expect(getGridCell(plannedSection, 1, 0)).toContainText('Scope: Category')
   })
 
-  test('R&D product picker shows used products first with "Used by your company" section', async ({ page }) => {
+  test('R&D product picker shows used products first with "Currently Producing" section', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
       id: 'company-rd-prio',
@@ -2147,25 +2147,25 @@ test.describe('Building detail upgrades', () => {
     const researchProductField = page.locator('.config-field').filter({ has: page.getByText('Research Product') })
     await researchProductField.locator('.picker-trigger').click()
 
-    // The "Used by your company" section header should be visible
+    // The "Currently Producing" section header should be visible (R&D rdContext mode)
     await expect(
       page.locator('.product-picker-panel .picker-section-header', {
-        hasText: 'Used by your company',
+        hasText: 'Currently Producing',
       }),
     ).toBeVisible()
 
-    // Wooden Chair (manufactured in the factory) should have a "Used by company" badge
+    // Wooden Chair (manufactured in the factory) should have a "Producing" badge
     const woodenChairItem = page.locator('.product-picker-panel .picker-item').filter({ has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }) })
     await expect(woodenChairItem).toBeVisible()
-    await expect(woodenChairItem.locator('.picker-item-badge')).toContainText('Used by company')
+    await expect(woodenChairItem.locator('.picker-item-badge')).toContainText('Producing')
 
     // The "All products" (catalog) section should also be present with remaining products
     await expect(page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' })).toBeVisible()
 
-    // The first item in the list should be the "Used by your company" section header
+    // The first item in the list should be the "Currently Producing" section header
     // (confirming used products appear before the catalog section)
     const firstHeader = page.locator('.product-picker-panel .picker-section-header').first()
-    await expect(firstHeader).toContainText('Used by your company')
+    await expect(firstHeader).toContainText('Currently Producing')
   })
 
   test('factory purchase selector shows raw materials and only intermediate products', async ({ page }) => {

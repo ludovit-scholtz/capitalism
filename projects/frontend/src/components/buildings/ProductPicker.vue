@@ -21,6 +21,12 @@ const props = defineProps<{
   helpTextKey?: string
   /** Optional empty-state override for context-aware pickers. */
   emptyStateKey?: string
+  /**
+   * When true, the picker is used in an R&D context (PRODUCT_QUALITY or BRAND_QUALITY unit).
+   * This changes the "used by company" section header label and styling to emphasise
+   * "Currently Producing" so players can focus research on their active production lines.
+   */
+  rdContext?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -124,13 +130,14 @@ function select(id: string | null) {
 
 function rankingReasonLabel(reason: string): string {
   if (reason === 'connected') return t('productPicker.reasonConnected')
-  if (reason === 'used_by_company') return t('productPicker.reasonUsedByCompany')
+  if (reason === 'used_by_company')
+    return props.rdContext ? t('productPicker.reasonActiveProduction') : t('productPicker.reasonUsedByCompany')
   return ''
 }
 
 function rankingReasonClass(reason: string): string {
   if (reason === 'connected') return 'badge-connected'
-  if (reason === 'used_by_company') return 'badge-used'
+  if (reason === 'used_by_company') return props.rdContext ? 'badge-active-production' : 'badge-used'
   return ''
 }
 
@@ -331,7 +338,13 @@ watch(
 
           <!-- Used-by-company products section -->
           <template v-if="groupedProducts.usedByCompany.length > 0">
-            <div class="picker-section-header">{{ t('productPicker.sectionUsedByCompany') }}</div>
+            <div
+              class="picker-section-header"
+              :class="{ 'picker-section-header--rd': rdContext }"
+            >
+              <span v-if="rdContext" class="picker-section-icon" aria-hidden="true">🏭</span>
+              {{ rdContext ? t('productPicker.sectionActiveProductLines') : t('productPicker.sectionUsedByCompany') }}
+            </div>
             <div
               v-for="r in groupedProducts.usedByCompany"
               :key="r.productType.id"
@@ -594,6 +607,20 @@ watch(
   border-top: 1px solid var(--color-border, #e5e7eb);
   position: sticky;
   top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.picker-section-header--rd {
+  color: #065f46;
+  background: #ecfdf5;
+  border-top-color: #a7f3d0;
+}
+
+.picker-section-icon {
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 .picker-item {
@@ -690,6 +717,11 @@ watch(
 .badge-used {
   background: #dbeafe;
   color: #1e40af;
+}
+
+.badge-active-production {
+  background: #d1fae5;
+  color: #065f46;
 }
 
 .badge-stock {
