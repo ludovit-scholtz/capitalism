@@ -232,6 +232,8 @@ watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
         cityLots(cityId: $cityId) {
           id cityId name description district latitude longitude populationIndex basePrice price suitableTypes
           ownerCompanyId buildingId
+          resourceType { id name slug }
+          materialQuality materialQuantity
         }
       }`,
       { cityId },
@@ -260,6 +262,20 @@ function districtLabel(district: string) {
   const key = `cityMap.districts.${district}`
   const translated = t(key)
   return translated === key ? district : translated
+}
+
+function buyBuildingMaterialQualityClass(quality: number): string {
+  if (quality >= 0.8) return 'quality-excellent'
+  if (quality >= 0.6) return 'quality-good'
+  if (quality >= 0.4) return 'quality-fair'
+  return 'quality-poor'
+}
+
+function buyBuildingMaterialQualityLabel(quality: number): string {
+  if (quality >= 0.8) return t('cityMap.rawMaterialQualityExcellent')
+  if (quality >= 0.6) return t('cityMap.rawMaterialQualityGood')
+  if (quality >= 0.4) return t('cityMap.rawMaterialQualityFair')
+  return t('cityMap.rawMaterialQualityPoor')
 }
 
 async function buyBuilding() {
@@ -582,6 +598,14 @@ async function buyBuilding() {
               <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
+              <span
+                v-if="lot.resourceType"
+                class="buy-building-resource-badge self-start"
+                data-testid="buy-building-resource-badge"
+                :title="t('cityMap.resourcePremiumTooltip')"
+              >
+                ⛏ {{ lot.resourceType.name }}
+              </span>
             </button>
           </div>
 
@@ -594,9 +618,48 @@ async function buyBuilding() {
             <div class="flex flex-wrap gap-4 text-sm text-muted">
               <span>{{ districtLabel(selectedLot.district) }}</span>
               <span
-                >{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong></span
-              >
+                >{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong>
+                <span
+                  v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice"
+                  class="buy-building-resource-premium-badge ml-1"
+                  :title="t('cityMap.resourcePremiumTooltip')"
+                >{{ t('cityMap.resourcePremium') }}</span>
+              </span>
               <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
+            </div>
+            <!-- Mining deposit investment summary (shown when MINE selected and lot has resource) -->
+            <div
+              v-if="selectedType === 'MINE' && selectedLot.resourceType"
+              class="buy-building-mining-summary"
+              data-testid="buy-building-mining-summary"
+            >
+              <h4 class="buy-building-mining-summary-title">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
+              <div class="buy-building-mining-summary-grid">
+                <div class="buy-building-mining-summary-item">
+                  <span class="text-[0.8125rem] text-muted">{{ t('cityMap.rawMaterialResource') }}</span>
+                  <strong class="text-sm">{{ selectedLot.resourceType.name }}</strong>
+                </div>
+                <div v-if="selectedLot.materialQuality != null" class="buy-building-mining-summary-item">
+                  <span class="text-[0.8125rem] text-muted">{{ t('cityMap.rawMaterialQuality') }}</span>
+                  <span class="buy-building-quality-badge" :class="buyBuildingMaterialQualityClass(selectedLot.materialQuality)">
+                    {{ buyBuildingMaterialQualityLabel(selectedLot.materialQuality) }}
+                    ({{ Math.round(selectedLot.materialQuality * 100) }}%)
+                  </span>
+                </div>
+                <div v-if="selectedLot.materialQuantity != null" class="buy-building-mining-summary-item">
+                  <span class="text-[0.8125rem] text-muted">{{ t('cityMap.rawMaterialQuantity') }}</span>
+                  <span class="text-sm">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</span>
+                </div>
+                <div class="buy-building-mining-summary-item">
+                  <span class="text-[0.8125rem] text-muted">{{ t('buildings.appraisedValue') }}</span>
+                  <span class="text-sm">{{ formatCurrency(selectedLot.basePrice) }}</span>
+                </div>
+                <div v-if="selectedLot.price > selectedLot.basePrice" class="buy-building-mining-summary-item">
+                  <span class="text-[0.8125rem] text-muted">{{ t('buildings.resourceDepositPremium') }}</span>
+                  <span class="text-sm font-semibold text-good">+ {{ formatCurrency(selectedLot.price - selectedLot.basePrice) }}</span>
+                </div>
+              </div>
+              <p class="buy-building-mining-hint">{{ t('cityMap.miningInvestmentHint') }}</p>
             </div>
           </div>
 
@@ -615,3 +678,92 @@ async function buyBuilding() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.buy-building-resource-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  cursor: help;
+}
+
+.buy-building-resource-premium-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #7c3aed;
+  background: rgba(139, 92, 246, 0.12);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.3rem;
+  vertical-align: middle;
+  cursor: help;
+}
+
+.buy-building-mining-summary {
+  background: rgba(139, 92, 246, 0.06);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.buy-building-mining-summary-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0 0 0.625rem 0;
+  color: #7c3aed;
+}
+
+.buy-building-mining-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 1rem;
+  margin-bottom: 0.625rem;
+}
+
+.buy-building-mining-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.buy-building-mining-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.buy-building-quality-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.1rem 0.375rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.buy-building-quality-badge.quality-excellent {
+  background: rgba(34, 197, 94, 0.15);
+  color: #16a34a;
+}
+
+.buy-building-quality-badge.quality-good {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+}
+
+.buy-building-quality-badge.quality-fair {
+  background: rgba(234, 179, 8, 0.15);
+  color: #ca8a04;
+}
+
+.buy-building-quality-badge.quality-poor {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+}
+</style>

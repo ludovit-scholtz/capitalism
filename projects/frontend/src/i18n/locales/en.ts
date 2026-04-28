@@ -740,6 +740,7 @@ export default {
     fundingGapShortfall: 'Shortfall',
     fundingGapGoToForex: '💱 Go to Forex Exchange',
     fundingGapViewStatement: '🏦 View Bank Statement',
+    resourceDepositPremium: 'Resource deposit premium',
   },
   buildingDetail: {
     title: 'Building Details',

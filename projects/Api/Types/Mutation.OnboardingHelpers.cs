@@ -105,6 +105,7 @@ public sealed partial class Mutation
     {
         var lot = await db.BuildingLots
             .Include(candidate => candidate.City)
+            .Include(candidate => candidate.ResourceType)
             .FirstOrDefaultAsync(candidate => candidate.Id == lotId);
 
         if (lot is null)
@@ -150,6 +151,16 @@ public sealed partial class Mutation
                 ErrorBuilder.New()
                     .SetMessage($"Building type {buildingType} is not suitable for this lot. Suitable types: {lot.SuitableTypes}")
                     .SetCode("UNSUITABLE_BUILDING_TYPE")
+                    .Build());
+        }
+
+        // Mines can only be placed on lots that have a raw material deposit.
+        if (buildingType == BuildingType.Mine && lot.ResourceTypeId is null)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A Mine can only be placed on a lot with a raw material deposit. This lot has no resource data.")
+                    .SetCode("MINE_REQUIRES_RESOURCE_DEPOSIT")
                     .Build());
         }
 
@@ -252,11 +263,14 @@ public sealed partial class Mutation
             .Where(lot => lot.CityId == cityId && lot.OwnerCompanyId == null)
             .ToListAsync();
 
+        // MINE buildings require a raw material deposit — skip generated lots without one.
         var lotId = lots
             .OrderBy(lot => lot.Price)
-            .FirstOrDefault(lot => lot.SuitableTypes
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Contains(buildingType, StringComparer.OrdinalIgnoreCase))?
+            .FirstOrDefault(lot =>
+                lot.SuitableTypes
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Contains(buildingType, StringComparer.OrdinalIgnoreCase)
+                && (buildingType != BuildingType.Mine || lot.ResourceTypeId is not null))?
             .Id;
 
         if (lotId is not Guid matchingLotId || matchingLotId == Guid.Empty)

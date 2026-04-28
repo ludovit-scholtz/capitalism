@@ -739,6 +739,7 @@ export default {
     fundingGapShortfall: 'Fehlbetrag',
     fundingGapGoToForex: '💱 Zur Forex-Börse',
     fundingGapViewStatement: '🏦 Kontoauszug anzeigen',
+    resourceDepositPremium: 'Rohstoffvorkommen-Prämie',
   },
   buildingDetail: {
     title: 'Geb\u00e4udedetails',
