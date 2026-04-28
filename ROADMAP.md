@@ -92,6 +92,10 @@ It will use real world map. The game will start in single city and later other c
 - **5 new backend tests**: `PowerPlantAnalytics_ReturnsReserveCapacityFields`, `PowerPlantAnalytics_FuelConstrainedOutput_WhenReserveLow`, `FuelProcurement_GasPlant_CostsMoreThanCoal`, `PowerPlantAnalytics_GasPlant_ReturnsFuelTypeLabel`, and one additional capacity constraint test.
 - **5 new Playwright E2E tests**: capacity bar visibility, constrained-output warning, grid link chain nodes, GAS badge and premium note, no-unit guidance.
 
+**Shipped (test coverage hardening — reserve lifecycle, nuclear non-thermal, dispatch P&L proof):**
+- **4 additional backend integration tests**: `PowerPlantAnalytics_NuclearPlant_ReturnsEmptyFuelFields` (proves non-thermal plants return zero fuel fields so frontend hides the fuel panel); `FuelReserve_PreSeededReserve_MaintainsStableLevelOverMultipleTicks` (proves procurement and consumption are in balance each tick, with fuel cost entries confirming procurement ran); `DispatchChange_50Pct_HalvesFuelCostAndReducesSurplusIncome` (proves halving dispatch halves fuel cost AND reduces surplus income — directly validates the "dispatch alters output or profitability" scenario); `PowerPlantAnalytics_WhenReserveIsFull_ConstrainedOutputIsZero` (proves fuelConstrainedOutputMw returns 0 when reserve equals max capacity).
+- **7 additional Playwright E2E tests**: green reserve bar (≥50%), red reserve bar (<20%), no-unit guidance empty state, dispatch badge color (yellow 40–79%, green ≥80%), 5-metric P&L grid for thermal plants (Fuel Costs visible), 4-metric P&L grid for non-thermal WIND plant (no Fuel Costs), metric label correctness smoke test.
+
 - [ ]  Advanced grid linking — bidirectional unit-to-unit flow arrows in the building grid editor
 
 ### Units
