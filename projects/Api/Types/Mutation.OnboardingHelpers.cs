@@ -263,11 +263,14 @@ public sealed partial class Mutation
             .Where(lot => lot.CityId == cityId && lot.OwnerCompanyId == null)
             .ToListAsync();
 
+        // MINE buildings require a raw material deposit — skip generated lots without one.
         var lotId = lots
             .OrderBy(lot => lot.Price)
-            .FirstOrDefault(lot => lot.SuitableTypes
-                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Contains(buildingType, StringComparer.OrdinalIgnoreCase))?
+            .FirstOrDefault(lot =>
+                lot.SuitableTypes
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Contains(buildingType, StringComparer.OrdinalIgnoreCase)
+                && (buildingType != BuildingType.Mine || lot.ResourceTypeId is not null))?
             .Id;
 
         if (lotId is not Guid matchingLotId || matchingLotId == Guid.Empty)
