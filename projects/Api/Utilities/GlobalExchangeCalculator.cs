@@ -9,9 +9,16 @@ namespace Api.Utilities;
 public static class GlobalExchangeCalculator
 {
     public const decimal DefaultMissingAbundance = 0.05m;
-    public const decimal TransitCostRatePerKmPerWeightUnit = 0.0025m;
-    public const decimal MinimumTransitCostPerUnit = 0.01m;
-    public const decimal MinimumCityTransitCostPerUnit = 0.05m;
+
+    /// <summary>
+    /// Base shipping rate per kilometre per unit weight (EUR).
+    /// Set to make cross-city transport a meaningful economic factor:
+    /// Bratislava→Prague (~280 km) for wood (5 kg) costs ~35 EUR at this rate.
+    /// </summary>
+    public const decimal TransitCostRatePerKmPerWeightUnit = 0.025m;
+
+    public const decimal MinimumTransitCostPerUnit = 0.10m;
+    public const decimal MinimumCityTransitCostPerUnit = 0.50m;
     public const decimal MinimumWeightPerUnit = 0.1m;
 
     public static decimal ComputeExchangePrice(City city, ResourceType resourceType, decimal abundance)
@@ -81,7 +88,7 @@ public static class GlobalExchangeCalculator
     }
 
     public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType)
-        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, 1m);
+        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, 1m, 1m);
 
     /// <summary>
     /// Computes the per-unit transit cost between two cities, expressed in the
@@ -92,24 +99,66 @@ public static class GlobalExchangeCalculator
     /// Pass 1.0 to keep the result in EUR.
     /// </param>
     public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType, decimal fxRate)
+        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, fxRate, 1m);
+
+    /// <summary>
+    /// Computes the per-unit transit cost between two cities, expressed in the
+    /// destination city's local currency, scaled by the destination city's fuel
+    /// price index.
+    /// </summary>
+    /// <param name="fxRate">
+    /// Units of the destination city currency per 1 EUR (e.g. 25.20 for CZK).
+    /// Pass 1.0 to keep the result in EUR.
+    /// </param>
+    /// <param name="fuelPriceIndex">
+    /// Destination city fuel cost multiplier (1.0 = EUR baseline).
+    /// Values above 1.0 increase transport costs; values below 1.0 decrease them.
+    /// </param>
+    public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType, decimal fxRate, decimal fuelPriceIndex)
     {
         if (sourceCity.Id == destinationCity.Id)
         {
             return 0m;
         }
 
-        var eurCost = Math.Max(
-            ComputeTransitCostPerUnit(
+        // Compute raw distance-weight cost first, then apply fuel, then floor.
+        // Consistent ordering: max(raw * fuel, minimum) — same as the coordinate overload.
+        var rawCost = ComputeRawTransitCostPerUnit(
             sourceCity.Latitude,
             sourceCity.Longitude,
             destinationCity.Latitude,
             destinationCity.Longitude,
-            resourceType.WeightPerUnit),
-            MinimumCityTransitCostPerUnit);
+            resourceType.WeightPerUnit);
+
+        var clampedFuelIndex = Math.Max(fuelPriceIndex, 0.1m);
+        var eurCost = Math.Max(rawCost * clampedFuelIndex, MinimumCityTransitCostPerUnit);
         return decimal.Round(eurCost * fxRate, 2, MidpointRounding.AwayFromZero);
     }
 
+    /// <summary>
+    /// Computes the per-unit transit cost from building coordinates, optionally scaled
+    /// by a fuel price index. Consistent ordering: fuel is applied to the raw
+    /// distance-weight cost, then the minimum floor is enforced.
+    /// Formula: max(raw × clampedFuel, MinimumTransitCostPerUnit)
+    /// </summary>
     public static decimal ComputeTransitCostPerUnit(
+        double latitudeA,
+        double longitudeA,
+        double latitudeB,
+        double longitudeB,
+        decimal weightPerUnit,
+        decimal fuelPriceIndex = 1.0m)
+    {
+        var rawCost = ComputeRawTransitCostPerUnit(latitudeA, longitudeA, latitudeB, longitudeB, weightPerUnit);
+        var clampedFuelIndex = Math.Max(fuelPriceIndex, 0.1m);
+        return decimal.Round(Math.Max(rawCost * clampedFuelIndex, MinimumTransitCostPerUnit), 2, MidpointRounding.AwayFromZero);
+    }
+
+    /// <summary>
+    /// Returns the pure distance-weight-rate product with no fuel scaling and no minimum floor.
+    /// Used internally so all public overloads share a single source of truth for the raw cost.
+    /// </summary>
+    private static decimal ComputeRawTransitCostPerUnit(
         double latitudeA,
         double longitudeA,
         double latitudeB,
@@ -117,8 +166,7 @@ public static class GlobalExchangeCalculator
         decimal weightPerUnit)
     {
         var distanceKm = ComputeDistanceKm(latitudeA, longitudeA, latitudeB, longitudeB);
-        var rawTransitCost = (decimal)distanceKm * Math.Max(weightPerUnit, MinimumWeightPerUnit) * TransitCostRatePerKmPerWeightUnit;
-        return decimal.Round(Math.Max(rawTransitCost, MinimumTransitCostPerUnit), 2, MidpointRounding.AwayFromZero);
+        return (decimal)distanceKm * Math.Max(weightPerUnit, MinimumWeightPerUnit) * TransitCostRatePerKmPerWeightUnit;
     }
 
     public static decimal ComputeItemWeightPerUnit(

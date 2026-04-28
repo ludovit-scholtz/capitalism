@@ -41,6 +41,15 @@ public sealed class City
     [MaxLength(3)]
     public string CurrencyCode { get; set; } = "EUR";
 
+    /// <summary>
+    /// Local fuel-price index relative to the EUR baseline (1.0).
+    /// A value of 1.25 means fuel in this city costs 25 % more than the baseline,
+    /// which scales up transit costs for all routes arriving at or departing from
+    /// this city.  Cities with subsidised fuel or cheap domestic supply have values
+    /// below 1.0.  Defaults to 1.0 (neutral).
+    /// </summary>
+    public decimal FuelPriceIndex { get; set; } = 1.0m;
+
     /// <summary>Buildings located in this city.</summary>
     public ICollection<Building> Buildings { get; set; } = [];
 

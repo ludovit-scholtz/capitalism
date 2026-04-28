@@ -195,10 +195,10 @@ describe('computeTransitCostPerUnit', () => {
     expect(cost).toBeGreaterThan(0)
   })
 
-  it('enforces minimum transit cost of 0.05 for cross-city transit', () => {
+  it('enforces minimum transit cost of 0.50 for cross-city transit', () => {
     // Very light resource (0.01 weight) over a short distance should still charge minimum
     const cost = computeTransitCostPerUnit(48.15, 17.11, 48.20, 17.15, 0.01)
-    expect(cost).toBeGreaterThanOrEqual(0.05)
+    expect(cost).toBeGreaterThanOrEqual(0.5)
   })
 
   it('scales with resource weight', () => {
@@ -225,6 +225,25 @@ describe('computeTransitCostPerUnit', () => {
     const cost = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 1.5)
     const decimals = cost.toString().split('.')[1]?.length ?? 0
     expect(decimals).toBeLessThanOrEqual(2)
+  })
+
+  it('applies fuel price index to scale cost proportionally', () => {
+    // Baseline (×1.0) vs high-fuel city (×1.25)
+    const baseline = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 2.0, 1.0)
+    const highFuel = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 2.0, 1.25)
+    expect(highFuel).toBeGreaterThan(baseline)
+  })
+
+  it('lower fuel price index reduces transit cost', () => {
+    const baseline = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 2.0, 1.0)
+    const lowFuel = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 2.0, 0.65)
+    expect(lowFuel).toBeLessThan(baseline)
+  })
+
+  it('defaults fuel price index to 1.0 when not provided', () => {
+    const withDefault = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 2.0)
+    const explicit = computeTransitCostPerUnit(48.15, 17.11, 50.08, 14.43, 2.0, 1.0)
+    expect(withDefault).toBe(explicit)
   })
 })
 

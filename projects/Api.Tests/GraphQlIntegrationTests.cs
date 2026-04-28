@@ -27798,8 +27798,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Must prefer a player exchange order, not the global exchange.
         // Price may be <= $1.00 if other tests have cheaper orders in the shared DB.
         Assert.Equal("PLAYER_EXCHANGE_ORDER", preview.GetProperty("sourceType").GetString());
-        Assert.True(preview.GetProperty("deliveredPricePerUnit").GetDecimal() <= 1.01m,
-            "Preview should pick the cheapest player order (≈ $1.00 plus shipping), not global exchange");
+        Assert.True(preview.GetProperty("deliveredPricePerUnit").GetDecimal() <= 1.10m,
+            "Preview should pick the cheapest player order (≈ $1.00 plus minimum transit cost $0.10), not global exchange");
     }
 
     [Fact]
@@ -27936,7 +27936,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(preview.GetProperty("canExecute").GetBoolean());
         Assert.Equal("PLAYER_EXCHANGE_ORDER", preview.GetProperty("sourceType").GetString());
         // Must use seller's $2.00 order, NOT other's cheaper $0.50 order.
-        Assert.Equal(2.01m, preview.GetProperty("deliveredPricePerUnit").GetDecimal());
+        // Delivered price = $2.00 + minimum transit cost ($0.10) = $2.10.
+        Assert.Equal(2.10m, preview.GetProperty("deliveredPricePerUnit").GetDecimal());
         Assert.Equal(sellerCompany.Id.ToString(), preview.GetProperty("sourceVendorCompanyId").GetString());
     }
 
@@ -28298,6 +28299,200 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         {
             Assert.Equal(0m, sameCityCandidate.GetProperty("transitCostPerUnit").GetDecimal());
         }
+    }
+
+    [Fact]
+    public async Task SourcingCandidates_LocalB2B_LowFuelIndex_TransitCostEnforcesMinimumFloor()
+    {
+        // Regression test for: local B2B path was computing max(raw, min) * fuel instead of
+        // max(raw * fuel, min). With fuel=0.1 and a short route, the buggy formula produced
+        // 0.10 * 0.1 = 0.01, dropping the transit cost below the minimum floor.
+        // The correct formula must yield max(tiny_raw * 0.1, 0.10) = 0.10.
+        var email = $"sc-b2b-lowfuel-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "SCB2BLowFuel");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstDeterministicAsync();
+        var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+
+        // Set a very low fuel index on the city so the bug becomes observable.
+        city.FuelPriceIndex = 0.1m;
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "SCB2BLowFuelCo", Cash = 100_000m };
+        db.Companies.Add(company);
+
+        // Buyer building – sits at the exact city coordinates.
+        var buyerBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "SCB2BBuyer",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(buyerBuilding);
+
+        // Seller building – only a few metres away (same city, short route).
+        var sellerBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "SCB2BSeller",
+            Level = 1, Latitude = city.Latitude + 0.0001, Longitude = city.Longitude + 0.0001,
+        };
+        db.Buildings.Add(sellerBuilding);
+
+        // Purchase unit on the buyer – LOCAL mode to trigger the B2B path.
+        var purchaseUnit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = buyerBuilding.Id, UnitType = Api.Data.Entities.UnitType.Purchase,
+            GridX = 0, GridY = 0, Level = 1, ResourceTypeId = resource.Id, PurchaseSource = "LOCAL",
+        };
+        db.BuildingUnits.Add(purchaseUnit);
+
+        // B2B_Sales unit on the seller with a known price and inventory.
+        var salesUnit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = sellerBuilding.Id, UnitType = Api.Data.Entities.UnitType.B2BSales,
+            GridX = 0, GridY = 0, Level = 1, MinPrice = 5m,
+        };
+        db.BuildingUnits.Add(salesUnit);
+
+        var inventory = new Api.Data.Entities.Inventory
+        {
+            BuildingUnitId = salesUnit.Id, ResourceTypeId = resource.Id, Quantity = 100m, Quality = 0.8m,
+        };
+        db.Inventories.Add(inventory);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { sourceType transitCostPerUnit isEligible } }",
+            new { unitId = purchaseUnit.Id.ToString() },
+            token);
+
+        var candidates = result.GetProperty("data").GetProperty("sourcingCandidates").EnumerateArray().ToList();
+        var b2bCandidate = candidates.FirstOrDefault(c =>
+            c.GetProperty("sourceType").GetString() is "LOCAL_B2B" or "LOCKED_VENDOR");
+
+        Assert.True(b2bCandidate.ValueKind != System.Text.Json.JsonValueKind.Undefined,
+            "Expected a LOCAL_B2B sourcing candidate but none was returned");
+
+        var transitCost = b2bCandidate.GetProperty("transitCostPerUnit").GetDecimal();
+        Assert.True(transitCost >= Api.Utilities.GlobalExchangeCalculator.MinimumTransitCostPerUnit,
+            $"Transit cost ({transitCost}) must be >= MinimumTransitCostPerUnit ({Api.Utilities.GlobalExchangeCalculator.MinimumTransitCostPerUnit}) even with fuel index 0.1");
+    }
+
+    [Fact]
+    public async Task SourcingCandidates_LocalB2B_HighFuelIndex_IncreasesTransitCostAboveBaseline()
+    {
+        // Proves that the fuel price index scales LOCAL B2B transit costs upward:
+        // high fuel city must charge more than baseline (fuel=1.0) for the same route.
+        var email = $"sc-b2b-hifuel-{Guid.NewGuid():N}@test.com";
+        await using var baselineFactory = new ApiWebApplicationFactory();
+        await using var highFuelFactory = new ApiWebApplicationFactory();
+        using var baselineClient = baselineFactory.CreateClient();
+        using var highFuelClient = highFuelFactory.CreateClient();
+        var baselineToken = await RegisterAndGetTokenAsync(baselineClient, email, "SCB2BHiFuelBase");
+        var highFuelToken = await RegisterAndGetTokenAsync(highFuelClient, email, "SCB2BHiFuelHi");
+
+        // ── Baseline factory (fuelIndex = 1.0) ──────────────────────────────────
+        Guid baselinePurchaseUnitId;
+        {
+            await using var scope = baselineFactory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            baselinePurchaseUnitId = await SeedLocalB2BScenarioAsync(db, email, 1.0m, "Base");
+        }
+
+        // ── High-fuel factory (fuelIndex = 2.0) ─────────────────────────────────
+        Guid highFuelPurchaseUnitId;
+        {
+            await using var scope = highFuelFactory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            highFuelPurchaseUnitId = await SeedLocalB2BScenarioAsync(db, email, 2.0m, "HiFuel");
+        }
+
+        var baselineResult = await ExecuteGraphQlAsync(
+            baselineClient,
+            "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { sourceType transitCostPerUnit } }",
+            new { unitId = baselinePurchaseUnitId.ToString() },
+            baselineToken);
+        var highFuelResult = await ExecuteGraphQlAsync(
+            highFuelClient,
+            "query SC($unitId: UUID!) { sourcingCandidates(buildingUnitId: $unitId) { sourceType transitCostPerUnit } }",
+            new { unitId = highFuelPurchaseUnitId.ToString() },
+            highFuelToken);
+
+        static decimal GetB2BTransitCost(System.Text.Json.JsonElement result)
+        {
+            var candidates = result.GetProperty("data").GetProperty("sourcingCandidates").EnumerateArray();
+            var b2b = candidates.FirstOrDefault(c =>
+                c.GetProperty("sourceType").GetString() is "LOCAL_B2B" or "LOCKED_VENDOR");
+            return b2b.ValueKind != System.Text.Json.JsonValueKind.Undefined
+                ? b2b.GetProperty("transitCostPerUnit").GetDecimal()
+                : 0m;
+        }
+
+        var baselineTransit = GetB2BTransitCost(baselineResult);
+        var highFuelTransit = GetB2BTransitCost(highFuelResult);
+
+        Assert.True(baselineTransit > 0m, $"Baseline transit cost should be positive but was {baselineTransit}");
+        Assert.True(highFuelTransit > baselineTransit,
+            $"High-fuel transit cost ({highFuelTransit}) must exceed baseline ({baselineTransit})");
+    }
+
+    /// <summary>Seeds a LOCAL B2B scenario with one buyer building and one seller building
+    /// (same city, ~150 km apart) for the high-fuel / baseline comparison tests.</summary>
+    private static async Task<Guid> SeedLocalB2BScenarioAsync(
+        AppDbContext db, string email, decimal fuelPriceIndex, string tag)
+    {
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var resource = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
+        var city = await db.Cities.FirstDeterministicAsync();
+        city.FuelPriceIndex = fuelPriceIndex;
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = $"B2BScen{tag}Co", Cash = 100_000m };
+        db.Companies.Add(company);
+
+        var buyerBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = $"B2BBuyer{tag}",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(buyerBuilding);
+
+        // Seller ~1.5° away (~150 km) so the raw transit cost well exceeds the minimum.
+        var sellerBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = $"B2BSeller{tag}",
+            Level = 1, Latitude = city.Latitude + 1.5, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(sellerBuilding);
+
+        var purchaseUnit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = buyerBuilding.Id, UnitType = Api.Data.Entities.UnitType.Purchase,
+            GridX = 0, GridY = 0, Level = 1, ResourceTypeId = resource.Id, PurchaseSource = "LOCAL",
+        };
+        db.BuildingUnits.Add(purchaseUnit);
+
+        var salesUnit = new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = sellerBuilding.Id, UnitType = Api.Data.Entities.UnitType.B2BSales,
+            GridX = 0, GridY = 0, Level = 1, MinPrice = 5m,
+        };
+        db.BuildingUnits.Add(salesUnit);
+
+        db.Inventories.Add(new Api.Data.Entities.Inventory
+        {
+            BuildingUnitId = salesUnit.Id, ResourceTypeId = resource.Id, Quantity = 100m, Quality = 0.8m,
+        });
+        await db.SaveChangesAsync();
+        return purchaseUnit.Id;
     }
 
     #endregion

@@ -33,7 +33,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
 
-### Currencies and bank accounts (80% complete)
+### Currencies and bank accounts (85% complete)
 
 - [x] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
 - [x] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
@@ -41,7 +41,7 @@ It will use real world map. The game will start in single city and later other c
 - [x] Player cannot go to minus on the bank account unless he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
 - [x] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
 - [ ] Make the research budget be calculated in USD.
-- [ ] Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
+- [x] Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
 - [x] In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
 - [x] When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
 

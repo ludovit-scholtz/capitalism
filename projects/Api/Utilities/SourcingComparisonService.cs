@@ -164,6 +164,9 @@ public static class SourcingComparisonService
         Guid buyerCompanyId)
     {
         var itemWeightPerUnit = await ComputeItemWeightPerUnitAsync(db, resourceId, productId);
+        var destinationFuelIndex = building.City?.FuelPriceIndex
+            ?? (await db.Cities.FindAsync(building.CityId))?.FuelPriceIndex
+            ?? 1.0m;
         var query = db.BuildingUnits
             .Where(u => u.UnitType == UnitType.B2BSales
                      && u.Building.CityId == building.CityId
@@ -208,7 +211,8 @@ public static class SourcingComparisonService
                     salesUnit.Building.Longitude,
                     building.Latitude,
                     building.Longitude,
-                    itemWeightPerUnit);
+                    itemWeightPerUnit,
+                    destinationFuelIndex);
                 var deliveredPrice = price + transitCost;
 
                 var qualityOk = inv.Quality >= minQuality;
@@ -301,6 +305,7 @@ public static class SourcingComparisonService
         // Get FX rate so exchange prices are shown in destination city's local currency.
         var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [destinationCity.CurrencyCode]);
         var destinationFxRate = FxRateHelper.GetEurRate(fxRates, destinationCity.CurrencyCode);
+        var destinationFuelIndex = destinationCity.FuelPriceIndex;
 
         var candidateCities = applyLockedCity && unit.LockedCityId.HasValue
             ? allCities.Where(c => c.Id == unit.LockedCityId.Value).ToList()
@@ -313,7 +318,7 @@ public static class SourcingComparisonService
                 ?.Abundance ?? GlobalExchangeCalculator.DefaultMissingAbundance;
 
             var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, destinationFxRate);
-            var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, destinationFxRate);
+            var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, destinationFxRate, destinationFuelIndex);
             var deliveredPrice = exchangePrice + transitCost;
             var quality = GlobalExchangeCalculator.ComputeExchangeQuality(abundance);
             var (qualityMin, qualityMax) = GlobalExchangeCalculator.ComputeExchangeQualityBand(abundance);

@@ -151,6 +151,12 @@ public sealed class GlobalExchangeOffer
     public decimal TransitCostPerUnit { get; set; }
     public decimal DeliveredPricePerUnit { get; set; }
     public decimal DistanceKm { get; set; }
+
+    /// <summary>
+    /// Destination city fuel price index applied to this transit cost
+    /// (1.0 = EUR baseline; values above 1.0 indicate costlier local fuel).
+    /// </summary>
+    public decimal FuelPriceIndex { get; set; } = 1.0m;
 }
 
 /// <summary>

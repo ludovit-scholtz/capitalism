@@ -27,9 +27,8 @@ public sealed partial class PurchasingPhase
         if (!context.ResourceTypesById.TryGetValue(resourceId, out var resource)) return (0m, 0m, 0m);
         if (!context.CitiesById.TryGetValue(building.CityId, out var destinationCity)) return (0m, 0m, 0m);
 
-        // Get the FX rate for the destination city so all prices are expressed in
-        // the company's local currency (e.g. CZK for Prague, INR for Delhi).
         var fxRate = context.GetCityFxRate(destinationCity);
+        var fuelPriceIndex = destinationCity.FuelPriceIndex;
 
         var purchaseSource = unit.PurchaseSource ?? "OPTIMAL";
         var candidateCities = unit.LockedCityId.HasValue && purchaseSource == "EXCHANGE"
@@ -45,7 +44,7 @@ public sealed partial class PurchasingPhase
                     ?.Abundance ?? GlobalExchangeCalculator.DefaultMissingAbundance;
 
                 var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, fxRate);
-                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, fxRate);
+                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, fxRate, fuelPriceIndex);
                 var deliveredPrice = exchangePrice + transitCost;
                 var estimatedQuality = GlobalExchangeCalculator.ComputeExchangeQuality(abundance);
 
@@ -114,7 +113,7 @@ public sealed partial class PurchasingPhase
                 BuildingId = building.Id,
                 BuildingUnitId = unit.Id,
                 Category = LedgerCategory.ShippingCost,
-                Description = $"Shipping: {resource.Name} from {bestOffer.sourceCity.Name}",
+                Description = $"Shipping: {resource.Name} from {bestOffer.sourceCity.Name} (fuel ×{fuelPriceIndex:F2})",
                 Amount = -shippingCost,
                 RecordedAtTick = context.CurrentTick,
                 RecordedAtUtc = DateTime.UtcNow,

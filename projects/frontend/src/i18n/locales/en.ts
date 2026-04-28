@@ -531,6 +531,7 @@ export default {
     noOffersForResource: 'No exchange offers available for this resource.',
     exchangePrice: 'Exchange',
     transitCost: 'Transit',
+    fuelPriceHint: 'Local fuel price index applied to this transit cost. Values above ×1.00 indicate costlier local fuel (e.g. London ×1.25); values below ×1.00 indicate subsidised fuel (e.g. Delhi ×0.65).',
     deliveredPrice: 'Delivered',
     quality: 'Quality',
     qualityBandHint: 'Actual quality varies within this band each tick. Higher abundance gives narrower, more predictable quality.',

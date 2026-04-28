@@ -79,6 +79,11 @@ public sealed partial class PurchasingPhase : ITickPhase
         var totalSourcingCost = 0m;
         var weightedQualityTotal = 0m;
 
+        // Get destination city fuel price index to scale transport costs.
+        var destFuelPriceIndex = context.CitiesById.TryGetValue(building.CityId, out var destCity)
+            ? destCity.FuelPriceIndex
+            : 1.0m;
+
         // Phase 1: Player-placed exchange orders (LOCAL or OPTIMAL source).
         if (purchaseSource is "LOCAL" or "OPTIMAL")
         {
@@ -95,13 +100,13 @@ public sealed partial class PurchasingPhase : ITickPhase
                         return false;
                     }
 
-                    var deliveredPricePerUnit = o.PricePerUnit + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit);
+                    var deliveredPricePerUnit = o.PricePerUnit + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
                     return deliveredPricePerUnit <= maxPrice;
                 })
                 .OrderBy(o =>
                 {
                     var exchangeBuilding = context.BuildingsById[o.ExchangeBuildingId];
-                    return o.PricePerUnit + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit);
+                    return o.PricePerUnit + ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
                 })
                 .ToList();
 
@@ -124,7 +129,7 @@ public sealed partial class PurchasingPhase : ITickPhase
                     continue;
                 }
 
-                var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit);
+                var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(exchangeBuilding, building, itemWeightPerUnit, destFuelPriceIndex);
                 var goodsCost = fill * order.PricePerUnit;
                 var shippingCost = fill * transitCostPerUnit;
                 var totalDeliveredCost = goodsCost + shippingCost;
@@ -202,7 +207,8 @@ public sealed partial class PurchasingPhase : ITickPhase
                 productId,
                 itemWeightPerUnit,
                 maxPrice,
-                minQuality);
+                minQuality,
+                destFuelPriceIndex);
 
             foreach (var supply in localSupplies)
             {
