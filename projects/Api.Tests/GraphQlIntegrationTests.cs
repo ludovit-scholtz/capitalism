@@ -21127,6 +21127,102 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task StoreBuildingConfiguration_BrandQuality_CategoryScope_WithDirectIndustryCategory_Succeeds()
+    {
+        // CATEGORY scope with industryCategory set directly (no productTypeId) must now succeed.
+        // This validates the fix for the "must target a product type" validation bug.
+        var token = await RegisterAndGetTokenAsync($"rd-bq-catind-{Guid.NewGuid()}@test.com", "BQ Cat Industry");
+        var (_, buildingId) = await CreateRdBuildingAsync(token);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new
+                        {
+                            unitType = "BRAND_QUALITY",
+                            gridX = 0,
+                            gridY = 0,
+                            linkUp = false,
+                            linkDown = false,
+                            linkLeft = false,
+                            linkRight = false,
+                            linkUpLeft = false,
+                            linkUpRight = false,
+                            linkDownLeft = false,
+                            linkDownRight = false,
+                            brandScope = "CATEGORY",
+                            industryCategory = "FURNITURE"
+                        }
+                    }
+                }
+            },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _),
+            "BRAND_QUALITY with CATEGORY scope + direct industryCategory must succeed without a productTypeId.");
+        var planId = result.GetProperty("data").GetProperty("storeBuildingConfiguration").GetProperty("id").GetString();
+        Assert.False(string.IsNullOrEmpty(planId), "Should return a valid plan ID.");
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_BrandQuality_CategoryScope_WithoutAnchorOrCategory_Fails()
+    {
+        // CATEGORY scope without either productTypeId or industryCategory must fail with the new
+        // BRAND_QUALITY_CATEGORY_REQUIRED error code.
+        var token = await RegisterAndGetTokenAsync($"rd-bq-catnone-{Guid.NewGuid()}@test.com", "BQ Cat None");
+        var (_, buildingId) = await CreateRdBuildingAsync(token);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new
+                        {
+                            unitType = "BRAND_QUALITY",
+                            gridX = 0,
+                            gridY = 0,
+                            linkUp = false,
+                            linkDown = false,
+                            linkLeft = false,
+                            linkRight = false,
+                            linkUpLeft = false,
+                            linkUpRight = false,
+                            linkDownLeft = false,
+                            linkDownRight = false,
+                            brandScope = "CATEGORY"
+                        }
+                    }
+                }
+            },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            "BRAND_QUALITY with CATEGORY scope and no anchor/category must fail.");
+        Assert.Equal("BRAND_QUALITY_CATEGORY_REQUIRED",
+            errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+
+    [Fact]
     public async Task CompanyBrands_UnauthenticatedRequest_Fails()
     {
         var companyId = Guid.NewGuid();

@@ -135,6 +135,20 @@ public sealed class OperatingCostPhase : ITickPhase
             // ── Debit individual unit costs and record ledger entries ──
             foreach (var (unit, laborCost, energyCost) in unitCosts)
             {
+                var laborDescription = unit.UnitType switch
+                {
+                    UnitType.ProductQuality => "R&D Salary: Product Quality Research",
+                    UnitType.BrandQuality => "R&D Salary: Brand Quality Research",
+                    _ => $"Operating labor for {unit.UnitType}",
+                };
+
+                var energyDescription = unit.UnitType switch
+                {
+                    UnitType.ProductQuality => "R&D Energy: Product Quality Lab",
+                    UnitType.BrandQuality => "R&D Energy: Brand Quality Lab",
+                    _ => $"Operating energy for {unit.UnitType}",
+                };
+
                 if (laborCost > 0m)
                 {
                     context.Db.LedgerEntries.Add(new LedgerEntry
@@ -145,7 +159,7 @@ public sealed class OperatingCostPhase : ITickPhase
                         BuildingUnitId = unit.Id,
                         BankAccountId = bankAccount.Id,
                         Category = LedgerCategory.LaborCost,
-                        Description = $"Operating labor for {unit.UnitType}",
+                        Description = laborDescription,
                         Amount = -laborCost,
                         RecordedAtTick = context.CurrentTick,
                         RecordedAtUtc = DateTime.UtcNow,
@@ -162,7 +176,7 @@ public sealed class OperatingCostPhase : ITickPhase
                         BuildingUnitId = unit.Id,
                         BankAccountId = bankAccount.Id,
                         Category = LedgerCategory.EnergyCost,
-                        Description = $"Operating energy for {unit.UnitType}",
+                        Description = energyDescription,
                         Amount = -energyCost,
                         RecordedAtTick = context.CurrentTick,
                         RecordedAtUtc = DateTime.UtcNow,

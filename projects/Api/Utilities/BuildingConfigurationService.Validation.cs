@@ -160,12 +160,26 @@ public static partial class BuildingConfigurationService
                             .Build());
                 }
 
-                if (unit.BrandScope is BrandScope.Category or BrandScope.Product && !unit.ProductTypeId.HasValue)
+                // PRODUCT scope: must reference a specific product type.
+                if (unit.BrandScope is BrandScope.Product && !unit.ProductTypeId.HasValue)
                 {
                     throw new GraphQLException(
                         ErrorBuilder.New()
-                            .SetMessage("Brand Quality units researching a category or product must target a product type.")
+                            .SetMessage("Brand Quality units with PRODUCT scope must target a specific product type.")
                             .SetCode("BRAND_QUALITY_PRODUCT_REQUIRED")
+                            .Build());
+                }
+
+                // CATEGORY scope: must reference either a product type (industry is inferred) or
+                // an industry category directly (e.g. "FURNITURE"). Both forms are valid.
+                if (unit.BrandScope is BrandScope.Category
+                    && !unit.ProductTypeId.HasValue
+                    && string.IsNullOrWhiteSpace(unit.IndustryCategory))
+                {
+                    throw new GraphQLException(
+                        ErrorBuilder.New()
+                            .SetMessage("Brand Quality units with CATEGORY scope must specify either a product type (to derive the category) or an industry category directly.")
+                            .SetCode("BRAND_QUALITY_CATEGORY_REQUIRED")
                             .Build());
                 }
             }

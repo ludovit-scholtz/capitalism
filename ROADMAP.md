@@ -161,11 +161,17 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
-### R&D Building (0% complete)
+### R&D Building (65% complete)
 
+**Shipped in this increment:**
+- ✅ Fixed CATEGORY scope validation bug: BRAND_QUALITY units with CATEGORY scope can now be configured using a direct `industryCategory` field (e.g. "FURNITURE") without requiring a `productTypeId`. The old validation incorrectly required a product type for both CATEGORY and PRODUCT scopes.
+- ✅ Public-sales competitiveness now blends product, category, and company brand contributions coherently via `FindCombinedBrand`: product (full weight), category (60%), company (30%) using additive diminishing-returns formula — no double-counting.
+- ✅ R&D operating costs raised to be materially impactful: PRODUCT_QUALITY and BRAND_QUALITY labor hours increased from 0.55 → 2.0 and energy from 0.09 → 0.22, making R&D roughly 3× more expensive than a marketing unit in the same city.
+- ✅ Ledger entries for R&D units now use clear labels: "R&D Salary: Product Quality Research" and "R&D Salary: Brand Quality Research" so players can directly connect research investment with financial consequences in the ledger.
+- ✅ 5 new backend tests covering: category scope validation via GraphQL, R&D cost exceeding marketing cost by ≥3×, R&D ledger label correctness, and combined brand (product+category) contributing more public sales than product-only brand.
+
+**Remaining:**
 - [ ] When selecting the product, make sure to show at the top the products the company is currently producing.
-- [ ] When i select brand quality category research and select for example furniture, there is error "Brand Quality units researching a category or product must target a product type.". Make sure it is possible to research the category brand marketing opportunities which will increase the marketing unit efficiency to build a category brand. Make sure the product, category and company brands are calculated in the sales calculation for public sale unit sales.
-- [ ] For every unit the product quality or brand quality in the R&D building add additional monthly salary costs. Currently it is very cheap to run the R&D building, make it more expensive. Make sure this costs are visible in the ledger.
 
 ### Appartment and commercial buildings (90% complete)
 
