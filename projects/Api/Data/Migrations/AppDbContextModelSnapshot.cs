@@ -820,6 +820,10 @@ namespace Api.Data.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("character varying(3)");
 
+                    b.Property<decimal>("FuelPriceIndex")
+                        .HasColumnType("numeric")
+                        .HasDefaultValue(1.0m);
+
                     b.Property<double>("Latitude")
                         .HasColumnType("double precision");
 

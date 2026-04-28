@@ -60,8 +60,8 @@ export type PurchaseSelectorWeightedProduct = {
 }
 
 const MINIMUM_WEIGHT_PER_UNIT = 0.1
-const TRANSIT_COST_RATE_PER_KM_PER_WEIGHT_UNIT = 0.0025
-const MINIMUM_TRANSIT_COST_PER_UNIT = 0.01
+const TRANSIT_COST_RATE_PER_KM_PER_WEIGHT_UNIT = 0.025
+const MINIMUM_TRANSIT_COST_PER_UNIT = 0.10
 
 export function getPurchaseSelectorItemKey(kind: PurchaseSelectorItemKind, id: string): string {
   return `${kind}:${id}`

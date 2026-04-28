@@ -178,7 +178,7 @@ public static class ProcurementPreviewService
                 o.ExchangeBuilding.Longitude,
                 building.Latitude,
                 building.Longitude,
-                itemWeightPerUnit))
+                itemWeightPerUnit) * Math.Max(building.City?.FuelPriceIndex ?? 1.0m, 0.1m))
             .FirstOrDefault();
 
         if (bestOrder is null)
@@ -192,12 +192,13 @@ public static class ProcurementPreviewService
             };
         }
 
+        var fuelIndex = building.City?.FuelPriceIndex ?? 1.0m;
         var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
             bestOrder.ExchangeBuilding.Latitude,
             bestOrder.ExchangeBuilding.Longitude,
             building.Latitude,
             building.Longitude,
-            itemWeightPerUnit);
+            itemWeightPerUnit) * Math.Max(fuelIndex, 0.1m);
         var deliveredPrice = bestOrder.PricePerUnit + transitCost;
         if (deliveredPrice > maxPrice)
         {
@@ -283,7 +284,7 @@ public static class ProcurementPreviewService
                     ?.Abundance ?? GlobalExchangeCalculator.DefaultMissingAbundance;
 
                 var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(sourceCity, resource, abundance, destinationFxRate);
-                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, destinationFxRate);
+                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(sourceCity, destinationCity, resource, destinationFxRate, destinationCity.FuelPriceIndex);
                 var deliveredPrice = exchangePrice + transitCost;
                 var quality = GlobalExchangeCalculator.ComputeExchangeQuality(abundance);
 
@@ -412,12 +413,13 @@ public static class ProcurementPreviewService
                 if (inv.Quality < minQuality) continue;
 
                 var price = salesUnit.MinPrice ?? 0m;
+                var fuelIndex = building.City?.FuelPriceIndex ?? 1.0m;
                 var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
                     salesUnit.Building.Latitude,
                     salesUnit.Building.Longitude,
                     building.Latitude,
                     building.Longitude,
-                    itemWeightPerUnit);
+                    itemWeightPerUnit) * Math.Max(fuelIndex, 0.1m);
                 var deliveredPrice = price + transitCost;
                 if (price <= 0m || deliveredPrice > maxPrice) continue;
 

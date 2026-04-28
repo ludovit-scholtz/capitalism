@@ -13,7 +13,8 @@ public sealed partial class PurchasingPhase
         Guid? productId,
         decimal itemWeightPerUnit,
         decimal maxPrice,
-        decimal minQuality)
+        decimal minQuality,
+        decimal fuelPriceIndex = 1.0m)
     {
         var matchingSupplies = new List<(Building Building, BuildingUnit Unit, Inventory Inventory, decimal PricePerUnit, decimal TransitCostPerUnit, decimal DeliveredPricePerUnit)>();
 
@@ -51,7 +52,7 @@ public sealed partial class PurchasingPhase
                         continue;
 
                     var price = unit.MinPrice ?? GetBasePrice(context, inventory.ResourceTypeId, inventory.ProductTypeId);
-                    var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(building, destinationBuilding, itemWeightPerUnit);
+                    var transitCostPerUnit = ComputeBuildingTransitCostPerUnit(building, destinationBuilding, itemWeightPerUnit, fuelPriceIndex);
                     var deliveredPricePerUnit = price + transitCostPerUnit;
                     if (price <= 0m || deliveredPricePerUnit > maxPrice)
                         continue;
@@ -81,13 +82,15 @@ public sealed partial class PurchasingPhase
     private static decimal ComputeBuildingTransitCostPerUnit(
         Building sourceBuilding,
         Building destinationBuilding,
-        decimal itemWeightPerUnit)
+        decimal itemWeightPerUnit,
+        decimal fuelPriceIndex = 1.0m)
     {
-        return GlobalExchangeCalculator.ComputeTransitCostPerUnit(
+        var rawCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(
             sourceBuilding.Latitude,
             sourceBuilding.Longitude,
             destinationBuilding.Latitude,
             destinationBuilding.Longitude,
             itemWeightPerUnit);
+        return decimal.Round(rawCost * Math.Max(fuelPriceIndex, 0.1m), 2, MidpointRounding.AwayFromZero);
     }
 }

@@ -85,7 +85,7 @@ public sealed class GlobalExchangeCalculatorUnitTests
     }
 
     [Fact]
-    public void ComputeTransitCostPerUnit_EnforcesMinimumCostOf005()
+    public void ComputeTransitCostPerUnit_EnforcesMinimumCostOf050()
     {
         // Very light resource over very short distance should still incur minimum cost.
         var cityA = MakeCity(Guid.NewGuid(), 48.15, 17.11);
@@ -94,7 +94,7 @@ public sealed class GlobalExchangeCalculatorUnitTests
 
         var cost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(cityA, cityB, veryLightResource);
 
-        Assert.True(cost >= 0.05m, $"Expected minimum 0.05 transit cost but got {cost}");
+        Assert.True(cost >= 0.50m, $"Expected minimum 0.50 transit cost but got {cost}");
     }
 
     [Fact]
@@ -543,5 +543,105 @@ public sealed class GlobalExchangeCalculatorUnitTests
 
         Assert.True(expensivePrice > cheapPrice,
             $"Expensive-city price ({expensivePrice}) should exceed cheap-city price ({cheapPrice})");
+    }
+
+    // ---------------------------------------------------------------------------
+    // FuelPriceIndex / oil-linked transport costs
+    // ---------------------------------------------------------------------------
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_FuelPriceIndex_HigherFuelMeansCostlierTransport()
+    {
+        // A destination city with high fuel price (London ×1.25) should charge more
+        // for the same route than a city with baseline fuel (EUR ×1.00).
+        var prague = MakeCity(Guid.NewGuid(), 50.08, 14.43);
+        var bratislava = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var resource = MakeResource(10m, 2.0m); // 2 kg/unit
+
+        var baselineCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, 1m, 1.00m);
+        var highFuelCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, 1m, 1.25m);
+
+        Assert.True(highFuelCost > baselineCost,
+            $"High-fuel route ({highFuelCost}) should cost more than baseline ({baselineCost})");
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_FuelPriceIndex_LowerFuelMeansCheaperTransport()
+    {
+        // A destination with subsidised fuel (Delhi ×0.65) should charge less transport
+        // than the EUR baseline (×1.00).
+        var prague = MakeCity(Guid.NewGuid(), 50.08, 14.43);
+        var bratislava = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var resource = MakeResource(10m, 2.0m);
+
+        var baselineCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, 1m, 1.00m);
+        var cheapFuelCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, 1m, 0.65m);
+
+        Assert.True(cheapFuelCost < baselineCost,
+            $"Low-fuel route ({cheapFuelCost}) should cost less than baseline ({baselineCost})");
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_FuelPriceIndex_ProportionalToFuelFactor()
+    {
+        // Doubling the fuel price index should roughly double the transit cost.
+        var prague = MakeCity(Guid.NewGuid(), 50.08, 14.43);
+        var bratislava = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var resource = MakeResource(10m, 5.0m); // heavy to avoid minimum-cost domination
+
+        var singleFuelCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, 1m, 1.0m);
+        var doubleFuelCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, 1m, 2.0m);
+
+        // Allow ±5% rounding tolerance.
+        var ratio = doubleFuelCost / singleFuelCost;
+        Assert.InRange(ratio, 1.90m, 2.10m);
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_FuelPriceIndex_SameCityIsAlwaysFree()
+    {
+        // Even a very high fuel price index must not create a charge for same-city transfers.
+        var cityId = Guid.NewGuid();
+        var city = MakeCity(cityId, 48.15, 17.11);
+        var resource = MakeResource(10m, 5.0m);
+
+        var cost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(city, city, resource, 1m, 5.0m);
+
+        Assert.Equal(0m, cost);
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_BratislavaToPrague_IsSignificantlyHigherThanOldRate()
+    {
+        // The new 10× rate increase must make the Bratislava→Prague route for iron ore
+        // (8 kg/unit) cost materially more than the old 0.0025 rate (≈0.55 EUR).
+        // With the new rate of 0.025, the base cost should be ≈5.55 EUR.
+        var bratislava = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var prague = MakeCity(Guid.NewGuid(), 50.08, 14.43);
+        var ironOre = MakeResource(6m, 8.0m); // iron ore: BasePrice=6, Weight=8
+
+        var cost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, ironOre, 1m, 1.0m);
+
+        // Old maximum would have been ~0.70 EUR. New cost must be > 5 EUR.
+        Assert.True(cost > 5.0m, $"Expected route cost > 5 EUR with new rate, got {cost}");
+    }
+
+    [Fact]
+    public void ComputeTransitCostPerUnit_FxRate_ScalesCostToLocalCurrency()
+    {
+        // CZK FX rate ≈ 25.5 means a EUR transit cost must be multiplied by ~25.5.
+        var bratislava = MakeCity(Guid.NewGuid(), 48.15, 17.11);
+        var prague = MakeCity(Guid.NewGuid(), 50.08, 14.43);
+        var resource = MakeResource(10m, 2.0m);
+
+        const decimal eurRate = 1m;
+        const decimal czkRate = 25.5m;
+
+        var eurCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, eurRate, 1.0m);
+        var czkCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(prague, bratislava, resource, czkRate, 1.0m);
+
+        // CZK cost should be ~25.5× the EUR cost (within rounding).
+        var ratio = czkCost / eurCost;
+        Assert.InRange(ratio, 25.0m, 26.0m);
     }
 }

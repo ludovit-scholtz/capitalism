@@ -532,6 +532,7 @@ export default {
     noOffersForResource: 'Pre túto surovinu nie sú k dispozícii žiadne ponuky burzy.',
     exchangePrice: 'Burza',
     transitCost: 'Doprava',
+    fuelPriceHint: 'Miestny index ceny paliva aplikovaný na tieto prepravné náklady. Hodnoty nad ×1,00 znamenajú drahšie palivo (napr. Londýn ×1,25); hodnoty pod ×1,00 znamenajú dotované palivo (napr. Dillí ×0,65).',
     deliveredPrice: 'Doručenie',
     quality: 'Kvalita',
     qualityBandHint: 'Skutočná kvalita sa mení v tomto rozsahu každý tick. Vyššia dostupnosť znamená predvídateľnejšiu kvalitu.',

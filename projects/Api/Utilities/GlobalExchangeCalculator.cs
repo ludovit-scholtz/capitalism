@@ -9,9 +9,16 @@ namespace Api.Utilities;
 public static class GlobalExchangeCalculator
 {
     public const decimal DefaultMissingAbundance = 0.05m;
-    public const decimal TransitCostRatePerKmPerWeightUnit = 0.0025m;
-    public const decimal MinimumTransitCostPerUnit = 0.01m;
-    public const decimal MinimumCityTransitCostPerUnit = 0.05m;
+
+    /// <summary>
+    /// Base shipping rate per kilometre per unit weight (EUR).
+    /// Set to make cross-city transport a meaningful economic factor:
+    /// Bratislava→Prague (~280 km) for wood (5 kg) costs ~35 EUR at this rate.
+    /// </summary>
+    public const decimal TransitCostRatePerKmPerWeightUnit = 0.025m;
+
+    public const decimal MinimumTransitCostPerUnit = 0.10m;
+    public const decimal MinimumCityTransitCostPerUnit = 0.50m;
     public const decimal MinimumWeightPerUnit = 0.1m;
 
     public static decimal ComputeExchangePrice(City city, ResourceType resourceType, decimal abundance)
@@ -81,7 +88,7 @@ public static class GlobalExchangeCalculator
     }
 
     public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType)
-        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, 1m);
+        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, 1m, 1m);
 
     /// <summary>
     /// Computes the per-unit transit cost between two cities, expressed in the
@@ -92,19 +99,36 @@ public static class GlobalExchangeCalculator
     /// Pass 1.0 to keep the result in EUR.
     /// </param>
     public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType, decimal fxRate)
+        => ComputeTransitCostPerUnit(sourceCity, destinationCity, resourceType, fxRate, 1m);
+
+    /// <summary>
+    /// Computes the per-unit transit cost between two cities, expressed in the
+    /// destination city's local currency, scaled by the destination city's fuel
+    /// price index.
+    /// </summary>
+    /// <param name="fxRate">
+    /// Units of the destination city currency per 1 EUR (e.g. 25.20 for CZK).
+    /// Pass 1.0 to keep the result in EUR.
+    /// </param>
+    /// <param name="fuelPriceIndex">
+    /// Destination city fuel cost multiplier (1.0 = EUR baseline).
+    /// Values above 1.0 increase transport costs; values below 1.0 decrease them.
+    /// </param>
+    public static decimal ComputeTransitCostPerUnit(City sourceCity, City destinationCity, ResourceType resourceType, decimal fxRate, decimal fuelPriceIndex)
     {
         if (sourceCity.Id == destinationCity.Id)
         {
             return 0m;
         }
 
+        var clampedFuelIndex = Math.Max(fuelPriceIndex, 0.1m);
         var eurCost = Math.Max(
             ComputeTransitCostPerUnit(
             sourceCity.Latitude,
             sourceCity.Longitude,
             destinationCity.Latitude,
             destinationCity.Longitude,
-            resourceType.WeightPerUnit),
+            resourceType.WeightPerUnit) * clampedFuelIndex,
             MinimumCityTransitCostPerUnit);
         return decimal.Round(eurCost * fxRate, 2, MidpointRounding.AwayFromZero);
     }

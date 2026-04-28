@@ -132,6 +132,7 @@ const EXCHANGE_QUERY = `
       transitCostPerUnit
       deliveredPricePerUnit
       distanceKm
+      fuelPriceIndex
     }
   }
 `
@@ -480,7 +481,15 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
                   </div>
                   <div class="offer-metric">
                     <span class="metric-label">{{ t('globalExchange.transitCost') }}</span>
-                    <span class="metric-value transit-cost"> +{{ formatPrice(offer.transitCostPerUnit) }} · {{ offer.distanceKm }} km </span>
+                    <span class="metric-value transit-cost">
+                      +{{ formatPrice(offer.transitCostPerUnit) }} · {{ offer.distanceKm }} km
+                      <span
+                        v-if="offer.fuelPriceIndex && offer.fuelPriceIndex !== 1"
+                        class="fuel-badge"
+                        :class="offer.fuelPriceIndex > 1 ? 'fuel-high' : 'fuel-low'"
+                        :title="t('globalExchange.fuelPriceHint')"
+                      >⛽ ×{{ offer.fuelPriceIndex.toFixed(2) }}</span>
+                    </span>
                   </div>
                   <div class="offer-metric delivered-metric">
                     <span class="metric-label">{{ t('globalExchange.deliveredPrice') }}</span>
@@ -944,6 +953,32 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
   font-weight: 500;
   color: var(--color-text);
   text-align: right;
+}
+
+.transit-cost {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.fuel-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+.fuel-high {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 20%, transparent);
+  color: var(--color-warning, #f59e0b);
+}
+
+.fuel-low {
+  background: color-mix(in srgb, var(--color-success, #22c55e) 20%, transparent);
+  color: var(--color-success, #22c55e);
 }
 
 .delivered-metric {

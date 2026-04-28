@@ -533,6 +533,7 @@ export default {
     noOffersForResource: 'Für diesen Rohstoff sind keine Börsenangebote verfügbar.',
     exchangePrice: 'Börse',
     transitCost: 'Transit',
+    fuelPriceHint: 'Lokaler Kraftstoffpreisindex für diese Transportkosten. Werte über ×1,00 bedeuten teureren Kraftstoff (z.B. London ×1,25); Werte unter ×1,00 bedeuten subventionierten Kraftstoff (z.B. Delhi ×0,65).',
     deliveredPrice: 'Geliefert',
     quality: 'Qualität',
     qualityBandHint: 'Die tatsächliche Qualität schwankt jeden Tick innerhalb dieses Bereichs. Höhere Verfügbarkeit bedeutet gleichmäßigere Qualität.',

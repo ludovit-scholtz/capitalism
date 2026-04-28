@@ -27798,8 +27798,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         // Must prefer a player exchange order, not the global exchange.
         // Price may be <= $1.00 if other tests have cheaper orders in the shared DB.
         Assert.Equal("PLAYER_EXCHANGE_ORDER", preview.GetProperty("sourceType").GetString());
-        Assert.True(preview.GetProperty("deliveredPricePerUnit").GetDecimal() <= 1.01m,
-            "Preview should pick the cheapest player order (≈ $1.00 plus shipping), not global exchange");
+        Assert.True(preview.GetProperty("deliveredPricePerUnit").GetDecimal() <= 1.10m,
+            "Preview should pick the cheapest player order (≈ $1.00 plus minimum transit cost $0.10), not global exchange");
     }
 
     [Fact]
@@ -27936,7 +27936,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(preview.GetProperty("canExecute").GetBoolean());
         Assert.Equal("PLAYER_EXCHANGE_ORDER", preview.GetProperty("sourceType").GetString());
         // Must use seller's $2.00 order, NOT other's cheaper $0.50 order.
-        Assert.Equal(2.01m, preview.GetProperty("deliveredPricePerUnit").GetDecimal());
+        // Delivered price = $2.00 + minimum transit cost ($0.10) = $2.10.
+        Assert.Equal(2.10m, preview.GetProperty("deliveredPricePerUnit").GetDecimal());
         Assert.Equal(sellerCompany.Id.ToString(), preview.GetProperty("sourceVendorCompanyId").GetString());
     }
 

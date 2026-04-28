@@ -113,6 +113,7 @@ public sealed partial class Query
 
         // Get FX rate so all exchange prices are shown in the destination city's local currency.
         var fxRate = await ComputeForexRateAsync(db, "EUR", destinationCity.CurrencyCode);
+        var fuelPriceIndex = destinationCity.FuelPriceIndex;
 
         var cities = await db.Cities
             .Include(city => city.Resources)
@@ -136,7 +137,7 @@ public sealed partial class Query
                     .FirstOrDefault(entry => entry.ResourceTypeId == resource.Id)?.Abundance
                     ?? GlobalExchangeCalculator.DefaultMissingAbundance;
                 var exchangePrice = GlobalExchangeCalculator.ComputeExchangePrice(city, resource, abundance, fxRate);
-                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(city, destinationCity, resource, fxRate);
+                var transitCost = GlobalExchangeCalculator.ComputeTransitCostPerUnit(city, destinationCity, resource, fxRate, fuelPriceIndex);
 
                 return new GlobalExchangeOffer
                 {
@@ -160,7 +161,8 @@ public sealed partial class Query
                             destinationCity.Latitude,
                             destinationCity.Longitude),
                         1,
-                        MidpointRounding.AwayFromZero)
+                        MidpointRounding.AwayFromZero),
+                    FuelPriceIndex = fuelPriceIndex,
                 };
             }))
             .OrderBy(offer => offer.DeliveredPricePerUnit)

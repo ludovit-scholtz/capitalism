@@ -277,6 +277,8 @@ export interface GlobalExchangeOffer {
   transitCostPerUnit: number
   deliveredPricePerUnit: number
   distanceKm: number
+  /** Destination city fuel price index (1.0 = EUR baseline). */
+  fuelPriceIndex?: number
 }
 
 /** A product marketplace listing from a player-placed SELL exchange order. */
@@ -426,6 +428,8 @@ export interface City {
   longitude: number
   population: number
   baseSalaryPerManhour?: number
+  /** Local fuel-price index relative to EUR baseline (1.0). Values > 1.0 mean costlier fuel. */
+  fuelPriceIndex?: number
   resources: Resource[]
 }
 

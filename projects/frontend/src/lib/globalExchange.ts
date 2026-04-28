@@ -84,8 +84,12 @@ export function computeDistanceKm(
 
 /**
  * Computes the per-unit transit cost from a source city to a destination city.
- * Same-city transfers are free. Cross-city cost scales with distance and resource
- * weight; the minimum cross-city charge is 0.05.
+ * Same-city transfers have no transit cost.  Cross-city cost scales with distance
+ * and resource weight; the minimum cross-city charge is 0.50.
+ *
+ * The optional `fuelPriceIndex` parameter scales the result to reflect local
+ * fuel costs at the destination city (1.0 = EUR baseline; 1.25 = 25 % more
+ * expensive, e.g. London; 0.70 = cheaper, e.g. Beijing).
  *
  * Mirrors `GlobalExchangeCalculator.ComputeTransitCostPerUnit`.
  */
@@ -95,13 +99,15 @@ export function computeTransitCostPerUnit(
   destLat: number,
   destLon: number,
   weightPerUnit: number,
+  fuelPriceIndex = 1.0,
 ): number {
   const distanceKm = computeDistanceKm(sourceLat, sourceLon, destLat, destLon)
   if (distanceKm <= 0) return 0
 
   const effectiveWeight = Math.max(weightPerUnit, 0.1)
-  const rawCost = distanceKm * effectiveWeight * 0.0025
-  return Number(Math.max(rawCost, 0.05).toFixed(2))
+  const effectiveFuelIndex = Math.max(fuelPriceIndex, 0.1)
+  const rawCost = distanceKm * effectiveWeight * 0.025 * effectiveFuelIndex
+  return Number(Math.max(rawCost, 0.5).toFixed(2))
 }
 
 /**
