@@ -55,6 +55,40 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        // Enforce the city-average floor at the API layer.
+        // This mirrors the rule in StoreBuildingConfiguration and ensures a direct API call
+        // cannot bypass the browser-side min attribute constraint.
+        if (unit.ProductTypeId.HasValue)
+        {
+            var currencyCode = await db.Cities
+                .AsNoTracking()
+                .Where(c => c.Id == unit.Building.CityId)
+                .Select(c => c.CurrencyCode)
+                .FirstOrDefaultAsync() ?? "EUR";
+
+            var product = await db.ProductTypes
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == unit.ProductTypeId.Value);
+
+            if (product is not null)
+            {
+                var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode]);
+                var fxRate = FxRateHelper.GetEurRate(fxRates, currencyCode);
+                var floor = Math.Round(product.BasePrice * fxRate, 2);
+
+                if (input.NewMinPrice < floor)
+                {
+                    throw new GraphQLException(
+                        ErrorBuilder.New()
+                            .SetMessage(
+                                $"The minimum price ({input.NewMinPrice:F2}) for this product in {currencyCode} is below the city average price ({floor:F2} {currencyCode}). " +
+                                "Set the price at or above the city market reference price.")
+                            .SetCode("PRICE_BELOW_CITY_AVERAGE")
+                            .Build());
+                }
+            }
+        }
+
         unit.MinPrice = input.NewMinPrice;
         await db.SaveChangesAsync();
 

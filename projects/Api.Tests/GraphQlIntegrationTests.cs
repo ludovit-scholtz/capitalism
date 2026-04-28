@@ -5373,6 +5373,258 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task StoreBuildingConfiguration_PublicSales_PriceBelowCityAverageRejected()
+    {
+        // Proves the city-average price floor is enforced server-side (not only in the browser).
+        // Wooden Chair BasePrice = 45 EUR; Bratislava uses EUR so floor = 45.00.
+        // Submitting minPrice = 10 (below floor) must return PRICE_BELOW_CITY_AVERAGE.
+        var token = await RegisterAndGetTokenAsync($"shop-pricefloor-{Guid.NewGuid()}@test.com", "PriceFloor");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "PriceFloor Corp" } },
+            token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+
+        var cityId = await GetCityIdByNameAsync(); // Bratislava — EUR city
+
+        var buildingResult = await ExecuteGraphQlAsync(
+            "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
+            new { input = new { companyId, cityId, type = "SALES_SHOP", name = "Price Floor Shop" } },
+            token);
+        var buildingId = buildingResult.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        var productsResult = await ExecuteGraphQlAsync("{ productTypes(industry: \"FURNITURE\") { id slug basePrice } }");
+        var chairProduct = productsResult.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray()
+            .First(p => p.GetProperty("slug").GetString() == "wooden-chair");
+        var productId = chairProduct.GetProperty("id").GetString();
+        var basePrice = chairProduct.GetProperty("basePrice").GetDecimal();
+        // Bratislava is EUR — floor = basePrice × 1.0 = basePrice (e.g. 45).
+        // Submit a price clearly below the floor.
+        var belowFloorPrice = Math.Round(basePrice * 0.5m, 2);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new
+                        {
+                            unitType = "PUBLIC_SALES", gridX = 0, gridY = 0,
+                            linkUp = false, linkDown = false, linkLeft = false, linkRight = false,
+                            linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false,
+                            productTypeId = productId, minPrice = belowFloorPrice
+                        }
+                    }
+                }
+            },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            $"Expected PRICE_BELOW_CITY_AVERAGE error but got success. belowFloorPrice={belowFloorPrice}");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("PRICE_BELOW_CITY_AVERAGE", code);
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_PublicSales_PriceAtCityAverageAccepted()
+    {
+        // Proves a price exactly at the city average is accepted by the backend.
+        var token = await RegisterAndGetTokenAsync($"shop-pricefloor-at-{Guid.NewGuid()}@test.com", "PriceFloorAt");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "PriceFloorAt Corp" } },
+            token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
+
+        var cityId = await GetCityIdByNameAsync(); // Bratislava — EUR city, fxRate = 1.0
+
+        var buildingResult = await ExecuteGraphQlAsync(
+            "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
+            new { input = new { companyId, cityId, type = "SALES_SHOP", name = "Price At Floor Shop" } },
+            token);
+        var buildingId = buildingResult.GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
+
+        var productsResult = await ExecuteGraphQlAsync("{ productTypes(industry: \"FURNITURE\") { id slug basePrice } }");
+        var chairProduct = productsResult.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray()
+            .First(p => p.GetProperty("slug").GetString() == "wooden-chair");
+        var productId = chairProduct.GetProperty("id").GetString();
+        var basePrice = chairProduct.GetProperty("basePrice").GetDecimal();
+        // Floor = basePrice × 1.0 (EUR city). Submit exactly at the floor.
+        var atFloorPrice = Math.Round(basePrice, 2);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new
+                        {
+                            unitType = "PUBLIC_SALES", gridX = 0, gridY = 0,
+                            linkUp = false, linkDown = false, linkLeft = false, linkRight = false,
+                            linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false,
+                            productTypeId = productId, minPrice = atFloorPrice
+                        }
+                    }
+                }
+            },
+            token);
+
+        // Must succeed — price at floor is valid.
+        Assert.False(result.TryGetProperty("errors", out _),
+            $"Expected success at floor price {atFloorPrice} but got errors.");
+        Assert.True(result.TryGetProperty("data", out _));
+    }
+
+    [Fact]
+    public async Task StoreBuildingConfiguration_PublicSales_CzkCityPriceFloorIsScaled()
+    {
+        // Proves the floor uses the FX-scaled city price (not the raw EUR base price).
+        // Prague uses CZK with ~25.20× rate. Wooden Chair EUR base = 45 → floor ≈ 1,134 CZK.
+        // Submitting 50 CZK (far below the CZK floor) must return PRICE_BELOW_CITY_AVERAGE.
+        var token = await RegisterAndGetTokenAsync($"shop-czk-floor-{Guid.NewGuid()}@test.com", "CzkFloor");
+        var pragueId = await GetCityIdByNameAsync("Prague");
+        var pragueGuid = Guid.Parse(pragueId);
+
+        // Create a shop in Prague directly via DB to avoid CZK bank balance requirements
+        // (PlaceBuilding checks local currency funds; this test only needs the validation path).
+        Guid buildingId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var userId = await db.Players
+                .Where(p => p.Email == $"shop-czk-floor-{token.Split('.')[0]}@test.com" || true)
+                .Select(p => p.Id)
+                .FirstOrDefaultAsync();
+            // Resolve the authenticated player's ID from the JWT token.
+            var jwtHandler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
+            var jwtToken = jwtHandler.ReadJwtToken(token);
+            var playerIdStr = jwtToken.Claims.FirstOrDefault(c => c.Type == "sub")?.Value
+                ?? jwtToken.Claims.FirstOrDefault(c => c.Type == System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var playerId = Guid.Parse(playerIdStr!);
+
+            var company = await db.Companies.FirstOrDefaultAsync(c => c.PlayerId == playerId);
+            if (company is null)
+            {
+                company = new Company { Id = Guid.NewGuid(), PlayerId = playerId, Name = "CZK Floor Corp", TotalSharesIssued = 1000 };
+                db.Companies.Add(company);
+                await db.SaveChangesAsync();
+            }
+
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = pragueGuid,
+                Type = BuildingType.SalesShop,
+                Name = "CZK Floor Shop",
+                Latitude = 50.08,
+                Longitude = 14.43,
+                Level = 1,
+                PowerConsumption = 1m,
+                BuiltAtUtc = DateTime.UtcNow,
+            };
+            db.Buildings.Add(building);
+            await db.SaveChangesAsync();
+            buildingId = building.Id;
+        }
+
+        var productsResult = await ExecuteGraphQlAsync("{ productTypes(industry: \"FURNITURE\") { id slug } }");
+        var productId = productsResult.GetProperty("data").GetProperty("productTypes")
+            .EnumerateArray()
+            .First(p => p.GetProperty("slug").GetString() == "wooden-chair")
+            .GetProperty("id").GetString();
+
+        // 50 CZK is well below any reasonable CZK floor for Wooden Chair.
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new
+                        {
+                            unitType = "PUBLIC_SALES", gridX = 0, gridY = 0,
+                            linkUp = false, linkDown = false, linkLeft = false, linkRight = false,
+                            linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false,
+                            productTypeId = productId, minPrice = (decimal?)50m
+                        }
+                    }
+                }
+            },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            "Expected PRICE_BELOW_CITY_AVERAGE for 50 CZK on a CZK-scaled product");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("PRICE_BELOW_CITY_AVERAGE", code);
+    }
+
+    [Fact]
+    public async Task UpdatePublicSalesPrice_PriceBelowCityAverageRejected()
+    {
+        // Proves the city-average floor is also enforced in the UpdatePublicSalesPrice
+        // mutation (instant-price-update path).  A direct API call with a value below
+        // the floor must return PRICE_BELOW_CITY_AVERAGE even if the browser allows it.
+        var (token, unitId) = await SetupPublicSalesUnitAsync(
+            $"upsp-floor-{Guid.NewGuid()}@test.com", "FloorCheck", "FloorCheck Co");
+
+        // Fetch the product base price and city currency to compute the floor.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var unit = await db.BuildingUnits
+            .Include(u => u.Building)
+            .FirstAsync(u => u.Id == unitId);
+        var product = await db.ProductTypes.FindAsync(unit.ProductTypeId);
+        var city = await db.Cities.FindAsync(unit.Building.CityId);
+        var currencyCode = city?.CurrencyCode ?? "EUR";
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [currencyCode]);
+        var fxRate = FxRateHelper.GetEurRate(fxRates, currencyCode);
+        var floor = Math.Round(product!.BasePrice * fxRate, 2);
+        var belowFloor = Math.Round(floor * 0.5m, 2);
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation UpdatePublicSalesPrice($input: UpdatePublicSalesPriceInput!) {
+                updatePublicSalesPrice(input: $input) { id minPrice }
+            }
+            """,
+            new { input = new { unitId, newMinPrice = belowFloor } },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors),
+            $"Expected PRICE_BELOW_CITY_AVERAGE for price {belowFloor} (floor={floor})");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("PRICE_BELOW_CITY_AVERAGE", code);
+    }
+
+    [Fact]
     public async Task StoreBuildingConfiguration_SalesShop_UnauthorizedPlayerCannotConfigure()
     {
         var ownerToken = await RegisterAndGetTokenAsync($"shop-owner-{Guid.NewGuid()}@test.com", "Shop Owner");
@@ -17610,7 +17862,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var (token, unitId) = await SetupPublicSalesUnitAsync(
             "upsp-successive@test.com", "Successive", "Successive Co");
 
-        foreach (var price in new[] { 10.00m, 25.50m, 9.99m })
+        foreach (var price in new[] { 50.00m, 75.50m, 60.99m })
         {
             var result = await ExecuteGraphQlAsync(
                 """
@@ -17631,8 +17883,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var unit = await db.BuildingUnits.FindAsync(unitId);
             Assert.NotNull(unit);
-            Assert.True(Math.Abs(unit!.MinPrice!.Value - 9.99m) < 0.001m,
-                $"Expected final price 9.99 but got {unit.MinPrice}.");
+            Assert.True(Math.Abs(unit!.MinPrice!.Value - 60.99m) < 0.001m,
+                $"Expected final price 60.99 but got {unit.MinPrice}.");
         }
     }
 

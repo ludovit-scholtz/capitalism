@@ -64,6 +64,7 @@ public sealed partial class Mutation
         await EnsureSubmittedProductsAreAccessibleAsync(db, building, input.Units, hasActiveProSubscription);
         await ValidateMediaHouseReferencesAsync(db, building, input.Units);
         await ValidateProductTopologyAsync(db, building.Id, input.Units);
+        await BuildingConfigurationService.ValidatePublicSalesPriceFloorAsync(db, building.CityId, input.Units);
 
         var plan = await BuildingConfigurationService.StoreConfigurationAsync(db, building, input.Units, gameState.CurrentTick);
         await db.SaveChangesAsync();
