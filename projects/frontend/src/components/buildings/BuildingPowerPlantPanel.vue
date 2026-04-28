@@ -238,16 +238,115 @@ const chartMaxValue = computed(() => {
         <p v-if="dispatchSuccess" class="dispatch-success mt-1 text-xs text-green-400">{{ t('powerPlant.dispatch.success') }}</p>
       </div>
 
-      <!-- Fuel reserve (thermal plants only) -->
+      <!-- Fuel reserve (thermal plants only) — richer capacity bar, chain visualization, multi-fuel badge -->
       <div
         v-if="isThermalPlant"
         class="fuel-reserve mb-4 rounded-lg border border-divider bg-surface p-3"
       >
-        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <!-- Header row: title + fuel type badge -->
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs font-semibold uppercase tracking-wide text-muted">⛽ {{ t('powerPlant.fuelReserve.title') }}</span>
-          <span class="text-sm font-bold text-foreground">{{ (powerPlantAnalytics.fuelReserveMwh ?? 0).toFixed(1) }} MWh</span>
+          <div class="flex items-center gap-2">
+            <!-- Multi-fuel economics badge -->
+            <span
+              class="fuel-type-badge inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+              :class="powerPlantAnalytics.plantType === 'GAS' ? 'bg-blue-600/20 text-blue-300' : 'bg-orange-600/20 text-orange-300'"
+              :title="powerPlantAnalytics.plantType === 'GAS'
+                ? t('powerPlant.fuelReserve.gasPremiumNote')
+                : t('powerPlant.fuelReserve.fuelCostHint', { cost: powerPlantAnalytics.fuelCostPerMwhEur.toFixed(2) })"
+            >
+              {{ powerPlantAnalytics.plantType === 'GAS' ? '🔵' : '🟠' }}
+              {{ t('powerPlant.fuelReserve.fuelTypeBadge', { type: powerPlantAnalytics.fuelTypeLabel || powerPlantAnalytics.plantType }) }}
+            </span>
+            <span class="fuel-reserve-mwh text-sm font-bold text-foreground">
+              {{ (powerPlantAnalytics.fuelReserveMwh ?? 0).toFixed(1) }}
+              <span class="text-xs font-normal text-muted">/ {{ (powerPlantAnalytics.maxFuelReserveMwh ?? 0).toFixed(0) }} MWh</span>
+            </span>
+          </div>
         </div>
-        <p class="text-xs text-muted">{{ t('powerPlant.fuelReserve.hint') }}</p>
+
+        <!-- Reserve capacity bar -->
+        <div v-if="(powerPlantAnalytics.maxFuelReserveMwh ?? 0) > 0" class="fuel-reserve-bar-wrapper mb-2">
+          <div class="mb-1 flex items-center justify-between text-xs text-muted">
+            <span>{{ t('powerPlant.fuelReserve.capacityLabel') }}</span>
+            <span class="font-semibold" :class="(powerPlantAnalytics.fuelReservePercent ?? 0) < 20 ? 'text-red-400' : (powerPlantAnalytics.fuelReservePercent ?? 0) < 50 ? 'text-yellow-400' : 'text-green-400'">
+              {{ t('powerPlant.fuelReserve.fillPercent', { percent: powerPlantAnalytics.fuelReservePercent ?? 0 }) }}
+            </span>
+          </div>
+          <div class="fuel-reserve-bar h-3 w-full overflow-hidden rounded-full bg-black/20">
+            <div
+              class="fuel-reserve-bar-fill h-full rounded-full transition-all duration-300"
+              :class="{
+                'bg-red-500': (powerPlantAnalytics.fuelReservePercent ?? 0) < 20,
+                'bg-yellow-500': (powerPlantAnalytics.fuelReservePercent ?? 0) >= 20 && (powerPlantAnalytics.fuelReservePercent ?? 0) < 50,
+                'bg-green-500': (powerPlantAnalytics.fuelReservePercent ?? 0) >= 50,
+              }"
+              :style="{ width: `${Math.max(powerPlantAnalytics.fuelReservePercent ?? 0, 1)}%` }"
+            />
+          </div>
+          <div v-if="(powerPlantAnalytics.fuelPurchaseCapacityMwhPerTick ?? 0) > 0" class="mt-1 text-xs text-muted">
+            {{ t('powerPlant.fuelReserve.procurementRate', { mwh: (powerPlantAnalytics.fuelPurchaseCapacityMwhPerTick ?? 0).toFixed(1) }) }}
+          </div>
+        </div>
+        <!-- No FUEL_PURCHASE units installed -->
+        <p v-else class="no-fp-units mb-2 text-xs text-yellow-400">{{ t('powerPlant.fuelReserve.noFuelPurchaseUnits') }}</p>
+
+        <!-- Constrained output warning -->
+        <div
+          v-if="(powerPlantAnalytics.fuelConstrainedOutputMw ?? 0) > 0"
+          class="fuel-constrained-warning mt-2 flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-600/10 px-3 py-2 text-xs text-red-300"
+        >
+          <span class="mt-0.5 text-base">⚠️</span>
+          <span>{{ t('powerPlant.fuelReserve.constrainedWarning', { mw: (powerPlantAnalytics.fuelConstrainedOutputMw ?? 0).toFixed(1) }) }}</span>
+        </div>
+
+        <!-- No ENERGY_PRODUCING units installed (guidance) -->
+        <p v-else-if="(powerPlantAnalytics.energyProducingCapacityMw ?? 0) === 0" class="no-ep-units mt-2 text-xs text-muted">
+          {{ t('powerPlant.fuelReserve.noEnergyProducingUnits') }}
+        </p>
+
+        <!-- Grid link chain: FUEL_PURCHASE → ENERGY_PRODUCING → GRID -->
+        <div
+          v-if="(powerPlantAnalytics.maxFuelReserveMwh ?? 0) > 0 || (powerPlantAnalytics.energyProducingCapacityMw ?? 0) > 0"
+          class="grid-link-chain mt-3 border-t border-divider pt-3"
+        >
+          <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ t('powerPlant.fuelReserve.gridLinkTitle') }}</p>
+          <div class="flex flex-wrap items-center gap-1 text-xs">
+            <!-- FP node -->
+            <div
+              class="grid-link-node fuel-purchase-node rounded-lg border border-divider bg-card px-2.5 py-1.5"
+              :class="(powerPlantAnalytics.maxFuelReserveMwh ?? 0) > 0 ? 'border-orange-500/40' : 'opacity-40'"
+            >
+              <span class="font-semibold">⛽ {{ t('powerPlant.fuelReserve.gridLinkFuelPurchase') }}</span>
+              <br />
+              <span class="text-muted">{{ t('powerPlant.fuelReserve.gridLinkFuelPurchaseHint', { mwh: (powerPlantAnalytics.fuelPurchaseCapacityMwhPerTick ?? 0).toFixed(1), max: (powerPlantAnalytics.maxFuelReserveMwh ?? 0).toFixed(0) }) }}</span>
+            </div>
+            <!-- Arrow -->
+            <span class="chain-arrow text-muted">→</span>
+            <!-- EP node -->
+            <div
+              class="grid-link-node energy-producing-node rounded-lg border border-divider bg-card px-2.5 py-1.5"
+              :class="(powerPlantAnalytics.energyProducingCapacityMw ?? 0) > 0 ? 'border-yellow-500/40' : 'opacity-40'"
+            >
+              <span class="font-semibold">🔥 {{ t('powerPlant.fuelReserve.gridLinkEnergyProducing') }}</span>
+              <br />
+              <span class="text-muted">{{ t('powerPlant.fuelReserve.gridLinkEnergyProducingHint', { mw: (powerPlantAnalytics.energyProducingCapacityMw ?? 0).toFixed(1) }) }}</span>
+            </div>
+            <!-- Arrow -->
+            <span class="chain-arrow text-muted">→</span>
+            <!-- Grid node -->
+            <div class="grid-link-node city-grid-node rounded-lg border border-green-500/40 bg-card px-2.5 py-1.5">
+              <span class="font-semibold text-green-400">⚡ {{ t('powerPlant.fuelReserve.gridLinkGrid') }}</span>
+            </div>
+          </div>
+          <!-- GAS premium notice -->
+          <p v-if="powerPlantAnalytics.plantType === 'GAS'" class="gas-premium-note mt-2 text-xs text-blue-300">
+            {{ t('powerPlant.fuelReserve.gasPremiumNote') }}
+          </p>
+        </div>
+
+        <!-- Legacy hint text (when no units yet) -->
+        <p v-else class="mt-2 text-xs text-muted">{{ t('powerPlant.fuelReserve.hint') }}</p>
       </div>
 
       <!-- P&L summary grid (5 metrics incl. fuel costs for thermal) -->

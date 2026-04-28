@@ -2032,6 +2032,23 @@ export default {
     fuelReserve: {
       title: 'Zásoby paliva',
       hint: 'Palivo sa obstaráva každý tick jednotkami NÁKUP PALIVA. Jednotky VÝROBA ENERGIE konvertujú uskladnené palivo na elektrinu pre sieť.',
+      capacityLabel: 'Kapacita zásobníka',
+      currentLabel: 'Aktuálna zásoba',
+      maxLabel: 'Maximálna kapacita',
+      fillPercent: '{percent}% plný',
+      procurementRate: '+{mwh} MWh/tick nákup',
+      constrainedWarning: '{mw} MW výkonu obmedzených — zásobník príliš nízky na zásobenie všetkých jednotiek VÝROBA ENERGIE.',
+      noFuelPurchaseUnits: 'Nainštalujte jednotky NÁKUP PALIVA na nákup paliva a zväčšenie kapacity zásobníka.',
+      noEnergyProducingUnits: 'Nainštalujte jednotky VÝROBA ENERGIE na konverziu paliva na výkon siete.',
+      gridLinkTitle: 'Reťazec palivo → sieť',
+      gridLinkFuelPurchase: 'Nákup paliva',
+      gridLinkFuelPurchaseHint: 'Nakupuje {mwh} MWh/tick. Zásobník sa plní smerom k {max} MWh.',
+      gridLinkEnergyProducing: 'Výroba energie',
+      gridLinkEnergyProducingHint: 'Konvertuje zásoby paliva na {mw} MW elektrickej energie.',
+      gridLinkGrid: 'Mestská sieť',
+      fuelTypeBadge: 'Palivo {type}',
+      fuelCostHint: 'Základná cena: {cost} €/MWh (pred úpravou cenového indexu mesta).',
+      gasPremiumNote: 'Zemný plyn je o 20 % drahší ako uhlie na MWh, ale ponúka rýchlejšiu reakciu a čistejšie spaľovanie.',
     },
     units: {
       POWER_GENERATION: {

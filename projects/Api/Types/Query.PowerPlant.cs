@@ -52,6 +52,12 @@ public sealed partial class Query
                     .Build());
         }
 
+        // Load installed units so we can compute reserve capacity and constrained output.
+        var units = await db.BuildingUnits
+            .AsNoTracking()
+            .Where(u => u.BuildingId == buildingId)
+            .ToListAsync();
+
         var safeLimit = Math.Clamp(limit ?? 100, 1, 100);
         var currentTick = await db.GameStates
             .AsNoTracking()
@@ -104,6 +110,49 @@ public sealed partial class Query
             });
         }
 
+        // ── Fuel reserve capacity and constrained-output analytics ─────────────
+        var isThermal = GameConstants.IsThermalPlant(building.PowerPlantType);
+
+        var fuelPurchaseUnits = units
+            .Where(u => u.UnitType == UnitType.FuelPurchase)
+            .ToList();
+
+        var maxFuelReserveMwh = isThermal
+            ? fuelPurchaseUnits.Sum(u => GameConstants.FuelReserveCapacityPerUnitLevel * u.Level)
+            : 0m;
+
+        var fuelPurchaseCapacityMwhPerTick = isThermal
+            ? fuelPurchaseUnits.Sum(u => GameConstants.FuelPurchaseBoostMwPerLevel * u.Level)
+            : 0m;
+
+        var energyProducingCapacityMw = isThermal
+            ? units
+                .Where(u => u.UnitType == UnitType.EnergyProducing)
+                .Sum(u => GameConstants.EnergyProducingBoostMwPerLevel * u.Level)
+            : 0m;
+
+        // Constrained output: how much ENERGY_PRODUCING capacity is unused because the fuel
+        // reserve is too low.  This is an instantaneous estimate based on current reserve.
+        var fuelConstrainedOutputMw = isThermal && energyProducingCapacityMw > 0m
+            ? Math.Max(0m, energyProducingCapacityMw - building.FuelReserveMwh)
+            : 0m;
+
+        var fuelReservePercent = maxFuelReserveMwh > 0m
+            ? (int)Math.Round(building.FuelReserveMwh / maxFuelReserveMwh * 100m)
+            : 0;
+        fuelReservePercent = Math.Clamp(fuelReservePercent, 0, 100);
+
+        var fuelTypeLabel = building.PowerPlantType switch
+        {
+            PowerPlantType.Coal => "Coal",
+            PowerPlantType.Gas  => "Natural Gas",
+            _                   => string.Empty,
+        };
+
+        var fuelCostPerMwhEur = isThermal
+            ? GameConstants.FuelCostPerMwhForPlantType(building.PowerPlantType)
+            : 0m;
+
         return new PowerPlantAnalytics
         {
             BuildingId = building.Id,
@@ -114,6 +163,13 @@ public sealed partial class Query
                 : GameConstants.DefaultPowerOutputMw(building.PowerPlantType),
             DispatchTargetPercent = building.DispatchTargetPercent,
             FuelReserveMwh = building.FuelReserveMwh,
+            MaxFuelReserveMwh = maxFuelReserveMwh,
+            FuelReservePercent = fuelReservePercent,
+            FuelPurchaseCapacityMwhPerTick = fuelPurchaseCapacityMwhPerTick,
+            EnergyProducingCapacityMw = energyProducingCapacityMw,
+            FuelConstrainedOutputMw = fuelConstrainedOutputMw,
+            FuelTypeLabel = fuelTypeLabel,
+            FuelCostPerMwhEur = fuelCostPerMwhEur,
             DataFromTick = windowStart,
             DataToTick = currentTick,
             TotalSurplusIncome = snapshots.Sum(s => s.SurplusIncome),

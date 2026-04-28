@@ -2040,6 +2040,23 @@ export default {
     fuelReserve: {
       title: 'Brennstoffreserve',
       hint: 'Brennstoff wird jeden Tick von BRENNSTOFFBESCHAFFUNGS-Einheiten beschafft. ENERGIEERZEUGER-Einheiten wandeln gespeicherten Brennstoff in Netzstrom um.',
+      capacityLabel: 'Reservekapazität',
+      currentLabel: 'Aktuelle Reserve',
+      maxLabel: 'Max. Kapazität',
+      fillPercent: '{percent}% gefüllt',
+      procurementRate: '+{mwh} MWh/Tick Beschaffung',
+      constrainedWarning: '{mw} MW Leistung eingeschränkt — Reserve zu niedrig für alle ENERGIEERZEUGER-Einheiten.',
+      noFuelPurchaseUnits: 'Keine BRENNSTOFFBESCHAFFUNGS-Einheiten installiert. Installieren Sie sie, um Brennstoffbeschaffung und Reservekapazität zu aktivieren.',
+      noEnergyProducingUnits: 'Keine ENERGIEERZEUGER-Einheiten installiert. Fügen Sie sie hinzu, um gespeicherten Brennstoff in Netzstrom umzuwandeln.',
+      gridLinkTitle: 'Brennstoff → Netz-Kette',
+      gridLinkFuelPurchase: 'Brennstoffbeschaffung',
+      gridLinkFuelPurchaseHint: 'Beschafft {mwh} MWh/Tick. Reserve füllt sich bis zu {max} MWh.',
+      gridLinkEnergyProducing: 'Energieerzeuger',
+      gridLinkEnergyProducingHint: 'Wandelt gespeicherten Brennstoff in {mw} MW Netzstrom um.',
+      gridLinkGrid: 'Stadtnetz',
+      fuelTypeBadge: '{type}-Brennstoff',
+      fuelCostHint: 'Grundkosten: {cost} €/MWh (vor städtischer Preisindex-Anpassung).',
+      gasPremiumNote: 'Erdgas kostet 20 % mehr als Kohle pro MWh, bietet aber schnellere Reaktion und sauberere Verbrennung.',
     },
     units: {
       POWER_GENERATION: {

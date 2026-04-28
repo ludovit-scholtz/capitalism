@@ -3746,6 +3746,13 @@ export function useBuildingDetail() {
             currentOutputMw
             dispatchTargetPercent
             fuelReserveMwh
+            maxFuelReserveMwh
+            fuelReservePercent
+            fuelPurchaseCapacityMwhPerTick
+            energyProducingCapacityMw
+            fuelConstrainedOutputMw
+            fuelTypeLabel
+            fuelCostPerMwhEur
             dataFromTick
             dataToTick
             totalSurplusIncome

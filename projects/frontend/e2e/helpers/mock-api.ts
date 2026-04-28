@@ -4568,26 +4568,50 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
 
       const dataToTick = state.gameState.currentTick
       const dataFromTick = Math.max(0, dataToTick - (limit - 1))
+
+      const isThermal = ['COAL', 'GAS'].includes(building.powerPlantType ?? '')
+      const fuelUnits = (building.units ?? []).filter((u) => u.unitType === 'FUEL_PURCHASE')
+      const epUnits = (building.units ?? []).filter((u) => u.unitType === 'ENERGY_PRODUCING')
+      const maxFuelReserveMwh = isThermal ? fuelUnits.reduce((sum, u) => sum + u.level * 50, 0) : 0
+      const fuelPurchaseCapacityMwhPerTick = isThermal ? fuelUnits.reduce((sum, u) => sum + u.level * 10, 0) : 0
+      const energyProducingCapacityMw = isThermal ? epUnits.reduce((sum, u) => sum + u.level * 20, 0) : 0
+      const currentReserve = building.fuelReserveMwh ?? 0
+      const fuelConstrainedOutputMw = isThermal && energyProducingCapacityMw > 0
+        ? Math.max(0, energyProducingCapacityMw - currentReserve)
+        : 0
+      const fuelReservePercent = maxFuelReserveMwh > 0
+        ? Math.min(100, Math.round((currentReserve / maxFuelReserveMwh) * 100))
+        : 0
+      const fuelTypeLabel = (building.powerPlantType === 'GAS') ? 'Natural Gas' : (building.powerPlantType === 'COAL') ? 'Coal' : ''
+      const fuelCostPerMwhEur = building.powerPlantType === 'GAS' ? 3.6 : building.powerPlantType === 'COAL' ? 3 : 0
+
       const powerPlantAnalytics = {
         buildingId: building.id,
         buildingName: building.name,
         plantType: building.powerPlantType ?? 'COAL',
         currentOutputMw: building.powerOutput ?? 50,
         dispatchTargetPercent: building.dispatchTargetPercent ?? 100,
-        fuelReserveMwh: building.fuelReserveMwh ?? 0,
+        fuelReserveMwh: currentReserve,
+        maxFuelReserveMwh,
+        fuelReservePercent,
+        fuelPurchaseCapacityMwhPerTick,
+        energyProducingCapacityMw,
+        fuelConstrainedOutputMw,
+        fuelTypeLabel,
+        fuelCostPerMwhEur,
         dataFromTick,
         dataToTick,
         totalSurplusIncome: 225,
         totalGridFines: 0,
         totalOperatingCosts: 12,
-        totalFuelCosts: 85,
+        totalFuelCosts: isThermal ? 85 : 0,
         totalNetProfit: 128,
         timeline: Array.from({ length: Math.min(limit, 5) }, (_, i) => ({
           tick: dataToTick - 4 + i,
           surplusIncome: 45,
           gridFine: 0,
           operatingCosts: 2.4,
-          fuelCosts: 17,
+          fuelCosts: isThermal ? 17 : 0,
           netProfit: 25.6,
         })),
       }

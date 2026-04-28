@@ -2164,4 +2164,274 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
 
         Assert.True(result.TryGetProperty("errors", out _), "Should return errors for invalid dispatch target");
     }
+
+    /// <summary>
+    /// powerPlantAnalytics query must return the new fuel-reserve capacity fields:
+    /// maxFuelReserveMwh, fuelReservePercent, fuelPurchaseCapacityMwhPerTick,
+    /// energyProducingCapacityMw, fuelConstrainedOutputMw, fuelTypeLabel, and fuelCostPerMwhEur.
+    /// </summary>
+    [Fact]
+    public async Task PowerPlantAnalytics_ReturnsReserveCapacityFields()
+    {
+        var token = await RegisterAndGetTokenAsync($"analytics_cap_{Guid.NewGuid():N}"[..28] + "@t.com", "CapTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Cap Analytics Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        // COAL plant with 1 × FUEL_PURCHASE (level 2) and 1 × ENERGY_PRODUCING (level 1).
+        // Max reserve capacity = 2 × 50 MWh = 100 MWh.
+        // Current reserve = 40 MWh → fill percent = 40%.
+        // FP procurement capacity = 2 × 10 = 20 MWh/tick.
+        // EP capacity = 1 × 20 = 20 MW.
+        // Constrained = max(0, 20 − 40) = 0 (reserve >= EP capacity).
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Cap Analytics Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m,
+            FuelReserveMwh = 40m, DispatchTargetPercent = 100, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+
+        db.BuildingUnits.AddRange(
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = plant.Id, UnitType = UnitType.FuelPurchase,    GridX = 0, GridY = 0, Level = 2 },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = plant.Id, UnitType = UnitType.EnergyProducing, GridX = 1, GridY = 0, Level = 1 }
+        );
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Analytics($buildingId: UUID!) {
+                powerPlantAnalytics(buildingId: $buildingId) {
+                    maxFuelReserveMwh
+                    fuelReservePercent
+                    fuelPurchaseCapacityMwhPerTick
+                    energyProducingCapacityMw
+                    fuelConstrainedOutputMw
+                    fuelTypeLabel
+                    fuelCostPerMwhEur
+                }
+            }
+            """,
+            new { buildingId = plant.Id },
+            token);
+
+        var analytics = result.GetProperty("data").GetProperty("powerPlantAnalytics");
+        Assert.Equal(100m, analytics.GetProperty("maxFuelReserveMwh").GetDecimal());
+        Assert.Equal(40, analytics.GetProperty("fuelReservePercent").GetInt32());
+        Assert.Equal(20m, analytics.GetProperty("fuelPurchaseCapacityMwhPerTick").GetDecimal());
+        Assert.Equal(20m, analytics.GetProperty("energyProducingCapacityMw").GetDecimal());
+        Assert.Equal(0m, analytics.GetProperty("fuelConstrainedOutputMw").GetDecimal()); // reserve (40) >= EP cap (20)
+        Assert.Equal("Coal", analytics.GetProperty("fuelTypeLabel").GetString());
+        Assert.Equal(GameConstants.FuelCostPerMwhBase, analytics.GetProperty("fuelCostPerMwhEur").GetDecimal());
+    }
+
+    /// <summary>
+    /// When the fuel reserve is lower than the ENERGY_PRODUCING unit capacity,
+    /// fuelConstrainedOutputMw should be > 0 indicating how much output is being lost.
+    /// </summary>
+    [Fact]
+    public async Task PowerPlantAnalytics_FuelConstrainedOutput_WhenReserveLow()
+    {
+        var token = await RegisterAndGetTokenAsync($"constrained_{Guid.NewGuid():N}"[..28] + "@t.com", "ConstrainedTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Constrained Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        // COAL plant with 2 × ENERGY_PRODUCING (level 1 each) = 40 MW EP capacity.
+        // Reserve = 15 MWh — only 15 MW of the 40 MW EP capacity can fire.
+        // Constrained = 40 − 15 = 25 MW of unused capacity.
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Constrained Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m,
+            FuelReserveMwh = 15m, DispatchTargetPercent = 100, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+
+        db.BuildingUnits.AddRange(
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = plant.Id, UnitType = UnitType.EnergyProducing, GridX = 0, GridY = 0, Level = 1 },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = plant.Id, UnitType = UnitType.EnergyProducing, GridX = 1, GridY = 0, Level = 1 }
+        );
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Analytics($buildingId: UUID!) {
+                powerPlantAnalytics(buildingId: $buildingId) {
+                    energyProducingCapacityMw
+                    fuelConstrainedOutputMw
+                }
+            }
+            """,
+            new { buildingId = plant.Id },
+            token);
+
+        var analytics = result.GetProperty("data").GetProperty("powerPlantAnalytics");
+        Assert.Equal(40m, analytics.GetProperty("energyProducingCapacityMw").GetDecimal());
+        Assert.Equal(25m, analytics.GetProperty("fuelConstrainedOutputMw").GetDecimal()); // 40 − 15 = 25
+    }
+
+    /// <summary>
+    /// A GAS plant should pay FuelCostPerMwhBase × GasFuelCostMultiplier per MWh —
+    /// i.e. 20% more than an equivalent COAL plant procuring the same quantity.
+    /// </summary>
+    [Fact]
+    public async Task FuelProcurement_GasPlant_CostsMoreThanCoal()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"MultiFuel_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.1, Longitude = 16.9, Population = 5_000, AverageRentPerSqm = 5m,
+            FuelPriceIndex = 1.0m, CurrencyCode = "EUR"
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Multi Fuel Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        db.FxRates.Add(new FxRate
+        {
+            Id = Guid.NewGuid(), BaseCurrencyCode = "EUR", QuoteCurrencyCode = "EUR",
+            Rate = 1.0m, RateDate = DateOnly.FromDateTime(DateTime.UtcNow), FetchedAtUtc = DateTime.UtcNow, Source = "FALLBACK"
+        });
+
+        // Create separate bank accounts for coal and gas plants.
+        var coalAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(db, company.Id, "EUR");
+        coalAccount.Balance = 100_000m;
+
+        // Create a second EUR account for the gas plant.
+        var gasAccount = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = "1234567890123456",
+            CompanyId = company.Id,
+            CurrencyCode = "EUR",
+            Balance = 100_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(gasAccount);
+
+        // Identical plants except for plant type and bank account.
+        // Both have 1 × FUEL_PURCHASE level-1 unit → procure 10 MWh/tick.
+        var coalPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Coal Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m, PowerConsumption = 0m,
+            FuelReserveMwh = 0m, BankAccountId = coalAccount.Id, BuiltAtUtc = DateTime.UtcNow
+        };
+        var gasPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Gas Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "GAS", PowerOutput = 40m, PowerConsumption = 0m,
+            FuelReserveMwh = 0m, BankAccountId = gasAccount.Id, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(coalPlant, gasPlant);
+
+        db.BuildingUnits.AddRange(
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = coalPlant.Id, UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1 },
+            new BuildingUnit { Id = Guid.NewGuid(), BuildingId = gasPlant.Id,  UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1 }
+        );
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var coalCost = await db.LedgerEntries
+            .Where(e => e.BuildingId == coalPlant.Id && e.Category == LedgerCategory.FuelCost)
+            .SumAsync(e => Math.Abs(e.Amount));
+
+        var gasCost = await db.LedgerEntries
+            .Where(e => e.BuildingId == gasPlant.Id && e.Category == LedgerCategory.FuelCost)
+            .SumAsync(e => Math.Abs(e.Amount));
+
+        Assert.True(coalCost > 0m, $"Coal plant should have fuel cost but got {coalCost}");
+        Assert.True(gasCost > coalCost,
+            $"GAS plant fuel cost ({gasCost}) should be higher than COAL ({coalCost}) by {GameConstants.GasFuelCostMultiplier}x");
+
+        // Verify the exact multiplier: GAS / COAL should equal GasFuelCostMultiplier.
+        var ratio = gasCost / coalCost;
+        Assert.True(Math.Abs(ratio - GameConstants.GasFuelCostMultiplier) < 0.001m,
+            $"GAS/COAL cost ratio should be {GameConstants.GasFuelCostMultiplier} but was {ratio}");
+    }
+
+    /// <summary>
+    /// fuelTypeLabel must be "Natural Gas" for GAS plants.
+    /// </summary>
+    [Fact]
+    public async Task PowerPlantAnalytics_GasPlant_ReturnsFuelTypeLabel()
+    {
+        var token = await RegisterAndGetTokenAsync($"gastype_{Guid.NewGuid():N}"[..28] + "@t.com", "GasTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Gas Type Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Gas Type Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "GAS", PowerOutput = 40m, FuelReserveMwh = 0m,
+            DispatchTargetPercent = 100, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Analytics($buildingId: UUID!) {
+                powerPlantAnalytics(buildingId: $buildingId) {
+                    fuelTypeLabel
+                    fuelCostPerMwhEur
+                }
+            }
+            """,
+            new { buildingId = plant.Id },
+            token);
+
+        var analytics = result.GetProperty("data").GetProperty("powerPlantAnalytics");
+        Assert.Equal("Natural Gas", analytics.GetProperty("fuelTypeLabel").GetString());
+        Assert.Equal(GameConstants.FuelCostPerMwhBase * GameConstants.GasFuelCostMultiplier,
+            analytics.GetProperty("fuelCostPerMwhEur").GetDecimal());
+    }
 }
