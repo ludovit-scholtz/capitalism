@@ -5006,7 +5006,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('rankings') && !query.includes('companyRankings')) {
       const USD_RATE = 1.08
       const rankings = state.players
-        .filter((p) => p.role !== 'ADMIN')
+        .filter((p) => p.role !== 'ADMIN' && p.email !== 'government@capitalism.game')
         .map((p) => {
           const personalCash = p.personalCash ?? 0
           const sharesValue = Number(
@@ -5048,7 +5048,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     if (query.includes('companyRankings')) {
       const USD_RATE = 1.08
       const companyRankings = state.players
-        .filter((player) => player.role !== 'ADMIN')
+        .filter((player) => player.role !== 'ADMIN' && player.email !== 'government@capitalism.game')
         .flatMap((player) =>
           player.companies.map((company) => {
             const buildingValue = company.buildings.reduce((sum, building) => {
@@ -5944,8 +5944,17 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           inflowSummaries,
           shippingCostSummaries,
           multiAccountAlerts,
-          players: state.players.map(buildGameAdminPlayer).sort((left, right) => left.displayName.localeCompare(right.displayName)),
-          invisiblePlayers: state.players.filter((player) => player.isInvisibleInChat).map(buildGameAdminPlayer),
+          players: state.players
+            .filter((player) => player.email !== 'government@capitalism.game')
+            .map(buildGameAdminPlayer)
+            .sort((left, right) => left.displayName.localeCompare(right.displayName)),
+          invisiblePlayers: state.players
+            .filter((player) => player.email !== 'government@capitalism.game' && player.isInvisibleInChat)
+            .map(buildGameAdminPlayer),
+          governmentPlayer: (() => {
+            const govPlayer = state.players.find((player) => player.email === 'government@capitalism.game')
+            return govPlayer ? buildGameAdminPlayer(govPlayer) : null
+          })(),
           globalGameAdminGrants: state.globalGameAdminGrants.map((grant) => ({ ...grant })).sort((left, right) => left.email.localeCompare(right.email)),
           recentAuditLogs: [...state.adminAuditLogs].sort((left, right) => right.recordedAtUtc.localeCompare(left.recordedAtUtc)).slice(0, 12),
         },

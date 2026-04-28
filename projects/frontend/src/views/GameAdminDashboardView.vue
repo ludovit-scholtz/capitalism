@@ -357,6 +357,49 @@ onMounted(async () => {
         <article class="card admin-panel admin-panel-wide">
           <div class="admin-panel-header">
             <div>
+              <h2>{{ t('admin.governmentTitle') }}</h2>
+              <p>{{ t('admin.governmentBody') }}</p>
+            </div>
+          </div>
+          <div v-if="adminStore.dashboard?.governmentPlayer" class="admin-player-list">
+            <article class="admin-player-card admin-gov-card">
+              <div class="admin-player-topline">
+                <div>
+                  <h3>{{ adminStore.dashboard.governmentPlayer.displayName }}</h3>
+                  <p>{{ adminStore.dashboard.governmentPlayer.email }}</p>
+                </div>
+                <div class="admin-player-badges">
+                  <span class="badge badge-warning">SYSTEM</span>
+                </div>
+              </div>
+              <div class="admin-player-stats">
+                <span>{{ t('admin.personalCash') }}: {{ formatCurrency(adminStore.dashboard.governmentPlayer.personalCash) }}</span>
+                <span>{{ t('admin.companyCash') }}: {{ formatCurrency(adminStore.dashboard.governmentPlayer.totalCompanyCash) }}</span>
+              </div>
+              <div class="admin-player-actions">
+                <button type="button" class="btn btn-primary" @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'PERSON')">
+                  {{ t('admin.impersonateGovernment') }}
+                </button>
+                <button
+                  v-for="company in adminStore.dashboard.governmentPlayer.companies"
+                  :key="company.id"
+                  type="button"
+                  class="admin-company-pill"
+                  @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'COMPANY', company.id)"
+                >
+                  {{ company.name }} · {{ formatCurrency(company.cash) }}
+                </button>
+              </div>
+            </article>
+          </div>
+          <p v-else class="admin-empty-state">{{ t('admin.governmentNotSeeded') }}</p>
+        </article>
+      </section>
+
+      <section class="admin-grid admin-grid-wide">
+        <article class="card admin-panel admin-panel-wide">
+          <div class="admin-panel-header">
+            <div>
               <h2>{{ t('admin.playersTitle') }}</h2>
               <p>{{ t('admin.playersBody') }}</p>
             </div>
@@ -718,6 +761,11 @@ onMounted(async () => {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: rgba(255, 255, 255, 0.02);
+}
+
+.admin-gov-card {
+  border-color: rgba(255, 138, 0, 0.35);
+  background: rgba(255, 138, 0, 0.06);
 }
 
 .admin-player-topline {

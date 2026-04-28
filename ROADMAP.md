@@ -29,9 +29,11 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped:** Onboarding now persists the player's chosen city to localStorage after register/login so the active city is correct on all subsequent pages. The buy-building flow pre-selects the active city from the navbar filter instead of requiring a redundant city choice. The context switcher now formats company cash in the selected city's currency (e.g. CZK for Prague) instead of always showing USD.
 
-### Government company
+### Government company (100% complete)
 
-- [ ] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
+- [x] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
+
+**Shipped:** The government system account is now excluded from all public leaderboard queries (`rankings` and `companyRankings`). It remains a fully-functional internal simulation participant that owns banks, holds currency, and participates in economic flows. A dedicated "Government system account" section has been added to the admin operations dashboard so authorized administrators can view the government's balances and impersonate it via a clearly-labeled, admin-only button.
 
 ### Currencies and bank accounts (93% complete)
 

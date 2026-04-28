@@ -1557,6 +1557,8 @@ export interface GameAdminDashboard {
   invisiblePlayers: GameAdminPlayer[]
   globalGameAdminGrants: GlobalGameAdminGrant[]
   recentAuditLogs: GameAdminAuditLog[]
+  /** The government system account, separated from regular players for admin impersonation. */
+  governmentPlayer: GameAdminPlayer | null
 }
 
 /** FX exchange rate summary returned by the fxRates query. EUR-based (1 EUR = rate units of quoteCurrency). */

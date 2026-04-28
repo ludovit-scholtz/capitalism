@@ -536,4 +536,71 @@ test.describe('Game news and administration', () => {
     await expect(page.getByRole('heading', { name: 'Weekend patch deployed' })).toBeVisible()
     await expect(page.getByText('Patch notes for the weekend are now live in every game.')).toBeVisible()
   })
+
+  test('admin dashboard shows government system account section with impersonate button', async ({ page }) => {
+    const admin = makeAdminPlayer({
+      id: 'admin-gov-test',
+      email: 'admin-gov@test.com',
+      displayName: 'Gov Admin',
+    })
+    const regularPlayer = makePlayer({
+      id: 'regular-gov-test',
+      email: 'regular@test.com',
+      displayName: 'Regular Tycoon',
+    })
+    const govPlayer = makePlayer({
+      id: 'gov-system',
+      email: 'government@capitalism.game',
+      displayName: 'Government',
+    })
+    govPlayer.companies.push({
+      id: 'gov-bank',
+      playerId: 'gov-system',
+      name: 'Government Bank',
+      cash: 50000000,
+      foundedAtUtc: '2020-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    setupMockApi(page, {
+      players: [admin, regularPlayer, govPlayer],
+      currentUserId: admin.id,
+      currentToken: `token-${admin.id}`,
+    })
+    await authenticate(page, `token-${admin.id}`)
+    await page.goto('/admin')
+
+    // Government system account section must be visible
+    await expect(page.getByRole('heading', { name: 'Government system account' })).toBeVisible()
+
+    // Government player info displayed
+    await expect(page.getByText('government@capitalism.game')).toBeVisible()
+
+    // Impersonate government button must be present
+    const govSection = page.locator('.admin-gov-card')
+    await expect(govSection.getByRole('button', { name: 'Impersonate government' })).toBeVisible()
+
+    // Government must NOT appear in the regular players section
+    const playersSection = page.locator('.admin-player-list').last()
+    await expect(playersSection.locator('.admin-player-card', { hasText: 'government@capitalism.game' })).toHaveCount(0)
+  })
+
+  test('government system account impersonation is accessible only to admins', async ({ page }) => {
+    const regularPlayer = makePlayer({
+      id: 'regular-no-gov',
+      email: 'regular-no-gov@test.com',
+      displayName: 'No Access Player',
+    })
+    setupMockApi(page, {
+      players: [regularPlayer],
+      currentUserId: regularPlayer.id,
+      currentToken: `token-${regularPlayer.id}`,
+    })
+    await authenticate(page, `token-${regularPlayer.id}`)
+    await page.goto('/admin')
+
+    // Non-admin users see the access denied message, not the government section
+    await expect(page.getByText('Administrator access required')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Government system account' })).toHaveCount(0)
+  })
 })

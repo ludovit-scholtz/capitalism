@@ -26,7 +26,7 @@ public sealed partial class Query
     public async Task<List<PlayerRanking>> GetRankings([Service] AppDbContext db)
     {
         var players = await db.Players
-            .Where(p => p.Role != PlayerRole.Admin)
+            .Where(p => p.Role != PlayerRole.Admin && p.Email != GovernmentActorConstants.GovernmentEmail)
             .ToListAsync();
 
         // Load all companies, buildings, lots, inventories, and shareholdings for share price calculation
@@ -118,7 +118,7 @@ public sealed partial class Query
             .Include(c => c.Buildings)
             .ThenInclude(b => b.City)
             .Include(c => c.Player)
-            .Where(c => c.Player != null && c.Player.Role != PlayerRole.Admin)
+            .Where(c => c.Player != null && c.Player.Role != PlayerRole.Admin && c.Player.Email != GovernmentActorConstants.GovernmentEmail)
             .AsSplitQuery()
             .ToListAsync();
 
