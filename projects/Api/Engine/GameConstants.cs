@@ -173,6 +173,40 @@ public static class GameConstants
     public static decimal MediaHouseContentEfficiency(int level) =>
         1m - 1m / ((decimal)level + 1m);
 
+    // ── Media house building upgrade constants ────────────────────────────────
+
+    /// <summary>Maximum upgrade level for a media house building.</summary>
+    public const int MaxMediaHouseLevel = 5;
+
+    /// <summary>
+    /// Cash cost (in EUR, FX-adjusted at purchase time) to upgrade a media house
+    /// from <paramref name="currentLevel"/> to the next level.
+    /// Level 1→2: €50 000, 2→3: €150 000, 3→4: €400 000, 4→5: €1 000 000.
+    /// </summary>
+    public static decimal MediaHouseUpgradeCost(int currentLevel) => currentLevel switch
+    {
+        1 => 50_000m,
+        2 => 150_000m,
+        3 => 400_000m,
+        4 => 1_000_000m,
+        _ => 50_000m * (decimal)Math.Pow(3, Math.Max(currentLevel - 1, 0))
+    };
+
+    /// <summary>
+    /// Ticks required to complete a media house upgrade from <paramref name="currentLevel"/>
+    /// to the next level.  1 tick = 1 hour; 24 ticks = 1 in-game day.
+    /// Level 1→2: 48 ticks (2 days), 2→3: 168 ticks (1 week),
+    /// 3→4: 720 ticks (30 days), 4→5: 2160 ticks (90 days).
+    /// </summary>
+    public static int MediaHouseUpgradeTicks(int currentLevel) => currentLevel switch
+    {
+        1 => 48,
+        2 => 168,
+        3 => 720,
+        4 => 2160,
+        _ => 48 * (int)Math.Pow(4, Math.Max(currentLevel - 1, 0))
+    };
+
     /// <summary>
     /// Range of the brand-awareness boost from content ranking.
     /// A top-ranked outlet (100%) multiplies marketing effectiveness by

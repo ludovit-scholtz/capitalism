@@ -454,3 +454,72 @@ public sealed class UnitProductTickSnapshot
     /// </summary>
     public decimal? EstimatedProfit { get; set; }
 }
+
+// ── Media house analytics DTOs ────────────────────────────────────────────────
+
+/// <summary>
+/// Advertising income entry in the media house analytics history.
+/// </summary>
+public sealed class MediaHouseIncomeEntry
+{
+    public long Tick { get; set; }
+    public decimal Amount { get; set; }
+    public string Description { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Shows how one advertiser's brand is being affected by campaigns through this media house.
+/// </summary>
+public sealed class MediaHouseBrandEffectRow
+{
+    public Guid CompanyId { get; set; }
+    public string CompanyName { get; set; } = string.Empty;
+    /// <summary>PRODUCT | CATEGORY | COMPANY</summary>
+    public string BrandScope { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    /// <summary>Current brand awareness as percentage 0–100.</summary>
+    public decimal BrandAwareness { get; set; }
+    /// <summary>Current marketing quality (prestige) as percentage 0–100.</summary>
+    public decimal MarketingQuality { get; set; }
+    /// <summary>The combined channel × content-ranking multiplier applied to this advertiser's campaigns.</summary>
+    public decimal EffectivenessMultiplierApplied { get; set; }
+}
+
+/// <summary>
+/// Full analytics result for a MEDIA_HOUSE building.
+/// </summary>
+public sealed class MediaHouseAnalyticsResult
+{
+    public Guid BuildingId { get; set; }
+    public string BuildingName { get; set; } = string.Empty;
+    /// <summary>NEWSPAPER | RADIO | TV</summary>
+    public string MediaType { get; set; } = string.Empty;
+    public int Level { get; set; }
+    public decimal ContentValue { get; set; }
+    /// <summary>Content ranking as a percentage 0–100 relative to top outlet in same city+type.</summary>
+    public decimal ContentRankingPct { get; set; }
+    /// <summary>Raw channel multiplier based on media type (1.0/1.5/2.0).</summary>
+    public decimal ChannelMultiplier { get; set; }
+    /// <summary>Combined channel × content-ranking multiplier seen by advertisers.</summary>
+    public decimal EffectiveMultiplier { get; set; }
+    /// <summary>Current level content-conversion efficiency as integer percent.</summary>
+    public int CurrentEfficiencyPct { get; set; }
+    /// <summary>Next level content-conversion efficiency as integer percent. Equals CurrentEfficiencyPct when at max level.</summary>
+    public int NextLevelEfficiencyPct { get; set; }
+    public bool IsMaxLevel { get; set; }
+    /// <summary>Upgrade cost in EUR (before FX). Null when at max level.</summary>
+    public decimal? UpgradeCostEur { get; set; }
+    /// <summary>Ticks required for the next upgrade. Null when at max level.</summary>
+    public int? UpgradeTimeTicks { get; set; }
+    public int MaxLevel { get; set; }
+    public decimal TotalIncomeLast100Ticks { get; set; }
+    public decimal AvgIncomePerTick { get; set; }
+    public List<MediaHouseIncomeEntry> IncomeHistory { get; set; } = [];
+    /// <summary>Number of companies currently advertising through this media house.</summary>
+    public int AdvertiserCount { get; set; }
+    /// <summary>Brand impact rows for all brands of active advertisers.</summary>
+    public List<MediaHouseBrandEffectRow> BrandEffects { get; set; } = [];
+    /// <summary>DOMINANT | COMPETITIVE | GROWING | EARLY_STAGE</summary>
+    public string StrategyRating { get; set; } = string.Empty;
+    public string StrategyTip { get; set; } = string.Empty;
+}

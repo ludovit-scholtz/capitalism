@@ -254,6 +254,13 @@ public sealed class SetMediaHouseContentBudgetInput
     public decimal? ContentBudgetPerTick { get; set; }
 }
 
+/// <summary>Input for upgrading a media house building to the next level.</summary>
+public sealed class UpgradeMediaHouseInput
+{
+    /// <summary>MEDIA_HOUSE building to upgrade.</summary>
+    public Guid BuildingId { get; set; }
+}
+
 /// <summary>Input for purchasing a building lot and placing a building on it.</summary>
 public sealed class PurchaseLotInput
 {

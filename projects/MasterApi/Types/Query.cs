@@ -141,7 +141,7 @@ public sealed class Query
         var playerEmail = string.IsNullOrWhiteSpace(input.PlayerEmail)
             ? null
             : NormalizeEmail(input.PlayerEmail, "INVALID_PLAYER_EMAIL");
-        var limit = Math.Clamp(input.Limit, 1, 100);
+        var limit = Math.Clamp(input.Limit, 1, 500);
 
         var entries = await db.GameNewsEntries
             .AsNoTracking()

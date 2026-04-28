@@ -202,6 +202,8 @@ export type MockBuilding = {
   contentValue?: number
   /** Per-tick content spending budget for MEDIA_HOUSE buildings */
   contentBudgetPerTick?: number | null
+  /** True when the building is a government-seeded media outlet (not player-owned) */
+  isGovernmentOwned?: boolean
   /** True when the building is suspended due to insufficient bank account funds */
   isSuspendedForFunds?: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
