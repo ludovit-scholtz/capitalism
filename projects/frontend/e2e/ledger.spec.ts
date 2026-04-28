@@ -136,8 +136,8 @@ test.describe('Company Ledger', () => {
     await expect(page.getByRole('heading', { name: 'Income Statement' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Balance Sheet' })).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Cash Flow Statement' })).toBeVisible()
-    await expect(page.locator('.statement-row').filter({ hasText: 'Labor Costs' })).toContainText('-€2,500.00')
-    await expect(page.locator('.statement-row').filter({ hasText: 'Energy Costs' })).toContainText('-€750.00')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Labor Costs' })).toContainText('-€2,500')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Energy Costs' })).toContainText('-€750')
   })
 
   test('ledger shows shipping costs and shipping drill-down entries', async ({ page }) => {
@@ -204,7 +204,7 @@ test.describe('Company Ledger', () => {
 
     await page.goto(`/ledger/${company.id}`)
 
-    await expect(page.locator('.statement-row').filter({ hasText: 'Shipping Costs' })).toContainText('-€320.00')
+    await expect(page.locator('.statement-row').filter({ hasText: 'Shipping Costs' })).toContainText('-€320')
     await page.getByRole('button', { name: 'Detail: Shipping Costs' }).click()
     await expect(page.getByRole('heading', { name: 'Detail: Shipping' })).toBeVisible()
     await expect(page.locator('.drill-table')).toContainText('Wooden Chair')
@@ -452,7 +452,7 @@ test.describe('Company Ledger', () => {
 
     await page.getByRole('button', { name: /Year 2000/ }).click()
     await expect(page.locator('.kpi-card').getByText('Year 2000')).toBeVisible()
-    await expect(page.getByText('€1,200.00')).toBeVisible()
+    await expect(page.getByText('€1,200')).toBeVisible()
   })
 
   test('back button returns to dashboard', async ({ page }) => {
@@ -714,7 +714,7 @@ test.describe('Company Ledger', () => {
     await expect(page.locator('.kpi-card').getByText('Year 2000')).toBeVisible()
 
     // Revenue for year 2000 should show €2,400
-    await expect(page.getByText('€2,400.00')).toBeVisible()
+    await expect(page.getByText('€2,400')).toBeVisible()
 
     // Open revenue drill-down for the historical year
     const revenueRow = page

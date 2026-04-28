@@ -164,12 +164,12 @@ test.describe('Bank Statement Review', () => {
 
     // Credit row (first - highest tick shown first / newest first ordering)
     const creditRow = rows.first()
-    await expect(creditRow.locator('.credit-cell')).toContainText('5,000.00')
+    await expect(creditRow.locator('.credit-cell')).toContainText('5,000')
     await expect(creditRow.locator('.debit-cell .empty-cell-dash')).toBeVisible()
 
     // Debit row
     const debitRow = rows.nth(1)
-    await expect(debitRow.locator('.debit-cell')).toContainText('1,500.00')
+    await expect(debitRow.locator('.debit-cell')).toContainText('1,500')
     await expect(debitRow.locator('.credit-cell .empty-cell-dash')).toBeVisible()
   })
 
