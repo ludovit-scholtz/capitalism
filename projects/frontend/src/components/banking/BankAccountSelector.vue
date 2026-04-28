@@ -61,7 +61,7 @@ function onSelect(event: Event) {
           :key="bal.currencyCode"
           :value="bal.currencyCode"
         >
-          {{ bal.currencyCode }} — {{ t('bankStatement.balance') }}: {{ formatAmount(bal.balance, bal.currencyCode) }}
+          {{ bal.currencySymbol }} {{ bal.currencyCode }} — {{ t('bankStatement.balance') }}: {{ formatAmount(bal.balance, bal.currencyCode) }}
         </option>
       </select>
     </div>

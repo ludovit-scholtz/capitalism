@@ -88,7 +88,7 @@ export function formatMoney(
  *
  * @example
  *   formatCurrencyTitle(1_234_567, 'EUR', 'en')  // "€1,234,567 EUR"
- *   formatCurrencyTitle(25.42, 'CZK', 'de')       // "25,42 CZK CZK"  (Intl appends code for CZK)
+ *   formatCurrencyTitle(25.42, 'CZK', 'de')       // "25,42 CZK" (Intl already includes CZK code)
  */
 export function formatCurrencyTitle(amount: number, currencyCode = 'EUR', locale = 'en'): string {
   if (!isFinite(amount) || isNaN(amount)) return `— ${currencyCode}`

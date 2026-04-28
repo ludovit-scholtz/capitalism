@@ -489,7 +489,7 @@ function goToNextPage() {
                 <CurrencyAmount v-if="row.amount >= 0" :amount="row.amount" :currency="statement.currencyCode" />
                 <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
-              <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle">
+              <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle" :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
                 <CurrencyAmount :amount="row.runningBalance" :currency="statement.currencyCode" />
                 <span class="text-xs text-muted ml-0.5">{{ categoryIcon(row.category) }}</span>
               </td>
