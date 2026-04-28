@@ -2076,6 +2076,7 @@ export default {
       projectedNetLabel: 'Est. Netto diesen Tick',
       projectedNote: 'Schätzung basierend auf aktueller Stadtbilanz und Ihrem Kapazitätsanteil ({share}% der Gesamtversorgung). Tatsächliche Beträge werden je Tick über das Hauptbuch verrechnet.',
       projectedNoData: 'Keine Prognose verfügbar — Nennleistung des Kraftwerks ist null.',
+      projectedNoSupply: 'Die Stadt hat noch keine Stromversorgung registriert. Die Prognose erscheint, sobald mindestens ein Kraftwerk in dieser Stadt aktiv ist.',
       capacityShare: 'Ihr Kapazitätsanteil',
     },
   },

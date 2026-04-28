@@ -2075,6 +2075,7 @@ export default {
       projectedNetLabel: 'Est. net this tick',
       projectedNote: 'Estimate based on current city balance and your capacity share ({share}% of total supply). Actual amounts settled each tick via the ledger.',
       projectedNoData: 'No projection available — plant rated output is zero.',
+      projectedNoSupply: 'City has no power supply registered yet. Projection will appear once at least one power plant is active in this city.',
       capacityShare: 'Your capacity share',
     },
   },

@@ -15,29 +15,37 @@ const {
   formatCurrency,
 } = bd
 
-// Grid economics constants (must match GameConstants.cs)
+// Grid economics constants — must be kept manually synchronized with GameConstants.cs.
+// Backend: GameConstants.GridSurplusIncomePerMwTick = 5, GameConstants.GridFinePerMwTick = 8.
+// These are used only for frontend projection estimates; the ledger is the source of truth.
 const SURPLUS_RATE_PER_MW_TICK = 5
 const FINE_RATE_PER_MW_TICK = 8
 
 // Per-tick projected economics based on current city balance.
-const projected = computed(() => {
+// Returns null when projection is unavailable, 'no-supply' when city has no power supply yet.
+type ProjectedResult =
+  | { kind: 'surplus' | 'fine' | 'balanced'; amount: number; sharePercent: number }
+  | { kind: 'no-supply' }
+  | null
+
+const projected = computed<ProjectedResult>(() => {
   const balance = cityPowerBalance.value
   const plantOutput = building.value?.powerOutput ?? 0
-  if (!balance || plantOutput <= 0 || balance.totalSupplyMw <= 0) return null
+  if (!balance) return null
+  if (plantOutput <= 0) return null
+  if (balance.totalSupplyMw <= 0) return { kind: 'no-supply' }
 
   const capacityShare = plantOutput / balance.totalSupplyMw
   const sharePercent = Math.round(capacityShare * 100)
 
   if (balance.reserveMw > 0) {
-    // Surplus: plant earns proportional to its capacity share of the surplus
     const surplusIncome = balance.reserveMw * SURPLUS_RATE_PER_MW_TICK * capacityShare
-    return { kind: 'surplus' as const, amount: surplusIncome, sharePercent }
+    return { kind: 'surplus', amount: surplusIncome, sharePercent }
   } else if (balance.reserveMw < 0) {
-    // Shortage: plant is fined proportional to its capacity share of the shortage
     const fine = Math.abs(balance.reserveMw) * FINE_RATE_PER_MW_TICK * capacityShare
-    return { kind: 'fine' as const, amount: fine, sharePercent }
+    return { kind: 'fine', amount: fine, sharePercent }
   }
-  return { kind: 'balanced' as const, amount: 0, sharePercent }
+  return { kind: 'balanced', amount: 0, sharePercent }
 })
 
 function loadBalanceIfNeeded() {
@@ -122,7 +130,7 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
 
       <!-- Projected per-tick economics based on current balance -->
       <div
-        v-if="projected"
+        v-if="projected && projected.kind !== 'no-supply'"
         class="ppa-projected mt-3 border-t border-divider pt-3"
       >
         <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ t('powerPlant.cityPowerStatus.projectedTitle') }}</p>
@@ -146,6 +154,10 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
         </div>
         <p v-else class="text-xs text-muted">{{ t('powerPlant.cityPowerStatus.balancedHint') }}</p>
       </div>
+      <!-- City has supply data but no plants yet — different message from zero-output plant -->
+      <p v-else-if="projected?.kind === 'no-supply'" class="mt-2 text-xs text-muted">
+        {{ t('powerPlant.cityPowerStatus.projectedNoSupply') }}
+      </p>
       <p v-else-if="cityPowerBalance && (building?.powerOutput ?? 0) <= 0" class="mt-2 text-xs text-muted">
         {{ t('powerPlant.cityPowerStatus.projectedNoData') }}
       </p>

@@ -2068,6 +2068,7 @@ export default {
       projectedNetLabel: 'Est. čistý tento tick',
       projectedNote: 'Odhad na základe aktuálnej bilancie mesta a vášho podielu kapacity ({share}% celkovej dodávky). Skutočné sumy sú zúčtované každý tick cez účtovníctvo.',
       projectedNoData: 'Projekcia nie je dostupná — nominálny výkon elektrárne je nula.',
+      projectedNoSupply: 'Mesto zatiaľ nemá zaregistrovanú žiadnu dodávku energie. Projekcia sa zobrazí, keď bude v tomto meste aktívna aspoň jedna elektráreň.',
       capacityShare: 'Váš podiel kapacity',
     },
   },
