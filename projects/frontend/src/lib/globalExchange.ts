@@ -83,15 +83,28 @@ export function computeDistanceKm(
 }
 
 /**
- * Computes the per-unit transit cost from a source city to a destination city.
- * Same-city transfers have no transit cost.  Cross-city cost scales with distance
- * and resource weight; the minimum cross-city charge is 0.50.
+ * Computes the per-unit transit cost between two geographic coordinates,
+ * scaled by an optional fuel price index.
  *
- * The optional `fuelPriceIndex` parameter scales the result to reflect local
+ * **This helper is intended for city-to-city global-exchange display only.**
+ * For city-level exchange, same-city transfers are free and cross-city costs
+ * scale with distance and resource weight. The minimum charge of **0.50** mirrors
+ * `GlobalExchangeCalculator.MinimumCityTransitCostPerUnit` (the authoritative
+ * backend floor used by the city-to-city transport overload).
+ *
+ * The `fuelPriceIndex` is applied to the raw distance-weight cost *before* the
+ * minimum floor is enforced (i.e. `max(raw × fuel, 0.50)`), matching the backend
+ * formula exactly so the UI never shows a different value than the server charges.
+ *
+ * Do **not** use this helper for building-to-building (local B2B) transit
+ * calculations; those use `MinimumTransitCostPerUnit = 0.10` and are handled
+ * server-side via `GlobalExchangeCalculator.ComputeTransitCostPerUnit(lat, lon, …)`.
+ *
+ * The optional `fuelPriceIndex` parameter scales the raw cost to reflect local
  * fuel costs at the destination city (1.0 = EUR baseline; 1.25 = 25 % more
  * expensive, e.g. London; 0.70 = cheaper, e.g. Beijing).
  *
- * Mirrors `GlobalExchangeCalculator.ComputeTransitCostPerUnit`.
+ * Mirrors `GlobalExchangeCalculator.ComputeTransitCostPerUnit(City, City, …)`.
  */
 export function computeTransitCostPerUnit(
   sourceLat: number,

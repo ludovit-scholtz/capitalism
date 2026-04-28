@@ -211,7 +211,8 @@ public static class SourcingComparisonService
                     salesUnit.Building.Longitude,
                     building.Latitude,
                     building.Longitude,
-                    itemWeightPerUnit) * Math.Max(destinationFuelIndex, 0.1m);
+                    itemWeightPerUnit,
+                    destinationFuelIndex);
                 var deliveredPrice = price + transitCost;
 
                 var qualityOk = inv.Quality >= minQuality;
