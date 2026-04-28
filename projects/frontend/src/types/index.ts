@@ -111,6 +111,8 @@ export interface Building {
   contentValue: number
   /** Per-tick content spending configured by the media house owner. Null if not set. */
   contentBudgetPerTick: number | null
+  /** True when the MEDIA_HOUSE building is a government-seeded baseline outlet (cannot be upgraded). */
+  isGovernmentOwned: boolean
   /** True when the building was suspended on the last tick due to insufficient bank account funds. */
   isSuspendedForFunds: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
@@ -1826,4 +1828,52 @@ export interface TransferFundsResult {
   currencyCode: string
   fromAccount: PlayerBankAccountSummary
   toAccount: PlayerBankAccountSummary
+}
+
+/** Advertising income entry for a media house */
+export interface MediaHouseIncomeEntry {
+  tick: number
+  amount: number
+  description: string
+}
+
+/** Brand effect row showing how a campaign through this media house impacts a brand */
+export interface MediaHouseBrandEffectRow {
+  companyId: string
+  companyName: string
+  /** PRODUCT | CATEGORY | COMPANY */
+  brandScope: string
+  productName: string
+  /** 0–100 */
+  brandAwareness: number
+  /** 0–100 */
+  marketingQuality: number
+  effectivenessMultiplierApplied: number
+}
+
+/** Full analytics result for a MEDIA_HOUSE building */
+export interface MediaHouseAnalyticsResult {
+  buildingId: string
+  buildingName: string
+  /** NEWSPAPER | RADIO | TV */
+  mediaType: string
+  level: number
+  contentValue: number
+  contentRankingPct: number
+  channelMultiplier: number
+  effectiveMultiplier: number
+  currentEfficiencyPct: number
+  nextLevelEfficiencyPct: number
+  isMaxLevel: boolean
+  upgradeCostEur: number | null
+  upgradeTimeTicks: number | null
+  maxLevel: number
+  totalIncomeLast100Ticks: number
+  avgIncomePerTick: number
+  incomeHistory: MediaHouseIncomeEntry[]
+  advertiserCount: number
+  brandEffects: MediaHouseBrandEffectRow[]
+  /** DOMINANT | COMPETITIVE | GROWING | EARLY_STAGE */
+  strategyRating: string
+  strategyTip: string
 }

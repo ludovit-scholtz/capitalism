@@ -71,6 +71,7 @@ import type {
   ResearchBrandState,
   ResourceType,
   CityMediaHouseInfo,
+  MediaHouseAnalyticsResult,
   SourcingCandidate,
   UnitProductAnalytics,
 } from '@/types'
@@ -365,6 +366,15 @@ export function useBuildingDetail() {
   const savingContentBudget = ref(false)
   const contentBudgetError = ref<string | null>(null)
   const contentBudgetSuccess = ref(false)
+
+  // Media house upgrade (MEDIA_HOUSE)
+  const upgradingMediaHouse = ref(false)
+  const mediaHouseUpgradeError = ref<string | null>(null)
+  const mediaHouseUpgradeSuccess = ref(false)
+
+  // Media house analytics (MEDIA_HOUSE)
+  const mediaHouseAnalytics = ref<MediaHouseAnalyticsResult | null>(null)
+  const mediaHouseAnalyticsLoading = ref(false)
 
   // Flush storage
   const showFlushConfirmDialog = ref(false)
@@ -2072,6 +2082,70 @@ export function useBuildingDetail() {
     }
   }
 
+  /** Upgrades the current MEDIA_HOUSE building to the next level. */
+  async function upgradeMediaHouse() {
+    if (!building.value) return
+    upgradingMediaHouse.value = true
+    mediaHouseUpgradeError.value = null
+    mediaHouseUpgradeSuccess.value = false
+    try {
+      const result = await gqlRequest<{
+        upgradeMediaHouse: { id: string; level: number }
+      }>(
+        `mutation UpgradeMediaHouse($input: UpgradeMediaHouseInput!) {
+          upgradeMediaHouse(input: $input) {
+            id level
+          }
+        }`,
+        { input: { buildingId: building.value.id } },
+      )
+      if (building.value) {
+        building.value.level = result.upgradeMediaHouse.level
+      }
+      mediaHouseUpgradeSuccess.value = true
+      // Refresh analytics after upgrade.
+      await loadMediaHouseAnalytics()
+      setTimeout(() => {
+        mediaHouseUpgradeSuccess.value = false
+      }, 4000)
+    } catch (reason: unknown) {
+      mediaHouseUpgradeError.value =
+        reason instanceof Error ? reason.message : t('mediaHouse.upgradeFailed')
+    } finally {
+      upgradingMediaHouse.value = false
+    }
+  }
+
+  /** Loads brand-impact analytics for the current MEDIA_HOUSE building. */
+  async function loadMediaHouseAnalytics() {
+    if (!building.value || building.value.type !== 'MEDIA_HOUSE') return
+    mediaHouseAnalyticsLoading.value = true
+    try {
+      const data = await gqlRequest<{ mediaHouseAnalytics: MediaHouseAnalyticsResult | null }>(
+        `query MediaHouseAnalytics($buildingId: UUID!) {
+          mediaHouseAnalytics(buildingId: $buildingId) {
+            buildingId buildingName mediaType level contentValue contentRankingPct
+            channelMultiplier effectiveMultiplier currentEfficiencyPct nextLevelEfficiencyPct
+            isMaxLevel upgradeCostEur upgradeTimeTicks maxLevel
+            totalIncomeLast100Ticks avgIncomePerTick
+            advertiserCount strategyRating strategyTip
+            incomeHistory { tick amount description }
+            brandEffects {
+              companyId companyName brandScope productName
+              brandAwareness marketingQuality effectivenessMultiplierApplied
+            }
+          }
+        }`,
+        { buildingId: building.value.id },
+      )
+      mediaHouseAnalytics.value = data.mediaHouseAnalytics ?? null
+    } catch {
+      mediaHouseAnalytics.value = null
+    } finally {
+      mediaHouseAnalyticsLoading.value = false
+    }
+  }
+
   /** Extract serialisable unit data from the draft list. */
   function getDraftLayoutUnits(): LayoutUnit[] {
     return draftUnits.value.map((u) => ({
@@ -3738,6 +3812,7 @@ export function useBuildingDetail() {
               builtAtUtc
               contentValue
               contentBudgetPerTick
+              isGovernmentOwned
               isSuspendedForFunds
               suspendedReason
               cityReferenceRentPerSqm
@@ -3948,6 +4023,9 @@ export function useBuildingDetail() {
       void loadBuildingFinancialTimeline(buildingId.value)
       if (building.value?.type === 'POWER_PLANT') {
         void loadPowerPlantAnalytics(buildingId.value)
+      }
+      if (building.value?.type === 'MEDIA_HOUSE') {
+        void loadMediaHouseAnalytics()
       }
     } catch (reason: unknown) {
       if (requestId !== activeBuildingLoadRequest) {
@@ -4266,6 +4344,11 @@ export function useBuildingDetail() {
     savingContentBudget,
     contentBudgetError,
     contentBudgetSuccess,
+    upgradingMediaHouse,
+    mediaHouseUpgradeError,
+    mediaHouseUpgradeSuccess,
+    mediaHouseAnalytics,
+    mediaHouseAnalyticsLoading,
     showFlushConfirmDialog,
     flushingStorage,
     flushStorageError,
@@ -4489,6 +4572,8 @@ export function useBuildingDetail() {
     loadResearchBrands,
     loadCityMediaHouses,
     loadPublicSalesAnalytics,
+    loadMediaHouseAnalytics,
+    upgradeMediaHouse,
     loadUnitProductAnalytics,
     submitQuickPriceUpdate,
     submitFlushStorage,

@@ -89,7 +89,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (65% complete)
+### Media house (90% complete)
 
 **Shipped in this increment:**
 - ✅ Buying a Media house no longer fails with an empty `mediaType` validation error — the buy-building and city-map flows both require media type selection before purchase.
@@ -99,10 +99,15 @@ It will use real world map. The game will start in single city and later other c
 - ✅ The building detail page shows the dedicated Media House Management panel (content value, content budget, city competitor ranking, effectiveness multiplier).
 - ✅ Backend integration tests cover `purchaseLot` with valid mediaType, missing mediaType, and all three media types (NEWSPAPER, RADIO, TV).
 - ✅ E2E tests verify the media house detail renders without the factory grid and shows the management panel.
+- ✅ Strategic purchase guidance added to buy-building flow: three expandable cards explain NEWSPAPER vs RADIO vs TV trade-offs, strategic moat rationale, and when to choose each channel type.
+- ✅ Media house upgrade path implemented: `upgradeMediaHouse` mutation increases building level (1→5), each level improves content conversion efficiency (50%→83%), costs are FX-adjusted to city currency, and a ledger entry is recorded.
+- ✅ Upgrade UI in building detail panel shows efficiency ladder (levels 1-5 with % display), estimated cost and duration, and a success/error banner after upgrading.
+- ✅ Brand-impact analytics panel added to building detail: shows active advertiser count, average and total advertising income, per-advertiser brand awareness / marketing quality bars, income history mini-chart (last 30 ticks), and a combined effective multiplier row.
+- ✅ `getMediaHouseAnalytics` GraphQL query exposes upgrade cost, next-level efficiency, advertiser brand effects, income history, and strategy rating (EARLY_STAGE / GROWING / COMPETITIVE / DOMINANT).
+- ✅ Combined effective multiplier visible in the Effectiveness section (channel reach × content ranking bonus).
+- ✅ Backend tests cover `upgradeMediaHouse` validation (wrong type, government-owned, max level), analytics query structure, and that efficiency improves with each level.
 
-- [ ] Add detailed media house economy tutorial and in-depth strategic guidance to the purchase flow explaining how content budget, content value, and effectiveness multiplier interact.
-- [ ] Allow upgrading a media house to improve content delivery efficiency.
-- [ ] Show media house influence on brand quality in the brand analytics panel.
+- [ ] Show media house income as a dedicated ledger category in the company ledger (currently recorded as `MediaHouseIncome` but not surfaced in the ledger UI drill-down).
 
 ### Mining (80% complete)
 

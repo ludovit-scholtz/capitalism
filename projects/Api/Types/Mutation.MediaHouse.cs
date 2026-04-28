@@ -1,6 +1,8 @@
+using System.Globalization;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Security;
+using Api.Utilities;
 using HotChocolate.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -66,6 +68,117 @@ public sealed partial class Mutation
         building.ContentBudgetPerTick = (input.ContentBudgetPerTick is null or <= 0m)
             ? null
             : input.ContentBudgetPerTick;
+
+        await db.SaveChangesAsync();
+        return building;
+    }
+
+    /// <summary>
+    /// Upgrades a player-owned MEDIA_HOUSE building to the next level, improving content delivery
+    /// efficiency and power capacity.
+    /// Deducts the FX-adjusted upgrade cost from the building's bank account immediately.
+    /// A media house can be upgraded up to level <see cref="Engine.GameConstants.MaxMediaHouseLevel"/>.
+    /// </summary>
+    [Authorize]
+    public async Task<Building> UpgradeMediaHouse(
+        UpgradeMediaHouseInput input,
+        [Service] AppDbContext db,
+        [Service] IHttpContextAccessor httpContextAccessor)
+    {
+        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
+
+        var building = await db.Buildings
+            .Include(b => b.Company)
+            .Include(b => b.City)
+            .Include(b => b.BankAccount)
+            .FirstOrDefaultAsync(b => b.Id == input.BuildingId);
+
+        if (building is null || building.Company.PlayerId != userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Building not found or you don't own it.")
+                    .SetCode("BUILDING_NOT_FOUND")
+                    .Build());
+        }
+
+        if (building.Type != BuildingType.MediaHouse)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Only media house buildings can be upgraded with this mutation.")
+                    .SetCode("INVALID_BUILDING_TYPE")
+                    .Build());
+        }
+
+        if (building.IsGovernmentOwned)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Government-owned media houses cannot be upgraded by players.")
+                    .SetCode("GOVERNMENT_OWNED")
+                    .Build());
+        }
+
+        if (building.Level >= Engine.GameConstants.MaxMediaHouseLevel)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"This media house is already at maximum level ({Engine.GameConstants.MaxMediaHouseLevel}).")
+                    .SetCode("MAX_LEVEL_REACHED")
+                    .Build());
+        }
+
+        // FX-adjust the upgrade cost to the building's city currency.
+        var cityCurrencyCode = building.City?.CurrencyCode ?? "EUR";
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, [cityCurrencyCode]);
+        var fxRate = FxRateHelper.GetEurRate(fxRates, cityCurrencyCode);
+        var upgradeCost = decimal.Round(
+            Engine.GameConstants.MediaHouseUpgradeCost(building.Level) * fxRate,
+            2, MidpointRounding.AwayFromZero);
+
+        var fundingAccount = building.BankAccount
+            ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
+                db,
+                building,
+                cityCurrencyCode,
+                httpContextAccessor.HttpContext!.RequestAborted);
+
+        if (!string.Equals(fundingAccount.CurrencyCode, cityCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Building bank account currency ({fundingAccount.CurrencyCode}) must match city currency ({cityCurrencyCode}). Assign a {cityCurrencyCode} account before upgrading.")
+                    .SetCode("CURRENCY_MISMATCH")
+                    .Build());
+        }
+
+        if (fundingAccount.Balance < upgradeCost)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage($"Insufficient funds. Upgrade costs {upgradeCost.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode} but bank account {fundingAccount.AccountNumber} only has {fundingAccount.Balance.ToString("N0", CultureInfo.InvariantCulture)} {cityCurrencyCode}.")
+                    .SetCode("INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        var oldLevel = building.Level;
+        building.Level += 1;
+        fundingAccount.Balance -= upgradeCost;
+
+        var gameState = await db.GameStates.FirstOrDefaultDeterministicAsync();
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = building.CompanyId,
+            BuildingId = building.Id,
+            Category = LedgerCategory.UnitUpgrade,
+            Description = $"Media house upgrade: {building.MediaType?.ToLowerInvariant() ?? "media"} Lv{oldLevel}→{building.Level} ({building.Name})",
+            Amount = -upgradeCost,
+            RecordedAtTick = gameState?.CurrentTick ?? 0,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
 
         await db.SaveChangesAsync();
         return building;

@@ -416,6 +416,26 @@ async function buyBuilding() {
               <option value="TV">📺 {{ t('cityMap.mediaTypeTv') }} (×2.0)</option>
             </select>
             <p class="text-xs text-muted m-0">{{ t('cityMap.mediaTypeHint') }}</p>
+
+            <!-- Strategy guide cards -->
+            <div class="mt-2 grid gap-2">
+              <div class="rounded-lg border border-divider bg-surface p-3">
+                <p class="mb-1.5 text-xs font-bold text-foreground">📰 {{ t('cityMap.mediaTypeNewspaper') }}</p>
+                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuideNewspaper') }}</p>
+              </div>
+              <div class="rounded-lg border border-divider bg-surface p-3">
+                <p class="mb-1.5 text-xs font-bold text-foreground">📻 {{ t('cityMap.mediaTypeRadio') }}</p>
+                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuideRadio') }}</p>
+              </div>
+              <div class="rounded-lg border border-divider bg-surface p-3">
+                <p class="mb-1.5 text-xs font-bold text-foreground">📺 {{ t('cityMap.mediaTypeTv') }}</p>
+                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuideTV') }}</p>
+              </div>
+              <div class="rounded-lg border border-amber-300/50 bg-amber-500/10 p-3">
+                <p class="mb-1 text-xs font-bold text-amber-700 dark:text-amber-400">💡 {{ t('cityMap.mediaTypeStrategyTitle') }}</p>
+                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeStrategyBody') }}</p>
+              </div>
+            </div>
           </div>
 
           <!-- City selection -->
