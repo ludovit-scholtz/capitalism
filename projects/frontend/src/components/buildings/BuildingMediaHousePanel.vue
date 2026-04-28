@@ -192,7 +192,7 @@ const strategyRatingColor = computed(() => {
     </div>
 
     <!-- Content ranking -->
-    <div class="rounded-xl border border-divider bg-card p-4 sm:p-5">
+    <div class="media-house-ranking-section rounded-xl border border-divider bg-card p-4 sm:p-5">
       <h3 class="media-house-section-title mb-3 text-sm font-semibold uppercase tracking-wide text-muted">{{ t('mediaHouse.competitorsTitle') }}</h3>
       <div v-if="cityMediaHouses.filter((m) => m.mediaType === building?.mediaType).length > 0" class="media-house-competitors grid gap-2">
         <div
