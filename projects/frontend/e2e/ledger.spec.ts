@@ -1420,4 +1420,327 @@ test.describe('Ledger tick-refresh stability', () => {
     // Entry in CZK should show CZK badge in the amount cell
     await expect(page.locator('.drill-table tbody tr').filter({ hasText: 'Wooden Chair' }).locator('.currency-badge-inline')).toContainText('CZK')
   })
+
+  test('media house income row is visible when company has media house revenue', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const mediaHouseId = 'building-media-tv'
+    const company = {
+      id: 'company-media-income',
+      playerId: player.id,
+      name: 'Media Empire Corp',
+      cash: 400000,
+      foundedAtUtc: new Date().toISOString(),
+      buildings: [
+        {
+          id: mediaHouseId,
+          companyId: 'company-media-income',
+          cityId: 'bratislava',
+          type: 'MEDIA_HOUSE',
+          name: 'TV Station Alpha',
+          latitude: 48.15,
+          longitude: 17.12,
+          level: 2,
+          powerConsumption: 0,
+          isForSale: false,
+          builtAtUtc: new Date().toISOString(),
+          units: [],
+          pendingConfiguration: null,
+        },
+      ],
+    }
+    player.companies = [company]
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = company.id
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    // Seed ledger with media house income
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: 'Media Empire Corp',
+      currentCash: 400000,
+      totalRevenue: 0,
+      totalMediaHouseIncome: 12500,
+      totalPurchasingCosts: 0,
+      totalLaborCosts: 0,
+      totalEnergyCosts: 0,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 12500,
+      propertyValue: 80000,
+      propertyAppreciation: 0,
+      buildingValue: 500000,
+      inventoryValue: 0,
+      totalAssets: 980000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 12500,
+      cashFromInvestments: 0,
+      firstRecordedTick: 5,
+      lastRecordedTick: 25,
+      buildingSummaries: [
+        {
+          buildingId: mediaHouseId,
+          buildingName: 'TV Station Alpha',
+          buildingType: 'MEDIA_HOUSE',
+          revenue: 12500,
+          costs: 0,
+          currencyCode: 'EUR',
+          currencySymbol: '€',
+        },
+      ],
+    }
+
+    // Seed drill-down entries for MEDIA_HOUSE_INCOME
+    state.drillDownData[`${company.id}:MEDIA_HOUSE_INCOME`] = [
+      {
+        id: 'mhi-1',
+        category: 'MEDIA_HOUSE_INCOME',
+        description: 'Advertising income from 3 advertisers',
+        amount: 4200,
+        recordedAtTick: 10,
+        buildingId: mediaHouseId,
+        buildingName: 'TV Station Alpha',
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: null,
+        resourceName: null,
+      },
+      {
+        id: 'mhi-2',
+        category: 'MEDIA_HOUSE_INCOME',
+        description: 'Advertising income from 4 advertisers',
+        amount: 5800,
+        recordedAtTick: 15,
+        buildingId: mediaHouseId,
+        buildingName: 'TV Station Alpha',
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: null,
+        resourceName: null,
+      },
+      {
+        id: 'mhi-3',
+        category: 'MEDIA_HOUSE_INCOME',
+        description: 'Advertising income from 5 advertisers',
+        amount: 2500,
+        recordedAtTick: 25,
+        buildingId: mediaHouseId,
+        buildingName: 'TV Station Alpha',
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: null,
+        resourceName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    // Media House Income row should be visible in the income statement
+    await expect(
+      page.locator('.statement-row.media-house-income-row').filter({ hasText: 'Media House Income' }),
+    ).toBeVisible()
+
+    // The amount should show a positive value
+    await expect(
+      page.locator('.statement-row.media-house-income-row .amount-positive'),
+    ).toContainText('€')
+  })
+
+  test('media house income drill-down shows per-tick entries with building links', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const mediaHouseId = 'building-media-radio'
+    const company = {
+      id: 'company-media-drill',
+      playerId: player.id,
+      name: 'Radio Broadcasting Corp',
+      cash: 250000,
+      foundedAtUtc: new Date().toISOString(),
+      buildings: [
+        {
+          id: mediaHouseId,
+          companyId: 'company-media-drill',
+          cityId: 'bratislava',
+          type: 'MEDIA_HOUSE',
+          name: 'Radio Plus',
+          latitude: 48.14,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 0,
+          isForSale: false,
+          builtAtUtc: new Date().toISOString(),
+          units: [],
+          pendingConfiguration: null,
+        },
+      ],
+    }
+    player.companies = [company]
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = company.id
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: 'Radio Broadcasting Corp',
+      currentCash: 250000,
+      totalRevenue: 0,
+      totalMediaHouseIncome: 8400,
+      totalPurchasingCosts: 0,
+      totalLaborCosts: 0,
+      totalEnergyCosts: 0,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 8400,
+      propertyValue: 50000,
+      propertyAppreciation: 0,
+      buildingValue: 350000,
+      inventoryValue: 0,
+      totalAssets: 650000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 8400,
+      cashFromInvestments: 0,
+      firstRecordedTick: 8,
+      lastRecordedTick: 20,
+      buildingSummaries: [],
+    }
+
+    state.drillDownData[`${company.id}:MEDIA_HOUSE_INCOME`] = [
+      {
+        id: 'mhi-radio-1',
+        category: 'MEDIA_HOUSE_INCOME',
+        description: 'Advertising income from 2 advertisers',
+        amount: 3600,
+        recordedAtTick: 10,
+        buildingId: mediaHouseId,
+        buildingName: 'Radio Plus',
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: null,
+        resourceName: null,
+      },
+      {
+        id: 'mhi-radio-2',
+        category: 'MEDIA_HOUSE_INCOME',
+        description: 'Advertising income from 3 advertisers',
+        amount: 4800,
+        recordedAtTick: 20,
+        buildingId: mediaHouseId,
+        buildingName: 'Radio Plus',
+        buildingUnitId: null,
+        productTypeId: null,
+        productName: null,
+        resourceTypeId: null,
+        resourceName: null,
+      },
+    ]
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    // Click the drill-down button on the media house income row
+    const mediaRow = page.locator('.statement-row.media-house-income-row').filter({ hasText: 'Media House Income' })
+    await mediaRow.getByRole('button').click()
+
+    // Drill panel header should reference media house income
+    await expect(page.locator('.drill-header')).toContainText('Media House Income')
+
+    // Both entries should appear in the drill table
+    await expect(page.locator('.drill-table tbody tr')).toHaveCount(2)
+
+    // The description text from the entries should be visible
+    await expect(page.locator('.drill-table').getByText('Advertising income from 2 advertisers')).toBeVisible()
+    await expect(page.locator('.drill-table').getByText('Advertising income from 3 advertisers')).toBeVisible()
+
+    // Building link should navigate to the building detail
+    const buildingLink = page.locator('.drill-table tbody tr').first().getByRole('link', { name: 'Radio Plus' })
+    await expect(buildingLink).toBeVisible()
+  })
+
+  test('media house income row is hidden when company has no media house revenue', async ({ page }) => {
+    const player = makePlayer()
+    const state = setupMockApi(page, {
+      players: [player],
+      cities: makeDefaultCities(),
+      resourceTypes: makeDefaultResources(),
+      productTypes: makeDefaultProducts(),
+    })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    const company = makeLedgerCompany(player.id)
+    player.companies = [company]
+    player.activeAccountType = 'COMPANY'
+    player.activeCompanyId = company.id
+    player.onboardingCompletedAtUtc = new Date().toISOString()
+
+    state.ledgerData[company.id] = {
+      companyId: company.id,
+      companyName: company.name,
+      currentCash: 200000,
+      totalRevenue: 5000,
+      totalMediaHouseIncome: 0,
+      totalPurchasingCosts: 1000,
+      totalLaborCosts: 500,
+      totalEnergyCosts: 200,
+      totalMarketingCosts: 0,
+      totalTaxPaid: 0,
+      totalOtherCosts: 0,
+      netIncome: 3300,
+      propertyValue: 0,
+      propertyAppreciation: 0,
+      buildingValue: 200000,
+      inventoryValue: 0,
+      totalAssets: 400000,
+      totalPropertyPurchases: 0,
+      cashFromOperations: 3300,
+      cashFromInvestments: 0,
+      firstRecordedTick: 1,
+      lastRecordedTick: 10,
+      buildingSummaries: [],
+    }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto(`/ledger/${company.id}`)
+
+    // Revenue row must be visible (sanity check)
+    await expect(page.locator('.statement-row').filter({ hasText: /^Revenue/ }).first()).toBeVisible()
+
+    // Media house income row should NOT be visible when income is zero
+    await expect(page.locator('.statement-row.media-house-income-row')).toHaveCount(0)
+  })
 })
