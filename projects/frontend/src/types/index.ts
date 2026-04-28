@@ -115,6 +115,10 @@ export interface Building {
   isGovernmentOwned: boolean
   /** True when the building was suspended on the last tick due to insufficient bank account funds. */
   isSuspendedForFunds: boolean
+  /** Dispatch target percentage for POWER_PLANT buildings (0–100). 100 = full output (default). */
+  dispatchTargetPercent: number
+  /** Current fuel reserve for thermal power plants (COAL/GAS) in MWh. */
+  fuelReserveMwh: number
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
   suspendedReason: string | null
   /**
@@ -828,6 +832,8 @@ export interface PowerPlantTickSnapshot {
   surplusIncome: number
   gridFine: number
   operatingCosts: number
+  /** Fuel procurement costs this tick (COAL/GAS plants only). */
+  fuelCosts: number
   netProfit: number
 }
 
@@ -836,11 +842,17 @@ export interface PowerPlantAnalytics {
   buildingName: string
   plantType: string
   currentOutputMw: number
+  /** Dispatch target percentage (0–100). 100 = full output. */
+  dispatchTargetPercent: number
+  /** Current fuel reserve in MWh (thermal plants only). */
+  fuelReserveMwh: number
   dataFromTick: number
   dataToTick: number
   totalSurplusIncome: number
   totalGridFines: number
   totalOperatingCosts: number
+  /** Total fuel procurement costs across the analytics window (COAL/GAS only). */
+  totalFuelCosts: number
   totalNetProfit: number
   timeline: PowerPlantTickSnapshot[]
 }

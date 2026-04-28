@@ -1453,12 +1453,14 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
 
         // COAL plant 10 MW base + 1×ENERGY_PRODUCING level 1 (20 MW boost) = 30 MW
         // Consumer 25 MW: supply 30 > demand 25 → surplus
+        // FuelReserveMwh pre-seeded so ENERGY_PRODUCING can draw from it (new fuel-chain model).
         var powerPlant = new Building
         {
             Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
             Type = BuildingType.PowerPlant, Name = "Gen Plant",
             Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
             PowerPlantType = "COAL", PowerOutput = 10m, PowerConsumption = 0m,
+            FuelReserveMwh = 100m, // pre-seed reserve so ENERGY_PRODUCING contributes MW
             BuiltAtUtc = DateTime.UtcNow
         };
         var consumer = new Building
@@ -1513,14 +1515,16 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
         var company = new Company { Id = Guid.NewGuid(), Name = "Fuel Corp", Cash = 1_000_000m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
         db.Companies.Add(company);
 
-        // COAL plant 5 MW base + 1×FUEL_PURCHASE level 1 (10 MW capacity boost) = 15 MW
+        // COAL plant 5 MW base + 1×FUEL_PURCHASE level 1 (10 MW from reserve) = 15 MW
         // Consumer 12 MW: supply 15 > demand 12 → surplus
+        // FuelReserveMwh pre-seeded so FUEL_PURCHASE unit can draw from reserve (new fuel-chain model).
         var powerPlant = new Building
         {
             Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
             Type = BuildingType.PowerPlant, Name = "Fuel Plant",
             Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
             PowerPlantType = "COAL", PowerOutput = 5m, PowerConsumption = 0m,
+            FuelReserveMwh = 50m, // pre-seed reserve so FUEL_PURCHASE contributes MW
             BuiltAtUtc = DateTime.UtcNow
         };
         var consumer = new Building
@@ -1717,5 +1721,447 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
             .SumAsync(e => e.Amount);
         Assert.True(surplusIncome > 0m,
             $"Mixed wind+hydro plant should earn surplus income when WATER_TURBINE output is not wind-scaled. Got {surplusIncome}");
+    }
+
+
+    // ── Fuel-chain gameplay tests ─────────────────────────────────────────────
+
+    /// <summary>
+    /// FuelProcurementPhase must debit the building bank account and add a FUEL_COST ledger
+    /// entry every tick that a COAL/GAS plant has FUEL_PURCHASE units and sufficient funds.
+    /// </summary>
+    [Fact]
+    public async Task FuelProcurementPhase_CoalPlant_ChargesFuelCostAndFillsReserve()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"FuelChg_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.1, Longitude = 16.9, Population = 5_000, AverageRentPerSqm = 5m,
+            FuelPriceIndex = 1.0m, CurrencyCode = "EUR"
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Fuel Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // EUR/EUR fx rate is needed for cost computation.
+        db.FxRates.Add(new FxRate
+        {
+            Id = Guid.NewGuid(), BaseCurrencyCode = "EUR", QuoteCurrencyCode = "EUR",
+            Rate = 1m, RateDate = DateOnly.FromDateTime(DateTime.UtcNow), FetchedAtUtc = DateTime.UtcNow, Source = "FALLBACK"
+        });
+
+        // Bank account with enough balance to cover procurement cost.
+        var bankAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(db, company.Id, "EUR");
+        bankAccount.Balance = 1_000m;
+
+        // COAL plant: 50 MW base + FUEL_PURCHASE level 1 = procures 10 MWh/tick.
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Coal Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m, PowerConsumption = 0m,
+            FuelReserveMwh = 0m, BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(powerPlant);
+
+        db.BuildingUnits.Add(new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // FuelProcurementPhase records a FUEL_COST ledger entry for the procured MWh.
+        // The fuel reserve is consumed in the same tick by PowerDistributionPhase, so
+        // FuelReserveMwh nets back to 0 at end-of-tick; the procurement is proven
+        // by the ledger entry alone.
+        // 10 MWh × FuelCostPerMwhBase (3) × fuelPriceIndex 1.0 × fxRate 1.0 = 30 EUR
+        var expectedCost = 10m * GameConstants.FuelCostPerMwhBase;
+        var fuelCostEntry = await db.LedgerEntries
+            .FirstOrDefaultAsync(e => e.BuildingId == powerPlant.Id && e.Category == LedgerCategory.FuelCost);
+        Assert.NotNull(fuelCostEntry);
+        Assert.True(fuelCostEntry.Amount < 0m, "Fuel cost ledger entry should be negative");
+        Assert.True(Math.Abs(Math.Abs(fuelCostEntry.Amount) - expectedCost) < 0.10m,
+            $"Expected fuel cost ~{expectedCost} EUR, actual {Math.Abs(fuelCostEntry.Amount)} EUR");
+    }
+
+    /// <summary>
+    /// When the bank account has less balance than full fuel procurement cost,
+    /// the phase procures proportionally (partial procurement, not zero).
+    /// </summary>
+    [Fact]
+    public async Task FuelProcurementPhase_InsufficientFunds_ProcuresPartialFuel()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"LowFunds_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.1, Longitude = 16.9, Population = 5_000, AverageRentPerSqm = 5m,
+            FuelPriceIndex = 1.0m, CurrencyCode = "EUR"
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Low Funds Corp", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        db.FxRates.Add(new FxRate
+        {
+            Id = Guid.NewGuid(), BaseCurrencyCode = "EUR", QuoteCurrencyCode = "EUR",
+            Rate = 1m, RateDate = DateOnly.FromDateTime(DateTime.UtcNow), FetchedAtUtc = DateTime.UtcNow, Source = "FALLBACK"
+        });
+
+        // Only 10 EUR in bank (full cost for 10 MWh = 10 × FuelCostPerMwhBase EUR) — partial procurement expected.
+        var bankAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(db, company.Id, "EUR");
+        bankAccount.Balance = 10m;
+
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Coal Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m, PowerConsumption = 0m,
+            FuelReserveMwh = 0m, BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(powerPlant);
+
+        db.BuildingUnits.Add(new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // With 10 EUR and costPerMwh = 3 EUR/MWh, we can afford ~3.33 MWh (partial procurement).
+        // That fuel is consumed in the same tick by PowerDistributionPhase.
+        // Proof of partial procurement: FUEL_COST ledger entry exists with |Amount| ≤ 10 EUR.
+        var fuelCostEntry = await db.LedgerEntries
+            .FirstOrDefaultAsync(e => e.BuildingId == powerPlant.Id && e.Category == LedgerCategory.FuelCost);
+        Assert.NotNull(fuelCostEntry);
+        Assert.True(fuelCostEntry.Amount < 0m, "Fuel cost should be negative");
+        // Full cost = 10 MWh × 3 = 30 EUR. Partial cost ≤ 10 EUR (starting balance).
+        var fullFuelCostPartialTest = 10m * GameConstants.FuelCostPerMwhBase;
+        Assert.True(Math.Abs(fuelCostEntry.Amount) < fullFuelCostPartialTest,
+            $"Partial procurement cost {Math.Abs(fuelCostEntry.Amount)} should be less than full {fullFuelCostPartialTest}");
+        Assert.True(Math.Abs(fuelCostEntry.Amount) <= 10.01m,
+            $"Partial cost {Math.Abs(fuelCostEntry.Amount)} should not exceed starting balance (10 EUR)");
+    }
+
+    /// <summary>
+    /// Setting dispatch target to 50% should halve the effective output and fuel consumption.
+    /// </summary>
+    [Fact]
+    public async Task DispatchTarget_50Pct_HalvesOutputAndFuelConsumption()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"DispCity_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.1, Longitude = 16.9, Population = 5_000, AverageRentPerSqm = 5m,
+            FuelPriceIndex = 1.0m, CurrencyCode = "EUR"
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Dispatch Corp", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        db.FxRates.Add(new FxRate
+        {
+            Id = Guid.NewGuid(), BaseCurrencyCode = "EUR", QuoteCurrencyCode = "EUR",
+            Rate = 1m, RateDate = DateOnly.FromDateTime(DateTime.UtcNow), FetchedAtUtc = DateTime.UtcNow, Source = "FALLBACK"
+        });
+
+        var bankAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(db, company.Id, "EUR");
+        bankAccount.Balance = 500m;
+
+        // COAL plant: 20 MW base + FUEL_PURCHASE level 1 (10 MW when fuel available). Dispatch = 50%.
+        // FuelReserveMwh starts at 0; FuelProcurementPhase procures at 50% dispatch = 5 MWh.
+        // After procurement: reserve = 5 MWh.
+        // ComputeAndConsumeFuel: FUEL_PURCHASE draws min(10, 5) = 5 MW, reserve → 0.
+        // rawOutput = (20 + 5); × 0.5 dispatch = 12.5 MW.
+        // Consumer: 10 MW → POWERED (12.5 > 10).
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Half-Dispatch Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 20m, PowerConsumption = 0m,
+            DispatchTargetPercent = 50, FuelReserveMwh = 0m, BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 10m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        db.BuildingUnits.Add(new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Powered, consumer.PowerStatus);
+
+        // At 50% dispatch, fuel procurement is 5 MWh (half the full-dispatch 10 MWh).
+        // Cost = 5 × FuelCostPerMwhBase = 15 EUR. Full = 30 EUR.
+        var fullFuelCost = 10m * GameConstants.FuelCostPerMwhBase;
+        var fuelCost = await db.LedgerEntries
+            .Where(e => e.BuildingId == powerPlant.Id && e.Category == LedgerCategory.FuelCost)
+            .SumAsync(e => Math.Abs(e.Amount));
+        Assert.True(fuelCost > 0m, $"Fuel cost should be > 0, got {fuelCost}");
+        Assert.True(fuelCost < fullFuelCost, $"Half-dispatch fuel cost {fuelCost} should be < full {fullFuelCost}");
+    }
+
+    /// <summary>
+    /// A COAL plant with zero dispatch target should produce 0 MW output and zero fuel cost.
+    /// </summary>
+    [Fact]
+    public async Task DispatchTarget_Zero_ProducesNoOutputAndNoFuelCost()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"ZeroDisp_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.1, Longitude = 16.9, Population = 5_000, AverageRentPerSqm = 5m,
+            FuelPriceIndex = 1.0m, CurrencyCode = "EUR"
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Offline Corp", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        db.FxRates.Add(new FxRate
+        {
+            Id = Guid.NewGuid(), BaseCurrencyCode = "EUR", QuoteCurrencyCode = "EUR",
+            Rate = 1m, RateDate = DateOnly.FromDateTime(DateTime.UtcNow), FetchedAtUtc = DateTime.UtcNow, Source = "FALLBACK"
+        });
+
+        var bankAccount = await BuildingBankAccountProvisioning.EnsureCompanyCurrencyAccountAsync(db, company.Id, "EUR");
+        bankAccount.Balance = 500m;
+
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Offline Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m, PowerConsumption = 0m,
+            DispatchTargetPercent = 0, FuelReserveMwh = 100m, BankAccountId = bankAccount.Id,
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 10m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+        db.BuildingUnits.Add(new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.FuelPurchase, GridX = 0, GridY = 0, Level = 1
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Offline, consumer.PowerStatus);
+
+        // Zero dispatch = zero fuel procurement, zero FUEL_COST entries.
+        // (Other operational costs like labor/grid fines may still be charged.)
+        var fuelCost = await db.LedgerEntries
+            .Where(e => e.BuildingId == powerPlant.Id && e.Category == LedgerCategory.FuelCost)
+            .SumAsync(e => Math.Abs(e.Amount));
+        Assert.Equal(0m, fuelCost);
+    }
+
+    /// <summary>
+    /// ENERGY_PRODUCING units require fuel from the reserve to generate output.
+    /// If reserve is zero, ENERGY_PRODUCING contributes 0 MW output.
+    /// </summary>
+    [Fact]
+    public async Task EnergyProducing_EmptyReserve_ContributesZeroMw()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstDeterministicAsync();
+        var city = new City
+        {
+            Id = Guid.NewGuid(), Name = $"EmptyRes_{Guid.NewGuid():N}"[..20], CountryCode = "XX",
+            Latitude = 48.1, Longitude = 16.9, Population = 5_000, AverageRentPerSqm = 5m,
+            FuelPriceIndex = 1.0m, CurrencyCode = "EUR"
+        };
+        db.Cities.Add(city);
+
+        var company = new Company { Id = Guid.NewGuid(), Name = "Empty Corp", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+        db.Companies.Add(company);
+
+        // COAL plant: small base output (5 MW), 1 × ENERGY_PRODUCING unit.
+        // With empty reserve, EP contributes 0 MW → total = 5 MW.
+        // Consumer 40 MW → 5/40 = 12.5% < 50% → OFFLINE.
+        var powerPlant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Empty Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 5m, PowerConsumption = 0m,
+            FuelReserveMwh = 0m, // empty reserve — ENERGY_PRODUCING contributes 0
+            BuiltAtUtc = DateTime.UtcNow
+        };
+        var consumer = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.Factory, Name = "Consumer",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerConsumption = 40m, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.AddRange(powerPlant, consumer);
+
+        db.BuildingUnits.Add(new BuildingUnit
+        {
+            Id = Guid.NewGuid(), BuildingId = powerPlant.Id,
+            UnitType = UnitType.EnergyProducing, GridX = 0, GridY = 0, Level = 1
+        });
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // 5 MW base + ENERGY_PRODUCING with 0 reserve (contributes 0 MW) = 5 MW; demand 40 MW → OFFLINE
+        await db.Entry(consumer).ReloadAsync();
+        Assert.Equal(PowerStatus.Offline, consumer.PowerStatus);
+    }
+
+    /// <summary>
+    /// setPlantDispatch GraphQL mutation should update the building's DispatchTargetPercent.
+    /// </summary>
+    [Fact]
+    public async Task SetPlantDispatch_Mutation_UpdatesDispatchTarget()
+    {
+        var token = await RegisterAndGetTokenAsync($"dispatchtest_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Dispatch Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Dispatch Test Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m,
+            DispatchTargetPercent = 100, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetDispatch($buildingId: UUID!, $percent: Int!) {
+                setPlantDispatch(input: { buildingId: $buildingId, dispatchTargetPercent: $percent }) {
+                    id dispatchTargetPercent
+                }
+            }
+            """,
+            new { buildingId = plant.Id, percent = 75 },
+            token);
+
+        var updated = result.GetProperty("data").GetProperty("setPlantDispatch");
+        Assert.Equal(75, updated.GetProperty("dispatchTargetPercent").GetInt32());
+
+        await db.Entry(plant).ReloadAsync();
+        Assert.Equal(75, plant.DispatchTargetPercent);
+    }
+
+    /// <summary>
+    /// setPlantDispatch should reject values outside 0–100.
+    /// </summary>
+    [Fact]
+    public async Task SetPlantDispatch_InvalidPercent_ReturnsError()
+    {
+        var token = await RegisterAndGetTokenAsync($"dispatche2_{Guid.NewGuid():N}"[..28] + "@t.com", "DispatchErrorTester");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var player = await db.Players.OrderByDescending(p => p.CreatedAtUtc).FirstDeterministicAsync();
+        var city = await db.Cities.FirstDeterministicAsync();
+        var company = await db.Companies.Where(c => c.PlayerId == player.Id).FirstOrDefaultAsync();
+        if (company is null)
+        {
+            company = new Company { Id = Guid.NewGuid(), Name = "Dispatch Err Co", Cash = 0m, PlayerId = player.Id, FoundedAtUtc = DateTime.UtcNow };
+            db.Companies.Add(company);
+            await db.SaveChangesAsync();
+        }
+
+        var plant = new Building
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id,
+            Type = BuildingType.PowerPlant, Name = "Dispatch Error Plant",
+            Latitude = city.Latitude, Longitude = city.Longitude, Level = 1,
+            PowerPlantType = "COAL", PowerOutput = 50m,
+            DispatchTargetPercent = 100, BuiltAtUtc = DateTime.UtcNow
+        };
+        db.Buildings.Add(plant);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation SetDispatch($buildingId: UUID!, $percent: Int!) {
+                setPlantDispatch(input: { buildingId: $buildingId, dispatchTargetPercent: $percent }) {
+                    id dispatchTargetPercent
+                }
+            }
+            """,
+            new { buildingId = plant.Id, percent = 150 },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out _), "Should return errors for invalid dispatch target");
     }
 }

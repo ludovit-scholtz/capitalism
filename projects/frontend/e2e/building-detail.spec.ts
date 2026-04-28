@@ -20505,4 +20505,142 @@ test.describe('Power plant analytics panel', () => {
     await expect(page.locator('.cell-type', { hasText: 'Power Generation' }).first()).toBeVisible()
     await expect(page.locator('.cell-type', { hasText: 'Battery Storage' }).first()).toBeVisible()
   })
+
+  test('shows dispatch control slider in analytics panel', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ dispatchTargetPercent: 80 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Dispatch control section should be visible with its heading
+    await expect(analyticsPanel.getByText('Dispatch Control')).toBeVisible()
+    // Dispatch apply button
+    await expect(analyticsPanel.getByRole('button', { name: 'Apply' })).toBeVisible()
+    // Dispatch range input
+    await expect(analyticsPanel.locator('.dispatch-slider')).toBeVisible()
+  })
+
+  test('shows fuel reserve status for thermal (COAL) plants', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ powerPlantType: 'COAL', fuelReserveMwh: 125.5 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Fuel reserve section visible for thermal plants
+    const fuelReserveSection = analyticsPanel.locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+    await expect(fuelReserveSection.getByText('Fuel Reserve')).toBeVisible()
+    // Fuel costs metric visible in P&L summary for thermal plant
+    await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).toBeVisible()
+  })
+
+  test('does not show fuel reserve for non-thermal (WIND) plants', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ powerPlantType: 'WIND', powerOutput: 25 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Fuel reserve section hidden for non-thermal plant
+    await expect(analyticsPanel.locator('.fuel-reserve')).not.toBeVisible()
+    // Fuel costs metric NOT shown for non-thermal plants
+    await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).not.toBeVisible()
+  })
+
+  test('dispatch apply button updates dispatch target via mutation', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ dispatchTargetPercent: 100 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+    await expect(analyticsPanel.locator('.dispatch-control')).toBeVisible()
+
+    // Move slider to 50% and apply
+    const slider = analyticsPanel.locator('.dispatch-slider')
+    await slider.fill('50')
+    // Verify the badge shows 50% immediately after moving the slider
+    await expect(analyticsPanel.locator('.dispatch-control')).toContainText('50%')
+    await analyticsPanel.getByRole('button', { name: 'Apply' }).click()
+
+    // Success message should appear confirming the mutation was sent
+    await expect(analyticsPanel.locator('.dispatch-success')).toBeVisible()
+  })
 })

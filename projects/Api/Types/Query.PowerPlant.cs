@@ -17,7 +17,8 @@ public sealed partial class Query
     ///   - surplusIncome  : GRID_SURPLUS_INCOME ledger entries
     ///   - gridFine       : GRID_FINE ledger entries (absolute value)
     ///   - operatingCosts : LABOR_COST + ENERGY_COST ledger entries
-    ///   - netProfit      : surplusIncome – gridFine – operatingCosts
+    ///   - fuelCosts      : FUEL_COST ledger entries (absolute value; COAL/GAS plants only)
+    ///   - netProfit      : surplusIncome - gridFine - operatingCosts - fuelCosts
     /// </summary>
     [Authorize]
     public async Task<PowerPlantAnalytics> GetPowerPlantAnalytics(
@@ -66,7 +67,8 @@ public sealed partial class Query
                 && (e.Category == LedgerCategory.GridSurplusIncome
                     || e.Category == LedgerCategory.GridFine
                     || e.Category == LedgerCategory.LaborCost
-                    || e.Category == LedgerCategory.EnergyCost))
+                    || e.Category == LedgerCategory.EnergyCost
+                    || e.Category == LedgerCategory.FuelCost))
             .Select(e => new { e.RecordedAtTick, e.Category, e.Amount })
             .OrderBy(e => e.RecordedAtTick)
             .ToListAsync();
@@ -87,6 +89,9 @@ public sealed partial class Query
             var opCosts = tickEntries
                 .Where(e => e.Category is LedgerCategory.LaborCost or LedgerCategory.EnergyCost)
                 .Sum(e => Math.Abs(e.Amount));
+            var fuelCosts = tickEntries
+                .Where(e => e.Category == LedgerCategory.FuelCost)
+                .Sum(e => Math.Abs(e.Amount));
 
             snapshots.Add(new PowerPlantTickSnapshot
             {
@@ -94,7 +99,8 @@ public sealed partial class Query
                 SurplusIncome = surplusIncome,
                 GridFine = gridFine,
                 OperatingCosts = opCosts,
-                NetProfit = surplusIncome - gridFine - opCosts,
+                FuelCosts = fuelCosts,
+                NetProfit = surplusIncome - gridFine - opCosts - fuelCosts,
             });
         }
 
@@ -106,11 +112,14 @@ public sealed partial class Query
             CurrentOutputMw = building.PowerOutput > 0m
                 ? building.PowerOutput.Value
                 : GameConstants.DefaultPowerOutputMw(building.PowerPlantType),
+            DispatchTargetPercent = building.DispatchTargetPercent,
+            FuelReserveMwh = building.FuelReserveMwh,
             DataFromTick = windowStart,
             DataToTick = currentTick,
             TotalSurplusIncome = snapshots.Sum(s => s.SurplusIncome),
             TotalGridFines = snapshots.Sum(s => s.GridFine),
             TotalOperatingCosts = snapshots.Sum(s => s.OperatingCosts),
+            TotalFuelCosts = snapshots.Sum(s => s.FuelCosts),
             TotalNetProfit = snapshots.Sum(s => s.NetProfit),
             Timeline = snapshots,
         };

@@ -2021,12 +2021,24 @@ export default {
       surplusIncome: 'Surplus Income',
       gridFine: 'Grid Fines',
       operatingCosts: 'Operating Costs',
+      fuelCosts: 'Fuel Costs',
       netProfit: 'Net Profit',
       tickWindow: 'Ticks {start}–{end}',
       tickTooltip: 'Tick {tick}: +{income} income, -{costs} costs',
       noData: 'No grid economics data yet. Economics are recorded each tick once the city has both power plants and consumers.',
       surplusHint: 'Earned when city supply exceeds demand. Rate: {rate}/MW/tick.',
       fineHint: 'Charged when city supply falls short of demand. Rate: {rate}/MW/tick.',
+    },
+    dispatch: {
+      title: 'Dispatch Control',
+      sliderLabel: 'Output dispatch target (%)',
+      hint: 'Set how much of the rated capacity this plant generates each tick. Lower dispatch saves fuel cost but reduces surplus income and increases shortage risk.',
+      applyBtn: 'Apply',
+      success: 'Dispatch target updated. Takes effect on the next tick.',
+    },
+    fuelReserve: {
+      title: 'Fuel Reserve',
+      hint: 'Fuel is procured each tick by FUEL_PURCHASE units. ENERGY_PRODUCING units convert stored fuel into grid electricity.',
     },
     units: {
       POWER_GENERATION: {

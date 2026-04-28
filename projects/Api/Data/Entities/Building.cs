@@ -188,6 +188,21 @@ public sealed class Building
     [MaxLength(200)]
     public string? SuspendedReason { get; set; }
 
+    /// <summary>
+    /// Player-set dispatch target as a percentage (0–100) of the plant's rated capacity.
+    /// 100 = run at full output; 50 = run at half capacity, halving both fuel costs and output.
+    /// Applies to POWER_PLANT buildings only; ignored for all other building types.
+    /// Defaults to 100 (full output) when not explicitly set.
+    /// </summary>
+    public int DispatchTargetPercent { get; set; } = 100;
+
+    /// <summary>
+    /// Current fuel reserve for thermal power plants (COAL/GAS) in MWh.
+    /// Filled each tick by FUEL_PURCHASE units; consumed by ENERGY_PRODUCING units.
+    /// Renewable and nuclear plants do not use fuel reserves.
+    /// </summary>
+    public decimal FuelReserveMwh { get; set; } = 0m;
+
     /// <summary>Units installed in this building's 4x4 grid.</summary>
     public ICollection<BuildingUnit> Units { get; set; } = [];
 

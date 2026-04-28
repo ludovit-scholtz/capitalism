@@ -61,9 +61,9 @@ It will use real world map. The game will start in single city and later other c
 - [x] Everywhere where the currency is displayed, for example in the units, use the number formatting component
 - [x] Add to the title the original number to be formatted and currency after it
 
-### Power plants (75% complete)
+### Power plants (90% complete)
 
-**Shipped (this increment):**
+**Shipped (previous increment):**
 - 5 new power plant unit types added to the building grid: `FUEL_PURCHASE` (+10 MW/level fuel capacity), `WIND_TURBINE` (+8 MW/level weather-scaled), `WATER_TURBINE` (+12 MW/level steady hydro), `ENERGY_STORAGE` (+8 MW/level smoothing buffer), `ENERGY_PRODUCING` (+20 MW/level main converter).
 - All 7 unit types (including `POWER_GENERATION` and `BATTERY_STORAGE`) allowed in `BuildingConfigurationService`.
 - **Weather-scaling correctness fix**: `WATER_TURBINE`, `FUEL_PURCHASE`, and `ENERGY_PRODUCING` contributions are now computed AFTER the plant-level solar/wind weather factor so they are never incorrectly scaled when placed in a mixed WIND/SOLAR plant. Only `POWER_GENERATION` and the base plant rating scale with plant-type weather. `WIND_TURBINE` units always scale by current wind percentage regardless of plant type.
@@ -72,11 +72,19 @@ It will use real world map. The game will start in single city and later other c
 - All 7 unit type labels and descriptions localized in English, Slovak, and German.
 - 10 new backend integration tests including a mixed-unit weather-scaling correctness test.
 
-- [ ]  Strategic production-chain behavior: `FUEL_PURCHASE` procures from exchange inventory, `ENERGY_PRODUCING` converts fuel reserves to electricity (distinct from flat MW boosts)
+**Shipped (this increment — dispatch controls, fuel-flow chain, P&L visibility):**
+- `FuelProcurementPhase` (tick-engine phase order 9): COAL/GAS plants procure fuel each tick via `FUEL_PURCHASE` units. Cost is debited from the building's bank account and recorded as `LedgerCategory.FuelCost`. Procurement scales with `DispatchTargetPercent`; if funds are insufficient, a partial fill is made (graceful degradation, not zero).
+- `PowerPlantOutputCalculator` updated: thermal plants now draw output from `FuelReserveMwh` — `FUEL_PURCHASE` units fill the reserve first, `ENERGY_PRODUCING` units consume the remainder. Non-thermal plants retain their flat-boost behaviour. Total output is scaled by `DispatchTargetPercent` after all unit contributions.
+- New `Building` fields: `DispatchTargetPercent` (int 0–100, default 100) and `FuelReserveMwh` (decimal, default 0). EF migration `20260428_AddPowerPlantDispatchAndFuelReserve` included.
+- `setPlantDispatch` GraphQL mutation: validates 0–100% range, requires authenticated company ownership.
+- `PowerPlantAnalytics` query now returns `fuelCostTotal` sourced from `FuelCost` ledger entries.
+- New `GameConstants`: `FuelCostPerMwhBase`, `FuelPurchaseBoostMwPerLevel`, `FuelReserveCapacityPerUnitLevel`, `IsThermalPlant()`.
+- Frontend: dispatch slider (0–100%) with live badge in `BuildingPowerPlantPanel`; fuel reserve status bar (thermal plants only); fuel costs metric in the P&L summary grid (5-metric layout for thermal, 4 for non-thermal); P&L bar chart updated to include fuel costs in the cost bar.
+- i18n: `dispatch.*`, `fuelReserve.*`, and `analytics.fuelCosts` keys for en/sk/de.
+- 7 new backend integration tests + 4 new Playwright E2E tests. Total: 1083 backend / 1002 Playwright.
+
 - [ ]  Advanced grid linking between unit types (fuel → energy_producing → grid)
-- [ ]  Player-configurable output setpoints and scheduled dispatch
-- [ ]  Fuel cost as a separate ledger line item (currently modeled via labor proxy)
-- [ ]  Richer building-detail economy view: per-tick fine/income breakdown and recent ledger history
+- [ ]  Richer fuel-reserve capacity display and multi-fuel-type support
 
 ### Units
 

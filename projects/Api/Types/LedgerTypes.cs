@@ -111,11 +111,17 @@ public sealed class PowerPlantAnalytics
     public string BuildingName { get; set; } = string.Empty;
     public string PlantType { get; set; } = string.Empty;
     public decimal CurrentOutputMw { get; set; }
+    /// <summary>Player-set dispatch target (0–100%). Returned from the database at query time.</summary>
+    public int DispatchTargetPercent { get; set; }
+    /// <summary>Current fuel reserve in MWh (COAL/GAS plants). Always 0 for renewable/nuclear.</summary>
+    public decimal FuelReserveMwh { get; set; }
     public long DataFromTick { get; set; }
     public long DataToTick { get; set; }
     public decimal TotalSurplusIncome { get; set; }
     public decimal TotalGridFines { get; set; }
     public decimal TotalOperatingCosts { get; set; }
+    /// <summary>Total fuel procurement costs over the analytics window (COAL/GAS plants only).</summary>
+    public decimal TotalFuelCosts { get; set; }
     public decimal TotalNetProfit { get; set; }
     public List<PowerPlantTickSnapshot> Timeline { get; set; } = [];
 }
@@ -127,6 +133,8 @@ public sealed class PowerPlantTickSnapshot
     public decimal SurplusIncome { get; set; }
     public decimal GridFine { get; set; }
     public decimal OperatingCosts { get; set; }
+    /// <summary>Fuel procurement cost for this tick (COAL/GAS plants only).</summary>
+    public decimal FuelCosts { get; set; }
     public decimal NetProfit { get; set; }
 }
 

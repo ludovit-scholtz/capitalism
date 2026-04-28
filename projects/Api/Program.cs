@@ -135,6 +135,7 @@ public class Program
         // ── Game tick engine ──
         builder.Services.AddScoped<TickProcessor>();
         builder.Services.AddScoped<ITickPhase, WeatherUpdatePhase>();
+        builder.Services.AddScoped<ITickPhase, FuelProcurementPhase>();
         builder.Services.AddScoped<ITickPhase, PowerDistributionPhase>();
         builder.Services.AddScoped<ITickPhase, PowerGridEconomicsPhase>();
         builder.Services.AddScoped<ITickPhase, ConstructionPhase>();

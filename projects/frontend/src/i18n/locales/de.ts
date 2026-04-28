@@ -2022,12 +2022,24 @@ export default {
       surplusIncome: 'Überschusseinnahmen',
       gridFine: 'Netzstrafgebühren',
       operatingCosts: 'Betriebskosten',
+      fuelCosts: 'Brennstoffkosten',
       netProfit: 'Nettogewinn',
       tickWindow: 'Ticks {start}–{end}',
       tickTooltip: 'Tick {tick}: +{income} Einnahmen, -{costs} Kosten',
       noData: 'Noch keine Netzdaten. Daten werden jeden Tick aufgezeichnet, sobald die Stadt Kraftwerke und Verbraucher hat.',
       surplusHint: 'Verdient, wenn das Stadtangebot die Nachfrage übersteigt. Tarif: {rate}/MW/Tick.',
       fineHint: 'Berechnet, wenn das Stadtangebot die Nachfrage nicht deckt. Tarif: {rate}/MW/Tick.',
+    },
+    dispatch: {
+      title: 'Einsatzsteuerung',
+      sliderLabel: 'Ziel-Einsatzprozent (%)',
+      hint: 'Legen Sie fest, wie viel der Nennleistung das Kraftwerk jeden Tick erzeugt. Geringerer Einsatz spart Brennstoffkosten, verringert aber Überschusseinnahmen und erhöht das Mangel-Risiko.',
+      applyBtn: 'Anwenden',
+      success: 'Einsatzziel aktualisiert. Wirkt ab dem nächsten Tick.',
+    },
+    fuelReserve: {
+      title: 'Brennstoffreserve',
+      hint: 'Brennstoff wird jeden Tick von BRENNSTOFFBESCHAFFUNGS-Einheiten beschafft. ENERGIEERZEUGER-Einheiten wandeln gespeicherten Brennstoff in Netzstrom um.',
     },
     units: {
       POWER_GENERATION: {

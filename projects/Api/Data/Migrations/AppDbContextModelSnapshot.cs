@@ -334,6 +334,14 @@ namespace Api.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<int>("DispatchTargetPercent")
+                        .HasDefaultValue(100)
+                        .HasColumnType("integer");
+
+                    b.Property<decimal>("FuelReserveMwh")
+                        .HasDefaultValue(0m)
+                        .HasColumnType("numeric");
+
                     b.Property<decimal?>("TotalAreaSqm")
                         .HasPrecision(18, 2)
                         .HasColumnType("numeric(18,2)");

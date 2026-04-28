@@ -108,6 +108,15 @@ public sealed partial class TickContext
     public List<Inventory> NewInventory { get; } = [];
     public List<BuildingUnitResourceHistory> NewUnitResourceHistories { get; } = [];
 
+    /// <summary>
+    /// Effective MW output for each power-plant building, computed and stored by
+    /// <see cref="Phases.PowerDistributionPhase"/> so that <see cref="Phases.PowerGridEconomicsPhase"/>
+    /// can use the same output values without recomputing (important because fuel reserves are consumed
+    /// during the distribution phase and would appear as 0 if re-evaluated later).
+    /// Keyed by <see cref="Building.Id"/>.
+    /// </summary>
+    public Dictionary<Guid, decimal> PlantEffectiveOutputMwById { get; } = [];
+
     // ── Helpers ──
 
     /// <summary>

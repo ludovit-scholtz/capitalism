@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
@@ -12,6 +12,10 @@ const {
   cityPowerBalance,
   cityPowerBalanceLoading,
   loadCityPowerBalance,
+  setPlantDispatch,
+  dispatchSaving,
+  dispatchError,
+  dispatchSuccess,
   formatCurrency,
 } = bd
 
@@ -48,6 +52,27 @@ const projected = computed<ProjectedResult>(() => {
   return { kind: 'balanced', amount: 0, sharePercent }
 })
 
+// Whether this is a thermal (COAL/GAS) plant — fuel reserve logic only applies to these.
+const isThermalPlant = computed(() => {
+  const pt = building.value?.powerPlantType
+  return pt === 'COAL' || pt === 'GAS'
+})
+
+// Dispatch control slider (local draft, synced from building on mount/change).
+const draftDispatch = ref(100)
+watch(
+  () => building.value?.dispatchTargetPercent,
+  (v) => {
+    if (v != null) draftDispatch.value = v
+  },
+  { immediate: true },
+)
+
+async function applyDispatch() {
+  if (!building.value) return
+  await setPlantDispatch(building.value.id, draftDispatch.value)
+}
+
 function loadBalanceIfNeeded() {
   if (building.value?.type === 'POWER_PLANT' && building.value?.cityId) {
     loadCityPowerBalance(building.value.cityId)
@@ -56,6 +81,13 @@ function loadBalanceIfNeeded() {
 
 onMounted(loadBalanceIfNeeded)
 watch(() => building.value?.cityId, loadBalanceIfNeeded)
+
+// Pre-compute the chart scale for the P&L bar chart (avoids O(n²) re-computation in template).
+const chartMaxValue = computed(() => {
+  const tl = powerPlantAnalytics.value?.timeline
+  if (!tl || tl.length === 0) return 1
+  return Math.max(...tl.map((s) => Math.max(s.surplusIncome ?? 0, (s.gridFine ?? 0) + (s.operatingCosts ?? 0) + (s.fuelCosts ?? 0)))) || 1
+})
 </script>
 
 <template>
@@ -170,7 +202,59 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
         {{ t('powerPlant.analytics.tickWindow', { start: powerPlantAnalytics.dataFromTick, end: powerPlantAnalytics.dataToTick }) }}
       </p>
 
-      <div class="ppa-summary-grid grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <!-- Dispatch control -->
+      <div class="dispatch-control mb-4 rounded-lg border border-divider bg-surface p-3">
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-semibold uppercase tracking-wide text-muted">{{ t('powerPlant.dispatch.title') }}</span>
+          <span
+            class="rounded-full px-2 py-0.5 text-xs font-bold"
+            :class="{
+              'bg-green-600/20 text-green-400': draftDispatch >= 80,
+              'bg-yellow-500/20 text-yellow-400': draftDispatch >= 40 && draftDispatch < 80,
+              'bg-red-600/20 text-red-400': draftDispatch < 40,
+            }"
+          >{{ draftDispatch }}%</span>
+        </div>
+        <input
+          v-model.number="draftDispatch"
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          class="dispatch-slider w-full accent-[var(--color-accent)]"
+          :aria-label="t('powerPlant.dispatch.sliderLabel')"
+        />
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+          <p class="flex-1 text-xs text-muted">{{ t('powerPlant.dispatch.hint') }}</p>
+          <button
+            class="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            :disabled="dispatchSaving || draftDispatch === (building?.dispatchTargetPercent ?? 100)"
+            @click="applyDispatch"
+          >
+            {{ dispatchSaving ? t('common.saving') : t('powerPlant.dispatch.applyBtn') }}
+          </button>
+        </div>
+        <p v-if="dispatchError" class="mt-1 text-xs text-red-400">{{ dispatchError }}</p>
+        <p v-if="dispatchSuccess" class="dispatch-success mt-1 text-xs text-green-400">{{ t('powerPlant.dispatch.success') }}</p>
+      </div>
+
+      <!-- Fuel reserve (thermal plants only) -->
+      <div
+        v-if="isThermalPlant"
+        class="fuel-reserve mb-4 rounded-lg border border-divider bg-surface p-3"
+      >
+        <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <span class="text-xs font-semibold uppercase tracking-wide text-muted">⛽ {{ t('powerPlant.fuelReserve.title') }}</span>
+          <span class="text-sm font-bold text-foreground">{{ (powerPlantAnalytics.fuelReserveMwh ?? 0).toFixed(1) }} MWh</span>
+        </div>
+        <p class="text-xs text-muted">{{ t('powerPlant.fuelReserve.hint') }}</p>
+      </div>
+
+      <!-- P&L summary grid (5 metrics incl. fuel costs for thermal) -->
+      <div
+        class="ppa-summary-grid grid gap-3"
+        :class="isThermalPlant ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5' : 'grid-cols-2 sm:grid-cols-4'"
+      >
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
           <span class="ppa-metric-label" :title="t('powerPlant.analytics.surplusHint', { rate: SURPLUS_RATE_PER_MW_TICK })">
             {{ t('powerPlant.analytics.surplusIncome') }}
@@ -186,6 +270,10 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
           <span class="ppa-metric-label">{{ t('powerPlant.analytics.operatingCosts') }}</span>
           <strong class="ppa-metric-value ppa-cost mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalOperatingCosts) }}</strong>
+        </div>
+        <div v-if="isThermalPlant" class="ppa-metric rounded-lg border border-divider bg-surface p-3">
+          <span class="ppa-metric-label">{{ t('powerPlant.analytics.fuelCosts') }}</span>
+          <strong class="ppa-metric-value ppa-fuel-cost mt-1 block text-base">{{ formatCurrency(powerPlantAnalytics.totalFuelCosts) }}</strong>
         </div>
         <div class="ppa-metric rounded-lg border border-divider bg-surface p-3">
           <span class="ppa-metric-label">{{ t('powerPlant.analytics.netProfit') }}</span>
@@ -203,7 +291,7 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
 
       <!-- Per-tick P&L bar chart -->
       <div
-        v-if="powerPlantAnalytics.timeline.some((s) => s.surplusIncome > 0 || s.gridFine > 0 || s.operatingCosts > 0)"
+        v-if="powerPlantAnalytics.timeline.some((s) => (s.surplusIncome ?? 0) > 0 || (s.gridFine ?? 0) > 0 || (s.operatingCosts ?? 0) > 0 || (s.fuelCosts ?? 0) > 0)"
         class="ppa-chart mt-4 flex h-14 items-end gap-px overflow-hidden rounded-md border border-divider bg-surface px-1 py-1"
         role="img"
         :aria-label="t('powerPlant.analytics.panelTitle')"
@@ -215,23 +303,23 @@ watch(() => building.value?.cityId, loadBalanceIfNeeded)
           :title="
             t('powerPlant.analytics.tickTooltip', {
               tick: snap.tick,
-              income: formatCurrency(snap.surplusIncome),
-              costs: formatCurrency(snap.gridFine + snap.operatingCosts),
+              income: formatCurrency(snap.surplusIncome ?? 0),
+              costs: formatCurrency((snap.gridFine ?? 0) + (snap.operatingCosts ?? 0) + (snap.fuelCosts ?? 0)),
             })
           "
         >
           <div
-            v-if="snap.surplusIncome > 0"
+            v-if="(snap.surplusIncome ?? 0) > 0"
             class="ppa-bar ppa-bar-income min-w-[1px] flex-1 rounded-t-sm"
             :style="{
-              height: `${Math.min(Math.round((snap.surplusIncome / (Math.max(...powerPlantAnalytics.timeline.map((s) => Math.max(s.surplusIncome, s.gridFine + s.operatingCosts))) || 1)) * 50), 50)}px`,
+              height: `${Math.min(Math.round(((snap.surplusIncome ?? 0) / chartMaxValue) * 50), 50)}px`,
             }"
           />
           <div
-            v-if="snap.gridFine + snap.operatingCosts > 0"
+            v-if="(snap.gridFine ?? 0) + (snap.operatingCosts ?? 0) + (snap.fuelCosts ?? 0) > 0"
             class="ppa-bar ppa-bar-cost min-w-[1px] flex-1 rounded-t-sm"
             :style="{
-              height: `${Math.min(Math.round(((snap.gridFine + snap.operatingCosts) / (Math.max(...powerPlantAnalytics.timeline.map((s) => Math.max(s.surplusIncome, s.gridFine + s.operatingCosts))) || 1)) * 50), 50)}px`,
+              height: `${Math.min(Math.round((((snap.gridFine ?? 0) + (snap.operatingCosts ?? 0) + (snap.fuelCosts ?? 0)) / chartMaxValue) * 50), 50)}px`,
             }"
           />
         </div>
