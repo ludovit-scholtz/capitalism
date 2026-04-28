@@ -30,7 +30,7 @@ const LEDGER_QUERY = `
     companyLedger(companyId: $companyId, gameYear: $gameYear) {
       companyId companyName gameYear isCurrentGameYear currentCash
       primaryCurrencyCode primaryCurrencySymbol hasMixedCurrencies
-      totalRevenue totalPurchasingCosts totalShippingCosts totalLaborCosts totalEnergyCosts totalMarketingCosts totalTaxPaid totalOtherCosts taxableIncome estimatedIncomeTax netIncome
+      totalRevenue totalMediaHouseIncome totalPurchasingCosts totalShippingCosts totalLaborCosts totalEnergyCosts totalMarketingCosts totalTaxPaid totalOtherCosts taxableIncome estimatedIncomeTax netIncome
       totalDepositInterestReceived totalDepositInterestPaid totalLoanInterestIncome totalLoanInterestExpense
       propertyValue propertyAppreciation buildingValue inventoryValue totalDepositsPlaced totalAssets totalPropertyPurchases
       totalStockPurchaseCashOut totalStockSaleCashIn cashFromOperations cashFromInvestments cashFromBanking firstRecordedTick lastRecordedTick
@@ -272,6 +272,18 @@ useTickRefresh(async () => {
               <span class="amount-positive">{{ formatAmount(ledger.totalRevenue) }}</span>
               <button class="drill-btn" :class="{ active: drillCategory === 'REVENUE' }" :aria-label="t('ledger.drillDown') + ': ' + t('ledger.revenue')" @click="toggleDrill('REVENUE')">
                 {{ drillCategory === 'REVENUE' ? '▲' : '▼' }}
+              </button>
+            </div>
+            <div v-if="(ledger.totalMediaHouseIncome ?? 0) > 0" class="statement-row media-house-income-row">
+              <span class="row-label">📺 {{ t('ledger.mediaHouseIncome') }}</span>
+              <span class="amount-positive">{{ formatAmount(ledger.totalMediaHouseIncome ?? 0) }}</span>
+              <button
+                class="drill-btn"
+                :class="{ active: drillCategory === 'MEDIA_HOUSE_INCOME' }"
+                :aria-label="t('ledger.drillDown') + ': ' + t('ledger.mediaHouseIncome')"
+                @click="toggleDrill('MEDIA_HOUSE_INCOME')"
+              >
+                {{ drillCategory === 'MEDIA_HOUSE_INCOME' ? '▲' : '▼' }}
               </button>
             </div>
             <div v-if="(ledger.totalDepositInterestReceived ?? 0) > 0" class="statement-row">

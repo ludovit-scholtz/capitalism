@@ -98,6 +98,14 @@ public static class LedgerCalculator
             .Sum(entry => entry.Amount);
     }
 
+    /// <summary>Advertising income earned by this company's media house buildings.</summary>
+    public static decimal GetTotalMediaHouseIncome(IEnumerable<LedgerEntry> entries)
+    {
+        return entries
+            .Where(entry => entry.Category == LedgerCategory.MediaHouseIncome && entry.Amount > 0m)
+            .Sum(entry => entry.Amount);
+    }
+
     // ── Banking income/expense helpers ────────────────────────────────────────
 
     /// <summary>Deposit interest earned by this company as a depositor (income).</summary>
@@ -173,12 +181,13 @@ public static class LedgerCalculator
     {
         var ledgerEntries = entries.ToList();
         var revenue = GetTotalRevenue(ledgerEntries);
-        // Banking interest income is also taxable
+        // Banking interest income and media house advertising income are also taxable
         var bankingIncome = GetTotalDepositInterestReceived(ledgerEntries) + GetTotalLoanInterestIncome(ledgerEntries);
+        var mediaHouseIncome = GetTotalMediaHouseIncome(ledgerEntries);
         var deductibleCosts = Math.Abs(ledgerEntries
             .Where(entry => DeductibleCategories.Contains(entry.Category) && entry.Amount < 0m)
             .Sum(entry => entry.Amount));
 
-        return Math.Max(revenue + bankingIncome - deductibleCosts, 0m);
+        return Math.Max(revenue + bankingIncome + mediaHouseIncome - deductibleCosts, 0m);
     }
 }

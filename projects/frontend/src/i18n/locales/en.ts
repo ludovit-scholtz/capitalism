@@ -1711,6 +1711,7 @@ export default {
     loanInterestExpense: 'Loan Interest Expense',
     depositsPlaced: 'Bank Deposits Placed',
     cashFromBanking: 'From Banking',
+    mediaHouseIncome: 'Media House Income',
     category: {
       REVENUE: 'Revenue',
       PURCHASING_COST: 'Purchasing',
@@ -1737,6 +1738,8 @@ export default {
       LOAN_PENALTY: 'Loan Penalty',
       CENTRAL_BANK_BORROW: 'Central Bank Borrowing',
       CENTRAL_BANK_REPAY: 'Central Bank Repayment',
+      MEDIA_HOUSE_INCOME: 'Media House Income',
+      MEDIA_HOUSE_CONTENT: 'Content Investment',
     },
     currency: 'Currency',
     mixedCurrencies: 'Multi-currency',

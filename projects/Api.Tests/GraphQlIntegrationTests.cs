@@ -20139,6 +20139,358 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     }
 
     [Fact]
+    public async Task CompanyLedger_MediaHouseIncome_IsIncludedInTotalAndNetIncome()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var email = $"ledger-mhi-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "MediaHouseIncomeUser");
+
+        Guid companyId;
+        Guid buildingId;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            var city = await db.Cities.FirstDeterministicAsync();
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Media Income Corp",
+                Cash = 200_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+
+            var mediaBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "TV Station Beta",
+                Level = 1,
+            };
+            db.Buildings.Add(mediaBuilding);
+
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = mediaBuilding.Id,
+                    Category = LedgerCategory.MediaHouseIncome,
+                    Description = "Advertising income from 3 advertisers",
+                    Amount = 4_500m,
+                    RecordedAtTick = 10,
+                    RecordedAtUtc = DateTime.UtcNow,
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = mediaBuilding.Id,
+                    Category = LedgerCategory.MediaHouseIncome,
+                    Description = "Advertising income from 5 advertisers",
+                    Amount = 7_200m,
+                    RecordedAtTick = 20,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+            buildingId = mediaBuilding.Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            query GetCompanyLedger($companyId: UUID!) {
+              companyLedger(companyId: $companyId) {
+                totalRevenue
+                totalMediaHouseIncome
+                netIncome
+                taxableIncome
+                cashFromOperations
+              }
+            }
+            """,
+            new { companyId },
+            token);
+
+        var ledger = result.GetProperty("data").GetProperty("companyLedger");
+
+        Assert.Equal(0m, ledger.GetProperty("totalRevenue").GetDecimal());
+        Assert.Equal(11_700m, ledger.GetProperty("totalMediaHouseIncome").GetDecimal());
+        Assert.Equal(11_700m, ledger.GetProperty("netIncome").GetDecimal());
+        Assert.Equal(11_700m, ledger.GetProperty("taxableIncome").GetDecimal());
+        Assert.Equal(11_700m, ledger.GetProperty("cashFromOperations").GetDecimal());
+        _ = buildingId; // referenced via entries
+    }
+
+    [Fact]
+    public async Task CompanyLedger_MediaHouseIncome_IsDistinctFromRevenue()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var email = $"ledger-mhi-dist-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "MHIDistinct");
+
+        Guid companyId;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+            var city = await db.Cities.FirstDeterministicAsync();
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Mixed Income Corp",
+                Cash = 300_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+
+            var mediaBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "Radio Station",
+                Level = 1,
+            };
+            db.Buildings.Add(mediaBuilding);
+
+            var shopBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.SalesShop,
+                Name = "Main Shop",
+                Level = 1,
+            };
+            db.Buildings.Add(shopBuilding);
+
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = shopBuilding.Id,
+                    Category = LedgerCategory.Revenue,
+                    Description = "Product sales",
+                    Amount = 20_000m,
+                    RecordedAtTick = 10,
+                    RecordedAtUtc = DateTime.UtcNow,
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = mediaBuilding.Id,
+                    Category = LedgerCategory.MediaHouseIncome,
+                    Description = "Advertising income from 2 advertisers",
+                    Amount = 3_000m,
+                    RecordedAtTick = 10,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            query GetCompanyLedger($companyId: UUID!) {
+              companyLedger(companyId: $companyId) {
+                totalRevenue
+                totalMediaHouseIncome
+                netIncome
+                taxableIncome
+              }
+            }
+            """,
+            new { companyId },
+            token);
+
+        var ledger = result.GetProperty("data").GetProperty("companyLedger");
+
+        // Product sales and media house income must be separate fields
+        Assert.Equal(20_000m, ledger.GetProperty("totalRevenue").GetDecimal());
+        Assert.Equal(3_000m, ledger.GetProperty("totalMediaHouseIncome").GetDecimal());
+        // Net income = revenue + media house income
+        Assert.Equal(23_000m, ledger.GetProperty("netIncome").GetDecimal());
+        // Taxable income includes both
+        Assert.Equal(23_000m, ledger.GetProperty("taxableIncome").GetDecimal());
+    }
+
+    [Fact]
+    public async Task LedgerDrillDown_MediaHouseIncome_ReturnsEntriesWithBuildingContext()
+    {
+        var token = await RegisterAndGetTokenAsync("ledger-mhi-drill@test.com", "MHIDrillUser");
+
+        Guid companyId;
+        Guid buildingId;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == "ledger-mhi-drill@test.com");
+            var city = await db.Cities.FirstDeterministicAsync();
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "Media Drill Corp",
+                Cash = 150_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+
+            var mediaBuilding = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = city.Id,
+                Type = BuildingType.MediaHouse,
+                Name = "Newspaper HQ",
+                Level = 1,
+            };
+            db.Buildings.Add(mediaBuilding);
+
+            db.LedgerEntries.AddRange(
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = mediaBuilding.Id,
+                    Category = LedgerCategory.MediaHouseIncome,
+                    Description = "Advertising income from 2 advertisers",
+                    Amount = 1_800m,
+                    RecordedAtTick = 5,
+                    RecordedAtUtc = DateTime.UtcNow,
+                },
+                new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = company.Id,
+                    BuildingId = mediaBuilding.Id,
+                    Category = LedgerCategory.MediaHouseIncome,
+                    Description = "Advertising income from 4 advertisers",
+                    Amount = 3_200m,
+                    RecordedAtTick = 15,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+            buildingId = mediaBuilding.Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query GetDrillDown($companyId: UUID!, $category: String!) {
+              ledgerDrillDown(companyId: $companyId, category: $category) {
+                id
+                category
+                amount
+                recordedAtTick
+                buildingId
+                buildingName
+                buildingType
+                description
+              }
+            }
+            """,
+            new { companyId, category = LedgerCategory.MediaHouseIncome },
+            token);
+
+        var entries = result.GetProperty("data").GetProperty("ledgerDrillDown");
+        Assert.Equal(2, entries.GetArrayLength());
+
+        // All entries should have the media house building context
+        foreach (var entry in entries.EnumerateArray())
+        {
+            Assert.Equal("MEDIA_HOUSE_INCOME", entry.GetProperty("category").GetString());
+            Assert.Equal(buildingId.ToString(), entry.GetProperty("buildingId").GetString());
+            Assert.Equal("Newspaper HQ", entry.GetProperty("buildingName").GetString());
+            Assert.Equal("MEDIA_HOUSE", entry.GetProperty("buildingType").GetString());
+            Assert.True(entry.GetProperty("amount").GetDecimal() > 0);
+        }
+
+        // Entries should be ordered most recent first (tick 15 before tick 5)
+        var entryList = entries.EnumerateArray().ToList();
+        Assert.Equal(15, entryList[0].GetProperty("recordedAtTick").GetInt64());
+        Assert.Equal(5, entryList[1].GetProperty("recordedAtTick").GetInt64());
+    }
+
+    [Fact]
+    public async Task CompanyLedger_MediaHouseIncome_ZeroWhenNoMediaHouseLedgerEntries()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var email = $"ledger-mhi-zero-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "MHIZero");
+
+        Guid companyId;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var player = await db.Players.SingleAsync(p => p.Email == email);
+
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "No Media Corp",
+                Cash = 100_000m,
+                FoundedAtUtc = DateTime.UtcNow,
+                FoundedAtTick = 0,
+            };
+            db.Companies.Add(company);
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                Category = LedgerCategory.Revenue,
+                Description = "Shop sales",
+                Amount = 5_000m,
+                RecordedAtTick = 10,
+                RecordedAtUtc = DateTime.UtcNow,
+            });
+            await db.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            query GetCompanyLedger($companyId: UUID!) {
+              companyLedger(companyId: $companyId) {
+                totalRevenue
+                totalMediaHouseIncome
+              }
+            }
+            """,
+            new { companyId },
+            token);
+
+        var ledger = result.GetProperty("data").GetProperty("companyLedger");
+        Assert.Equal(5_000m, ledger.GetProperty("totalRevenue").GetDecimal());
+        Assert.Equal(0m, ledger.GetProperty("totalMediaHouseIncome").GetDecimal());
+    }
+
+    [Fact]
     public async Task CompanyLedger_BuildingSummaries_ShowsMultipleBuildings()
     {
         var token = await RegisterAndGetTokenAsync("ledger-multi-bld@test.com", "MultiBldUser");

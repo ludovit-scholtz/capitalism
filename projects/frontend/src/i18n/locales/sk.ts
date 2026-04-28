@@ -1705,6 +1705,7 @@ export default {
     loanInterestExpense: 'Náklady na úroky z pôžičiek',
     depositsPlaced: 'Bankové vklady',
     cashFromBanking: 'Z bankových operácií',
+    mediaHouseIncome: 'Príjem mediálneho domu',
     category: {
       REVENUE: 'Tržby',
       PURCHASING_COST: 'Nákup',
@@ -1731,6 +1732,8 @@ export default {
       LOAN_PENALTY: 'Penále za pôžičku',
       CENTRAL_BANK_BORROW: 'Výpožička od centrálnej banky',
       CENTRAL_BANK_REPAY: 'Splátka centrálnej banke',
+      MEDIA_HOUSE_INCOME: 'Príjem mediálneho domu',
+      MEDIA_HOUSE_CONTENT: 'Investícia do obsahu',
     },
     currency: 'Mena',
     mixedCurrencies: 'Viac mien',

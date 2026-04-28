@@ -72,6 +72,7 @@ export type MockLedgerSummary = {
   primaryCurrencySymbol?: string
   hasMixedCurrencies?: boolean
   totalRevenue: number
+  totalMediaHouseIncome?: number
   totalPurchasingCosts: number
   totalShippingCosts?: number
   totalLaborCosts: number
@@ -1215,6 +1216,7 @@ function buildMockLedgerSummaryPayload(summary: MockLedgerSummary, gameState: Mo
     totalStockPurchaseCashOut: summary.totalStockPurchaseCashOut ?? 0,
     totalStockSaleCashIn: summary.totalStockSaleCashIn ?? 0,
     totalShippingCosts: summary.totalShippingCosts ?? 0,
+    totalMediaHouseIncome: summary.totalMediaHouseIncome ?? 0,
     taxableIncome:
       summary.taxableIncome ??
       Math.max(
