@@ -360,7 +360,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
                 company { id name cash }
                 factory { id name type }
                 salesShop { id name type }
-                selectedProduct { id name industry }
+                selectedProduct { id name industry basePrice }
+                cityCurrencyCode
               }
             }
             """,
@@ -1099,6 +1100,68 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
             Assert.NotEmpty(salesRecords);
         }
+    }
+
+    [Fact]
+    public async Task FinishOnboarding_PragueCity_ReturnsCzkCurrencyCodeAndFxAdjustedValues()
+    {
+        // This test verifies that the onboarding FX-pricing is end-to-end correct for a non-EUR city.
+        // ROADMAP item: "When selecting product in onboarding make sure to show the correct price.
+        // At the moment the product base price is shown without the fx rate adjustment."
+        //
+        // Acceptance criteria:
+        // 1. `cityCurrencyCode` in the result is "CZK" (not EUR) for Prague.
+        // 2. The company bank account has a CZK balance well above the EUR-equivalent starter amount,
+        //    proving the founder deposit and IPO raise were FX-converted to CZK at booking.
+        // 3. The PUBLIC_SALES unit's minPrice is an FX-adjusted CZK amount (much larger than the
+        //    raw EUR base price), confirming the backend applied the city FX rate to the unit setup.
+        var token = await RegisterAndGetTokenAsync(email: $"fx-prague-{Guid.NewGuid():N}@test.com");
+        var cityId = await GetCityIdByNameAsync("Prague");
+        var factoryLotId = await CreateTestLotAsync(cityId, "FACTORY,MINE", "Prague FX Factory");
+
+        await ExecuteGraphQlAsync(
+            """
+            mutation StartOnboardingCompany($input: StartOnboardingCompanyInput!) {
+              startOnboardingCompany(input: $input) { nextStep company { id } }
+            }
+            """,
+            new { input = new { industry = "FURNITURE", cityId, companyName = "Prague FX Corp", factoryLotId } },
+            token);
+
+        var productId = await GetStarterProductIdAsync("FURNITURE", "wooden-chair");
+        var shopLotId = await CreateTestLotAsync(cityId, "SALES_SHOP,COMMERCIAL", "Prague FX Shop", 90_000m);
+
+        var result = await FinishOnboardingAsync(token, productId, shopLotId);
+
+        Assert.False(result.TryGetProperty("errors", out _), "FinishOnboarding should succeed for Prague (CZK)");
+
+        var payload = result.GetProperty("data").GetProperty("finishOnboarding");
+
+        // AC1: cityCurrencyCode must be CZK for Prague.
+        var returnedCurrencyCode = payload.GetProperty("cityCurrencyCode").GetString();
+        Assert.Equal("CZK", returnedCurrencyCode);
+
+        // AC2: company cash must be in CZK — substantially larger than the EUR-equivalent amount.
+        // Default IPO + founder contribution = 700 000 EUR.  With CZK rate ~25,
+        // the CZK balance (after lot deductions) should be >> 1 000 000.
+        var companyCash = payload.GetProperty("company").GetProperty("cash").GetDecimal();
+        Assert.True(companyCash > 1_000_000m,
+            $"Prague company cash should be in CZK (> 1 000 000), actual: {companyCash}");
+
+        // AC3: product basePrice is returned in EUR as the canonical game unit.
+        var productBasePrice = payload.GetProperty("selectedProduct").GetProperty("basePrice").GetDecimal();
+        Assert.True(productBasePrice > 0m && productBasePrice < 1_000m,
+            $"Product basePrice should be the EUR-denominated game value (< 1 000), actual: {productBasePrice}");
+
+        // AC4: The PUBLIC_SALES unit's minPrice must be FX-adjusted (>> raw EUR base price).
+        // Backend sets minPrice = basePrice * fxRate * 1.5 in AddStarterShop.
+        var shopBuildingId = Guid.Parse(payload.GetProperty("salesShop").GetProperty("id").GetString()!);
+        await using var verificationScope = _factory.Services.CreateAsyncScope();
+        var db = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var publicSalesUnit = await db.BuildingUnits
+            .SingleAsync(unit => unit.BuildingId == shopBuildingId && unit.UnitType == UnitType.PublicSales);
+        Assert.True(publicSalesUnit.MinPrice > productBasePrice * 10m,
+            $"PUBLIC_SALES minPrice ({publicSalesUnit.MinPrice}) should be FX-adjusted CZK (>> EUR basePrice {productBasePrice})");
     }
 
     #endregion

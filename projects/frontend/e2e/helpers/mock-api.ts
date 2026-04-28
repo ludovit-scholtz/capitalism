@@ -2802,6 +2802,11 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       player.onboardingCompanyId = null
       player.onboardingFactoryLotId = null
 
+      // Derive the city currency code from the shop lot's cityId so the frontend
+      // can display the correct local currency in the completion step (e.g. CZK for Prague).
+      const shopCity = state.cities.find((c) => c.id === shopLot.cityId)
+      const cityCurrencyCode = shopCity?.currencyCode ?? 'EUR'
+
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -2812,6 +2817,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               factory: company.buildings.find((candidate) => candidate.type === 'FACTORY'),
               salesShop: shopBuilding,
               selectedProduct: product,
+              cityCurrencyCode,
             },
           },
         }),
@@ -3053,6 +3059,8 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       player.onboardingCityId = null
       player.onboardingCompanyId = null
       player.onboardingFactoryLotId = null
+      const completeCity = state.cities.find((c) => c.id === input.cityId)
+      const completeCityCurrencyCode = completeCity?.currencyCode ?? 'EUR'
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -3063,6 +3071,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               factory: company.buildings[0],
               salesShop: company.buildings[1],
               selectedProduct: product ?? state.productTypes[0],
+              cityCurrencyCode: completeCityCurrencyCode,
             },
           },
         }),

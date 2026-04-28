@@ -29,6 +29,13 @@ public sealed class OnboardingResult
 
     /// <summary>The product selected for manufacturing.</summary>
     public ProductType SelectedProduct { get; set; } = null!;
+
+    /// <summary>
+    /// ISO 4217 currency code for the city where the player started their empire.
+    /// The frontend uses this to format all monetary values in the onboarding completion
+    /// screen using the correct local currency instead of defaulting to EUR.
+    /// </summary>
+    public string CityCurrencyCode { get; set; } = "EUR";
 }
 
 /// <summary>Result of purchasing the first factory during lot-based onboarding.</summary>
