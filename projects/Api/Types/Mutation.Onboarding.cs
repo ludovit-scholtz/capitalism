@@ -221,7 +221,8 @@ public sealed partial class Mutation
             Company = company,
             Factory = factory,
             SalesShop = shop,
-            SelectedProduct = product
+            SelectedProduct = product,
+            CityCurrencyCode = city.CurrencyCode
         };
     }
 
@@ -562,7 +563,8 @@ public sealed partial class Mutation
             Company = company,
             Factory = factory,
             SalesShop = shop,
-            SelectedProduct = product
+            SelectedProduct = product,
+            CityCurrencyCode = onboardingCityCurrencyCode
         };
     }
 }

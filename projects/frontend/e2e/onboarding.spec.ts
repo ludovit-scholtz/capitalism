@@ -1983,8 +1983,8 @@ test.describe('Guided first-profit onboarding (post-completion)', () => {
     await expect(page.locator('.milestone-error')).toBeVisible()
     await expect(page.locator('.milestone-error')).toContainText(/configure/i)
 
-    // Should NOT navigate away — URL stays on onboarding (with step=complete query param from resume)
-    await expect(page).toHaveURL('/onboarding?step=complete')
+    // Should NOT navigate away — URL stays on onboarding (step=complete query param from resume, optional cityId)
+    await expect(page).toHaveURL(/\/onboarding\?step=complete/)
   })
 
   test('milestone button shows FIRST_SALE_NOT_RECORDED error when no real sale yet', async ({ page }) => {
@@ -4773,5 +4773,194 @@ test.describe('Onboarding wizard — localization (AC10)', () => {
     await expect(page.locator('.ipo-card', { hasText: 'Štartovacie IPO' })).toBeVisible()
     await expect(page.locator('.ipo-card', { hasText: 'Rastové IPO' })).toBeVisible()
     await expect(page.locator('.ipo-card', { hasText: 'Expanzné IPO' })).toBeVisible()
+  })
+})
+
+test.describe('FX-adjusted onboarding pricing (ROADMAP: correct city-currency product prices)', () => {
+  // ROADMAP item: "When selecting product in onboarding make sure to show the correct price.
+  // At the moment the product base price is shown without the fx rate adjustment."
+  //
+  // These tests prove that the completion step (step 7) shows monetary values in the player's
+  // chosen city currency, not in raw EUR regardless of city.
+
+  test('completion step shows CZK currency for Prague onboarding (not EUR)', async ({ page }) => {
+    // Acceptance criteria: "Onboarding product prices are displayed using the selected city currency
+    // and the correct FX-adjusted amount."
+    // Prague uses CZK. After completing the wizard, the configure-guide cash panel must show
+    // the balance formatted in CZK (e.g. "CZK 390,000"), not in EUR ("€390,000").
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingLots = [
+      ...makeDefaultBuildingLots(),
+      {
+        id: 'lot-prague-fx-factory',
+        cityId: 'city-pr',
+        name: 'Prague FX Factory Site',
+        description: 'Factory lot for FX pricing test.',
+        district: 'Industrial Zone',
+        latitude: 50.08,
+        longitude: 14.44,
+        populationIndex: 0.7,
+        basePrice: 90_000,
+        price: 90_000,
+        suitableTypes: 'FACTORY,MINE',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+      {
+        id: 'lot-prague-fx-shop',
+        cityId: 'city-pr',
+        name: 'Prague FX Shop Row',
+        description: 'Shop lot for FX pricing test.',
+        district: 'Commercial District',
+        latitude: 50.083,
+        longitude: 14.43,
+        populationIndex: 1.2,
+        basePrice: 120_000,
+        price: 120_000,
+        suitableTypes: 'SALES_SHOP,COMMERCIAL',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+    ]
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+
+    // Select Prague (CZK) instead of default Bratislava (EUR)
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair', city: 'Prague' })
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Prague FX Factory Site/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Prague FX Shop Row/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+
+    // The mock returns cityCurrencyCode: 'CZK' for Prague lots.
+    // The configure-guide cash step must display the balance in CZK, not EUR (€).
+    const cashStep = page.locator('.configure-step').filter({ hasText: 'Review your cash' })
+    await expect(cashStep).toBeVisible()
+    const cashText = await cashStep.textContent()
+    expect(cashText).toMatch(/CZK/i)
+    // Must NOT show EUR symbol for a CZK city
+    expect(cashText).not.toMatch(/€/)
+  })
+
+  test('completion step achievement panel shows CZK cash for Prague (not EUR)', async ({ page }) => {
+    // Acceptance criteria: "Any onboarding totals, summaries, validations, and confirmation text
+    // use the same currency logic as the final recorded transaction."
+    // The achievement-item showing the company capital at the top of step 7 must also be in CZK.
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    state.buildingLots = [
+      ...makeDefaultBuildingLots(),
+      {
+        id: 'lot-prague-ach-factory',
+        cityId: 'city-pr',
+        name: 'Prague Achievement Factory',
+        description: 'Factory lot for achievement panel test.',
+        district: 'Industrial Zone',
+        latitude: 50.08,
+        longitude: 14.44,
+        populationIndex: 0.7,
+        basePrice: 90_000,
+        price: 90_000,
+        suitableTypes: 'FACTORY,MINE',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+      {
+        id: 'lot-prague-ach-shop',
+        cityId: 'city-pr',
+        name: 'Prague Achievement Shop',
+        description: 'Shop lot for achievement panel test.',
+        district: 'Commercial District',
+        latitude: 50.083,
+        longitude: 14.43,
+        populationIndex: 1.2,
+        basePrice: 120_000,
+        price: 120_000,
+        suitableTypes: 'SALES_SHOP,COMMERCIAL',
+        ownerCompanyId: null,
+        buildingId: null,
+        ownerCompany: null,
+        building: null,
+        resourceType: null,
+        materialQuality: null,
+        materialQuantity: null,
+      },
+    ]
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+
+    await chooseOnboardingRouteChoices(page, { industry: 'Furniture', product: 'Wooden Chair', city: 'Prague' })
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Factory Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Prague Achievement Factory/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Factory' }).click()
+
+    await expect(page.getByRole('heading', { name: 'Choose Your First Shop Lot' })).toBeVisible()
+    await page.getByRole('button', { name: 'List View' }).click()
+    await page.getByRole('button', { name: /Prague Achievement Shop/i }).click()
+    await page.getByRole('button', { name: 'Purchase First Sales Shop' }).click()
+
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+
+    // The achievement item panel (💰 icon + capital amount) must use CZK, not EUR.
+    const capitalItem = page.locator('.achievement-item').filter({ hasText: '390,000' })
+    await expect(capitalItem).toBeVisible()
+    const capitalText = await capitalItem.textContent()
+    expect(capitalText).toMatch(/CZK/)
+    expect(capitalText).not.toMatch(/€/)
+  })
+
+  test('EUR city (Bratislava) still shows EUR in completion step (no regression)', async ({ page }) => {
+    // Regression guard: EUR cities must still show EUR amounts in step 7.
+    // Confirms that the cityCurrencyCode fix does not break the default EUR flow.
+    const player = makePlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticateViaLocalStorage(page, `token-${player.id}`)
+    await page.goto('/onboarding')
+    await completeGuidedOnboarding(page, 'EUR Regression Corp')
+
+    await expect(page.getByRole('heading', { name: /Your Empire Has Launched/i })).toBeVisible()
+
+    // The configure-guide cash step must show EUR (€), not CZK.
+    const cashStep = page.locator('.configure-step').filter({ hasText: 'Review your cash' })
+    await expect(cashStep).toBeVisible()
+    const cashText = await cashStep.textContent()
+    // EUR-formatted values use € symbol in en locale
+    expect(cashText).toMatch(/[€$]|EUR/)
+    expect(cashText).not.toMatch(/CZK/i)
   })
 })

@@ -291,6 +291,20 @@ const configureGuideCash = computed(() => {
 })
 
 /**
+ * Currency code to use for all monetary display on the completion step (step 7).
+ * Prefers the explicit `cityCurrencyCode` from the backend's `OnboardingResult`, which is
+ * populated when `finishOnboarding` or `completeOnboarding` is called in this session.
+ * Falls back to `selectedCity.value?.currencyCode` (set during the wizard flow) and finally
+ * to 'EUR' so the display always has a valid currency even in the resume-after-reload case.
+ */
+const completionCurrencyCode = computed<string>(
+  () =>
+    completionResult.value?.cityCurrencyCode ??
+    selectedCity.value?.currencyCode ??
+    'EUR',
+)
+
+/**
  * The auto-configured public sale price for the guest's shop.
  * The backend sets MinPrice = local basePrice × 1.5 for the PUBLIC_SALES unit during FinishOnboarding.
  */
@@ -565,7 +579,27 @@ onMounted(async () => {
     }
 
     if (isResumingConfigureStep.value) {
+      // Load cities and FX rates in the resume path so that formatCurrency() can use the
+      // player's onboarding city currency instead of defaulting to EUR.  The city is derived
+      // from the player's shop building, which is recorded as onboardingShopBuildingId.
+      const [citiesData, fxRatesData] = await Promise.all([
+        gqlRequest<{ cities: City[] }>(CITIES_QUERY),
+        gqlRequest<{ eurFxRates: EurFxRate[] }>('{ eurFxRates { currencyCode rate } }'),
+      ])
       await Promise.all([loadGameState(), loadFirstSaleMission()])
+
+      cities.value = citiesData.cities
+      eurFxRates.value = fxRatesData.eurFxRates
+
+      // Derive the player's onboarding city from the shop building that was created during
+      // onboarding (onboardingShopBuildingId → building.cityId → city for correct currency).
+      const shopBuilding = auth.player?.companies
+        .flatMap((company) => company.buildings)
+        .find((building) => building.id === auth.player?.onboardingShopBuildingId)
+      if (shopBuilding?.cityId) {
+        selectedCityId.value = shopBuilding.cityId
+      }
+
       step.value = 7
       isRouteStateReady.value = true
       return
@@ -776,6 +810,7 @@ async function completeOnboarding() {
           factory { id name type units { id unitType gridX gridY level linkRight } }
           salesShop { id name type units { id unitType gridX gridY level linkRight } }
           selectedProduct { name industry basePrice }
+          cityCurrencyCode
         }
       }`,
       {
@@ -888,6 +923,7 @@ async function saveGuestProgress() {
               factory { id name type units { id unitType gridX gridY level linkRight } }
               salesShop { id name type units { id unitType gridX gridY level linkRight } }
               selectedProduct { name industry basePrice }
+              cityCurrencyCode
             }
           }`,
           {
@@ -1679,8 +1715,8 @@ useTickRefresh(async () => {
           <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
             <span class="text-2xl shrink-0">💰</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ formatCurrency(completionResult.company.cash) }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash) }) }}</span>
+              <strong class="text-sm">{{ formatCurrency(completionResult.company.cash, completionCurrencyCode) }}</strong>
+              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash, completionCurrencyCode) }) }}</span>
             </div>
           </div>
         </div>
@@ -1756,7 +1792,7 @@ useTickRefresh(async () => {
               <span class="text-2xl shrink-0">💰</span>
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepCash') }}</strong>
-                <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash) }) }}</p>
+                <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash, completionCurrencyCode) }) }}</p>
               </div>
             </article>
 
@@ -1765,7 +1801,7 @@ useTickRefresh(async () => {
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPrice') }}</strong>
                 <p class="text-muted text-xs m-0">
-                  {{ configureGuideBasePrice === null ? t('onboarding.configureStepPriceDesc') : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice) }) }}
+                  {{ configureGuideBasePrice === null ? t('onboarding.configureStepPriceDesc') : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice, completionCurrencyCode) }) }}
                 </p>
               </div>
             </article>
