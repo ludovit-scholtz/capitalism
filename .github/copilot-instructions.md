@@ -28,11 +28,14 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - Game backend uses ASP.NET Core 10, Hot Chocolate GraphQL, Entity Framework Core (PostgreSQL in runtime), and JWT bearer authentication.
 - Master backend uses ASP.NET Core 10, Hot Chocolate GraphQL, and Entity Framework Core to store the live game-server registry.
 - `projects/Api` runs on PostgreSQL in normal runtime. Design-time EF migrations for the game API must be scaffolded against PostgreSQL via `projects/Api/Data/AppDbContextFactory.cs` and the `GameCatalog` connection string.
+- **Code-first is the required backend workflow.** Define schema changes in the C# entity/model/DbContext configuration first, then scaffold the PostgreSQL migration from that model. Do not treat PostgreSQL as the source of truth.
+- **Use the repository migration scripts for game API model changes.** From `projects/Api`, create a migration with `pwsh ./scripts/New-AppMigration.ps1 -Name <MigrationName>` and remove the last un-applied scaffold with `pwsh ./scripts/Remove-AppMigration.ps1`.
+- **Never hand-edit migration snapshots as a substitute for model changes.** `Data/Migrations/AppDbContextModelSnapshot.cs` must stay generated output from the C# model.
 - **SQLite is forbidden in this repository.** Do not add `UseSqlite`, `Microsoft.Data.Sqlite`, or SQLite-specific schema/query logic.
 - **All automated tests must use EF Core InMemory provider** (unique database name per test scope/factory) instead of SQLite files or `:memory:` connections.
 - **SQL commands are allowed only inside EF migration files.** In runtime services/initializers/tests, use LINQ and EF APIs only.
 - **Do not use `FromSqlInterpolated`, `FromSqlRaw`, or `ExecuteSql*` in runtime services/initializers/tests.** Use LINQ and EF APIs only; if legacy schema drift requires compatibility filtering, materialize with LINQ and perform safe in-memory matching rather than raw SQL.
-- When a backend model changes, always add the corresponding EF migration and make the startup upgrade path safe for a server restart onto the new build.
+- When a backend model changes, always add the corresponding EF migration via `projects/Api/scripts/New-AppMigration.ps1` and make the startup upgrade path safe for a server restart onto the new build.
 - Never swallow `MigrateAsync()` failures for the game API. If schema upgrade fails, startup must fail so the server does not continue running with runtime `column does not exist` errors.
 - For every API model/migration change, add or update regression tests using EF InMemory to verify initialization and runtime behavior (idempotent startup, seeded data, and updated domain flow).
 - Frontends communicate with their backend exclusively via GraphQL using lightweight fetch-based clients.
@@ -278,7 +281,7 @@ dotnet build
 ```
 
 ## Docker Compose startup debugging (clean PostgreSQL)
-- Do not use or recreate manual migration scripts (`Manage-ApiMigrations.ps1`, `Manage-MasterMigrations.ps1`). Startup migrations must run from application boot (`MigrateAsync()` in initializers) against PostgreSQL.
+- Do not use or recreate the legacy manual migration scripts (`Manage-ApiMigrations.ps1`, `Manage-MasterMigrations.ps1`). Use `projects/Api/scripts/New-AppMigration.ps1` to scaffold new code-first PostgreSQL migrations and `projects/Api/scripts/Remove-AppMigration.ps1` only to undo the last un-applied scaffold. Startup migrations must still run from application boot (`MigrateAsync()` in initializers) against PostgreSQL.
 - The canonical clean-start command sequence is:
 ```bash
 cd projects
