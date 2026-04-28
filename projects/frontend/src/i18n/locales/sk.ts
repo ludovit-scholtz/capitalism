@@ -2014,12 +2014,24 @@ export default {
       surplusIncome: 'Príjem za prebytok',
       gridFine: 'Pokuty za nedostatok',
       operatingCosts: 'Prevádzkové náklady',
+      fuelCosts: 'Náklady na palivo',
       netProfit: 'Čistý zisk',
       tickWindow: 'Ticky {start}–{end}',
       tickTooltip: 'Tick {tick}: +{income} príjem, -{costs} náklady',
       noData: 'Zatiaľ žiadne ekonomické dáta siete. Dáta sa zaznamenávajú každý tick, keď má mesto elektrárne aj spotrebiteľov.',
       surplusHint: 'Zarobené, keď ponuka mesta prevyšuje dopyt. Sadzba: {rate}/MW/tick.',
       fineHint: 'Účtované, keď ponuka mesta nestačí pokryť dopyt. Sadzba: {rate}/MW/tick.',
+    },
+    dispatch: {
+      title: 'Riadenie výkonu',
+      sliderLabel: 'Cieľový výkon (%)',
+      hint: 'Nastavte, koľko z menovitého výkonu elektráreň generuje každý tick. Nižší výkon šetrí náklady na palivo, ale znižuje príjem z prebytku a zvyšuje riziko nedostatku.',
+      applyBtn: 'Použiť',
+      success: 'Cieľový výkon aktualizovaný. Platí od nasledujúceho ticku.',
+    },
+    fuelReserve: {
+      title: 'Zásoby paliva',
+      hint: 'Palivo sa obstaráva každý tick jednotkami NÁKUP PALIVA. Jednotky VÝROBA ENERGIE konvertujú uskladnené palivo na elektrinu pre sieť.',
     },
     units: {
       POWER_GENERATION: {

@@ -3744,17 +3744,21 @@ export function useBuildingDetail() {
             buildingName
             plantType
             currentOutputMw
+            dispatchTargetPercent
+            fuelReserveMwh
             dataFromTick
             dataToTick
             totalSurplusIncome
             totalGridFines
             totalOperatingCosts
+            totalFuelCosts
             totalNetProfit
             timeline {
               tick
               surplusIncome
               gridFine
               operatingCosts
+              fuelCosts
               netProfit
             }
           }
@@ -3770,6 +3774,38 @@ export function useBuildingDetail() {
       if (requestId === activePowerPlantAnalyticsRequest) {
         powerPlantAnalyticsLoading.value = false
       }
+    }
+  }
+
+  const dispatchSaving = ref(false)
+  const dispatchError = ref<string | null>(null)
+  const dispatchSuccess = ref(false)
+
+  async function setPlantDispatch(buildingId: string, dispatchTargetPercent: number) {
+    dispatchSaving.value = true
+    dispatchError.value = null
+    dispatchSuccess.value = false
+    try {
+      const data = await gqlRequest<{ setPlantDispatch: { id: string; dispatchTargetPercent: number } }>(
+        `mutation SetPlantDispatch($input: SetPlantDispatchInput!) {
+          setPlantDispatch(input: $input) {
+            id
+            dispatchTargetPercent
+          }
+        }`,
+        { input: { buildingId, dispatchTargetPercent } },
+      )
+      // Update the local building state immediately.
+      if (building.value && data.setPlantDispatch) {
+        building.value = { ...building.value, dispatchTargetPercent: data.setPlantDispatch.dispatchTargetPercent }
+      }
+      dispatchSuccess.value = true
+      // Reload analytics to reflect the new dispatch target.
+      void loadPowerPlantAnalytics(buildingId, true)
+    } catch (e) {
+      dispatchError.value = e instanceof Error ? e.message : 'Failed to update dispatch target.'
+    } finally {
+      dispatchSaving.value = false
     }
   }
 
@@ -3847,6 +3883,8 @@ export function useBuildingDetail() {
               isGovernmentOwned
               isSuspendedForFunds
               suspendedReason
+              dispatchTargetPercent
+              fuelReserveMwh
               cityReferenceRentPerSqm
               adjustedMarketRentPerSqm
               populationIndex
@@ -4618,6 +4656,10 @@ export function useBuildingDetail() {
     loadBuildingFinancialTimeline,
     loadPowerPlantAnalytics,
     loadCityPowerBalance,
+    setPlantDispatch,
+    dispatchSaving,
+    dispatchError,
+    dispatchSuccess,
     fetchRankedProducts,
     getB2BPriceSource,
     getB2BSuggestedPrice,

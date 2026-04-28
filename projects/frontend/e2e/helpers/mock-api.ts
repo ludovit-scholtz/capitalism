@@ -208,6 +208,10 @@ export type MockBuilding = {
   isSuspendedForFunds?: boolean
   /** Machine-readable suspension reason: null | 'MISSING_BANK_ACCOUNT' | 'INSUFFICIENT_FUNDS:<amount>' */
   suspendedReason?: string | null
+  /** Dispatch target percentage for POWER_PLANT buildings (0–100). Default 100. */
+  dispatchTargetPercent?: number
+  /** Current fuel reserve for thermal plants (MWh). */
+  fuelReserveMwh?: number
   /** City base average rent per m² (APARTMENT/COMMERCIAL only) */
   cityReferenceRentPerSqm?: number | null
   /** Location-adjusted market rent per m² = city rate × PopulationIndex (APARTMENT/COMMERCIAL only) */
@@ -3928,6 +3932,36 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       })
     }
 
+    if (query.includes('SetPlantDispatch') || query.includes('setPlantDispatch')) {
+      const input = body.variables?.input
+      const player = state.players.find((p) => p.id === state.currentUserId)
+      if (!player) {
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ errors: [{ message: 'Not authenticated' }] }) })
+      }
+      const building = player.companies.flatMap((c) => c.buildings).find((b) => b.id === input?.buildingId)
+      if (!building) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Building not found', extensions: { code: 'BUILDING_NOT_FOUND' } }] }),
+        })
+      }
+      const pct = Number(input?.dispatchTargetPercent ?? 100)
+      if (pct < 0 || pct > 100) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ errors: [{ message: 'Dispatch target must be 0–100.', extensions: { code: 'INVALID_DISPATCH_PERCENT' } }] }),
+        })
+      }
+      building.dispatchTargetPercent = pct
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { setPlantDispatch: { id: building.id, dispatchTargetPercent: building.dispatchTargetPercent } } }),
+      })
+    }
+
     if (query.includes('PurchaseLot') || query.includes('purchaseLot')) {
       const input = body.variables?.input
       const player = state.players.find((p) => p.id === state.currentUserId)
@@ -4539,18 +4573,22 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         buildingName: building.name,
         plantType: building.powerPlantType ?? 'COAL',
         currentOutputMw: building.powerOutput ?? 50,
+        dispatchTargetPercent: building.dispatchTargetPercent ?? 100,
+        fuelReserveMwh: building.fuelReserveMwh ?? 0,
         dataFromTick,
         dataToTick,
         totalSurplusIncome: 225,
         totalGridFines: 0,
         totalOperatingCosts: 12,
-        totalNetProfit: 213,
+        totalFuelCosts: 85,
+        totalNetProfit: 128,
         timeline: Array.from({ length: Math.min(limit, 5) }, (_, i) => ({
           tick: dataToTick - 4 + i,
           surplusIncome: 45,
           gridFine: 0,
           operatingCosts: 2.4,
-          netProfit: 42.6,
+          fuelCosts: 17,
+          netProfit: 25.6,
         })),
       }
 
