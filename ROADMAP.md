@@ -61,13 +61,21 @@ It will use real world map. The game will start in single city and later other c
 - [x] Everywhere where the currency is displayed, for example in the units, use the number formatting component
 - [x] Add to the title the original number to be formatted and currency after it
 
-### Power plants (65% complete)
+### Power plants (85% complete)
 
-- [ ]  Create the powerplant units and implement them on frontend as well
-- [ ]  Implement everything mentioned in the power plant section below 
-- [ ]  Power plant unit grid (purchasing, wind turbine, energy producing, battery, storage units).
-- [ ]  P&L chart for power plant building detail.
-- [ ]  Government fine for under-supply / surplus-sale income for over-supply.
+**Shipped (this increment):**
+- 5 new power plant unit types added and wired end-to-end: `FUEL_PURCHASE` (+10 MW/level fuel capacity), `WIND_TURBINE` (+8 MW/level weather-scaled), `WATER_TURBINE` (+12 MW/level steady hydro), `ENERGY_STORAGE` (+8 MW/level smoothing buffer), `ENERGY_PRODUCING` (+20 MW/level main converter).
+- All 7 unit types (including `POWER_GENERATION` and `BATTERY_STORAGE`) are now allowed in the power plant building grid via `BuildingConfigurationService`.
+- `PowerDistributionPhase` and `PowerGridEconomicsPhase` both apply the correct MW boosts for every unit type; `WIND_TURBINE` is weather-scaled by wind percentage regardless of plant type.
+- `CompanyEconomyCalculator` calculates per-tick labor and energy-auxiliary costs for all new unit types.
+- `BuildingPowerPlantPanel` now shows a **city power status** section (supply vs demand, reserve MW, BALANCED/CONSTRAINED/CRITICAL badge, contextual hint) fetched from `cityPowerBalance` query.
+- Unit guide section expanded from 2 to 7 cards organized into "Generation Units" and "Support Units" groups.
+- All 7 unit type labels and descriptions localized in English, Slovak, and German (`unitTypes`, `unitDescriptions`, `supplyChain.unitTypes`, `powerPlant.units`, `powerPlant.cityPowerStatus`).
+- 9 new backend integration tests covering wind turbine, water turbine, energy storage, energy producing, fuel purchase, allowed-unit-type list, stat labels, stat boost values, and economy cost coverage.
+
+- [ ]  Advanced grid linking between unit types (fuel → energy_producing → grid)
+- [ ]  Player-configurable output setpoints and scheduled dispatch
+- [ ]  Fuel cost as a separate ledger line item (currently modeled via labor proxy)
 
 ### Units
 

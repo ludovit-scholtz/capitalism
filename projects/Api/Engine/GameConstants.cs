@@ -357,6 +357,38 @@ public static class GameConstants
     /// </summary>
     public const decimal BatterySmoothingMwPerLevel = 5m;
 
+    /// <summary>
+    /// Additional MW of fuel-based output capacity per level of a FUEL_PURCHASE unit.
+    /// Represents the fuel procurement and supply chain for coal/gas plants.
+    /// </summary>
+    public const decimal FuelPurchaseBoostMwPerLevel = 10m;
+
+    /// <summary>
+    /// Additional MW of wind-generated output per level of a WIND_TURBINE unit.
+    /// This value is scaled by the current weather wind percentage each tick.
+    /// </summary>
+    public const decimal WindTurbineBoostMwPerLevel = 8m;
+
+    /// <summary>
+    /// Additional MW of steady hydro-electric output per level of a WATER_TURBINE unit.
+    /// Water turbines are not affected by weather — they provide reliable baseline generation.
+    /// </summary>
+    public const decimal WaterTurbineBoostMwPerLevel = 12m;
+
+    /// <summary>
+    /// MW of mechanical-energy smoothing per level of an ENERGY_STORAGE unit.
+    /// Stores wind/water mechanical force to buffer variable renewable output,
+    /// reducing exposure to shortage fines during low-generation periods.
+    /// </summary>
+    public const decimal EnergyStorageSmoothingMwPerLevel = 8m;
+
+    /// <summary>
+    /// Additional MW of converted electricity per level of an ENERGY_PRODUCING unit.
+    /// The main electricity conversion stage: consumes fuel or mechanical force to generate
+    /// grid-ready electricity. Highest output boost per unit but requires upstream units.
+    /// </summary>
+    public const decimal EnergyProducingBoostMwPerLevel = 20m;
+
     // ── Grid economics constants ──────────────────────────────────────────────
 
     /// <summary>
@@ -476,6 +508,11 @@ public static class GameConstants
             Data.Entities.UnitType.Branding         => 5_000m,
             Data.Entities.UnitType.PowerGeneration  => 15_000m,
             Data.Entities.UnitType.BatteryStorage   => 12_000m,
+            Data.Entities.UnitType.FuelPurchase     => 12_000m,
+            Data.Entities.UnitType.WindTurbine      => 18_000m,
+            Data.Entities.UnitType.WaterTurbine     => 25_000m,
+            Data.Entities.UnitType.EnergyStorage    => 14_000m,
+            Data.Entities.UnitType.EnergyProducing  => 22_000m,
             _                                       => 4_000m
         };
         // Each subsequent level costs 5× more: L1→L2 = base, L2→L3 = 5×base, L3→L4 = 25×base
@@ -495,6 +532,11 @@ public static class GameConstants
         Data.Entities.UnitType.BrandQuality     => true,
         Data.Entities.UnitType.PowerGeneration  => true,
         Data.Entities.UnitType.BatteryStorage   => true,
+        Data.Entities.UnitType.FuelPurchase     => true,
+        Data.Entities.UnitType.WindTurbine      => true,
+        Data.Entities.UnitType.WaterTurbine     => true,
+        Data.Entities.UnitType.EnergyStorage    => true,
+        Data.Entities.UnitType.EnergyProducing  => true,
         _                                       => false
     };
 
@@ -511,6 +553,11 @@ public static class GameConstants
         Data.Entities.UnitType.BrandQuality     => ResearchEfficiencyRate(level) * 1000m,
         Data.Entities.UnitType.PowerGeneration  => PowerGenerationUnitBoostMwPerLevel * level,
         Data.Entities.UnitType.BatteryStorage   => BatterySmoothingMwPerLevel * level,
+        Data.Entities.UnitType.FuelPurchase     => FuelPurchaseBoostMwPerLevel * level,
+        Data.Entities.UnitType.WindTurbine      => WindTurbineBoostMwPerLevel * level,
+        Data.Entities.UnitType.WaterTurbine     => WaterTurbineBoostMwPerLevel * level,
+        Data.Entities.UnitType.EnergyStorage    => EnergyStorageSmoothingMwPerLevel * level,
+        Data.Entities.UnitType.EnergyProducing  => EnergyProducingBoostMwPerLevel * level,
         _                                       => (decimal)level
     };
 
@@ -527,6 +574,11 @@ public static class GameConstants
         Data.Entities.UnitType.BrandQuality     => "efficiency‰/tick",
         Data.Entities.UnitType.PowerGeneration  => "MW output boost",
         Data.Entities.UnitType.BatteryStorage   => "MW buffer",
+        Data.Entities.UnitType.FuelPurchase     => "MW fuel capacity",
+        Data.Entities.UnitType.WindTurbine      => "MW wind output",
+        Data.Entities.UnitType.WaterTurbine     => "MW hydro output",
+        Data.Entities.UnitType.EnergyStorage    => "MW force storage",
+        Data.Entities.UnitType.EnergyProducing  => "MW generation",
         _                                       => "level"
     };
 

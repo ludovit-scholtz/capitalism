@@ -147,4 +147,37 @@ public static class UnitType
 
     /// <summary>Provides a smoothing buffer that partially offsets grid shortage penalties.</summary>
     public const string BatteryStorage = "BATTERY_STORAGE";
+
+    /// <summary>
+    /// Purchases coal or gas fuel for fuel-based plants (COAL/GAS).
+    /// Each level adds FuelPurchaseBoostMwPerLevel of additional output capacity.
+    /// The Budget field controls maximum fuel spend per tick.
+    /// </summary>
+    public const string FuelPurchase = "FUEL_PURCHASE";
+
+    /// <summary>
+    /// Wind turbine unit — produces wind-force energy scaled by current weather.
+    /// Adds WindTurbineBoostMwPerLevel × (windPercent/100) MW per level.
+    /// Works in any plant but is most efficient in WIND-type plants.
+    /// </summary>
+    public const string WindTurbine = "WIND_TURBINE";
+
+    /// <summary>
+    /// Water turbine unit — produces steady hydro energy independent of weather.
+    /// Adds WaterTurbineBoostMwPerLevel MW per level. Expensive but reliable.
+    /// </summary>
+    public const string WaterTurbine = "WATER_TURBINE";
+
+    /// <summary>
+    /// Energy storage unit — stores mechanical energy (wind/water force) to smooth
+    /// variable output. Adds EnergyStorageSmoothingMwPerLevel MW of smoothing per level.
+    /// </summary>
+    public const string EnergyStorage = "ENERGY_STORAGE";
+
+    /// <summary>
+    /// Energy producing unit — the main electricity converter. Consumes fuel or
+    /// mechanical force and converts it to grid electricity.
+    /// Adds EnergyProducingBoostMwPerLevel MW per level.
+    /// </summary>
+    public const string EnergyProducing = "ENERGY_PRODUCING";
 }
