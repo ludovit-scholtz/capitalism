@@ -332,6 +332,57 @@
   background: var(--color-primary);
 }
 
+/* ──────────────────────────────────────────────────────────────────
+   Live flow links — when neighboring units had real inventory movement
+   last tick the connector pulses to signal active material flow.
+   ────────────────────────────────────────────────────────────────── */
+
+.link-toggle.live.active .link-line {
+  background: var(--color-primary);
+  animation: link-live-pulse 2s ease-in-out infinite;
+}
+
+@keyframes link-live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-primary) 0%, transparent);
+  }
+
+  50% {
+    opacity: 0.75;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 30%, transparent);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Selected-path links — when an adjacent cell is selected, highlight
+   the link connectors leading to/from it so the player can trace
+   the full connection chain at a glance.
+   ────────────────────────────────────────────────────────────────── */
+
+.link-toggle.selected-path {
+  border-color: color-mix(in srgb, var(--color-primary) 70%, transparent) !important;
+}
+
+.link-toggle.selected-path .link-line {
+  background: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+}
+
+.link-toggle.selected-path.active .link-line {
+  background: var(--color-primary);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   Connected-cell highlight — cells that are linked to the selected
+   cell get a soft primary border to show the chain scope.
+   ────────────────────────────────────────────────────────────────── */
+
+.grid-cell.connected {
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
 .link-arrow {
   position: absolute;
   color: var(--color-primary);

@@ -21294,4 +21294,372 @@ test.describe('Public sales pricing guidance panel', () => {
     await expect(guidancePanel.locator('.pricing-guide-brand-hint')).toBeVisible()
     await expect(guidancePanel.locator('.pricing-guide-brand-hint')).toContainText(/brand/i)
   })
+
+  // ─────────────────────────────────────────────────────────────────────────────
+  // Advanced grid-link flow visualization
+  // ─────────────────────────────────────────────────────────────────────────────
+
+  test('link with real inventory flow shows live class on the connector', async ({ page }) => {
+    const player = makePlayer()
+    const miningId = 'live-mining-u1'
+    const storageId = 'live-storage-u2'
+    player.companies.push({
+      id: 'company-live-link',
+      playerId: player.id,
+      name: 'Live Link Corp',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-live-link',
+          companyId: 'company-live-link',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'Live Link Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: miningId,
+              buildingId: 'building-live-link',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkRight: true,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 30,
+              inventoryQuality: 0.8,
+            },
+            {
+              id: storageId,
+              buildingId: 'building-live-link',
+              unitType: 'STORAGE',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkRight: false,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 20,
+              inventoryQuality: 0.8,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // Seed actual outflow from mining unit — makes the horizontal link "live"
+    state.unitLastTickMovement[miningId] = { lastTickInflow: 0, lastTickOutflow: 8 }
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-live-link')
+    await expect(page.getByRole('heading', { name: 'Live Link Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    // The horizontal link connector between (0,0) and (1,0) must carry the live class
+    const hLink = activeSection.locator('.unit-row').first().locator('.link-toggle.horizontal').first()
+    await expect(hLink).toHaveClass(/active/)
+    await expect(hLink).toHaveClass(/live/)
+  })
+
+  test('inactive link (no inventory movement) does not show live class', async ({ page }) => {
+    const player = makePlayer()
+    const miningId = 'inactive-mining-u1'
+    player.companies.push({
+      id: 'company-inactive-link',
+      playerId: player.id,
+      name: 'Inactive Link Corp',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-inactive-link',
+          companyId: 'company-inactive-link',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'Inactive Link Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: miningId,
+              buildingId: 'building-inactive-link',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkRight: true,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 10,
+              inventoryQuality: 0.7,
+            },
+            {
+              id: 'inactive-storage-u2',
+              buildingId: 'building-inactive-link',
+              unitType: 'STORAGE',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkRight: false,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: null,
+              inventoryQuantity: 0,
+              inventoryQuality: 0,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    // No movement seeded — lastTickOutflow stays null
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-inactive-link')
+    await expect(page.getByRole('heading', { name: 'Inactive Link Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const hLink = activeSection.locator('.unit-row').first().locator('.link-toggle.horizontal').first()
+    // Link exists (forward) but no flow → active class, no live class
+    await expect(hLink).toHaveClass(/active/)
+    await expect(hLink).not.toHaveClass(/live/)
+  })
+
+  test('selecting a cell highlights adjacent links with selected-path class', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-sel-path',
+      playerId: player.id,
+      name: 'Sel Path Corp',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-sel-path',
+          companyId: 'company-sel-path',
+          cityId: 'city-ba',
+          type: 'MINE',
+          name: 'Sel Path Mine',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'sp-mining',
+              buildingId: 'building-sel-path',
+              unitType: 'MINING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkRight: true,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 50,
+              inventoryQuality: 0.8,
+            },
+            {
+              id: 'sp-storage',
+              buildingId: 'building-sel-path',
+              unitType: 'STORAGE',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkRight: false,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 20,
+              inventoryQuality: 0.8,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-sel-path')
+    await expect(page.getByRole('heading', { name: 'Sel Path Mine' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+
+    // Before selecting any cell, no selected-path class on any link
+    const hLink = activeSection.locator('.unit-row').first().locator('.link-toggle.horizontal').first()
+    await expect(hLink).not.toHaveClass(/selected-path/)
+
+    // Click the mining cell at (0,0)
+    await getGridCell(activeSection, 0, 0).click()
+
+    // The horizontal link between (0,0) and (1,0) must now have selected-path
+    await expect(hLink).toHaveClass(/selected-path/)
+
+    // The connected storage cell must also have the connected class
+    const storageCell = getGridCell(activeSection, 1, 0)
+    await expect(storageCell).toHaveClass(/connected/)
+
+    // Cells not in the chain must NOT have connected class
+    const unconnectedCell = getGridCell(activeSection, 2, 0)
+    await expect(unconnectedCell).not.toHaveClass(/connected/)
+  })
+
+  test('horizontal link title tooltip shows flow context for a factory link', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-tooltip-link',
+      playerId: player.id,
+      name: 'Tooltip Corp',
+      cash: 300000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-tooltip-link',
+          companyId: 'company-tooltip-link',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Tooltip Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'tt-purchase',
+              buildingId: 'building-tooltip-link',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkRight: true,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              resourceTypeId: 'res-wood',
+              inventoryQuantity: 30,
+              inventoryQuality: 0.9,
+            },
+            {
+              id: 'tt-manufacturing',
+              buildingId: 'building-tooltip-link',
+              unitType: 'MANUFACTURING',
+              gridX: 1,
+              gridY: 0,
+              level: 1,
+              linkRight: false,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+              productTypeId: 'prod-chair',
+              inventoryQuantity: 5,
+              inventoryQuality: 0.9,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player], products: [makeChairProduct()] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-tooltip-link')
+    await expect(page.getByRole('heading', { name: 'Tooltip Factory' })).toBeVisible()
+
+    const activeSection = getGridSection(page, 'Current Configuration')
+    const hLink = activeSection.locator('.unit-row').first().locator('.link-toggle.horizontal').first()
+
+    // The title attribute must contain unit-type labels and arrow direction
+    const titleValue = await hLink.getAttribute('title')
+    expect(titleValue).not.toBeNull()
+    expect(titleValue!).toMatch(/Purchase.*Manufacturing|purchase.*manufacturing/i)
+    // Arrow symbol present
+    expect(titleValue!).toContain('→')
+  })
 })
