@@ -105,7 +105,7 @@ public sealed class PublicSalesPhase : ITickPhase
                     var qualityMultiplier = Math.Max(0.15m, inv.Quality);
                     var qualityDemandFactor = ComputeQualityDemandFactor(inv.Quality);
 
-                    var brand = context.FindBrand(building.CompanyId, inv.ProductTypeId, industry);
+                    var brand = context.FindCombinedBrand(building.CompanyId, inv.ProductTypeId, industry);
                     brandAwareness = Math.Clamp(brand?.Awareness ?? 0m, 0m, 1m);
                     var brandQuality = ComputeCombinedBrandQuality(brand);
                     var brandFactor = ComputeBrandFactor(brandAwareness.Value, brandQuality);

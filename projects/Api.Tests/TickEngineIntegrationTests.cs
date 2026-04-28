@@ -4655,26 +4655,26 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             .FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
 
         // Expected USD budget for Prague CZK company (using FallbackEurRates: CZK=25.20, USD=1.08):
-        //   laborCostCzk = 0.55 h × 22 CZK/h = 12.10 CZK
-        //   energyCostCzk = 0.09 MWh × 55 = 4.95 (local units)
-        //   totalCzk = 17.05
-        //   totalUsd = 17.05 / 25.20 × 1.08 ≈ 0.7308 USD
-        //   budgetGain = 0.7308 × 0.5 ≈ 0.3654 USD
-        const decimal expectedBudgetUsd = 0.3654m;
+        //   laborCostCzk = 2.0 h × 22 CZK/h = 44.00 CZK  (R&D salary cost increased from 0.55 h)
+        //   energyCostCzk = 0.22 MWh × 55 = 12.10 CZK    (R&D energy cost increased from 0.09 MWh)
+        //   totalCzk = 56.10
+        //   totalUsd = 56.10 / 25.20 × 1.08 ≈ 2.4042 USD
+        //   budgetGain = 2.4042 × 0.5 ≈ 1.2021 USD
+        const decimal expectedBudgetUsd = 1.2021m;
 
         Assert.True(budget.AccumulatedBudget > 0m,
             "CZK-city R&D should accumulate a positive USD budget.");
 
         var diff = Math.Abs(budget.AccumulatedBudget - expectedBudgetUsd);
-        Assert.True(diff < 0.02m,
+        Assert.True(diff < 0.05m,
             $"Prague CZK company should accumulate ~{expectedBudgetUsd:F4} USD but got {budget.AccumulatedBudget:F4}. " +
-            $"Without USD normalization the gain would be ~8.5 (CZK-inflated). " +
+            $"Without USD normalization the gain would be ~28 (CZK-inflated). " +
             $"Diff = {diff:F4}.");
 
-        // Guard: the raw CZK-inflated amount (17.05 × 0.5 = 8.525) must NOT be what is stored.
-        Assert.True(budget.AccumulatedBudget < 1m,
+        // Guard: the raw CZK-inflated amount (56.10 × 0.5 = 28.05) must NOT be what is stored.
+        Assert.True(budget.AccumulatedBudget < 5m,
             $"Budget {budget.AccumulatedBudget:F4} is suspiciously large — it may be using the " +
-            $"nominal CZK amount instead of USD. Expected < 1.0 USD for a level-1 Prague R&D tick.");
+            $"nominal CZK amount instead of USD. Expected < 5.0 USD for a level-1 Prague R&D tick.");
     }
 
     [Fact]
@@ -4712,11 +4712,16 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
 
         var budget = await db.ProductResearchBudgets.FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
 
-        // EUR budget per tick ≈ $8.019 USD (well above the old €8.019 EUR pre-normalization since EUR < USD)
-        const decimal expectedBudgetUsd = 8.019m;
+        // EUR budget per tick (Bratislava, baseSalary=18 EUR/h, level=1):
+        //   laborCostEur = 2.0 h × 18 EUR/h = 36.00 EUR  (R&D salary cost increased from 0.55 h)
+        //   energyCostEur = 0.22 MWh × 55 = 12.10 EUR    (R&D energy cost increased from 0.09 MWh)
+        //   totalCostEur = 48.10 EUR
+        //   totalCostUsd = 48.10 × 1.08 = 51.948 USD  (EUR/USD = 1.08)
+        //   budgetGain   = 51.948 × 0.5 ≈ 25.974 USD
+        const decimal expectedBudgetUsd = 25.974m;
         Assert.True(budget.AccumulatedBudget > 0m, "EUR-city R&D should accumulate a positive USD budget.");
         var diff = Math.Abs(budget.AccumulatedBudget - expectedBudgetUsd);
-        Assert.True(diff < 0.1m,
+        Assert.True(diff < 0.5m,
             $"Bratislava EUR company should accumulate ~{expectedBudgetUsd:F4} USD but got {budget.AccumulatedBudget:F4}. Diff={diff:F4}.");
     }
 
@@ -4756,11 +4761,11 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
         var budget = await db.ProductResearchBudgets.FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
 
         Assert.True(budget.AccumulatedBudget > 0m, "INR-city R&D should accumulate a positive USD budget.");
-        // Without normalization: 8.25 × 0.5 = 4.125 INR stored (nominally large).
-        // With normalization: ≈ 0.049 USD. Must be below 1 USD.
-        Assert.True(budget.AccumulatedBudget < 1m,
-            $"Delhi INR company budget {budget.AccumulatedBudget:F4} looks INR-inflated (expected < 1.0 USD for L1). " +
-            $"Without USD normalization it would be ~4.125.");
+        // Without normalization: (2.0 × 6 + 0.22 × 55) × 0.5 = (12 + 12.1) × 0.5 = 12.05 INR stored (nominally large).
+        // With normalization: ≈ 0.14 USD. Must be below 5 USD.
+        Assert.True(budget.AccumulatedBudget < 5m,
+            $"Delhi INR company budget {budget.AccumulatedBudget:F4} looks INR-inflated (expected < 5.0 USD for L1). " +
+            $"Without USD normalization it would be ~12 INR.");
     }
 
     [Fact]
@@ -4869,9 +4874,189 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             $"Without normalization the ratio would be inverted (~0.03) due to INR nominal inflation.");
     }
 
-    #endregion
+    [Fact]
+    public async Task ResearchPhase_RdUnitLaborCost_IsHigherThanMarketingUnit()
+    {
+        // R&D units (PRODUCT_QUALITY / BRAND_QUALITY) should cost more in operating salary
+        // than a marketing unit in the same city.  This ensures R&D is a meaningful capital
+        // allocation, not a nearly-free bonus.
+        // Labor hours: R&D = 2.0, Marketing = 0.6  → R&D salary must be > marketing salary.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
 
-    #region Salary and Overhead Integration
+        Guid rdCompanyId;
+        Guid mktCompanyId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await seedDb.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+            (Player, Company, Building, BuildingUnit) MakeCompany(string tag, string unitType)
+            {
+                var player = new Player { Id = Guid.NewGuid(), Email = $"rdcost-{tag}-{Guid.NewGuid():N}@test.com", DisplayName = tag, PasswordHash = "h", Role = PlayerRole.Player };
+                var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"Corp {tag}", Cash = 5_000_000m };
+                var bldg = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = BuildingType.ResearchDevelopment, Name = $"Lab {tag}", Level = 1 };
+                var u = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = bldg.Id, UnitType = unitType, GridX = 0, GridY = 0, Level = 1, ProductTypeId = unitType == UnitType.ProductQuality ? product.Id : null, BrandScope = unitType == UnitType.BrandQuality ? BrandScope.Company : null };
+                var acct = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = $"1111{Math.Abs(tag.GetHashCode()):D12}", Balance = 5_000_000m, CurrencyCode = city.CurrencyCode };
+                seedDb.Players.Add(player); seedDb.Companies.Add(company); seedDb.Buildings.Add(bldg);
+                seedDb.BuildingUnits.Add(u); seedDb.BankAccounts.Add(acct);
+                bldg.BankAccountId = acct.Id;
+                return (player, company, bldg, u);
+            }
+
+            var (_, rdComp, _, _) = MakeCompany("RD", UnitType.ProductQuality);
+            var (_, mktComp, _, _) = MakeCompany("MKT", UnitType.Marketing);
+            rdCompanyId = rdComp.Id;
+            mktCompanyId = mktComp.Id;
+
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var rdLaborCost = await db.LedgerEntries
+            .Where(l => l.CompanyId == rdCompanyId && l.Category == LedgerCategory.LaborCost)
+            .SumAsync(l => -l.Amount);
+
+        var mktLaborCost = await db.LedgerEntries
+            .Where(l => l.CompanyId == mktCompanyId && l.Category == LedgerCategory.LaborCost)
+            .SumAsync(l => -l.Amount);
+
+        Assert.True(rdLaborCost > mktLaborCost,
+            $"R&D labor cost ({rdLaborCost:F2}) must exceed marketing labor cost ({mktLaborCost:F2}). " +
+            "R&D requires specialist researchers which should be the most expensive unit type.");
+
+        // R&D should be at least 3x more expensive than marketing (2.0 vs 0.6 labor hours).
+        Assert.True(rdLaborCost >= mktLaborCost * 3m,
+            $"R&D labor ({rdLaborCost:F2}) should be ≥3× marketing labor ({mktLaborCost:F2}). " +
+            $"Actual ratio: {rdLaborCost / mktLaborCost:F2}×");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_RdLedgerEntries_UseRdSalaryDescription()
+    {
+        // Ledger entries for R&D units should use the "R&D Salary:" prefix in their description
+        // so players can clearly identify research running costs in the ledger view.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var city = await seedDb.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+            var player = new Player { Id = Guid.NewGuid(), Email = $"rdlabel-{Guid.NewGuid():N}@test.com", DisplayName = "RD Label", PasswordHash = "h", Role = PlayerRole.Player };
+            var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "Label Corp", Cash = 5_000_000m };
+            companyId = company.Id;
+
+            var bldg = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = BuildingType.ResearchDevelopment, Name = "Label Lab", Level = 1 };
+            var pqUnit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = bldg.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id };
+            var bqUnit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = bldg.Id, UnitType = UnitType.BrandQuality, GridX = 1, GridY = 0, Level = 1, BrandScope = BrandScope.Company };
+            var account = new BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = "7777000000001234", Balance = 5_000_000m, CurrencyCode = city.CurrencyCode };
+
+            seedDb.Players.Add(player);
+            seedDb.Companies.Add(company);
+            seedDb.Buildings.Add(bldg);
+            seedDb.BuildingUnits.AddRange(pqUnit, bqUnit);
+            seedDb.BankAccounts.Add(account);
+            bldg.BankAccountId = account.Id;
+
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var laborEntries = await db.LedgerEntries
+            .Where(l => l.CompanyId == companyId && l.Category == LedgerCategory.LaborCost)
+            .ToListAsync();
+
+        Assert.True(laborEntries.Any(e => e.Description == "R&D Salary: Product Quality Research"),
+            "PRODUCT_QUALITY ledger entry must use the R&D salary label.");
+        Assert.True(laborEntries.Any(e => e.Description == "R&D Salary: Brand Quality Research"),
+            "BRAND_QUALITY ledger entry must use the R&D salary label.");
+    }
+
+    [Fact]
+    public async Task PublicSalesPhase_CombinedBrand_ProductAndCategoryBothContribute()
+    {
+        // A seller with a strong category brand should achieve higher
+        // competitiveness than a seller with no brand at all.
+        // This validates that FindCombinedBrand blending elevates category-brand sellers.
+        //
+        // Design: use small stock (8 units) so stockTurnoverCap (≈ 4 units) is the binding
+        // constraint rather than SalesCapacity(1)=20 or city demand (2M pop >> 8 units total).
+        // Both sellers sell different amounts because brandFactor differs significantly.
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Large city: demand >> seller stock — ensures demand is not the bottleneck.
+        var city = CreatePublicSalesTestCity($"CombBrand-{Guid.NewGuid():N}", 2_000_000);
+        db.Cities.Add(city);
+
+        var product = await db.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+
+        // Seller A: no brand → brandFactor ≈ 0.20 (minimum)
+        var (companyNoBrandId, _, _) = AddPublicSalesSeller(
+            db, city, product,
+            suffix: $"NoBrand-{Guid.NewGuid():N}",
+            stockQuantity: 8m,
+            quality: 0.8m,
+            priceMultiplier: 1m,
+            brandAwareness: 0m);
+
+        // Seller B: category brand only (awareness=0.8) → blended awareness ≈ 0.48
+        //   brandFactor ≈ (0.2 + 0.48×0.8) × (1 + combinedQuality×0.5) ≈ 0.58–0.71
+        var (companyCategoryBrandId, _, _) = AddPublicSalesSeller(
+            db, city, product,
+            suffix: $"CatBrand-{Guid.NewGuid():N}",
+            stockQuantity: 8m,
+            quality: 0.8m,
+            priceMultiplier: 1m,
+            brandAwareness: 0m); // no product brand; category brand added below
+
+        db.Brands.Add(new Brand
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = companyCategoryBrandId,
+            Scope = BrandScope.Category,
+            IndustryCategory = Industry.Furniture,
+            Name = "Furniture Category Brand",
+            Awareness = 0.8m,
+            Quality = 0.7m,
+            MarketingQuality = 0.0m,
+            MarketingEfficiencyMultiplier = 1m,
+        });
+
+        await db.SaveChangesAsync();
+
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var categoryBrandSold = await db.PublicSalesRecords
+            .Where(r => r.CompanyId == companyCategoryBrandId && r.CityId == city.Id && r.ProductTypeId == product.Id)
+            .SumAsync(r => (decimal?)r.QuantitySold) ?? 0m;
+
+        var noBrandSold = await db.PublicSalesRecords
+            .Where(r => r.CompanyId == companyNoBrandId && r.CityId == city.Id && r.ProductTypeId == product.Id)
+            .SumAsync(r => (decimal?)r.QuantitySold) ?? 0m;
+
+        Assert.True(categoryBrandSold > noBrandSold,
+            $"Company with category brand ({categoryBrandSold}) should sell more than no-brand company ({noBrandSold}). " +
+            "Category brand should contribute brand factor lift via FindCombinedBrand blending.");
+        Assert.True(noBrandSold > 0m, $"No-brand seller should sell at least something. Actual: {noBrandSold}.");
+    }
+
+
+
 
     [Fact]
     public async Task OperatingCostPhase_HigherSalaryMultiplier_IncreasesLaborCost()

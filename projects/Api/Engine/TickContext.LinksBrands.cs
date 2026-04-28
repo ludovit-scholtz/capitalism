@@ -81,6 +81,68 @@ public sealed partial class TickContext
         return brands.FirstOrDefault(b => b.Scope == BrandScope.Company);
     }
 
+    /// <summary>
+    /// Returns a synthetic brand that combines contributions from product-level, category-level,
+    /// and company-level brands using additive blending with diminishing returns.
+    /// Each tier contributes independently so all three can benefit sales without double-counting:
+    /// – product brand (direct match): full weight (1.0×)
+    /// – category brand (same industry): 60% weight
+    /// – company brand (company-wide): 30% weight
+    /// Combined = 1 – (1 – product) × (1 – category × 0.6) × (1 – company × 0.3)
+    /// Returns null when no brands exist at any level for this company.
+    /// </summary>
+    public Brand? FindCombinedBrand(Guid companyId, Guid? productTypeId, string? industry)
+    {
+        if (!BrandsByCompany.TryGetValue(companyId, out var brands))
+            return null;
+
+        Brand? productBrand = null;
+        Brand? categoryBrand = null;
+        Brand? companyBrand = null;
+
+        if (productTypeId.HasValue)
+        {
+            productBrand = brands.FirstOrDefault(b =>
+                b.Scope == BrandScope.Product && b.ProductTypeId == productTypeId);
+        }
+
+        if (!string.IsNullOrEmpty(industry))
+        {
+            categoryBrand = brands.FirstOrDefault(b =>
+                b.Scope == BrandScope.Category && b.IndustryCategory == industry);
+        }
+
+        companyBrand = brands.FirstOrDefault(b => b.Scope == BrandScope.Company);
+
+        if (productBrand is null && categoryBrand is null && companyBrand is null)
+            return null;
+
+        // Blend each brand attribute: product gets full weight, category 60%, company 30%.
+        static decimal Blend(decimal p, decimal cat, decimal com) =>
+            Math.Clamp(1m - (1m - p) * (1m - cat * 0.6m) * (1m - com * 0.3m), 0m, 1m);
+
+        return new Brand
+        {
+            Id = productBrand?.Id ?? categoryBrand?.Id ?? companyBrand!.Id,
+            CompanyId = companyId,
+            Scope = productBrand?.Scope ?? categoryBrand?.Scope ?? companyBrand!.Scope,
+            Name = productBrand?.Name ?? categoryBrand?.Name ?? companyBrand!.Name,
+            Awareness = Blend(
+                productBrand?.Awareness ?? 0m,
+                categoryBrand?.Awareness ?? 0m,
+                companyBrand?.Awareness ?? 0m),
+            Quality = Blend(
+                productBrand?.Quality ?? 0m,
+                categoryBrand?.Quality ?? 0m,
+                companyBrand?.Quality ?? 0m),
+            MarketingQuality = Blend(
+                productBrand?.MarketingQuality ?? 0m,
+                categoryBrand?.MarketingQuality ?? 0m,
+                companyBrand?.MarketingQuality ?? 0m),
+            MarketingEfficiencyMultiplier = 1m,
+        };
+    }
+
     public decimal GetCompanyAssetValue(Guid companyId)
     {
         if (!CompaniesById.ContainsKey(companyId))

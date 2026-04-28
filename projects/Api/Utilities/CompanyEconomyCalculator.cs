@@ -86,8 +86,8 @@ public static class CompanyEconomyCalculator
             UnitType.Branding => 0.3m,
             UnitType.Marketing => 0.6m,
             UnitType.PublicSales => 0.7m,
-            UnitType.ProductQuality => 0.55m,
-            UnitType.BrandQuality => 0.55m,
+            UnitType.ProductQuality => 2.0m,
+            UnitType.BrandQuality => 2.0m,
             UnitType.PowerGeneration => 0.4m,
             UnitType.BatteryStorage => 0.2m,
             UnitType.FuelPurchase => 0.5m,   // procurement staff
@@ -114,8 +114,8 @@ public static class CompanyEconomyCalculator
             UnitType.Branding => 0.05m,
             UnitType.Marketing => 0.07m,
             UnitType.PublicSales => 0.12m,
-            UnitType.ProductQuality => 0.09m,
-            UnitType.BrandQuality => 0.09m,
+            UnitType.ProductQuality => 0.22m,
+            UnitType.BrandQuality => 0.22m,
             UnitType.PowerGeneration => 0.05m,
             UnitType.BatteryStorage => 0.03m,
             UnitType.FuelPurchase => 0.08m,    // fuel processing energy
