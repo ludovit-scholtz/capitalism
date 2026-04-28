@@ -4677,6 +4677,198 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             $"nominal CZK amount instead of USD. Expected < 1.0 USD for a level-1 Prague R&D tick.");
     }
 
+    [Fact]
+    public async Task ResearchPhase_EurCityBudget_StoredInUsd()
+    {
+        // EUR city (Bratislava, baseSalary=18 EUR/h) accumulates budget in USD.
+        // totalCostEur = (0.55 h × 18 EUR/h) + (0.09 MWh × 55) = 9.90 + 4.95 = 14.85 EUR
+        // totalCostUsd = 14.85 × 1.08 = 16.038 USD  (EUR/USD = 1.08)
+        // budgetGain   = 16.038 × 0.5 ≈ 8.019 USD
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bratislava = await seedDb.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            var player = new Player { Id = Guid.NewGuid(), Email = $"rd-eur-{Guid.NewGuid():N}@test.com", DisplayName = "EUR Lab", PasswordHash = "hash", Role = PlayerRole.Player };
+            var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "EUR Lab Corp", Cash = 10_000_000m };
+            var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = bratislava.Id, Type = BuildingType.ResearchDevelopment, Name = "EUR Lab", Level = 1 };
+            var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id };
+            seedDb.Players.Add(player); seedDb.Companies.Add(company); seedDb.Buildings.Add(building); seedDb.BuildingUnits.Add(unit);
+            await seedDb.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var budget = await db.ProductResearchBudgets.FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
+
+        // EUR budget per tick ≈ $8.019 USD (well above the old €8.019 EUR pre-normalization since EUR < USD)
+        const decimal expectedBudgetUsd = 8.019m;
+        Assert.True(budget.AccumulatedBudget > 0m, "EUR-city R&D should accumulate a positive USD budget.");
+        var diff = Math.Abs(budget.AccumulatedBudget - expectedBudgetUsd);
+        Assert.True(diff < 0.1m,
+            $"Bratislava EUR company should accumulate ~{expectedBudgetUsd:F4} USD but got {budget.AccumulatedBudget:F4}. Diff={diff:F4}.");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_InrCityBudget_StoredInUsdNotInflated()
+    {
+        // Delhi (INR, baseSalary=6 INR/h) accumulates a small USD budget — no INR-inflation.
+        // totalCostInr = (0.55 × 6) + (0.09 × 55) = 3.30 + 4.95 = 8.25 INR
+        // totalCostUsd = 8.25 / 90.50 × 1.08 ≈ 0.0984 USD  (FallbackEurRates: INR=90.50, USD=1.08)
+        // budgetGain   = 0.0984 × 0.5 ≈ 0.0492 USD
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var delhi = await seedDb.Cities.FirstAsync(c => c.Name == "Delhi");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            var player = new Player { Id = Guid.NewGuid(), Email = $"rd-inr-{Guid.NewGuid():N}@test.com", DisplayName = "INR Lab", PasswordHash = "hash", Role = PlayerRole.Player };
+            var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "INR Lab Corp", Cash = 100_000_000m };
+            var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = delhi.Id, Type = BuildingType.ResearchDevelopment, Name = "INR Lab", Level = 1 };
+            var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = 1, ProductTypeId = product.Id };
+            seedDb.Players.Add(player); seedDb.Companies.Add(company); seedDb.Buildings.Add(building); seedDb.BuildingUnits.Add(unit);
+            await seedDb.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var budget = await db.ProductResearchBudgets.FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
+
+        Assert.True(budget.AccumulatedBudget > 0m, "INR-city R&D should accumulate a positive USD budget.");
+        // Without normalization: 8.25 × 0.5 = 4.125 INR stored (nominally large).
+        // With normalization: ≈ 0.049 USD. Must be below 1 USD.
+        Assert.True(budget.AccumulatedBudget < 1m,
+            $"Delhi INR company budget {budget.AccumulatedBudget:F4} looks INR-inflated (expected < 1.0 USD for L1). " +
+            $"Without USD normalization it would be ~4.125.");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_BrandQualityUnit_IncreasesMarketingEfficiency()
+    {
+        // BRAND_QUALITY units update Brand.MarketingEfficiencyMultiplier — they do NOT create
+        // a ProductResearchBudget row. Confirm that a BRAND_QUALITY unit in Bratislava correctly
+        // increases the brand's marketing efficiency per tick (scope = PRODUCT).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bratislava = await seedDb.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            var player = new Player { Id = Guid.NewGuid(), Email = $"rd-bq-{Guid.NewGuid():N}@test.com", DisplayName = "BQ Lab", PasswordHash = "hash", Role = PlayerRole.Player };
+            var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BQ Lab Corp", Cash = 10_000_000m };
+            var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = bratislava.Id, Type = BuildingType.ResearchDevelopment, Name = "BQ Lab", Level = 1 };
+            var unit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                UnitType = UnitType.BrandQuality,
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+                ProductTypeId = product.Id,
+                BrandScope = "PRODUCT"
+            };
+            seedDb.Players.Add(player); seedDb.Companies.Add(company); seedDb.Buildings.Add(building); seedDb.BuildingUnits.Add(unit);
+            await seedDb.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        // BRAND_QUALITY writes to Brand.MarketingEfficiencyMultiplier, not ProductResearchBudget.
+        var brand = await db.Brands.FirstOrDefaultAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
+        Assert.NotNull(brand);
+        Assert.True(brand.MarketingEfficiencyMultiplier > 1m,
+            $"BRAND_QUALITY should raise MarketingEfficiencyMultiplier above 1.0 but got {brand.MarketingEfficiencyMultiplier}.");
+    }
+
+    [Fact]
+    public async Task ResearchPhase_CzkCompanyCannotOutspendEurCompanyByNominalAmount()
+    {
+        // Regression guard: before the fix, a CZK company accumulating at nominal local-currency
+        // rate would accumulate ~8.5 per tick vs EUR ≈ 8.0 — almost equal by coincidence due to
+        // Prague's BaseSalaryPerManhour being 22 CZK and Bratislava's being 18 EUR.
+        // But INR at 6 INR/h × 90.5 FX = 543 INR → ~271 per tick (vs EUR ~14.85 → ~7.4).
+        // The real pathological case is INR: 271 >> 7.4 is >36× advantage without normalization.
+        //
+        // This test checks that INR budget << EUR budget in USD (both normalized to USD, INR is cheaper).
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid eurCompanyId, inrCompanyId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var bratislava = await seedDb.Cities.FirstAsync(c => c.Name == "Bratislava");
+            var delhi = await seedDb.Cities.FirstAsync(c => c.Name == "Delhi");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            static void AddCompany(AppDbContext db, Guid cityId, Guid productId, out Guid companyId, string tag)
+            {
+                var player = new Player { Id = Guid.NewGuid(), Email = $"rd-cmp-{tag}-{Guid.NewGuid():N}@test.com", DisplayName = $"Lab {tag}", PasswordHash = "hash", Role = PlayerRole.Player };
+                var company = new Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"Lab Corp {tag}", Cash = 100_000_000m };
+                var building = new Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = cityId, Type = BuildingType.ResearchDevelopment, Name = $"Lab {tag}", Level = 1 };
+                var unit = new BuildingUnit { Id = Guid.NewGuid(), BuildingId = building.Id, UnitType = UnitType.ProductQuality, GridX = 0, GridY = 0, Level = 1, ProductTypeId = productId };
+                db.Players.Add(player); db.Companies.Add(company); db.Buildings.Add(building); db.BuildingUnits.Add(unit);
+                companyId = company.Id;
+            }
+
+            AddCompany(seedDb, bratislava.Id, product.Id, out eurCompanyId, "EUR");
+            AddCompany(seedDb, delhi.Id, product.Id, out inrCompanyId, "INR");
+            await seedDb.SaveChangesAsync();
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+        await processor.ProcessTickAsync();
+
+        var eurBudget = await db.ProductResearchBudgets.FirstAsync(b => b.CompanyId == eurCompanyId && b.ProductTypeId == productId);
+        var inrBudget = await db.ProductResearchBudgets.FirstAsync(b => b.CompanyId == inrCompanyId && b.ProductTypeId == productId);
+
+        // Both in USD; INR hourly wage (6 INR/h ≈ $0.07/h) is much cheaper than EUR (18 EUR/h ≈ $19.44/h).
+        // Ratio eurBudget / inrBudget should be > 10 (EUR city is more expensive in USD terms).
+        Assert.True(eurBudget.AccumulatedBudget > inrBudget.AccumulatedBudget,
+            $"EUR-city budget (${eurBudget.AccumulatedBudget:F4}) should exceed INR-city budget (${inrBudget.AccumulatedBudget:F4}) in USD terms.");
+
+        var ratio = eurBudget.AccumulatedBudget / inrBudget.AccumulatedBudget;
+        Assert.True(ratio > 5m,
+            $"EUR/INR budget ratio {ratio:F2} is too low. EUR workers cost more in USD, so EUR R&D should contribute more per tick. " +
+            $"Without normalization the ratio would be inverted (~0.03) due to INR nominal inflation.");
+    }
+
     #endregion
 
     #region Salary and Overhead Integration

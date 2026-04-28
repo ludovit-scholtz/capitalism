@@ -11948,13 +11948,13 @@ test.describe('R&D Research Progress Panel', () => {
     await expect(panel).toBeVisible()
 
     // Budget panel rows are shown for PRODUCT-scope brands with budget data
-    await expect(panel.locator('.research-budget-label', { hasText: 'Research budget invested' })).toBeVisible()
-    await expect(panel.locator('.research-budget-value', { hasText: '€9,900' })).toBeVisible()
-    await expect(panel.locator('.research-budget-label', { hasText: 'Budget for 100% quality' })).toBeVisible()
-    await expect(panel.locator('.research-budget-value', { hasText: '€45,000' })).toBeVisible()
+    await expect(panel.locator('.research-budget-label', { hasText: 'Research budget invested (USD)' })).toBeVisible()
+    await expect(panel.locator('.research-budget-value', { hasText: '$9,900.00' })).toBeVisible()
+    await expect(panel.locator('.research-budget-label', { hasText: 'Target for 100% quality' })).toBeVisible()
+    await expect(panel.locator('.research-budget-value', { hasText: '$45,000.00' })).toBeVisible()
     // Competitor row shown when competitor has more budget
-    await expect(panel.locator('.research-budget-label', { hasText: 'Top competitor budget' })).toBeVisible()
-    await expect(panel.locator('.research-budget-value--warn', { hasText: '€18,500' })).toBeVisible()
+    await expect(panel.locator('.research-budget-label', { hasText: 'Top competitor budget (USD)' })).toBeVisible()
+    await expect(panel.locator('.research-budget-value--warn', { hasText: '$18,500.00' })).toBeVisible()
     // Decay hint always shown in budget panel
     await expect(panel.locator('.research-budget-hint')).toBeVisible()
   })
