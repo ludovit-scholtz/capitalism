@@ -140,6 +140,12 @@ public sealed class PowerPlantAnalytics
     /// satisfy all ENERGY_PRODUCING units this tick.
     /// = max(0, EnergyProducingCapacityMw − current reserve).
     /// 0 for non-thermal plants; 0 when the reserve is sufficient.
+    /// <para>
+    /// The calculation uses a 1:1 MWh-to-MW ratio (1 MWh of stored fuel reserve supports 1 MW
+    /// of ENERGY_PRODUCING output capacity).  This is an intentional game-balance simplification
+    /// that keeps thermal reserve planning intuitive for players: if the reserve drops below
+    /// the total EP capacity (in MW), the shortfall directly indicates the lost MW of output.
+    /// </para>
     /// </summary>
     public decimal FuelConstrainedOutputMw { get; set; }
     /// <summary>

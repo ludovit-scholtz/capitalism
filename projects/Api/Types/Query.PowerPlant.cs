@@ -133,6 +133,8 @@ public sealed partial class Query
 
         // Constrained output: how much ENERGY_PRODUCING capacity is unused because the fuel
         // reserve is too low.  This is an instantaneous estimate based on current reserve.
+        // Uses a 1:1 MWh-to-MW ratio (intentional game-balance simplification — see
+        // FuelConstrainedOutputMw XML doc in LedgerTypes.cs for rationale).
         var fuelConstrainedOutputMw = isThermal && energyProducingCapacityMw > 0m
             ? Math.Max(0m, energyProducingCapacityMw - building.FuelReserveMwh)
             : 0m;

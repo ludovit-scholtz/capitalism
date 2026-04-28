@@ -253,7 +253,7 @@ const chartMaxValue = computed(() => {
               :class="powerPlantAnalytics.plantType === 'GAS' ? 'bg-blue-600/20 text-blue-300' : 'bg-orange-600/20 text-orange-300'"
               :title="powerPlantAnalytics.plantType === 'GAS'
                 ? t('powerPlant.fuelReserve.gasPremiumNote')
-                : t('powerPlant.fuelReserve.fuelCostHint', { cost: powerPlantAnalytics.fuelCostPerMwhEur.toFixed(2) })"
+                : t('powerPlant.fuelReserve.fuelCostHint', { cost: (powerPlantAnalytics.fuelCostPerMwhEur ?? 0).toFixed(2) })"
             >
               {{ powerPlantAnalytics.plantType === 'GAS' ? '🔵' : '🟠' }}
               {{ t('powerPlant.fuelReserve.fuelTypeBadge', { type: powerPlantAnalytics.fuelTypeLabel || powerPlantAnalytics.plantType }) }}

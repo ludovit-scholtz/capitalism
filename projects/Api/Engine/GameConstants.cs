@@ -429,8 +429,14 @@ public static class GameConstants
 
     /// <summary>
     /// Returns the effective fuel cost per MWh (in EUR, before city FX scaling) for a given
-    /// thermal plant type.  GAS plants pay a 20% premium over COAL; all other types return
-    /// the base rate as a safe fallback (should never be called for non-thermal plants).
+    /// thermal plant type.  GAS plants pay a 20% premium over COAL.
+    /// <para>
+    /// Non-thermal plant types (SOLAR, WIND, NUCLEAR, HYDRO) should never reach this method
+    /// because callers guard with <see cref="IsThermalPlant"/>.  The fallback to
+    /// <see cref="FuelCostPerMwhBase"/> is intentionally safe for those cases rather than
+    /// throwing, so that a misconfigured plant degrades gracefully instead of crashing the
+    /// tick engine.
+    /// </para>
     /// </summary>
     public static decimal FuelCostPerMwhForPlantType(string? plantType) =>
         plantType == Data.Entities.PowerPlantType.Gas
