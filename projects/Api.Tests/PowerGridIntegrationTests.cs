@@ -2591,7 +2591,7 @@ public sealed class PowerGridIntegrationTests : IClassFixture<ApiWebApplicationF
     /// <summary>
     /// Reducing dispatch from 100% to 50% on a COAL plant halves both fuel cost
     /// AND surplus income from the grid (compared to a full-dispatch plant in the
-    /// same city).  This proves the dispatch control has visible P&amp;L consequences.
+    /// same city).  This proves the dispatch control has visible P&L consequences.
     /// </summary>
     [Fact]
     public async Task DispatchChange_50Pct_HalvesFuelCostAndReducesSurplusIncome()

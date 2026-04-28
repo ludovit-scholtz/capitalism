@@ -21099,7 +21099,8 @@ test.describe('Power plant analytics panel', () => {
     await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).toBeVisible()
     await expect(analyticsPanel.getByText('Net Profit', { exact: true })).toBeVisible()
 
-    // The summary grid should use the 5-column class for thermal plants
+    // The summary grid uses 'grid-cols-2' on mobile, 'sm:grid-cols-3', 'lg:grid-cols-5' for thermal.
+    // Playwright runs at desktop width, so check for the base mobile class which is always present.
     await expect(analyticsPanel.locator('.ppa-summary-grid')).toHaveClass(/grid-cols-2/)
   })
 
