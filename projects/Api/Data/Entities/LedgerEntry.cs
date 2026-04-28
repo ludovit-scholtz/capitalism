@@ -79,4 +79,10 @@ public static class LedgerCategory
     public const string FounderContribution = "FOUNDER_CONTRIBUTION";
     /// <summary>IPO public shareholder investment credited to the company account at formation.</summary>
     public const string IpoRaise = "IPO_RAISE";
+    /// <summary>
+    /// Fuel procurement cost for thermal power plants (COAL/GAS).
+    /// Charged each tick when FUEL_PURCHASE units procure fuel and store it in the plant's reserve.
+    /// Amount is proportional to fuel procured × city fuel price index.
+    /// </summary>
+    public const string FuelCost = "FUEL_COST";
 }

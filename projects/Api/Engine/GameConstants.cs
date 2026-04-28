@@ -403,6 +403,30 @@ public static class GameConstants
     /// </summary>
     public const decimal GridFinePerMwTick = 8m;
 
+    // ── Fuel procurement constants (COAL/GAS plants) ──────────────────────────
+
+    /// <summary>
+    /// Whether a power-plant type uses thermal fuel (COAL or GAS).
+    /// Only thermal plants have fuel procurement and fuel reserve mechanics.
+    /// Renewable (SOLAR, WIND, WATER) and nuclear plants do not procure fuel.
+    /// </summary>
+    public static bool IsThermalPlant(string? powerPlantType) =>
+        powerPlantType is PowerPlantType.Coal or PowerPlantType.Gas;
+
+    /// <summary>
+    /// Base cost (in EUR) per MWh of fuel procured by a FUEL_PURCHASE unit.
+    /// Scaled by <c>City.FuelPriceIndex</c> and the city FX rate to give the
+    /// local-currency cost per tick.
+    /// </summary>
+    public const decimal FuelCostPerMwhBase = 3m;
+
+    /// <summary>
+    /// Maximum fuel reserve capacity per level of a FUEL_PURCHASE unit, in MWh.
+    /// A single level-1 FUEL_PURCHASE unit can hold up to 50 MWh of reserve fuel.
+    /// Reserve caps prevent infinite fuel hoarding and give dispatch decisions meaning.
+    /// </summary>
+    public const decimal FuelReserveCapacityPerUnitLevel = 50m;
+
     // ── Market trend constants ────────────────────────────────────────────────
 
     /// <summary>
