@@ -11983,6 +11983,44 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             $"USD rate ({ratesByCurrency["USD"]}) should be in a reasonable range (0.5–3)");
     }
 
+    [Fact]
+    public async Task Rankings_ExcludesGovernmentPlayer()
+    {
+        // The government player is seeded by AppDbInitializer with email "government@capitalism.game".
+        // It must never appear in the public player rankings, even though it is a PLAYER-role account.
+        var result = await ExecuteGraphQlAsync("{ rankings { displayName } }");
+        var rankings = result.GetProperty("data").GetProperty("rankings");
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, rankings.ValueKind);
+
+        var displayNames = rankings.EnumerateArray()
+            .Select(r => r.GetProperty("displayName").GetString())
+            .ToList();
+
+        Assert.DoesNotContain("Government", displayNames);
+    }
+
+    [Fact]
+    public async Task CompanyRankings_ExcludesGovernmentCompany()
+    {
+        // The government company is seeded by AppDbInitializer with name "Government".
+        // It must never appear in the public company rankings.
+        var result = await ExecuteGraphQlAsync("{ companyRankings { companyName ownerDisplayName } }");
+        var rankings = result.GetProperty("data").GetProperty("companyRankings");
+        Assert.Equal(System.Text.Json.JsonValueKind.Array, rankings.ValueKind);
+
+        var companyNames = rankings.EnumerateArray()
+            .Select(r => r.GetProperty("companyName").GetString())
+            .ToList();
+
+        Assert.DoesNotContain("Government", companyNames);
+
+        var ownerNames = rankings.EnumerateArray()
+            .Select(r => r.GetProperty("ownerDisplayName").GetString())
+            .ToList();
+
+        Assert.DoesNotContain("Government", ownerNames);
+    }
+
     #endregion
 
     #region BuildingLots
@@ -32264,6 +32302,69 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal("Atlas Logistics", summaries[0].GetProperty("companyName").GetString());
         Assert.Equal(100m, summaries[0].GetProperty("amount").GetDecimal());
         Assert.Equal(2, summaries[0].GetProperty("entryCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task GameAdminDashboard_ExposesGovernmentPlayerInDedicatedField()
+    {
+        // The government player must appear in governmentPlayer (not in the regular players list)
+        // so the admin dashboard can present a clearly-labeled impersonation entry point.
+        var email = $"admin-gov-{Guid.NewGuid():N}@example.com";
+        var token = await RegisterAndGetTokenAsync(email, "Admin Gov Tester");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var admin = await db.Players.FirstAsync(p => p.Email == email);
+        admin.Role = PlayerRole.Admin;
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query AdminDashboardGov {
+              gameAdminDashboard {
+                players { email }
+                governmentPlayer { id email displayName }
+              }
+            }
+            """,
+            token: token);
+
+        Assert.False(result.TryGetProperty("errors", out _), "gameAdminDashboard should succeed for admin");
+
+        var dashboard = result.GetProperty("data").GetProperty("gameAdminDashboard");
+
+        // governmentPlayer field must be populated
+        var govPlayer = dashboard.GetProperty("governmentPlayer");
+        Assert.NotEqual(System.Text.Json.JsonValueKind.Null, govPlayer.ValueKind);
+        Assert.Equal("government@capitalism.game", govPlayer.GetProperty("email").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(govPlayer.GetProperty("id").GetString()), "Government player must have an id");
+
+        // governmentPlayer must NOT appear in the regular players list
+        var regularEmails = dashboard.GetProperty("players")
+            .EnumerateArray()
+            .Select(p => p.GetProperty("email").GetString())
+            .ToList();
+        Assert.DoesNotContain("government@capitalism.game", regularEmails);
+    }
+
+    [Fact]
+    public async Task GameAdminDashboard_GovernmentPlayerNotExposedToUnauthorizedUsers()
+    {
+        // Regular (non-admin) players must not be able to query the admin dashboard.
+        var token = await RegisterAndGetTokenAsync($"nonadmin-gov-{Guid.NewGuid():N}@example.com", "NonAdmin");
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query AdminDashboardGovUnauth {
+              gameAdminDashboard {
+                governmentPlayer { id email }
+              }
+            }
+            """,
+            token: token);
+
+        Assert.True(result.TryGetProperty("errors", out _),
+            "Non-admin players must not be able to access gameAdminDashboard.");
     }
 
     // ── Contradictory bidirectional link rejection ─────────────────────────────────────────────

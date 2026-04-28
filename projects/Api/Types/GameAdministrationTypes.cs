@@ -92,6 +92,12 @@ public sealed class GameAdminDashboardResult
 
     public List<GameAdminPlayerSummary> InvisiblePlayers { get; set; } = [];
 
+    /// <summary>
+    /// The government system account, exposed separately from the regular player list
+    /// so administrators can inspect and impersonate it from a dedicated, clearly-labeled UI section.
+    /// </summary>
+    public GameAdminPlayerSummary? GovernmentPlayer { get; set; }
+
     public List<GlobalGameAdminGrantSummary> GlobalGameAdminGrants { get; set; } = [];
 
     public List<GameAdminAuditLogRecord> RecentAuditLogs { get; set; } = [];

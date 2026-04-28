@@ -84,6 +84,9 @@ const DASHBOARD_FIELDS = `
   invisiblePlayers {
     ${PLAYER_FIELDS}
   }
+  governmentPlayer {
+    ${PLAYER_FIELDS}
+  }
   globalGameAdminGrants {
     id
     email

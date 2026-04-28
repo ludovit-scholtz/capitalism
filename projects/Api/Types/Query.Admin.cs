@@ -121,8 +121,16 @@ public sealed partial class Query
             InflowSummaries = inflowSummaries,
             ShippingCostSummaries = shippingCostSummaries,
             MultiAccountAlerts = BuildMultiAccountAlerts(players, companies, loans, shareholdings, personalCashByPlayerId),
-            Players = players.Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
-            InvisiblePlayers = players.Where(player => player.IsInvisibleInChat).Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
+            Players = players
+                .Where(player => player.Email != GovernmentActorConstants.GovernmentEmail)
+                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
+            InvisiblePlayers = players
+                .Where(player => player.Email != GovernmentActorConstants.GovernmentEmail && player.IsInvisibleInChat)
+                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId)).ToList(),
+            GovernmentPlayer = players
+                .Where(player => player.Email == GovernmentActorConstants.GovernmentEmail)
+                .Select(player => ToGameAdminPlayerSummary(player, personalCashByPlayerId))
+                .FirstOrDefault(),
             GlobalGameAdminGrants = globalAdminGrants,
             RecentAuditLogs = auditLogs.Select(log => new GameAdminAuditLogRecord
             {

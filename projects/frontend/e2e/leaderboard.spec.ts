@@ -201,6 +201,72 @@ test.describe('Leaderboard page', () => {
     await expect(page.getByText('🥈')).toBeVisible()
     await expect(page.getByText('🥉')).toBeVisible()
   })
+
+  test('government system account is excluded from player rankings', async ({ page }) => {
+    const realPlayer = makePlayer({ id: 'real-player', displayName: 'Real Citizen' })
+    realPlayer.companies.push({
+      id: 'real-comp',
+      playerId: 'real-player',
+      name: 'Real Corp',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+    // Seed the government player with the canonical email — it should be filtered out by the mock.
+    const govPlayer = makePlayer({
+      id: 'gov-player',
+      displayName: 'Government',
+      email: 'government@capitalism.game',
+    })
+    govPlayer.companies.push({
+      id: 'gov-comp',
+      playerId: 'gov-player',
+      name: 'Government',
+      cash: 99000000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    setupMockApi(page, { players: [realPlayer, govPlayer] })
+    await page.goto('/leaderboard')
+
+    await expect(page.getByText('Real Citizen')).toBeVisible()
+    // Government must not appear anywhere in the player rankings list.
+    await expect(page.locator('.rank-card').filter({ hasText: 'Government' })).toHaveCount(0)
+  })
+
+  test('government company is excluded from company rankings', async ({ page }) => {
+    const realPlayer = makePlayer({ id: 'real-player-co', displayName: 'Entrepreneur' })
+    realPlayer.companies.push({
+      id: 'real-corp-co',
+      playerId: 'real-player-co',
+      name: 'Entrepreneur Corp',
+      cash: 250000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+    const govPlayer = makePlayer({
+      id: 'gov-player-co',
+      displayName: 'Government',
+      email: 'government@capitalism.game',
+    })
+    govPlayer.companies.push({
+      id: 'gov-corp-co',
+      playerId: 'gov-player-co',
+      name: 'Government',
+      cash: 99000000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [],
+    })
+
+    setupMockApi(page, { players: [realPlayer, govPlayer] })
+    await page.goto('/leaderboard')
+    await page.getByRole('tab', { name: 'Richest Companies' }).click()
+
+    await expect(page.getByText('Entrepreneur Corp')).toBeVisible()
+    // Government company must not appear in the company rankings list.
+    await expect(page.locator('.rank-card').filter({ hasText: 'Government' })).toHaveCount(0)
+  })
 })
 
 test.describe('Leaderboard navigation', () => {
