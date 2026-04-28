@@ -115,6 +115,50 @@ public sealed class PowerPlantAnalytics
     public int DispatchTargetPercent { get; set; }
     /// <summary>Current fuel reserve in MWh (COAL/GAS plants). Always 0 for renewable/nuclear.</summary>
     public decimal FuelReserveMwh { get; set; }
+    /// <summary>
+    /// Maximum fuel reserve capacity in MWh — sum of (FuelReserveCapacityPerUnitLevel × level)
+    /// for all installed FUEL_PURCHASE units.  0 when no FUEL_PURCHASE units are installed.
+    /// </summary>
+    public decimal MaxFuelReserveMwh { get; set; }
+    /// <summary>
+    /// Reserve fill level expressed as an integer 0–100 percentage.
+    /// 100 = tank full; 0 = empty.  0 when MaxFuelReserveMwh is 0 (no FP units).
+    /// </summary>
+    public int FuelReservePercent { get; set; }
+    /// <summary>
+    /// Maximum fuel procurement per tick (in MWh) from all installed FUEL_PURCHASE units at 100% dispatch.
+    /// This is the raw unit capacity before dispatch scaling.
+    /// </summary>
+    public decimal FuelPurchaseCapacityMwhPerTick { get; set; }
+    /// <summary>
+    /// Maximum additional MW contributed by ENERGY_PRODUCING units when the reserve is full.
+    /// Shows the player how much generation capacity they are leaving unused if the reserve is low.
+    /// </summary>
+    public decimal EnergyProducingCapacityMw { get; set; }
+    /// <summary>
+    /// Estimated MW of output currently constrained because the fuel reserve is too low to
+    /// satisfy all ENERGY_PRODUCING units this tick.
+    /// = max(0, EnergyProducingCapacityMw − current reserve).
+    /// 0 for non-thermal plants; 0 when the reserve is sufficient.
+    /// <para>
+    /// The calculation uses a 1:1 MWh-to-MW ratio (1 MWh of stored fuel reserve supports 1 MW
+    /// of ENERGY_PRODUCING output capacity).  This is an intentional game-balance simplification
+    /// that keeps thermal reserve planning intuitive for players: if the reserve drops below
+    /// the total EP capacity (in MW), the shortfall directly indicates the lost MW of output.
+    /// </para>
+    /// </summary>
+    public decimal FuelConstrainedOutputMw { get; set; }
+    /// <summary>
+    /// Human-readable label describing the fuel type used by this plant, e.g. "Coal" or "Natural Gas".
+    /// Empty string for non-thermal plants.
+    /// </summary>
+    public string FuelTypeLabel { get; set; } = string.Empty;
+    /// <summary>
+    /// Base fuel cost in EUR per MWh for this plant type (before city FuelPriceIndex scaling).
+    /// Useful for the frontend to display per-fuel-type cost guidance.
+    /// 0 for non-thermal plants.
+    /// </summary>
+    public decimal FuelCostPerMwhEur { get; set; }
     public long DataFromTick { get; set; }
     public long DataToTick { get; set; }
     public decimal TotalSurplusIncome { get; set; }

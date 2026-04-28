@@ -2039,6 +2039,23 @@ export default {
     fuelReserve: {
       title: 'Fuel Reserve',
       hint: 'Fuel is procured each tick by FUEL_PURCHASE units. ENERGY_PRODUCING units convert stored fuel into grid electricity.',
+      capacityLabel: 'Reserve capacity',
+      currentLabel: 'Current reserve',
+      maxLabel: 'Max capacity',
+      fillPercent: '{percent}% full',
+      procurementRate: '+{mwh} MWh/tick procurement',
+      constrainedWarning: '{mw} MW output constrained — reserve too low to feed all ENERGY_PRODUCING units.',
+      noFuelPurchaseUnits: 'No FUEL_PURCHASE units installed. Install FUEL_PURCHASE units to enable fuel procurement and increase the reserve capacity.',
+      noEnergyProducingUnits: 'No ENERGY_PRODUCING units installed. Add ENERGY_PRODUCING units to convert stored fuel into additional grid output.',
+      gridLinkTitle: 'Fuel → Grid chain',
+      gridLinkFuelPurchase: 'Fuel Procurement',
+      gridLinkFuelPurchaseHint: 'Procures {mwh} MWh/tick. Reserve fills toward {max} MWh maximum.',
+      gridLinkEnergyProducing: 'Energy Producer',
+      gridLinkEnergyProducingHint: 'Converts stored fuel into {mw} MW of grid electricity.',
+      gridLinkGrid: 'City Grid',
+      fuelTypeBadge: '{type} fuel',
+      fuelCostHint: 'Base cost: {cost} €/MWh (before city price-index adjustment).',
+      gasPremiumNote: 'Natural gas costs 20% more than coal per MWh but offers faster response and cleaner combustion.',
     },
     units: {
       POWER_GENERATION: {

@@ -414,11 +414,34 @@ public static class GameConstants
         powerPlantType is PowerPlantType.Coal or PowerPlantType.Gas;
 
     /// <summary>
-    /// Base cost (in EUR) per MWh of fuel procured by a FUEL_PURCHASE unit.
+    /// Base cost (in EUR) per MWh of fuel procured by a FUEL_PURCHASE unit for COAL plants.
     /// Scaled by <c>City.FuelPriceIndex</c> and the city FX rate to give the
     /// local-currency cost per tick.
     /// </summary>
     public const decimal FuelCostPerMwhBase = 3m;
+
+    /// <summary>
+    /// Gas turbine fuel-cost multiplier applied on top of <see cref="FuelCostPerMwhBase"/>.
+    /// Natural gas burns cleaner but is priced at a premium over coal.
+    /// A GAS plant therefore pays 20% more per MWh of fuel than a COAL plant.
+    /// </summary>
+    public const decimal GasFuelCostMultiplier = 1.2m;
+
+    /// <summary>
+    /// Returns the effective fuel cost per MWh (in EUR, before city FX scaling) for a given
+    /// thermal plant type.  GAS plants pay a 20% premium over COAL.
+    /// <para>
+    /// Non-thermal plant types (SOLAR, WIND, NUCLEAR, HYDRO) should never reach this method
+    /// because callers guard with <see cref="IsThermalPlant"/>.  The fallback to
+    /// <see cref="FuelCostPerMwhBase"/> is intentionally safe for those cases rather than
+    /// throwing, so that a misconfigured plant degrades gracefully instead of crashing the
+    /// tick engine.
+    /// </para>
+    /// </summary>
+    public static decimal FuelCostPerMwhForPlantType(string? plantType) =>
+        plantType == Data.Entities.PowerPlantType.Gas
+            ? FuelCostPerMwhBase * GasFuelCostMultiplier
+            : FuelCostPerMwhBase;
 
     /// <summary>
     /// Maximum fuel reserve capacity per level of a FUEL_PURCHASE unit, in MWh.

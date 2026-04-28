@@ -77,9 +77,9 @@ public sealed class FuelProcurementPhase : ITickPhase
             // Actual procurement = min(what we can procure, how much space remains).
             var targetProcurementMwh = Math.Min(maxProcurementMwh, remainingCapacity);
 
-            // Fuel cost in local city currency.
+            // Fuel cost in local city currency — GAS costs more per MWh than COAL.
             var fxRate = context.GetCityFxRate(city);
-            var costPerMwh = GameConstants.FuelCostPerMwhBase * city.FuelPriceIndex * fxRate;
+            var costPerMwh = GameConstants.FuelCostPerMwhForPlantType(plant.PowerPlantType) * city.FuelPriceIndex * fxRate;
             var totalCost = decimal.Round(targetProcurementMwh * costPerMwh, 2, MidpointRounding.AwayFromZero);
 
             // Find the funding bank account.
@@ -115,6 +115,7 @@ public sealed class FuelProcurementPhase : ITickPhase
             bankAccount.Balance -= actualCost;
             plant.FuelReserveMwh += actualProcurementMwh;
 
+            var fuelTypeName = plant.PowerPlantType == Data.Entities.PowerPlantType.Gas ? "Natural Gas" : "Coal";
             context.Db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),
@@ -122,7 +123,7 @@ public sealed class FuelProcurementPhase : ITickPhase
                 BuildingId = plant.Id,
                 BankAccountId = bankAccount.Id,
                 Category = LedgerCategory.FuelCost,
-                Description = $"Fuel procurement: {actualProcurementMwh:F1} MWh @ {costPerMwh:F2} {city.CurrencyCode}/MWh (dispatch {plant.DispatchTargetPercent}%)",
+                Description = $"{fuelTypeName} procurement: {actualProcurementMwh:F1} MWh @ {costPerMwh:F2} {city.CurrencyCode}/MWh (dispatch {plant.DispatchTargetPercent}%)",
                 Amount = -actualCost,
                 RecordedAtTick = context.CurrentTick,
                 RecordedAtUtc = DateTime.UtcNow,

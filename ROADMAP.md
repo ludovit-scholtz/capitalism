@@ -61,7 +61,7 @@ It will use real world map. The game will start in single city and later other c
 - [x] Everywhere where the currency is displayed, for example in the units, use the number formatting component
 - [x] Add to the title the original number to be formatted and currency after it
 
-### Power plants (90% complete)
+### Power plants (96% complete)
 
 **Shipped (previous increment):**
 - 5 new power plant unit types added to the building grid: `FUEL_PURCHASE` (+10 MW/level fuel capacity), `WIND_TURBINE` (+8 MW/level weather-scaled), `WATER_TURBINE` (+12 MW/level steady hydro), `ENERGY_STORAGE` (+8 MW/level smoothing buffer), `ENERGY_PRODUCING` (+20 MW/level main converter).
@@ -72,7 +72,7 @@ It will use real world map. The game will start in single city and later other c
 - All 7 unit type labels and descriptions localized in English, Slovak, and German.
 - 10 new backend integration tests including a mixed-unit weather-scaling correctness test.
 
-**Shipped (this increment — dispatch controls, fuel-flow chain, P&L visibility):**
+**Shipped (dispatch controls, fuel-flow chain, P&L visibility):**
 - `FuelProcurementPhase` (tick-engine phase order 9): COAL/GAS plants procure fuel each tick via `FUEL_PURCHASE` units. Cost is debited from the building's bank account and recorded as `LedgerCategory.FuelCost`. Procurement scales with `DispatchTargetPercent`; if funds are insufficient, a partial fill is made (graceful degradation, not zero).
 - `PowerPlantOutputCalculator` updated: thermal plants now draw output from `FuelReserveMwh` — `FUEL_PURCHASE` units fill the reserve first, `ENERGY_PRODUCING` units consume the remainder. Non-thermal plants retain their flat-boost behaviour. Total output is scaled by `DispatchTargetPercent` after all unit contributions.
 - New `Building` fields: `DispatchTargetPercent` (int 0–100, default 100) and `FuelReserveMwh` (decimal, default 0). EF migration `20260428_AddPowerPlantDispatchAndFuelReserve` included.
@@ -81,10 +81,22 @@ It will use real world map. The game will start in single city and later other c
 - New `GameConstants`: `FuelCostPerMwhBase`, `FuelPurchaseBoostMwPerLevel`, `FuelReserveCapacityPerUnitLevel`, `IsThermalPlant()`.
 - Frontend: dispatch slider (0–100%) with live badge in `BuildingPowerPlantPanel`; fuel reserve status bar (thermal plants only); fuel costs metric in the P&L summary grid (5-metric layout for thermal, 4 for non-thermal); P&L bar chart updated to include fuel costs in the cost bar.
 - i18n: `dispatch.*`, `fuelReserve.*`, and `analytics.fuelCosts` keys for en/sk/de.
-- 7 new backend integration tests + 4 new Playwright E2E tests. Total: 1083 backend / 1002 Playwright.
+- 7 new backend integration tests + 4 new Playwright E2E tests.
 
-- [ ]  Advanced grid linking between unit types (fuel → energy_producing → grid)
-- [ ]  Richer fuel-reserve capacity display and multi-fuel-type support
+**Shipped (this increment — multi-fuel economics, reserve capacity dashboard, grid-linking visualization):**
+- **Multi-fuel cost differentiation**: GAS plants now pay `FuelCostPerMwhBase × GasFuelCostMultiplier` (1.2×) per MWh — 20% more than COAL. `GameConstants.GasFuelCostMultiplier = 1.2` and `FuelCostPerMwhForPlantType()` apply the multiplier in `FuelProcurementPhase`. Both constants exposed via the new `fuelCostPerMwhEur` field on `PowerPlantAnalytics`.
+- **Reserve capacity analytics**: `PowerPlantAnalytics` now returns `maxFuelReserveMwh`, `fuelReservePercent` (0–100 integer), `fuelPurchaseCapacityMwhPerTick`, `energyProducingCapacityMw`, `fuelConstrainedOutputMw`, `fuelTypeLabel`, and `fuelCostPerMwhEur` — computed from installed `FUEL_PURCHASE` and `ENERGY_PRODUCING` units against current `FuelReserveMwh`.
+- **Constrained-output calculation**: `fuelConstrainedOutputMw = max(0, energyProducingCapacityMw − currentReserve)` gives the player an instant answer to "how much output am I losing because I need more fuel?"
+- **`BuildingPowerPlantPanel` richer reserve UI**: thermal plant fuel reserve section upgraded to: (1) fuel type badge (🟠 Coal / 🔵 Natural Gas) with economics tooltip; (2) color-coded capacity progress bar (green ≥50%, yellow 20–49%, red <20%); (3) fill percent label and procurement rate; (4) constrained-output warning (red alert panel) when reserve is too low to feed all `ENERGY_PRODUCING` units; (5) guidance when no FP/EP units are installed; (6) **grid link chain** (⛽ Fuel Procurement → 🔥 Energy Producer → ⚡ City Grid) showing per-node capacity numbers; (7) GAS premium note explaining the 20% cost premium and tradeoff.
+- **i18n**: 20 new keys added in `powerPlant.fuelReserve.*` for en/sk/de.
+- **5 new backend tests**: `PowerPlantAnalytics_ReturnsReserveCapacityFields`, `PowerPlantAnalytics_FuelConstrainedOutput_WhenReserveLow`, `FuelProcurement_GasPlant_CostsMoreThanCoal`, `PowerPlantAnalytics_GasPlant_ReturnsFuelTypeLabel`, and one additional capacity constraint test.
+- **5 new Playwright E2E tests**: capacity bar visibility, constrained-output warning, grid link chain nodes, GAS badge and premium note, no-unit guidance.
+
+**Shipped (test coverage hardening — reserve lifecycle, nuclear non-thermal, dispatch P&L proof):**
+- **4 additional backend integration tests**: `PowerPlantAnalytics_NuclearPlant_ReturnsEmptyFuelFields` (proves non-thermal plants return zero fuel fields so frontend hides the fuel panel); `FuelReserve_PreSeededReserve_MaintainsStableLevelOverMultipleTicks` (proves procurement and consumption are in balance each tick, with fuel cost entries confirming procurement ran); `DispatchChange_50Pct_HalvesFuelCostAndReducesSurplusIncome` (proves halving dispatch halves fuel cost AND reduces surplus income — directly validates the "dispatch alters output or profitability" scenario); `PowerPlantAnalytics_WhenReserveIsFull_ConstrainedOutputIsZero` (proves fuelConstrainedOutputMw returns 0 when reserve equals max capacity).
+- **7 additional Playwright E2E tests**: green reserve bar (≥50%), red reserve bar (<20%), no-unit guidance empty state, dispatch badge color (yellow 40–79%, green ≥80%), 5-metric P&L grid for thermal plants (Fuel Costs visible), 4-metric P&L grid for non-thermal WIND plant (no Fuel Costs), metric label correctness smoke test.
+
+- [ ]  Advanced grid linking — bidirectional unit-to-unit flow arrows in the building grid editor
 
 ### Units
 

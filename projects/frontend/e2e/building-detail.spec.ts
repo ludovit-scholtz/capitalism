@@ -20601,9 +20601,9 @@ test.describe('Power plant analytics panel', () => {
     await expect(analyticsPanel).toBeVisible()
 
     // Fuel reserve section hidden for non-thermal plant
-    await expect(analyticsPanel.locator('.fuel-reserve')).not.toBeVisible()
+    await expect(analyticsPanel.locator('.fuel-reserve')).toBeHidden()
     // Fuel costs metric NOT shown for non-thermal plants
-    await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).not.toBeVisible()
+    await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).toBeHidden()
   })
 
   test('dispatch apply button updates dispatch target via mutation', async ({ page }) => {
@@ -20642,5 +20642,499 @@ test.describe('Power plant analytics panel', () => {
 
     // Success message should appear confirming the mutation was sent
     await expect(analyticsPanel.locator('.dispatch-success')).toBeVisible()
+  })
+
+  test('shows fuel reserve capacity bar for COAL plant with FUEL_PURCHASE units', async ({ page }) => {
+    const player = makePlayer()
+    // COAL plant with 1 × FUEL_PURCHASE (level 2) — max 100 MWh, current 40 MWh → 40%
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'COAL',
+      fuelReserveMwh: 40,
+      units: [
+        {
+          id: 'fp-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'FUEL_PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 2,
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+      ],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    const fuelReserveSection = analyticsPanel.locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // Capacity bar should be visible
+    await expect(fuelReserveSection.locator('.fuel-reserve-bar')).toBeVisible()
+    await expect(fuelReserveSection.locator('.fuel-reserve-bar-fill')).toBeVisible()
+
+    // Should show current / max MWh: "40.0 / 100 MWh"
+    await expect(fuelReserveSection.locator('.fuel-reserve-mwh')).toContainText('40.0')
+    await expect(fuelReserveSection.locator('.fuel-reserve-mwh')).toContainText('100 MWh')
+
+    // Should show fill percent text "40% full"
+    await expect(fuelReserveSection).toContainText('40% full')
+
+    // Should show procurement rate "+20.0 MWh/tick procurement"
+    await expect(fuelReserveSection).toContainText('20.0 MWh/tick')
+
+    // Coal fuel type badge should be visible
+    await expect(fuelReserveSection.locator('.fuel-type-badge')).toContainText('Coal')
+  })
+
+  test('shows fuel-constrained output warning when reserve is too low', async ({ page }) => {
+    const player = makePlayer()
+    // COAL plant with 2 × ENERGY_PRODUCING (level 1 each) = 40 MW EP capacity, but reserve = 15 MWh → constrained 25 MW
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'COAL',
+      fuelReserveMwh: 15,
+      units: [
+        {
+          id: 'ep-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'ENERGY_PRODUCING',
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+        {
+          id: 'ep-unit-2',
+          buildingId: 'pp-building-1',
+          unitType: 'ENERGY_PRODUCING',
+          gridX: 1,
+          gridY: 0,
+          level: 1,
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+      ],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    const fuelReserveSection = analyticsPanel.locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // Constrained output warning should be visible (25 MW constrained)
+    await expect(fuelReserveSection.locator('.fuel-constrained-warning')).toBeVisible()
+    await expect(fuelReserveSection.locator('.fuel-constrained-warning')).toContainText('25.0 MW')
+  })
+
+  test('shows grid link chain for COAL plant with both FP and EP units', async ({ page }) => {
+    const player = makePlayer()
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'COAL',
+      fuelReserveMwh: 80,
+      units: [
+        {
+          id: 'fp-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'FUEL_PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 2,
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: true,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+        {
+          id: 'ep-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'ENERGY_PRODUCING',
+          gridX: 1,
+          gridY: 0,
+          level: 1,
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+      ],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const fuelReserveSection = page.locator('[aria-label="power plant analytics"]').locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // Grid link chain should be visible with all three nodes
+    const chainSection = fuelReserveSection.locator('.grid-link-chain')
+    await expect(chainSection).toBeVisible()
+    await expect(chainSection.locator('.fuel-purchase-node')).toBeVisible()
+    await expect(chainSection.locator('.energy-producing-node')).toBeVisible()
+    await expect(chainSection.locator('.city-grid-node')).toBeVisible()
+  })
+
+  test('shows GAS fuel type badge and premium note for GAS plant', async ({ page }) => {
+    const player = makePlayer()
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'GAS',
+      powerOutput: 40,
+      fuelReserveMwh: 20,
+      units: [
+        {
+          id: 'fp-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'FUEL_PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 1,
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+      ],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Gas Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const fuelReserveSection = page.locator('[aria-label="power plant analytics"]').locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // GAS fuel type badge (blue) should be visible
+    await expect(fuelReserveSection.locator('.fuel-type-badge')).toBeVisible()
+    await expect(fuelReserveSection.locator('.fuel-type-badge')).toContainText('Natural Gas')
+
+    // GAS premium note should appear in the chain section
+    await expect(fuelReserveSection.locator('.gas-premium-note')).toBeVisible()
+    await expect(fuelReserveSection.locator('.gas-premium-note')).toContainText('20%')
+  })
+
+  test('reserve bar is green when reserve is 75% full', async ({ page }) => {
+    const player = makePlayer()
+    // 75% reserve → green bar (≥50% threshold)
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'COAL',
+      fuelReserveMwh: 75,
+      units: [
+        {
+          id: 'fp-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'FUEL_PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 2, // max = 2×50 = 100 MWh; 75/100 = 75%
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+      ],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const fuelReserveSection = page.locator('[aria-label="power plant analytics"]').locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // Bar fill should have green class (75% ≥ 50%)
+    const barFill = fuelReserveSection.locator('.fuel-reserve-bar-fill')
+    await expect(barFill).toBeVisible()
+    await expect(barFill).toHaveClass(/bg-green-500/)
+
+    // Fill label should show 75% and "full"
+    await expect(fuelReserveSection).toContainText('75% full')
+  })
+
+  test('reserve bar is red when reserve is below 20%', async ({ page }) => {
+    const player = makePlayer()
+    // 10% reserve → red bar (<20% threshold)
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'COAL',
+      fuelReserveMwh: 10,
+      units: [
+        {
+          id: 'fp-unit-1',
+          buildingId: 'pp-building-1',
+          unitType: 'FUEL_PURCHASE',
+          gridX: 0,
+          gridY: 0,
+          level: 2, // max = 100 MWh; 10/100 = 10% → red
+          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
+          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+        },
+      ],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const fuelReserveSection = page.locator('[aria-label="power plant analytics"]').locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // Bar fill should have red class (10% < 20%)
+    const barFill = fuelReserveSection.locator('.fuel-reserve-bar-fill')
+    await expect(barFill).toBeVisible()
+    await expect(barFill).toHaveClass(/bg-red-500/)
+
+    // Fill label percent text should be red
+    await expect(fuelReserveSection).toContainText('10% full')
+  })
+
+  test('shows no-unit guidance when neither FP nor EP units are installed', async ({ page }) => {
+    const player = makePlayer()
+    // Thermal plant with NO units at all → should show empty-state guidance
+    const building = makePowerPlantBuilding({
+      powerPlantType: 'COAL',
+      fuelReserveMwh: 0,
+      units: [],
+    })
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [building],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const fuelReserveSection = page.locator('[aria-label="power plant analytics"]').locator('.fuel-reserve')
+    await expect(fuelReserveSection).toBeVisible()
+
+    // No FP units → show guidance instead of capacity bar
+    await expect(fuelReserveSection.locator('.no-fp-units')).toBeVisible()
+
+    // Capacity bar should NOT be visible when no FP units
+    await expect(fuelReserveSection.locator('.fuel-reserve-bar')).toBeHidden()
+  })
+
+  test('dispatch slider shows yellow badge at 50% and green at 80%', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ dispatchTargetPercent: 100 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    const dispatchControl = analyticsPanel.locator('.dispatch-control')
+    const slider = dispatchControl.locator('.dispatch-slider')
+
+    // Move slider to 50% → badge should be yellow (40–79% range)
+    await slider.fill('50')
+    const badge50 = dispatchControl.locator('span.rounded-full').first()
+    await expect(badge50).toContainText('50%')
+    await expect(badge50).toHaveClass(/text-yellow-400/)
+
+    // Move slider to 80% → badge should be green (≥80% range)
+    await slider.fill('80')
+    const badge80 = dispatchControl.locator('span.rounded-full').first()
+    await expect(badge80).toContainText('80%')
+    await expect(badge80).toHaveClass(/text-green-400/)
+  })
+
+  test('shows fuel costs metric and 5-metric grid for thermal plants', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ powerPlantType: 'COAL', fuelReserveMwh: 50 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // All 5 P&L metrics must be visible for thermal plants
+    await expect(analyticsPanel.getByText('Surplus Income', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Grid Fines', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Operating Costs', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Net Profit', { exact: true })).toBeVisible()
+
+    // The summary grid uses 'grid-cols-2' on mobile, 'sm:grid-cols-3', 'lg:grid-cols-5' for thermal.
+    // Playwright runs at desktop width, so check for the base mobile class which is always present.
+    await expect(analyticsPanel.locator('.ppa-summary-grid')).toHaveClass(/grid-cols-2/)
+  })
+
+  test('shows only 4 metrics for non-thermal (WIND) plant — no fuel costs', async ({ page }) => {
+    const player = makePlayer()
+    player.companies = [
+      {
+        id: 'company-1',
+        playerId: player.id,
+        name: 'Energy Corp',
+        cash: 1_000_000,
+        foundedAtUtc: '2026-01-01T00:00:00Z',
+        buildings: [makePowerPlantBuilding({ powerPlantType: 'WIND', powerOutput: 30 })],
+      },
+    ]
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/pp-building-1')
+
+    const analyticsPanel = page.locator('[aria-label="power plant analytics"]')
+    await expect(analyticsPanel).toBeVisible()
+
+    // Fuel Costs metric must NOT appear for non-thermal plants
+    await expect(analyticsPanel.getByText('Fuel Costs', { exact: true })).toBeHidden()
+
+    // Other 4 metrics must still be present
+    await expect(analyticsPanel.getByText('Surplus Income', { exact: true })).toBeVisible()
+    await expect(analyticsPanel.getByText('Net Profit', { exact: true })).toBeVisible()
   })
 })
