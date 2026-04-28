@@ -51,11 +51,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
 - [ ] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
 
-### Number formatting (80% complete)
+### Number formatting (100% complete)
 
-- [ ] Create a vue component for number formatting in components/numbers folder
-- [ ] Everywhere where the currency is displayed, for example in the units, use the number formatting component
-- [ ] Add to the title the original number to be formatted and currency after it
+- [x] Create a vue component for number formatting in components/numbers folder
+- [x] Everywhere where the currency is displayed, for example in the units, use the number formatting component
+- [x] Add to the title the original number to be formatted and currency after it
 
 ### Power plants (65% complete)
 

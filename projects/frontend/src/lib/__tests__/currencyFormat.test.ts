@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { formatCompactMoney, formatMoney, formatNumber, formatCompactNumber } from '../currencyFormat'
+import {
+  formatCompactMoney,
+  formatMoney,
+  formatNumber,
+  formatCompactNumber,
+  formatCurrencyTitle,
+} from '../currencyFormat'
 
 describe('formatCompactMoney', () => {
   it('formats USD millions with $ prefix', () => {
@@ -132,5 +138,56 @@ describe('formatCompactNumber', () => {
 
   it('returns — for NaN', () => {
     expect(formatCompactNumber(NaN)).toBe('—')
+  })
+})
+
+describe('formatCurrencyTitle', () => {
+  it('returns full EUR amount with code appended when EUR symbol used', () => {
+    const result = formatCurrencyTitle(200_000, 'EUR', 'en')
+    // EUR uses € symbol → code not in formatted string → appends " EUR"
+    expect(result).toBe('€200,000 EUR')
+  })
+
+  it('returns full USD amount with code appended when $ symbol used', () => {
+    const result = formatCurrencyTitle(12_345, 'USD', 'en')
+    expect(result).toBe('$12,345 USD')
+  })
+
+  it('CZK code is embedded by Intl so no duplicate', () => {
+    const result = formatCurrencyTitle(5_040_000, 'CZK', 'en')
+    // Intl en-US renders CZK as "CZK 5,040,000"
+    expect(result).toContain('CZK')
+    expect(result).toContain('5,040,000')
+    // Should not contain "CZK CZK"
+    expect(result).not.toContain('CZK CZK')
+  })
+
+  it('includes decimals for non-integer amounts', () => {
+    const result = formatCurrencyTitle(1_234.56, 'EUR', 'en')
+    expect(result).toBe('€1,234.56 EUR')
+  })
+
+  it('returns — currency for NaN', () => {
+    const result = formatCurrencyTitle(NaN, 'EUR', 'en')
+    expect(result).toBe('— EUR')
+  })
+
+  it('returns — currency for Infinity', () => {
+    const result = formatCurrencyTitle(Infinity, 'USD', 'en')
+    expect(result).toBe('— USD')
+  })
+
+  it('handles negative amounts', () => {
+    const result = formatCurrencyTitle(-50_000, 'EUR', 'en')
+    expect(result).toContain('-')
+    expect(result).toContain('50,000')
+    expect(result).toContain('EUR')
+  })
+
+  it('uses locale-aware separators for sk locale', () => {
+    const result = formatCurrencyTitle(1_000_000, 'EUR', 'sk')
+    expect(typeof result).toBe('string')
+    expect(result).toMatch(/€|EUR/)
+    expect(result).toMatch(/1/)
   })
 })

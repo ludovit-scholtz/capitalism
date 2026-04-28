@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { gqlRequest } from '@/lib/graphql'
 import { formatMoney } from '@/lib/currencyFormat'
+import CurrencyAmount from '@/components/numbers/CurrencyAmount.vue'
 import type { PlayerBankAccountSummary } from '@/types'
 
 const { t, locale } = useI18n()
@@ -215,15 +216,9 @@ watch([fromTick, toTick], async () => {
   await loadStatement()
 })
 
-function formatAmount(val: number): string {
-  return new Intl.NumberFormat(locale.value, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(Math.abs(val))
-}
-
-function formatBalance(val: number, currencyCode: string): string {
-  return formatMoney(val, currencyCode, locale.value)
+function formatAmount(val: number, currencyCode?: string): string {
+  const code = currencyCode ?? statement.value?.currencyCode ?? 'EUR'
+  return formatMoney(Math.abs(val), code, locale.value)
 }
 
 function formatDate(utc: string): string {
@@ -347,7 +342,7 @@ function goToNextPage() {
         @change="onAccountChange"
       >
         <option v-for="account in contextAccounts" :key="account.id" :value="account.id">
-          {{ account.ownerDisplayName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ account.currencySymbol }}{{ formatAmount(account.balance) }}
+          {{ account.ownerDisplayName }} · {{ account.accountNumber }} · {{ account.currencyCode }} · {{ formatAmount(account.balance, account.currencyCode) }}
         </option>
       </select>
     </div>
@@ -424,7 +419,10 @@ function goToNextPage() {
             {{ t('bankStatement.currentBalance') }}
           </span>
           <span class="balance-amount text-2xl font-extrabold" :class="selectedAccountBalance >= 0 ? 'text-good' : 'text-bad'">
-            {{ formatBalance(selectedAccountBalance, selectedAccount?.currencyCode ?? statement.currencyCode) }}
+            <CurrencyAmount
+              :amount="selectedAccountBalance"
+              :currency="selectedAccount?.currencyCode ?? statement.currencyCode"
+            />
           </span>
         </div>
         <div class="flex gap-4 text-xs text-muted">
@@ -484,15 +482,15 @@ function goToNextPage() {
                 </span>
               </td>
               <td class="debit-cell px-3 py-2.5 text-right text-bad font-semibold align-middle">
-                <span v-if="row.amount < 0"> {{ statement.currencySymbol }}{{ formatAmount(row.amount) }} </span>
+                <CurrencyAmount v-if="row.amount < 0" :amount="Math.abs(row.amount)" :currency="statement.currencyCode" />
                 <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
               <td class="credit-cell px-3 py-2.5 text-right text-good font-semibold align-middle">
-                <span v-if="row.amount >= 0"> {{ statement.currencySymbol }}{{ formatAmount(row.amount) }} </span>
+                <CurrencyAmount v-if="row.amount >= 0" :amount="row.amount" :currency="statement.currencyCode" />
                 <span v-else class="empty-cell-dash text-muted">—</span>
               </td>
-              <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle">
-                <span :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'"> {{ statement.currencySymbol }}{{ formatAmount(row.runningBalance) }} </span>
+              <td class="px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle" :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
+                <CurrencyAmount :amount="row.runningBalance" :currency="statement.currencyCode" />
                 <span class="text-xs text-muted ml-0.5">{{ categoryIcon(row.category) }}</span>
               </td>
             </tr>

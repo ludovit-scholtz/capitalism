@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { formatMoney } from '@/lib/currencyFormat'
 import type { CurrencyBalance } from '@/types'
 
 interface Props {
@@ -22,17 +23,14 @@ const props = withDefaults(defineProps<Props>(), {
 })
 const emit = defineEmits<Emits>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const selectedBalance = computed<CurrencyBalance | null>(
   () => props.balances.find((b) => b.currencyCode === props.modelValue) ?? null,
 )
 
-function formatAmount(val: number): string {
-  return new Intl.NumberFormat('en', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(val)
+function formatAmount(val: number, currencyCode: string): string {
+  return formatMoney(val, currencyCode, locale.value)
 }
 
 function onSelect(event: Event) {
@@ -63,7 +61,7 @@ function onSelect(event: Event) {
           :key="bal.currencyCode"
           :value="bal.currencyCode"
         >
-          {{ bal.currencySymbol }} {{ bal.currencyCode }} — {{ t('bankStatement.balance') }}: {{ bal.currencySymbol }}{{ formatAmount(bal.balance) }}
+          {{ bal.currencySymbol }} {{ bal.currencyCode }} — {{ t('bankStatement.balance') }}: {{ formatAmount(bal.balance, bal.currencyCode) }}
         </option>
       </select>
     </div>
@@ -73,7 +71,10 @@ function onSelect(event: Event) {
       aria-live="polite"
     >
       <span class="font-bold text-brand text-sm">{{ selectedBalance.currencySymbol }}</span>
-      <span class="font-bold text-body text-sm">{{ formatAmount(selectedBalance.balance) }}</span>
+      <span
+        class="font-bold text-body text-sm"
+        :title="`${formatAmount(selectedBalance.balance, selectedBalance.currencyCode)} ${selectedBalance.currencyCode}`"
+      >{{ formatAmount(selectedBalance.balance, selectedBalance.currencyCode) }}</span>
       <span class="text-xs text-muted font-medium">{{ selectedBalance.currencyCode }}</span>
     </div>
   </div>
