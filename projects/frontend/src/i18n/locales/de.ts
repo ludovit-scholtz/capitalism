@@ -2039,7 +2039,7 @@ export default {
   research: {
     panelTitle: 'Forschungsfortschritt',
     intro:
-      'Die Forschung schreitet jeden Takt voran. Jede Produktqualitätseinheit wandelt einen Teil ihrer Betriebskosten in ein kumulatives Forschungsbudget für das zugewiesene Produkt um — dieses Budget verfällt jedoch um 0,1 % pro Takt. Ihre Produktqualität wird relativ zum stärksten globalen Forschungsinvestor bestimmt, daher sind nachhaltige Ausgaben und Wettbewerbsbewusstsein entscheidend. Markenqualitätsforschung verbessert die Effizienz Ihres Marketingbudgets — sie erhöht die Markenbekanntheit nicht direkt.',
+      'Die Forschung schreitet jeden Takt voran. Jede Produktqualitätseinheit wandelt einen Teil ihrer Betriebskosten in ein kumulatives Forschungsbudget für das zugewiesene Produkt um — dieses Budget verfällt jedoch um 0,1 % pro Takt. Forschungsbudgets werden in USD berechnet, damit Unternehmen in verschiedenen Städten (EUR, CZK usw.) auf gleicher Ebene konkurrieren. Ihre Produktqualität wird relativ zum stärksten globalen Forschungsinvestor bestimmt, daher sind nachhaltige Ausgaben und Wettbewerbsbewusstsein entscheidend. Markenqualitätsforschung verbessert die Effizienz Ihres Marketingbudgets — sie erhöht die Markenbekanntheit nicht direkt.',
     emptyState: 'Noch keine Forschung aufgezeichnet. Konfigurieren Sie Produktqualitäts- oder Markenqualitätseinheiten und lassen Sie die Simulation laufen, um hier Fortschritte zu sehen.',
     emptyStatePending: 'Forschungseinheiten sind konfiguriert und warten auf Aktivierung. Fortschritte erscheinen hier, sobald der Simulations-Tick läuft und Ihre Konfiguration in Kraft tritt.',
     qualityLabel: 'Produktqualität',
@@ -2049,10 +2049,10 @@ export default {
     awarenessEffect: 'Markenbekanntheit bei Kunden: {pct}%.',
     marketingEfficiencyEffect: 'Jede Einheit des Marketingbudgets erzeugt {multiplier}× mehr Markenbekanntheit als der Basiswert.',
     budget: {
-      accumulated: 'Investiertes Forschungsbudget',
-      target: 'Budget für 100 % Qualität (ohne Wettbewerb)',
-      topCompetitor: 'Höchstes Konkurrenzbudget',
-      decayHint: 'Ihr Forschungsbudget verfällt um 0,1 % pro Takt. Investieren Sie weiter, um Ihre Qualitätsführerschaft zu halten oder auszubauen.',
+      accumulated: 'Investiertes Forschungsbudget (USD)',
+      target: 'Ziel für 100 % Qualität – ohne Wettbewerb (USD)',
+      topCompetitor: 'Höchstes Konkurrenzbudget (USD)',
+      decayHint: 'Forschungsbudgets werden in USD normalisiert für fairen stadtübergreifenden Vergleich und verfallen um 0,1 % pro Takt. Investieren Sie weiter, um Ihre Qualitätsführerschaft zu halten oder auszubauen.',
     },
   },
   supplyChain: {

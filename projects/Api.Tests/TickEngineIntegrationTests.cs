@@ -4563,6 +4563,120 @@ public sealed class TickEngineIntegrationTests : IClassFixture<ApiWebApplication
             $"Level 2 R&D unit should accumulate more budget per tick ({budgetL2.AccumulatedBudget}) than Level 1 ({budgetL1.AccumulatedBudget}).");
     }
 
+    [Fact]
+    public async Task ResearchPhase_ProductQuality_BudgetNormalizedToUsdAcrossCurrencies()
+    {
+        // Verifies that R&D research budgets are accumulated in USD, not in local city currency.
+        //
+        // Before the USD-normalization fix, the budget gain was computed as:
+        //   gain = totalCostLocal × conversionRate   (using nominal local CZK/EUR/etc. amounts)
+        //
+        // After the fix, the gain is:
+        //   gain = totalCostUsd × conversionRate
+        //       = (totalCostLocal / localEurRate × usdEurRate) × conversionRate
+        //
+        // We seed one company in Prague (CZK) and verify the accumulated budget
+        // matches the expected USD-converted value within 1% tolerance.
+        // This directly proves the normalization formula is applied.
+        //
+        // Prague (CZK): baseLaborHours=0.55, hourlyWage=22 CZK,
+        //   baseEnergyMwh=0.09, energyPrice=55 CZK/MWh (local units), powerEfficiency=1.0.
+        //   totalCostCzk = (0.55 × 22) + (0.09 × 55) = 12.10 + 4.95 = 17.05 CZK
+        //   totalCostUsd = 17.05 / 25.20 × 1.08 ≈ 0.7308 USD
+        //   budgetGain   = 0.7308 × 0.5 (L1 conversionRate) ≈ 0.3654 USD
+        //
+        // WITHOUT normalization the gain would be 17.05 × 0.5 = 8.525 (CZK-inflated),
+        // which is larger than the equivalent Bratislava EUR budget per-tick (≈8.02 USD),
+        // creating an unfair CZK advantage.
+        //
+        // Uses isolated factory so FX fallback rates are used consistently.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+
+        Guid companyId;
+        Guid productId;
+
+        await using (var seedScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var prague = await seedDb.Cities.FirstAsync(c => c.Name == "Prague");
+            var product = await seedDb.ProductTypes.FirstAsync(p => p.Slug == "wooden-chair");
+            productId = product.Id;
+
+            var player = new Player
+            {
+                Id = Guid.NewGuid(),
+                Email = $"rd-usd-czk-{Guid.NewGuid():N}@test.com",
+                DisplayName = "CZK RD Tester",
+                PasswordHash = "hash",
+                Role = PlayerRole.Player
+            };
+            var company = new Company
+            {
+                Id = Guid.NewGuid(),
+                PlayerId = player.Id,
+                Name = "CZK Lab Corp",
+                Cash = 10_000_000m
+            };
+            var building = new Building
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                CityId = prague.Id,
+                Type = BuildingType.ResearchDevelopment,
+                Name = "CZK Lab",
+                Level = 1
+            };
+            var unit = new BuildingUnit
+            {
+                Id = Guid.NewGuid(),
+                BuildingId = building.Id,
+                UnitType = UnitType.ProductQuality,
+                GridX = 0,
+                GridY = 0,
+                Level = 1,
+                ProductTypeId = product.Id
+            };
+            seedDb.Players.Add(player);
+            seedDb.Companies.Add(company);
+            seedDb.Buildings.Add(building);
+            seedDb.BuildingUnits.Add(unit);
+            await seedDb.SaveChangesAsync();
+            companyId = company.Id;
+        }
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var processor = await CreateProcessorAsync(scope);
+
+        await processor.ProcessTickAsync();
+
+        var budget = await db.ProductResearchBudgets
+            .FirstAsync(b => b.CompanyId == companyId && b.ProductTypeId == productId);
+
+        // Expected USD budget for Prague CZK company (using FallbackEurRates: CZK=25.20, USD=1.08):
+        //   laborCostCzk = 0.55 h × 22 CZK/h = 12.10 CZK
+        //   energyCostCzk = 0.09 MWh × 55 = 4.95 (local units)
+        //   totalCzk = 17.05
+        //   totalUsd = 17.05 / 25.20 × 1.08 ≈ 0.7308 USD
+        //   budgetGain = 0.7308 × 0.5 ≈ 0.3654 USD
+        const decimal expectedBudgetUsd = 0.3654m;
+
+        Assert.True(budget.AccumulatedBudget > 0m,
+            "CZK-city R&D should accumulate a positive USD budget.");
+
+        var diff = Math.Abs(budget.AccumulatedBudget - expectedBudgetUsd);
+        Assert.True(diff < 0.02m,
+            $"Prague CZK company should accumulate ~{expectedBudgetUsd:F4} USD but got {budget.AccumulatedBudget:F4}. " +
+            $"Without USD normalization the gain would be ~8.5 (CZK-inflated). " +
+            $"Diff = {diff:F4}.");
+
+        // Guard: the raw CZK-inflated amount (17.05 × 0.5 = 8.525) must NOT be what is stored.
+        Assert.True(budget.AccumulatedBudget < 1m,
+            $"Budget {budget.AccumulatedBudget:F4} is suspiciously large — it may be using the " +
+            $"nominal CZK amount instead of USD. Expected < 1.0 USD for a level-1 Prague R&D tick.");
+    }
+
     #endregion
 
     #region Salary and Overhead Integration

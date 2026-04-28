@@ -39,6 +39,38 @@ public static class FxRateHelper
     }
 
     /// <summary>
+    /// Converts an amount in a given local currency to USD using EUR-based rates.
+    /// Formula: amount → EUR via <paramref name="eurRates"/>, then EUR → USD via <paramref name="eurRates"/>.
+    /// If <paramref name="fromCurrencyCode"/> is already "USD" the amount is returned unchanged.
+    /// </summary>
+    public static decimal ConvertToUsd(
+        decimal amount,
+        string fromCurrencyCode,
+        IReadOnlyDictionary<string, decimal> eurRates)
+    {
+        if (amount == 0m) return 0m;
+        if (string.Equals(fromCurrencyCode, "USD", StringComparison.OrdinalIgnoreCase)) return amount;
+
+        // Convert from local currency to EUR: EUR = amount / (units of fromCurrencyCode per EUR)
+        var localEurRate = GetEurRate(eurRates, fromCurrencyCode);
+        var amountInEur = amount / localEurRate;
+
+        // Convert EUR → USD using the EUR-per-USD rate stored in the same table.
+        var usdEurRate = GetEurRate(eurRates, "USD");
+        return amountInEur * usdEurRate;
+    }
+
+    /// <summary>
+    /// Converts an amount in EUR to USD using the pre-loaded <paramref name="eurRates"/> table.
+    /// </summary>
+    public static decimal ConvertEurToUsd(decimal amountInEur, IReadOnlyDictionary<string, decimal> eurRates)
+    {
+        if (amountInEur == 0m) return 0m;
+        var usdEurRate = GetEurRate(eurRates, "USD");
+        return amountInEur * usdEurRate;
+    }
+
+    /// <summary>
     /// Builds a lookup dictionary of EUR-based FX rates for the given currency codes.
     /// Queries the database first; missing codes fall back to <see cref="FallbackEurRates"/>.
     /// EUR itself always maps to 1.0.

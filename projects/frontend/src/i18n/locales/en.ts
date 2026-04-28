@@ -2038,7 +2038,7 @@ export default {
   research: {
     panelTitle: 'Research Progress',
     intro:
-      'Research advances each tick. Each Product Quality unit converts a fraction of its operating costs into a cumulative research budget for the assigned product — and that budget decays 0.1% per tick. Your product quality is determined relative to the strongest competing research investor globally, so sustained spending and competitive awareness are key. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
+      'Research advances each tick. Each Product Quality unit converts a fraction of its operating costs into a cumulative research budget for the assigned product — and that budget decays 0.1% per tick. Research budgets are calculated in USD so that companies in different cities (EUR, CZK, etc.) compete on the same level playing field. Your product quality is determined relative to the strongest competing research investor globally, so sustained spending and competitive awareness are key. Brand Quality research improves how efficiently your marketing budget converts into brand awareness — it does not directly grant awareness.',
     emptyState: 'No research recorded yet. Configure Product Quality or Brand Quality units and let the simulation run to see progress here.',
     emptyStatePending: 'Research units are configured and pending activation. Progress will appear here once the simulation tick runs and your configuration takes effect.',
     qualityLabel: 'Product Quality',
@@ -2048,10 +2048,10 @@ export default {
     awarenessEffect: 'Brand recognition with customers: {pct}%.',
     marketingEfficiencyEffect: 'Each unit of marketing budget produces {multiplier}× more brand awareness than baseline.',
     budget: {
-      accumulated: 'Research budget invested',
-      target: 'Budget for 100% quality (uncontested)',
-      topCompetitor: 'Top competitor budget',
-      decayHint: 'Your research budget decays 0.1% per tick. Keep investing to maintain or grow your quality lead.',
+      accumulated: 'Research budget invested (USD)',
+      target: 'Target for 100% quality — uncontested (USD)',
+      topCompetitor: 'Top competitor budget (USD)',
+      decayHint: 'Research budgets are normalized to USD for fair cross-city comparison and decay 0.1% per tick. Keep investing to maintain or grow your quality lead.',
     },
   },
   supplyChain: {

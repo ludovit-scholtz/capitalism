@@ -5,7 +5,18 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 
 const { t } = useI18n()
 const bd = inject(BUILDING_DETAIL_KEY)!
-const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, formatCurrency } = bd
+const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits } = bd
+
+/** Format a research budget amount in USD. Budgets are stored in USD on the backend. */
+function formatUsd(amount: number | null | undefined): string {
+  if (amount == null) return '—'
+  return new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+}
 </script>
 
 <template>
@@ -89,19 +100,19 @@ const { building, researchBrands, researchBrandsLoading, hasConfiguredRdUnits, f
           <div class="research-budget-row flex items-center justify-between gap-2 py-0.5">
             <span class="research-budget-label text-[0.8125rem] text-muted">{{ t('research.budget.accumulated') }}</span>
             <span class="research-budget-value text-[0.8125rem] font-semibold text-foreground">{{
-              brand.accumulatedResearchBudget != null ? formatCurrency(brand.accumulatedResearchBudget) : '—'
+              formatUsd(brand.accumulatedResearchBudget)
             }}</span>
           </div>
           <div class="research-budget-row flex items-center justify-between gap-2 py-0.5">
             <span class="research-budget-label text-[0.8125rem] text-muted">{{ t('research.budget.target') }}</span>
-            <span class="research-budget-value text-[0.8125rem] font-semibold text-foreground">{{ brand.baseResearchBudget != null ? formatCurrency(brand.baseResearchBudget) : '—' }}</span>
+            <span class="research-budget-value text-[0.8125rem] font-semibold text-foreground">{{ formatUsd(brand.baseResearchBudget) }}</span>
           </div>
           <div
             v-if="brand.maxCompetitorBudget != null && brand.accumulatedResearchBudget != null && brand.maxCompetitorBudget > (brand.accumulatedResearchBudget ?? 0)"
             class="research-budget-row research-budget-row--competitor mt-1 flex items-center justify-between gap-2 border-t border-divider pt-1.5"
           >
             <span class="research-budget-label text-[0.8125rem] text-muted">{{ t('research.budget.topCompetitor') }}</span>
-            <span class="research-budget-value research-budget-value--warn text-[0.8125rem] font-semibold text-warning">{{ formatCurrency(brand.maxCompetitorBudget) }}</span>
+            <span class="research-budget-value research-budget-value--warn text-[0.8125rem] font-semibold text-warning">{{ formatUsd(brand.maxCompetitorBudget) }}</span>
           </div>
           <p class="research-budget-hint mt-1.5 text-xs italic text-muted">{{ t('research.budget.decayHint') }}</p>
         </div>

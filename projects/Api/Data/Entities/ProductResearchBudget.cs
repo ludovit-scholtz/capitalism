@@ -24,11 +24,14 @@ public sealed class ProductResearchBudget
     public ProductType ProductType { get; set; } = null!;
 
     /// <summary>
-    /// Total accumulated research spending for this product (in game currency).
-    /// Increases each tick by <c>unitOperatingCost × ResearchBudgetConversionRate(level)</c>.
+    /// Total accumulated research spending for this product, stored in USD.
+    /// Increases each tick by <c>unitOperatingCostUsd × ResearchBudgetConversionRate(level)</c>,
+    /// where the unit operating cost is first converted from local city currency to USD using
+    /// the pre-loaded FX rates.  Storing values in USD ensures consistent budget comparison
+    /// across cities that use different currencies (EUR, CZK, INR, etc.).
     /// Decays by 0.1% (<see cref="Api.Engine.GameConstants.ResearchDecayRate"/>) per tick.
-    /// Reaching <see cref="Api.Engine.GameConstants.ResearchBaseQualityBudget"/> while uncontested
-    /// yields 100% product quality.
+    /// Reaching <see cref="Api.Engine.GameConstants.ResearchBaseQualityBudget"/> (in USD) while
+    /// uncontested yields 100% product quality.
     /// </summary>
     public decimal AccumulatedBudget { get; set; }
 }
