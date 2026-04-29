@@ -585,6 +585,7 @@ export default {
     topicMenuLabel: 'Výber témy encyklopédie',
     topicOnboardingHelp: 'Pomoc s onboardingom',
     topicFactoryLayoutHelp: 'Pomoc s layoutom tovární',
+    topicSalesShopHelp: 'Pomoc s nastavením predajne',
     topicResourcesDefinition: 'Definícia surovín',
     openImageFullscreen: 'Otvoriť veľký obrázok: {title}',
     closeFullscreenImage: 'Zavrieť náhľad',
@@ -672,6 +673,25 @@ export default {
     manufacturingGuideStepUnitTypesTitle: 'Prehľad typov jednotiek: čo robí každá z nich',
     manufacturingGuideStepUnitTypesBody:
       'Nastavenie továrne je výrazne jednoduchšie, keď má každý typ jednotky jasnú rolu. NÁKUP zabezpečuje vstupy podľa cenových a kvalitatívnych limitov. VÝROBA premieňa prepojené vstupy na produktový výstup. SKLAD tlmí časové výkyvy a chráni kontinuitu predaja. B2B_PREDAJ posúva tovar medzi vašimi budovami, keď chcete internú distribúciu. VEREJNÝ_PREDAJ vystavuje zásoby mestskému dopytu pri nastavenej minimálnej cene. KVALITA_PRODUKTU zvyšuje objektívnu kvalitu výrobku, zatiaľ čo KVALITA_ZNAČKY podporuje prémiové oceňovanie cez vnímanie trhu. BRANDING a MARKETING posilňujú povedomie a dopyt mimo čistej výrobnej kapacity. ŤAŽBA je vstupný článok pre vlastné ložiská surovín. Vnímajte jednotky ako prepojený výrobný systém, nie ako izolované prepínače.',
+    salesShopGuideTitle: 'Kompletný návod na nastavenie predajne',
+    salesShopGuideSubtitle: 'Krokový postup na kúpu prvej predajne, konfiguráciu nákupu, spustenie verejného predaja a zapnutie marketingu pre stabilný rast dopytu.',
+    salesShopGuideTopicsTitle: 'Témy nastavenia predajne',
+    salesShopGuideTopicBuyBuilding: 'Kúpa a umiestnenie predajne na vhodný pozemok',
+    salesShopGuideTopicPurchaseUnit: 'Nastavenie jednotky PURCHASE pre pravidelné dopĺňanie tovaru',
+    salesShopGuideTopicPublicSalesUnit: 'Nastavenie jednotky PUBLIC_SALES pre cenu, viditeľnosť a prvé tržby',
+    salesShopGuideTopicMarketingUnit: 'Nastavenie jednotky MARKETING pre kvalitnejší a stabilnejší dopyt',
+    salesShopGuideStepBuyBuildingTitle: 'Krok 1 - Kúpte budovu predajne',
+    salesShopGuideStepBuyBuildingBody:
+      'Predajňa je výkonná časť celého reťazca, nie len vizuálny doplnok mapy. V obrazovke kúpy budovy vyberte SALES_SHOP a uprednostnite pozemok, ktorý kúpite bez vyčerpania prevádzkovej rezervy. Správna kúpa musí nechať dosť peňazí na okamžité nastavenie jednotiek a prvé dopĺňanie zásob. Berte to ako uvedenie produktu na trh: továreň môže vyrábať bezchybne, ale bez dobre umiestnenej a financovanej predajne sa tržby nespustia. Po kúpe skontrolujte mesto, dostupnosť financií a či sa budova zobrazila v portfóliu firmy. Pri prvom štarte nepreplácajte prestížnu lokalitu, dôležitejšia je stabilita a rýchlosť spustenia. Dobre nastavená prvá predajňa skracuje cestu od skladu k reálnemu mestskému dopytu a merateľnému cashflow.',
+    salesShopGuideStepPurchaseUnitTitle: 'Krok 2 - Nastavte jednotku PURCHASE',
+    salesShopGuideStepPurchaseUnitBody:
+      'Jednotka PURCHASE v predajni rozhoduje o tom, za akú cenu a v akej kvalite príde tovar na regály. Nastavte produkt a zdroj tak, aby príchod zásob bol predvídateľný a naviazaný na zamýšľaný upstream reťazec. Ak dáte maximálnu cenu príliš nízko, jednotka bude hladovať a predajňa ostane prázdna. Ak dáte limit príliš vysoko, marža sa zrúti aj pri peknom objeme predaja. Zvoľte realistické limity a overte, že jednotka je správne prepojená s ďalšími krokmi toku. V prvých tickoch sledujte nulový inflow alebo veľké výpadky, to je signál že limity sú príliš prísne alebo prepojenia chybné. PURCHASE je strážca marže. Kvalitná konfigurácia chráni ziskovosť a bráni mylným záverom spôsobeným vypredaným skladom.',
+    salesShopGuideStepPublicSalesTitle: 'Krok 3 - Nastavte jednotku PUBLIC_SALES',
+    salesShopGuideStepPublicSalesBody:
+      'PUBLIC_SALES je moment, keď sa váš tovar skutočne stretne s dopytom mesta. Nastavte verejnú viditeľnosť predaja a minimálnu cenu blízko trhovej reality, aby prvé tick-y priniesli použiteľný signál. Príliš vysoká cena spomalí obrat zásob a nedá vám overiť, či je problém v produkte alebo v cene. Príliš nízka cena môže zvýšiť objem, ale skryť stratu na marži. Začnite vyváženým základom a potom upravujte po menších krokoch po niekoľkých tickoch. Udržiavajte jednotku zásobenú a prepojenia funkčné, aby mal trh čo kupovať každý cyklus. Sledujte spolu predané množstvo, tržby aj hrubý zisk. PUBLIC_SALES nastavujte ako riadený experiment, nie jednorazové kliknutie.',
+    salesShopGuideStepMarketingTitle: 'Krok 4 - Nastavte jednotku MARKETING',
+    salesShopGuideStepMarketingBody:
+      'MARKETING zvyšuje výkon predajne nad rámec samotnej ceny, pretože posilňuje viditeľnosť a dopytovú zotrvačnosť. Nastavte rozpočet podľa reálnej peňažnej rezervy firmy a sledujte, či zlepšený dopytový profil prevyšuje náklady. Príliš nízky rozpočet často neprinesie merateľný efekt, príliš vysoký rozpočet vie spáliť hotovosť skôr, ako odstránite prevádzkové úzke hrdlá. Marketing zapínajte až po stabilizácii PURCHASE a PUBLIC_SALES, aby posilňoval funkčný systém a nemaskoval chybný tok. V každom vyhodnocovacom okne porovnajte dodatočný objem a maržu oproti marketingovým nákladom. Meníte konfiguráciu postupne a podľa dát. V ranej fáze rastu je cieľom konzistencia: vyhladiť výkyvy dopytu, podporiť opakované nákupy a vytvoriť podmienky pre presnejšiu cenovú optimalizáciu.',
     viewDetail: 'Zobraziť detail',
     searchNoResults: 'Žiadne suroviny ani produkty nezodpovedajú vášmu vyhľadávaniu. Skúste iný výraz alebo vymažte filtre.',
   },

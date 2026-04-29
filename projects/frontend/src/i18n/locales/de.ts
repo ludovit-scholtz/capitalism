@@ -586,6 +586,7 @@ export default {
     topicMenuLabel: 'Themenauswahl der Enzyklopädie',
     topicOnboardingHelp: 'Onboarding-Hilfe',
     topicFactoryLayoutHelp: 'Fabriklayout-Hilfe',
+    topicSalesShopHelp: 'Verkaufsshop-Einrichtung',
     topicResourcesDefinition: 'Ressourcendefinition',
     openImageFullscreen: 'Vollbild öffnen: {title}',
     closeFullscreenImage: 'Vorschau schließen',
@@ -673,6 +674,25 @@ export default {
     manufacturingGuideStepUnitTypesTitle: 'Einheitentypen im Überblick: Aufgabe je Typ',
     manufacturingGuideStepUnitTypesBody:
       'Fabrikbetrieb wird deutlich klarer, wenn jeder Einheitentyp eine präzise Funktion hat. EINKAUF beschafft Inputs innerhalb Ihrer Preis- und Qualitätsgrenzen. PRODUKTION wandelt verbundene Inputs in verkaufsfähigen Output um. LAGER puffert Taktverschiebungen und hält den Absatzfluss stabil. B2B_VERKAUF verteilt Waren intern an andere eigene Gebäude, wenn Sie Ketten standortübergreifend aufbauen. ÖFFENTLICHER_VERKAUF öffnet Bestand für Stadtnachfrage zum konfigurierten Mindestpreis. PRODUKTQUALITÄT hebt objektive Produktleistung, während MARKENQUALITÄT höhere Zahlungsbereitschaft über Wahrnehmung unterstützt. BRANDING und MARKETING verstärken Reichweite, Nachfrageimpuls und Wiedererkennung außerhalb reiner Produktionslogik. BERGBAU ist die Extraktionsstufe für eigene Rohstoffvorkommen. Denken Sie in Rollen innerhalb eines verbundenen Systems statt in isolierten Schaltern, dann werden Durchsatz, Marge und Iteration wesentlich berechenbarer.',
+    salesShopGuideTitle: 'Komplette Verkaufsshop-Anleitung',
+    salesShopGuideSubtitle: 'Schritt-für-Schritt-Leitfaden für Kauf des ersten Shops, Einkaufskonfiguration, Aktivierung des öffentlichen Verkaufs und wirksames Marketing.',
+    salesShopGuideTopicsTitle: 'Themen zur Shop-Einrichtung',
+    salesShopGuideTopicBuyBuilding: 'Verkaufsshop kaufen und auf geeignetem Grundstück platzieren',
+    salesShopGuideTopicPurchaseUnit: 'PURCHASE-Einheit konfigurieren, damit der Shop zuverlässig Waren erhält',
+    salesShopGuideTopicPublicSalesUnit: 'PUBLIC_SALES für Preis, Sichtbarkeit und erste Umsätze einrichten',
+    salesShopGuideTopicMarketingUnit: 'MARKETING für stabilere Nachfrage und bessere Verkaufskonstanz aktivieren',
+    salesShopGuideStepBuyBuildingTitle: 'Schritt 1 - Verkaufsshop kaufen',
+    salesShopGuideStepBuyBuildingBody:
+      'Der Verkaufsshop ist kein dekoratives Gebäude, sondern Ihr Umsatzkonverter zwischen Produktion und Markt. Wählen Sie im Kaufdialog den Typ SALES_SHOP und priorisieren Sie ein Grundstück, das bezahlbar ist und gleichzeitig genug Liquidität für die Konfiguration lässt. Ein guter Kauf bedeutet, dass nach der Investition noch Kapital für Einheiten, erste Beschaffung und operative Korrekturen übrig bleibt. Vermeiden Sie am Start überteuerte Prestige-Lagen, wenn dadurch Ihr Handlungsspielraum sinkt. Prüfen Sie nach dem Kauf, ob Gebäude und Stadtkontext korrekt im Firmenportfolio erscheinen. Der erste Shop muss vor allem schnell einsatzbereit sein, damit Ihre Fabrikleistung in echte Nachfrage übersetzt wird. Solide Standort- und Budgetdisziplin in diesem Schritt entscheidet häufig über einen stabilen oder holprigen Markteintritt.',
+    salesShopGuideStepPurchaseUnitTitle: 'Schritt 2 - PURCHASE-Einheit konfigurieren',
+    salesShopGuideStepPurchaseUnitBody:
+      'Die PURCHASE-Einheit im Shop steuert, ob Bestand rechtzeitig, in brauchbarer Qualität und zu tragbaren Kosten ankommt. Wählen Sie Produkt und Quelle so, dass Ihr geplanter Lieferfluss zuverlässig bedient wird. Zu niedrige Preisgrenzen führen zu leeren Regalen, weil keine Einkäufe ausgeführt werden. Zu hohe Grenzen können den Absatz optisch gut aussehen lassen, während die Marge im Hintergrund kollabiert. Setzen Sie deshalb einen realistischen Korridor und kontrollieren Sie die Verlinkung innerhalb des Shop-Layouts. Beobachten Sie die ersten Ticks auf Anzeichen wie null Inflow, unregelmäßige Belieferung oder sprunghafte Kosten. PURCHASE ist der Filter zwischen Marktpreisen und Ihrer Profitabilität. Eine saubere Konfiguration schützt vor Fehlinterpretationen, die sonst durch Bestandslücken oder unkontrollierte Einkaufskosten entstehen.',
+    salesShopGuideStepPublicSalesTitle: 'Schritt 3 - PUBLIC_SALES konfigurieren',
+    salesShopGuideStepPublicSalesBody:
+      'Mit PUBLIC_SALES wird Ihr Bestand für die Stadtnachfrage sichtbar und monetarisierbar. Aktivieren Sie öffentliche Sichtbarkeit und setzen Sie den Mindestpreis nahe am realistischen Marktanker, damit die ersten Ticks verwertbares Feedback liefern. Ein zu hoher Startpreis kann Verkäufe blockieren und jede Diagnose erschweren. Ein zu niedriger Preis erzeugt zwar Volumen, kann aber die Deckungsbeiträge gefährden. Beginnen Sie ausgewogen, beobachten Sie mehrere Ticks und justieren Sie dann in kleinen Schritten. Stellen Sie sicher, dass die Einheit kontinuierlich versorgt wird, denn ohne Bestand ist jede Preisstrategie wertlos. Bewerten Sie immer Menge, Umsatz und Bruttogewinn zusammen. PUBLIC_SALES sollte als iterativer Steuerpunkt verstanden werden, nicht als einmalige Einstellung. So entsteht eine belastbare Basis für späteres Wachstum und differenzierte Preistests.',
+    salesShopGuideStepMarketingTitle: 'Schritt 4 - MARKETING konfigurieren',
+    salesShopGuideStepMarketingBody:
+      'MARKETING verbessert die Verkaufsleistung über reinen Preiswettbewerb hinaus, indem es Nachfragequalität und Wiedererkennung stärkt. Legen Sie ein Budget fest, das zu Ihrer aktuellen Liquiditätslage passt, und prüfen Sie regelmäßig, ob zusätzlicher Absatz und Marge die Ausgaben rechtfertigen. Zu kleine Budgets bleiben oft ohne messbaren Effekt, zu große Budgets verbrennen Kapital, bevor operative Engpässe gelöst sind. Aktivieren Sie Marketing erst, wenn PURCHASE und PUBLIC_SALES bereits stabil laufen. Dann verstärkt Budget ein funktionierendes System statt Defizite zu kaschieren. Vergleichen Sie in jedem Auswertungsfenster den Mehrertrag mit den Marketingkosten und passen Sie schrittweise an. Ziel im frühen Wachstum ist Verlässlichkeit: weniger Nachfragevolatilität, mehr wiederkehrende Verkäufe und planbarere Bedingungen für präzise Preisoptimierung und Expansion.',
     viewDetail: 'Detail anzeigen',
     searchNoResults: 'Keine Ressourcen oder Produkte entsprechen Ihrer Suche. Versuchen Sie einen anderen Begriff oder löschen Sie die Filter.',
   },

@@ -587,6 +587,7 @@ export default {
     topicMenuLabel: 'Encyclopedia topic selector',
     topicOnboardingHelp: 'Onboarding help',
     topicFactoryLayoutHelp: 'Factory layout help',
+    topicSalesShopHelp: 'Sales shop setup help',
     topicResourcesDefinition: 'Resources definition',
     openImageFullscreen: 'Open full image: {title}',
     closeFullscreenImage: 'Close preview',
@@ -674,6 +675,25 @@ export default {
     manufacturingGuideStepUnitTypesTitle: 'Unit type reference: what each one does',
     manufacturingGuideStepUnitTypesBody:
       'Factory setup gets easier once each unit type has a clear job. PURCHASE secures inputs within price and quality limits. MANUFACTURING converts connected inputs into product output. STORAGE absorbs timing shocks and protects sales continuity. B2B_SALES pushes goods to other company buildings when you want internal distribution. PUBLIC_SALES exposes inventory to city demand at your configured minimum price. PRODUCT_QUALITY improves objective product quality through focused investment, while BRAND_QUALITY supports premium pricing by strengthening market perception. BRANDING and MARKETING reinforce awareness and demand momentum outside pure production throughput. MINING is the extraction counterpart for raw deposits when your chain starts from owned resources. Treat each unit as a specialized role in one connected pipeline, not as independent toggles, and your operating decisions become predictable and measurable.',
+    salesShopGuideTitle: 'Sales Shop Setup Walkthrough',
+    salesShopGuideSubtitle: 'Step-by-step guide for buying your first sales shop, configuring purchase flow, opening public sales, and activating marketing for reliable demand growth.',
+    salesShopGuideTopicsTitle: 'Sales shop setup topics',
+    salesShopGuideTopicBuyBuilding: 'Buy and place the sales-shop building in a suitable lot',
+    salesShopGuideTopicPurchaseUnit: 'Configure the PURCHASE unit to pull stock into the shop',
+    salesShopGuideTopicPublicSalesUnit: 'Configure PUBLIC_SALES for price, visibility, and first revenue',
+    salesShopGuideTopicMarketingUnit: 'Configure MARKETING to improve demand quality and consistency',
+    salesShopGuideStepBuyBuildingTitle: 'Step 1 - Buy the sales-shop building',
+    salesShopGuideStepBuyBuildingBody:
+      'The sales shop starts as an execution hub, not a cosmetic building. In the buy-building flow, choose SALES_SHOP and prioritize a lot you can fund without draining operating reserve. The right purchase leaves enough company cash for immediate unit setup and early stock movement. Treat this as go-to-market infrastructure: your factory may produce perfectly, but without a correctly placed and funded shop, revenue never materializes. After purchase, confirm city context, affordability, and that the building appears in your company portfolio. Do not overpay for prestige location during first launch; survivability and setup speed matter more than vanity. A stable first shop creates the shortest path from inventory to real city demand and measurable cash flow.',
+    salesShopGuideStepPurchaseUnitTitle: 'Step 2 - Configure the PURCHASE unit',
+    salesShopGuideStepPurchaseUnitBody:
+      'Your shop PURCHASE unit controls inbound stock quality and cost before products ever reach customers. Configure product selection and sourcing so inventory arrives predictably from your intended upstream chain. If max price is too low, the unit starves and shelves stay empty; if too high, gross margin collapses even when sales volume looks strong. Set reasonable limits and validate that the unit is linked correctly to your shop flow so goods can move into sale-ready positions. Watch first ticks for signs of instability: repeated zero inflow means sourcing constraints are too strict or links are wrong. PURCHASE in sales shops is a margin gatekeeper. Good configuration protects profitability and prevents false conclusions caused by stock-outs.',
+    salesShopGuideStepPublicSalesTitle: 'Step 3 - Configure the PUBLIC_SALES unit',
+    salesShopGuideStepPublicSalesBody:
+      'PUBLIC_SALES is where your shop becomes visible to city demand. Set sale visibility to public and choose a minimum price near market reality so early ticks generate signal, not noise. If pricing is too aggressive, inventory stagnates and you cannot validate demand assumptions. If pricing is too low, volume may look healthy while contribution margin stays weak. Start from a balanced baseline, then iterate in small increments after several ticks. Keep the unit stocked and linked so demand has something to buy every cycle. Track quantity sold, realized revenue, and gross profit together. PUBLIC_SALES should be tuned as a controlled experiment, not a one-time toggle. The first stable configuration gives you the feedback loop needed for confident scaling.',
+    salesShopGuideStepMarketingTitle: 'Step 4 - Configure the MARKETING unit',
+    salesShopGuideStepMarketingBody:
+      'MARKETING extends sales performance beyond raw price mechanics by improving discoverability and demand momentum over time. Configure marketing with a realistic budget aligned to your current cash runway, then monitor whether improved demand quality offsets spend. Underfunded marketing often does nothing measurable; oversized budgets can silently burn cash before operational bottlenecks are solved. Activate marketing only after PURCHASE and PUBLIC_SALES are stable, so budget amplifies a working system instead of masking broken flow. In each review window, compare incremental volume and margin versus marketing cost. Keep adjustments gradual and evidence-driven. In early growth, the goal is consistency: use marketing to smooth demand volatility, strengthen repeat sales behavior, and create predictable conditions for price optimization and expansion.',
     viewDetail: 'View detail',
     searchNoResults: 'No resources or products match your search. Try a different term or clear the filters.',
   },

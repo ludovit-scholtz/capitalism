@@ -34,7 +34,7 @@ type CatalogEntry = {
   searchText: string
 }
 
-type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'resources-definition'
+type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'resources-definition'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -48,7 +48,7 @@ const resources = ref<ResourceType[]>([])
 const products = ref<ProductType[]>([])
 const fullscreenImage = ref<{ src: string; alt: string } | null>(null)
 
-const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'resources-definition']
+const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'sales-shop-help', 'resources-definition']
 
 const showProProducts = computed({
   get: () => route.query.showPro === '1',
@@ -79,6 +79,7 @@ const selectedTopic = computed<EncyclopediaTopicSlug>(() => {
 const topicMenu = computed(() => [
   { slug: 'onboarding-help' as const, label: t('encyclopedia.topicOnboardingHelp') },
   { slug: 'factory-layout-help' as const, label: t('encyclopedia.topicFactoryLayoutHelp') },
+  { slug: 'sales-shop-help' as const, label: t('encyclopedia.topicSalesShopHelp') },
   { slug: 'resources-definition' as const, label: t('encyclopedia.topicResourcesDefinition') },
 ])
 
@@ -152,6 +153,36 @@ const manufacturingGuideTopics = [
   'encyclopedia.manufacturingGuideTopicStorage',
   'encyclopedia.manufacturingGuideTopicPublicSales',
   'encyclopedia.manufacturingGuideTopicUnitTypes',
+]
+
+const salesShopGuideCards = [
+  {
+    titleKey: 'encyclopedia.salesShopGuideStepBuyBuildingTitle',
+    bodyKey: 'encyclopedia.salesShopGuideStepBuyBuildingBody',
+    imageUrl: '/sales-shop-help/step-1-buy-sales-shop-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.salesShopGuideStepPurchaseUnitTitle',
+    bodyKey: 'encyclopedia.salesShopGuideStepPurchaseUnitBody',
+    imageUrl: '/sales-shop-help/step-2-purchase-unit-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.salesShopGuideStepPublicSalesTitle',
+    bodyKey: 'encyclopedia.salesShopGuideStepPublicSalesBody',
+    imageUrl: '/sales-shop-help/step-3-public-sales-unit-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.salesShopGuideStepMarketingTitle',
+    bodyKey: 'encyclopedia.salesShopGuideStepMarketingBody',
+    imageUrl: '/sales-shop-help/step-4-marketing-unit-1920x1080.png',
+  },
+]
+
+const salesShopGuideTopics = [
+  'encyclopedia.salesShopGuideTopicBuyBuilding',
+  'encyclopedia.salesShopGuideTopicPurchaseUnit',
+  'encyclopedia.salesShopGuideTopicPublicSalesUnit',
+  'encyclopedia.salesShopGuideTopicMarketingUnit',
 ]
 
 const catalogEntries = computed<CatalogEntry[]>(() => {
@@ -428,6 +459,36 @@ function navigateToEntry(slug: string) {
                 @click="openImageFullscreen(getGuideCardImage(card), t(card.titleKey))"
               >
                 <img :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-28 object-cover" />
+              </button>
+              <div class="p-4 flex flex-col gap-2">
+                <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
+                <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <div v-if="selectedTopic === 'sales-shop-help'" class="encyclopedia-help-section rounded-2xl border border-divider bg-card p-6 lg:p-8 flex flex-col gap-8">
+        <section class="flex flex-col gap-3">
+          <h2 class="m-0">{{ t('encyclopedia.salesShopGuideTitle') }}</h2>
+          <p class="text-muted m-0">{{ t('encyclopedia.salesShopGuideSubtitle') }}</p>
+          <h3 class="m-0 text-base mt-2">{{ t('encyclopedia.salesShopGuideTopicsTitle') }}</h3>
+          <ul class="m-0 pl-5 text-sm text-muted flex flex-col gap-1">
+            <li v-for="topic in salesShopGuideTopics" :key="topic">
+              {{ t(topic) }}
+            </li>
+          </ul>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+            <article v-for="card in salesShopGuideCards" :key="card.titleKey" class="sales-shop-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <button
+                v-if="getGuideCardImage(card)"
+                type="button"
+                class="help-image-trigger block w-full"
+                :aria-label="t('encyclopedia.openImageFullscreen', { title: t(card.titleKey) })"
+                @click="openImageFullscreen(getGuideCardImage(card), t(card.titleKey))"
+              >
+                <img :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-36 object-cover" />
               </button>
               <div class="p-4 flex flex-col gap-2">
                 <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>

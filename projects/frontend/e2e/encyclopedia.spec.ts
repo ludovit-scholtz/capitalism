@@ -106,9 +106,34 @@ test.describe('Manufacturing encyclopedia', () => {
     await expect(page).toHaveURL('/encyclopedia/factory-layout-help')
     await expect(page.getByRole('heading', { name: 'Factory Layout Help' })).toBeVisible()
 
+    await page.getByRole('button', { name: 'Sales shop setup help' }).click()
+    await expect(page).toHaveURL('/encyclopedia/sales-shop-help')
+    await expect(page.getByRole('heading', { name: 'Sales Shop Setup Walkthrough' })).toBeVisible()
+
     await page.getByRole('button', { name: 'Resources definition' }).click()
     await expect(page).toHaveURL('/encyclopedia/resources-definition')
     await expect(page.getByRole('heading', { name: 'Resources' })).toBeVisible()
+  })
+
+  test('sales-shop topic shows full walkthrough cards and fullscreen image preview', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia/sales-shop-help')
+
+    await expect(page.getByRole('heading', { name: 'Sales Shop Setup Walkthrough' })).toBeVisible()
+    await expect(page.locator('.sales-shop-help-card')).toHaveCount(4)
+    await expect(page.locator('.sales-shop-help-card .help-card-image')).toHaveCount(4)
+    await expect(page.getByRole('heading', { name: 'Step 1 - Buy the sales-shop building' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Step 4 - Configure the MARKETING unit' })).toBeVisible()
+
+    await page.locator('.sales-shop-help-card .help-image-trigger').first().click()
+    await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toBeVisible()
+    await expect(page.locator('.fullscreen-help-image')).toBeVisible()
+    await page.getByRole('button', { name: 'Close preview' }).click()
+    await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toHaveCount(0)
   })
 
   test('onboarding help shows six localized onboarding screenshots', async ({ page }) => {
