@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { formatMoney, formatCompactMoney, formatCurrencyTitle } from '@/lib/currencyFormat'
+import { formatMoneyByFieldSize, formatCompactMoney, formatCurrencyTitle } from '@/lib/currencyFormat'
 
 interface Props {
   /** Numeric amount to display. */
@@ -10,6 +10,8 @@ interface Props {
   currency?: string
   /** When true renders compact notation (e.g. "€1.2M"). Defaults to false. */
   compact?: boolean
+  /** Optional character budget for the rendered field; when exceeded, compact notation is used. */
+  maxChars?: number | null
   /** When true prepends a +/− sign for positive/negative deltas. Defaults to false. */
   sign?: boolean
 }
@@ -17,6 +19,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   currency: 'EUR',
   compact: false,
+  maxChars: null,
   sign: false,
 })
 
@@ -29,7 +32,7 @@ const displayValue = computed<string>(() => {
   if (compact) {
     formatted = formatCompactMoney(amount, currency, locale.value)
   } else {
-    formatted = formatMoney(amount, currency, locale.value)
+    formatted = formatMoneyByFieldSize(amount, currency, locale.value, props.maxChars)
   }
 
   if (sign && isFinite(amount) && !isNaN(amount) && amount > 0) {
@@ -40,9 +43,7 @@ const displayValue = computed<string>(() => {
 })
 
 /** Full-precision value exposed via title/tooltip so players can inspect exact amounts. */
-const titleValue = computed<string>(() =>
-  formatCurrencyTitle(props.amount, props.currency, locale.value),
-)
+const titleValue = computed<string>(() => formatCurrencyTitle(props.amount, props.currency, locale.value))
 </script>
 
 <template>

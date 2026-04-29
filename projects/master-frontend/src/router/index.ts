@@ -23,6 +23,21 @@ const router = createRouter({
       name: 'gold-admin',
       component: () => import('@/views/GoldAdminView.vue'),
     },
+    {
+      path: '/referrals/setup',
+      name: 'referral-setup',
+      component: () => import('@/views/ReferralSetupView.vue'),
+    },
+    {
+      path: '/referrals/become',
+      name: 'referral-become',
+      component: () => import('@/views/ReferralBecomeView.vue'),
+    },
+    {
+      path: '/referrals/dashboard',
+      name: 'referral-dashboard',
+      component: () => import('@/views/ReferralDashboardView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

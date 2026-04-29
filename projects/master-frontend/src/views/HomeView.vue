@@ -119,6 +119,9 @@ onMounted(() => {
         <nav class="site-nav">
           <template v-if="auth.isAuthenticated">
             <span class="nav-player">{{ auth.player?.displayName ?? 'Account' }}</span>
+            <a class="nav-btn nav-btn--gold" href="/referrals/setup">Referral Setup</a>
+            <a class="nav-btn nav-btn--gold" href="/referrals/become">Become Referral</a>
+            <a class="nav-btn nav-btn--gold" href="/referrals/dashboard">Referral Dashboard</a>
             <a class="nav-btn nav-btn--gold" href="/account">⬛ My Gold</a>
             <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ Gold Admin</a>
             <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>

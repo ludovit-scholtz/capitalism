@@ -477,7 +477,7 @@ The power plant as a building as a whole has configuration for planned output. I
 
 Make sure to show the powerplant P&L chart in the building overview.
 
-### City selection
+## City selection
 
 - In the top menu where company is selected add selection also for the city
 - In the player dashboard filter only buildings in the selected city

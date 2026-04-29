@@ -29,25 +29,25 @@ It will use real world map. The game will start in single city and later other c
 - [x] Remove from the new building flow the city selection. City must be selected with the context switching.
 - [x] In the city map remove the cities switcher. Use the navbar context switcher to switch between the cities.
 
-### Currencies and bank accounts (0% complete)
+### Currencies and bank accounts (100% complete)
 
-- [ ] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
-- [ ] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
+- [x] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
+- [x] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
 
 ### Number formatting (100% complete)
 
-- [ ] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
-- [ ] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
+- [x] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
+- [x] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
 
-### Power plants (0% complete)
+### Power plants (100% complete)
 
-- [ ] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
+- [x] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
 
-### Units (0% complete)
+### Units (100% complete)
 
-- [ ] Do not show bank account change if unit is selected in a grid while editing the building
-- [ ] When new unit is selected in the grid, automatically select that unit. So if i create new purchase unit in position 1,1 i do not want the user to click on that unit again to configure it.
-- [ ] Fix css styles after tailwind migration. Make sure the design is professional.
+- [x] Do not show bank account change if unit is selected in a grid while editing the building
+- [x] When new unit is selected in the grid, automatically select that unit. So if i create new purchase unit in position 1,1 i do not want the user to click on that unit again to configure it.
+- [x] Fix css styles after tailwind migration. Make sure the design is professional.
 
 ### Audits (0% complete)
 
@@ -66,11 +66,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Make sure user can filter the land by the resource type when buying the mining property.
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
-### Appartment and commercial buildings (10% complete)
+### Appartment and commercial buildings (100% complete)
 
-- [ ] I do not see the appartment building size. Make sure when buying the property the size of the commercial building or appartment building is clearly stated. Fix the current buildings which does not have the total area filled in.
-- [ ] Occupancy must be always a number. When there is no occupancy there must be 0%
-- [ ] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
+- [x] I do not see the appartment building size. Make sure when buying the property the size of the commercial building or appartment building is clearly stated. Fix the current buildings which does not have the total area filled in.
+- [x] Occupancy must be always a number. When there is no occupancy there must be 0%
+- [x] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
 ### Encyclopedia (100% complete)
 
@@ -79,9 +79,9 @@ It will use real world map. The game will start in single city and later other c
 - [x] Add to the stock exchange also section for the dividends payout, how it is configured in the company and what effects it has on personal account.
 
 
-### Referal program (0% complete)
+### Referal program (100% complete)
 
-- [ ] Create page in master frontend to setup the referal code. Allow referal code to be filled only once. Make sure the existing referal code is used.
-- [ ] Create page in master frontend for any user to be a referal. If user wants to be a referal he must fill in his name, and tax domicil.
-- [ ] First referal code is autogenerated - 8 alphanumerical string. User can create multiple referal codes.
-- [ ] In the referal dashboard show the number of registered users under the specific referal code, number of second level referals registrations, number of active subscriptions, and number of second level active referal subscriptions
+- [x] Create page in master frontend to setup the referal code. Allow referal code to be filled only once. Make sure the existing referal code is used.
+- [x] Create page in master frontend for any user to be a referal. If user wants to be a referal he must fill in his name, and tax domicil.
+- [x] First referal code is autogenerated - 8 alphanumerical string. User can create multiple referal codes.
+- [x] In the referal dashboard show the number of registered users under the specific referal code, number of second level referals registrations, number of active subscriptions, and number of second level active referal subscriptions

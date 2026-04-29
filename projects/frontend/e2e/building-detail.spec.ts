@@ -40,13 +40,83 @@ async function configureStarterShopPurchaseItem(page: Page, planningSection: Ret
   await selectPurchaseItem(page, searchTerm, optionName)
 }
 
-
 /** Navigate to a tab in the read-only unit detail sidebar. */
 async function clickUnitTab(page: Page, tabName: string) {
   await page.locator('.unit-detail-tabs').getByRole('button', { name: tabName }).click()
 }
 
 test.describe('Building detail upgrades', () => {
+  test('auto-selects newly placed unit and hides assignment panel in edit sidebar', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-autoselect',
+      playerId: player.id,
+      name: 'Auto Select Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-autoselect',
+          companyId: 'company-autoselect',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Auto Select Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'asu-1',
+              buildingId: 'building-autoselect',
+              unitType: 'PURCHASE',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-autoselect')
+    await expect(page.getByRole('heading', { name: 'Auto Select Factory' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+
+    await getGridCell(plannedSection, 1, 1).click()
+    const sidebar = page.locator('.sidebar').first()
+    await expect(sidebar.getByText('Select a unit type to place')).toBeVisible()
+    await expect(sidebar.getByText('Assignment')).toHaveCount(0)
+
+    await sidebar.getByRole('button', { name: 'Purchase' }).click()
+
+    await expect(sidebar.getByText('Unit Configuration')).toBeVisible()
+    await expect(sidebar.getByRole('button', { name: 'Remove' })).toBeVisible()
+    await expect(getGridCell(plannedSection, 1, 1)).toContainText('Purchase')
+    await expect(sidebar.getByText('Assignment')).toHaveCount(0)
+  })
+
   test('allows revising links while a unit upgrade is still pending', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({
@@ -2101,9 +2171,7 @@ test.describe('Building detail upgrades', () => {
       .locator('select')
       .selectOption('CATEGORY')
     await expect(anchorProductField).toBeHidden()
-    const industryCategoryField = page
-      .locator('.config-field')
-      .filter({ has: page.getByText('Industry Category', { exact: true }) })
+    const industryCategoryField = page.locator('.config-field').filter({ has: page.getByText('Industry Category', { exact: true }) })
     await expect(industryCategoryField).toBeVisible()
     await industryCategoryField.locator('select').selectOption('FURNITURE')
     await expect(getGridCell(plannedSection, 1, 0)).toContainText('Scope: Category')
@@ -2322,14 +2390,10 @@ test.describe('Building detail upgrades', () => {
     await researchProductField.locator('.picker-trigger').click()
 
     // "Currently Producing" section should NOT be visible (no manufacturing units)
-    await expect(
-      page.locator('.product-picker-panel .picker-section-header', { hasText: 'Currently Producing' }),
-    ).toBeHidden()
+    await expect(page.locator('.product-picker-panel .picker-section-header', { hasText: 'Currently Producing' })).toBeHidden()
 
     // "Active in your portfolio" section SHOULD be visible (product in PUBLIC_SALES)
-    await expect(
-      page.locator('.product-picker-panel .picker-section-header', { hasText: 'Active in your portfolio' }),
-    ).toBeVisible()
+    await expect(page.locator('.product-picker-panel .picker-section-header', { hasText: 'Active in your portfolio' })).toBeVisible()
 
     // Wooden Chair should have "In portfolio" badge
     const woodenChairItem = page.locator('.product-picker-panel .picker-item').filter({
@@ -2442,9 +2506,7 @@ test.describe('Building detail upgrades', () => {
     await expect(woodenChairItem.locator('.picker-item-context')).toContainText('factory')
 
     // Catalog section should be present with remaining products
-    await expect(
-      page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' }),
-    ).toBeVisible()
+    await expect(page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' })).toBeVisible()
   })
 
   test('factory purchase selector shows raw materials and only intermediate products', async ({ page }) => {
@@ -13609,7 +13671,6 @@ test.describe('Public Sales Market Intelligence panel', () => {
     // Route should be preserved — still on the building detail page
     await expect(page).toHaveURL(/\/building\/building-shop-mi/)
 
-
     // Navigate to Market tab to verify MI panel is still intact
     await clickUnitTab(page, 'Market')
     // The analytics demand signal should still be visible
@@ -15499,6 +15560,80 @@ test.describe('Mine building edit mode', () => {
     await expect(page.locator('.picker-option').filter({ hasText: 'Manufacturing' })).toHaveCount(0)
     await expect(page.locator('.picker-option').filter({ hasText: 'Purchase' })).toHaveCount(0)
     await expect(page.locator('.picker-option').filter({ hasText: 'Public Sales' })).toHaveCount(0)
+  })
+})
+
+// ── Power plant unit-type picker coverage ───────────────────────────────────
+
+test.describe('Power plant edit mode — unit type picker', () => {
+  function makeEmptyPowerPlantForPicker() {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-power-picker',
+      playerId: player.id,
+      name: 'Picker Energy Corp',
+      cash: 900000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-power-picker',
+          companyId: 'company-power-picker',
+          cityId: 'city-ba',
+          type: 'POWER_PLANT',
+          name: 'Picker Power Plant',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 0,
+          powerOutput: 50,
+          powerPlantType: 'COAL',
+          powerStatus: 'POWERED',
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+    return player
+  }
+
+  test('power plant unit picker shows all power-generation unit options and allows placement', async ({ page }) => {
+    const player = makeEmptyPowerPlantForPicker()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-power-picker')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(plannedSection).toBeVisible()
+
+    const emptyCell = plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await emptyCell.click()
+    await expect(page.getByText('Select a unit type to place')).toBeVisible()
+
+    await expect(page.locator('.picker-option').filter({ hasText: 'Power Generation' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Battery Storage' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Fuel Procurement' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Wind Turbine' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Water Turbine' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Mechanical Energy Storage' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Energy Producer' })).toBeVisible()
+
+    await expect(page.locator('.picker-option').filter({ hasText: 'Manufacturing' })).toHaveCount(0)
+    await expect(page.locator('.picker-option').filter({ hasText: 'Mining' })).toHaveCount(0)
+
+    await page.locator('.picker-option').filter({ hasText: 'Energy Producer' }).click()
+    await expect(emptyCell).toContainText('Energy Producer')
   })
 })
 
@@ -18062,9 +18197,7 @@ test.describe('Unit upgrade panel', () => {
 })
 
 test.describe('Unit placement FX pricing in non-EUR city', () => {
-  test('new unit placement in Prague (CZK) building shows FX-adjusted CZK cost in changes summary', async ({
-    page,
-  }) => {
+  test('new unit placement in Prague (CZK) building shows FX-adjusted CZK cost in changes summary', async ({ page }) => {
     // Proves that when a player in Prague adds a new unit to an empty slot,
     // the displayed placement cost is in CZK (EUR base × CZK fx rate), not EUR.
     // MANUFACTURING base cost = 12,000 EUR × 25.19 CZK/EUR ≈ 302,280 CZK.
@@ -20937,8 +21070,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 0,
           gridY: 0,
           level: 2,
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
       ],
     })
@@ -21001,8 +21140,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 0,
           gridY: 0,
           level: 1,
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
         {
           id: 'ep-unit-2',
@@ -21011,8 +21156,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 1,
           gridY: 0,
           level: 1,
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
       ],
     })
@@ -21061,8 +21212,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 0,
           gridY: 0,
           level: 2,
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: true,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: true,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
         {
           id: 'ep-unit-1',
@@ -21071,8 +21228,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 1,
           gridY: 0,
           level: 1,
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
       ],
     })
@@ -21122,8 +21285,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 0,
           gridY: 0,
           level: 1,
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
       ],
     })
@@ -21174,8 +21343,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 0,
           gridY: 0,
           level: 2, // max = 2×50 = 100 MWh; 75/100 = 75%
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
       ],
     })
@@ -21226,8 +21401,14 @@ test.describe('Power plant analytics panel', () => {
           gridX: 0,
           gridY: 0,
           level: 2, // max = 100 MWh; 10/100 = 10% → red
-          linkUp: false, linkDown: false, linkLeft: false, linkRight: false,
-          linkUpLeft: false, linkUpRight: false, linkDownLeft: false, linkDownRight: false,
+          linkUp: false,
+          linkDown: false,
+          linkLeft: false,
+          linkRight: false,
+          linkUpLeft: false,
+          linkUpRight: false,
+          linkDownLeft: false,
+          linkDownRight: false,
         },
       ],
     })
@@ -21421,10 +21602,7 @@ test.describe('Power plant analytics panel', () => {
 // ── Public sales pricing guidance panel ──────────────────────────────────────
 
 test.describe('Public sales pricing guidance panel', () => {
-  function makeShopWithPublicSales({
-    productId = 'prod-chair',
-    minPrice = null as number | null,
-  } = {}) {
+  function makeShopWithPublicSales({ productId = 'prod-chair', minPrice = null as number | null } = {}) {
     return makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
       companies: [
@@ -21475,9 +21653,7 @@ test.describe('Public sales pricing guidance panel', () => {
     })
   }
 
-  test('pricing guidance panel is shown when product is configured and shows city reference price', async ({
-    page,
-  }) => {
+  test('pricing guidance panel is shown when product is configured and shows city reference price', async ({ page }) => {
     const chair = makeChairProduct() // basePrice = 45
     const player = makeShopWithPublicSales({ productId: chair.id, minPrice: 45 })
     const state = setupMockApi(page, {
@@ -21886,9 +22062,13 @@ test.describe('Public sales pricing guidance panel', () => {
               gridX: 1,
               gridY: 0,
               level: 1,
-              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
-              linkUpLeft: false, linkUpRight: false,
-              linkDownLeft: true,  // topRight links toward bottomLeft
+              linkRight: false,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: true, // topRight links toward bottomLeft
               linkDownRight: false,
               resourceTypeId: 'res-wood',
               inventoryQuantity: 20,
@@ -21901,9 +22081,12 @@ test.describe('Public sales pricing guidance panel', () => {
               gridX: 0,
               gridY: 1,
               level: 1,
-              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
+              linkRight: false,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
               linkUpLeft: false,
-              linkUpRight: false,  // only topRight side has the link flag
+              linkUpRight: false, // only topRight side has the link flag
               linkDownLeft: false,
               linkDownRight: false,
               resourceTypeId: 'res-wood',
@@ -21971,9 +22154,13 @@ test.describe('Public sales pricing guidance panel', () => {
               gridX: 1,
               gridY: 0,
               level: 1,
-              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
-              linkUpLeft: false, linkUpRight: false,
-              linkDownLeft: true,  // link from topRight (1,0) toward bottomLeft (0,1)
+              linkRight: false,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: true, // link from topRight (1,0) toward bottomLeft (0,1)
               linkDownRight: false,
               resourceTypeId: 'res-wood',
               inventoryQuantity: 50,
@@ -21986,9 +22173,14 @@ test.describe('Public sales pricing guidance panel', () => {
               gridX: 0,
               gridY: 1,
               level: 1,
-              linkRight: false, linkDown: false, linkUp: false, linkLeft: false,
-              linkUpLeft: false, linkUpRight: false,
-              linkDownLeft: false, linkDownRight: false,
+              linkRight: false,
+              linkDown: false,
+              linkUp: false,
+              linkLeft: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
               resourceTypeId: null,
               inventoryQuantity: 0,
               inventoryQuality: 0,

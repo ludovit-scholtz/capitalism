@@ -15,14 +15,7 @@ const { t } = useI18n()
 const totalCosts = computed(() => {
   if (!props.ledger) return 0
   const l = props.ledger
-  return (
-    (l.totalPurchasingCosts ?? 0) +
-    (l.totalLaborCosts ?? 0) +
-    (l.totalEnergyCosts ?? 0) +
-    (l.totalMarketingCosts ?? 0) +
-    (l.totalOtherCosts ?? 0) +
-    (l.totalTaxPaid ?? 0)
-  )
+  return (l.totalPurchasingCosts ?? 0) + (l.totalLaborCosts ?? 0) + (l.totalEnergyCosts ?? 0) + (l.totalMarketingCosts ?? 0) + (l.totalOtherCosts ?? 0) + (l.totalTaxPaid ?? 0)
 })
 
 /** Use the backend-authoritative netIncome (includes taxes) as the single source of truth. */
@@ -66,19 +59,19 @@ function profitClass(value: number): string {
       <div class="metric">
         <span class="metric-label">{{ t('financialSummary.revenue') }}</span>
         <span class="metric-value amount-positive">
-          <CurrencyAmount :amount="ledger.totalRevenue" :currency="currencyCode" />
+          <CurrencyAmount :amount="ledger.totalRevenue" :currency="currencyCode" :max-chars="12" />
         </span>
       </div>
       <div class="metric">
         <span class="metric-label">{{ t('financialSummary.costs') }}</span>
         <span class="metric-value amount-negative">
-          <CurrencyAmount :amount="totalCosts" :currency="currencyCode" />
+          <CurrencyAmount :amount="totalCosts" :currency="currencyCode" :max-chars="12" />
         </span>
       </div>
       <div class="metric metric--profit">
         <span class="metric-label">{{ t('financialSummary.netProfit') }}</span>
         <span class="metric-value" :class="profitClass(netProfit)">
-          <CurrencyAmount :amount="netProfit" :currency="currencyCode" :sign="true" />
+          <CurrencyAmount :amount="netProfit" :currency="currencyCode" :max-chars="12" :sign="true" />
         </span>
       </div>
     </div>
@@ -117,19 +110,18 @@ function profitClass(value: number): string {
   width: 4.5rem;
   height: 1.25rem;
   border-radius: 4px;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.06) 25%,
-    rgba(255, 255, 255, 0.12) 50%,
-    rgba(255, 255, 255, 0.06) 75%
-  );
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.06) 25%, rgba(255, 255, 255, 0.12) 50%, rgba(255, 255, 255, 0.06) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .financial-summary-metrics {

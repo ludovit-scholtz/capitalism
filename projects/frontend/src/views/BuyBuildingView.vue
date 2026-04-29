@@ -29,6 +29,8 @@ const submitting = ref(false)
 // Bank setup fields
 const depositRatePercent = ref<number>(3)
 const lendingRatePercent = ref<number>(8)
+// Resource filter for mine lots
+const selectedResourceFilter = ref<string>('')
 // Funding guidance
 const playerBalances = ref<CurrencyBalance[]>([])
 // Company bank accounts (for bank capital check)
@@ -57,6 +59,10 @@ const INITIATE_BASE_DEPOSIT_MUTATION = `
 `
 
 const buildingTypes = ['MINE', 'FACTORY', 'SALES_SHOP', 'RESEARCH_DEVELOPMENT', 'APARTMENT', 'COMMERCIAL', 'MEDIA_HOUSE', 'BANK', 'EXCHANGE', 'POWER_PLANT']
+const PROPERTY_DEFAULT_AREA_SQM: Record<string, number> = {
+  APARTMENT: 1800,
+  COMMERCIAL: 1400,
+}
 
 const selectedCompany = computed<Company | null>(() => {
   return auth.player?.companies.find((company) => company.id === companyId.value) ?? null
@@ -64,6 +70,13 @@ const selectedCompany = computed<Company | null>(() => {
 
 const selectedLot = computed<BuildingLot | null>(() => {
   return availableLots.value.find((lot) => lot.id === selectedLotId.value) ?? null
+})
+
+const isPropertyTypeSelected = computed(() => selectedType.value === 'APARTMENT' || selectedType.value === 'COMMERCIAL')
+
+const selectedPropertyAreaSqm = computed<number | null>(() => {
+  if (!isPropertyTypeSelected.value) return null
+  return PROPERTY_DEFAULT_AREA_SQM[selectedType.value] ?? null
 })
 
 const selectedCityObj = computed(() => cities.value.find((c) => c.id === selectedCityId.value) ?? null)
@@ -229,6 +242,7 @@ onMounted(async () => {
 watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
   selectedLotId.value = ''
   availableLots.value = []
+  selectedResourceFilter.value = ''
 
   if (buildingType !== 'MEDIA_HOUSE') {
     selectedMediaType.value = ''
@@ -265,12 +279,35 @@ watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
   }
 })
 
+/** Unique resource types available in the current city for mine lots. */
+const availableMineResources = computed(() => {
+  const seen = new Set<string>()
+  const result: Array<{ slug: string; name: string }> = []
+  for (const lot of availableLots.value) {
+    if (lot.resourceType && !seen.has(lot.resourceType.slug)) {
+      seen.add(lot.resourceType.slug)
+      result.push({ slug: lot.resourceType.slug, name: lot.resourceType.name })
+    }
+  }
+  return result.sort((a, b) => a.name.localeCompare(b.name))
+})
+
+/** Lots after applying optional resource type filter. */
+const filteredLots = computed(() => {
+  if (!selectedResourceFilter.value || selectedType.value !== 'MINE') return availableLots.value
+  return availableLots.value.filter((lot) => lot.resourceType?.slug === selectedResourceFilter.value)
+})
+
 function formatCurrency(value: number) {
   return formatMoney(value, selectedCityObj.value?.currencyCode ?? 'EUR', locale.value)
 }
 
 function formatPopulationIndex(value: number) {
   return value.toFixed(2)
+}
+
+function formatSqm(value: number) {
+  return `${value.toLocaleString(locale.value)} m²`
 }
 
 function districtLabel(district: string) {
@@ -608,10 +645,37 @@ async function buyBuilding() {
             {{ t('buildings.noAvailableLand') }}
           </div>
 
+          <!-- Mine resource filter (only when MINE type selected and multiple resources available) -->
+          <div v-if="selectedType === 'MINE' && availableMineResources.length > 1 && !lotsLoading && availableLots.length > 0" class="mine-resource-filter mb-4">
+            <span class="text-xs font-semibold text-muted mr-2">{{ t('buildings.filterByResource') }}:</span>
+            <div class="flex flex-wrap gap-2 mt-1.5">
+              <button
+                class="resource-filter-btn px-3 py-1 rounded-full border text-xs font-semibold transition-all"
+                :class="!selectedResourceFilter ? 'border-brand bg-brand/10 text-brand' : 'border-divider text-muted hover:border-brand hover:text-brand'"
+                @click="selectedResourceFilter = ''"
+              >
+                {{ t('common.all') }}
+              </button>
+              <button
+                v-for="res in availableMineResources"
+                :key="res.slug"
+                class="resource-filter-btn px-3 py-1 rounded-full border text-xs font-semibold transition-all"
+                :class="selectedResourceFilter === res.slug ? 'border-brand bg-brand/10 text-brand' : 'border-divider text-muted hover:border-brand hover:text-brand'"
+                @click="selectedResourceFilter = res.slug"
+              >
+                ⛏ {{ res.name }}
+              </button>
+            </div>
+          </div>
+
           <!-- Lot grid -->
-          <div v-else class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+          <div v-else-if="!lotsLoading && filteredLots.length === 0 && availableLots.length > 0" class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm">
+            {{ t('buildings.noLotsForResource') }}
+          </div>
+
+          <div v-if="filteredLots.length > 0" class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
             <button
-              v-for="lot in availableLots"
+              v-for="lot in filteredLots"
               :key="lot.id"
               class="lot-card flex flex-col gap-2 p-4 border-2 border-divider rounded-lg bg-page text-body text-left cursor-pointer transition-all duration-200 hover:border-brand hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               :class="selectedLotId === lot.id ? 'selected border-brand ring-1 ring-brand bg-[rgba(0,71,255,0.08)]' : ''"
@@ -624,12 +688,8 @@ async function buyBuilding() {
               <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
-              <span
-                v-if="lot.resourceType"
-                class="buy-building-resource-badge self-start"
-                data-testid="buy-building-resource-badge"
-                :title="t('cityMap.resourcePremiumTooltip')"
-              >
+              <span v-if="selectedPropertyAreaSqm != null" class="text-[0.8125rem] text-muted">{{ t('buildings.propertySize') }}: {{ formatSqm(selectedPropertyAreaSqm) }}</span>
+              <span v-if="lot.resourceType" class="buy-building-resource-badge self-start" data-testid="buy-building-resource-badge" :title="t('cityMap.resourcePremiumTooltip')">
                 ⛏ {{ lot.resourceType.name }}
               </span>
             </button>
@@ -645,20 +705,17 @@ async function buyBuilding() {
               <span>{{ districtLabel(selectedLot.district) }}</span>
               <span
                 >{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong>
-                <span
-                  v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice"
-                  class="buy-building-resource-premium-badge ml-1"
-                  :title="t('cityMap.resourcePremiumTooltip')"
-                >{{ t('cityMap.resourcePremium') }}</span>
+                <span v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice" class="buy-building-resource-premium-badge ml-1" :title="t('cityMap.resourcePremiumTooltip')">{{
+                  t('cityMap.resourcePremium')
+                }}</span>
               </span>
               <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
+              <span v-if="selectedPropertyAreaSqm != null"
+                >{{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong></span
+              >
             </div>
             <!-- Mining deposit investment summary (shown when MINE selected and lot has resource) -->
-            <div
-              v-if="selectedType === 'MINE' && selectedLot.resourceType"
-              class="buy-building-mining-summary"
-              data-testid="buy-building-mining-summary"
-            >
+            <div v-if="selectedType === 'MINE' && selectedLot.resourceType" class="buy-building-mining-summary" data-testid="buy-building-mining-summary">
               <h4 class="buy-building-mining-summary-title">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
               <div class="buy-building-mining-summary-grid">
                 <div class="buy-building-mining-summary-item">

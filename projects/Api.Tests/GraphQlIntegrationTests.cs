@@ -2972,13 +2972,20 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         // Company rankings must expose currencyCode and totalWealthUsd so the leaderboard
         // can render correct local currency labels and USD-normalised sort order.
-        var token = await RegisterAndGetTokenAsync("co-rankings-test@test.com", "Company Rankings Tester");
+        // Uses an isolated factory to avoid contamination from banking/loan tests in the
+        // shared factory that may leave companies with negative bank-account balances.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(isolatedClient, "co-rankings-test@test.com", "Company Rankings Tester");
         await ExecuteGraphQlAsync(
+            isolatedClient,
             "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
             new { input = new { name = "Rankings Co" } },
             token);
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "{ companyRankings { companyName currencyCode totalWealthUsd } }",
             null,
             null);
@@ -12243,6 +12250,68 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // Company cash should be reduced by lot price
         Assert.True(company.GetProperty("cash").GetDecimal() < 500_000m);
     }
+
+        [Fact]
+        public async Task PurchaseLot_PropertyBuilding_InitializesAreaAndZeroOccupancy()
+        {
+                var token = await RegisterAndGetTokenAsync($"lot-property-{Guid.NewGuid()}@test.com");
+                var (companyId, _, _) = await CompleteOnboardingAsync(token, "Property Buyer Co");
+
+                var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+                var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+                        .First(c => c.GetProperty("name").GetString() == "Bratislava")
+                        .GetProperty("id").GetString();
+
+                var lotsResult = await ExecuteGraphQlAsync(
+                        """
+                        query CityLots($cityId: UUID!) {
+                            cityLots(cityId: $cityId) { id suitableTypes ownerCompanyId }
+                        }
+                        """,
+                        new { cityId = bratislavaId });
+
+                var apartmentLotId = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
+                        .First(l => l.GetProperty("suitableTypes").GetString() == "APARTMENT"
+                                         && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null)
+                        .GetProperty("id").GetString();
+
+                var commercialLotId = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
+                        .First(l => l.GetProperty("suitableTypes").GetString()!.Contains("COMMERCIAL")
+                                         && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null)
+                        .GetProperty("id").GetString();
+
+                var apartmentResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation PurchaseLot($input: PurchaseLotInput!) {
+                            purchaseLot(input: $input) {
+                                building { id type occupancyPercent totalAreaSqm }
+                            }
+                        }
+                        """,
+                        new { input = new { companyId, lotId = apartmentLotId, buildingType = "APARTMENT", buildingName = "Test Apartments" } },
+                        token);
+
+                var commercialResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation PurchaseLot($input: PurchaseLotInput!) {
+                            purchaseLot(input: $input) {
+                                building { id type occupancyPercent totalAreaSqm }
+                            }
+                        }
+                        """,
+                        new { input = new { companyId, lotId = commercialLotId, buildingType = "COMMERCIAL", buildingName = "Test Offices" } },
+                        token);
+
+                var apartmentBuilding = apartmentResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+                Assert.Equal("APARTMENT", apartmentBuilding.GetProperty("type").GetString());
+                Assert.Equal(0m, apartmentBuilding.GetProperty("occupancyPercent").GetDecimal());
+                Assert.True(apartmentBuilding.GetProperty("totalAreaSqm").GetDecimal() > 0m);
+
+                var commercialBuilding = commercialResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+                Assert.Equal("COMMERCIAL", commercialBuilding.GetProperty("type").GetString());
+                Assert.Equal(0m, commercialBuilding.GetProperty("occupancyPercent").GetDecimal());
+                Assert.True(commercialBuilding.GetProperty("totalAreaSqm").GetDecimal() > 0m);
+        }
 
     [Fact]
     public async Task PurchaseLot_AlreadyOwned_Fails()
@@ -34662,6 +34731,80 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(2, rows.GetArrayLength());
         Assert.Equal(4, rows[0].GetProperty("recordedAtTick").GetInt64());
         Assert.Equal(3, rows[1].GetProperty("recordedAtTick").GetInt64());
+    }
+
+    [Fact]
+    public async Task BankStatement_WithAccountFilter_UsesAuthoritativeAccountBalanceForCurrentAndRunning()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-account-anchor@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Account Anchor Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var account = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            Balance = 5_000m,
+            CompanyId = company.Id,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+        db.BankAccounts.Add(account);
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = account.Id,
+            Category = LedgerCategory.BankAccountTransferOut,
+            Description = "Manual adjustment for statement anchor test",
+            Amount = -1_200m,
+            RecordedAtTick = 1,
+            RecordedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query BankStatementWithAccount($companyId: UUID!, $accountId: UUID!) {
+              bankStatement(companyId: $companyId, accountId: $accountId, limit: 50) {
+                currentBalance
+                rows {
+                  amount
+                  runningBalance
+                }
+              }
+            }
+            """,
+            new { companyId = company.Id, accountId = account.Id },
+            token);
+
+        var stmt = result.GetProperty("data").GetProperty("bankStatement");
+        Assert.Equal(5_000m, stmt.GetProperty("currentBalance").GetDecimal());
+
+        var rows = stmt.GetProperty("rows");
+        Assert.Equal(1, rows.GetArrayLength());
+        Assert.Equal(-1_200m, rows[0].GetProperty("amount").GetDecimal());
+        Assert.Equal(5_000m, rows[0].GetProperty("runningBalance").GetDecimal());
     }
 
     // Helper: gets current player ID using an isolated factory and token

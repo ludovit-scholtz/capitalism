@@ -41,11 +41,7 @@ function resolveLocale(locale: string): string {
  *   formatCompactMoney(123_456_789, 'EUR', 'en') // "€123.46M"
  *   formatCompactMoney(2_845, 'USD', 'en')        // "$2.85K"  (Intl compact short)
  */
-export function formatCompactMoney(
-  amount: number,
-  currencyCode = 'USD',
-  locale = 'en',
-): string {
+export function formatCompactMoney(amount: number, currencyCode = 'USD', locale = 'en'): string {
   if (!isFinite(amount) || isNaN(amount)) return '—'
   const intlLocale = resolveLocale(locale)
   return new Intl.NumberFormat(intlLocale, {
@@ -66,11 +62,7 @@ export function formatCompactMoney(
  *   formatMoney(200_000, 'EUR', 'en')   // "€200,000"
  *   formatMoney(25.42, 'CZK', 'de')     // "25,42 CZK"
  */
-export function formatMoney(
-  amount: number,
-  currencyCode = 'USD',
-  locale = 'en',
-): string {
+export function formatMoney(amount: number, currencyCode = 'USD', locale = 'en'): string {
   if (!isFinite(amount) || isNaN(amount)) return '—'
   const intlLocale = resolveLocale(locale)
   const fractionDigits = Number.isInteger(amount) ? 0 : 2
@@ -80,6 +72,19 @@ export function formatMoney(
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(amount)
+}
+
+/**
+ * Chooses full or compact money format according to available character budget.
+ * When maxChars is provided and full format exceeds it, compact format is returned.
+ */
+export function formatMoneyByFieldSize(amount: number, currencyCode = 'USD', locale = 'en', maxChars?: number | null): string {
+  if (!isFinite(amount) || isNaN(amount)) return '—'
+
+  const full = formatMoney(amount, currencyCode, locale)
+  if (maxChars == null || maxChars <= 0) return full
+
+  return full.length > maxChars ? formatCompactMoney(amount, currencyCode, locale) : full
 }
 
 /**
@@ -94,15 +99,11 @@ export function formatCurrencyTitle(amount: number, currencyCode = 'EUR', locale
   if (!isFinite(amount) || isNaN(amount)) return `— ${currencyCode}`
   const intlLocale = resolveLocale(locale)
   const fractionDigits = Number.isInteger(amount) ? 0 : 2
-  const formatted = new Intl.NumberFormat(intlLocale, {
-    style: 'currency',
-    currency: currencyCode,
+  const formattedNumber = new Intl.NumberFormat(intlLocale, {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(amount)
-  // Only append code when Intl did not already embed it (e.g. EUR → "€…", but CZK → "CZK …")
-  const codeAlreadyPresent = formatted.includes(currencyCode)
-  return codeAlreadyPresent ? formatted : `${formatted} ${currencyCode}`
+  return `${formattedNumber} ${currencyCode}`
 }
 
 /**

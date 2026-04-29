@@ -324,6 +324,35 @@ public static class GameConstants
     /// </summary>
     public const decimal PropertyBreakevenOccupancy = 0.75m;
 
+    /// <summary>
+    /// Initial occupancy for newly purchased apartment/commercial buildings.
+    /// The value is always numeric (never null) so UI can consistently render 0%.
+    /// </summary>
+    public const decimal PropertyInitialOccupancyPercent = 0m;
+
+    /// <summary>
+    /// Default total area in m² for new apartment buildings.
+    /// Used when no explicit area has been configured yet.
+    /// </summary>
+    public const decimal DefaultApartmentTotalAreaSqm = 1800m;
+
+    /// <summary>
+    /// Default total area in m² for new commercial buildings.
+    /// Used when no explicit area has been configured yet.
+    /// </summary>
+    public const decimal DefaultCommercialTotalAreaSqm = 1400m;
+
+    /// <summary>
+    /// Returns the default total area (m²) for the given property building type.
+    /// Returns null for non-property building types.
+    /// </summary>
+    public static decimal? DefaultPropertyAreaSqm(string buildingType) => buildingType switch
+    {
+        Data.Entities.BuildingType.Apartment => DefaultApartmentTotalAreaSqm,
+        Data.Entities.BuildingType.Commercial => DefaultCommercialTotalAreaSqm,
+        _ => null
+    };
+
     // ── Power grid constants ──────────────────────────────────────────────────
 
     /// <summary>

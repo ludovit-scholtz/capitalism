@@ -172,6 +172,8 @@ public sealed partial class Mutation
         }
 
         var depositRate = bank.DepositInterestRatePercent ?? 0m;
+        BankAccount? sourceAccount = null;
+        BankAccount? bankLiquidityAccount = null;
 
         if (input.Amount > 0m)
         {
@@ -184,12 +186,12 @@ public sealed partial class Mutation
                         .Build());
             }
 
-            var sourceAccount = await ResolveCompanyTransferAccountAsync(
+            sourceAccount = await ResolveCompanyTransferAccountAsync(
                 db,
                 depositorCompany.Id,
                 cityCurrencyCode,
                 cancellationToken: httpContextAccessor.HttpContext!.RequestAborted);
-            var bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
+            bankLiquidityAccount = await ResolveCompanyTransferAccountAsync(
                 db,
                 bank.CompanyId,
                 cityCurrencyCode,
@@ -267,13 +269,29 @@ public sealed partial class Mutation
                 Id = Guid.NewGuid(),
                 CompanyId = depositorCompany.Id,
                 BuildingId = bank.Id,
-                BankAccountId = deposit.Id,
+                BankAccountId = sourceAccount?.Id,
                 Category = LedgerCategory.DepositMade,
                 Description = $"Deposit into {bank.Name} at {depositRate}% p.a.",
                 Amount = -input.Amount,
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = DateTime.UtcNow,
             });
+
+            if (bankLiquidityAccount is not null)
+            {
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = bank.CompanyId,
+                    BuildingId = bank.Id,
+                    BankAccountId = bankLiquidityAccount.Id,
+                    Category = LedgerCategory.BankAccountTransferIn,
+                    Description = $"Customer deposit received from {depositorCompany.Name}",
+                    Amount = input.Amount,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
         }
 
         await db.SaveChangesAsync();
@@ -371,6 +389,8 @@ public sealed partial class Mutation
 
         // Transfer cash back to depositor
         CompanyBankingService.TryDebit(bankAccounts, actualBankPay, deposit.CurrencyCode);
+        var bankLedgerAccount = CompanyBankingService.FindPreferredAccount(bankAccounts, deposit.CurrencyCode)
+            ?? CompanyBankingService.FindAnyPreferredAccount(bankAccounts);
         if (centralBankCoverage > 0m)
         {
             // Central bank injects the shortfall directly — bank owes it back
@@ -405,13 +425,27 @@ public sealed partial class Mutation
                 RecordedAtTick = currentTick,
                 RecordedAtUtc = DateTime.UtcNow,
             });
+
+            if (actualBankPay > 0m)
+            {
+                db.LedgerEntries.Add(new LedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CompanyId = bankCompany.Id,
+                    BuildingId = bank.Id,
+                    BankAccountId = bankLedgerAccount?.Id,
+                    Category = LedgerCategory.BankAccountTransferOut,
+                    Description = $"Customer withdrawal paid to {depositorCompany?.Name ?? "customer"}",
+                    Amount = -actualBankPay,
+                    RecordedAtTick = currentTick,
+                    RecordedAtUtc = DateTime.UtcNow,
+                });
+            }
         }
 
         // If bank couldn't fully pay from own cash, record central-bank emergency coverage
         if (centralBankCoverage > 0m)
         {
-            var bankLedgerAccount = CompanyBankingService.FindPreferredAccount(bankAccounts, deposit.CurrencyCode)
-                ?? CompanyBankingService.FindAnyPreferredAccount(bankAccounts);
             db.LedgerEntries.Add(new LedgerEntry
             {
                 Id = Guid.NewGuid(),

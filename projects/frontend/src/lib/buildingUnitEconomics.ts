@@ -13,26 +13,27 @@ const unitConstructionCosts: Record<string, number> = {
   PUBLIC_SALES: 6000,
   PRODUCT_QUALITY: 8500,
   BRAND_QUALITY: 8500,
+  POWER_GENERATION: 15000,
+  BATTERY_STORAGE: 12000,
+  FUEL_PURCHASE: 12000,
+  WIND_TURBINE: 18000,
+  WATER_TURBINE: 25000,
+  ENERGY_STORAGE: 14000,
+  ENERGY_PRODUCING: 22000,
 }
 
 export function getUnitConstructionCost(unitType: string): number {
   return unitConstructionCosts[unitType] ?? 0
 }
 
-export function getPlannedUnitConstructionCost(
-  activeUnit: UnitIdentity | null | undefined,
-  plannedUnit: UnitIdentity | null | undefined,
-): number {
+export function getPlannedUnitConstructionCost(activeUnit: UnitIdentity | null | undefined, plannedUnit: UnitIdentity | null | undefined): number {
   if (!plannedUnit) return 0
   if (!activeUnit) return getUnitConstructionCost(plannedUnit.unitType)
   if (activeUnit.unitType !== plannedUnit.unitType) return getUnitConstructionCost(plannedUnit.unitType)
   return 0
 }
 
-export function sumPlannedConfigurationCost(
-  activeUnits: UnitIdentity[],
-  plannedUnits: UnitIdentity[],
-): number {
+export function sumPlannedConfigurationCost(activeUnits: UnitIdentity[], plannedUnits: UnitIdentity[]): number {
   const activeByPosition = new Map(activeUnits.map((unit) => [`${unit.gridX},${unit.gridY}`, unit]))
 
   return plannedUnits.reduce((total, unit) => {
@@ -46,18 +47,11 @@ export type InventoryCostEntry = {
   sourcingCostTotal: number
 }
 
-export function getInventorySourcingCostPerUnit(
-  quantity: number | null | undefined,
-  sourcingCostTotal: number | null | undefined,
-): number | null {
+export function getInventorySourcingCostPerUnit(quantity: number | null | undefined, sourcingCostTotal: number | null | undefined): number | null {
   if (quantity == null || quantity <= 0 || sourcingCostTotal == null) return null
   return Number((sourcingCostTotal / quantity).toFixed(2))
 }
 
 export function getTotalInventorySourcingCost(entries: InventoryCostEntry[]): number {
-  return Number(
-    entries
-      .reduce((total, entry) => total + (entry.quantity > 0 ? entry.sourcingCostTotal : 0), 0)
-      .toFixed(2),
-  )
+  return Number(entries.reduce((total, entry) => total + (entry.quantity > 0 ? entry.sourcingCostTotal : 0), 0).toFixed(2))
 }

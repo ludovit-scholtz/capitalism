@@ -400,6 +400,7 @@ export function useBuildingDetail() {
     FACTORY: ['PURCHASE', 'MANUFACTURING', 'BRANDING', 'STORAGE', 'B2B_SALES'],
     SALES_SHOP: ['PURCHASE', 'MARKETING', 'STORAGE', 'PUBLIC_SALES'],
     RESEARCH_DEVELOPMENT: ['PRODUCT_QUALITY', 'BRAND_QUALITY'],
+    POWER_PLANT: ['POWER_GENERATION', 'BATTERY_STORAGE', 'FUEL_PURCHASE', 'WIND_TURBINE', 'WATER_TURBINE', 'ENERGY_STORAGE', 'ENERGY_PRODUCING'],
   }
 
   const unitColors: Record<string, string> = {
@@ -413,6 +414,13 @@ export function useBuildingDetail() {
     PUBLIC_SALES: '#00c853',
     PRODUCT_QUALITY: '#0047ff',
     BRAND_QUALITY: '#9333ea',
+    POWER_GENERATION: '#f59e0b',
+    BATTERY_STORAGE: '#a855f7',
+    FUEL_PURCHASE: '#2563eb',
+    WIND_TURBINE: '#14b8a6',
+    WATER_TURBINE: '#0ea5e9',
+    ENERGY_STORAGE: '#64748b',
+    ENERGY_PRODUCING: '#ef4444',
   }
 
   const activeUnits = computed(() => building.value?.units ?? [])
@@ -1326,12 +1334,14 @@ export function useBuildingDetail() {
   function placeUnit(unitType: string) {
     if (!selectedCell.value || !isEditing.value) return
 
+    const targetCell = { ...selectedCell.value }
+
     const newUnit: EditableGridUnit = {
-      id: `draft-${selectedCell.value.x}-${selectedCell.value.y}-${Date.now()}`,
+      id: `draft-${targetCell.x}-${targetCell.y}-${Date.now()}`,
       unitType,
-      gridX: selectedCell.value.x,
-      gridY: selectedCell.value.y,
-      level: getUnitAtFrom(activeUnits.value, selectedCell.value.x, selectedCell.value.y)?.level ?? 1,
+      gridX: targetCell.x,
+      gridY: targetCell.y,
+      level: getUnitAtFrom(activeUnits.value, targetCell.x, targetCell.y)?.level ?? 1,
       linkUp: false,
       linkDown: false,
       linkLeft: false,
@@ -1365,7 +1375,7 @@ export function useBuildingDetail() {
     }
 
     draftUnits.value = [...draftUnits.value.filter((unit) => !(unit.gridX === newUnit.gridX && unit.gridY === newUnit.gridY)), newUnit]
-    selectedCell.value = null
+    selectedCell.value = targetCell
     showUnitPicker.value = false
   }
 
@@ -1500,12 +1510,7 @@ export function useBuildingDetail() {
     if (getHorizontalLinkStateFor(units, x, y) === 'none') return false
     const leftInv = getUnitInventorySummary(getUnitAtFrom(units, x, y))
     const rightInv = getUnitInventorySummary(getUnitAtFrom(units, x + 1, y))
-    return (
-      (leftInv?.lastTickOutflow ?? 0) > 0 ||
-      (leftInv?.lastTickInflow ?? 0) > 0 ||
-      (rightInv?.lastTickOutflow ?? 0) > 0 ||
-      (rightInv?.lastTickInflow ?? 0) > 0
-    )
+    return (leftInv?.lastTickOutflow ?? 0) > 0 || (leftInv?.lastTickInflow ?? 0) > 0 || (rightInv?.lastTickOutflow ?? 0) > 0 || (rightInv?.lastTickInflow ?? 0) > 0
   }
 
   /**
@@ -1516,12 +1521,7 @@ export function useBuildingDetail() {
     if (getVerticalLinkStateFor(units, x, y) === 'none') return false
     const topInv = getUnitInventorySummary(getUnitAtFrom(units, x, y))
     const bottomInv = getUnitInventorySummary(getUnitAtFrom(units, x, y + 1))
-    return (
-      (topInv?.lastTickOutflow ?? 0) > 0 ||
-      (topInv?.lastTickInflow ?? 0) > 0 ||
-      (bottomInv?.lastTickOutflow ?? 0) > 0 ||
-      (bottomInv?.lastTickInflow ?? 0) > 0
-    )
+    return (topInv?.lastTickOutflow ?? 0) > 0 || (topInv?.lastTickInflow ?? 0) > 0 || (bottomInv?.lastTickOutflow ?? 0) > 0 || (bottomInv?.lastTickInflow ?? 0) > 0
   }
 
   /**
@@ -1557,9 +1557,7 @@ export function useBuildingDetail() {
     const fromLabel = t(`buildingDetail.unitTypes.${fromUnit.unitType}`)
     const toLabel = t(`buildingDetail.unitTypes.${toUnit.unitType}`)
     const itemLabel = getUnitDisplayLabel(fromUnit) ?? getUnitDisplayLabel(toUnit)
-    const status = isHorizontalLinkLive(units, x, y)
-      ? t('buildingDetail.linkFlowLive')
-      : t('buildingDetail.linkFlowConfigured')
+    const status = isHorizontalLinkLive(units, x, y) ? t('buildingDetail.linkFlowLive') : t('buildingDetail.linkFlowConfigured')
 
     if (state === 'both') {
       return t('buildingDetail.linkFlowHintBidirectional', {
@@ -1593,9 +1591,7 @@ export function useBuildingDetail() {
     const fromLabel = t(`buildingDetail.unitTypes.${fromUnit.unitType}`)
     const toLabel = t(`buildingDetail.unitTypes.${toUnit.unitType}`)
     const itemLabel = getUnitDisplayLabel(fromUnit) ?? getUnitDisplayLabel(toUnit)
-    const status = isVerticalLinkLive(units, x, y)
-      ? t('buildingDetail.linkFlowLive')
-      : t('buildingDetail.linkFlowConfigured')
+    const status = isVerticalLinkLive(units, x, y) ? t('buildingDetail.linkFlowLive') : t('buildingDetail.linkFlowConfigured')
 
     if (state === 'both') {
       return t('buildingDetail.linkFlowHintBidirectional', {
@@ -2269,8 +2265,7 @@ export function useBuildingDetail() {
         mediaHouseUpgradeSuccess.value = false
       }, 4000)
     } catch (reason: unknown) {
-      mediaHouseUpgradeError.value =
-        reason instanceof Error ? reason.message : t('mediaHouse.upgradeFailed')
+      mediaHouseUpgradeError.value = reason instanceof Error ? reason.message : t('mediaHouse.upgradeFailed')
     } finally {
       upgradingMediaHouse.value = false
     }

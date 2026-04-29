@@ -44,7 +44,17 @@ public sealed class RentPhase : ITickPhase
                 building.PendingPriceActivationTick = null;
             }
 
-            if (building.PricePerSqm is null || building.TotalAreaSqm is null || building.OccupancyPercent is null)
+            if (!building.OccupancyPercent.HasValue)
+            {
+                building.OccupancyPercent = GameConstants.PropertyInitialOccupancyPercent;
+            }
+
+            if (!building.TotalAreaSqm.HasValue || building.TotalAreaSqm.Value <= 0m)
+            {
+                building.TotalAreaSqm = GameConstants.DefaultPropertyAreaSqm(building.Type) ?? 0m;
+            }
+
+            if (building.PricePerSqm is null || building.TotalAreaSqm is null || building.TotalAreaSqm.Value <= 0m || building.OccupancyPercent is null)
                 continue;
             if (!context.CompaniesById.TryGetValue(building.CompanyId, out var company))
                 continue;

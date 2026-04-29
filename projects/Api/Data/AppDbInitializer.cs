@@ -109,6 +109,9 @@ public sealed partial class AppDbInitializer(
         // mining premium increment).  Databases seeded before this change will not have
         // the lot; databases created after the initial seed will have it already.
         await EnsureCarpathianGoldSeamLotAsync();
+        await EnsureBratislavaMiningLotsAsync();
+        await EnsurePragueMiningLotsAsync();
+        await EnsureViennaMiningLotsAsync();
 
         var currentTick = await dbContext.GameStates
             .AsNoTracking()
@@ -156,6 +159,9 @@ public sealed partial class AppDbInitializer(
         // Existing buildings created before bank-account provisioning must be linked to
         // a company-owned account in their city currency on startup.
         await EnsureBuildingBankAccountsAsync();
+
+        // Property buildings must always have numeric occupancy and known area.
+        await EnsurePropertyBuildingDefaultsAsync();
     }
 
     private async Task SeedFxRatesAsync()
