@@ -17,6 +17,8 @@ public sealed class TickProcessor(
     IEnumerable<ITickPhase> phases,
     ILogger<TickProcessor> logger)
 {
+    private readonly IReadOnlyList<ITickPhase> orderedPhases = phases.OrderBy(p => p.Order).ToList();
+
     /// <summary>
     /// Advances the game by one tick and returns the configured interval in seconds
     /// so the hosted service knows how long to wait before the next tick.
@@ -36,7 +38,7 @@ public sealed class TickProcessor(
         var context = await BuildContextAsync(gameState, ct);
         var sw = Stopwatch.StartNew();
 
-        foreach (var phase in phases.OrderBy(p => p.Order))
+        foreach (var phase in orderedPhases)
         {
             try
             {
@@ -85,7 +87,7 @@ public sealed class TickProcessor(
             gameState.CurrentTick,
             sw.ElapsedMilliseconds,
             context.BuildingsById.Count,
-            phases.Count());
+            orderedPhases.Count);
 
         return gameState.TickIntervalSeconds;
     }
@@ -142,10 +144,15 @@ public sealed class TickProcessor(
             .Select(e => new { e.BuildingId, e.Amount })
             .ToListAsync(ct);
 
-        var recentSalaryByCity = recentLaborEntries
-            .Where(e => buildingCityLookup.ContainsKey(e.BuildingId!.Value))
-            .GroupBy(e => buildingCityLookup[e.BuildingId!.Value])
-            .ToDictionary(g => g.Key, g => g.Sum(e => Math.Abs(e.Amount)));
+        var recentSalaryByCity = new Dictionary<Guid, decimal>();
+        foreach (var entry in recentLaborEntries)
+        {
+            if (!entry.BuildingId.HasValue) continue;
+            if (!buildingCityLookup.TryGetValue(entry.BuildingId.Value, out var cityId)) continue;
+
+            var amount = Math.Abs(entry.Amount);
+            recentSalaryByCity[cityId] = recentSalaryByCity.GetValueOrDefault(cityId) + amount;
+        }
 
         // Load persisted market-trend states so PublicSalesPhase can apply and evolve them.
         var trendStates = await db.MarketTrendStates.ToListAsync(ct);

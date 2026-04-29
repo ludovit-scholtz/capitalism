@@ -6,10 +6,12 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Architecture optimization (0% complete)
+### Architecture optimization (10% complete)
 
 - [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - [ ] Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
+
+**Shipped (increment 1):** `GameConstants.cs` was split into partial engine files to reduce monolithic backend source size, and tick processing now avoids per-tick phase re-sorting and reduces allocations in recent-salary aggregation during `BuildContextAsync`.
 
 ### Archive E2E tests (0% complete)
 
