@@ -695,8 +695,7 @@ export default {
     salesShopGuideStepMarketingBody:
       'MARKETING zvyšuje výkon predajne nad rámec samotnej ceny, pretože posilňuje viditeľnosť a dopytovú zotrvačnosť. Nastavte rozpočet podľa reálnej peňažnej rezervy firmy a sledujte, či zlepšený dopytový profil prevyšuje náklady. Príliš nízky rozpočet často neprinesie merateľný efekt, príliš vysoký rozpočet vie spáliť hotovosť skôr, ako odstránite prevádzkové úzke hrdlá. Marketing zapínajte až po stabilizácii PURCHASE a PUBLIC_SALES, aby posilňoval funkčný systém a nemaskoval chybný tok. V každom vyhodnocovacom okne porovnajte dodatočný objem a maržu oproti marketingovým nákladom. Meníte konfiguráciu postupne a podľa dát. V ranej fáze rastu je cieľom konzistencia: vyhladiť výkyvy dopytu, podporiť opakované nákupy a vytvoriť podmienky pre presnejšiu cenovú optimalizáciu.',
     forexGuideTitle: 'Kompletný návod na Forex obchodovanie',
-    forexGuideSubtitle:
-      'Podrobný postup pre swap, transfer medzi účtami, čítanie FX sadzieb, kontrolu histórie swapov a Gold AMM režimy vrátane pozícií a likvidity.',
+    forexGuideSubtitle: 'Podrobný postup pre swap, transfer medzi účtami, čítanie FX sadzieb, kontrolu histórie swapov a Gold AMM režimy vrátane pozícií a likvidity.',
     forexGuideTopicsTitle: 'Forex témy',
     forexGuideTopicSwap: 'Štruktúra swap tabu, kontext účtu a správny smer výmeny meny',
     forexGuideTopicTransfer: 'Transfery medzi vlastnými bankovými účtami a ich význam pred swapom',

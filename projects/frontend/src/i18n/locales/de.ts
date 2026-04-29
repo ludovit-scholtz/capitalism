@@ -696,8 +696,7 @@ export default {
     salesShopGuideStepMarketingBody:
       'MARKETING verbessert die Verkaufsleistung über reinen Preiswettbewerb hinaus, indem es Nachfragequalität und Wiedererkennung stärkt. Legen Sie ein Budget fest, das zu Ihrer aktuellen Liquiditätslage passt, und prüfen Sie regelmäßig, ob zusätzlicher Absatz und Marge die Ausgaben rechtfertigen. Zu kleine Budgets bleiben oft ohne messbaren Effekt, zu große Budgets verbrennen Kapital, bevor operative Engpässe gelöst sind. Aktivieren Sie Marketing erst, wenn PURCHASE und PUBLIC_SALES bereits stabil laufen. Dann verstärkt Budget ein funktionierendes System statt Defizite zu kaschieren. Vergleichen Sie in jedem Auswertungsfenster den Mehrertrag mit den Marketingkosten und passen Sie schrittweise an. Ziel im frühen Wachstum ist Verlässlichkeit: weniger Nachfragevolatilität, mehr wiederkehrende Verkäufe und planbarere Bedingungen für präzise Preisoptimierung und Expansion.',
     forexGuideTitle: 'Forex-Handel Komplettanleitung',
-    forexGuideSubtitle:
-      'Vollstaendige Anleitung fuer Swap-Ausfuehrung, Kontotransfers, staedtische FX-Raten, Trade-Historie sowie Gold-AMM mit Swap, Positionen und Liquiditaet.',
+    forexGuideSubtitle: 'Vollstaendige Anleitung fuer Swap-Ausfuehrung, Kontotransfers, staedtische FX-Raten, Trade-Historie sowie Gold-AMM mit Swap, Positionen und Liquiditaet.',
     forexGuideTopicsTitle: 'Forex-Themen',
     forexGuideTopicSwap: 'Swap-Tab verstehen: Kontokontext, Quell- und Zielwaehrung, Richtung',
     forexGuideTopicTransfer: 'Transfers zwischen eigenen Bankkonten vor und nach Waehrungstausch',

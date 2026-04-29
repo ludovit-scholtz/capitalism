@@ -697,8 +697,7 @@ export default {
     salesShopGuideStepMarketingBody:
       'MARKETING extends sales performance beyond raw price mechanics by improving discoverability and demand momentum over time. Configure marketing with a realistic budget aligned to your current cash runway, then monitor whether improved demand quality offsets spend. Underfunded marketing often does nothing measurable; oversized budgets can silently burn cash before operational bottlenecks are solved. Activate marketing only after PURCHASE and PUBLIC_SALES are stable, so budget amplifies a working system instead of masking broken flow. In each review window, compare incremental volume and margin versus marketing cost. Keep adjustments gradual and evidence-driven. In early growth, the goal is consistency: use marketing to smooth demand volatility, strengthen repeat sales behavior, and create predictable conditions for price optimization and expansion.',
     forexGuideTitle: 'Forex Trading Walkthrough',
-    forexGuideSubtitle:
-      'Complete guide to swap execution, account transfers, city FX rates, trade history interpretation, and Gold AMM operations including swap, positions, and liquidity.',
+    forexGuideSubtitle: 'Complete guide to swap execution, account transfers, city FX rates, trade history interpretation, and Gold AMM operations including swap, positions, and liquidity.',
     forexGuideTopicsTitle: 'Forex topics',
     forexGuideTopicSwap: 'Swap tab structure, account context, and currency direction planning',
     forexGuideTopicTransfer: 'Transfers between your own bank accounts and why they matter before swaps',
