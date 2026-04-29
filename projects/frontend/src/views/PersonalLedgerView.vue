@@ -203,10 +203,10 @@ useTickRefresh(() => loadData(true))
             <!-- Tax reserve — amber-tinted when non-zero -->
             <article
               class="flex flex-col gap-1.5 rounded-[14px] border p-4"
-              :style="
+              :class="
                 personAccount.taxReserve > 0
-                  ? 'border-color: color-mix(in srgb, #f59e0b 40%, var(--color-border)); background: color-mix(in srgb, #f59e0b 6%, var(--color-surface));'
-                  : 'border-color: var(--color-border); background: color-mix(in srgb, var(--color-surface) 60%, var(--color-background));'
+                  ? 'border-amber-500/40 bg-amber-500/[0.06]'
+                  : 'border-divider bg-card/60'
               "
             >
               <span class="text-xs font-bold uppercase tracking-[0.06em] text-muted">
@@ -243,8 +243,7 @@ useTickRefresh(() => loadData(true))
           <!-- Tax note -->
           <p
             v-if="personAccount.taxReserve > 0"
-            class="mt-4 rounded-[10px] border px-4 py-3 text-sm text-muted"
-            style="background: color-mix(in srgb, #f59e0b 12%, var(--color-surface)); border-color: color-mix(in srgb, #f59e0b 35%, var(--color-border));"
+            class="mt-4 rounded-[10px] border border-amber-500/35 bg-amber-500/[0.12] px-4 py-3 text-sm text-muted"
             role="note"
           >
             {{ t('personalLedger.taxNote') }}
@@ -260,8 +259,7 @@ useTickRefresh(() => loadData(true))
             </div>
             <span
               v-if="personAccount.taxReserve > 0"
-              class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[0.82rem] text-amber-800"
-              style="background: color-mix(in srgb, #f59e0b 15%, var(--color-surface)); border-color: color-mix(in srgb, #f59e0b 40%, var(--color-border));"
+              class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-500/40 bg-amber-500/15 px-3 py-1 text-[0.82rem] text-amber-800"
             >
               {{ t('personalLedger.totalReserved') }}:
               <strong><CurrencyAmount :amount="personAccount.taxReserve" currency="EUR" /></strong>
