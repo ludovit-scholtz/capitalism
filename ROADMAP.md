@@ -23,119 +23,25 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped (increment 2 — core gameplay views):** Migrated five high-traffic views from legacy scoped CSS to Tailwind v4 utilities: `LeaderboardView` (wealth rankings with gradient hero, tab switcher, medal cards), `NewsView` (news/changelog feed with pill badges, unread indicators, and market-report table styles), `CompanySettingsView` (company profile, overhead dashboard, salary table), `PersonalLedgerView` (personal wealth breakdown, share trade history, dividend history), and `ManufacturingEncyclopediaView` (catalog grid with search, industry filter, and resource/product cards). All E2E selector classes preserved; scoped CSS fully removed from all five files (total ~1,200 style-lines eliminated). Files reduced well below the 500-line limit.
 
-### City selection (100% complete)
+### Currencies and bank accounts (0% complete)
 
-- [x] After the onboarding make sure to select the city which user selected in the onboarding. At the moment when user goes through and selects for example Prague, the first city is selected after he creates the account and logs in. Make sure to select his active city after user logs in.
-- [x] When buying new building do not ask for the city where to build the building. Use the selection from the city navbar filter
-- [x] In the context selection is the company cash visible. But there is error that the currency is not correct.
-
-**Shipped:** Onboarding now persists the player's chosen city to localStorage after register/login so the active city is correct on all subsequent pages. The buy-building flow pre-selects the active city from the navbar filter instead of requiring a redundant city choice. The context switcher now formats company cash in the selected city's currency (e.g. CZK for Prague) instead of always showing USD.
-
-### Government company (100% complete)
-
-- [x] Hide government from the leaderboard. Keep it as player, make sure the game administrators can impersonalize to government player
-
-**Shipped:** The government system account is now excluded from all public leaderboard queries (`rankings` and `companyRankings`). It remains a fully-functional internal simulation participant that owns banks, holds currency, and participates in economic flows. A dedicated "Government system account" section has been added to the admin operations dashboard so authorized administrators can view the government's balances and impersonate it via a clearly-labeled, admin-only button.
-
-### Currencies and bank accounts (100% complete)
-
-- [x] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
-- [x] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
-- [x] Organizie forex exchange to tabs, add to the top forex tabs the amm features like add liquidity, show liquidity, and swap at AMM — Forex Exchange Gold AMM tab now has three inner sub-tabs: AMM Swap (buy/sell XAU via constant-product pools), My Positions (pool share %, claimable fees, remove liquidity), and Add Liquidity (join existing pools or create a new pool). Blocked-gold warning is shown whenever gold is locked in pools so players know they cannot use it for new swaps.
-- [x] Player cannot go to minus on the bank account unless he pays money to the government for example for taxes or interest. Make sure that when player purchase items from other player in the purchasing unit for example, he cannot purchase more than he is able to pay from his building's bank account. If player do not have enough money to cover the labor costs the whole building is suspended for the tick and does not do anything. If this occurs, make sure to show this to the player on the frontend.
-- [x] When selecting product in onboarding make sure to show the correct price. At the moment the product base price is showned without the fx rate adjustment.
-- [x] Make the research budget be calculated in USD.
-- [x] Make sure the costs for transportation are counted in local currency. Make them 10x higher as it is now to make them more significant. The pricing of the transportation costs depends on the oil price and it may be different for every city.
-- [x] In B2B sales unit the recommended price is not adjusted by the fx rate. Find all occurances where this issue exists and fix it.
-- [x] When buying new units, the price is not adjusted by the fx rate. Make sure the prices for units are similar in usd nomination in all cities. Find out what else is not adjusted by the fx rates where players can have advantage in one city over another because the number is the same.
-- [x] In company settings when selecting salary multiplier make sure to show the proper city currency. Also when defining the base data make sure the base wage is set in the city currency properly and not in the usd for non usd cities.
-
-**Shipped (this PR):** Unit upgrade costs and new unit placement costs are now FX-adjusted to the building's city currency. A building in Prague now shows and charges CZK amounts (e.g. 302,400 CZK for a new MANUFACTURING unit instead of 12,000 EUR). The `ScheduleUnitUpgrade` mutation and `BuildingConfigurationService.ApplyDuePlansAsync` both validate that the assigned bank account currency matches the city currency and reject with `CURRENCY_MISMATCH` on a mismatch. B2B recommended prices are also FX-adjusted via `useBuildingDetail.cityFxRate`. The unit-upgrade query (`unitUpgradeInfo`) returns the FX-adjusted cost for display.
-
-**Shipped (R&D USD normalization):** Research budgets (`ProductResearchBudget.AccumulatedBudget`) are now always stored and compared in USD. The tick engine converts each unit's local-currency operating cost to USD before accumulating it, and the `baseQualityBudget` threshold (used to determine when a company reaches 100% uncontested quality) is also expressed in USD. The R&D panel in the building detail now displays all three budget figures (accumulated, target, top-competitor) formatted as USD amounts. Players in Prague (CZK), Vienna (EUR), New York (USD), and future cities all compete on an equal monetary footing for product-quality rankings.
-
-**Shipped (city-aware salary settings):** Company settings salary table now shows each city's own currency code — Prague wages display as CZK, New York as USD, Delhi as INR, etc. The `CompanyCitySalarySettingResult` GraphQL type now includes a `currencyCode` field per city, and both the base wage and effective wage columns use the city's local currency formatter instead of the company's primary currency. A currency badge next to each city name and a clarifying note below the table make it unambiguous that wages are not cross-currency-converted. Backend and E2E tests verify the per-city currency codes are correct.
-
-- [x] Allow to close down bank account if the balance of the account is equal exactly to 0.
-
-**Shipped (zero-balance account closure):** Players can now permanently close a company bank account when its balance is exactly zero. The new `closeCompanyBankAccount` GraphQL mutation validates ownership, rejects government and deposit accounts, blocks closure if the account is still assigned as a building's active bank account (returning `ACCOUNT_IN_USE` with the building name), and rejects any non-zero balance with a clear `NON_ZERO_BALANCE` error code. The bank accounts tab in the Loan Marketplace now shows a "Ready to close — zero balance" badge for eligible accounts, displays an inline error if closure is blocked (e.g. still assigned to a building), and shows a non-zero-balance hint for accounts that need funds transferred out first. Five backend integration tests cover: happy-path closure, non-zero rejection, building-assignment rejection, wrong-owner rejection, and unauthenticated rejection.
-
-- [x] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
+- [ ] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
+- [ ] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
 
 ### Number formatting (100% complete)
 
-- [x] Create a vue component for number formatting in components/numbers folder
-- [x] Everywhere where the currency is displayed, for example in the units, use the number formatting component
-- [x] Add to the title the original number to be formatted and currency after it
+- [ ] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
+- [ ] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
 
-### Power plants (96% complete)
+### Power plants (0% complete)
 
-**Shipped (previous increment):**
-- 5 new power plant unit types added to the building grid: `FUEL_PURCHASE` (+10 MW/level fuel capacity), `WIND_TURBINE` (+8 MW/level weather-scaled), `WATER_TURBINE` (+12 MW/level steady hydro), `ENERGY_STORAGE` (+8 MW/level smoothing buffer), `ENERGY_PRODUCING` (+20 MW/level main converter).
-- All 7 unit types (including `POWER_GENERATION` and `BATTERY_STORAGE`) allowed in `BuildingConfigurationService`.
-- **Weather-scaling correctness fix**: `WATER_TURBINE`, `FUEL_PURCHASE`, and `ENERGY_PRODUCING` contributions are now computed AFTER the plant-level solar/wind weather factor so they are never incorrectly scaled when placed in a mixed WIND/SOLAR plant. Only `POWER_GENERATION` and the base plant rating scale with plant-type weather. `WIND_TURBINE` units always scale by current wind percentage regardless of plant type.
-- `CompanyEconomyCalculator` calculates per-tick labor and energy-auxiliary costs for all new unit types.
-- `BuildingPowerPlantPanel` shows a live **city power status** section (supply vs demand, reserve MW, BALANCED/CONSTRAINED/CRITICAL badge, contextual hint) and expanded unit guide (2 → 7 cards).
-- All 7 unit type labels and descriptions localized in English, Slovak, and German.
-- 10 new backend integration tests including a mixed-unit weather-scaling correctness test.
-
-**Shipped (dispatch controls, fuel-flow chain, P&L visibility):**
-- `FuelProcurementPhase` (tick-engine phase order 9): COAL/GAS plants procure fuel each tick via `FUEL_PURCHASE` units. Cost is debited from the building's bank account and recorded as `LedgerCategory.FuelCost`. Procurement scales with `DispatchTargetPercent`; if funds are insufficient, a partial fill is made (graceful degradation, not zero).
-- `PowerPlantOutputCalculator` updated: thermal plants now draw output from `FuelReserveMwh` — `FUEL_PURCHASE` units fill the reserve first, `ENERGY_PRODUCING` units consume the remainder. Non-thermal plants retain their flat-boost behaviour. Total output is scaled by `DispatchTargetPercent` after all unit contributions.
-- New `Building` fields: `DispatchTargetPercent` (int 0–100, default 100) and `FuelReserveMwh` (decimal, default 0). EF migration `20260428_AddPowerPlantDispatchAndFuelReserve` included.
-- `setPlantDispatch` GraphQL mutation: validates 0–100% range, requires authenticated company ownership.
-- `PowerPlantAnalytics` query now returns `fuelCostTotal` sourced from `FuelCost` ledger entries.
-- New `GameConstants`: `FuelCostPerMwhBase`, `FuelPurchaseBoostMwPerLevel`, `FuelReserveCapacityPerUnitLevel`, `IsThermalPlant()`.
-- Frontend: dispatch slider (0–100%) with live badge in `BuildingPowerPlantPanel`; fuel reserve status bar (thermal plants only); fuel costs metric in the P&L summary grid (5-metric layout for thermal, 4 for non-thermal); P&L bar chart updated to include fuel costs in the cost bar.
-- i18n: `dispatch.*`, `fuelReserve.*`, and `analytics.fuelCosts` keys for en/sk/de.
-- 7 new backend integration tests + 4 new Playwright E2E tests.
-
-**Shipped (this increment — multi-fuel economics, reserve capacity dashboard, grid-linking visualization):**
-- **Multi-fuel cost differentiation**: GAS plants now pay `FuelCostPerMwhBase × GasFuelCostMultiplier` (1.2×) per MWh — 20% more than COAL. `GameConstants.GasFuelCostMultiplier = 1.2` and `FuelCostPerMwhForPlantType()` apply the multiplier in `FuelProcurementPhase`. Both constants exposed via the new `fuelCostPerMwhEur` field on `PowerPlantAnalytics`.
-- **Reserve capacity analytics**: `PowerPlantAnalytics` now returns `maxFuelReserveMwh`, `fuelReservePercent` (0–100 integer), `fuelPurchaseCapacityMwhPerTick`, `energyProducingCapacityMw`, `fuelConstrainedOutputMw`, `fuelTypeLabel`, and `fuelCostPerMwhEur` — computed from installed `FUEL_PURCHASE` and `ENERGY_PRODUCING` units against current `FuelReserveMwh`.
-- **Constrained-output calculation**: `fuelConstrainedOutputMw = max(0, energyProducingCapacityMw − currentReserve)` gives the player an instant answer to "how much output am I losing because I need more fuel?"
-- **`BuildingPowerPlantPanel` richer reserve UI**: thermal plant fuel reserve section upgraded to: (1) fuel type badge (🟠 Coal / 🔵 Natural Gas) with economics tooltip; (2) color-coded capacity progress bar (green ≥50%, yellow 20–49%, red <20%); (3) fill percent label and procurement rate; (4) constrained-output warning (red alert panel) when reserve is too low to feed all `ENERGY_PRODUCING` units; (5) guidance when no FP/EP units are installed; (6) **grid link chain** (⛽ Fuel Procurement → 🔥 Energy Producer → ⚡ City Grid) showing per-node capacity numbers; (7) GAS premium note explaining the 20% cost premium and tradeoff.
-- **i18n**: 20 new keys added in `powerPlant.fuelReserve.*` for en/sk/de.
-- **5 new backend tests**: `PowerPlantAnalytics_ReturnsReserveCapacityFields`, `PowerPlantAnalytics_FuelConstrainedOutput_WhenReserveLow`, `FuelProcurement_GasPlant_CostsMoreThanCoal`, `PowerPlantAnalytics_GasPlant_ReturnsFuelTypeLabel`, and one additional capacity constraint test.
-- **5 new Playwright E2E tests**: capacity bar visibility, constrained-output warning, grid link chain nodes, GAS badge and premium note, no-unit guidance.
-
-**Shipped (test coverage hardening — reserve lifecycle, nuclear non-thermal, dispatch P&L proof):**
-- **4 additional backend integration tests**: `PowerPlantAnalytics_NuclearPlant_ReturnsEmptyFuelFields` (proves non-thermal plants return zero fuel fields so frontend hides the fuel panel); `FuelReserve_PreSeededReserve_MaintainsStableLevelOverMultipleTicks` (proves procurement and consumption are in balance each tick, with fuel cost entries confirming procurement ran); `DispatchChange_50Pct_HalvesFuelCostAndReducesSurplusIncome` (proves halving dispatch halves fuel cost AND reduces surplus income — directly validates the "dispatch alters output or profitability" scenario); `PowerPlantAnalytics_WhenReserveIsFull_ConstrainedOutputIsZero` (proves fuelConstrainedOutputMw returns 0 when reserve equals max capacity).
-- **7 additional Playwright E2E tests**: green reserve bar (≥50%), red reserve bar (<20%), no-unit guidance empty state, dispatch badge color (yellow 40–79%, green ≥80%), 5-metric P&L grid for thermal plants (Fuel Costs visible), 4-metric P&L grid for non-thermal WIND plant (no Fuel Costs), metric label correctness smoke test.
-
-**Shipped (this increment — advanced grid-link flow visualization):**
-- **Live flow pulse on active links**: horizontal and vertical link connectors now carry a `live` CSS class when either adjacent unit had real inventory movement last tick. Active + live links pulse with a subtle keyframe animation so players can immediately see which connections have actual material flowing through them versus which are just configured but idle.
-- **Selection path highlighting**: clicking any unit cell in the active grid highlights all link connectors leading directly out of (or into) that cell with a `selected-path` class, giving them a brighter primary-colored border. Adjacent cells that are linked to the selected cell also get a `connected` border highlight so the player can trace the full chain at a glance.
-- **Flow hint tooltips**: every horizontal and vertical link connector now carries a native `title` attribute with a plain-language description of the flow path, for example "Wood: Purchase → Manufacturing (active last tick)" or "Wooden Chair: Manufacturing → Storage (no recent flow)". The hint adapts to the link direction (forward / backward / bidirectional), shows the configured item name where available, and uses "no recent flow" when no inventory was seen moving last tick.
-- **Localized copy**: three new i18n key groups added in `buildingDetail.linkFlow*` for en, sk, and de.
-- **4 new Playwright E2E tests**: live class on link with real flow, no live class when flow is absent, selected-path class appears on adjacent link when cell is clicked, title tooltip contains correct unit-type labels and arrow symbol.
-
-- [x]  Advanced grid linking — bidirectional unit-to-unit flow arrows in the building grid editor
+- [ ] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
 
 ### Units
 
-- [x]  In the grid show the picture of the product instead of cell-item-avatar
-
-#### B2B sales unit
-
-- [x]  The product selection is not localized
-- [x]  Make the sale visibility default to be Group
-
-#### Public sales unit
-
-- [x]  The product selection is not localized
-- [x]  Set the min price to be the city average price for the product
-- [x]  Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
-- [x]  Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
-
-**Status: 100% complete** (April 2026)
-
-**Shipped (April 2026 — unit grid imagery and B2B improvements):**
-- Unit/building grid cells now display the real product emoji image (from `getProductImageUrl`) instead of the generic monogram avatar whenever a product type is configured or held in inventory. Resource tiles still use the stored image URL. Fallback monogram is retained only when no product/resource is resolved.
-- B2B sales product picker is fully localized: product names and industry labels are rendered using the locale-aware `getLocalizedProductName` / `getLocalizedIndustry` helpers in all three supported locales (en, sk, de). The search filter also matches localized names.
-- New B2B sales units default to `GROUP` sale visibility instead of null/none, reducing misconfiguration risk for players who sell to business partners. The starter factory layout preset also uses GROUP as the default.
-
-**Shipped (April 2026):** City-aware pricing guidance panel in the public sales unit editor shows the city market reference price (product base price × FX rate), a below/at/above-market badge with contextual hints, and a brand momentum tip. The minimum price input is now bounded to the city average price. Passive brand awareness mechanics in PublicSalesPhase: superior-quality sellers and sole-city sellers gain small awareness increments each tick; inferior-quality sellers see slow awareness decay. All three backend tests (gain, decay, only-seller) pass. `cityAveragePrice` added to `PublicSalesAnalytics` GraphQL type.
+- [ ] Do not show bank account change if unit is selected in a grid while editing the building
+- [ ] When new unit is selected in the grid, automatically select that unit. So if i create new purchase unit in position 1,1 i do not want the user to click on that unit again to configure it.
+- [ ] Fix css styles after tailwind migration. Make sure the design is professional.
 
 ### Audits (0% complete)
 
@@ -143,67 +49,38 @@ It will use real world map. The game will start in single city and later other c
 
 ### Media house (100% complete)
 
-**Shipped in this increment:**
-- ✅ Buying a Media house no longer fails with an empty `mediaType` validation error — the buy-building and city-map flows both require media type selection before purchase.
-- ✅ Media type selection (NEWSPAPER ×1.0, RADIO ×1.5, TV ×2.0) is presented clearly in both the buy-building flow and the city-map purchase panel before a lot is purchased.
-- ✅ Selected `mediaType` is persisted by the backend `purchaseLot` mutation and exposed in GraphQL `building { mediaType }` responses.
-- ✅ Purchased media houses render as single-unit specialized properties — the factory-style 4×4 unit grid is now hidden for MEDIA_HOUSE buildings (matching the same treatment as APARTMENT and COMMERCIAL).
-- ✅ The building detail page shows the dedicated Media House Management panel (content value, content budget, city competitor ranking, effectiveness multiplier).
-- ✅ Backend integration tests cover `purchaseLot` with valid mediaType, missing mediaType, and all three media types (NEWSPAPER, RADIO, TV).
-- ✅ E2E tests verify the media house detail renders without the factory grid and shows the management panel.
-- ✅ Strategic purchase guidance added to buy-building flow: three expandable cards explain NEWSPAPER vs RADIO vs TV trade-offs, strategic moat rationale, and when to choose each channel type.
-- ✅ Media house upgrade path implemented: `upgradeMediaHouse` mutation increases building level (1→5), each level improves content conversion efficiency (50%→83%), costs are FX-adjusted to city currency, and a ledger entry is recorded.
-- ✅ Upgrade UI in building detail panel shows efficiency ladder (levels 1-5 with % display), estimated cost and duration, and a success/error banner after upgrading.
-- ✅ Brand-impact analytics panel added to building detail: shows active advertiser count, average and total advertising income, per-advertiser brand awareness / marketing quality bars, income history mini-chart (last 30 ticks), and a combined effective multiplier row.
-- ✅ `getMediaHouseAnalytics` GraphQL query exposes upgrade cost, next-level efficiency, advertiser brand effects, income history, and strategy rating (EARLY_STAGE / GROWING / COMPETITIVE / DOMINANT).
-- ✅ Combined effective multiplier visible in the Effectiveness section (channel reach × content ranking bonus).
-- ✅ Backend tests cover `upgradeMediaHouse` validation (wrong type, government-owned, max level), analytics query structure, and that efficiency improves with each level.
-- ✅ `MediaHouseIncome` is now surfaced as a dedicated first-class ledger category in the company ledger UI with full drill-down support. Players can see how much their media houses earned, drill into per-tick entries, and link through to the source building. Media house income is included in net income, cash from operations, and taxable income calculations. All three locales (en/sk/de) include polished category labels.
+- [ ] When media house is in the construction, allow the marketing units to configure it.
+- [ ] When media house is in the construction, do not make any caluclations for the marketing units, only charge the unit labor and energy costs.
 
 ### Mining (80% complete)
 
-**Shipped in this increment:**
-- ✅ Mining property purchase UI in BuyBuildingView now shows the raw material present on each relevant land, with resource type badge on lot cards.
-- ✅ Resource quality and quantity are displayed in a Mining Deposit Investment Summary panel when a mine lot is selected and MINE building type is chosen.
-- ✅ Pricing breakdown shows base land value plus resource deposit premium, with a "+ resource" badge when price exceeds appraised land value.
-- ✅ Mining land purchase prices scale to $20M–$200M equivalent range, driven by deposit quality, quantity, and global market value — verified by backend tests.
-- ✅ Invalid mine placement (MINE on a lot without a resource deposit) is now blocked with `MINE_REQUIRES_RESOURCE_DEPOSIT` error code.
-- ✅ Displayed local-currency prices match backend calculations and GraphQL/API responses.
-- ✅ Backend and E2E tests cover resource display, pricing thresholds, and invalid-placement rules.
-
+- [ ] Make sure every mining land property has the custom resource defined what is in that property. It must have the quality and resource amount defined. 
+- [ ] For each resource must be always available at least one property in each city
+- [ ] When user buys the mining property using the buy building flow, make sure to show the resource quality and quantity available at the property land. 
+- [ ] Make sure user can filter the land by the resource type when buying the mining property.
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
-
-### R&D Building (80% complete)
-
-**Shipped in this increment:**
-- ✅ Fixed CATEGORY scope validation bug: BRAND_QUALITY units with CATEGORY scope can now be configured using a direct `industryCategory` field (e.g. "FURNITURE") without requiring a `productTypeId`. The old validation incorrectly required a product type for both CATEGORY and PRODUCT scopes.
-- ✅ Public-sales competitiveness now blends product, category, and company brand contributions coherently via `FindCombinedBrand`: product (full weight), category (60%), company (30%) using additive diminishing-returns formula — no double-counting.
-- ✅ R&D operating costs raised to be materially impactful: PRODUCT_QUALITY and BRAND_QUALITY labor hours increased from 0.55 → 2.0 and energy from 0.09 → 0.22, making R&D roughly 3× more expensive than a marketing unit in the same city.
-- ✅ Ledger entries for R&D units now use clear labels: "R&D Salary: Product Quality Research" and "R&D Salary: Brand Quality Research" so players can directly connect research investment with financial consequences in the ledger.
-- ✅ 5 new backend tests covering: category scope validation via GraphQL, R&D cost exceeding marketing cost by ≥3×, R&D ledger label correctness, and combined brand (product+category) contributing more public sales than product-only brand.
-- ✅ **R&D product selector strategic UX upgrade:** Products the company actively manufactures (MANUFACTURING units) are now surfaced at the top with a dedicated green "Currently Producing" section header and "Producing" badge (score 80). Products only sold or stocked appear below in an "Active in your portfolio" section (score 50). Each R&D picker item shows a contextual detail: "Your company has a factory actively making this product" or "Your company sells or stocks this product." A hint guides players who have not yet started any manufacturing. The backend `rankedProductTypes` query now emits a distinct `manufacturing` reason (score 80) separate from `used_by_company` (score 50), and the mock API and frontend types are fully aligned. 4 new backend tests, 3 new E2E tests, and all locale files (en/sk/de) updated.
-
-**Remaining:**
-- [ ] When backend is restarted it must store all news from the changelog csv to the game server database.
 
 ### Appartment and commercial buildings (90% complete)
 
-**Shipped in this increment:**
-- ✅ Grid layout hidden for APARTMENT and COMMERCIAL buildings — these now present as single-unit properties without the factory-style unit grid.
-- ✅ Market Rate Guidance panel added to the property UI: shows city reference rate, location-adjusted market rate (city rate × PopulationIndex), your current rent, price position label (Very Attractive / Good / At Market / Above Market / Overpriced), % vs market, and occupancy expectations per price tier.
-- ✅ Market rate hint shown inline inside the rent-setting dialog so players see the benchmark before entering a new value.
-- ✅ Occupancy caps implemented in backend RentPhase: overpriced (>+10%) → 50% floor; at +10% → max 90%; below 60% of market → max 100%; linear interpolation between 60%–110%.
-- ✅ Location-adjusted market rate: compares rent against `city.AverageRentPerSqm × lot.PopulationIndex`, not just the raw city average.
-- ✅ Constant operating costs: each tick deducts `pricePerSqm × area × 0.75` (PROPERTY_MAINTENANCE ledger entry). Building breaks even at 75% occupancy, profitable above it.
-- ✅ New GraphQL fields on Building: `cityReferenceRentPerSqm`, `adjustedMarketRentPerSqm`, `populationIndex`.
-- ✅ 19 backend tests covering all occupancy/rent rules, price zones, ledger entries, and breakeven profitability.
-- ✅ Rent reference rate chart added to apartment and commercial building detail screens. The SVG chart shows the full occupancy curve (0–100%), colored pricing zones (Very Attractive / Good / Above Market / Overpriced), a dashed breakeven line at 75%, and interactive markers for the city reference rate, the location-adjusted market rate, and the player's current rent. Apartment buildings show the apartment-focused chart; commercial buildings show the commercial-focused chart. Currency formatting uses the correct city currency.
+- [ ] I do not see the appartment building size. Make sure when buying the property the size of the commercial building or appartment building is clearly stated. Fix the current buildings which does not have the total area filled in.
+- [ ] Occupancy must be always a number. When there is no occupancy there must be 0%
+- [ ] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
-**Remaining:**
-- [ ] When backend is restarted it must store all news from the changelog csv to the game server database. At the moment i see only few news and changelog csv is not imported.
-- [x] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports. **100% complete** — Weekly (`WEEKLY`) and monthly (`MONTHLY`) city market reports are now auto-generated at tick boundaries (every 168 ticks for weekly, every 720 ticks for monthly) by the new `MarketReportPhase`. Each report aggregates `PublicSalesRecord` data per city, ranks up to 10 products by revenue with gross margin %, seller count, and average price, generates bilingual HTML content (EN/SK/DE) with a styled table layout, persists as `CityMarketReport` rows (idempotent), and is published to the MasterApi newsroom as `MARKET_REPORT` entries by `MarketReportPublisherHostedService`. The frontend newsroom adds a dedicated 📊 Market Reports filter tab with teal-themed pill and special card styling for market report entries. 10 backend integration tests cover generation, idempotency, localization, ordering, DB round-trip, and GraphQL query/filter.
+### Encyclopedia
 
-## FX Exahcnge
+- [ ] The resources pictures are very big. Make it 6 columns on wide screen please.
+- [ ] Create section for the help with the game play. Update copilot instructions with any change to the basic flow also update the documentation in the encyclopedia.
+- [ ] Create help section with onboarding help. Please document the onboarding and create also pictures so that users can easier be onboarded
+- [ ] Create help section with manufacturing unit setup. Please document the manufacturing setup and create also pictures so that users can understand the game better
+
+### Referal program
+
+- [ ] Create page in master frontend to setup the referal code. Allow referal code to be filled only once. Make sure the existing referal code is used.
+- [ ] Create page in master frontend for any user to be a referal. If user wants to be a referal he must fill in his name, and tax domicil.
+- [ ] First referal code is autogenerated - 8 alphanumerical string. User can create multiple referal codes.
+- [ ] In the referal dashboard show the number of registered users under the specific referal code, number of second level referals registrations, number of active subscriptions, and number of second level active referal subscriptions
+
+## FX Exchange
 
 Each city is located in physical country which has the currency - CZK for Prague, EUR for Vienna or USD for New York for example.
 
