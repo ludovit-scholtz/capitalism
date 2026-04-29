@@ -12,6 +12,11 @@ const router = createRouter({
     { path: '/admin', name: 'admin-dashboard', component: () => import('@/views/GameAdminDashboardView.vue') },
     { path: '/leaderboard', name: 'leaderboard', component: () => import('@/views/LeaderboardView.vue') },
     { path: '/encyclopedia', name: 'encyclopedia', component: () => import('@/views/ManufacturingEncyclopediaView.vue') },
+    {
+      path: '/encyclopedia/:topicSlug(onboarding-help|factory-layout-help|resources-definition)',
+      name: 'encyclopedia-topic',
+      component: () => import('@/views/ManufacturingEncyclopediaView.vue'),
+    },
     { path: '/exchange', name: 'exchange', component: () => import('@/views/GlobalExchangeView.vue') },
     { path: '/stocks', name: 'stocks', component: () => import('@/views/StockExchangeView.vue') },
     { path: '/forex', name: 'forex', component: () => import('@/views/ForexExchangeView.vue') },

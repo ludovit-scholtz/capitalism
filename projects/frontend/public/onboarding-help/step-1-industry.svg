@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg1" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a" />
+      <stop offset="1" stop-color="#1e293b" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg1)" />
+  <rect x="40" y="40" width="1120" height="595" rx="18" fill="#111827" stroke="#334155" stroke-width="2" />
+  <text x="80" y="115" fill="#f8fafc" font-family="Segoe UI, Arial" font-size="36" font-weight="700">Onboarding - Step 1: Choose Industry</text>
+  <rect x="80" y="160" width="320" height="420" rx="14" fill="#1f2937" stroke="#475569" />
+  <rect x="440" y="160" width="320" height="420" rx="14" fill="#064e3b" stroke="#10b981" stroke-width="3" />
+  <rect x="800" y="160" width="320" height="420" rx="14" fill="#1f2937" stroke="#475569" />
+  <text x="120" y="245" fill="#e2e8f0" font-family="Segoe UI, Arial" font-size="30" font-weight="700">Furniture</text>
+  <text x="480" y="245" fill="#d1fae5" font-family="Segoe UI, Arial" font-size="30" font-weight="700">Food Processing</text>
+  <text x="840" y="245" fill="#e2e8f0" font-family="Segoe UI, Arial" font-size="30" font-weight="700">Healthcare</text>
+  <text x="480" y="298" fill="#a7f3d0" font-family="Segoe UI, Arial" font-size="22">Selected industry card</text>
+  <text x="80" y="620" fill="#94a3b8" font-family="Segoe UI, Arial" font-size="20">Screenshot mock: player chooses first business direction</text>
+</svg>

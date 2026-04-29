@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg2" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#111827" />
+      <stop offset="1" stop-color="#1f2937" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg2)" />
+  <rect x="40" y="40" width="1120" height="595" rx="18" fill="#0b1220" stroke="#334155" stroke-width="2" />
+  <text x="80" y="110" fill="#f8fafc" font-family="Segoe UI, Arial" font-size="36" font-weight="700">Onboarding - Step 2: Choose Product</text>
+  <rect x="80" y="160" width="220" height="380" rx="14" fill="#1f2937" stroke="#475569" />
+  <rect x="320" y="160" width="220" height="380" rx="14" fill="#1f2937" stroke="#475569" />
+  <rect x="560" y="160" width="220" height="380" rx="14" fill="#075985" stroke="#38bdf8" stroke-width="3" />
+  <rect x="800" y="160" width="320" height="380" rx="14" fill="#1f2937" stroke="#475569" />
+  <text x="600" y="220" fill="#e0f2fe" font-family="Segoe UI, Arial" font-size="26" font-weight="700">Bread</text>
+  <text x="600" y="255" fill="#bae6fd" font-family="Segoe UI, Arial" font-size="20">Market benchmark visible</text>
+  <text x="830" y="220" fill="#e2e8f0" font-family="Segoe UI, Arial" font-size="24" font-weight="600">Product detail panel</text>
+  <text x="80" y="620" fill="#94a3b8" font-family="Segoe UI, Arial" font-size="20">Screenshot mock: player compares starter products and picks one</text>
+</svg>

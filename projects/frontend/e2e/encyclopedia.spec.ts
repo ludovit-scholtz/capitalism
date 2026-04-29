@@ -78,7 +78,7 @@ test.describe('Manufacturing encyclopedia', () => {
     await expect(page.locator('.composition-node.ingredient').nth(1)).toContainText('10 packs')
   })
 
-  test('shows gameplay help, onboarding help, and manufacturing setup help with visual cards', async ({ page }) => {
+  test('shows gameplay help cards in resources-definition topic', async ({ page }) => {
     setupMockApi(page, {
       resourceTypes: [woodResource],
       productTypes: [electronicComponents, electronicTableProduct],
@@ -87,12 +87,42 @@ test.describe('Manufacturing encyclopedia', () => {
     await page.goto('/encyclopedia')
 
     await expect(page.getByRole('heading', { name: 'Gameplay Help' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Onboarding Help' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Manufacturing Unit Setup Help' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Resources' })).toBeVisible()
+  })
 
-    await expect(page.locator('.onboarding-help-card')).toHaveCount(4)
-    await expect(page.locator('.manufacturing-help-card')).toHaveCount(4)
-    await expect(page.locator('.help-card-image').first()).toBeVisible()
+  test('topic menu switches sections and updates URL with /encyclopedia/:topic-slug', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia')
+
+    await page.getByRole('button', { name: 'Onboarding help' }).click()
+    await expect(page).toHaveURL('/encyclopedia/onboarding-help')
+    await expect(page.getByRole('heading', { name: 'Onboarding Help' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Factory layout help' }).click()
+    await expect(page).toHaveURL('/encyclopedia/factory-layout-help')
+    await expect(page.getByRole('heading', { name: 'Factory Layout Help' })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Resources definition' }).click()
+    await expect(page).toHaveURL('/encyclopedia/resources-definition')
+    await expect(page.getByRole('heading', { name: 'Resources' })).toBeVisible()
+  })
+
+  test('onboarding help shows six localized onboarding screenshots', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia/onboarding-help')
+
+    await expect(page.locator('.onboarding-help-card')).toHaveCount(6)
+    await expect(page.locator('.onboarding-help-card .help-card-image')).toHaveCount(6)
+    await expect(page.getByRole('heading', { name: 'Step 1 - Choose your industry' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Step 6 - Buy first sales-shop lot' })).toBeVisible()
   })
 
   test('uses six-column layout on wide screens and keeps encyclopedia card images compact', async ({ page }) => {

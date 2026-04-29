@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675">
+  <defs>
+    <linearGradient id="bg6" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#1e1b4b" />
+      <stop offset="1" stop-color="#111827" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg6)" />
+  <rect x="40" y="40" width="1120" height="595" rx="18" fill="#0b1220" stroke="#334155" stroke-width="2" />
+  <text x="80" y="110" fill="#f8fafc" font-family="Segoe UI, Arial" font-size="36" font-weight="700">Onboarding - Step 6: Sales Shop Lot</text>
+  <rect x="80" y="170" width="500" height="390" rx="14" fill="#1f2937" stroke="#475569" />
+  <rect x="620" y="170" width="500" height="390" rx="14" fill="#312e81" stroke="#818cf8" stroke-width="3" />
+  <text x="655" y="235" fill="#e0e7ff" font-family="Segoe UI, Arial" font-size="28" font-weight="700">Shop setup summary</text>
+  <text x="655" y="275" fill="#c7d2fe" font-family="Segoe UI, Arial" font-size="20">PUBLIC_SALES configured</text>
+  <text x="655" y="305" fill="#c7d2fe" font-family="Segoe UI, Arial" font-size="20">Starter product linked</text>
+  <text x="655" y="335" fill="#c7d2fe" font-family="Segoe UI, Arial" font-size="20">Ready for first tick revenue</text>
+  <text x="80" y="620" fill="#94a3b8" font-family="Segoe UI, Arial" font-size="20">Screenshot mock: player completes first go-to-market chain</text>
+</svg>
