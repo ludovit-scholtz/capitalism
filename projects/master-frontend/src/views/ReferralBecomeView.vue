@@ -29,7 +29,8 @@ function submitBecomeReferral() {
     successMessage.value =
       'Referral profile is active. Your first code was generated automatically, and you can create more in the dashboard.'
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Unable to activate referral profile.'
+    errorMessage.value =
+      error instanceof Error ? error.message : 'Unable to activate referral profile.'
   }
 }
 
@@ -66,12 +67,24 @@ onMounted(async () => {
       <form class="become-form" @submit.prevent="submitBecomeReferral">
         <div class="field">
           <label for="full-name">Name</label>
-          <input id="full-name" v-model="fullName" type="text" placeholder="Ludovit Scholtz" required />
+          <input
+            id="full-name"
+            v-model="fullName"
+            type="text"
+            placeholder="Ludovit Scholtz"
+            required
+          />
         </div>
 
         <div class="field">
           <label for="tax-domicile">Tax domicile</label>
-          <input id="tax-domicile" v-model="taxDomicile" type="text" placeholder="Slovakia" required />
+          <input
+            id="tax-domicile"
+            v-model="taxDomicile"
+            type="text"
+            placeholder="Slovakia"
+            required
+          />
         </div>
 
         <button type="submit" class="primary">Activate Referral Profile</button>

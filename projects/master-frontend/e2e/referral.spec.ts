@@ -128,15 +128,17 @@ test.describe('Referral pages', () => {
     await expect(row).toContainText('1')
     await expect(row).toContainText('2')
 
-    await expect(page.locator('.summary-card', { hasText: 'Direct registrations' })).toContainText('1')
+    await expect(page.locator('.summary-card', { hasText: 'Direct registrations' })).toContainText(
+      '1',
+    )
     await expect(
       page.locator('.summary-card', { hasText: 'Second-level registrations' }),
     ).toContainText('2')
     await expect(page.locator('.summary-card', { hasText: 'Active subscriptions' })).toContainText(
       '1',
     )
-    await expect(page.locator('.summary-card', { hasText: 'Second-level active subs' })).toContainText(
-      '1',
-    )
+    await expect(
+      page.locator('.summary-card', { hasText: 'Second-level active subs' }),
+    ).toContainText('1')
   })
 })

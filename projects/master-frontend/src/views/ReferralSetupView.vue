@@ -2,7 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
-import { applyReferralCode, getReferralProfile, syncReferralSubscriptionStatus } from '@/lib/referrals'
+import {
+  applyReferralCode,
+  getReferralProfile,
+  syncReferralSubscriptionStatus,
+} from '@/lib/referrals'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
@@ -25,7 +29,10 @@ function loadProfile() {
 }
 
 function normalizeCodeInput() {
-  referralCode.value = referralCode.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)
+  referralCode.value = referralCode.value
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 8)
 }
 
 function submitCode() {
