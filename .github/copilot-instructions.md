@@ -229,14 +229,21 @@ npx playwright test --project=chromium e2e/onboarding.spec.ts
 npx playwright test --debug --project=chromium
 ```
 
-### Encyclopedia help screenshots (real FullHD)
-- Use Playwright-generated screenshots for encyclopedia help content. Do not use hand-drawn or external mockups when documenting in-game onboarding/factory guidance.
+### Help and encyclopedia screenshots (real FullHD)
+- Use Playwright-generated screenshots for encyclopedia and help content. Do not use hand-drawn or external mockups when documenting in-game onboarding/factory guidance.
 - Capture at exact FullHD viewport: `1920x1080`.
-- Canonical command:
+- **Screenshot specs are excluded from `npm run test:e2e` by default.** They live in `e2e/*-screenshots.spec.ts` and are only run via the dedicated command.
+- Canonical command to generate all screenshots:
+```bash
+cd projects/frontend
+CI=true npm run test:screenshots
+```
+- To run a single screenshot spec:
 ```bash
 cd projects/frontend
 CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec.ts
 ```
+- Screenshot spec files: `encyclopedia-screenshots.spec.ts`, `forex-help-screenshots.spec.ts`, `onboarding-help-screenshots.spec.ts`, `sales-shop-help-screenshots.spec.ts`, `stock-exchange-help-screenshots.spec.ts`.
 - Output folder must be: `projects/frontend/docs/screenshots/encyclopedia-help/`.
 - Required minimum captures:
   - `encyclopedia-onboarding-help-1920x1080.png`
@@ -247,6 +254,7 @@ CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec
   - Use production-mode Playwright run (`CI=true`) to match shipped styling.
   - Keep default app locale unless a locale-specific screenshot is explicitly required.
   - Do not crop UI chrome out of the screenshot; capture the full viewport for authenticity.
+- **Never add `*-screenshots.spec.ts` files to the `testIgnore` exclusion list in `playwright.config.ts`.** The exclusion pattern `**/*-screenshots.spec.ts` is already set as `testIgnore` so these specs are automatically skipped by `npm run test:e2e`.
 
 ## Backend testing
 - Integration tests in `Api.Tests/GraphQlIntegrationTests.cs` use `WebApplicationFactory` with a unique inmemory or postgresql database per test factory instance.
