@@ -167,13 +167,13 @@ useTickRefresh(() => loadData(true))
         <section class="rounded-2xl border border-divider bg-card p-6 shadow-sm">
           <h2 class="mb-5 text-lg font-semibold">{{ t('personalLedger.wealthBreakdownTitle') }}</h2>
 
-          <div class="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
+          <div class="wealth-grid grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
             <!-- Net wealth — brand-tinted primary card -->
             <article
               class="flex flex-col gap-1.5 rounded-[14px] border p-4"
               style="border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border)); background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));"
             >
-              <span class="text-xs font-bold uppercase tracking-[0.06em] text-muted">
+              <span class="wealth-label text-xs font-bold uppercase tracking-[0.06em] text-muted">
                 {{ t('personalLedger.netWealth') }}
               </span>
               <strong class="text-[1.8rem] font-bold tabular-nums text-brand">
@@ -189,7 +189,7 @@ useTickRefresh(() => loadData(true))
               class="flex flex-col gap-1.5 rounded-[14px] border border-divider p-4"
               style="background: color-mix(in srgb, var(--color-surface) 60%, var(--color-background));"
             >
-              <span class="text-xs font-bold uppercase tracking-[0.06em] text-muted">
+              <span class="wealth-label text-xs font-bold uppercase tracking-[0.06em] text-muted">
                 {{ t('personalLedger.availableCash') }}
               </span>
               <strong class="text-[1.35rem] font-bold tabular-nums text-body">
@@ -209,11 +209,11 @@ useTickRefresh(() => loadData(true))
                   : 'border-divider bg-card/60'
               "
             >
-              <span class="text-xs font-bold uppercase tracking-[0.06em] text-muted">
+              <span class="wealth-label text-xs font-bold uppercase tracking-[0.06em] text-muted">
                 {{ t('personalLedger.taxReserve') }}
               </span>
               <strong
-                class="text-[1.35rem] font-bold tabular-nums"
+                class="wealth-amount--blocked text-[1.35rem] font-bold tabular-nums"
                 :class="personAccount.taxReserve > 0 ? 'text-amber-700' : 'text-body'"
               >
                 <CurrencyAmount :amount="personAccount.taxReserve" currency="EUR" />
@@ -228,7 +228,7 @@ useTickRefresh(() => loadData(true))
               class="flex flex-col gap-1.5 rounded-[14px] border border-divider p-4"
               style="background: color-mix(in srgb, var(--color-surface) 60%, var(--color-background));"
             >
-              <span class="text-xs font-bold uppercase tracking-[0.06em] text-muted">
+              <span class="wealth-label text-xs font-bold uppercase tracking-[0.06em] text-muted">
                 {{ t('personalLedger.portfolioValue') }}
               </span>
               <strong class="text-[1.35rem] font-bold tabular-nums text-body">
@@ -327,8 +327,8 @@ useTickRefresh(() => loadData(true))
                       class="inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-[0.72rem] font-bold"
                       :class="
                         trade.direction === 'BUY'
-                          ? 'bg-good/15 text-good'
-                          : 'bg-bad/15 text-bad'
+                          ? 'direction-badge--buy bg-good/15 text-good'
+                          : 'direction-badge--sell bg-bad/15 text-bad'
                       "
                     >
                       {{ trade.direction === 'BUY' ? t('personalLedger.buy') : t('personalLedger.sell') }}

@@ -214,6 +214,7 @@ onMounted(async () => {
           :class="{
             'news-card-market border-[rgba(0,200,150,0.25)]': entry.entryType === 'MARKET_REPORT',
             'border-divider': entry.entryType !== 'MARKET_REPORT',
+            'news-card-unread': initiallyUnreadIds.has(entry.id),
           }"
           :style="{
             background:

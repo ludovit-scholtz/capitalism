@@ -310,8 +310,8 @@ onMounted(loadSettings)
             </table>
           </div>
 
-          <p class="text-[0.82rem] text-muted mt-3 mb-1">{{ t('companySettings.salaryImpactHint') }}</p>
-          <p class="text-[0.82rem] text-muted mb-1">{{ t('companySettings.salaryLocalCurrencyNote') }}</p>
+          <p class="salary-impact-hint text-[0.82rem] text-muted mt-3 mb-1">{{ t('companySettings.salaryImpactHint') }}</p>
+          <p class="salary-local-currency-note text-[0.82rem] text-muted mb-1">{{ t('companySettings.salaryLocalCurrencyNote') }}</p>
 
           <p v-if="success" class="text-good mt-3" role="status">{{ success }}</p>
           <p v-if="error" class="text-red-600 mt-3" role="alert">{{ error }}</p>

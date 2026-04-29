@@ -191,13 +191,13 @@ function getRankGradient(index: number): string | undefined {
         <p class="text-base text-muted max-w-[540px] mx-auto">{{ t('leaderboard.subtitle') }}</p>
         <div class="flex justify-center mt-4 gap-3 flex-wrap">
           <span
-            class="inline-flex items-center gap-1.5 bg-white/[0.07] border border-white/[0.12] rounded-full px-3 py-1 text-[0.78rem] text-muted cursor-default select-none"
+            class="leaderboard-tick-chip inline-flex items-center gap-1.5 bg-white/[0.07] border border-white/[0.12] rounded-full px-3 py-1 text-[0.78rem] text-muted cursor-default select-none"
             :title="currentTick !== null ? t('leaderboard.tickHint') + ' #' + currentTick : t('leaderboard.tickHint')"
           >
             <span class="font-semibold text-brand uppercase tracking-[0.04em] text-[0.72rem]">
               {{ t('leaderboard.tick') }}
             </span>
-            <span class="tabular-nums font-bold text-body">
+            <span class="leaderboard-tick-value tabular-nums font-bold text-body">
               {{ currentGameTime !== null ? currentGameTime : '—' }}
             </span>
           </span>
