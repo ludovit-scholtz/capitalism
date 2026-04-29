@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /* oxlint-disable no-unused-vars */
- 
- 
+
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMoney } from '@/lib/currencyFormat'
@@ -326,8 +325,6 @@ onUnmounted(() => {
       </aside>
     </div>
   </section>
-
 </template>
 
 <style scoped src="./OnboardingLotSelector.styles.css"></style>
-

@@ -850,5 +850,3 @@ async function buyBuilding() {
   color: #dc2626;
 }
 </style>
-
-

@@ -235,7 +235,7 @@ onMounted(async () => {
 </script>
 
 <template>
-<div class="admin-view container">
+  <div class="admin-view container">
     <div class="page-header admin-header">
       <div>
         <p class="admin-eyebrow">{{ t('admin.eyebrow') }}</p>
@@ -581,10 +581,8 @@ onMounted(async () => {
           </div>
         </article>
       </section>
-
     </template>
   </div>
 </template>
 
 <style scoped src="./GameAdminDashboardView.styles.css"></style>
-

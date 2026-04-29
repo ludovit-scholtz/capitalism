@@ -125,7 +125,9 @@
                     <span class="stat-value">{{ formatPercent(loan.annualInterestRatePercent) }}</span>
                   </div>
                 </div>
-                <div v-if="loan.missedPayments > 0" class="overdue-warning">├ö├ť├í {{ loan.missedPayments }} missed payment(s) ├ö├ç├Â penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}</div>
+                <div v-if="loan.missedPayments > 0" class="overdue-warning">
+                  ├ö├ť├í {{ loan.missedPayments }} missed payment(s) ├ö├ç├Â penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}
+                </div>
                 <div v-if="loan.collateralBuildingId" class="collateral-badge">
                   ┬ş─Ź─ć┼Ą {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
                   <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue) }}) </span>
@@ -202,17 +204,9 @@
                   </div>
                 </div>
                 <!-- Zero-balance ready-to-close indicator (non-deposit accounts only) -->
-                <p
-                  v-if="account.balance == 0 && !account.isDepositAccount"
-                  class="account-ready-close mt-2 text-xs font-medium text-success"
-                >
-                  ├ö┼ą├┤ {{ t('bank.accountReadyToClose') }}
-                </p>
+                <p v-if="account.balance == 0 && !account.isDepositAccount" class="account-ready-close mt-2 text-xs font-medium text-success">├ö┼ą├┤ {{ t('bank.accountReadyToClose') }}</p>
                 <!-- Non-zero balance hint -->
-                <p
-                  v-else-if="account.balance != 0 && !account.isDepositAccount"
-                  class="account-nonzero-hint mt-2 text-xs text-muted"
-                >
+                <p v-else-if="account.balance != 0 && !account.isDepositAccount" class="account-nonzero-hint mt-2 text-xs text-muted">
                   {{ t('bank.closeAccountNonZeroHint') }}
                 </p>
                 <!-- Close error feedback -->
@@ -488,15 +482,13 @@
       </div>
     </div>
   </main>
-
 </template>
 
 <script setup lang="ts">
 /* oxlint-disable no-unused-vars */
- 
+
 // Split-file SFC: script symbols are consumed by LoanMarketplaceView.template.html.
- 
- 
+
 import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
@@ -1014,9 +1006,6 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
     closingAccountId.value = null
   }
 }
-
-
 </script>
 
 <style scoped src="./LoanMarketplaceView.styles.css"></style>
-

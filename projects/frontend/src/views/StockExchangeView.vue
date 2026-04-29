@@ -951,7 +951,9 @@ useTickRefresh(async () => {
                                 <label class="trade-order-caption mt-2 block">{{ t('stockExchange.settlementAccountLabel') }}</label>
                                 <select v-model="selectedSettlementBankAccountId" class="trade-input mt-1" :aria-label="t('stockExchange.settlementAccountLabel')">
                                   <option value="">{{ t('stockExchange.selectSettlementAccount') }}</option>
-                                  <option v-for="account in activeSettlementAccounts" :key="account.id" :value="account.id">{{ account.accountNumber }} ┬Ě {{ formatCurrency(account.balance) }}</option>
+                                  <option v-for="account in activeSettlementAccounts" :key="account.id" :value="account.id">
+                                    {{ account.accountNumber }} ┬Ě {{ formatCurrency(account.balance) }}
+                                  </option>
                                 </select>
                                 <p v-if="activeSettlementAccounts.length === 0" class="trade-order-hint mt-1">
                                   {{ t('stockExchange.noUsdSettlementAccount') }}

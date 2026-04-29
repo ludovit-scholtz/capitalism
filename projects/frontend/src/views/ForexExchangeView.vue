@@ -113,8 +113,7 @@ const cityRateBoard = computed<CityRateRow[]>(() => {
     .map((code) => {
       const targetEurRate = eurRatesMap.value[code] ?? 1
       const crossRate = targetEurRate / baseEurRate
-      const symbol =
-        code === 'EUR' ? 'ÔéČ' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
+      const symbol = code === 'EUR' ? 'ÔéČ' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
       const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)
       return {
         targetCode: code,
@@ -868,11 +867,7 @@ watch(activeTab, async (tab) => {
                       </tr>
                     </thead>
                     <tbody>
-                      <tr
-                        v-for="row in cityRateBoard"
-                        :key="row.targetCode"
-                        class="history-row border-b border-divider/40 last:border-0"
-                      >
+                      <tr v-for="row in cityRateBoard" :key="row.targetCode" class="history-row border-b border-divider/40 last:border-0">
                         <td class="px-3 py-3 align-middle">
                           <div class="flex items-center gap-2">
                             <span class="min-w-[2rem] text-base font-bold text-brand">{{ row.targetSymbol }}</span>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
- 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -792,7 +791,4 @@ function navigateToEntry(slug: string) {
       <img :src="fullscreenImage.src" :alt="fullscreenImage.alt" class="fullscreen-help-image max-w-full max-h-full object-contain rounded-xl border border-divider" />
     </div>
   </div>
-
-
 </template>
-

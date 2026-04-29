@@ -297,12 +297,7 @@ const configureGuideCash = computed(() => {
  * Falls back to `selectedCity.value?.currencyCode` (set during the wizard flow) and finally
  * to 'EUR' so the display always has a valid currency even in the resume-after-reload case.
  */
-const completionCurrencyCode = computed<string>(
-  () =>
-    completionResult.value?.cityCurrencyCode ??
-    selectedCity.value?.currencyCode ??
-    'EUR',
-)
+const completionCurrencyCode = computed<string>(() => completionResult.value?.cityCurrencyCode ?? selectedCity.value?.currencyCode ?? 'EUR')
 
 /**
  * The auto-configured public sale price for the guest's shop.
@@ -582,10 +577,7 @@ onMounted(async () => {
       // Load cities and FX rates in the resume path so that formatCurrency() can use the
       // player's onboarding city currency instead of defaulting to EUR.  The city is derived
       // from the player's shop building, which is recorded as onboardingShopBuildingId.
-      const [citiesData, fxRatesData] = await Promise.all([
-        gqlRequest<{ cities: City[] }>(CITIES_QUERY),
-        gqlRequest<{ eurFxRates: EurFxRate[] }>('{ eurFxRates { currencyCode rate } }'),
-      ])
+      const [citiesData, fxRatesData] = await Promise.all([gqlRequest<{ cities: City[] }>(CITIES_QUERY), gqlRequest<{ eurFxRates: EurFxRate[] }>('{ eurFxRates { currencyCode rate } }')])
       await Promise.all([loadGameState(), loadFirstSaleMission()])
 
       cities.value = citiesData.cities
@@ -593,9 +585,7 @@ onMounted(async () => {
 
       // Derive the player's onboarding city from the shop building that was created during
       // onboarding (onboardingShopBuildingId Ôćĺ building.cityId Ôćĺ city for correct currency).
-      const shopBuilding = auth.player?.companies
-        .flatMap((company) => company.buildings)
-        .find((building) => building.id === auth.player?.onboardingShopBuildingId)
+      const shopBuilding = auth.player?.companies.flatMap((company) => company.buildings).find((building) => building.id === auth.player?.onboardingShopBuildingId)
       if (shopBuilding?.cityId) {
         selectedCityId.value = shopBuilding.cityId
       }
@@ -1801,7 +1791,11 @@ useTickRefresh(async () => {
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPrice') }}</strong>
                 <p class="text-muted text-xs m-0">
-                  {{ configureGuideBasePrice === null ? t('onboarding.configureStepPriceDesc') : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice, completionCurrencyCode) }) }}
+                  {{
+                    configureGuideBasePrice === null
+                      ? t('onboarding.configureStepPriceDesc')
+                      : t('onboarding.configureStepPriceDescWithPrice', { price: formatCurrency(configureGuideBasePrice, completionCurrencyCode) })
+                  }}
                 </p>
               </div>
             </article>
@@ -2153,4 +2147,3 @@ useTickRefresh(async () => {
   }
 }
 </style>
-

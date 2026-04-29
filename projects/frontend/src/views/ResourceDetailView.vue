@@ -261,7 +261,7 @@ function goBack() {
 </script>
 
 <template>
-<div class="resource-detail-view container">
+  <div class="resource-detail-view container">
     <nav class="breadcrumb">
       <button type="button" class="back-link" @click="goBack">ÔćÉ {{ t('resourceDetail.backToEncyclopedia') }}</button>
       <label class="filter-toggle">
@@ -423,10 +423,8 @@ function goBack() {
           </article>
         </div>
       </section>
-
     </template>
   </div>
 </template>
 
 <style scoped src="./ResourceDetailView.styles.css"></style>
-

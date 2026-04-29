@@ -1,5 +1,4 @@
 <script setup lang="ts">
- 
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
@@ -594,9 +593,6 @@ useTickRefresh(async () => {
       </div>
     </div>
   </div>
-
-
 </template>
 
 <style scoped src="./LedgerView.styles.css"></style>
-

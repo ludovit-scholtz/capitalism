@@ -577,7 +577,9 @@ async function createCompany() {
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary">
                 {{ t('dashboard.buyBuilding') }}
               </RouterLink>
-              <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary"> ­čŚ║´ŞĆ {{ t('nav.cityMap') }} </RouterLink>
+              <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary">
+                ­čŚ║´ŞĆ {{ t('nav.cityMap') }}
+              </RouterLink>
               <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> ­čôĺ {{ t('dashboard.viewLedger') }} </RouterLink>
               <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ÔÜÖ´ŞĆ {{ t('dashboard.companySettings') }} </RouterLink>
             </div>
@@ -734,5 +736,3 @@ async function createCompany() {
     </template>
   </div>
 </template>
-
-

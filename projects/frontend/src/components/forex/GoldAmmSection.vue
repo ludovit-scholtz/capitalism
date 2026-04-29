@@ -1,17 +1,8 @@
 <script setup lang="ts">
- 
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
-import type {
-  GoldAmmPool,
-  GoldAmmSwapQuote,
-  GoldAmmSwapResult,
-  GoldAmmLiquidityResult,
-  GoldAmmRemoveLiquidityResult,
-  GoldBalanceInfo,
-  CurrencyBalance,
-} from '@/types'
+import type { GoldAmmPool, GoldAmmSwapQuote, GoldAmmSwapResult, GoldAmmLiquidityResult, GoldAmmRemoveLiquidityResult, GoldBalanceInfo, CurrencyBalance } from '@/types'
 
 const { t } = useI18n()
 
@@ -343,12 +334,7 @@ onMounted(loadData)
 
     <template v-else>
       <!-- Gold Balance Card (always visible) -->
-      <div
-        v-if="goldBalance"
-        class="rounded-xl p-5 mb-5 text-[#1a1200]"
-        style="background: linear-gradient(135deg, #f5c842 0%, #e5a800 100%)"
-        aria-label="Gold Balance"
-      >
+      <div v-if="goldBalance" class="rounded-xl p-5 mb-5 text-[#1a1200]" style="background: linear-gradient(135deg, #f5c842 0%, #e5a800 100%)" aria-label="Gold Balance">
         <span class="inline-block text-xs font-bold uppercase tracking-wide bg-black/15 rounded px-2 py-0.5 mb-3">
           {{ t('goldAmm.goldBadge') }}
         </span>
@@ -366,9 +352,7 @@ onMounted(loadData)
             <span class="font-bold">{{ formatGold(goldBalance.blockedInPools) }} XAU</span>
           </div>
         </div>
-        <div v-if="goldBalance.blockedInPools > 0" class="mt-3 text-xs font-semibold bg-black/15 rounded px-2 py-1.5">
-          ├ö├ť├í┬┤┼×─ć {{ t('goldAmm.blockedGoldWarning') }}
-        </div>
+        <div v-if="goldBalance.blockedInPools > 0" class="mt-3 text-xs font-semibold bg-black/15 rounded px-2 py-1.5">├ö├ť├í┬┤┼×─ć {{ t('goldAmm.blockedGoldWarning') }}</div>
       </div>
 
       <!-- Inner Tab Bar -->
@@ -437,18 +421,10 @@ onMounted(loadData)
             <label class="text-sm font-medium text-muted">
               {{ t('goldAmm.amount') }}
               <span class="text-xs font-normal opacity-70 ml-1">
-                ({{ t('goldAmm.availableGold') }}: {{ formatFiat(swapInputBalance) }}
-                {{ swapDirection === 'FIAT_TO_GOLD' ? swapCurrency : 'XAU' }})
+                ({{ t('goldAmm.availableGold') }}: {{ formatFiat(swapInputBalance) }} {{ swapDirection === 'FIAT_TO_GOLD' ? swapCurrency : 'XAU' }})
               </span>
             </label>
-            <input
-              v-model.number="swapAmount"
-              type="number"
-              min="0"
-              step="any"
-              class="form-input"
-              :placeholder="t('goldAmm.amountPlaceholder')"
-            />
+            <input v-model.number="swapAmount" type="number" min="0" step="any" class="form-input" :placeholder="t('goldAmm.amountPlaceholder')" />
           </div>
 
           <div v-if="swapQuoteError" class="text-sm text-bad px-3 py-2 bg-bad/10 rounded-md" role="alert">
@@ -456,23 +432,14 @@ onMounted(loadData)
           </div>
 
           <div v-if="!swapShowConfirm">
-            <button
-              class="btn btn-primary"
-              :disabled="swapQuoteLoading || !!swapValidationError || !swapAmount"
-              @click="fetchSwapQuote"
-            >
+            <button class="btn btn-primary" :disabled="swapQuoteLoading || !!swapValidationError || !swapAmount" @click="fetchSwapQuote">
               {{ swapQuoteLoading ? t('common.loading') : t('goldAmm.getQuote') }}
             </button>
           </div>
         </div>
 
         <!-- Quote confirmation -->
-        <div
-          v-if="swapShowConfirm && swapQuote"
-          class="bg-card-raised border border-divider rounded-lg p-4 mt-5"
-          role="region"
-          aria-label="Swap Quote"
-        >
+        <div v-if="swapShowConfirm && swapQuote" class="bg-card-raised border border-divider rounded-lg p-4 mt-5" role="region" aria-label="Swap Quote">
           <h4 class="text-sm font-semibold text-body mb-3">{{ t('goldAmm.quoteTitle') }}</h4>
           <table class="w-full border-collapse text-sm mb-4">
             <tbody>
@@ -498,9 +465,7 @@ onMounted(loadData)
               </tr>
               <tr>
                 <td class="py-1.5 text-muted">{{ t('goldAmm.slippage') }}</td>
-                <td class="py-1.5 font-semibold" :class="swapQuote.slippagePercent > 1 ? 'text-bad' : 'text-body'">
-                  {{ swapQuote.slippagePercent.toFixed(2) }}%
-                </td>
+                <td class="py-1.5 font-semibold" :class="swapQuote.slippagePercent > 1 ? 'text-bad' : 'text-body'">{{ swapQuote.slippagePercent.toFixed(2) }}%</td>
               </tr>
             </tbody>
           </table>
@@ -529,22 +494,14 @@ onMounted(loadData)
 
         <div v-if="myPositions.length === 0" class="py-8 text-center">
           <p class="text-sm text-muted italic mb-3">{{ t('goldAmm.noPositions') }}</p>
-          <button class="btn btn-primary" @click="activeTab = 'addLiquidity'">
-            {{ t('goldAmm.tabAddLiquidity') }} ├ö─ç─║
-          </button>
+          <button class="btn btn-primary" @click="activeTab = 'addLiquidity'">{{ t('goldAmm.tabAddLiquidity') }} ├ö─ç─║</button>
         </div>
 
         <div v-else class="flex flex-col gap-5">
-          <div
-            v-for="pool in myPositions"
-            :key="pool.id"
-            class="border border-divider rounded-lg p-4"
-          >
+          <div v-for="pool in myPositions" :key="pool.id" class="border border-divider rounded-lg p-4">
             <div class="flex justify-between items-center mb-3">
               <span class="text-base font-bold text-body">{{ pool.currencyCode }}/XAU</span>
-              <span class="text-xs bg-brand/10 text-brand rounded-full px-2.5 py-0.5 font-semibold">
-                {{ (pool.myPosition?.sharePercent ?? 0).toFixed(2) }}% {{ t('goldAmm.positionShares') }}
-              </span>
+              <span class="text-xs bg-brand/10 text-brand rounded-full px-2.5 py-0.5 font-semibold"> {{ (pool.myPosition?.sharePercent ?? 0).toFixed(2) }}% {{ t('goldAmm.positionShares') }} </span>
             </div>
 
             <div class="grid grid-cols-2 gap-3 text-sm mb-4">
@@ -580,20 +537,9 @@ onMounted(loadData)
             <div class="flex flex-wrap items-end gap-3">
               <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-muted">{{ t('goldAmm.removeFraction') }}</label>
-                <input
-                  v-model.number="removeFraction"
-                  type="number"
-                  min="0.01"
-                  max="1"
-                  step="0.01"
-                  class="form-input w-28"
-                />
+                <input v-model.number="removeFraction" type="number" min="0.01" max="1" step="0.01" class="form-input w-28" />
               </div>
-              <button
-                class="btn btn-danger"
-                :disabled="removeLoading && removePositionId === pool.myPosition?.id"
-                @click="pool.myPosition?.id && removeLiquidity(pool.myPosition.id)"
-              >
+              <button class="btn btn-danger" :disabled="removeLoading && removePositionId === pool.myPosition?.id" @click="pool.myPosition?.id && removeLiquidity(pool.myPosition.id)">
                 {{ removeLoading && removePositionId === pool.myPosition?.id ? t('common.loading') : t('goldAmm.removeLiquidity') }}
               </button>
             </div>
@@ -605,7 +551,6 @@ onMounted(loadData)
 
       <!-- ├ö├Â├ç├ö├Â├ç Add Liquidity Tab ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
       <div v-else-if="activeTab === 'addLiquidity'" class="flex flex-col gap-5" aria-label="Add Liquidity">
-
         <!-- Add to existing pool -->
         <div v-if="pools.length > 0" class="bg-card border border-divider rounded-xl p-6">
           <h3 class="text-base font-semibold text-body mb-1 pb-3 border-b border-divider">
@@ -617,9 +562,7 @@ onMounted(loadData)
             <div class="flex flex-col gap-1.5">
               <label class="text-sm font-medium text-muted">{{ t('goldAmm.addLiquidityPool') }}</label>
               <select v-model="addPoolId" class="form-select">
-                <option v-for="p in pools" :key="p.id" :value="p.id">
-                  {{ p.currencyCode }}/XAU ├ö├ç├Â {{ formatFiat(p.fiatReserve) }} {{ p.currencyCode }} + {{ formatGold(p.goldReserve) }} XAU
-                </option>
+                <option v-for="p in pools" :key="p.id" :value="p.id">{{ p.currencyCode }}/XAU ├ö├ç├Â {{ formatFiat(p.fiatReserve) }} {{ p.currencyCode }} + {{ formatGold(p.goldReserve) }} XAU</option>
               </select>
             </div>
 
@@ -703,6 +646,4 @@ onMounted(loadData)
       </div>
     </template>
   </section>
-
 </template>
-
