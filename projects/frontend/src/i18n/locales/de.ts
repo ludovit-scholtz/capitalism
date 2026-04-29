@@ -716,6 +716,7 @@ export default {
     noAvailableLand: 'In der gewählten Stadt ist kein passendes Grundstück für diesen Gebäudetyp verfügbar.',
     populationIndex: 'Bevölkerungsindex',
     appraisedValue: 'Schätzwert',
+    propertySize: 'Objektgröße',
     askingPrice: 'Angebotspreis',
     selectedLand: 'Ausgewähltes Grundstück',
     cost: 'Kosten',

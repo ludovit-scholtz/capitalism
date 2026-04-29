@@ -717,6 +717,7 @@ export default {
     noAvailableLand: 'No available land matches this building type in the selected city.',
     populationIndex: 'Population index',
     appraisedValue: 'Appraised value',
+    propertySize: 'Property size',
     askingPrice: 'Asking price',
     selectedLand: 'Selected land',
     cost: 'Cost',

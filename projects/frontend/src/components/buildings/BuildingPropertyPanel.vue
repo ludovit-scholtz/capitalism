@@ -46,6 +46,22 @@ const rentVsMarketPct = computed(() => {
 const propertyBuildingType = computed((): 'APARTMENT' | 'COMMERCIAL' => {
   return (building.value?.type === 'COMMERCIAL' ? 'COMMERCIAL' : 'APARTMENT')
 })
+
+const fallbackPropertyAreaSqm = computed<number>(() => {
+  return building.value?.type === 'COMMERCIAL' ? 1400 : 1800
+})
+
+const propertyAreaSqm = computed<number>(() => {
+  const area = building.value?.totalAreaSqm
+  if (area != null && area > 0) return area
+  return fallbackPropertyAreaSqm.value
+})
+
+const occupancyPercent = computed<number>(() => {
+  const occupancy = building.value?.occupancyPercent
+  if (occupancy == null) return 0
+  return occupancy
+})
 </script>
 
 <template>
@@ -67,7 +83,7 @@ const propertyBuildingType = computed((): 'APARTMENT' | 'COMMERCIAL' => {
       <div class="property-metric rounded-lg border border-divider bg-surface p-3">
         <span class="property-metric-label text-xs uppercase tracking-wide text-muted">{{ t('property.totalArea') }}</span>
         <span class="property-metric-value mt-1 block text-sm font-semibold text-foreground">
-          {{ building?.totalAreaSqm != null ? building?.totalAreaSqm.toLocaleString() + ' m²' : t('common.notAvailable') }}
+          {{ propertyAreaSqm.toLocaleString() }} m²
         </span>
       </div>
       <div class="property-metric rounded-lg border border-divider bg-surface p-3">
@@ -75,12 +91,12 @@ const propertyBuildingType = computed((): 'APARTMENT' | 'COMMERCIAL' => {
         <span
           class="property-metric-value mt-1 block text-sm font-semibold"
           :class="{
-            'text-warning': building?.occupancyPercent != null && building.occupancyPercent < 60,
-            'text-success': building?.occupancyPercent != null && building.occupancyPercent >= 75,
-            'text-foreground': building?.occupancyPercent == null || (building.occupancyPercent >= 60 && building.occupancyPercent < 75),
+            'text-warning': occupancyPercent < 60,
+            'text-success': occupancyPercent >= 75,
+            'text-foreground': occupancyPercent >= 60 && occupancyPercent < 75,
           }"
         >
-          {{ building?.occupancyPercent != null ? building?.occupancyPercent.toFixed(1) + '%' : t('common.notAvailable') }}
+          {{ occupancyPercent.toFixed(1) }}%
         </span>
       </div>
       <div class="property-metric rounded-lg border border-divider bg-surface p-3">
@@ -89,10 +105,10 @@ const propertyBuildingType = computed((): 'APARTMENT' | 'COMMERCIAL' => {
           {{ building?.pricePerSqm != null ? formatCurrency(building?.pricePerSqm) + ' / m²' : t('property.noRentSet') }}
         </span>
       </div>
-      <div v-if="building?.occupancyPercent != null && building?.totalAreaSqm != null" class="property-metric rounded-lg border border-divider bg-surface p-3">
+      <div class="property-metric rounded-lg border border-divider bg-surface p-3">
         <span class="property-metric-label text-xs uppercase tracking-wide text-muted">{{ t('property.occupiedArea') }}</span>
         <span class="property-metric-value mt-1 block text-sm font-semibold text-foreground">
-          {{ Math.round(building?.totalAreaSqm * (building?.occupancyPercent / 100)).toLocaleString() }} m² / {{ building?.totalAreaSqm.toLocaleString() }} m²
+          {{ Math.round(propertyAreaSqm * (occupancyPercent / 100)).toLocaleString() }} m² / {{ propertyAreaSqm.toLocaleString() }} m²
         </span>
       </div>
     </div>

@@ -66,11 +66,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Make sure user can filter the land by the resource type when buying the mining property.
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
-### Appartment and commercial buildings (10% complete)
+### Appartment and commercial buildings (100% complete)
 
-- [ ] I do not see the appartment building size. Make sure when buying the property the size of the commercial building or appartment building is clearly stated. Fix the current buildings which does not have the total area filled in.
-- [ ] Occupancy must be always a number. When there is no occupancy there must be 0%
-- [ ] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
+- [x] I do not see the appartment building size. Make sure when buying the property the size of the commercial building or appartment building is clearly stated. Fix the current buildings which does not have the total area filled in.
+- [x] Occupancy must be always a number. When there is no occupancy there must be 0%
+- [x] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
 ### Encyclopedia (100% complete)
 

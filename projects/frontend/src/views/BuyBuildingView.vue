@@ -57,6 +57,10 @@ const INITIATE_BASE_DEPOSIT_MUTATION = `
 `
 
 const buildingTypes = ['MINE', 'FACTORY', 'SALES_SHOP', 'RESEARCH_DEVELOPMENT', 'APARTMENT', 'COMMERCIAL', 'MEDIA_HOUSE', 'BANK', 'EXCHANGE', 'POWER_PLANT']
+const PROPERTY_DEFAULT_AREA_SQM: Record<string, number> = {
+  APARTMENT: 1800,
+  COMMERCIAL: 1400,
+}
 
 const selectedCompany = computed<Company | null>(() => {
   return auth.player?.companies.find((company) => company.id === companyId.value) ?? null
@@ -64,6 +68,13 @@ const selectedCompany = computed<Company | null>(() => {
 
 const selectedLot = computed<BuildingLot | null>(() => {
   return availableLots.value.find((lot) => lot.id === selectedLotId.value) ?? null
+})
+
+const isPropertyTypeSelected = computed(() => selectedType.value === 'APARTMENT' || selectedType.value === 'COMMERCIAL')
+
+const selectedPropertyAreaSqm = computed<number | null>(() => {
+  if (!isPropertyTypeSelected.value) return null
+  return PROPERTY_DEFAULT_AREA_SQM[selectedType.value] ?? null
 })
 
 const selectedCityObj = computed(() => cities.value.find((c) => c.id === selectedCityId.value) ?? null)
@@ -271,6 +282,10 @@ function formatCurrency(value: number) {
 
 function formatPopulationIndex(value: number) {
   return value.toFixed(2)
+}
+
+function formatSqm(value: number) {
+  return `${value.toLocaleString(locale.value)} m²`
 }
 
 function districtLabel(district: string) {
@@ -624,6 +639,7 @@ async function buyBuilding() {
               <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
+              <span v-if="selectedPropertyAreaSqm != null" class="text-[0.8125rem] text-muted">{{ t('buildings.propertySize') }}: {{ formatSqm(selectedPropertyAreaSqm) }}</span>
               <span
                 v-if="lot.resourceType"
                 class="buy-building-resource-badge self-start"
@@ -652,6 +668,7 @@ async function buyBuilding() {
                 >{{ t('cityMap.resourcePremium') }}</span>
               </span>
               <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
+              <span v-if="selectedPropertyAreaSqm != null">{{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong></span>
             </div>
             <!-- Mining deposit investment summary (shown when MINE selected and lot has resource) -->
             <div

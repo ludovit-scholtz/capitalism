@@ -715,6 +715,7 @@ export default {
     noAvailableLand: 'V zvolenom meste nie je dostupný vhodný pozemok pre tento typ budovy.',
     populationIndex: 'Index populácie',
     appraisedValue: 'Odhadovaná hodnota',
+    propertySize: 'Veľkosť nehnuteľnosti',
     askingPrice: 'Predajná cena',
     selectedLand: 'Vybraný pozemok',
     cost: 'Cena',

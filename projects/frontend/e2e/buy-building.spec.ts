@@ -47,6 +47,40 @@ test.describe('Buy Building View', () => {
     await expect(starterFactoryLot.getByText(/Population index/i)).toBeVisible()
   })
 
+  test('shows apartment property size in land cards and selected summary', async ({ page }) => {
+    const player = makePlayer({
+      onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',
+      companies: [
+        {
+          id: 'company-1',
+          playerId: 'player-1',
+          name: 'Housing Group',
+          cash: 500000,
+          foundedAtUtc: '2026-01-01T00:00:00Z',
+          buildings: [],
+        },
+      ],
+    })
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-1')
+
+    await page.getByRole('button', { name: /Apartment/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
+
+    const apartmentLot = page.getByRole('button', { name: /Riverside Apartment Block/i })
+    await expect(apartmentLot).toBeVisible()
+    await expect(apartmentLot.getByText(/Property size:/i)).toBeVisible()
+    await expect(apartmentLot.getByText(/1,800 m²/i)).toBeVisible()
+
+    await apartmentLot.click()
+    await expect(page.getByText(/Property size:/i).nth(1)).toBeVisible()
+    await expect(page.getByText(/1,800 m²/i).nth(1)).toBeVisible()
+  })
+
   test('purchases a selected land parcel and opens the building detail page', async ({ page }) => {
     const player = makePlayer({
       onboardingCompletedAtUtc: '2026-01-01T00:00:00Z',

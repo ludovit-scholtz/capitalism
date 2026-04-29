@@ -12244,6 +12244,68 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.True(company.GetProperty("cash").GetDecimal() < 500_000m);
     }
 
+        [Fact]
+        public async Task PurchaseLot_PropertyBuilding_InitializesAreaAndZeroOccupancy()
+        {
+                var token = await RegisterAndGetTokenAsync($"lot-property-{Guid.NewGuid()}@test.com");
+                var (companyId, _, _) = await CompleteOnboardingAsync(token, "Property Buyer Co");
+
+                var citiesResult = await ExecuteGraphQlAsync("{ cities { id name } }");
+                var bratislavaId = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray()
+                        .First(c => c.GetProperty("name").GetString() == "Bratislava")
+                        .GetProperty("id").GetString();
+
+                var lotsResult = await ExecuteGraphQlAsync(
+                        """
+                        query CityLots($cityId: UUID!) {
+                            cityLots(cityId: $cityId) { id suitableTypes ownerCompanyId }
+                        }
+                        """,
+                        new { cityId = bratislavaId });
+
+                var apartmentLotId = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
+                        .First(l => l.GetProperty("suitableTypes").GetString() == "APARTMENT"
+                                         && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null)
+                        .GetProperty("id").GetString();
+
+                var commercialLotId = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
+                        .First(l => l.GetProperty("suitableTypes").GetString()!.Contains("COMMERCIAL")
+                                         && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null)
+                        .GetProperty("id").GetString();
+
+                var apartmentResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation PurchaseLot($input: PurchaseLotInput!) {
+                            purchaseLot(input: $input) {
+                                building { id type occupancyPercent totalAreaSqm }
+                            }
+                        }
+                        """,
+                        new { input = new { companyId, lotId = apartmentLotId, buildingType = "APARTMENT", buildingName = "Test Apartments" } },
+                        token);
+
+                var commercialResult = await ExecuteGraphQlAsync(
+                        """
+                        mutation PurchaseLot($input: PurchaseLotInput!) {
+                            purchaseLot(input: $input) {
+                                building { id type occupancyPercent totalAreaSqm }
+                            }
+                        }
+                        """,
+                        new { input = new { companyId, lotId = commercialLotId, buildingType = "COMMERCIAL", buildingName = "Test Offices" } },
+                        token);
+
+                var apartmentBuilding = apartmentResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+                Assert.Equal("APARTMENT", apartmentBuilding.GetProperty("type").GetString());
+                Assert.Equal(0m, apartmentBuilding.GetProperty("occupancyPercent").GetDecimal());
+                Assert.True(apartmentBuilding.GetProperty("totalAreaSqm").GetDecimal() > 0m);
+
+                var commercialBuilding = commercialResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building");
+                Assert.Equal("COMMERCIAL", commercialBuilding.GetProperty("type").GetString());
+                Assert.Equal(0m, commercialBuilding.GetProperty("occupancyPercent").GetDecimal());
+                Assert.True(commercialBuilding.GetProperty("totalAreaSqm").GetDecimal() > 0m);
+        }
+
     [Fact]
     public async Task PurchaseLot_AlreadyOwned_Fails()
     {

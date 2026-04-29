@@ -218,6 +218,13 @@ public sealed partial class Mutation
             ConstructionCost = constructionCost,
         };
 
+        // Property buildings must always start with numeric occupancy and a known area.
+        if (buildingType == BuildingType.Apartment || buildingType == BuildingType.Commercial)
+        {
+            building.TotalAreaSqm = Engine.GameConstants.DefaultPropertyAreaSqm(buildingType);
+            building.OccupancyPercent = Engine.GameConstants.PropertyInitialOccupancyPercent;
+        }
+
         db.Buildings.Add(building);
         await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(db, building, lot.City?.CurrencyCode);
         lot.OwnerCompanyId = company.Id;

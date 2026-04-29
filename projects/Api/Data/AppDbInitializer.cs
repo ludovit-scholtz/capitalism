@@ -156,6 +156,9 @@ public sealed partial class AppDbInitializer(
         // Existing buildings created before bank-account provisioning must be linked to
         // a company-owned account in their city currency on startup.
         await EnsureBuildingBankAccountsAsync();
+
+        // Property buildings must always have numeric occupancy and known area.
+        await EnsurePropertyBuildingDefaultsAsync();
     }
 
     private async Task SeedFxRatesAsync()
