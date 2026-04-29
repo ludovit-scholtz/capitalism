@@ -34,7 +34,7 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
 - [ ] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
 
-### Number formatting (100% complete)
+### Number formatting (0% complete)
 
 - [ ] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
 - [ ] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
