@@ -658,6 +658,7 @@ export default {
     manufacturingGuideTopicManufacturing: 'MANUFACTURING unit configuration and line consistency',
     manufacturingGuideTopicStorage: 'STORAGE buffering and anti-starvation flow control',
     manufacturingGuideTopicPublicSales: 'PUBLIC_SALES pricing, demand response, and iteration',
+    manufacturingGuideTopicUnitTypes: 'What every factory-relevant unit type actually does',
     manufacturingGuideStepPurchaseTitle: 'PURCHASE: Source inputs safely',
     manufacturingGuideStepPurchaseBody:
       'The PURCHASE unit is your defensive control point against bad input economics. Configure it with a realistic maximum price and a minimum quality floor so your factory does not consume expensive or weak inputs that destroy margins downstream. Keep this unit linked directly to MANUFACTURING to avoid disconnected flow where stock accumulates but production stays idle. Monitor how often purchasing succeeds each tick; repeated misses usually mean your cap is too strict for current market conditions. Raise limits gradually rather than in large jumps, then re-check final sales margin before keeping the change. A disciplined PURCHASE setup stabilizes the entire chain by protecting cost predictability, which is more valuable in early growth than chasing occasional low-price outliers.',
@@ -670,6 +671,9 @@ export default {
     manufacturingGuideStepPublicSalesTitle: 'PUBLIC_SALES: Price and release',
     manufacturingGuideStepPublicSalesBody:
       'PUBLIC_SALES is the market-facing unit where all upstream work becomes realized cash flow. Start with a realistic minimum price near market reference, then adjust in small controlled steps after observing several ticks. If units sell out instantly, test a modest price increase to capture margin; if inventory piles up, lower price carefully or improve perceived value through quality. Keep this unit supplied, because no pricing strategy works when shelves are empty. Track quantity sold, revenue, and gross profit together rather than optimizing one metric in isolation. The goal is a repeatable operating band where demand remains active and margin remains healthy. Consistent PUBLIC_SALES iteration turns your first factory from a static setup into a learning system that compounds over time.',
+    manufacturingGuideStepUnitTypesTitle: 'Unit type reference: what each one does',
+    manufacturingGuideStepUnitTypesBody:
+      'Factory setup gets easier once each unit type has a clear job. PURCHASE secures inputs within price and quality limits. MANUFACTURING converts connected inputs into product output. STORAGE absorbs timing shocks and protects sales continuity. B2B_SALES pushes goods to other company buildings when you want internal distribution. PUBLIC_SALES exposes inventory to city demand at your configured minimum price. PRODUCT_QUALITY improves objective product quality through focused investment, while BRAND_QUALITY supports premium pricing by strengthening market perception. BRANDING and MARKETING reinforce awareness and demand momentum outside pure production throughput. MINING is the extraction counterpart for raw deposits when your chain starts from owned resources. Treat each unit as a specialized role in one connected pipeline, not as independent toggles, and your operating decisions become predictable and measurable.',
     viewDetail: 'View detail',
     searchNoResults: 'No resources or products match your search. Try a different term or clear the filters.',
   },

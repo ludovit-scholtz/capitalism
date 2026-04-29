@@ -34,6 +34,24 @@ test.describe('Encyclopedia FullHD screenshots', () => {
     await page.screenshot({ path: factoryLayoutPath })
     expect(fs.existsSync(factoryLayoutPath)).toBeTruthy()
 
+    await page.locator('.manufacturing-help-card .help-image-trigger').first().click()
+    const factoryLayoutPurchaseDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-factory-layout-help-purchase-fullscreen-1920x1080.png')
+    await page.screenshot({ path: factoryLayoutPurchaseDialogPath })
+    expect(fs.existsSync(factoryLayoutPurchaseDialogPath)).toBeTruthy()
+    await page.getByRole('button', { name: /close preview|zavrieť náhľad|vorschau schließen/i }).click()
+
+    await page.locator('.manufacturing-help-card .help-image-trigger').nth(2).click()
+    const factoryLayoutStorageDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-factory-layout-help-storage-fullscreen-1920x1080.png')
+    await page.screenshot({ path: factoryLayoutStorageDialogPath })
+    expect(fs.existsSync(factoryLayoutStorageDialogPath)).toBeTruthy()
+    await page.getByRole('button', { name: /close preview|zavrieť náhľad|vorschau schließen/i }).click()
+
+    await page.locator('.manufacturing-help-card .help-image-trigger').last().click()
+    const factoryLayoutUnitTypesDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-factory-layout-help-unit-types-fullscreen-1920x1080.png')
+    await page.screenshot({ path: factoryLayoutUnitTypesDialogPath })
+    expect(fs.existsSync(factoryLayoutUnitTypesDialogPath)).toBeTruthy()
+    await page.getByRole('button', { name: /close preview|zavrieť náhľad|vorschau schließen/i }).click()
+
     await page.goto('/encyclopedia/resources-definition')
     const resourcesDefinitionPath = path.join(OUTPUT_DIR, 'encyclopedia-resources-definition-1920x1080.png')
     await page.screenshot({ path: resourcesDefinitionPath })

@@ -656,6 +656,7 @@ export default {
     manufacturingGuideTopicManufacturing: 'Konfigurácia jednotky VÝROBA a konzistentná linka',
     manufacturingGuideTopicStorage: 'Tlmenie výkyvov cez SKLAD a ochrana proti výpadkom',
     manufacturingGuideTopicPublicSales: 'Cenotvorba vo VEREJNOM_PREDAJI a iterácie podľa dopytu',
+    manufacturingGuideTopicUnitTypes: 'Referencia všetkých typov jednotiek a ich úloh',
     manufacturingGuideStepPurchaseTitle: 'NÁKUP: Bezpečný sourcing vstupov',
     manufacturingGuideStepPurchaseBody:
       'Jednotka NÁKUP je obranný bod celej ekonomiky linky. Nastavte maximálnu cenu a minimálnu kvalitu tak, aby ste neplatili prehnane drahé alebo slabé vstupy, ktoré neskôr zničia maržu. Udržte túto jednotku priamo prepojenú s VÝROBOU, inak sa môže stať, že zásoby budú rásť, ale výroba zostane neaktívna. Sledujte, ako často nákup prejde v každom ticku. Ak často zlyháva, býva limit príliš prísny pre aktuálny trh. Limity dvíhajte postupne, nie skokovo, a vždy kontrolujte dopad na hrubý zisk vo finálnom predaji. Dobre nastavený NÁKUP dá celej továrni predvídateľné náklady, čo je v early game dôležitejšie než naháňanie extrémnych výhod.',
@@ -668,6 +669,9 @@ export default {
     manufacturingGuideStepPublicSalesTitle: 'VEREJNÝ_PREDAJ: Cena a predaj',
     manufacturingGuideStepPublicSalesBody:
       'VEREJNÝ_PREDAJ je trhová brána, kde sa všetka predchádzajúca práca mení na reálny cash-flow. Začnite s minimálnou cenou blízko referenčnej trhovej úrovne a následne upravujte po malých krokoch po niekoľkých tickoch. Ak sa tovar vypredáva okamžite, otestujte mierne zvýšenie ceny pre lepšiu maržu. Ak sa zásoba hromadí, cenu opatrne znížte alebo zvýšte atraktivitu cez kvalitu. Kľúčové je mať konzistentný stock, pretože žiadna cenová stratégia nefunguje pri prázdnom regáli. Sledujte spolu množstvo, tržby aj hrubý zisk, nie iba jednu metriku. Cieľom je nájsť opakovateľný interval, kde dopyt zostáva živý a marža zdravá. Práve táto iterácia robí továreň dlhodobo škálovateľnou.',
+    manufacturingGuideStepUnitTypesTitle: 'Prehľad typov jednotiek: čo robí každá z nich',
+    manufacturingGuideStepUnitTypesBody:
+      'Nastavenie továrne je výrazne jednoduchšie, keď má každý typ jednotky jasnú rolu. NÁKUP zabezpečuje vstupy podľa cenových a kvalitatívnych limitov. VÝROBA premieňa prepojené vstupy na produktový výstup. SKLAD tlmí časové výkyvy a chráni kontinuitu predaja. B2B_PREDAJ posúva tovar medzi vašimi budovami, keď chcete internú distribúciu. VEREJNÝ_PREDAJ vystavuje zásoby mestskému dopytu pri nastavenej minimálnej cene. KVALITA_PRODUKTU zvyšuje objektívnu kvalitu výrobku, zatiaľ čo KVALITA_ZNAČKY podporuje prémiové oceňovanie cez vnímanie trhu. BRANDING a MARKETING posilňujú povedomie a dopyt mimo čistej výrobnej kapacity. ŤAŽBA je vstupný článok pre vlastné ložiská surovín. Vnímajte jednotky ako prepojený výrobný systém, nie ako izolované prepínače.',
     viewDetail: 'Zobraziť detail',
     searchNoResults: 'Žiadne suroviny ani produkty nezodpovedajú vášmu vyhľadávaniu. Skúste iný výraz alebo vymažte filtre.',
   },

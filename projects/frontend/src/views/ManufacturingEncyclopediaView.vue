@@ -139,6 +139,11 @@ const manufacturingGuideCards = [
     bodyKey: 'encyclopedia.manufacturingGuideStepPublicSalesBody',
     productSlug: 'basic-medicine',
   },
+  {
+    titleKey: 'encyclopedia.manufacturingGuideStepUnitTypesTitle',
+    bodyKey: 'encyclopedia.manufacturingGuideStepUnitTypesBody',
+    imageUrl: '/onboarding-help/step-5-factory-lot.png',
+  },
 ]
 
 const manufacturingGuideTopics = [
@@ -146,6 +151,7 @@ const manufacturingGuideTopics = [
   'encyclopedia.manufacturingGuideTopicManufacturing',
   'encyclopedia.manufacturingGuideTopicStorage',
   'encyclopedia.manufacturingGuideTopicPublicSales',
+  'encyclopedia.manufacturingGuideTopicUnitTypes',
 ]
 
 const catalogEntries = computed<CatalogEntry[]>(() => {
@@ -412,7 +418,7 @@ function navigateToEntry(slug: string) {
               {{ t(topic) }}
             </li>
           </ul>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
             <article v-for="card in manufacturingGuideCards" :key="card.titleKey" class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden">
               <button
                 v-if="getGuideCardImage(card)"
