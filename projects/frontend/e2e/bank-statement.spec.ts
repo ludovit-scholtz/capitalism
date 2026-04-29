@@ -67,6 +67,15 @@ function seedBankAccounts(state: ReturnType<typeof setupMockApi>, playerId: stri
   }
 }
 
+async function switchCityViaContextSwitcher(
+  page: Parameters<typeof test>[0]['page'],
+  cityName: 'Bratislava' | 'Prague' | 'Vienna',
+) {
+  await page.locator('.ctx-trigger').click()
+  await page.locator('.ctx-city-option', { hasText: cityName }).click()
+  await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText(cityName)
+}
+
 // ── Bank Statement Review page ────────────────────────────────────────────────
 
 test.describe('Bank Statement Review', () => {
@@ -352,8 +361,8 @@ test.describe('Funding guidance in Buy Building', () => {
     // Select a building type first
     await page.locator('.type-card').first().click()
 
-    // Select Prague
-    await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
+    // Select Prague via the global context switcher
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     // Funding guidance should appear
     const guidance = page.locator('.funding-guidance')
@@ -378,8 +387,8 @@ test.describe('Funding guidance in Buy Building', () => {
     // Select a building type
     await page.locator('.type-card').first().click()
 
-    // Select Bratislava (EUR city)
-    await page.locator('.city-option').filter({ hasText: 'Bratislava' }).click()
+    // Select Bratislava (EUR city) via the global context switcher
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // No funding warning for EUR city
     await expect(page.locator('.funding-guidance')).toBeHidden()
@@ -404,8 +413,8 @@ test.describe('Funding guidance in Buy Building', () => {
     // Select a building type
     await page.locator('.type-card').first().click()
 
-    // Select Prague
-    await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
+    // Select Prague via the global context switcher
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     const guidance = page.locator('.funding-guidance')
     await expect(guidance).toBeVisible()
@@ -451,8 +460,8 @@ test.describe('Funding guidance in Buy Building', () => {
     // Select a building type
     await page.locator('.type-card').first().click()
 
-    // Select Prague
-    await page.locator('.city-option').filter({ hasText: 'Prague' }).click()
+    // Select Prague via the global context switcher
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     // Should NOT show funding warning since player has CZK
     await expect(page.locator('.funding-guidance')).toBeHidden()
