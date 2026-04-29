@@ -109,6 +109,9 @@ public sealed partial class AppDbInitializer(
         // mining premium increment).  Databases seeded before this change will not have
         // the lot; databases created after the initial seed will have it already.
         await EnsureCarpathianGoldSeamLotAsync();
+        await EnsureBratislavaMiningLotsAsync();
+        await EnsurePragueMiningLotsAsync();
+        await EnsureViennaMiningLotsAsync();
 
         var currentTick = await dbContext.GameStates
             .AsNoTracking()

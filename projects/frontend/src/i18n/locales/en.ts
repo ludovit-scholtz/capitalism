@@ -715,6 +715,8 @@ export default {
     selectLand: 'Select Land',
     availableLand: 'Available land',
     noAvailableLand: 'No available land matches this building type in the selected city.',
+    filterByResource: 'Filter by resource',
+    noLotsForResource: 'No available mine lots contain this resource type. Select a different filter.',
     populationIndex: 'Population index',
     appraisedValue: 'Appraised value',
     propertySize: 'Property size',

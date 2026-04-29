@@ -29,6 +29,8 @@ const submitting = ref(false)
 // Bank setup fields
 const depositRatePercent = ref<number>(3)
 const lendingRatePercent = ref<number>(8)
+// Resource filter for mine lots
+const selectedResourceFilter = ref<string>('')
 // Funding guidance
 const playerBalances = ref<CurrencyBalance[]>([])
 // Company bank accounts (for bank capital check)
@@ -240,6 +242,7 @@ onMounted(async () => {
 watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
   selectedLotId.value = ''
   availableLots.value = []
+  selectedResourceFilter.value = ''
 
   if (buildingType !== 'MEDIA_HOUSE') {
     selectedMediaType.value = ''
@@ -274,6 +277,25 @@ watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
   } finally {
     lotsLoading.value = false
   }
+})
+
+/** Unique resource types available in the current city for mine lots. */
+const availableMineResources = computed(() => {
+  const seen = new Set<string>()
+  const result: Array<{ slug: string; name: string }> = []
+  for (const lot of availableLots.value) {
+    if (lot.resourceType && !seen.has(lot.resourceType.slug)) {
+      seen.add(lot.resourceType.slug)
+      result.push({ slug: lot.resourceType.slug, name: lot.resourceType.name })
+    }
+  }
+  return result.sort((a, b) => a.name.localeCompare(b.name))
+})
+
+/** Lots after applying optional resource type filter. */
+const filteredLots = computed(() => {
+  if (!selectedResourceFilter.value || selectedType.value !== 'MINE') return availableLots.value
+  return availableLots.value.filter((lot) => lot.resourceType?.slug === selectedResourceFilter.value)
 })
 
 function formatCurrency(value: number) {
@@ -623,10 +645,37 @@ async function buyBuilding() {
             {{ t('buildings.noAvailableLand') }}
           </div>
 
+          <!-- Mine resource filter (only when MINE type selected and multiple resources available) -->
+          <div v-if="selectedType === 'MINE' && availableMineResources.length > 1 && !lotsLoading && availableLots.length > 0" class="mine-resource-filter mb-4">
+            <span class="text-xs font-semibold text-muted mr-2">{{ t('buildings.filterByResource') }}:</span>
+            <div class="flex flex-wrap gap-2 mt-1.5">
+              <button
+                class="resource-filter-btn px-3 py-1 rounded-full border text-xs font-semibold transition-all"
+                :class="!selectedResourceFilter ? 'border-brand bg-brand/10 text-brand' : 'border-divider text-muted hover:border-brand hover:text-brand'"
+                @click="selectedResourceFilter = ''"
+              >
+                {{ t('common.all') }}
+              </button>
+              <button
+                v-for="res in availableMineResources"
+                :key="res.slug"
+                class="resource-filter-btn px-3 py-1 rounded-full border text-xs font-semibold transition-all"
+                :class="selectedResourceFilter === res.slug ? 'border-brand bg-brand/10 text-brand' : 'border-divider text-muted hover:border-brand hover:text-brand'"
+                @click="selectedResourceFilter = res.slug"
+              >
+                ⛏ {{ res.name }}
+              </button>
+            </div>
+          </div>
+
           <!-- Lot grid -->
-          <div v-else class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+          <div v-else-if="!lotsLoading && filteredLots.length === 0 && availableLots.length > 0" class="mt-4 p-4 border border-divider rounded-lg bg-page text-muted text-sm">
+            {{ t('buildings.noLotsForResource') }}
+          </div>
+
+          <div v-if="filteredLots.length > 0" class="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
             <button
-              v-for="lot in availableLots"
+              v-for="lot in filteredLots"
               :key="lot.id"
               class="lot-card flex flex-col gap-2 p-4 border-2 border-divider rounded-lg bg-page text-body text-left cursor-pointer transition-all duration-200 hover:border-brand hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               :class="selectedLotId === lot.id ? 'selected border-brand ring-1 ring-brand bg-[rgba(0,71,255,0.08)]' : ''"

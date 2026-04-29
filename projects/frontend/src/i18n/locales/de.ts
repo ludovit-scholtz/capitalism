@@ -714,6 +714,8 @@ export default {
     selectLand: 'Grundstück wählen',
     availableLand: 'Verfügbares Land',
     noAvailableLand: 'In der gewählten Stadt ist kein passendes Grundstück für diesen Gebäudetyp verfügbar.',
+    filterByResource: 'Nach Ressource filtern',
+    noLotsForResource: 'Keine verfügbaren Bergbauflächen enthalten diesen Ressourcentyp. Wählen Sie einen anderen Filter.',
     populationIndex: 'Bevölkerungsindex',
     appraisedValue: 'Schätzwert',
     propertySize: 'Objektgröße',

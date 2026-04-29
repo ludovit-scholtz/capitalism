@@ -713,6 +713,8 @@ export default {
     selectLand: 'Vyberte pozemok',
     availableLand: 'Dostupné pozemky',
     noAvailableLand: 'V zvolenom meste nie je dostupný vhodný pozemok pre tento typ budovy.',
+    filterByResource: 'Filtrovať podľa suroviny',
+    noLotsForResource: 'Žiadne dostupné banské pozemky neobsahujú tento typ suroviny. Vyberte iný filter.',
     populationIndex: 'Index populácie',
     appraisedValue: 'Odhadovaná hodnota',
     propertySize: 'Veľkosť nehnuteľnosti',
