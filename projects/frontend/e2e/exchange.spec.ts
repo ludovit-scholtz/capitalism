@@ -612,7 +612,7 @@ test.describe('Global Exchange — transit-reranking proof', () => {
 
     // Filter to ORGANIC category — Wood and Grain are ORGANIC
     const categorySelect = page.locator('.filter-select')
-    await categorySelect.selectOption({ label: 'Organic' })
+    await categorySelect.selectOption('ORGANIC')
 
     const filteredCount = await page.locator('.resource-row').count()
     expect(filteredCount).toBeGreaterThan(0)
