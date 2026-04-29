@@ -283,12 +283,12 @@ useTickRefresh(() => loadData(true))
               </thead>
               <tbody>
                 <tr v-for="trade in sellTrades" :key="trade.id">
-                  <td class="border-b border-divider px-3 py-[0.55rem]">{{ trade.companyName }}</td>
-                  <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums">{{ formatShares(trade.shareCount) }}</td>
-                  <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums"><CurrencyAmount :amount="trade.pricePerShare" currency="EUR" /></td>
-                  <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums"><CurrencyAmount :amount="trade.totalValue" currency="EUR" /></td>
-                  <td class="border-b border-divider px-3 py-[0.55rem] text-right tabular-nums font-semibold text-amber-700"><CurrencyAmount :amount="trade.totalValue * PERSONAL_STOCK_SALE_TAX_RATE" currency="EUR" /></td>
-                  <td class="border-b border-divider px-3 py-[0.55rem]">{{ formatDateTime(trade.recordedAtUtc) }}</td>
+                  <td class="tax-cell border-b border-divider px-3 py-[0.55rem]">{{ trade.companyName }}</td>
+                  <td class="tax-cell border-b border-divider px-3 py-[0.55rem] text-right tabular-nums">{{ formatShares(trade.shareCount) }}</td>
+                  <td class="tax-cell border-b border-divider px-3 py-[0.55rem] text-right tabular-nums"><CurrencyAmount :amount="trade.pricePerShare" currency="EUR" /></td>
+                  <td class="tax-cell border-b border-divider px-3 py-[0.55rem] text-right tabular-nums"><CurrencyAmount :amount="trade.totalValue" currency="EUR" /></td>
+                  <td class="tax-cell border-b border-divider px-3 py-[0.55rem] text-right tabular-nums font-semibold text-amber-700"><CurrencyAmount :amount="trade.totalValue * PERSONAL_STOCK_SALE_TAX_RATE" currency="EUR" /></td>
+                  <td class="tax-cell border-b border-divider px-3 py-[0.55rem]">{{ formatDateTime(trade.recordedAtUtc) }}</td>
                 </tr>
               </tbody>
             </table>

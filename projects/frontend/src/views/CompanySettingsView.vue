@@ -228,7 +228,7 @@ onMounted(loadSettings)
           </div>
 
           <p class="text-sm text-muted">{{ t('companySettings.overheadHelp') }}</p>
-          <p class="text-[0.82rem] text-muted mt-1">{{ t('companySettings.overheadReduceTip') }}</p>
+          <p class="overhead-tip text-[0.82rem] text-muted mt-1">{{ t('companySettings.overheadReduceTip') }}</p>
         </section>
 
         <!-- Form card -->
