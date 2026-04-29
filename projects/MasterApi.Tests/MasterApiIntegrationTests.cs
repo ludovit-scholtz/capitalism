@@ -788,13 +788,20 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
             Assert.True(changelogItems.Count >= 4, $"Expected at least 4 CHANGELOG entries, got {changelogItems.Count}");
 
             // Verify one specific CSV-imported entry (Bank capitalization, GUID 4e587c8a-...) is present and well-formed.
-            var bankCap = changelogItems.FirstOrDefault(item =>
+            // Use Any() + First() instead of FirstOrDefault() to avoid the value-type default(JsonElement)
+            // ambiguity where ValueKind could be Undefined on a valid empty array scenario.
+            bool hasBankCap = changelogItems.Any(item =>
                 item.GetProperty("localizations").EnumerateArray().Any(l =>
                     l.GetProperty("locale").GetString() == "en"
                     && (l.GetProperty("title").GetString() ?? string.Empty)
                            .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
+            Assert.True(hasBankCap, "Expected 'Bank capitalization' entry in the feed but it was not found.");
 
-            Assert.True(bankCap.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Expected Bank capitalization entry in feed but not found.");
+            var bankCap = changelogItems.First(item =>
+                item.GetProperty("localizations").EnumerateArray().Any(l =>
+                    l.GetProperty("locale").GetString() == "en"
+                    && (l.GetProperty("title").GetString() ?? string.Empty)
+                           .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
             var bankCapLocales = bankCap.GetProperty("localizations").EnumerateArray()
                 .Select(l => l.GetProperty("locale").GetString())
                 .ToHashSet();

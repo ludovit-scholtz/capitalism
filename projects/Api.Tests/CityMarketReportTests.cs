@@ -505,7 +505,8 @@ public sealed class CityMarketReportTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Seed sales data covering the last week's window.
+        // Seed sales data covering the last week's window: 10 ticks ending at tickBoundary.
+        // Offset places records at ticks [tickBoundary-10 .. tickBoundary-1], all within the report window.
         var tickBoundary = GameConstants.TicksPerWeek; // 168
         await SeedSalesDataAsync(db, "Bratislava", 50m, 10, tickOffset: tickBoundary - 11L);
 
@@ -543,7 +544,7 @@ public sealed class CityMarketReportTests
         await SeedSalesDataAsync(db, "Bratislava", 50m, 5, tickOffset: 200_000L);
 
         var gs = await db.GameStates.FirstDeterministicAsync();
-        // Tick 200_005 is not on a weekly (168) or monthly (720) boundary.
+        // 200_005 % 168 == 5 (not a weekly boundary) and 200_005 % 720 == 5 (not monthly either).
         var nonBoundaryTick = 200_005L;
         gs.CurrentTick = nonBoundaryTick;
         await db.SaveChangesAsync();
@@ -652,7 +653,7 @@ public sealed class CityMarketReportTests
             Id = Guid.NewGuid(),
             PlayerId = player.Id,
             Name = $"Margin Corp {Guid.NewGuid():N}",
-            Cash = 0m
+            Cash = 0m  // Legacy field; target model uses bank accounts. Kept for required EF column.
         };
         db.Companies.Add(company);
 

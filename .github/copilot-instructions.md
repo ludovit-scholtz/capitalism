@@ -1203,3 +1203,21 @@ Root-cause of CI build failures (April 2026, PR #128 — after merging main):
 3. **For three or more statements, use an arrow function:** `@click="() => { a = 1; b = 2; c = 3 }"`.
 4. **After any merge that brings in new Vue files from `main`, grep for the pattern** `grep -rn '@[a-z]*="$' src/ --include='*.vue'` and verify every match is either an arrow-function body (`() => {`) or a single statement. Multi-line multi-statement handlers without semicolons must be fixed before committing.
 5. **Add dark-mode regression E2E tests for every view whose build syntax is fixed.** If a view was broken and is now fixed, prove it renders correctly in both themes with at least two Playwright assertions (dark background token + heading visible).
+
+## CHANGELOG.csv growth — tests querying gameNewsFeed must use limit 500, not 100
+
+Root-cause of a CI failure (April 2026, PR #weekly-reports):
+- `GameNewsFeed_CsvImportedEntriesAreVisibleInFeed` used `limit = 100` in the GraphQL query.
+- CHANGELOG.csv grew to 139+ rows. The query is ordered by `PublishedAtUtc DESC`, so the oldest entries fall outside the 100-item window.
+- `changelogItems.FirstOrDefault(...)` returns `default(JsonElement)` (a struct) when the sought entry is not found. `Assert.NotNull(default(JsonElement))` silently passes because structs box to non-null objects. Then `bankCap.GetProperty("localizations")` throws `InvalidOperationException`.
+
+**Rules to prevent recurrence:**
+1. **When querying `gameNewsFeed` in tests that verify a specific CSV-imported entry, use `limit = 500`** (the max allowed) to ensure all entries are within the result window, regardless of how many rows CHANGELOG.csv has.
+2. **Never use `Assert.NotNull` on a `JsonElement` value type.** Instead use `Any()` + `First()` pattern:
+   ```csharp
+   bool found = list.Any(item => /* predicate */);
+   Assert.True(found, "Entry not found in feed.");
+   var entry = list.First(item => /* predicate */);
+   ```
+3. **Every time CHANGELOG.csv grows beyond the previously assumed row count, check whether any test uses a hardcoded `limit` smaller than the current row count.** Keep the limit at 500 to future-proof against further growth.
+4. **xUnit analyzer warning `xUnit2002: Do not use Assert.NotNull() on value type`** is a real bug signal, not just a style warning. Treat it as a required fix.
