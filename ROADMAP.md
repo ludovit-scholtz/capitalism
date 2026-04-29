@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Architecture optimization (15% complete)
+### Architecture optimization (18% complete)
 
 - [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - [ ] Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
@@ -14,6 +14,8 @@ It will use real world map. The game will start in single city and later other c
 **Shipped (increment 1):** `GameConstants.cs` was split into partial engine files to reduce monolithic backend source size, and tick processing now avoids per-tick phase re-sorting and reduces allocations in recent-salary aggregation during `BuildContextAsync`.
 
 **Shipped (increment 2):** `PublicSalesPhase` was split into partial backend class files to keep engine sources maintainable, and tick sales processing now reuses preloaded `TickContext.LotsByBuildingId` instead of executing a per-tick database lot lookup query.
+
+**Shipped (increment 3):** `BankStatementView.vue` was split into dedicated banking presentation components (`BankStatementSummaryCard` and `BankStatementTable`), reducing the view from 513 lines to 312 lines while preserving the existing account-selection, filtering, and pagination flow.
 
 ### Archive E2E tests (0% complete)
 
