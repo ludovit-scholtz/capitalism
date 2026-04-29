@@ -34,7 +34,7 @@ type CatalogEntry = {
   searchText: string
 }
 
-type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'resources-definition'
+type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'stock-exchange-help' | 'resources-definition'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -48,7 +48,7 @@ const resources = ref<ResourceType[]>([])
 const products = ref<ProductType[]>([])
 const fullscreenImage = ref<{ src: string; alt: string } | null>(null)
 
-const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'sales-shop-help', 'resources-definition']
+const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'sales-shop-help', 'stock-exchange-help', 'resources-definition']
 
 const showProProducts = computed({
   get: () => route.query.showPro === '1',
@@ -80,6 +80,7 @@ const topicMenu = computed(() => [
   { slug: 'onboarding-help' as const, label: t('encyclopedia.topicOnboardingHelp') },
   { slug: 'factory-layout-help' as const, label: t('encyclopedia.topicFactoryLayoutHelp') },
   { slug: 'sales-shop-help' as const, label: t('encyclopedia.topicSalesShopHelp') },
+  { slug: 'stock-exchange-help' as const, label: t('encyclopedia.topicStockExchangeHelp') },
   { slug: 'resources-definition' as const, label: t('encyclopedia.topicResourcesDefinition') },
 ])
 
@@ -183,6 +184,48 @@ const salesShopGuideTopics = [
   'encyclopedia.salesShopGuideTopicPurchaseUnit',
   'encyclopedia.salesShopGuideTopicPublicSalesUnit',
   'encyclopedia.salesShopGuideTopicMarketingUnit',
+]
+
+const stockExchangeGuideCards = [
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepIpoTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepIpoBody',
+    imageUrl: '/stock-exchange-help/step-1-ipo-plan-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepCompanyBuyTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepCompanyBuyBody',
+    imageUrl: '/stock-exchange-help/step-2-company-buy-shares-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepPersonalBuyTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepPersonalBuyBody',
+    imageUrl: '/stock-exchange-help/step-3-personal-buy-shares-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepSellTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepSellBody',
+    imageUrl: '/stock-exchange-help/step-4-sell-shares-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepUsdForexTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepUsdForexBody',
+    imageUrl: '/stock-exchange-help/step-5-usd-forex-swap-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepTaxLedgerTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepTaxLedgerBody',
+    imageUrl: '/stock-exchange-help/step-6-tax-reserve-ledger-1920x1080.png',
+  },
+]
+
+const stockExchangeGuideTopics = [
+  'encyclopedia.stockExchangeGuideTopicIpo',
+  'encyclopedia.stockExchangeGuideTopicCompanyBuy',
+  'encyclopedia.stockExchangeGuideTopicPersonalBuy',
+  'encyclopedia.stockExchangeGuideTopicSell',
+  'encyclopedia.stockExchangeGuideTopicUsdForex',
+  'encyclopedia.stockExchangeGuideTopicTax',
 ]
 
 const catalogEntries = computed<CatalogEntry[]>(() => {
@@ -481,6 +524,36 @@ function navigateToEntry(slug: string) {
           </ul>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
             <article v-for="card in salesShopGuideCards" :key="card.titleKey" class="sales-shop-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <button
+                v-if="getGuideCardImage(card)"
+                type="button"
+                class="help-image-trigger block w-full"
+                :aria-label="t('encyclopedia.openImageFullscreen', { title: t(card.titleKey) })"
+                @click="openImageFullscreen(getGuideCardImage(card), t(card.titleKey))"
+              >
+                <img :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-36 object-cover" />
+              </button>
+              <div class="p-4 flex flex-col gap-2">
+                <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
+                <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <div v-if="selectedTopic === 'stock-exchange-help'" class="encyclopedia-help-section rounded-2xl border border-divider bg-card p-6 lg:p-8 flex flex-col gap-8">
+        <section class="flex flex-col gap-3">
+          <h2 class="m-0">{{ t('encyclopedia.stockExchangeGuideTitle') }}</h2>
+          <p class="text-muted m-0">{{ t('encyclopedia.stockExchangeGuideSubtitle') }}</p>
+          <h3 class="m-0 text-base mt-2">{{ t('encyclopedia.stockExchangeGuideTopicsTitle') }}</h3>
+          <ul class="m-0 pl-5 text-sm text-muted flex flex-col gap-1">
+            <li v-for="topic in stockExchangeGuideTopics" :key="topic">
+              {{ t(topic) }}
+            </li>
+          </ul>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
+            <article v-for="card in stockExchangeGuideCards" :key="card.titleKey" class="stock-exchange-help-card rounded-xl border border-divider bg-page overflow-hidden">
               <button
                 v-if="getGuideCardImage(card)"
                 type="button"

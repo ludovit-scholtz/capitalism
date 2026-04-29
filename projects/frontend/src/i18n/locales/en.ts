@@ -588,6 +588,7 @@ export default {
     topicOnboardingHelp: 'Onboarding help',
     topicFactoryLayoutHelp: 'Factory layout help',
     topicSalesShopHelp: 'Sales shop setup help',
+    topicStockExchangeHelp: 'Stock exchange help',
     topicResourcesDefinition: 'Resources definition',
     openImageFullscreen: 'Open full image: {title}',
     closeFullscreenImage: 'Close preview',
@@ -694,6 +695,33 @@ export default {
     salesShopGuideStepMarketingTitle: 'Step 4 - Configure the MARKETING unit',
     salesShopGuideStepMarketingBody:
       'MARKETING extends sales performance beyond raw price mechanics by improving discoverability and demand momentum over time. Configure marketing with a realistic budget aligned to your current cash runway, then monitor whether improved demand quality offsets spend. Underfunded marketing often does nothing measurable; oversized budgets can silently burn cash before operational bottlenecks are solved. Activate marketing only after PURCHASE and PUBLIC_SALES are stable, so budget amplifies a working system instead of masking broken flow. In each review window, compare incremental volume and margin versus marketing cost. Keep adjustments gradual and evidence-driven. In early growth, the goal is consistency: use marketing to smooth demand volatility, strengthen repeat sales behavior, and create predictable conditions for price optimization and expansion.',
+    stockExchangeGuideTitle: 'Stock Exchange Walkthrough',
+    stockExchangeGuideSubtitle: 'End-to-end guide from onboarding IPO choices to share trading, USD settlement setup, forex swap preparation, and tax-reserve discipline in personal ledgers.',
+    stockExchangeGuideTopicsTitle: 'Stock exchange topics',
+    stockExchangeGuideTopicIpo: 'IPO choice during onboarding and what it changes for your first listed company',
+    stockExchangeGuideTopicCompanyBuy: 'Buying shares through a company account using company cash and USD settlement',
+    stockExchangeGuideTopicPersonalBuy: 'Buying shares through your personal account and portfolio construction',
+    stockExchangeGuideTopicSell: 'Selling shares, bid/ask execution, and liquidity-aware exits',
+    stockExchangeGuideTopicUsdForex: 'USD settlement account requirement and forex swap preparation',
+    stockExchangeGuideTopicTax: 'Tax reserve mechanics and personal-ledger review after sales',
+    stockExchangeGuideStepIpoTitle: 'Step 1 - Choose IPO plan in onboarding',
+    stockExchangeGuideStepIpoBody:
+      'Your stock-exchange story starts before you ever open the Stock Exchange page. In onboarding, the IPO plan decides how much outside capital your first company raises and how much founder ownership you keep. A larger raise gives better operating runway for early mistakes and expansion, but your founder stake is diluted sooner. A smaller raise keeps stronger ownership but can create cash pressure when you need land, setup, and first-cycle inventory at the same time. Treat this as governance plus liquidity design, not just a one-click onboarding choice. The chosen plan influences future control thresholds, merger eligibility pace, and how much flexibility your company has before you begin personal and corporate share trading decisions.',
+    stockExchangeGuideStepCompanyBuyTitle: 'Step 2 - Buy shares with a company account',
+    stockExchangeGuideStepCompanyBuyBody:
+      'When you trade as a company, every order is executed from the company context selected in the top navbar and settles through a USD bank account owned by that company. This is materially different from personal investing because corporate cash, risk, and strategic intent are involved. Company purchases can support control strategies, defensive ownership, or long-term capital deployment, but they also reduce operating liquidity available for buildings, wages, and production buffers. Before pressing Buy, verify account context, selected settlement account, ask price, estimated cost, and current float conditions in the trade panel. Company-level ownership contributes to combined control ratio, so these trades directly shape claim-control and merge pathways. Use company buys deliberately, not as passive portfolio activity.',
+    stockExchangeGuideStepPersonalBuyTitle: 'Step 3 - Buy shares with your personal account',
+    stockExchangeGuideStepPersonalBuyBody:
+      'Personal-account buying is your direct investment layer, separate from company treasury strategy. In person mode, the trade panel uses your personal spendable cash and records ownership in your personal portfolio, where each holding tracks quantity, ownership ratio, live share price, and market value. This is ideal for targeted exposure to firms you do not want your operating company to fund directly. Focus on position sizing first: define quantity from available cash, then compare ask price against your intended horizon before execution. Because portfolio valuation changes every tick with quoted prices, avoid interpreting one snapshot as final performance. Personal buys are strongest when treated as a measured capital-allocation plan tied to risk tolerance, not as short-term reaction to one visible price move.',
+    stockExchangeGuideStepSellTitle: 'Step 4 - Sell shares using bid/ask discipline',
+    stockExchangeGuideStepSellBody:
+      'Selling shares executes at the bid side, so your realized exit value depends on quantity, spread, and market conditions at that tick. In the trade panel, review estimated proceeds before confirming the order and ensure you are selling from the intended account context. Personal-account sells and company-account sells are not equivalent operationally: they affect different balances and reporting surfaces. A good sell workflow uses staged exits rather than panic liquidation, especially when spreads widen. Confirm owned-share quantity, evaluate whether the position still supports your strategic objective, then sell in controlled increments when needed. The important behavior is repeatable execution discipline: read bid/ask, size carefully, and preserve optionality for future entries, control claims, or operating needs that may arise after the sale.',
+    stockExchangeGuideStepUsdForexTitle: 'Step 5 - Prepare USD settlement and forex swap',
+    stockExchangeGuideStepUsdForexBody:
+      'Stock trades require a USD settlement account for the active trade context. If the stock panel shows no USD settlement account, your next stop is Forex and banking setup, not another trade click. Use Forex to convert available currency into USD and ensure the resulting balance exists in the correct owner context: personal for person-account trading, company for company-account trading. After swap execution, re-open the stock trade panel and explicitly select the right settlement account so orders can clear. This requirement prevents hidden currency mismatch and keeps exchange accounting consistent. Operationally, it means share trading is a two-layer process: first liquidity preparation in currency space, then execution in the stock market. Treat USD readiness as a prerequisite checklist item for every trade session.',
+    stockExchangeGuideStepTaxLedgerTitle: 'Step 6 - Review tax reserve in personal ledger',
+    stockExchangeGuideStepTaxLedgerBody:
+      'After personal-account share sales, the system reserves 15% of proceeds into a tax reserve that is blocked from spending until tax-year settlement. This is visible both in stock-exchange confirmations and in the Personal Ledger, where available cash and tax reserve are separated explicitly. The key operational mistake to avoid is treating gross personal cash as fully tradable capital right after a profitable sale. Always read available cash, not only total cash, before planning follow-up buys. In the ledger, review reserve history, trade entries, and dividend flows together to understand true deployable liquidity. A disciplined review loop here protects you from overcommitting funds, keeps your next trade sizing realistic, and prevents avoidable insufficient-funds failures caused by ignored reserve mechanics.',
     viewDetail: 'View detail',
     searchNoResults: 'No resources or products match your search. Try a different term or clear the filters.',
   },

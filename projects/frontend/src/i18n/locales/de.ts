@@ -587,6 +587,7 @@ export default {
     topicOnboardingHelp: 'Onboarding-Hilfe',
     topicFactoryLayoutHelp: 'Fabriklayout-Hilfe',
     topicSalesShopHelp: 'Verkaufsshop-Einrichtung',
+    topicStockExchangeHelp: 'Aktienboersen-Hilfe',
     topicResourcesDefinition: 'Ressourcendefinition',
     openImageFullscreen: 'Vollbild öffnen: {title}',
     closeFullscreenImage: 'Vorschau schließen',
@@ -693,6 +694,33 @@ export default {
     salesShopGuideStepMarketingTitle: 'Schritt 4 - MARKETING konfigurieren',
     salesShopGuideStepMarketingBody:
       'MARKETING verbessert die Verkaufsleistung über reinen Preiswettbewerb hinaus, indem es Nachfragequalität und Wiedererkennung stärkt. Legen Sie ein Budget fest, das zu Ihrer aktuellen Liquiditätslage passt, und prüfen Sie regelmäßig, ob zusätzlicher Absatz und Marge die Ausgaben rechtfertigen. Zu kleine Budgets bleiben oft ohne messbaren Effekt, zu große Budgets verbrennen Kapital, bevor operative Engpässe gelöst sind. Aktivieren Sie Marketing erst, wenn PURCHASE und PUBLIC_SALES bereits stabil laufen. Dann verstärkt Budget ein funktionierendes System statt Defizite zu kaschieren. Vergleichen Sie in jedem Auswertungsfenster den Mehrertrag mit den Marketingkosten und passen Sie schrittweise an. Ziel im frühen Wachstum ist Verlässlichkeit: weniger Nachfragevolatilität, mehr wiederkehrende Verkäufe und planbarere Bedingungen für präzise Preisoptimierung und Expansion.',
+    stockExchangeGuideTitle: 'Komplette Anleitung zur Aktienboerse',
+    stockExchangeGuideSubtitle: 'Durchgaengiger Ablauf von der IPO-Entscheidung im Onboarding ueber Kauf und Verkauf bis zu USD-Settlement, Forex-Swap und Steuerreserve im persoenlichen Ledger.',
+    stockExchangeGuideTopicsTitle: 'Themen zur Aktienboerse',
+    stockExchangeGuideTopicIpo: 'IPO im Onboarding und Auswirkung auf dein erstes boersennotiertes Unternehmen',
+    stockExchangeGuideTopicCompanyBuy: 'Aktienkauf ueber Firmenkonto mit Firmenliquiditaet und USD-Settlement',
+    stockExchangeGuideTopicPersonalBuy: 'Aktienkauf ueber persoenliches Konto und Portfolioaufbau',
+    stockExchangeGuideTopicSell: 'Aktienverkauf mit Bid/Ask-Disziplin und Liquiditaetssteuerung',
+    stockExchangeGuideTopicUsdForex: 'USD-Settlement-Pflicht und Vorbereitung per Forex-Swap',
+    stockExchangeGuideTopicTax: 'Steuerreserve nach Verkauf und Kontrolle im persoenlichen Ledger',
+    stockExchangeGuideStepIpoTitle: 'Schritt 1 - IPO-Plan im Onboarding waehlen',
+    stockExchangeGuideStepIpoBody:
+      'Der Weg zur Aktienboerse beginnt bereits im Onboarding, lange bevor du die Boersenansicht oeffnest. Die IPO-Wahl bestimmt, wie viel externes Kapital dein erstes Unternehmen erhaelt und welchen Gruenderanteil du behaeltst. Ein groesserer Raise gibt mehr operative Reserve fuer Ausbau und Fehlerpuffer, verwaessert aber frueher deinen Kontrollanteil. Ein kleiner Raise schuetzt Ownership, kann jedoch bei Grundstuecken, Setup und Startinventar schnell zu Liquiditaetsdruck fuehren. Betrachte die Entscheidung als Kombination aus Governance und Finanzierung, nicht als formalen Klick. Sie beeinflusst direkt, wie schnell du Kontrollschwellen erreichst, wie flexibel du bei spaeteren Merges bist und ob du spaeter eher ueber Firmenkonto oder persoenliches Konto in Aktien investierst.',
+    stockExchangeGuideStepCompanyBuyTitle: 'Schritt 2 - Aktien ueber Firmenkonto kaufen',
+    stockExchangeGuideStepCompanyBuyBody:
+      'Beim Firmenhandel laufen Orders im Kontext der in der Navigation aktiven Firma und werden ueber ein USD-Bankkonto dieser Firma abgewickelt. Das unterscheidet sich grundlegend von persoenlichem Investing, weil hier operative Unternehmensliquiditaet eingesetzt wird. Firmenkaeufe koennen fuer Kontrolle, strategische Beteiligung oder langfristige Kapitalallokation sinnvoll sein, reduzieren aber gleichzeitig Mittel fuer Gebaeude, Lohnkosten und Produktionspuffer. Vor dem Kauf pruefst du deshalb Kontokontext, Settlement-Konto, Ask-Preis, geschaetzte Kosten und aktuelle Float-Situation. Firmenanteile zaehlen in die kombinierte Kontrolle hinein und beeinflussen damit Claim-Control- und Merge-Pfade direkt. Nutze Firmenkaeufe als bewusstes strategisches Werkzeug, nicht als passives Nebenportfolio ohne Zieldefinition.',
+    stockExchangeGuideStepPersonalBuyTitle: 'Schritt 3 - Aktien ueber persoenliches Konto kaufen',
+    stockExchangeGuideStepPersonalBuyBody:
+      'Der persoenliche Modus ist deine private Investmentebene, getrennt von der Unternehmenskasse. Im Personenkontext nutzt das Trade-Panel verfuegbares persoenliches Kapital und verbucht die Position in deinem Portfolio mit Stueckzahl, Anteil, aktuellem Preis und Marktwert. Das ist ideal, wenn du gezielt Exposure auf Unternehmen aufbauen willst, ohne Firmenliquiditaet zu binden. Beginne mit Positionsgroesse statt mit Gefuehl: Menge anhand von Available Cash festlegen und dann Ask-Preis gegen deinen Anlagehorizont abgleichen. Da Bewertungen tickweise schwanken, ist ein einzelner Snapshot kein verlaesslicher Performancebeweis. Starke persoenliche Kaeufe entstehen aus geplanter Kapitalallokation mit Risikobudget, nicht aus spontaner Reaktion auf kurzfristige Preisbewegungen im Moment der Anzeige.',
+    stockExchangeGuideStepSellTitle: 'Schritt 4 - Aktien mit Bid/Ask-Disziplin verkaufen',
+    stockExchangeGuideStepSellBody:
+      'Beim Verkauf wird auf der Bid-Seite ausgefuehrt, daher haengen reale Erloese von Spread, Menge und Marktlage im aktuellen Tick ab. Pruefe vor Bestaetigung die erwarteten Erloese und stelle sicher, dass du aus dem richtigen Kontokontext verkaufst. Verkaeufe aus persoenlichem Konto und Firmenkonto haben unterschiedliche Bilanz- und Reporting-Wirkung und duerfen nicht vermischt werden. Robust ist ein gestufter Ausstieg statt kompletter Notverkauf in einem Schritt. Kontrolliere verfuegbare Stueckzahl, bewerte den strategischen Grund der Position und reduziere bei Bedarf in Tranchen. Gute Exit-Qualitaet bedeutet wiederholbare Ausfuehrung: Bid/Ask lesen, Menge sauber dimensionieren und Handlungsspielraum fuer spaetere Re-Entries, Kontrollziele oder operative Liquiditaetsbedarfe erhalten.',
+    stockExchangeGuideStepUsdForexTitle: 'Schritt 5 - USD-Settlement per Forex vorbereiten',
+    stockExchangeGuideStepUsdForexBody:
+      'Aktienhandel setzt ein USD-Settlement-Konto im aktiven Handelskonto voraus. Wenn das Trade-Panel meldet, dass kein USD-Konto verfuegbar ist, fuehrst du zuerst Waehrungs- und Kontovorbereitung aus, statt erneut auf Kaufen zu klicken. Im Forex-Bereich tauschst du verfuegbare Mittel in USD und achtest darauf, dass die Zielgutschrift im korrekten Owner-Kontext landet: persoenlich fuer Personentrades, unternehmensbezogen fuer Firmentrades. Danach zurueck zur Boerse, Settlement-Konto explizit auswaehlen und erst dann ausfuehren. Diese Logik verhindert verdeckte Waehrungsmismatches und haelt die Abwicklung konsistent. Praktisch ist Trading damit zweistufig: erst Liquiditaet in passender Waehrung bereitstellen, danach Marktorder platzieren. USD-Readiness ist vor jeder Handelssitzung ein Pflichtcheck.',
+    stockExchangeGuideStepTaxLedgerTitle: 'Schritt 6 - Steuerreserve im persoenlichen Ledger pruefen',
+    stockExchangeGuideStepTaxLedgerBody:
+      'Nach Aktienverkaeufen aus dem persoenlichen Konto reserviert das System 15% des Erloeses als Steuerreserve. Dieser Betrag bleibt bis zum Jahresabschluss blockiert und ist nicht frei handelbar. Die Trennung ist sowohl in Boersenmeldungen als auch im persoenlichen Ledger sichtbar, wo Gesamtcash und verfuegbares Cash bewusst getrennt dargestellt werden. Der typische Fehler ist, direkt nach einem erfolgreichen Verkauf mit Bruttocash weiterzuplanen. Entscheidend ist immer das verfuegbare Cash. Im Ledger solltest du Reserveentwicklung, Trade-Historie und Dividenden gemeinsam betrachten, um reale Einsatzliquiditaet korrekt einzuschaetzen. Diese Routine verhindert Ueberallokation, stabilisiert Positionsgroessen und reduziert vermeidbare Insufficient-Funds-Fehler durch ignorierte Steuerreserve.',
     viewDetail: 'Detail anzeigen',
     searchNoResults: 'Keine Ressourcen oder Produkte entsprechen Ihrer Suche. Versuchen Sie einen anderen Begriff oder löschen Sie die Filter.',
   },

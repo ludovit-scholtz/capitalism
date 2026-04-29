@@ -66,5 +66,15 @@ test.describe('Encyclopedia FullHD screenshots', () => {
     const salesShopDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-sales-shop-help-fullscreen-dialog-1920x1080.png')
     await page.screenshot({ path: salesShopDialogPath })
     expect(fs.existsSync(salesShopDialogPath)).toBeTruthy()
+
+    await page.goto('/encyclopedia/stock-exchange-help')
+    const stockExchangePath = path.join(OUTPUT_DIR, 'encyclopedia-stock-exchange-help-1920x1080.png')
+    await page.screenshot({ path: stockExchangePath })
+    expect(fs.existsSync(stockExchangePath)).toBeTruthy()
+
+    await page.locator('.stock-exchange-help-card .help-image-trigger').first().click()
+    const stockExchangeDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-stock-exchange-help-fullscreen-dialog-1920x1080.png')
+    await page.screenshot({ path: stockExchangeDialogPath })
+    expect(fs.existsSync(stockExchangeDialogPath)).toBeTruthy()
   })
 })

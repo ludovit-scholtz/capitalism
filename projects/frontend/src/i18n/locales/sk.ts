@@ -586,6 +586,7 @@ export default {
     topicOnboardingHelp: 'Pomoc s onboardingom',
     topicFactoryLayoutHelp: 'Pomoc s layoutom tovární',
     topicSalesShopHelp: 'Pomoc s nastavením predajne',
+    topicStockExchangeHelp: 'Pomoc s burzou akcií',
     topicResourcesDefinition: 'Definícia surovín',
     openImageFullscreen: 'Otvoriť veľký obrázok: {title}',
     closeFullscreenImage: 'Zavrieť náhľad',
@@ -692,6 +693,33 @@ export default {
     salesShopGuideStepMarketingTitle: 'Krok 4 - Nastavte jednotku MARKETING',
     salesShopGuideStepMarketingBody:
       'MARKETING zvyšuje výkon predajne nad rámec samotnej ceny, pretože posilňuje viditeľnosť a dopytovú zotrvačnosť. Nastavte rozpočet podľa reálnej peňažnej rezervy firmy a sledujte, či zlepšený dopytový profil prevyšuje náklady. Príliš nízky rozpočet často neprinesie merateľný efekt, príliš vysoký rozpočet vie spáliť hotovosť skôr, ako odstránite prevádzkové úzke hrdlá. Marketing zapínajte až po stabilizácii PURCHASE a PUBLIC_SALES, aby posilňoval funkčný systém a nemaskoval chybný tok. V každom vyhodnocovacom okne porovnajte dodatočný objem a maržu oproti marketingovým nákladom. Meníte konfiguráciu postupne a podľa dát. V ranej fáze rastu je cieľom konzistencia: vyhladiť výkyvy dopytu, podporiť opakované nákupy a vytvoriť podmienky pre presnejšiu cenovú optimalizáciu.',
+    stockExchangeGuideTitle: 'Kompletný návod na burzu akcií',
+    stockExchangeGuideSubtitle: 'Postup od IPO vo fáze onboardingu cez nákup a predaj akcií až po USD zúčtovanie, forex swap a správu daňovej rezervy v osobných knihách.',
+    stockExchangeGuideTopicsTitle: 'Témy burzy akcií',
+    stockExchangeGuideTopicIpo: 'IPO vo fáze onboardingu a jeho dopad na prvú verejnú firmu',
+    stockExchangeGuideTopicCompanyBuy: 'Nákup akcií cez firemný účet s firemnou hotovosťou a USD zúčtovaním',
+    stockExchangeGuideTopicPersonalBuy: 'Nákup akcií cez osobný účet a budovanie osobného portfólia',
+    stockExchangeGuideTopicSell: 'Predaj akcií, bid/ask exekúcia a kontrola likvidity',
+    stockExchangeGuideTopicUsdForex: 'Požiadavka USD zúčtovacieho účtu a príprava cez forex swap',
+    stockExchangeGuideTopicTax: 'Daňová rezerva po predaji a kontrola v osobných knihách',
+    stockExchangeGuideStepIpoTitle: 'Krok 1 - Vyberte IPO plán v onboardingu',
+    stockExchangeGuideStepIpoBody:
+      'Príbeh burzy akcií sa začína skôr, než otvoríte stránku Burza. V onboardingu výber IPO plánu určuje, koľko externého kapitálu firma získa a aký podiel si ponechá zakladateľ. Vyšší raise dáva väčšiu prevádzkovú rezervu na chyby a expanziu, ale rýchlejšie oslabí founder ownership. Nižší raise drží kontrolu silnejšie, no môže vytvoriť tlak na hotovosť pri nákupe pozemkov, konfigurácii a prvom zásobovaní. Neberte to ako formálny krok, ale ako kombináciu governance a likvidity. Tento výber vplýva na tempo, ktorým sa dostanete ku kontrolným prahom, fúziám a neskorším rozhodnutiam, či investovať cez osobný účet alebo cez firemný účet.',
+    stockExchangeGuideStepCompanyBuyTitle: 'Krok 2 - Nakupujte akcie cez firemný účet',
+    stockExchangeGuideStepCompanyBuyBody:
+      'Pri obchodovaní cez firmu sa príkazy vykonávajú z účtu firmy vybratej v hornom prepínači kontextu a vysporiadanie prebieha cez USD bankový účet tejto firmy. To je zásadne iné než osobné investovanie, pretože riskujete prevádzkovú likviditu podniku. Firemné nákupy dávajú zmysel pri stratégii kontroly, obrane podielu alebo pri dlhodobom kapitálovom nasadení, no zároveň znižujú hotovosť pre budovy, mzdy a prevádzkové vankúše. Pred kliknutím na nákup overte správny account context, zvolený settlement account, ask cenu a odhad nákladov. Firemné podiely sa započítavajú do combined control ratio, takže ovplyvňujú claim control aj merge možnosti. Firemné nákupy robte cielene, nie ako pasívne portfólio.',
+    stockExchangeGuideStepPersonalBuyTitle: 'Krok 3 - Nakupujte akcie cez osobný účet',
+    stockExchangeGuideStepPersonalBuyBody:
+      'Osobný účet je vaša priama investičná vrstva oddelená od firemnej pokladnice. V person režime panel používa osobnú disponibilnú hotovosť a vlastníctvo sa zapisuje do osobného portfólia s počtom akcií, podielom, aktuálnou cenou a trhovou hodnotou. Tento režim je vhodný, keď chcete expozíciu na firmu bez čerpania firemného kapitálu. Základ je position sizing: najprv určte množstvo podľa available cash, potom porovnajte ask cenu s plánovaným horizontom. Hodnotenie portfólia sa mení každý tick, preto nevyhodnocujte výkon podľa jedného snapshotu. Osobný nákup má byť premyslená alokácia kapitálu podľa rizika, nie impulzná reakcia na krátkodobý pohyb ceny.',
+    stockExchangeGuideStepSellTitle: 'Krok 4 - Predávajte akcie s bid/ask disciplínou',
+    stockExchangeGuideStepSellBody:
+      'Predaj akcií sa realizuje na bid strane, takže výsledný výnos závisí od spreadu, množstva a stavu trhu v danom ticku. Pred potvrdením sledujte estimated proceeds a overte, že predávate zo správneho účtu. Predaj z osobného a firemného účtu má odlišný dopad na hotovosť aj reporty, preto ich nemožno zamieňať. Bezpečná prax je postupný výstup namiesto panického odpredaja celej pozície. Skontrolujte owned shares, porovnajte strategický dôvod držby a predávajte po dávkach, ak potrebujete likviditu. Kľúč je opakovateľná exekučná disciplína: čítať bid/ask, správne dimenzovať príkaz a nechať si priestor pre ďalšie vstupy, claim control alebo prevádzkové potreby po predaji.',
+    stockExchangeGuideStepUsdForexTitle: 'Krok 5 - Pripravte USD zúčtovanie cez forex',
+    stockExchangeGuideStepUsdForexBody:
+      'Burza akcií vyžaduje USD zúčtovací účet pre aktívny obchodný kontext. Ak panel hlási, že USD settlement account nie je dostupný, riešenie nie je ďalší pokus o obchod, ale príprava likvidity vo Forex a bankových účtoch. Vo Forexe zmeňte menu na USD a uistite sa, že výsledný zostatok existuje v správnom owner kontexte: osobný pre person trading, firemný pre company trading. Po swape sa vráťte na Burzu a explicitne vyberte settlement účet, aby objednávky mohli prejsť. Tento krok bráni menovým nesúladom a drží účtovanie konzistentné. V praxi je trading dvojfázový proces: najprv mena, potom exekúcia. USD pripravenosť berte ako povinný checklist pred každou seansou.',
+    stockExchangeGuideStepTaxLedgerTitle: 'Krok 6 - Skontrolujte daňovú rezervu v osobných knihách',
+    stockExchangeGuideStepTaxLedgerBody:
+      'Po predaji akcií z osobného účtu systém rezervuje 15% výnosu do daňovej rezervy, ktorá je blokovaná až do vysporiadania na konci daňového roka. Tento stav vidíte v potvrdzovacích správach burzy aj v osobných knihách, kde sú personal cash a available cash oddelené. Najčastejšia chyba je plánovať ďalšie nákupy podľa hrubej hotovosti po úspešnom predaji. Vždy sledujte dostupnú hotovosť, nie len celkový zostatok. V osobných knihách vyhodnocujte spolu rezervu, históriu obchodov a dividendové príjmy, aby ste mali obraz o skutočne použiteľnej likvidite. Táto rutina chráni pred prehnaným sizingom a pred zlyhaniami typu insufficient funds spôsobenými ignorovanou daňovou rezervou.',
     viewDetail: 'Zobraziť detail',
     searchNoResults: 'Žiadne suroviny ani produkty nezodpovedajú vášmu vyhľadávaniu. Skúste iný výraz alebo vymažte filtre.',
   },
