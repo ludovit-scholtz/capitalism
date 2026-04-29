@@ -1226,7 +1226,7 @@ export function useBuildingDetail() {
         minPrice: null,
         maxPrice: null,
         purchaseSource: null,
-        saleVisibility: 'PUBLIC',
+        saleVisibility: 'GROUP',
         budget: null,
         mediaHouseBuildingId: null,
         minQuality: null,
@@ -1357,6 +1357,7 @@ export function useBuildingDetail() {
 
     // Auto-fill competitive default price for B2B_SALES based on adjacent/building units
     if (unitType === 'B2B_SALES') {
+      newUnit.saleVisibility = 'GROUP'
       const suggestedPrice = getB2BSuggestedPrice(newUnit)
       if (suggestedPrice !== null) {
         newUnit.minPrice = suggestedPrice
@@ -2895,11 +2896,13 @@ export function useBuildingDetail() {
   function getConfiguredItemImageUrl(unit: GridUnit | undefined): string | null {
     const resourceTypeId = unit && 'resourceTypeId' in unit ? unit.resourceTypeId : null
     if (resourceTypeId) {
-      return resourceTypes.value.find((resource) => resource.id === resourceTypeId)?.imageUrl ?? null
+      const resource = resourceTypes.value.find((r) => r.id === resourceTypeId)
+      return resource ? getResourceImageUrl(resource) : null
     }
     const productTypeId = unit && 'productTypeId' in unit ? unit.productTypeId : null
     if (!productTypeId) return null
-    return productTypes.value.find((product) => product.id === productTypeId)?.imageUrl ?? null
+    const product = productTypes.value.find((p) => p.id === productTypeId)
+    return product ? getProductImageUrl(product) : null
   }
 
   function getConfiguredItemMonogram(unit: GridUnit | undefined): string {
@@ -2916,10 +2919,12 @@ export function useBuildingDetail() {
 
   function getInventoryItemImageUrl(inventory: BuildingUnitInventory): string | null {
     if (inventory.resourceTypeId) {
-      return resourceTypes.value.find((resource) => resource.id === inventory.resourceTypeId)?.imageUrl ?? null
+      const resource = resourceTypes.value.find((r) => r.id === inventory.resourceTypeId)
+      return resource ? getResourceImageUrl(resource) : null
     }
     if (inventory.productTypeId) {
-      return productTypes.value.find((product) => product.id === inventory.productTypeId)?.imageUrl ?? null
+      const product = productTypes.value.find((p) => p.id === inventory.productTypeId)
+      return product ? getProductImageUrl(product) : null
     }
     return null
   }
