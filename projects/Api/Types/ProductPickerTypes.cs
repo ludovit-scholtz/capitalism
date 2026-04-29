@@ -15,10 +15,11 @@ public sealed class RankedProductResult
 
     /// <summary>
     /// Machine-readable reason this product was ranked where it is.
-    /// One of: <c>connected</c>, <c>used_by_company</c>, <c>catalog</c>.
+    /// One of: <c>connected</c>, <c>manufacturing</c>, <c>used_by_company</c>, <c>catalog</c>.
     /// <list type="bullet">
     ///   <item><c>connected</c> – the product is already configured in another unit of the same building.</item>
-    ///   <item><c>used_by_company</c> – the player's company manufactures this product in at least one other building (used in R&amp;D contexts).</item>
+    ///   <item><c>manufacturing</c> – the player's company is actively manufacturing this product (highest R&amp;D priority, score 80).</item>
+    ///   <item><c>used_by_company</c> – the player's company sells or stocks this product but does not manufacture it (secondary R&amp;D priority, score 50).</item>
     ///   <item><c>catalog</c> – no special priority; falls back to alphabetical order.</item>
     /// </list>
     /// </summary>
@@ -26,7 +27,7 @@ public sealed class RankedProductResult
 
     /// <summary>
     /// Numeric score used to sort results. Higher scores appear first.
-    /// Connected = 100, used_by_company = 50, catalog = 10.
+    /// Connected = 100, manufacturing = 80, used_by_company = 50, catalog = 10.
     /// Within the same score tier products are sorted alphabetically.
     /// </summary>
     public int RankingScore { get; set; } = 10;
@@ -38,7 +39,10 @@ public static class ProductRankingReason
     /// <summary>Product is already configured in another unit of the same building.</summary>
     public const string Connected = "connected";
 
-    /// <summary>Player's company manufactures this product in another building (R&amp;D context).</summary>
+    /// <summary>Player's company is actively manufacturing this product in at least one building (R&amp;D context, highest priority after connected, score 80).</summary>
+    public const string Manufacturing = "manufacturing";
+
+    /// <summary>Player's company sells or stocks this product but does not manufacture it (R&amp;D context, secondary priority, score 50).</summary>
     public const string UsedByCompany = "used_by_company";
 
     /// <summary>No special context; alphabetical fallback.</summary>

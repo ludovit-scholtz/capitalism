@@ -69,9 +69,10 @@ const filteredProducts = computed(() => {
 /** Grouped by section for visual separation. */
 const groupedProducts = computed(() => {
   const connected = filteredProducts.value.filter((r) => r.rankingReason === 'connected')
+  const manufacturing = filteredProducts.value.filter((r) => r.rankingReason === 'manufacturing')
   const usedByCompany = filteredProducts.value.filter((r) => r.rankingReason === 'used_by_company')
   const catalog = filteredProducts.value.filter((r) => r.rankingReason === 'catalog')
-  return { connected, usedByCompany, catalog }
+  return { connected, manufacturing, usedByCompany, catalog }
 })
 
 /** The currently selected product entry, if any. */
@@ -140,6 +141,7 @@ function select(id: string | null) {
 
 function rankingReasonLabel(reason: string): string {
   if (reason === 'connected') return t('productPicker.reasonConnected')
+  if (reason === 'manufacturing') return t('productPicker.reasonManufacturing')
   if (reason === 'used_by_company')
     return props.rdContext ? t('productPicker.reasonActiveProduction') : t('productPicker.reasonUsedByCompany')
   return ''
@@ -147,7 +149,8 @@ function rankingReasonLabel(reason: string): string {
 
 function rankingReasonClass(reason: string): string {
   if (reason === 'connected') return 'badge-connected'
-  if (reason === 'used_by_company') return props.rdContext ? 'badge-active-production' : 'badge-used'
+  if (reason === 'manufacturing') return 'badge-active-production'
+  if (reason === 'used_by_company') return props.rdContext ? 'badge-used' : 'badge-used'
   return ''
 }
 
@@ -188,6 +191,11 @@ function availabilityReasonClass(entry: RankedProductResult): string {
 function availabilityReasonDetail(entry: RankedProductResult): string {
   const meta = getAvailabilityMeta(entry)
   if (meta) return t(meta.detailKey)
+  // R&D context: show contextual guidance so players understand why the product is prioritised.
+  if (props.rdContext) {
+    if (entry.rankingReason === 'manufacturing') return t('productPicker.contextManufacturing')
+    if (entry.rankingReason === 'used_by_company') return t('productPicker.contextInPortfolio')
+  }
   return ''
 }
 
@@ -346,14 +354,65 @@ watch(
             </div>
           </template>
 
-          <!-- Used-by-company products section -->
+          <!-- Manufacturing products section (R&D: highest priority — actively produced by the company) -->
+          <template v-if="groupedProducts.manufacturing.length > 0">
+            <div class="picker-section-header picker-section-header--rd">
+              <span class="picker-section-icon" aria-hidden="true">🏭</span>
+              {{ t('productPicker.sectionActiveProductLines') }}
+            </div>
+            <div
+              v-for="r in groupedProducts.manufacturing"
+              :key="r.productType.id"
+              class="picker-item"
+              :class="{
+                'picker-item-selected': selectedId === r.productType.id,
+                'picker-item-locked': r.productType.isProOnly && !r.productType.isUnlockedForCurrentPlayer,
+              }"
+              role="option"
+              :aria-selected="selectedId === r.productType.id"
+              :aria-disabled="r.productType.isProOnly && !r.productType.isUnlockedForCurrentPlayer"
+              tabindex="0"
+              @click="!(r.productType.isProOnly && !r.productType.isUnlockedForCurrentPlayer) && select(r.productType.id)"
+              @keydown.enter.space.prevent="!(r.productType.isProOnly && !r.productType.isUnlockedForCurrentPlayer) && select(r.productType.id)"
+            >
+              <img
+                :src="productImage(r)"
+                :alt="localProductName(r)"
+                class="picker-item-img"
+                aria-hidden="true"
+              />
+               <div class="picker-item-body">
+                 <span class="picker-item-name">{{ localProductName(r) }}</span>
+                 <span class="picker-item-industry">{{ localIndustry(r) }}</span>
+                 <span v-if="availabilityReasonDetail(r)" class="picker-item-context">{{ availabilityReasonDetail(r) }}</span>
+               </div>
+               <span
+                 v-if="availabilityReasonLabel(r)"
+                 class="picker-item-badge"
+                 :class="availabilityReasonClass(r)"
+                 :title="availabilityReasonLabel(r)"
+               >{{ availabilityReasonLabel(r) }}</span>
+               <span v-if="r.productType.isProOnly && !r.productType.isUnlockedForCurrentPlayer" class="picker-item-badge badge-pro">
+                 {{ t('catalog.proBadge') }}
+               </span>
+            </div>
+          </template>
+
+          <!-- R&D: guidance hint when the company has not yet started manufacturing anything -->
+          <div
+            v-if="rdContext && groupedProducts.manufacturing.length === 0 && groupedProducts.usedByCompany.length === 0 && !searchQuery"
+            class="picker-rd-hint"
+          >
+            {{ t('productPicker.rdNoActiveProducts') }}
+          </div>
+
+          <!-- Used-by-company products section (R&D: secondary priority — sold or stocked but not manufactured) -->
           <template v-if="groupedProducts.usedByCompany.length > 0">
             <div
               class="picker-section-header"
-              :class="{ 'picker-section-header--rd': rdContext }"
+              :class="{ 'picker-section-header--rd-secondary': rdContext }"
             >
-              <span v-if="rdContext" class="picker-section-icon" aria-hidden="true">🏭</span>
-              {{ rdContext ? t('productPicker.sectionActiveProductLines') : t('productPicker.sectionUsedByCompany') }}
+              {{ rdContext ? t('productPicker.sectionActivePortfolio') : t('productPicker.sectionUsedByCompany') }}
             </div>
             <div
               v-for="r in groupedProducts.usedByCompany"
@@ -396,7 +455,7 @@ watch(
           <!-- Catalog section -->
           <template v-if="groupedProducts.catalog.length > 0">
             <div
-              v-if="groupedProducts.connected.length > 0 || groupedProducts.usedByCompany.length > 0"
+              v-if="groupedProducts.connected.length > 0 || groupedProducts.manufacturing.length > 0 || groupedProducts.usedByCompany.length > 0"
               class="picker-section-header"
             >
               {{ t('productPicker.sectionCatalog') }}
@@ -626,6 +685,20 @@ watch(
   color: #065f46;
   background: #ecfdf5;
   border-top-color: #a7f3d0;
+}
+
+.picker-section-header--rd-secondary {
+  color: #1e40af;
+  background: #eff6ff;
+  border-top-color: #bfdbfe;
+}
+
+.picker-rd-hint {
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  border-bottom: 1px solid var(--color-border-light, #f0f0f0);
 }
 
 .picker-section-icon {
