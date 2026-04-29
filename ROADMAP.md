@@ -74,8 +74,8 @@ It will use real world map. The game will start in single city and later other c
 
 ### Encyclopedia (100% complete)
 
-- [ ] Update help section with onboarding help. Please document the onboarding and create also  full hd pictures from the onboarding process so that users can easier be onboarded. For each step create 100 word definition describing what they players are doing.
-- [ ] Update help section with manufacturing unit setup in the factories. Create list of the topics. Please document the manufacturing setup, how units are created, what every unit type is doing and create also full hd pictures so that users can understand the game better. For every topic also create at least 100 word description on what player is doing.
+- [x] Update help section with onboarding help. Please document the onboarding and create also  full hd pictures from the onboarding process so that users can easier be onboarded. For each step create 100 word definition describing what they players are doing.
+- [x] Update help section with manufacturing unit setup in the factories. Create list of the topics. Please document the manufacturing setup, how units are created, what every unit type is doing and create also full hd pictures so that users can understand the game better. For every topic also create at least 100 word description on what player is doing.
 
 ### Referal program (0% complete)
 

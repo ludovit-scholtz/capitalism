@@ -624,17 +624,23 @@ export default {
     onboardingGuideTitle: 'Pomoc s onboardingom',
     onboardingGuideSubtitle: 'Kompletný sprievodca so screenshotmi cez všetky onboarding rozhodnutia od odvetvia po prvú predajňu.',
     onboardingGuideStep1Title: 'Krok 1 - Výber odvetvia',
-    onboardingGuideStep1Body: 'Vyberáte podnikateľský štýl a rizikový profil. Nábytok je najstabilnejší štart, Potraviny sú o objeme a Zdravotníctvo cieli vyššie marže na kus.',
+    onboardingGuideStep1Body:
+      'V tomto kroku si vyberáte podnikateľskú identitu, podľa ktorej sa bude formovať celý váš prvý biznis. Nábytok je najbezpečnejší štart, pretože má jednoduchší vstupný reťazec a stabilný dopyt. Potravinárstvo vás učí pracovať s objemom, kde malé zmeny ceny dokážu výrazne pohnúť predajmi. Zdravotníctvo je náročnejšie na disciplínu, ale odmeňuje vyššou maržou na jednotku. Pri výbere porovnajte štartové produkty, rýchlosť výroby a to, koľko zložitosti chcete riešiť v prvých tickoch. Toto rozhodnutie určí váš prvý výrobný rytmus, spôsob cenotvorby aj tempo, akým sa dostanete k stabilnému cash-flow vhodnému na expanziu.',
     onboardingGuideStep2Title: 'Krok 2 - Výber štartového produktu',
-    onboardingGuideStep2Body: 'Uzamknete prvý produkt pre výrobný reťazec. Toto rozhodnutie určí vstupné suroviny, cieľovú cenu a citlivosť na dopyt.',
+    onboardingGuideStep2Body:
+      'Tu definitívne uzamknete produkt, ktorý bude vaša prvá továreň vyrábať a predajňa predávať. Nie je to len vizuálna voľba. Mení sa tým potrebný vstupný materiál, očakávané náklady na výrobný cyklus aj realistický cenový koridor pre prvé predaje. Pozrite si základnú cenu, recept a tempo craftu, pretože práve tieto údaje ovplyvnia vašu počiatočnú maržu a obrátku zásob. Produkt s rýchlym cyklom prináša rýchlejšiu spätnú väzbu, produkt s vyššou cenou zase zosilní chyby pri zlej konfigurácii. Vyberajte tak, aby ste v prvých desiatich tickoch zvládli dopyt, maržu aj jednoduchosť nastavovania bez zbytočného chaosu.',
     onboardingGuideStep3Title: 'Krok 3 - Výber mesta',
-    onboardingGuideStep3Body: 'Zvolíte mestský kontext štartu. Mena, dostupnosť pozemkov a lokálna ekonomika ovplyvnia dostupnosť aj ďalšiu expanziu.',
+    onboardingGuideStep3Body:
+      'Výber mesta určuje ekonomické prostredie vášho štartu. Mena ovplyvňuje spôsob, akým čítate ceny, dostupnosť kapitálu a porovnávanie investícií medzi lotmi. Dostupnosť pozemkov rozhodne, či viete rýchlo spustiť výrobný reťazec bez preplácania. Lokálna ekonomika a veľkosť trhu zas vplývajú na to, ako agresívne môžete nastaviť predajnú cenu v prvých kolách. Berte to ako výber terénu pre celý launch: niekde je výhodnejšia stabilita a opatrné náklady, inde rýchlejší rast po rozbehu. Kľúčové je nevyčerpať sa pri nákupoch lotov, aby vám ostala rezerva na nákup vstupov, mzdy a doladenie konfigurácie v nasledujúcich tickoch.',
     onboardingGuideStep4Title: 'Krok 4 - Voľba IPO plánu',
-    onboardingGuideStep4Body: 'Nastavíte pomer podielu zakladateľa a štartového kapitálu. Vyšší externý kapitál zvyšuje rezervu, no znižuje vlastnícky podiel.',
+    onboardingGuideStep4Body:
+      'IPO plán je strategický kompromis medzi kontrolou a runway. Nižší úpis ponechá zakladateľovi silnejší podiel, ale dá firme menej hotovosti na loty, jednotky a počiatočné chyby. Vyšší úpis pridá bezpečnostnú rezervu a zníži tlak pri prvých rozhodnutiach, no zároveň oslabí váš vlastnícky podiel. Správna voľba závisí od skúsenosti a štýlu hry. Ak onboarding robíte prvýkrát, vyššia hotovosť pomáha zvládnuť učenie bez kritického stresu. Ak už viete presné kroky, môžete ísť efektívnejšie cez nižší úpis. Čítajte hodnoty founder ownership a public float ako riadiace páky dlhodobej stratégie, nie iba ako čísla na obrazovke.',
     onboardingGuideStep5Title: 'Krok 5 - Kúpa prvého lotu pre továreň',
-    onboardingGuideStep5Body: 'Rezervujete výrobný pozemok a potvrdíte použitie firemných peňazí. Nechajte dostatok kapitálu na jednotky a následnú kúpu predajne.',
+    onboardingGuideStep5Body:
+      'V tomto bode meníte plán na fyzickú výrobnú stopu. Kúpa prvého továrenského lotu priamo ovplyvní zostatok hotovosti, s ktorým vstupujete do konfigurácie jednotiek a ďalšieho nákupu predajne. Neoptimalizujte podľa názvu štvrte, ale podľa prežitia prvého produkčného cyklu. Potrebujete kapitál nielen na lot, ale aj na bezpečný prechod do ďalších krokov bez núdzových rozhodnutí. V zozname alebo na mape porovnajte varianty a vyberte taký lot, ktorý nechá rezervu na prevádzkové výkyvy. Mierne lacnejší lot často znamená lepší štart, pretože v prvých tickoch máte priestor na korekcie cenotvorby aj nákupu vstupov bez okamžitého tlaku na likviditu.',
     onboardingGuideStep6Title: 'Krok 6 - Kúpa prvého lotu pre predajňu',
-    onboardingGuideStep6Body: 'Dokončíte prvú cestu na trh. Po konfigurácii rozhodujú nastavenie VEREJNÉHO_PREDAJA a timing tickov o rýchlosti prvých tržieb.',
+    onboardingGuideStep6Body:
+      'Posledným onboarding nákupom dokončíte prvú cestu produktu k zákazníkovi. Predajný lot je miesto, kde sa výroba mení na tržby, preto je tento krok prechodom z prípravy do aktívnej exekúcie. Po kúpe sa sústreďte na čisté nastavenie VEREJNÉHO_PREDAJA: realistická minimálna cena, dostupnosť zásob a pozorovanie nasledujúcich tickov, kým príde prvý reálny predaj. Na začiatku je dôležitejšia rýchla spätná väzba než maximalizácia marže, preto nastavujte cenu tak, aby sa tovar hýbal. Keď sa objaví prvý predajný signál, môžete systematicky testovať elasticitu dopytu a dolaďovať maržu. Tento krok uzatvára onboarding a štartuje opakovateľnú rastovú slučku.',
     onboardingGuideStepIndustryTitle: '1. Vyberte štartové odvetvie',
     onboardingGuideStepIndustryBody: 'Vyberte Nábytok, Potravinárstvo alebo Zdravotníctvo. To určí prvý dodávateľský reťazec aj cenovú logiku.',
     onboardingGuideStepProductTitle: '2. Uzamknite prvý produkt',
@@ -644,15 +650,24 @@ export default {
     onboardingGuideStepShopTitle: '4. Otvorte prvú predajňu',
     onboardingGuideStepShopBody: 'Kúpte lot predajne, nastavte cenu vo VEREJNOM_PREDAJI a sledujte ďalšie ticky kvôli prvému príjmu.',
     manufacturingGuideTitle: 'Pomoc s layoutom tovární',
-    manufacturingGuideSubtitle: 'Odporúčaný štartový reťazec pre stabilnú skorú produkciu.',
+    manufacturingGuideSubtitle: 'Témový návod na vytvorenie, prepojenie a stabilnú prevádzku prvého ziskového výrobného reťazca.',
+    manufacturingGuideTopicsTitle: 'Témy nastavenia továrne',
+    manufacturingGuideTopicPurchase: 'Nastavenie jednotky NÁKUP a cenová disciplína vstupov',
+    manufacturingGuideTopicManufacturing: 'Konfigurácia jednotky VÝROBA a konzistentná linka',
+    manufacturingGuideTopicStorage: 'Tlmenie výkyvov cez SKLAD a ochrana proti výpadkom',
+    manufacturingGuideTopicPublicSales: 'Cenotvorba vo VEREJNOM_PREDAJI a iterácie podľa dopytu',
     manufacturingGuideStepPurchaseTitle: 'NÁKUP: Bezpečný sourcing vstupov',
-    manufacturingGuideStepPurchaseBody: 'Nastavte max cenu a minimálnu kvalitu, aby ste nepreplácali. Túto jednotku držte prepojenú s VÝROBOU.',
+    manufacturingGuideStepPurchaseBody:
+      'Jednotka NÁKUP je obranný bod celej ekonomiky linky. Nastavte maximálnu cenu a minimálnu kvalitu tak, aby ste neplatili prehnane drahé alebo slabé vstupy, ktoré neskôr zničia maržu. Udržte túto jednotku priamo prepojenú s VÝROBOU, inak sa môže stať, že zásoby budú rásť, ale výroba zostane neaktívna. Sledujte, ako často nákup prejde v každom ticku. Ak často zlyháva, býva limit príliš prísny pre aktuálny trh. Limity dvíhajte postupne, nie skokovo, a vždy kontrolujte dopad na hrubý zisk vo finálnom predaji. Dobre nastavený NÁKUP dá celej továrni predvídateľné náklady, čo je v early game dôležitejšie než naháňanie extrémnych výhod.',
     manufacturingGuideStepManufactureTitle: 'VÝROBA: Premeňte vstupy na výstup',
-    manufacturingGuideStepManufactureBody: 'Na linku vyberte jeden produkt a overte, že sú pripojené všetky potrebné vstupy. Kvalita závisí od vstupov a V&V.',
+    manufacturingGuideStepManufactureBody:
+      'VÝROBA je miesto, kde vzniká hodnota, preto musí byť konfigurácia jednoduchá a konzistentná. Na jednu linku nastavte jeden jasný produkt a pred spustením overte, že všetky povinné vstupy majú funkčné prepojenie. Ak výstup kolíše, najprv skontrolujte dostupnosť vstupov a až potom samotnú jednotku. Kvalita výstupu je odvodená od kvality vstupov a postupne ju zlepšuje výskum, preto sa vyhýbajte častému prehadzovaniu produktu v prvých tickoch. Nechajte linku bežať stabilne dostatočne dlho, aby ste získali použiteľné dáta o dopyte, marži a obrátke. Správne nastavená VÝROBA mení nákup na predajný tovar predvídateľným tempom, čo umožní robiť rozhodnutia podľa čísiel, nie pocitu.',
     manufacturingGuideStepStorageTitle: 'SKLAD: Vyrovnávajte výkyvy',
-    manufacturingGuideStepStorageBody: 'Sklad funguje ako tlmič, aby sa predaj nezastavil pri kolísaní nákupu medzi tickmi.',
+    manufacturingGuideStepStorageBody:
+      'SKLAD chráni váš príjem pred časovým nesúladom medzi nákupom, výrobou a predajom. Bez bufferu môže jeden slabý tick nákupu spôsobiť reťazový výpadok výroby a prázdny predaj. Sklad preto nastavujte ako aktívny tlmič: držte zásobu, ktorá pokryje krátke výkyvy, ale neviažte zbytočne veľa kapitálu v nadmerných zásobách. Trend skladu je zároveň diagnostika. Ak zásoby rastú a predaj stagnuje, cena je často príliš vysoká. Ak zásoby miznú a predaj vypadáva, problém býva v nákupe alebo kapacite výroby. V early fáze je stabilita cennejšia než maximálne využitie. Dobrá práca so SKLADOM udrží plynulý tok tovaru a dá vám čas na bezpečné iterácie.',
     manufacturingGuideStepPublicSalesTitle: 'VEREJNÝ_PREDAJ: Cena a predaj',
-    manufacturingGuideStepPublicSalesBody: 'Nastavte realistickú minimálnu cenu, držte zásoby a dolaďujte po každom tick okne podľa dopytu.',
+    manufacturingGuideStepPublicSalesBody:
+      'VEREJNÝ_PREDAJ je trhová brána, kde sa všetka predchádzajúca práca mení na reálny cash-flow. Začnite s minimálnou cenou blízko referenčnej trhovej úrovne a následne upravujte po malých krokoch po niekoľkých tickoch. Ak sa tovar vypredáva okamžite, otestujte mierne zvýšenie ceny pre lepšiu maržu. Ak sa zásoba hromadí, cenu opatrne znížte alebo zvýšte atraktivitu cez kvalitu. Kľúčové je mať konzistentný stock, pretože žiadna cenová stratégia nefunguje pri prázdnom regáli. Sledujte spolu množstvo, tržby aj hrubý zisk, nie iba jednu metriku. Cieľom je nájsť opakovateľný interval, kde dopyt zostáva živý a marža zdravá. Práve táto iterácia robí továreň dlhodobo škálovateľnou.',
     viewDetail: 'Zobraziť detail',
     searchNoResults: 'Žiadne suroviny ani produkty nezodpovedajú vášmu vyhľadávaniu. Skúste iný výraz alebo vymažte filtre.',
   },

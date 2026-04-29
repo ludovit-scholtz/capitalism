@@ -89,32 +89,32 @@ const onboardingGuideCards = [
   {
     titleKey: 'encyclopedia.onboardingGuideStep1Title',
     bodyKey: 'encyclopedia.onboardingGuideStep1Body',
-    imageUrl: '/onboarding-help/step-1-industry.svg',
+    imageUrl: '/onboarding-help/step-1-industry.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep2Title',
     bodyKey: 'encyclopedia.onboardingGuideStep2Body',
-    imageUrl: '/onboarding-help/step-2-product.svg',
+    imageUrl: '/onboarding-help/step-2-product.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep3Title',
     bodyKey: 'encyclopedia.onboardingGuideStep3Body',
-    imageUrl: '/onboarding-help/step-3-city.svg',
+    imageUrl: '/onboarding-help/step-3-city.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep4Title',
     bodyKey: 'encyclopedia.onboardingGuideStep4Body',
-    imageUrl: '/onboarding-help/step-4-ipo.svg',
+    imageUrl: '/onboarding-help/step-4-ipo.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep5Title',
     bodyKey: 'encyclopedia.onboardingGuideStep5Body',
-    imageUrl: '/onboarding-help/step-5-factory-lot.svg',
+    imageUrl: '/onboarding-help/step-5-factory-lot.png',
   },
   {
     titleKey: 'encyclopedia.onboardingGuideStep6Title',
     bodyKey: 'encyclopedia.onboardingGuideStep6Body',
-    imageUrl: '/onboarding-help/step-6-shop-lot.svg',
+    imageUrl: '/onboarding-help/step-6-shop-lot.png',
   },
 ]
 
@@ -139,6 +139,13 @@ const manufacturingGuideCards = [
     bodyKey: 'encyclopedia.manufacturingGuideStepPublicSalesBody',
     productSlug: 'basic-medicine',
   },
+]
+
+const manufacturingGuideTopics = [
+  'encyclopedia.manufacturingGuideTopicPurchase',
+  'encyclopedia.manufacturingGuideTopicManufacturing',
+  'encyclopedia.manufacturingGuideTopicStorage',
+  'encyclopedia.manufacturingGuideTopicPublicSales',
 ]
 
 const catalogEntries = computed<CatalogEntry[]>(() => {
@@ -399,6 +406,12 @@ function navigateToEntry(slug: string) {
         <section class="flex flex-col gap-3">
           <h2 class="m-0">{{ t('encyclopedia.manufacturingGuideTitle') }}</h2>
           <p class="text-muted m-0">{{ t('encyclopedia.manufacturingGuideSubtitle') }}</p>
+          <h3 class="m-0 text-base mt-2">{{ t('encyclopedia.manufacturingGuideTopicsTitle') }}</h3>
+          <ul class="m-0 pl-5 text-sm text-muted flex flex-col gap-1">
+            <li v-for="topic in manufacturingGuideTopics" :key="topic">
+              {{ t(topic) }}
+            </li>
+          </ul>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
             <article v-for="card in manufacturingGuideCards" :key="card.titleKey" class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden">
               <button
