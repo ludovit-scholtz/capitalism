@@ -1144,7 +1144,6 @@ useTickRefresh(async () => {
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
       </div>
-
       <div v-if="step < 7" class="flex items-start mb-10 px-4 overflow-x-auto">
         <div class="progress-segment" :class="{ active: step >= 1, done: step > 1 }">
           <div class="progress-step"><span v-if="step > 1" class="check-icon text-lg">✓</span><span v-else>1</span></div>
@@ -1176,9 +1175,7 @@ useTickRefresh(async () => {
           <span class="progress-label">{{ t('onboarding.step6Title') }}</span>
         </div>
       </div>
-
       <div v-if="error" class="bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad px-4 py-3 rounded-lg text-sm mb-4" role="alert">{{ error }}</div>
-
       <div v-if="step === 1" class="step-content bg-card border border-divider rounded-xl p-8">
         <div class="mb-4">
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step1Title') }}</h2>
@@ -1186,42 +1183,37 @@ useTickRefresh(async () => {
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
           <button v-for="ind in industries" :key="ind" class="industry-card" :class="{ selected: selectedIndustry === ind }" @click="selectIndustry(ind)">
-            <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '­čĆş' }}</span>
-            <span class="font-bold text-base">{{ formatIndustry(ind) }}</span>
-            <span class="card-first-product">{{ t(industryFirstProductKeys[ind] || '') }}</span>
-            <span class="card-desc text-[0.8125rem] text-muted leading-snug">{{ t(industryDescKeys[ind] || '') }}</span>
-            <span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
+            <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
+            ><span class="font-bold text-base">{{ formatIndustry(ind) }}</span
+            ><span class="card-first-product">{{ t(industryFirstProductKeys[ind] || '') }}</span
+            ><span class="card-desc text-[0.8125rem] text-muted leading-snug">{{ t(industryDescKeys[ind] || '') }}</span
+            ><span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
           </button>
         </div>
       </div>
-
       <div v-if="step === 2" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step2Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
         </div>
-
         <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
           <button v-for="prod in sortedProducts" :key="prod.id" class="product-card" :class="{ selected: selectedProductId === prod.id }" @click="selectProduct(prod.id)">
-            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" />
-            <span class="font-bold text-base">{{ getProductName(prod) }}</span>
-            <span class="text-[1rem] font-bold text-[var(--color-secondary)]">{{ getProductPriceSummary(prod) }}</span>
-            <span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span>
-            <span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
+            <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" /><span class="font-bold text-base">{{
+              getProductName(prod)
+            }}</span
+            ><span class="text-[1rem] font-bold text-[var(--color-secondary)]">{{ getProductPriceSummary(prod) }}</span
+            ><span class="text-xs text-muted">{{ t('onboarding.craftTime', { ticks: prod.baseCraftTicks }) }}</span
+            ><span class="text-[0.8125rem] text-muted leading-snug">{{ getProductDescription(prod) }}</span>
             <div class="flex flex-col gap-1 text-xs text-muted">
-              <span class="font-medium">{{ t('onboarding.requires') }}:</span>
-              <span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium">
-                {{ getRecipeIngredientLabel(prod, index) }}
-              </span>
+              <span class="font-medium">{{ t('onboarding.requires') }}:</span
+              ><span v-for="(recipe, index) in prod.recipes" :key="index" class="text-[var(--color-tertiary)] font-medium"> {{ getRecipeIngredientLabel(prod, index) }} </span>
             </div>
           </button>
         </div>
-
         <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" @click="prevStep">ÔćÉ {{ t('common.back') }}</button>
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
         </div>
       </div>
-
       <div v-if="step === 3" class="step-content bg-card border border-divider rounded-xl p-8">
         <div class="mb-4">
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step3Title') }}</h2>
@@ -1230,48 +1222,44 @@ useTickRefresh(async () => {
         <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
           <button v-for="city in cities" :key="city.id" class="city-card" :class="{ selected: selectedCityId === city.id }" @click="selectCity(city.id)">
             <div class="flex items-center gap-2">
-              <span class="text-2xl">­čĆÖ´ŞĆ</span>
-              <span class="font-bold text-base">{{ city.name }}</span>
+              <span class="text-2xl">🏙️</span><span class="font-bold text-base">{{ city.name }}</span>
             </div>
             <div class="flex gap-3 text-[0.8125rem] text-muted">
-              <span class="bg-card-raised px-2 py-0.5 rounded font-semibold text-xs">{{ city.countryCode }}</span>
-              <span v-if="city.currencyCode" class="city-currency bg-brand px-2 py-0.5 rounded font-semibold text-xs text-white">{{ city.currencyCode }}</span>
-              <span>{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
+              <span class="bg-card-raised px-2 py-0.5 rounded font-semibold text-xs">{{ city.countryCode }}</span
+              ><span v-if="city.currencyCode" class="city-currency bg-brand px-2 py-0.5 rounded font-semibold text-xs text-white">{{ city.currencyCode }}</span
+              ><span>{{ t('onboarding.population') }} {{ city.population.toLocaleString() }}</span>
             </div>
             <div class="flex flex-wrap gap-1.5 items-center">
-              <span class="text-xs text-muted">{{ t('onboarding.resources') }}:</span>
-              <span v-for="(resource, index) in city.resources" :key="index" class="bg-[rgba(0,200,83,0.1)] text-[var(--color-secondary)] px-2 py-0.5 rounded-full text-[0.6875rem] font-medium">
+              <span class="text-xs text-muted">{{ t('onboarding.resources') }}:</span
+              ><span v-for="(resource, index) in city.resources" :key="index" class="bg-[rgba(0,200,83,0.1)] text-[var(--color-secondary)] px-2 py-0.5 rounded-full text-[0.6875rem] font-medium">
                 {{ getCityResourceName(city, index) }}
               </span>
             </div>
           </button>
         </div>
         <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" @click="prevStep">ÔćÉ {{ t('common.back') }}</button>
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
         </div>
       </div>
-
       <div v-if="step === 4" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step4Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step4Desc') }}</p>
         </div>
-
         <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span>
-            <strong>{{ companyName }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span
+            ><strong>{{ companyName }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span>
-            <strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityFxRate) }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.founderContribution') }}</span
+            ><strong>{{ formatCurrency(FOUNDER_CONTRIBUTION * cityFxRate) }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span>
-            <strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.personalCash') }}</span
+            ><strong>{{ formatCurrency(remainingPersonalCash, 'EUR') }}</strong>
           </article>
         </div>
-
         <div class="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
           <button
             v-for="option in ipoOptions"
@@ -1280,40 +1268,36 @@ useTickRefresh(async () => {
             :class="{ selected: selectedIpoRaiseTarget === option.raiseTarget }"
             @click="selectIpoPlan(option.raiseTarget)"
           >
-            <span class="font-bold text-sm">{{ t(option.titleKey) }}</span>
-            <span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span>
-            <span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span>
-            <span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span>
-            <span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>
+            <span class="font-bold text-sm">{{ t(option.titleKey) }}</span
+            ><span class="text-muted text-xs">{{ t('onboarding.ipoRaise') }}: {{ formatCurrency(option.raiseTarget * cityFxRate) }}</span
+            ><span class="text-muted text-xs">{{ t('onboarding.ipoFounderOwnership') }}: {{ formatPercent(option.founderOwnershipRatio) }}</span
+            ><span class="text-muted text-xs">{{ t('onboarding.ipoPublicFloat') }}: {{ formatPercent(1 - option.founderOwnershipRatio) }}</span
+            ><span class="text-muted text-[0.8125rem] leading-snug">{{ t(option.descriptionKey) }}</span>
           </button>
         </div>
-
         <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" @click="prevStep">ÔćÉ {{ t('common.back') }}</button>
+          <button class="btn btn-secondary" @click="prevStep">← {{ t('common.back') }}</button>
         </div>
       </div>
-
       <div v-if="step === 5" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step5Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step5Desc') }}</p>
         </div>
-
         <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span>
-            <strong>{{ companyName }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.generatedCompanyName') }}</span
+            ><strong>{{ companyName }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.startingCash') }}</span>
-            <strong>{{ formatCurrency(companyStartingCash) }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.startingCash') }}</span
+            ><strong>{{ formatCurrency(companyStartingCash) }}</strong>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
-            <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span>
-            <strong>{{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span
+            ><strong>{{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
           </article>
         </div>
-
         <div class="bg-card-raised border border-divider rounded-lg p-4">
           <h3 class="font-semibold text-sm mb-2">{{ t('onboarding.factoryGuideTitle') }}</h3>
           <p class="text-muted text-sm m-0">{{ t('onboarding.factoryGuideBody') }}</p>
@@ -1323,10 +1307,7 @@ useTickRefresh(async () => {
             <li>{{ t('onboarding.factoryGuideHint3') }}</li>
           </ul>
         </div>
-
-        <p v-if="availableFactoryLots.length === 0" class="empty-state-message text-muted text-sm m-0">
-          {{ t('onboarding.noFactoryLots') }}
-        </p>
+        <p v-if="availableFactoryLots.length === 0" class="empty-state-message text-muted text-sm m-0">{{ t('onboarding.noFactoryLots') }}</p>
         <OnboardingLotSelector
           v-else
           key="factory-lot-selector"
@@ -1337,58 +1318,42 @@ useTickRefresh(async () => {
           :recommended-lot-ids="recommendedFactoryLotIds"
           :city="selectedCity"
         />
-
         <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">ÔćÉ {{ t('common.back') }}</button>
-          <button class="btn btn-primary btn-lg" :disabled="!canProceedStep3 || loading" @click="startOnboardingCompany">
-            {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }}
-            <span v-if="!loading" class="ml-1">­čĆş</span>
+          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
+          ><button class="btn btn-primary btn-lg" :disabled="!canProceedStep3 || loading" @click="startOnboardingCompany">
+            {{ loading ? t('common.loading') : t('onboarding.purchaseFactory') }} <span v-if="!loading" class="ml-1">🏭</span>
           </button>
         </div>
       </div>
-
       <div v-if="step === 6" class="step-content step-content-wide bg-card border border-divider rounded-xl p-8 flex flex-col gap-6">
         <div>
           <h2 class="text-xl font-semibold mb-1">{{ t('onboarding.step6Title') }}</h2>
           <p class="text-muted text-sm">{{ t('onboarding.step6Desc') }}</p>
         </div>
-
         <div class="bg-card-raised border border-divider rounded-lg p-4" role="status">
-          <strong>{{ t('onboarding.factoryPurchasedTitle') }}</strong>
-          <span class="text-muted ml-1">
-            {{
-              t('onboarding.factoryPurchasedBody', {
-                lot: selectedFactoryLot?.name ?? '',
-                cash: formatCurrency(starterCash),
-              })
-            }}
-          </span>
+          <strong>{{ t('onboarding.factoryPurchasedTitle') }}</strong
+          ><span class="text-muted ml-1"> {{ t('onboarding.factoryPurchasedBody', { lot: selectedFactoryLot?.name ?? '', cash: formatCurrency(starterCash) }) }} </span>
         </div>
-
         <div class="budget-grid grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.availableCash') }}</span>
-            <strong>{{ formatCurrency(starterCash) }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.availableCash') }}</span
+            ><strong>{{ formatCurrency(starterCash) }}</strong>
           </article>
           <article v-if="selectedProduct" class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider">
-            <span class="text-muted text-xs">{{ t('onboarding.selectProduct') }}</span>
-            <strong>{{ getProductName(selectedProduct) }}</strong>
-            <span class="text-xs text-muted">{{ getProductPriceSummary(selectedProduct) }}</span>
+            <span class="text-muted text-xs">{{ t('onboarding.selectProduct') }}</span
+            ><strong>{{ getProductName(selectedProduct) }}</strong
+            ><span class="text-xs text-muted">{{ getProductPriceSummary(selectedProduct) }}</span>
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedShopLot && starterCash < selectedShopLot.price }">
-            <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span>
-            <strong>{{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
+            <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span
+            ><strong>{{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
           </article>
         </div>
-
         <div class="bg-card-raised border border-divider rounded-lg p-4">
           <h3 class="font-semibold text-sm mb-2">{{ t('onboarding.shopGuideTitle') }}</h3>
           <p class="text-muted text-sm m-0">{{ t('onboarding.shopGuideBody') }}</p>
         </div>
-
-        <p v-if="availableShopLots.length === 0" class="empty-state-message text-muted text-sm m-0">
-          {{ t('onboarding.noShopLots') }}
-        </p>
+        <p v-if="availableShopLots.length === 0" class="empty-state-message text-muted text-sm m-0">{{ t('onboarding.noShopLots') }}</p>
         <OnboardingLotSelector
           v-else
           key="shop-lot-selector"
@@ -1399,46 +1364,33 @@ useTickRefresh(async () => {
           :recommended-lot-ids="recommendedShopLotIds"
           :city="selectedCity"
         />
-
         <div v-if="canShowStep4Summary" class="summary bg-card-raised border border-divider rounded-lg p-4">
           <div class="flex items-center gap-2 mb-2">
-            <span class="text-xl">­čôő</span>
+            <span class="text-xl">📋</span>
             <h3 class="font-semibold text-base m-0">{{ t('onboarding.summary') }}</h3>
           </div>
           <p class="text-muted text-sm m-0">
-            {{
-              t('onboarding.shopSummaryText', {
-                company: companyName,
-                city: selectedCity?.name ?? '',
-                product: selectedProduct ? getProductName(selectedProduct) : '',
-              })
-            }}
+            {{ t('onboarding.shopSummaryText', { company: companyName, city: selectedCity?.name ?? '', product: selectedProduct ? getProductName(selectedProduct) : '' }) }}
           </p>
           <div class="flex flex-col gap-1.5 mt-3">
             <div class="flex items-center gap-2 text-[0.8125rem] px-2 py-1.5 bg-card rounded">
-              <span>­čĆş</span>
-              <span>{{ selectedFactoryLot?.name }} ÔÇö {{ t(`cityMap.districts.${selectedFactoryLot?.district}`) }}</span>
+              <span>🏭</span><span>{{ selectedFactoryLot?.name }} — {{ t(`cityMap.districts.${selectedFactoryLot?.district}`) }}</span>
             </div>
             <div class="flex items-center gap-2 text-[0.8125rem] px-2 py-1.5 bg-card rounded">
-              <span>­čĆ¬</span>
-              <span>{{ selectedShopLot?.name }} ÔÇö {{ t(`cityMap.districts.${selectedShopLot?.district}`) }}</span>
+              <span>🏪</span><span>{{ selectedShopLot?.name }} — {{ t(`cityMap.districts.${selectedShopLot?.district}`) }}</span>
             </div>
             <div class="flex items-center gap-2 text-[0.8125rem] px-2 py-1.5 bg-card rounded">
-              <span>­čôŽ</span>
-              <span>{{ selectedProduct ? getProductName(selectedProduct) : '' }}</span>
+              <span>📦</span><span>{{ selectedProduct ? getProductName(selectedProduct) : '' }}</span>
             </div>
           </div>
         </div>
-
         <div class="step-actions flex gap-3 justify-end mt-2">
-          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">ÔćÉ {{ t('common.back') }}</button>
-          <button class="btn btn-primary btn-lg" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
-            {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }}
-            <span v-if="!loading" class="ml-1">­čĆ¬</span>
+          <button class="btn btn-secondary" :disabled="auth.player?.onboardingCurrentStep === 'SHOP_SELECTION'" @click="prevStep">← {{ t('common.back') }}</button
+          ><button class="btn btn-primary btn-lg" :disabled="!canProceedStep4 || loading" @click="completeOnboarding">
+            {{ loading ? t('common.loading') : t('onboarding.purchaseShop') }} <span v-if="!loading" class="ml-1">🏪</span>
           </button>
         </div>
       </div>
-
       <div
         v-if="step === 7 && (completionResult || isResumingConfigureStep || isGuestMode || milestoneCompleted)"
         class="step-content completion-step bg-card border border-divider rounded-xl p-8 flex flex-col gap-6 text-center"
@@ -1449,86 +1401,82 @@ useTickRefresh(async () => {
           </h2>
           <p class="text-muted mx-auto max-w-[480px] leading-relaxed">{{ t(isGuestMode ? 'onboarding.guestCompletionDesc' : 'onboarding.completionDesc') }}</p>
         </div>
-
         <!-- Guest mode: show simulated achievements and save-progress form -->
         <div v-if="isGuestMode" class="completion-achievements grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 text-left">
           <div v-if="selectedCity" class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čîŹ</span>
+            <span class="text-2xl shrink-0">🌍</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ selectedCity.name }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionCity') }}</span>
+              <strong class="text-sm">{{ selectedCity.name }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionCity') }}</span>
             </div>
           </div>
           <div v-if="selectedIndustry" class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĆş</span>
+            <span class="text-2xl shrink-0">🏭</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ formatIndustry(selectedIndustry) }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionIndustry') }}</span>
+              <strong class="text-sm">{{ formatIndustry(selectedIndustry) }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionIndustry') }}</span>
             </div>
           </div>
           <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĆó</span>
+            <span class="text-2xl shrink-0">🏢</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionFactory') }}</span>
+              <strong class="text-sm">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionFactory') }}</span>
             </div>
           </div>
           <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĆ¬</span>
+            <span class="text-2xl shrink-0">🏪</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ selectedShopLot?.name || t('onboarding.guestShopPlaceholder') }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionShop') }}</span>
+              <strong class="text-sm">{{ selectedShopLot?.name || t('onboarding.guestShopPlaceholder') }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionShop') }}</span>
             </div>
           </div>
           <div v-if="selectedProduct" class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čôŽ</span>
+            <span class="text-2xl shrink-0">📦</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ getProductName(selectedProduct) }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionProduct', { product: getProductName(selectedProduct) }) }}</span>
+              <strong class="text-sm">{{ getProductName(selectedProduct) }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionProduct', { product: getProductName(selectedProduct) }) }}</span>
             </div>
           </div>
           <div class="flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĺ░</span>
+            <span class="text-2xl shrink-0">💰</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }) }}</span>
+              <strong class="text-sm">{{ formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(effectiveOnboardingCompanyCash ?? companyStartingCash) }) }}</span>
             </div>
           </div>
         </div>
-
         <!-- Guest factory layout preview -->
         <div v-if="isGuestMode && guestFactoryLayout" class="factory-layout-panel bg-card border border-divider rounded-xl p-5 text-left" aria-label="Factory layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.factoryLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.factoryLayoutGuestDesc') }}</p>
           <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in guestFactoryLayout" :key="unit.unitType">
-              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? 'Ôľ¬´ŞĆ' }}</span>
-                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
+            <template v-for="(unit, index) in guestFactoryLayout" :key="unit.unitType"
+              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span
+                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < guestFactoryLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">Ôćĺ</span>
-            </template>
+              <span v-if="index < guestFactoryLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
+            >
           </div>
         </div>
-
         <!-- Guest shop layout preview -->
         <div v-if="isGuestMode && guestShopLayout" class="factory-layout-panel factory-layout-shop bg-card border border-[rgba(34,197,94,0.4)] rounded-xl p-5 text-left" aria-label="Sales shop layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.shopLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.shopLayoutGuestDesc') }}</p>
           <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in guestShopLayout" :key="unit.unitType">
-              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? 'Ôľ¬´ŞĆ' }}</span>
-                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
+            <template v-for="(unit, index) in guestShopLayout" :key="unit.unitType"
+              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span
+                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < guestShopLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">Ôćĺ</span>
-            </template>
+              <span v-if="index < guestShopLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
+            >
           </div>
         </div>
-
         <!-- Guest mode tick countdown -->
         <div v-if="isGuestMode && gameState" class="guest-tick-panel flex gap-3 items-start bg-page border border-divider rounded-lg p-4 text-sm text-muted text-left">
-          <span class="text-2xl shrink-0">ÔĆ▒</span>
+          <span class="text-2xl shrink-0">⏱</span>
           <div>
             <strong class="block mb-1 text-body">{{ t('onboarding.configureStepTick') }}</strong>
             <p class="m-0">{{ t('onboarding.configureStepTickDesc') }}</p>
@@ -1536,7 +1484,6 @@ useTickRefresh(async () => {
             <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good" role="timer">{{ tickCountdown }}</p>
           </div>
         </div>
-
         <!-- Guest simulated profit preview -->
         <div
           v-if="isGuestMode && simulatedProfit"
@@ -1545,7 +1492,7 @@ useTickRefresh(async () => {
           aria-label="Simulated first profit"
         >
           <div class="flex gap-3 items-start">
-            <span class="text-2xl shrink-0">­čôł</span>
+            <span class="text-2xl shrink-0">📈</span>
             <div>
               <strong class="block mb-1 text-body">{{ t('onboarding.guestProfitPreviewTitle') }}</strong>
               <p class="text-sm text-muted m-0">{{ t('onboarding.guestProfitPreviewDesc') }}</p>
@@ -1553,20 +1500,19 @@ useTickRefresh(async () => {
           </div>
           <div class="flex flex-col gap-2 border-t border-[rgba(0,200,83,0.25)] pt-3">
             <div class="flex justify-between items-center text-sm">
-              <span class="text-muted">{{ t('onboarding.guestProfitRevenue') }}</span>
-              <span class="profit-stat-revenue">{{ formatCurrency(simulatedProfit.revenue) }}</span>
+              <span class="text-muted">{{ t('onboarding.guestProfitRevenue') }}</span
+              ><span class="profit-stat-revenue">{{ formatCurrency(simulatedProfit.revenue) }}</span>
             </div>
             <div class="flex justify-between items-center text-sm">
-              <span class="text-muted">{{ t('onboarding.guestProfitCost') }}</span>
-              <span>-{{ formatCurrency(simulatedProfit.cost) }}</span>
+              <span class="text-muted">{{ t('onboarding.guestProfitCost') }}</span
+              ><span>-{{ formatCurrency(simulatedProfit.cost) }}</span>
             </div>
             <div class="flex justify-between items-center text-sm font-semibold border-t border-[rgba(0,200,83,0.25)] pt-2">
-              <span class="text-muted">{{ t('onboarding.guestProfitNet') }}</span>
-              <span :class="simulatedProfit.profit >= 0 ? 'text-good' : 'text-bad'"> {{ simulatedProfit.profit >= 0 ? '+' : '' }}{{ formatCurrency(simulatedProfit.profit) }} </span>
+              <span class="text-muted">{{ t('onboarding.guestProfitNet') }}</span
+              ><span :class="simulatedProfit.profit >= 0 ? 'text-good' : 'text-bad'"> {{ simulatedProfit.profit >= 0 ? '+' : '' }}{{ formatCurrency(simulatedProfit.profit) }} </span>
             </div>
           </div>
         </div>
-
         <!-- Guest pricing explanation -->
         <div
           v-if="isGuestMode && selectedProduct && guestConfiguredShopPrice"
@@ -1575,7 +1521,7 @@ useTickRefresh(async () => {
           aria-label="Configured sale price"
         >
           <div class="flex gap-3 items-start">
-            <span class="text-2xl shrink-0">­čĺ▓</span>
+            <span class="text-2xl shrink-0">💲</span>
             <div>
               <strong class="block mb-1 text-body">{{ t('onboarding.guestPriceTitle') }}</strong>
               <p class="text-sm text-muted m-0">
@@ -1591,7 +1537,6 @@ useTickRefresh(async () => {
           </div>
           <p class="price-panel-tip text-xs text-muted border-t border-[rgba(0,71,255,0.15)] pt-2 m-0 italic">{{ t('onboarding.guestPriceTip') }}</p>
         </div>
-
         <!-- Guest save-progress section -->
         <section
           v-if="isGuestMode"
@@ -1599,35 +1544,32 @@ useTickRefresh(async () => {
           aria-labelledby="guest-save-title"
         >
           <div class="flex gap-4 items-start">
-            <span class="text-3xl shrink-0">­čöÉ</span>
+            <span class="text-3xl shrink-0">🔐</span>
             <div>
               <h3 id="guest-save-title" class="text-xl font-semibold text-brand mb-1 m-0">{{ t('onboarding.guestSaveTitle') }}</h3>
               <p class="text-sm text-muted m-0">{{ t('onboarding.guestSaveSubtitle') }}</p>
             </div>
           </div>
-
           <ul class="guest-keeps-list list-none p-0 m-0 flex flex-col gap-1.5 text-sm text-muted" aria-label="What you keep when you save">
             <li>
-              Ôťů <strong class="text-body">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong> ÔÇö {{ t('onboarding.guestSaveKeepsCompany') }}
+              ✅ <strong class="text-body">{{ companyName || t('onboarding.guestCompanyPlaceholder') }}</strong> — {{ t('onboarding.guestSaveKeepsCompany') }}
             </li>
             <li v-if="selectedCity">
-              Ôťů <strong class="text-body">{{ selectedCity.name }}</strong> ÔÇö {{ t('onboarding.guestSaveKeepsCity') }}
+              ✅ <strong class="text-body">{{ selectedCity.name }}</strong> — {{ t('onboarding.guestSaveKeepsCity') }}
             </li>
             <li v-if="selectedProduct">
-              Ôťů <strong class="text-body">{{ getProductName(selectedProduct) }}</strong> ÔÇö {{ t('onboarding.guestSaveKeepsProduct') }}
+              ✅ <strong class="text-body">{{ getProductName(selectedProduct) }}</strong> — {{ t('onboarding.guestSaveKeepsProduct') }}
             </li>
-            <li>Ôťů {{ t('onboarding.guestSaveKeepsSetup') }}</li>
+            <li>✅ {{ t('onboarding.guestSaveKeepsSetup') }}</li>
           </ul>
-
           <div class="guest-auth-toggle flex border-2 border-divider rounded-lg overflow-hidden w-fit">
             <button
               class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors"
               :class="{ active: guestAuthMode === 'register' }"
               @click="guestAuthMode = 'register'"
             >
-              {{ t('onboarding.guestRegister') }}
-            </button>
-            <button
+              {{ t('onboarding.guestRegister') }}</button
+            ><button
               class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors"
               :class="{ active: guestAuthMode === 'login' }"
               @click="guestAuthMode = 'login'"
@@ -1635,11 +1577,10 @@ useTickRefresh(async () => {
               {{ t('onboarding.guestLogin') }}
             </button>
           </div>
-
           <div class="flex flex-col gap-3 max-w-[420px]">
             <div class="flex flex-col gap-1.5">
-              <label for="guestEmail" class="text-sm font-semibold">{{ t('auth.email') }}</label>
-              <input
+              <label for="guestEmail" class="text-sm font-semibold">{{ t('auth.email') }}</label
+              ><input
                 id="guestEmail"
                 v-model="guestEmail"
                 type="email"
@@ -1649,8 +1590,8 @@ useTickRefresh(async () => {
               />
             </div>
             <div v-if="guestAuthMode === 'register'" class="flex flex-col gap-1.5">
-              <label for="guestDisplayName" class="text-sm font-semibold">{{ t('auth.displayName') }}</label>
-              <input
+              <label for="guestDisplayName" class="text-sm font-semibold">{{ t('auth.displayName') }}</label
+              ><input
                 id="guestDisplayName"
                 v-model="guestDisplayName"
                 type="text"
@@ -1660,8 +1601,8 @@ useTickRefresh(async () => {
               />
             </div>
             <div class="flex flex-col gap-1.5">
-              <label for="guestPassword" class="text-sm font-semibold">{{ t('auth.password') }}</label>
-              <input
+              <label for="guestPassword" class="text-sm font-semibold">{{ t('auth.password') }}</label
+              ><input
                 id="guestPassword"
                 v-model="guestPassword"
                 type="password"
@@ -1670,77 +1611,70 @@ useTickRefresh(async () => {
                 class="px-4 py-3 border-2 border-divider rounded-lg bg-page text-body text-base focus:outline-none focus:border-brand"
               />
             </div>
-
             <p v-if="guestSaveError" class="text-bad text-sm m-0" role="alert">{{ guestSaveError }}</p>
-
             <button class="btn btn-primary btn-lg w-full justify-center" :disabled="guestSaveLoading" @click="saveGuestProgress">
-              {{ guestSaveLoading ? t('common.loading') : t('onboarding.guestSaveCta') }}
-              <span v-if="!guestSaveLoading" class="ml-1">­čĺż</span>
+              {{ guestSaveLoading ? t('common.loading') : t('onboarding.guestSaveCta') }} <span v-if="!guestSaveLoading" class="ml-1">💾</span>
             </button>
           </div>
         </section>
-
         <div v-if="completionResult" class="completion-achievements grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4 text-left">
           <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĆş</span>
+            <span class="text-2xl shrink-0">🏭</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ completionResult.factory.name }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionFactory') }}</span>
+              <strong class="text-sm">{{ completionResult.factory.name }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionFactory') }}</span>
             </div>
           </div>
           <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĆ¬</span>
+            <span class="text-2xl shrink-0">🏪</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ completionResult.salesShop.name }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionShop') }}</span>
+              <strong class="text-sm">{{ completionResult.salesShop.name }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionShop') }}</span>
             </div>
           </div>
           <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čôŽ</span>
+            <span class="text-2xl shrink-0">📦</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ completionResult.selectedProduct.name }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionProduct', { product: completionResult.selectedProduct.name }) }}</span>
+              <strong class="text-sm">{{ completionResult.selectedProduct.name }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionProduct', { product: completionResult.selectedProduct.name }) }}</span>
             </div>
           </div>
           <div class="achievement-item flex items-start gap-3 bg-card border border-divider rounded-lg p-4">
-            <span class="text-2xl shrink-0">­čĺ░</span>
+            <span class="text-2xl shrink-0">💰</span>
             <div class="flex flex-col gap-1">
-              <strong class="text-sm">{{ formatCurrency(completionResult.company.cash, completionCurrencyCode) }}</strong>
-              <span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash, completionCurrencyCode) }) }}</span>
+              <strong class="text-sm">{{ formatCurrency(completionResult.company.cash, completionCurrencyCode) }}</strong
+              ><span class="text-muted text-xs">{{ t('onboarding.completionCapital', { amount: formatCurrency(completionResult.company.cash, completionCurrencyCode) }) }}</span>
             </div>
           </div>
         </div>
-
         <!-- Authenticated factory layout display -->
         <div v-if="completionFactoryUnits" class="factory-layout-panel bg-card border border-divider rounded-xl p-5 text-left" aria-label="Factory layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.factoryLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.factoryLayoutDesc') }}</p>
           <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in completionFactoryUnits" :key="unit.id">
-              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? 'Ôľ¬´ŞĆ' }}</span>
-                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
+            <template v-for="(unit, index) in completionFactoryUnits" :key="unit.id"
+              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] }}</span
+                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < completionFactoryUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">Ôćĺ</span>
-            </template>
+              <span v-if="index < completionFactoryUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
+            >
           </div>
         </div>
-
         <!-- Authenticated shop layout display -->
         <div v-if="completionShopUnits" class="factory-layout-panel factory-layout-shop bg-card border border-[rgba(34,197,94,0.4)] rounded-xl p-5 text-left" aria-label="Sales shop layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.shopLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.shopLayoutDesc') }}</p>
           <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in completionShopUnits" :key="unit.id">
-              <div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? 'Ôľ¬´ŞĆ' }}</span>
-                <span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
+            <template v-for="(unit, index) in completionShopUnits" :key="unit.id"
+              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
+                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] }}</span
+                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
               </div>
-              <span v-if="index < completionShopUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">Ôćĺ</span>
-            </template>
+              <span v-if="index < completionShopUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
+            >
           </div>
         </div>
-
         <section
           v-if="!isGuestMode"
           class="startup-pack-panel text-left border border-[rgba(255,109,0,0.35)] rounded-xl p-6 bg-gradient-to-br from-[rgba(255,109,0,0.12)] to-[rgba(0,71,255,0.1)]"
@@ -1755,7 +1689,6 @@ useTickRefresh(async () => {
               {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
             </span>
           </div>
-
           <p class="text-muted text-sm mt-3 mb-5">
             <template v-if="auth.isProSubscriber && auth.player?.proSubscriptionEndsAtUtc">
               {{ t('proAccess.activeBody', { date: formatDateTime(auth.player.proSubscriptionEndsAtUtc) }) }}
@@ -1765,29 +1698,23 @@ useTickRefresh(async () => {
             </template>
           </p>
           <p class="text-muted text-sm mb-4">{{ t('proAccess.manageBody') }}</p>
-
           <div class="flex flex-wrap gap-3">
-            <a class="btn btn-primary btn-lg" :href="masterPortalUrl" target="_blank" rel="noreferrer">
-              {{ t('proAccess.openPortal') }}
-            </a>
+            <a class="btn btn-primary btn-lg" :href="masterPortalUrl" target="_blank" rel="noreferrer"> {{ t('proAccess.openPortal') }} </a>
           </div>
         </section>
-
         <section v-if="!isGuestMode && !milestoneCompleted" class="configure-guide bg-card border border-divider rounded-xl p-6 text-left" aria-labelledby="configure-guide-title">
           <h3 id="configure-guide-title" class="text-xl font-semibold text-brand mb-2">{{ t('onboarding.configureShopTitle') }}</h3>
           <p class="text-muted text-sm mb-5">{{ t('onboarding.configureShopDesc') }}</p>
-
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
-              <span class="text-2xl shrink-0">­čĺ░</span>
+              <span class="text-2xl shrink-0">💰</span>
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepCash') }}</strong>
                 <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepCashDesc', { amount: formatCurrency(configureGuideCash, completionCurrencyCode) }) }}</p>
               </div>
             </article>
-
             <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
-              <span class="text-2xl shrink-0">­čĺ▓</span>
+              <span class="text-2xl shrink-0">💲</span>
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPrice') }}</strong>
                 <p class="text-muted text-xs m-0">
@@ -1799,17 +1726,15 @@ useTickRefresh(async () => {
                 </p>
               </div>
             </article>
-
             <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
-              <span class="text-2xl shrink-0">­čîÉ</span>
+              <span class="text-2xl shrink-0">🌐</span>
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepPublicSales') }}</strong>
                 <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepPublicSalesDesc') }}</p>
               </div>
             </article>
-
             <article class="configure-step flex gap-3 items-start bg-page border border-divider rounded-lg p-4">
-              <span class="text-2xl shrink-0">ÔĆ▒</span>
+              <span class="text-2xl shrink-0">⏱</span>
               <div>
                 <strong class="block mb-1 text-sm">{{ t('onboarding.configureStepTick') }}</strong>
                 <p class="text-muted text-xs m-0">{{ t('onboarding.configureStepTickDesc') }}</p>
@@ -1818,60 +1743,45 @@ useTickRefresh(async () => {
                   <li>{{ t('onboarding.nextTickProcessStep2') }}</li>
                   <li>{{ t('onboarding.nextTickProcessStep3') }}</li>
                 </ol>
-                <p v-if="gameState" class="tick-status text-muted text-xs m-0 mt-1">
-                  {{ t('onboarding.configureStepTickStatus', { time: formatGameTickTime(gameState.currentTick, locale) }) }}
-                </p>
+                <p v-if="gameState" class="tick-status text-muted text-xs m-0 mt-1">{{ t('onboarding.configureStepTickStatus', { time: formatGameTickTime(gameState.currentTick, locale) }) }}</p>
                 <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good text-sm" role="timer">{{ tickCountdown }}</p>
               </div>
             </article>
           </div>
-
           <div class="flex justify-center mb-6">
-            <RouterLink v-if="shopBuildingId" :to="'/building/' + shopBuildingId" class="btn btn-primary btn-lg"> {{ t('onboarding.configureShopCta') }} <span class="ml-1">­čĆ¬</span> </RouterLink>
+            <RouterLink v-if="shopBuildingId" :to="'/building/' + shopBuildingId" class="btn btn-primary btn-lg"> {{ t('onboarding.configureShopCta') }} <span class="ml-1">🏪</span></RouterLink>
           </div>
-
           <!-- Mission readiness status -->
           <div
             v-if="firstSaleMission"
             class="mission-status border rounded-lg p-4 flex flex-col gap-3 mb-2"
-            :class="{
-              'mission-status--blocking': firstSaleMission.phase === 'CONFIGURE_SHOP',
-              'mission-status--awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE',
-            }"
+            :class="{ 'mission-status--blocking': firstSaleMission.phase === 'CONFIGURE_SHOP', 'mission-status--awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE' }"
             role="status"
             aria-label="Business readiness"
           >
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-lg">{{ firstSaleMission.phase === 'AWAITING_FIRST_SALE' ? 'ÔĆ│' : 'ÔÜá´ŞĆ' }}</span>
-              <strong class="text-sm">{{ t('onboarding.missionStatusTitle') }}</strong>
-              <span
+              <span class="text-lg">{{ firstSaleMission.phase === 'AWAITING_FIRST_SALE' ? '⏳' : '⚠️' }}</span
+              ><strong class="text-sm">{{ t('onboarding.missionStatusTitle') }}</strong
+              ><span
                 class="mission-phase-badge text-xs font-semibold px-2 py-0.5 rounded-full ml-auto"
-                :class="{
-                  'badge-configure': firstSaleMission.phase === 'CONFIGURE_SHOP',
-                  'badge-awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE',
-                }"
+                :class="{ 'badge-configure': firstSaleMission.phase === 'CONFIGURE_SHOP', 'badge-awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE' }"
               >
                 {{ firstSaleMission.phase === 'CONFIGURE_SHOP' ? t('onboarding.missionPhaseConfigureShop') : t('onboarding.missionPhaseAwaiting') }}
               </span>
             </div>
             <ul v-if="firstSaleMission.blockers.length > 0" class="mission-blockers m-0 pl-5 text-sm text-muted flex flex-col gap-1">
-              <li v-for="blocker in firstSaleMission.blockers" :key="blocker" class="text-caution">
-                {{ blockerMessage(blocker) }}
-              </li>
+              <li v-for="blocker in firstSaleMission.blockers" :key="blocker" class="text-caution">{{ blockerMessage(blocker) }}</li>
             </ul>
             <p v-else class="m-0 text-sm text-muted">{{ t('onboarding.configureStepTickDesc') }}</p>
           </div>
-
           <div class="border-t border-divider pt-5 flex flex-col items-center gap-3 text-center">
             <p class="text-sm text-muted m-0">{{ t('onboarding.milestoneCompleteHint') }}</p>
             <button class="btn btn-secondary" :disabled="milestoneLoading" @click="markMilestoneComplete">
-              {{ milestoneLoading ? t('common.loading') : t('onboarding.milestoneCompleteCta') }}
-              <span v-if="!milestoneLoading" class="ml-1">✓</span>
+              {{ milestoneLoading ? t('common.loading') : t('onboarding.milestoneCompleteCta') }} <span v-if="!milestoneLoading" class="ml-1">✓</span>
             </button>
             <p v-if="milestoneError" class="milestone-error text-bad text-sm m-0" role="alert">{{ milestoneError }}</p>
           </div>
         </section>
-
         <!-- Business live panel: shown after marking milestone complete -->
         <section
           v-if="!isGuestMode && milestoneCompleted"
@@ -1879,13 +1789,12 @@ useTickRefresh(async () => {
           aria-labelledby="business-live-title"
         >
           <div class="flex gap-4 items-start">
-            <span class="text-3xl shrink-0">­čÄë</span>
+            <span class="text-3xl shrink-0">🎉</span>
             <div>
               <h3 id="business-live-title" class="text-lg font-semibold m-0 mb-1">{{ t('onboarding.businessLiveTitle') }}</h3>
               <p class="text-sm text-muted m-0">{{ t('onboarding.businessLiveDesc') }}</p>
             </div>
           </div>
-
           <!-- First-sale celebration -->
           <div
             v-if="firstSaleMission && firstSaleMission.firstSaleRevenue !== null"
@@ -1918,14 +1827,12 @@ useTickRefresh(async () => {
               </div>
             </dl>
           </div>
-
           <div v-if="gameState" class="flex flex-col gap-1">
             <p class="tick-status text-sm text-muted m-0" :title="'tick #' + gameState.currentTick">
               {{ t('onboarding.businessLiveTickInfo', { time: formatGameTickTime(gameState.currentTick, locale) }) }}
             </p>
             <p v-if="tickCountdown" class="tick-countdown m-0 font-semibold text-good" role="timer">{{ tickCountdown }}</p>
           </div>
-
           <div>
             <h4 class="text-sm font-semibold mb-2 m-0">{{ t('onboarding.nextTickProcessTitle') }}</h4>
             <ol class="next-tick-process-list ml-5 p-0 text-sm text-muted flex flex-col gap-1">
@@ -1934,23 +1841,19 @@ useTickRefresh(async () => {
               <li>{{ t('onboarding.nextTickProcessStep3') }}</li>
             </ol>
           </div>
-
           <div class="flex gap-3 items-center flex-wrap">
             <button class="btn btn-primary btn-lg" @click="navigateToDashboard">
-              {{ firstSaleMission?.firstSaleRevenue !== null ? t('onboarding.firstSaleCelebrationCta') : t('onboarding.businessLiveDashboardCta') }}
-              <span class="ml-1">Ôćĺ</span>
-            </button>
-            <RouterLink to="/leaderboard" class="btn btn-secondary">{{ t('onboarding.completionViewLeaderboard') }}</RouterLink>
-            <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('onboarding.completionBrowseEncyclopedia') }}</RouterLink>
+              {{ firstSaleMission?.firstSaleRevenue !== null ? t('onboarding.firstSaleCelebrationCta') : t('onboarding.businessLiveDashboardCta') }} <span class="ml-1">→</span></button
+            ><RouterLink to="/leaderboard" class="btn btn-secondary">{{ t('onboarding.completionViewLeaderboard') }}</RouterLink
+            ><RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('onboarding.completionBrowseEncyclopedia') }}</RouterLink>
           </div>
         </section>
-
         <div v-if="!isGuestMode && !milestoneCompleted" class="mt-4">
           <h3 class="text-lg font-semibold mb-4 text-muted">{{ t('onboarding.completionNextSteps') }}</h3>
           <div class="flex gap-4 justify-center flex-wrap">
-            <RouterLink to="/dashboard" class="btn btn-secondary">{{ t('onboarding.completionGoDashboard') }} Ôćĺ</RouterLink>
-            <RouterLink to="/leaderboard" class="btn btn-secondary">{{ t('onboarding.completionViewLeaderboard') }}</RouterLink>
-            <RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('onboarding.completionBrowseEncyclopedia') }}</RouterLink>
+            <RouterLink to="/dashboard" class="btn btn-secondary">{{ t('onboarding.completionGoDashboard') }} →</RouterLink
+            ><RouterLink to="/leaderboard" class="btn btn-secondary">{{ t('onboarding.completionViewLeaderboard') }}</RouterLink
+            ><RouterLink to="/encyclopedia" class="btn btn-secondary">{{ t('onboarding.completionBrowseEncyclopedia') }}</RouterLink>
           </div>
         </div>
       </div>

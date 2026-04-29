@@ -46,7 +46,7 @@
       </div>
 
       <template v-else>
-        <!-- ├ö├Â├ç├ö├Â├ç BORROW TAB ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+        <!-- ÔöÇÔöÇ BORROW TAB ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
         <div v-if="activeTab === 'borrow'" class="flex flex-col gap-10 lg:gap-12">
           <!-- Lender action panel: context-aware CTA for offering loans -->
           <section class="lender-cta-section flex flex-col gap-6" aria-label="Lender action">
@@ -57,14 +57,12 @@
               v-if="!auth.isAuthenticated"
               class="lender-cta-card lender-cta-login flex flex-col gap-5 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8"
             >
-              <div class="lender-cta-icon" aria-hidden="true">┬ş─Ź─ć┼Ż</div>
+              <div class="lender-cta-icon" aria-hidden="true">­čĆŽ</div>
               <div class="lender-cta-body">
                 <h3 class="lender-cta-title">{{ t('bank.loginToLendTitle') }}</h3>
                 <p class="lender-cta-description">{{ t('bank.loginToLendDescription') }}</p>
               </div>
-              <router-link to="/login" class="btn btn-secondary lender-cta-btn" aria-label="Log in to offer loans">
-                {{ t('bank.loginToLend') }}
-              </router-link>
+              <router-link to="/login" class="btn btn-secondary lender-cta-btn" aria-label="Log in to offer loans"> {{ t('bank.loginToLend') }} </router-link>
             </div>
 
             <!-- Authenticated, no bank building: acquire CTA -->
@@ -72,27 +70,23 @@
               v-else-if="!hasBankBuilding"
               class="lender-cta-card lender-cta-acquire flex flex-col gap-5 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8"
             >
-              <div class="lender-cta-icon" aria-hidden="true">┬ş─Ź─ć┼Ż</div>
+              <div class="lender-cta-icon" aria-hidden="true">­čĆŽ</div>
               <div class="lender-cta-body">
                 <h3 class="lender-cta-title">{{ t('bank.noBankCTATitle') }}</h3>
                 <p class="lender-cta-description">{{ t('bank.noBankCTADescription') }}</p>
               </div>
-              <button class="btn btn-primary lender-cta-btn" @click="navigateToAcquireBank" aria-label="Acquire a Bank building">
-                {{ t('bank.acquireBank') }}
-              </button>
+              <button class="btn btn-primary lender-cta-btn" @click="navigateToAcquireBank" aria-label="Acquire a Bank building">{{ t('bank.acquireBank') }}</button>
             </div>
 
             <!-- Authenticated, has bank: manage bank CTA -->
             <div v-else class="lender-cta-card lender-cta-manage flex flex-col gap-5 rounded-3xl border border-brand/40 bg-card p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-8">
-              <div class="lender-cta-icon" aria-hidden="true">┬ş─Ź─ć┼Ż</div>
+              <div class="lender-cta-icon" aria-hidden="true">­čĆŽ</div>
               <div class="lender-cta-body">
                 <h3 class="lender-cta-title">{{ t('bank.hasBankCTATitle') }}</h3>
                 <p class="lender-cta-description">{{ t('bank.hasBankCTADescription') }}</p>
                 <span class="lender-bank-name">{{ firstBankBuilding?.name }}</span>
               </div>
-              <button class="btn btn-primary lender-cta-btn" @click="navigateToManageBank">
-                {{ t('bank.manageBank') }}
-              </button>
+              <button class="btn btn-primary lender-cta-btn" @click="navigateToManageBank">{{ t('bank.manageBank') }}</button>
             </div>
           </section>
 
@@ -103,9 +97,7 @@
               <div v-for="loan in activeLoans" :key="loan.id" class="loan-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm" :class="loanStatusClass(loan.status)">
                 <div class="loan-card-header">
                   <span class="lender-name">{{ loan.lenderCompanyName }}</span>
-                  <span class="loan-status-badge" :class="loanStatusClass(loan.status)">
-                    {{ t(`bank.statusBadge.${loan.status}`) }}
-                  </span>
+                  <span class="loan-status-badge" :class="loanStatusClass(loan.status)"> {{ t(`bank.statusBadge.${loan.status}`) }} </span>
                 </div>
                 <div class="loan-card-body">
                   <div class="loan-stat">
@@ -125,11 +117,9 @@
                     <span class="stat-value">{{ formatPercent(loan.annualInterestRatePercent) }}</span>
                   </div>
                 </div>
-                <div v-if="loan.missedPayments > 0" class="overdue-warning">
-                  ├ö├ť├í {{ loan.missedPayments }} missed payment(s) ├ö├ç├Â penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}
-                </div>
+                <div v-if="loan.missedPayments > 0" class="overdue-warning">ÔÜá {{ loan.missedPayments }} missed payment(s) ÔÇö penalty accumulated: {{ formatCurrency(loan.accumulatedPenalty) }}</div>
                 <div v-if="loan.collateralBuildingId" class="collateral-badge">
-                  ┬ş─Ź─ć┼Ą {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
+                  ­čĆŤ {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
                   <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(loan.collateralAppraisedValue) }}) </span>
                 </div>
               </div>
@@ -149,7 +139,7 @@
               <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card flex flex-col gap-4 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
                 <div class="bank-borrow-card-header">
                   <div class="bank-borrow-identity">
-                    <span class="bank-borrow-icon">┬ş─Ź─ć┼Ż</span>
+                    <span class="bank-borrow-icon">­čĆŽ</span>
                     <div>
                       <span class="bank-borrow-name">{{ bank.bankBuildingName }}</span>
                       <span class="bank-borrow-lender">{{ bank.lenderCompanyName }}</span>
@@ -163,9 +153,7 @@
                 <div class="bank-borrow-stats">
                   <div class="borrow-stat">
                     <span class="stat-label">{{ t('bank.availableCapacity') }}</span>
-                    <span class="stat-value" :class="bank.availableLendingCapacity > 0 ? '' : 'stat-zero'">
-                      {{ formatCurrency(bank.availableLendingCapacity) }}
-                    </span>
+                    <span class="stat-value" :class="bank.availableLendingCapacity > 0 ? '' : 'stat-zero'"> {{ formatCurrency(bank.availableLendingCapacity) }} </span>
                   </div>
                   <div class="borrow-stat">
                     <span class="stat-label">{{ t('common.city') }}</span>
@@ -173,9 +161,7 @@
                   </div>
                 </div>
                 <div class="bank-borrow-card-footer">
-                  <router-link :to="`/bank/${bank.bankBuildingId}`" class="btn btn-primary btn-sm">
-                    {{ t('bank.visitBankToBorrow') }}
-                  </router-link>
+                  <router-link :to="`/bank/${bank.bankBuildingId}`" class="btn btn-primary btn-sm"> {{ t('bank.visitBankToBorrow') }} </router-link>
                 </div>
               </div>
             </div>
@@ -183,7 +169,7 @@
         </div>
         <!-- end borrow tab -->
 
-        <!-- ├ö├Â├ç├ö├Â├ç DEPOSIT TAB ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+        <!-- ÔöÇÔöÇ DEPOSIT TAB ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
         <div v-if="activeTab === 'deposit'" class="deposit-tab flex flex-col gap-8 lg:gap-10">
           <section v-if="auth.isAuthenticated" class="my-bank-accounts-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
             <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myBankAccounts') }}</h2>
@@ -204,15 +190,11 @@
                   </div>
                 </div>
                 <!-- Zero-balance ready-to-close indicator (non-deposit accounts only) -->
-                <p v-if="account.balance == 0 && !account.isDepositAccount" class="account-ready-close mt-2 text-xs font-medium text-success">├ö┼ą├┤ {{ t('bank.accountReadyToClose') }}</p>
+                <p v-if="account.balance == 0 && !account.isDepositAccount" class="account-ready-close mt-2 text-xs font-medium text-success">Ôťô {{ t('bank.accountReadyToClose') }}</p>
                 <!-- Non-zero balance hint -->
-                <p v-else-if="account.balance != 0 && !account.isDepositAccount" class="account-nonzero-hint mt-2 text-xs text-muted">
-                  {{ t('bank.closeAccountNonZeroHint') }}
-                </p>
+                <p v-else-if="account.balance != 0 && !account.isDepositAccount" class="account-nonzero-hint mt-2 text-xs text-muted">{{ t('bank.closeAccountNonZeroHint') }}</p>
                 <!-- Close error feedback -->
-                <p v-if="closeAccountErrors[account.id]" class="close-account-error mt-2 text-xs text-error" role="alert">
-                  {{ closeAccountErrors[account.id] }}
-                </p>
+                <p v-if="closeAccountErrors[account.id]" class="close-account-error mt-2 text-xs text-error" role="alert">{{ closeAccountErrors[account.id] }}</p>
                 <!-- Close button (non-deposit accounts with zero balance only) -->
                 <button
                   v-if="account.balance == 0 && !account.isDepositAccount"
@@ -220,7 +202,7 @@
                   :disabled="closingAccountId === account.id"
                   @click="closeBankAccount(account.id, false)"
                 >
-                  {{ closingAccountId === account.id ? '├ö├ç┼Ż' : t('bank.closeAccount') }}
+                  {{ closingAccountId === account.id ? 'ÔÇŽ' : t('bank.closeAccount') }}
                 </button>
                 <!-- Deposit account zero-balance close (existing flow) -->
                 <button
@@ -229,7 +211,7 @@
                   :disabled="closingAccountId === account.id"
                   @click="closeBankAccount(account.id, true)"
                 >
-                  {{ closingAccountId === account.id ? '├ö├ç┼Ż' : t('bank.closeAccount') }}
+                  {{ closingAccountId === account.id ? 'ÔÇŽ' : t('bank.closeAccount') }}
                 </button>
               </div>
             </div>
@@ -270,9 +252,7 @@
                     <span v-else-if="field === 'lendingRate'">{{ t('bank.lendingInterestRate') }}</span>
                     <span v-else-if="field === 'capacity'">{{ t('bank.availableLendingCapacity') }}</span>
                     <span v-else>{{ t('common.city') }}</span>
-                    <span v-if="bankSortBy === field" class="sort-dir-icon" aria-hidden="true">
-                      {{ bankSortDir === 'asc' ? '├ö─ç─╣' : '├ö─ç├┤' }}
-                    </span>
+                    <span v-if="bankSortBy === field" class="sort-dir-icon" aria-hidden="true"> {{ bankSortDir === 'asc' ? 'ÔćĹ' : 'Ôćô' }} </span>
                   </button>
                 </div>
               </div>
@@ -286,7 +266,7 @@
                   <div class="bank-card-header">
                     <div>
                       <h3 class="bank-card-name">{{ bank.bankBuildingName }}</h3>
-                      <span class="bank-card-city">{{ bank.cityName }} ÔöČ─Ü {{ bank.lenderCompanyName }}</span>
+                      <span class="bank-card-city">{{ bank.cityName }} ┬Ě {{ bank.lenderCompanyName }}</span>
                     </div>
                   </div>
                   <div class="bank-card-rates">
@@ -301,20 +281,12 @@
                   </div>
                   <div class="bank-card-capacity">
                     <span class="capacity-label">{{ t('bank.availableLendingCapacity') }}</span>
-                    <span class="capacity-value" :class="bank.availableLendingCapacity > 0 ? 'positive' : 'zero'">
-                      {{ formatCurrency(bank.availableLendingCapacity) }}
-                    </span>
+                    <span class="capacity-value" :class="bank.availableLendingCapacity > 0 ? 'positive' : 'zero'"> {{ formatCurrency(bank.availableLendingCapacity) }} </span>
                   </div>
                   <div class="bank-card-actions">
-                    <button class="btn btn-secondary btn-sm" @click="navigateToBank(bank.bankBuildingId)">
-                      {{ t('bank.viewBankDetail') }}
-                    </button>
-                    <button v-if="auth.isAuthenticated" class="btn btn-primary btn-sm bank-deposit-btn" @click="openDepositModal(bank)">
-                      {{ t('bank.makeDeposit') }}
-                    </button>
-                    <router-link v-else-if="!auth.isAuthenticated" to="/login" class="btn btn-primary btn-sm">
-                      {{ t('auth.login') }}
-                    </router-link>
+                    <button class="btn btn-secondary btn-sm" @click="navigateToBank(bank.bankBuildingId)">{{ t('bank.viewBankDetail') }}</button>
+                    <button v-if="auth.isAuthenticated" class="btn btn-primary btn-sm bank-deposit-btn" @click="openDepositModal(bank)">{{ t('bank.makeDeposit') }}</button>
+                    <router-link v-else-if="!auth.isAuthenticated" to="/login" class="btn btn-primary btn-sm"> {{ t('auth.login') }} </router-link>
                   </div>
                 </div>
               </div>
@@ -329,7 +301,7 @@
         <div class="modal" role="dialog" :aria-label="t('bank.confirmAccept')">
           <div class="modal-header">
             <h2>{{ t('bank.confirmAccept') }}</h2>
-            <button class="modal-close" @click="closeAcceptModal" :aria-label="t('common.close')">├ö┼ą─Ż</button>
+            <button class="modal-close" @click="closeAcceptModal" :aria-label="t('common.close')">ÔťĽ</button>
           </div>
           <div class="modal-body">
             <div class="loan-summary">
@@ -377,7 +349,7 @@
               </div>
               <div class="summary-row">
                 <span>{{ t('bank.paymentAmount') }}</span>
-                <strong>{{ formatCurrency(estimatedPaymentAmount) }} Ôöť┼Ü {{ estimatedTotalPayments }}</strong>
+                <strong>{{ formatCurrency(estimatedPaymentAmount) }} ├Ś {{ estimatedTotalPayments }}</strong>
               </div>
               <div class="summary-row total-row">
                 <span>{{ t('bank.totalRepayment') }}</span>
@@ -402,7 +374,7 @@
                   <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" :disabled="!b.isEligible" class="collateral-radio" />
                   <span class="collateral-option-body">
                     <span class="collateral-option-name">{{ b.buildingName }}</span>
-                    <span class="collateral-option-type">{{ b.buildingType }} ÔöČ─Ü Lv{{ b.level }}</span>
+                    <span class="collateral-option-type">{{ b.buildingType }} ┬Ě Lv{{ b.level }}</span>
                     <span v-if="!b.isEligible" class="collateral-tag ineligible-tag">{{ t('bank.collateralAlreadyPledged') }}</span>
                     <span v-else class="collateral-stats">
                       <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
@@ -414,8 +386,8 @@
                 </label>
               </div>
               <!-- Collateral-specific warning -->
-              <p v-if="collateralRequiredWarning" class="risk-warning collateral-warning">├ö├ť├í {{ collateralRequiredWarning }}</p>
-              <p v-if="collateralCapacityWarning" class="risk-warning collateral-warning">├ö├ť├í {{ collateralCapacityWarning }}</p>
+              <p v-if="collateralRequiredWarning" class="risk-warning collateral-warning">ÔÜá {{ collateralRequiredWarning }}</p>
+              <p v-if="collateralCapacityWarning" class="risk-warning collateral-warning">ÔÜá {{ collateralCapacityWarning }}</p>
               <!-- Selected collateral summary -->
               <div v-if="selectedCollateral" class="collateral-selected-summary">
                 <span class="collateral-selected-label">{{ t('bank.collateralBuilding') }}:</span>
@@ -435,7 +407,7 @@
               </div>
             </div>
 
-            <p class="risk-warning">├ö├ť├í {{ t('bank.riskWarning') }}</p>
+            <p class="risk-warning">ÔÜá {{ t('bank.riskWarning') }}</p>
 
             <div v-if="acceptError" class="error-message">{{ acceptError }}</div>
           </div>
@@ -454,7 +426,7 @@
         <div class="modal w-full max-w-xl overflow-y-auto rounded-[28px] border border-divider bg-card shadow-2xl" role="dialog" :aria-label="t('bank.makeDeposit')">
           <div class="modal-header flex items-center justify-between border-b border-divider px-6 py-5 sm:px-8 sm:py-6">
             <h2 class="text-2xl font-bold text-body">{{ t('bank.makeDeposit') }}</h2>
-            <button class="modal-close" :aria-label="t('common.close')" @click="closeDepositModal">├ö┼ą─Ż</button>
+            <button class="modal-close" :aria-label="t('common.close')" @click="closeDepositModal">ÔťĽ</button>
           </div>
           <div class="modal-body flex flex-col gap-6 px-6 py-6 sm:px-8 sm:py-8">
             <div class="loan-summary rounded-2xl border border-divider bg-card-raised p-5">

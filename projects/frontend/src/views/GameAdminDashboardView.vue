@@ -242,9 +242,7 @@ onMounted(async () => {
         <h1>{{ t('admin.title') }}</h1>
         <p>{{ t('admin.subtitle') }}</p>
       </div>
-      <button v-if="adminStore.session?.isImpersonating" type="button" class="btn btn-secondary" @click="stopImpersonation">
-        {{ t('admin.stopImpersonation') }}
-      </button>
+      <button v-if="adminStore.session?.isImpersonating" type="button" class="btn btn-secondary" @click="stopImpersonation">{{ t('admin.stopImpersonation') }}</button>
     </div>
 
     <div v-if="!canAccessDashboard && !adminStore.loadingSession" class="admin-locked card">
@@ -304,16 +302,10 @@ onMounted(async () => {
               <h2>{{ t('admin.shippingTitle') }}</h2>
               <p>{{ t('admin.shippingBody') }}</p>
             </div>
-            <button type="button" class="btn btn-secondary" @click="showShippingCosts = !showShippingCosts">
-              {{ showShippingCosts ? t('common.close') : t('admin.viewShippingCosts') }}
-            </button>
+            <button type="button" class="btn btn-secondary" @click="showShippingCosts = !showShippingCosts">{{ showShippingCosts ? t('common.close') : t('admin.viewShippingCosts') }}</button>
           </div>
-          <div v-if="!showShippingCosts" class="admin-empty-state">
-            {{ t('admin.shippingClosed') }}
-          </div>
-          <div v-else-if="(adminStore.dashboard?.shippingCostSummaries.length ?? 0) === 0" class="admin-empty-state">
-            {{ t('admin.shippingEmpty') }}
-          </div>
+          <div v-if="!showShippingCosts" class="admin-empty-state">{{ t('admin.shippingClosed') }}</div>
+          <div v-else-if="(adminStore.dashboard?.shippingCostSummaries.length ?? 0) === 0" class="admin-empty-state">{{ t('admin.shippingEmpty') }}</div>
           <div v-else class="admin-list">
             <div v-for="summary in adminStore.dashboard?.shippingCostSummaries ?? []" :key="summary.companyId" class="admin-list-item">
               <div>
@@ -332,9 +324,7 @@ onMounted(async () => {
               <p>{{ t('admin.alertsBody') }}</p>
             </div>
           </div>
-          <div v-if="(adminStore.dashboard?.multiAccountAlerts.length ?? 0) === 0" class="admin-empty-state">
-            {{ t('admin.alertsEmpty') }}
-          </div>
+          <div v-if="(adminStore.dashboard?.multiAccountAlerts.length ?? 0) === 0" class="admin-empty-state">{{ t('admin.alertsEmpty') }}</div>
           <div v-else class="admin-alert-list">
             <div v-for="alert in adminStore.dashboard?.multiAccountAlerts ?? []" :key="`${alert.reason}-${alert.supportingEntityName}`" class="admin-alert-card">
               <div class="admin-alert-topline">
@@ -346,7 +336,7 @@ onMounted(async () => {
                 {{ t('admin.alertsLinkedTo') }}
                 <strong>{{ alert.relatedPlayer.displayName }}</strong>
               </p>
-              <p class="admin-alert-meta">{{ alert.supportingEntityType }} ┬Ě {{ alert.supportingEntityName }}</p>
+              <p class="admin-alert-meta">{{ alert.supportingEntityType }} · {{ alert.supportingEntityName }}</p>
               <p class="admin-alert-amount">{{ formatCurrency(alert.exposureAmount) }}</p>
             </div>
           </div>
@@ -377,9 +367,7 @@ onMounted(async () => {
                 <span>{{ t('admin.companyCash') }}: {{ formatCurrency(adminStore.dashboard.governmentPlayer.totalCompanyCash) }}</span>
               </div>
               <div class="admin-player-actions">
-                <button type="button" class="btn btn-primary" @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'PERSON')">
-                  {{ t('admin.impersonateGovernment') }}
-                </button>
+                <button type="button" class="btn btn-primary" @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'PERSON')">{{ t('admin.impersonateGovernment') }}</button>
                 <button
                   v-for="company in adminStore.dashboard.governmentPlayer.companies"
                   :key="company.id"
@@ -387,7 +375,7 @@ onMounted(async () => {
                   class="admin-company-pill"
                   @click="startImpersonation(adminStore.dashboard.governmentPlayer.id, 'COMPANY', company.id)"
                 >
-                  {{ company.name }} ┬Ě {{ formatCurrency(company.cash) }}
+                  {{ company.name }} · {{ formatCurrency(company.cash) }}
                 </button>
               </div>
             </article>
@@ -424,12 +412,8 @@ onMounted(async () => {
               </div>
 
               <div class="admin-player-actions">
-                <button type="button" class="btn btn-secondary" @click="startImpersonation(player.id, 'PERSON')">
-                  {{ t('admin.impersonatePerson') }}
-                </button>
-                <button type="button" class="btn btn-secondary" @click="toggleInvisible(player)">
-                  {{ player.isInvisibleInChat ? t('admin.makeVisible') : t('admin.makeInvisible') }}
-                </button>
+                <button type="button" class="btn btn-secondary" @click="startImpersonation(player.id, 'PERSON')">{{ t('admin.impersonatePerson') }}</button>
+                <button type="button" class="btn btn-secondary" @click="toggleInvisible(player)">{{ player.isInvisibleInChat ? t('admin.makeVisible') : t('admin.makeInvisible') }}</button>
                 <button v-if="canManageRootFeatures" type="button" class="btn btn-ghost" @click="toggleLocalAdmin(player)">
                   {{ player.role === 'ADMIN' ? t('admin.removeLocalAdmin') : t('admin.grantLocalAdmin') }}
                 </button>
@@ -437,7 +421,7 @@ onMounted(async () => {
 
               <div v-if="player.companies.length > 0" class="admin-company-list">
                 <button v-for="company in player.companies" :key="company.id" type="button" class="admin-company-pill" @click="startImpersonation(player.id, 'COMPANY', company.id)">
-                  {{ company.name }} ┬Ě {{ formatCurrency(company.cash) }}
+                  {{ company.name }} · {{ formatCurrency(company.cash) }}
                 </button>
               </div>
             </article>
@@ -519,9 +503,7 @@ onMounted(async () => {
                   <span>{{ formatDate(entry.updatedAtUtc) }}</span>
                   <span>{{ entry.targetServerKey ?? t('admin.globalScope') }}</span>
                 </div>
-                <button type="button" class="btn btn-secondary" :disabled="!canEditEntry(entry)" @click="editEntry(entry)">
-                  {{ t('admin.editEntry') }}
-                </button>
+                <button type="button" class="btn btn-secondary" :disabled="!canEditEntry(entry)" @click="editEntry(entry)">{{ t('admin.editEntry') }}</button>
               </article>
             </div>
           </div>
@@ -547,11 +529,9 @@ onMounted(async () => {
               <div v-for="grant in adminStore.dashboard?.globalGameAdminGrants ?? []" :key="grant.id" class="admin-list-item">
                 <div>
                   <strong>{{ grant.email }}</strong>
-                  <p>{{ grant.grantedByEmail }} ┬Ě {{ formatDate(grant.updatedAtUtc) }}</p>
+                  <p>{{ grant.grantedByEmail }} · {{ formatDate(grant.updatedAtUtc) }}</p>
                 </div>
-                <button type="button" class="btn btn-ghost" @click="removeGlobalAdmin(grant.email)">
-                  {{ t('admin.removeGlobalAdmin') }}
-                </button>
+                <button type="button" class="btn btn-ghost" @click="removeGlobalAdmin(grant.email)">{{ t('admin.removeGlobalAdmin') }}</button>
               </div>
             </div>
           </div>
@@ -571,8 +551,8 @@ onMounted(async () => {
               <div>
                 <strong>{{ log.adminActorDisplayName }}</strong>
                 <p>
-                  {{ log.effectivePlayerDisplayName }} ┬Ě {{ log.effectiveAccountType }}
-                  <span v-if="log.effectiveCompanyName">┬Ě {{ log.effectiveCompanyName }}</span>
+                  {{ log.effectivePlayerDisplayName }} · {{ log.effectiveAccountType }}
+                  <span v-if="log.effectiveCompanyName">· {{ log.effectiveCompanyName }}</span>
                 </p>
                 <p>{{ log.graphQlOperationName || log.mutationSummary }}</p>
               </div>

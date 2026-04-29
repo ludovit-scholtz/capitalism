@@ -263,7 +263,7 @@ function goBack() {
 <template>
   <div class="resource-detail-view container">
     <nav class="breadcrumb">
-      <button type="button" class="back-link" @click="goBack">ÔćÉ {{ t('resourceDetail.backToEncyclopedia') }}</button>
+      <button type="button" class="back-link" @click="goBack">← {{ t('resourceDetail.backToEncyclopedia') }}</button>
       <label class="filter-toggle">
         <input v-model="showProProducts" type="checkbox" />
         <span>{{ t('encyclopedia.showProProducts') }}</span>
@@ -275,9 +275,7 @@ function goBack() {
     <div v-else-if="!selectedResource && !selectedProduct" class="not-found">
       <h2>{{ t('resourceDetail.notFound') }}</h2>
       <p>{{ getNotFoundHint() }}</p>
-      <button type="button" class="btn-primary" @click="goBack">
-        {{ t('resourceDetail.backToEncyclopedia') }}
-      </button>
+      <button type="button" class="btn-primary" @click="goBack">{{ t('resourceDetail.backToEncyclopedia') }}</button>
     </div>
 
     <template v-else>
@@ -295,9 +293,7 @@ function goBack() {
           </div>
           <h1>{{ getSelectedTitle() }}</h1>
           <p class="resource-description">{{ getSelectedDescription() }}</p>
-          <p v-if="selectedProduct?.isProOnly" class="resource-description">
-            {{ getProductAccessDetail(selectedProduct) }}
-          </p>
+          <p v-if="selectedProduct?.isProOnly" class="resource-description">{{ getProductAccessDetail(selectedProduct) }}</p>
           <div class="resource-meta">
             <div class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.basePrice') }}</span>
@@ -325,9 +321,7 @@ function goBack() {
             </div>
           </div>
           <div v-if="selectedResource" class="hero-cta">
-            <RouterLink to="/exchange" class="btn-exchange-link" :aria-label="t('resourceDetail.checkExchangePrices')">
-              {{ t('resourceDetail.checkExchangePrices') }}
-            </RouterLink>
+            <RouterLink to="/exchange" class="btn-exchange-link" :aria-label="t('resourceDetail.checkExchangePrices')"> {{ t('resourceDetail.checkExchangePrices') }} </RouterLink>
           </div>
         </div>
       </header>
@@ -354,7 +348,7 @@ function goBack() {
             <strong>{{ recipe.quantity }} {{ recipe.resourceType?.unitSymbol ?? recipe.inputProductType?.unitSymbol }}</strong>
             <span>{{ getLocalizedRecipeIngredientName(recipe, locale) }}</span>
           </div>
-          <span class="composition-arrow" aria-hidden="true">Ôćĺ</span>
+          <span class="composition-arrow" aria-hidden="true">→</span>
           <div
             class="composition-node output clickable"
             role="link"
@@ -382,9 +376,7 @@ function goBack() {
           <p>{{ t('resourceDetail.usedInProductsHelp') }}</p>
         </div>
 
-        <p v-if="relatedProducts.length === 0" class="empty-state">
-          {{ t('resourceDetail.noProductsUsingResource') }}
-        </p>
+        <p v-if="relatedProducts.length === 0" class="empty-state">{{ t('resourceDetail.noProductsUsingResource') }}</p>
 
         <div v-else class="product-grid">
           <article

@@ -1,5 +1,5 @@
 /* oxlint-disable no-unused-vars */
- 
+
 import { ref, computed, onMounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
@@ -394,4 +394,3 @@ async function buyBuilding() {
     submitting.value = false
   }
 }
-

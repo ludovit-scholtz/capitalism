@@ -62,7 +62,7 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
 <template>
   <div class="building-detail-view container">
     <div class="page-nav">
-      <RouterLink to="/dashboard" class="back-link"> <span>ÔćÉ</span> {{ t('buildingDetail.backToDashboard') }} </RouterLink>
+      <RouterLink to="/dashboard" class="back-link"> <span>←</span> {{ t('buildingDetail.backToDashboard') }} </RouterLink>
     </div>
 
     <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
@@ -81,9 +81,7 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
       <div v-if="configWarnings.length > 0" class="config-warnings" role="alert">
         <strong>{{ t('buildingDetail.warnings.title') }}</strong>
         <ul>
-          <li v-for="(warning, i) in configWarnings" :key="i">
-            {{ t(warning.key, warning.params || {}) }}
-          </li>
+          <li v-for="(warning, i) in configWarnings" :key="i">{{ t(warning.key, warning.params || {}) }}</li>
         </ul>
       </div>
 
@@ -92,29 +90,25 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
 
       <div v-if="showStarterSetupBanner" class="starter-setup-banner" role="region" aria-label="starter setup">
         <div class="starter-setup-content">
-          <h2 class="starter-setup-title">­čĆş {{ t('buildingDetail.starterSetup.title') }}</h2>
+          <h2 class="starter-setup-title">🏭 {{ t('buildingDetail.starterSetup.title') }}</h2>
           <p class="starter-setup-body">{{ t('buildingDetail.starterSetup.body') }}</p>
           <p class="starter-setup-desc">{{ t('buildingDetail.starterSetup.starterLayoutDesc') }}</p>
           <p class="starter-setup-whatnext">{{ t('buildingDetail.starterSetup.whatNext') }}</p>
         </div>
         <div class="starter-setup-actions">
-          <button class="btn btn-primary" @click="applyStarterLayout">
-            {{ t('buildingDetail.starterSetup.applyStarter') }}
-          </button>
+          <button class="btn btn-primary" @click="applyStarterLayout">{{ t('buildingDetail.starterSetup.applyStarter') }}</button>
         </div>
       </div>
 
       <div v-if="showSalesShopStarterBanner" class="starter-setup-banner starter-setup-banner--shop" role="region" aria-label="shop starter setup">
         <div class="starter-setup-content">
-          <h2 class="starter-setup-title">­čĆ¬ {{ t('buildingDetail.shopStarterSetup.title') }}</h2>
+          <h2 class="starter-setup-title">🏪 {{ t('buildingDetail.shopStarterSetup.title') }}</h2>
           <p class="starter-setup-body">{{ t('buildingDetail.shopStarterSetup.body') }}</p>
           <p class="starter-setup-desc">{{ t('buildingDetail.shopStarterSetup.starterLayoutDesc') }}</p>
           <p class="starter-setup-whatnext">{{ t('buildingDetail.shopStarterSetup.whatNext') }}</p>
         </div>
         <div class="starter-setup-actions">
-          <button class="btn btn-primary" @click="applyShopStarterLayout">
-            {{ t('buildingDetail.shopStarterSetup.applyStarter') }}
-          </button>
+          <button class="btn btn-primary" @click="applyShopStarterLayout">{{ t('buildingDetail.shopStarterSetup.applyStarter') }}</button>
         </div>
       </div>
 
@@ -124,18 +118,16 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
           <p>{{ t('buildingDetail.upgradeQueuedBody', { time: formatTickDuration(remainingUpgradeTicks, locale) }) }}</p>
         </div>
         <div class="upgrade-banner-actions">
-          <div class="upgrade-pill" :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration!.appliesAtTick })">
-            {{ t('buildingDetail.upgradeAppliesAt', { time: formatGameTickTime(pendingConfiguration!.appliesAtTick, locale) }) }}
+          <div class="upgrade-pill" :title="t('buildingDetail.upgradeAppliesAt', { time: pendingConfiguration?.appliesAtTick })">
+            {{ t('buildingDetail.upgradeAppliesAt', { time: formatGameTickTime(pendingConfiguration?.appliesAtTick ?? 0, locale) }) }}
           </div>
-          <button v-if="!isEditing" class="btn btn-danger btn-sm" :disabled="cancellingPlan" @click="cancelPlan">
-            {{ cancellingPlan ? t('common.loading') : t('buildingDetail.cancelPlan') }}
-          </button>
+          <button v-if="!isEditing" class="btn btn-danger btn-sm" :disabled="cancellingPlan" @click="cancelPlan">{{ cancellingPlan ? t('common.loading') : t('buildingDetail.cancelPlan') }}</button>
         </div>
       </div>
       <div v-if="cancelPlanError" class="error-banner" role="alert">{{ cancelPlanError }}</div>
 
       <div v-if="allUnitsUnderUpgrade.length > 0" class="concurrent-upgrades-panel" aria-label="Units under upgrade">
-        <h4>ÔĆ│ {{ t('buildingDetail.unitUpgrade.concurrentTitle') }}</h4>
+        <h4>⏳ {{ t('buildingDetail.unitUpgrade.concurrentTitle') }}</h4>
         <p class="concurrent-upgrades-help">{{ t('buildingDetail.unitUpgrade.concurrentHelp') }}</p>
         <ul class="concurrent-upgrades-list">
           <li
@@ -146,7 +138,7 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
           >
             <span class="concurrent-upgrade-type">{{ u.unitType }}</span>
             <span class="concurrent-upgrade-pos">({{ u.gridX }}, {{ u.gridY }})</span>
-            <span class="concurrent-upgrade-arrow">Ôćĺ</span>
+            <span class="concurrent-upgrade-arrow">→</span>
             <span class="concurrent-upgrade-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: u.toLevel }) }}</span>
             <span class="concurrent-upgrade-ticks" :title="u.ticksRemaining + ' ticks'">{{
               t('buildingDetail.unitUpgrade.ticksRemaining', { time: formatTickDuration(u.ticksRemaining, locale) })
@@ -157,13 +149,7 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
 
       <div v-if="lockedConfiguredProducts.length > 0" class="pro-access-banner" role="status">
         <strong>{{ t('catalog.proLockedTitle') }}</strong>
-        <p>
-          {{
-            t('buildingDetail.proAccessGrandfathered', {
-              products: lockedConfiguredProductNames,
-            })
-          }}
-        </p>
+        <p>{{ t('buildingDetail.proAccessGrandfathered', { products: lockedConfiguredProductNames }) }}</p>
       </div>
 
       <BuildingChainStatusPanel v-if="isMultiUnitBuilding" />

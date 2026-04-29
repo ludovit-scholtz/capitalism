@@ -46,10 +46,7 @@ async function authenticateViaLocalStorage(page: import('@playwright/test').Page
   }, `token-${playerId}`)
 }
 
-async function switchCityViaContextSwitcher(
-  page: import('@playwright/test').Page,
-  cityName: 'Bratislava' | 'Prague' | 'Vienna',
-) {
+async function switchCityViaContextSwitcher(page: import('@playwright/test').Page, cityName: 'Bratislava' | 'Prague' | 'Vienna') {
   await page.locator('.ctx-trigger').click()
   await page.locator('.ctx-city-option', { hasText: cityName }).click()
   await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText(cityName)
