@@ -6,7 +6,7 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
-### Architecture optimization (21% complete)
+### Architecture optimization (24% complete)
 
 - [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
 - [ ] Optimize the pefromance for tick calculations, make sure it works as efficient as possible, while preserving the security of the game accounts. Make sure that game is playable by thousounds of people at one time.
@@ -18,6 +18,8 @@ It will use real world map. The game will start in single city and later other c
 **Shipped (increment 3):** `BankStatementView.vue` was split into dedicated banking presentation components (`BankStatementSummaryCard` and `BankStatementTable`), reducing the view from 513 lines to 312 lines while preserving the existing account-selection, filtering, and pagination flow.
 
 **Shipped (increment 4):** `ContextSwitcher.vue` was split so the dropdown panel now lives in `ContextSwitcherPanel.vue`, reducing the parent layout component from 525 lines to 295 lines while preserving the existing city/account switcher selectors and behavior.
+
+**Shipped (increment 5):** `ProductPicker.vue` was split so the teleported dropdown panel now lives in `ProductPickerPanel.vue`, reducing the picker parent from 735 lines to 278 lines while preserving the existing `.product-picker-panel` and `.picker-*` DOM hooks used by the UI flow.
 
 ### Archive E2E tests (0% complete)
 
