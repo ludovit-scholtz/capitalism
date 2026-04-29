@@ -586,6 +586,7 @@ export default {
     topicOnboardingHelp: 'Pomoc s onboardingom',
     topicFactoryLayoutHelp: 'Pomoc s layoutom tovární',
     topicSalesShopHelp: 'Pomoc s nastavením predajne',
+    topicForexTradingHelp: 'Pomoc s forex obchodovaním',
     topicStockExchangeHelp: 'Pomoc s burzou akcií',
     topicResourcesDefinition: 'Definícia surovín',
     openImageFullscreen: 'Otvoriť veľký obrázok: {title}',
@@ -693,6 +694,41 @@ export default {
     salesShopGuideStepMarketingTitle: 'Krok 4 - Nastavte jednotku MARKETING',
     salesShopGuideStepMarketingBody:
       'MARKETING zvyšuje výkon predajne nad rámec samotnej ceny, pretože posilňuje viditeľnosť a dopytovú zotrvačnosť. Nastavte rozpočet podľa reálnej peňažnej rezervy firmy a sledujte, či zlepšený dopytový profil prevyšuje náklady. Príliš nízky rozpočet často neprinesie merateľný efekt, príliš vysoký rozpočet vie spáliť hotovosť skôr, ako odstránite prevádzkové úzke hrdlá. Marketing zapínajte až po stabilizácii PURCHASE a PUBLIC_SALES, aby posilňoval funkčný systém a nemaskoval chybný tok. V každom vyhodnocovacom okne porovnajte dodatočný objem a maržu oproti marketingovým nákladom. Meníte konfiguráciu postupne a podľa dát. V ranej fáze rastu je cieľom konzistencia: vyhladiť výkyvy dopytu, podporiť opakované nákupy a vytvoriť podmienky pre presnejšiu cenovú optimalizáciu.',
+    forexGuideTitle: 'Kompletný návod na Forex obchodovanie',
+    forexGuideSubtitle:
+      'Podrobný postup pre swap, transfer medzi účtami, čítanie FX sadzieb, kontrolu histórie swapov a Gold AMM režimy vrátane pozícií a likvidity.',
+    forexGuideTopicsTitle: 'Forex témy',
+    forexGuideTopicSwap: 'Štruktúra swap tabu, kontext účtu a správny smer výmeny meny',
+    forexGuideTopicTransfer: 'Transfery medzi vlastnými bankovými účtami a ich význam pred swapom',
+    forexGuideTopicRates: 'Mestská FX tabuľka, čítanie základnej meny a sadzba po poplatku',
+    forexGuideTopicHistory: 'História swapov, audit realizovaných kurzov a čas exekúcie',
+    forexGuideTopicGoldSwap: 'Gold AMM swap pre nákup a predaj XAU voči fiat menám',
+    forexGuideTopicGoldPositions: 'Gold AMM pozície, podiel v poole a nárokovateľné poplatky',
+    forexGuideTopicGoldLiquidity: 'Pridanie/odobratie likvidity a tvorba nového poolu',
+    forexGuideStepSwapOverviewTitle: 'Krok 1 - Najprv skontrolujte kontext v Swap tabe',
+    forexGuideStepSwapOverviewBody:
+      'Každý forex obchod začína kontrolou kontextu účtu a smeru meny ešte pred zadaním sumy. V hre sa swap vyhodnocuje podľa konkrétnych bankových účtov, preto je výber source a destination účet prvá bezpečnostná kontrola. Overte, že pracujete v správnom owner kontexte (osobný alebo firemný), že máte dostupný zostatok na zdrojovom účte a že cieľová mena je tá, ktorú naozaj potrebujete pre ďalší krok. Ak tento krok preskočíte, môžete dostať quote z nesprávneho účtu a následne zlyhať na burze, pri nákupe budovy alebo pri splátke. Cieľ je presnosť: správny účet, správna mena, správny účel. Tento screenshot učí hráča čítať Swap panel ako treasury panel, nie ako rýchly kalkulátor.',
+    forexGuideStepSwapExecutionTitle: 'Krok 2 - Vyžiadajte quote a potvrďte swap s kontrolou poplatku',
+    forexGuideStepSwapExecutionBody:
+      'Po zadaní sumy vždy kliknite na získanie quote a skontrolujte celú potvrdzovaciu kartu pred exekúciou. Práve tu vidíte kurz, výšku poplatku a finálnu prijatú sumu, takže viete overiť, či swap pokryje plánovaný cieľ, napríklad USD obchod na burze akcií alebo nákup budovy v lokálnej mene mesta. Ak je prijatá hodnota nízka, upravte sumu a nespúšťajte obchod naslepo. Po potvrdení sledujte success banner a oba nové zostatky, aby ste vedeli, že vysporiadanie prebehlo na očakávaných účtoch. Tento postup vytvára opakovateľnú disciplínu: kurz prijatý, poplatok pochopený, výstup dostatočný, zostatky potvrdené. Vďaka tomu sa znižujú chyby a zlyhania v nadväzujúcich krokoch hry.',
+    forexGuideStepTransferTitle: 'Krok 3 - Presúvajte likviditu medzi vlastnými účtami',
+    forexGuideStepTransferBody:
+      'Transfer tab je kľúčový nástroj na presun prostriedkov medzi vašimi účtami v rovnakej mene. Používajte ho vždy, keď potrebujete pripraviť správny účet pre swap, stock trade alebo inú operáciu, ktorá sa viaže na konkrétne settlement konto. Vyberte zdroj, cieľ, sumu a voliteľný popis, potom skontrolujte available balance na zdrojovej strane. Systém správne blokuje chyby ako rovnaký účet na oboch stranách alebo nesúlad meny, preto sa oplatí transfer plánovať s predstihom. Pri viacerých firmách je transfer disciplína ešte dôležitejšia: celkovo môžete mať dosť peňazí, ale lokálne na účte nie. Tento krok učí treasury návyk, ktorý znižuje počet zbytočne zamietnutých akcií počas aktívneho hrania.',
+    forexGuideStepRatesTitle: 'Krok 4 - Čítajte FX sadzby podľa mestského kontextu',
+    forexGuideStepRatesBody:
+      'Rates tab vysvetľuje, prečo rovnaká nominálna suma neznamená rovnakú kúpnu silu v rôznych mestách. Najprv sledujte base currency banner a potom porovnávajte cieľové kurzy vrátane stĺpca po poplatku. Ten ukazuje reálne vykonateľný kurz, ktorý je mierne horší ako stredová sadzba. Pred väčšími investíciami používajte túto tabuľku ako plánovací nástroj: odhadnite, koľko meny naozaj získate a či to stačí na ďalší krok. Kontrolujte aj čas aktualizácie a zdroj, aby ste sa rozhodovali na aktuálnych údajoch. Správna interpretácia rates boardu znižuje nerealistické očakávania a pomáha lepšie načasovať medzimestské rozhodnutia, nákupy a kapitálové presuny medzi menami.',
+    forexGuideStepHistoryTitle: 'Krok 5 - Kontrolujte históriu swapov ako audit kapitálu',
+    forexGuideStepHistoryBody:
+      'História swapov je miesto, kde sa ukáže kvalita vašich rozhodnutí. Každý záznam obsahuje vstupnú sumu, výstupnú sumu, použitý kurz, poplatok a tick exekúcie, čo umožní spätne skontrolovať, či boli konverzie efektívne. Po väčšej sérii obchodov si porovnajte riadky a hľadajte opakovaný fee drag, zlé časovanie alebo chybný smer konverzie. Táto tabuľka je užitočná aj pri diagnostike: ak neskôr zlyhá akcia pre insufficient funds, v histórii overíte, či swap prebehol a v akej mene. Vnímajte ju ako osobný treasury denník, nie len archív. Pravidelná kontrola histórie mení forex z impulzívneho klikania na riadený proces práce s kapitálom.',
+    forexGuideStepGoldSwapTitle: 'Krok 6 - Spúšťajte Gold AMM swap s kontrolou slippage',
+    forexGuideStepGoldSwapBody:
+      'Gold AMM swap umožňuje meniť fiat menu za XAU alebo XAU späť do fiat cez likviditné pooly. Pred quote vždy skontrolujte smer obchodu, menu poolu, vstupnú sumu a dostupný zostatok, pretože nedostatok fiat alebo dostupného zlata vedie k okamžitému zamietnutiu. Quote karta zobrazuje slippage, poplatok a implied price, takže viete zhodnotiť, či obchod dáva zmysel pre hedging, špekuláciu alebo presun likvidity. Po potvrdení sledujte výsledok a nové zostatky fiat aj zlata. Tento režim je odlišný od klasických FX sadzieb, preto je dôležité naučiť sa pracovať s poolovou cenotvorbou. Správna práca s Gold AMM znižuje prekvapenia pri volatilite a zlepšuje treasury flexibilitu.',
+    forexGuideStepGoldPositionsTitle: 'Krok 7 - Sledujte Gold AMM pozície a nárokovateľné hodnoty',
+    forexGuideStepGoldPositionsBody:
+      'V tabe Positions vidíte, kde je vaša likvidita viazaná a akú hodnotu môžete aktuálne vybrať. Sledujte podiel v poole, claimable fiat, claimable gold a celkové liquidity shares. Toto je zásadné najmä preto, že zlato zamknuté v poole nie je voľne použiteľné pre nové swapy. Ak hráč tento fakt ignoruje, často narazí na chyby typu insufficient gold napriek tomu, že celkový gold balance vyzerá vysoký. Pozície preto používajte ako rizikový panel: rozhoduje sa tu, či pokračovať v zarábaní poplatkov, časť likvidity odobrať alebo presunúť expozíciu do inej meny. Pravidelná kontrola pozícií po výraznejších pohyboch trhu drží vašu treasury stratégiu konzistentnú a predvídateľnú.',
+    forexGuideStepGoldLiquidityTitle: 'Krok 8 - Pridávajte a odoberajte likviditu plánovane',
+    forexGuideStepGoldLiquidityBody:
+      'Likvidita v Gold AMM je strategická vrstva nad samotným swapom. V režime Add Liquidity môžete vstúpiť do existujúceho poolu alebo založiť nový pool pre vybranú fiat menu. Pred potvrdením odhadujte, koľko fiat a zlata ste pripravení zamknúť a na ako dlho, aby ste neohrozili prevádzkovú flexibilitu. Pri odoberaní likvidity pracujte s podielom opatrne a overte očakávaný návrat fiat aj XAU. Cieľom nie je len zbierať poplatky, ale zachovať rovnováhu medzi výnosom a dostupnou hotovosťou pre ďalšie kroky hry. Tento krok učí hráča pristupovať k AMM likvidite ako k portfóliovému rozhodnutiu, nie ako k jednorazovému experimentu bez následkov.',
     stockExchangeGuideTitle: 'Kompletný návod na burzu akcií',
     stockExchangeGuideSubtitle: 'Postup od IPO vo fáze onboardingu cez nákup a predaj akcií až po USD zúčtovanie, forex swap a správu daňovej rezervy v osobných knihách.',
     stockExchangeGuideTopicsTitle: 'Témy burzy akcií',
@@ -702,6 +738,8 @@ export default {
     stockExchangeGuideTopicSell: 'Predaj akcií, bid/ask exekúcia a kontrola likvidity',
     stockExchangeGuideTopicUsdForex: 'Požiadavka USD zúčtovacieho účtu a príprava cez forex swap',
     stockExchangeGuideTopicTax: 'Daňová rezerva po predaji a kontrola v osobných knihách',
+    stockExchangeGuideTopicDividendConfig: 'Nastavenie dividendového pomeru v Company Settings a jeho strategický význam',
+    stockExchangeGuideTopicDividendPersonal: 'Dopad dividend na osobný účet a disponibilnú investičnú hotovosť',
     stockExchangeGuideStepIpoTitle: 'Krok 1 - Vyberte IPO plán v onboardingu',
     stockExchangeGuideStepIpoBody:
       'Príbeh burzy akcií sa začína skôr, než otvoríte stránku Burza. V onboardingu výber IPO plánu určuje, koľko externého kapitálu firma získa a aký podiel si ponechá zakladateľ. Vyšší raise dáva väčšiu prevádzkovú rezervu na chyby a expanziu, ale rýchlejšie oslabí founder ownership. Nižší raise drží kontrolu silnejšie, no môže vytvoriť tlak na hotovosť pri nákupe pozemkov, konfigurácii a prvom zásobovaní. Neberte to ako formálny krok, ale ako kombináciu governance a likvidity. Tento výber vplýva na tempo, ktorým sa dostanete ku kontrolným prahom, fúziám a neskorším rozhodnutiam, či investovať cez osobný účet alebo cez firemný účet.',
@@ -720,6 +758,12 @@ export default {
     stockExchangeGuideStepTaxLedgerTitle: 'Krok 6 - Skontrolujte daňovú rezervu v osobných knihách',
     stockExchangeGuideStepTaxLedgerBody:
       'Po predaji akcií z osobného účtu systém rezervuje 15% výnosu do daňovej rezervy, ktorá je blokovaná až do vysporiadania na konci daňového roka. Tento stav vidíte v potvrdzovacích správach burzy aj v osobných knihách, kde sú personal cash a available cash oddelené. Najčastejšia chyba je plánovať ďalšie nákupy podľa hrubej hotovosti po úspešnom predaji. Vždy sledujte dostupnú hotovosť, nie len celkový zostatok. V osobných knihách vyhodnocujte spolu rezervu, históriu obchodov a dividendové príjmy, aby ste mali obraz o skutočne použiteľnej likvidite. Táto rutina chráni pred prehnaným sizingom a pred zlyhaniami typu insufficient funds spôsobenými ignorovanou daňovou rezervou.',
+    stockExchangeGuideStepDividendConfigTitle: 'Krok 7 - Nastavte dividendový payout ratio vo firme',
+    stockExchangeGuideStepDividendConfigBody:
+      'Dividendová politika sa nastavuje v Company Settings cez parameter dividend payout ratio. Tento údaj určuje, aká časť zisku sa vyplatí akcionárom a aká časť zostane vo firme ako retained kapitál. Vyšší pomer zvyšuje okamžitý príjem investorov, no znižuje interný cash buffer na rast, nové budovy a absorbovanie rizika. Nižší pomer ponechá viac peňazí vo firme, čo je vhodné pri expanzii alebo vyššej volatilite, ale investori dostanú nižší cash výnos v krátkom horizonte. Nastavenie preto robte v kontexte stratégie firmy, nie podľa pocitu. Spolu s cash-flow plánom, dlhom a investičnými cieľmi tvorí payout ratio základ udržateľnej dividendovej politiky.',
+    stockExchangeGuideStepDividendPersonalTitle: 'Krok 8 - Vyhodnoťte dividendový dopad na osobný účet',
+    stockExchangeGuideStepDividendPersonalBody:
+      'Keď firma vyplatí dividendy, efekt sa premietne do osobných účtov akcionárov a do dividendovej histórie v stock rozhraní. Sledujte spoločnosť, herný rok, sumu na akciu a celkový kredit, ktorý zvýši vašu dostupnú osobnú likviditu bez potreby predaja podielu. Toto je dôležité, pretože dividendy umožňujú financovať nové nákupy pri zachovaní ownership pozície. Pri analýze výkonnosti preto oddeľujte trading zisky od dividendového cashflow, keďže ide o odlišné zdroje výnosu aj rizika. Ak dividendy neprišli, skontrolujte či ste držali akcie v čase distribúcie a či firma mala nastavený primeraný payout ratio. Tento krok učí hráča používať dividendy ako plánovaný príjmový nástroj.',
     viewDetail: 'Zobraziť detail',
     searchNoResults: 'Žiadne suroviny ani produkty nezodpovedajú vášmu vyhľadávaniu. Skúste iný výraz alebo vymažte filtre.',
   },

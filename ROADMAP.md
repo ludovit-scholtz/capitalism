@@ -72,11 +72,11 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Occupancy must be always a number. When there is no occupancy there must be 0%
 - [ ] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
-### Encyclopedia (0% complete)
+### Encyclopedia (100% complete)
 
-- [ ] Create complete walkthrough for the forex trading in encyclopedia. Create list of the topics. Please document everything from swap walkthrough, transfers, fx rates, swap history, Gold AMM swap, Gold amm positions, Gold amm liquidity, and find other related matters.. Analyze the code to provide the best documentation possible. Use full hd pictures so that users can understand the game better. For every topic also create at least 100 word description on what player is doing.
+- [x] Create complete walkthrough for the forex trading in encyclopedia. Create list of the topics. Please document everything from swap walkthrough, transfers, fx rates, swap history, Gold AMM swap, Gold amm positions, Gold amm liquidity, and find other related matters.. Analyze the code to provide the best documentation possible. Use full hd pictures so that users can understand the game better. For every topic also create at least 100 word description on what player is doing.
 
-- [ ] Add to the stock exchange also section for the dividends payout, how it is configured in the company and what effects it has on personal account.
+- [x] Add to the stock exchange also section for the dividends payout, how it is configured in the company and what effects it has on personal account.
 
 
 ### Referal program (0% complete)

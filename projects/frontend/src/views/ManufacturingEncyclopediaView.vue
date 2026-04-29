@@ -34,7 +34,7 @@ type CatalogEntry = {
   searchText: string
 }
 
-type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'stock-exchange-help' | 'resources-definition'
+type EncyclopediaTopicSlug = 'onboarding-help' | 'factory-layout-help' | 'sales-shop-help' | 'forex-trading-help' | 'stock-exchange-help' | 'resources-definition'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -48,7 +48,7 @@ const resources = ref<ResourceType[]>([])
 const products = ref<ProductType[]>([])
 const fullscreenImage = ref<{ src: string; alt: string } | null>(null)
 
-const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'sales-shop-help', 'stock-exchange-help', 'resources-definition']
+const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'sales-shop-help', 'forex-trading-help', 'stock-exchange-help', 'resources-definition']
 
 const showProProducts = computed({
   get: () => route.query.showPro === '1',
@@ -80,6 +80,7 @@ const topicMenu = computed(() => [
   { slug: 'onboarding-help' as const, label: t('encyclopedia.topicOnboardingHelp') },
   { slug: 'factory-layout-help' as const, label: t('encyclopedia.topicFactoryLayoutHelp') },
   { slug: 'sales-shop-help' as const, label: t('encyclopedia.topicSalesShopHelp') },
+  { slug: 'forex-trading-help' as const, label: t('encyclopedia.topicForexTradingHelp') },
   { slug: 'stock-exchange-help' as const, label: t('encyclopedia.topicStockExchangeHelp') },
   { slug: 'resources-definition' as const, label: t('encyclopedia.topicResourcesDefinition') },
 ])
@@ -186,6 +187,59 @@ const salesShopGuideTopics = [
   'encyclopedia.salesShopGuideTopicMarketingUnit',
 ]
 
+const forexGuideCards = [
+  {
+    titleKey: 'encyclopedia.forexGuideStepSwapOverviewTitle',
+    bodyKey: 'encyclopedia.forexGuideStepSwapOverviewBody',
+    imageUrl: '/forex-help/step-1-swap-overview-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepSwapExecutionTitle',
+    bodyKey: 'encyclopedia.forexGuideStepSwapExecutionBody',
+    imageUrl: '/forex-help/step-2-quote-and-confirm-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepTransferTitle',
+    bodyKey: 'encyclopedia.forexGuideStepTransferBody',
+    imageUrl: '/forex-help/step-3-account-transfer-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepRatesTitle',
+    bodyKey: 'encyclopedia.forexGuideStepRatesBody',
+    imageUrl: '/forex-help/step-4-fx-rates-board-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepHistoryTitle',
+    bodyKey: 'encyclopedia.forexGuideStepHistoryBody',
+    imageUrl: '/forex-help/step-5-swap-history-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepGoldSwapTitle',
+    bodyKey: 'encyclopedia.forexGuideStepGoldSwapBody',
+    imageUrl: '/forex-help/step-6-gold-amm-swap-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepGoldPositionsTitle',
+    bodyKey: 'encyclopedia.forexGuideStepGoldPositionsBody',
+    imageUrl: '/forex-help/step-7-gold-amm-positions-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.forexGuideStepGoldLiquidityTitle',
+    bodyKey: 'encyclopedia.forexGuideStepGoldLiquidityBody',
+    imageUrl: '/forex-help/step-8-gold-amm-liquidity-1920x1080.png',
+  },
+]
+
+const forexGuideTopics = [
+  'encyclopedia.forexGuideTopicSwap',
+  'encyclopedia.forexGuideTopicTransfer',
+  'encyclopedia.forexGuideTopicRates',
+  'encyclopedia.forexGuideTopicHistory',
+  'encyclopedia.forexGuideTopicGoldSwap',
+  'encyclopedia.forexGuideTopicGoldPositions',
+  'encyclopedia.forexGuideTopicGoldLiquidity',
+]
+
 const stockExchangeGuideCards = [
   {
     titleKey: 'encyclopedia.stockExchangeGuideStepIpoTitle',
@@ -217,6 +271,16 @@ const stockExchangeGuideCards = [
     bodyKey: 'encyclopedia.stockExchangeGuideStepTaxLedgerBody',
     imageUrl: '/stock-exchange-help/step-6-tax-reserve-ledger-1920x1080.png',
   },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepDividendConfigTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepDividendConfigBody',
+    imageUrl: '/stock-exchange-help/step-7-dividend-config-company-settings-1920x1080.png',
+  },
+  {
+    titleKey: 'encyclopedia.stockExchangeGuideStepDividendPersonalTitle',
+    bodyKey: 'encyclopedia.stockExchangeGuideStepDividendPersonalBody',
+    imageUrl: '/stock-exchange-help/step-8-dividend-effects-personal-account-1920x1080.png',
+  },
 ]
 
 const stockExchangeGuideTopics = [
@@ -226,6 +290,8 @@ const stockExchangeGuideTopics = [
   'encyclopedia.stockExchangeGuideTopicSell',
   'encyclopedia.stockExchangeGuideTopicUsdForex',
   'encyclopedia.stockExchangeGuideTopicTax',
+  'encyclopedia.stockExchangeGuideTopicDividendConfig',
+  'encyclopedia.stockExchangeGuideTopicDividendPersonal',
 ]
 
 const catalogEntries = computed<CatalogEntry[]>(() => {
@@ -524,6 +590,36 @@ function navigateToEntry(slug: string) {
           </ul>
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
             <article v-for="card in salesShopGuideCards" :key="card.titleKey" class="sales-shop-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <button
+                v-if="getGuideCardImage(card)"
+                type="button"
+                class="help-image-trigger block w-full"
+                :aria-label="t('encyclopedia.openImageFullscreen', { title: t(card.titleKey) })"
+                @click="openImageFullscreen(getGuideCardImage(card), t(card.titleKey))"
+              >
+                <img :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-36 object-cover" />
+              </button>
+              <div class="p-4 flex flex-col gap-2">
+                <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
+                <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
+              </div>
+            </article>
+          </div>
+        </section>
+      </div>
+
+      <div v-if="selectedTopic === 'forex-trading-help'" class="encyclopedia-help-section rounded-2xl border border-divider bg-card p-6 lg:p-8 flex flex-col gap-8">
+        <section class="flex flex-col gap-3">
+          <h2 class="m-0">{{ t('encyclopedia.forexGuideTitle') }}</h2>
+          <p class="text-muted m-0">{{ t('encyclopedia.forexGuideSubtitle') }}</p>
+          <h3 class="m-0 text-base mt-2">{{ t('encyclopedia.forexGuideTopicsTitle') }}</h3>
+          <ul class="m-0 pl-5 text-sm text-muted flex flex-col gap-1">
+            <li v-for="topic in forexGuideTopics" :key="topic">
+              {{ t(topic) }}
+            </li>
+          </ul>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
+            <article v-for="card in forexGuideCards" :key="card.titleKey" class="forex-help-card rounded-xl border border-divider bg-page overflow-hidden">
               <button
                 v-if="getGuideCardImage(card)"
                 type="button"

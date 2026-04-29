@@ -13,7 +13,7 @@ const router = createRouter({
     { path: '/leaderboard', name: 'leaderboard', component: () => import('@/views/LeaderboardView.vue') },
     { path: '/encyclopedia', name: 'encyclopedia', component: () => import('@/views/ManufacturingEncyclopediaView.vue') },
     {
-      path: '/encyclopedia/:topicSlug(onboarding-help|factory-layout-help|sales-shop-help|stock-exchange-help|resources-definition)',
+      path: '/encyclopedia/:topicSlug(onboarding-help|factory-layout-help|sales-shop-help|forex-trading-help|stock-exchange-help|resources-definition)',
       name: 'encyclopedia-topic',
       component: () => import('@/views/ManufacturingEncyclopediaView.vue'),
     },

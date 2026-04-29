@@ -76,5 +76,15 @@ test.describe('Encyclopedia FullHD screenshots', () => {
     const stockExchangeDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-stock-exchange-help-fullscreen-dialog-1920x1080.png')
     await page.screenshot({ path: stockExchangeDialogPath })
     expect(fs.existsSync(stockExchangeDialogPath)).toBeTruthy()
+
+    await page.goto('/encyclopedia/forex-trading-help')
+    const forexPath = path.join(OUTPUT_DIR, 'encyclopedia-forex-trading-help-1920x1080.png')
+    await page.screenshot({ path: forexPath })
+    expect(fs.existsSync(forexPath)).toBeTruthy()
+
+    await page.locator('.forex-help-card .help-image-trigger').first().click()
+    const forexDialogPath = path.join(OUTPUT_DIR, 'encyclopedia-forex-trading-help-fullscreen-dialog-1920x1080.png')
+    await page.screenshot({ path: forexDialogPath })
+    expect(fs.existsSync(forexDialogPath)).toBeTruthy()
   })
 })

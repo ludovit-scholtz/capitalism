@@ -38,7 +38,7 @@ async function openTradePanel(page: Page, companyName: string) {
 }
 
 test.describe('Stock exchange help screenshots', () => {
-  test('captures real FullHD walkthrough screenshots for IPO, trading, forex, and tax ledger', async ({ page }) => {
+  test('captures real FullHD walkthrough screenshots for IPO, trading, forex, tax ledger, and dividend flow', async ({ page }) => {
     fs.mkdirSync(PUBLIC_OUTPUT_DIR, { recursive: true })
     fs.mkdirSync(DOCS_OUTPUT_DIR, { recursive: true })
 
@@ -216,5 +216,14 @@ test.describe('Stock exchange help screenshots', () => {
     await page.goto('/personal-ledger')
     await expect(page.getByRole('heading', { name: 'Personal Ledger' })).toBeVisible()
     await saveScreenshot(page, 'step-6-tax-reserve-ledger-1920x1080.png')
+
+    await page.goto('/company/company-home/settings')
+    await expect(page.getByRole('heading', { name: 'Home Holdings' })).toBeVisible()
+    await saveScreenshot(page, 'step-7-dividend-config-company-settings-1920x1080.png')
+
+    await page.goto('/personal-ledger')
+    await expect(page.getByRole('heading', { name: /Dividend (income|history)/i })).toBeVisible()
+    await page.getByRole('heading', { name: /Dividend (income|history)/i }).scrollIntoViewIfNeeded()
+    await saveScreenshot(page, 'step-8-dividend-effects-personal-account-1920x1080.png')
   })
 })

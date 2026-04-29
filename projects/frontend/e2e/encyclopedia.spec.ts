@@ -110,6 +110,10 @@ test.describe('Manufacturing encyclopedia', () => {
     await expect(page).toHaveURL('/encyclopedia/sales-shop-help')
     await expect(page.getByRole('heading', { name: 'Sales Shop Setup Walkthrough' })).toBeVisible()
 
+    await page.getByRole('button', { name: 'Forex trading help' }).click()
+    await expect(page).toHaveURL('/encyclopedia/forex-trading-help')
+    await expect(page.getByRole('heading', { name: 'Forex Trading Walkthrough' })).toBeVisible()
+
     await page.getByRole('button', { name: 'Stock exchange help' }).click()
     await expect(page).toHaveURL('/encyclopedia/stock-exchange-help')
     await expect(page.getByRole('heading', { name: 'Stock Exchange Walkthrough' })).toBeVisible()
@@ -128,12 +132,33 @@ test.describe('Manufacturing encyclopedia', () => {
     await page.goto('/encyclopedia/stock-exchange-help')
 
     await expect(page.getByRole('heading', { name: 'Stock Exchange Walkthrough' })).toBeVisible()
-    await expect(page.locator('.stock-exchange-help-card')).toHaveCount(6)
-    await expect(page.locator('.stock-exchange-help-card .help-card-image')).toHaveCount(6)
+    await expect(page.locator('.stock-exchange-help-card')).toHaveCount(8)
+    await expect(page.locator('.stock-exchange-help-card .help-card-image')).toHaveCount(8)
     await expect(page.getByRole('heading', { name: 'Step 1 - Choose IPO plan in onboarding' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Step 6 - Review tax reserve in personal ledger' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Step 8 - Read dividend impact in personal account' })).toBeVisible()
 
     await page.locator('.stock-exchange-help-card .help-image-trigger').first().click()
+    await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toBeVisible()
+    await expect(page.locator('.fullscreen-help-image')).toBeVisible()
+    await page.getByRole('button', { name: 'Close preview' }).click()
+    await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toHaveCount(0)
+  })
+
+  test('forex topic shows full walkthrough cards and fullscreen image preview', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia/forex-trading-help')
+
+    await expect(page.getByRole('heading', { name: 'Forex Trading Walkthrough' })).toBeVisible()
+    await expect(page.locator('.forex-help-card')).toHaveCount(8)
+    await expect(page.locator('.forex-help-card .help-card-image')).toHaveCount(8)
+    await expect(page.getByRole('heading', { name: 'Step 1 - Understand the Swap tab context first' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Step 8 - Add or remove liquidity with a plan' })).toBeVisible()
+
+    await page.locator('.forex-help-card .help-image-trigger').first().click()
     await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toBeVisible()
     await expect(page.locator('.fullscreen-help-image')).toBeVisible()
     await page.getByRole('button', { name: 'Close preview' }).click()
