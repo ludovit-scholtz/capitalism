@@ -73,18 +73,30 @@ public sealed partial class Query
             .ThenBy(e => e.RecordedAtUtc)
             .ToListAsync();
 
-        // Use authoritative account balances instead of ledger-only sums to avoid drift.
-        // For account view: selected account balance.
-        // For company view: sum of active company bank accounts.
-        var currentBalance = selectedAccount is not null
-            ? selectedAccount.Balance
-            : (await db.BankAccounts
+        var ledgerNetBalance = allEntries.Sum(e => e.Amount);
+        var hasLegacyUnscopedEntries = !accountId.HasValue && allEntries.Any(e => e.BankAccountId is null);
+
+        // Use authoritative account balances when accounts exist.
+        // Legacy/test data may not seed company bank accounts yet, so fall back to
+        // the ledger-derived net balance to keep statements stable for those cases.
+        var activeCompanyAccounts = selectedAccount is null
+            ? await db.BankAccounts
                 .AsNoTracking()
                 .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
-                .SumAsync(a => (decimal?)a.Balance) ?? 0m);
+                .Select(a => a.Balance)
+                .ToListAsync()
+            : null;
+
+        var currentBalance = selectedAccount is not null
+            ? selectedAccount.Balance
+            : hasLegacyUnscopedEntries
+                ? ledgerNetBalance
+            : activeCompanyAccounts!.Count > 0
+                ? activeCompanyAccounts.Sum()
+                : ledgerNetBalance;
 
         // Compute running balances in chronological order, anchored to current balance.
-        var openingBalance = currentBalance - allEntries.Sum(e => e.Amount);
+        var openingBalance = currentBalance - ledgerNetBalance;
         decimal runningBalance = openingBalance;
         var balanceMap = new Dictionary<Guid, decimal>(allEntries.Count);
         foreach (var entry in allEntries)
