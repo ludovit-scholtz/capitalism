@@ -13,68 +13,27 @@ namespace Api.Data.Migrations
         {
             if (ActiveProvider.Contains("Npgsql", StringComparison.OrdinalIgnoreCase))
             {
+                // BankAccounts.Id is ALWAYS UUID, regardless of Companies.Id type
+                // Note: FK to Companies is NOT created here because Companies.Id may still be TEXT type
+                // The FK will be added after ComprehensiveSchemaRepairWithCleanup migration converts Companies.Id to UUID
                 migrationBuilder.Sql(
                     """
-                    DO $$
-                    DECLARE
-                        company_id_type TEXT;
-                        bank_account_id_type TEXT;
-                    BEGIN
-                        SELECT pg_catalog.format_type(a.atttypid, a.atttypmod)
-                        INTO company_id_type
-                        FROM pg_attribute a
-                        JOIN pg_class c ON c.oid = a.attrelid
-                        JOIN pg_namespace n ON n.oid = c.relnamespace
-                        WHERE n.nspname = 'public'
-                          AND c.relname = 'Companies'
-                          AND a.attname = 'Id'
-                          AND a.attnum > 0
-                          AND NOT a.attisdropped;
+                    CREATE TABLE IF NOT EXISTS "BankAccounts" (
+                        "Id" uuid NOT NULL,
+                        "AccountNumber" character varying(16) NOT NULL,
+                        "CurrencyCode" character varying(3) NOT NULL,
+                        "Balance" numeric(18,2) NOT NULL,
+                        "CompanyId" uuid NULL,
+                        "IsGovernmentAccount" boolean NOT NULL,
+                        "CreatedAtUtc" timestamp with time zone NOT NULL,
+                        CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id")
+                    );
+                    """);
 
-                        IF company_id_type IS NULL THEN
-                            RAISE EXCEPTION 'Companies.Id column not found while creating BankAccounts';
-                        END IF;
-
-                        IF company_id_type = 'uuid' THEN
-                            bank_account_id_type := 'uuid';
-                        ELSE
-                            bank_account_id_type := 'text';
-                        END IF;
-
-                        IF bank_account_id_type = 'uuid' THEN
-                            EXECUTE '
-                                CREATE TABLE IF NOT EXISTS "BankAccounts" (
-                                    "Id" uuid NOT NULL,
-                                    "AccountNumber" character varying(16) NOT NULL,
-                                    "CurrencyCode" character varying(3) NOT NULL,
-                                    "Balance" numeric(18,2) NOT NULL,
-                                    "CompanyId" uuid NULL,
-                                    "IsGovernmentAccount" boolean NOT NULL,
-                                    "CreatedAtUtc" timestamp with time zone NOT NULL,
-                                    CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id"),
-                                    CONSTRAINT "FK_BankAccounts_Companies_CompanyId"
-                                        FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE SET NULL
-                                )';
-                        ELSE
-                            EXECUTE '
-                                CREATE TABLE IF NOT EXISTS "BankAccounts" (
-                                    "Id" text NOT NULL,
-                                    "AccountNumber" character varying(16) NOT NULL,
-                                    "CurrencyCode" character varying(3) NOT NULL,
-                                    "Balance" numeric(18,2) NOT NULL,
-                                    "CompanyId" text NULL,
-                                    "IsGovernmentAccount" boolean NOT NULL,
-                                    "CreatedAtUtc" timestamp with time zone NOT NULL,
-                                    CONSTRAINT "PK_BankAccounts" PRIMARY KEY ("Id"),
-                                    CONSTRAINT "FK_BankAccounts_Companies_CompanyId"
-                                        FOREIGN KEY ("CompanyId") REFERENCES "Companies" ("Id") ON DELETE SET NULL
-                                )';
-                        END IF;
-
-                        EXECUTE format(
-                            'ALTER TABLE "Buildings" ADD COLUMN IF NOT EXISTS "BankAccountId" %s NULL',
-                            bank_account_id_type);
-                    END $$;
+                // Add BankAccountId column to Buildings as UUID
+                migrationBuilder.Sql(
+                    """
+                    ALTER TABLE "Buildings" ADD COLUMN IF NOT EXISTS "BankAccountId" uuid NULL;
                     """);
 
                 migrationBuilder.Sql("ALTER TABLE \"Buildings\" ADD COLUMN IF NOT EXISTS \"IsSuspendedForFunds\" boolean NOT NULL DEFAULT FALSE;");

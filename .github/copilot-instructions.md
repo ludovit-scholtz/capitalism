@@ -30,6 +30,7 @@ Update /CHANGELOG.csv with a new entry for each meaningful change. Create guid i
 - `projects/Api` runs on PostgreSQL in normal runtime. Design-time EF migrations for the game API must be scaffolded against PostgreSQL via `projects/Api/Data/AppDbContextFactory.cs` and the `GameCatalog` connection string.
 - **Code-first is the required backend workflow.** Define schema changes in the C# entity/model/DbContext configuration first, then scaffold the PostgreSQL migration from that model. Do not treat PostgreSQL as the source of truth.
 - **Use the repository migration scripts for game API model changes.** From `projects/Api`, create a migration with `pwsh ./scripts/New-AppMigration.ps1 -Name <MigrationName>` and remove the last un-applied scaffold with `pwsh ./scripts/Remove-AppMigration.ps1`.
+- **Never create EF migration `.cs` files by hand.** If a migration needs custom SQL, scaffold it first so EF generates the `.Designer.cs`, `[Migration]`, `[DbContext]`, and snapshot metadata, then edit the generated `Up()`/`Down()` methods.
 - **Never hand-edit migration snapshots as a substitute for model changes.** `Data/Migrations/AppDbContextModelSnapshot.cs` must stay generated output from the C# model.
 - **SQLite is forbidden in this repository.** Do not add `UseSqlite`, `Microsoft.Data.Sqlite`, or SQLite-specific schema/query logic.
 - **All automated tests must use EF Core InMemory provider** (unique database name per test scope/factory) instead of SQLite files or `:memory:` connections.
@@ -293,7 +294,8 @@ docker-compose logs --no-color --tail=200 postgresmaster masterapi game1
 - `postgresmaster` must be `healthy` before APIs start. Compose health checks are required so APIs do not crash on first boot while PostgreSQL is still initializing.
 - Keep PostgreSQL data mounted at `/var/lib/postgresql/data4` and bootstrap all required databases (`gamemaster`, `game1`) using `docker/postgres-init/01-create-game-databases.sql` for clean-volume startup.
 - For local container-to-container PostgreSQL connections, include `SSL Mode=Disable` in connection strings so containers do not require local TLS certificates.
-- If startup fails, triage in this order: (1) `docker-compose ps -a` container status, (2) PostgreSQL health/log readiness, (3) existence of `gamemaster` and `game1` databases, (4) API migration logs, (5) GraphQL health checks (`https://localhost:44364/graphql`, `https://localhost:44356/healthz`).
+- Local compose APIs run HTTP inside the containers (`ASPNETCORE_URLS=http://+:44364` and `http://+:44356`). Do not switch compose back to HTTPS unless a server certificate is mounted and configured; container-to-container URLs such as `MasterServer__ApiUrl` must also use `http://masterapi:44364/graphql`.
+- If startup fails, triage in this order: (1) `docker-compose ps -a` container status, (2) PostgreSQL health/log readiness, (3) existence of `gamemaster` and `game1` databases, (4) API migration logs, (5) GraphQL health checks (`http://localhost:44364/graphql`, `http://localhost:44356/healthz`).
 
 ## Validation requirements before reporting completion
 - For backend changes, do not stop at Debug-only targeted tests. Always run the workflow-equivalent Release pipeline locally:
@@ -796,6 +798,21 @@ Root-cause of a startup failure (April 2026, `ContentBudgetPerTick` duplicate-co
 4. **Add a regression test for the decision logic itself**: pending new PostgreSQL migration => `ShouldRepairSchemaArtifact(...) == false`; pending legacy hydrated migration => `true`.
 5. **If you see PostgreSQL duplicate-artifact startup errors (`42701` duplicate column, `42P07` relation already exists) immediately inspect whether startup repair created the artifact before `MigrateAsync()`.** Fix the repair guard first; do not paper over it by swallowing migration failures.
 6. **Recovery path when a database is already in the broken state** (column pre-created, migration still pending in `__EFMigrationsHistory`): make the `Up()` migration idempotent by replacing `migrationBuilder.AddColumn<T>(...)` with `migrationBuilder.Sql("ALTER TABLE ... ADD COLUMN IF NOT EXISTS ...")`. This is safe because `IF NOT EXISTS` is a no-op when the column already exists, so the migration can be applied without error and the history row is recorded, unblocking future migrations. Add a regression test in `DatabaseMigrationBootstrapTests` that simulates the broken state (column added manually, migration still pending) and asserts `InitializeAsync()` succeeds and the column survives.
+
+## EF migration metadata — hand-written migrations are invisible
+
+Root-cause of a startup failure (April 2026, `FuelPriceIndex` missing-column crash):
+- `City.FuelPriceIndex` was added to the C# model and seed data, but the migration file `20260428010000_AddCityFuelPriceIndex.cs` was hand-written without a generated `.Designer.cs`, `[Migration]`, or `[DbContext]` metadata.
+- EF Core discovers migrations from compiled migration metadata, not from filenames in `Data/Migrations`. Because the file lacked metadata, `MigrateAsync()` never applied it and startup later failed with `42703: column "FuelPriceIndex" of relation "Cities" does not exist`.
+- The same metadata-less pattern existed in several manually-created repair/feature migrations. Those obsolete invisible files were consolidated into a generated PostgreSQL migration: `20260429095149_RepairMissingManualMigrationArtifacts`.
+- Clean Docker Compose PostgreSQL proved the fix: `game1` recorded the repair migration in `__EFMigrationsHistory`, `Cities.FuelPriceIndex` existed, and the tick engine processed ticks successfully.
+
+**Rules to prevent recurrence:**
+1. **Never add a migration by creating only a timestamped `.cs` file.** Use `projects/Api/scripts/New-AppMigration.ps1 -Name <MigrationName>` so EF generates the migration class, designer metadata, and model snapshot together.
+2. **Custom SQL belongs inside a generated migration.** Scaffold first, then replace or augment the generated `Up()`/`Down()` body with idempotent PostgreSQL SQL where necessary.
+3. **After adding or cleaning migrations, verify EF discovery explicitly:** run `dotnet ef migrations list --configuration Release --no-build` from `projects/Api` and confirm the new migration appears.
+4. **Keep `DatabaseMigrationBootstrapTests.AllMigrationClasses_HaveEfMetadata` green.** Any migration class missing `[Migration]` or `[DbContext]` metadata is a release blocker because it will not be reliably applied by `MigrateAsync()`.
+5. **For schema-startup bugs, prove the fix against clean PostgreSQL, not only InMemory tests.** Use Docker Compose with a fresh volume, check `__EFMigrationsHistory`, query the new columns/tables directly, and confirm `game1` starts and processes ticks.
 
 ## Tick-refresh flicker prevention — always verify selectors against actual i18n labels before pushing E2E tests
 
