@@ -2,9 +2,9 @@
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { RankedProductResult } from '@/types'
-import { getProductImageUrl } from '@/lib/catalogPresentation'
+import { getProductImageUrl, getLocalizedProductName, getLocalizedIndustry } from '@/lib/catalogPresentation'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const props = defineProps<{
   /** Currently selected product type ID (or null/undefined for no selection). */
@@ -46,12 +46,22 @@ const MIN_SPACE_BELOW = 200
 const VIEWPORT_HEIGHT_FRACTION = 0.5
 const PANEL_GAP = 4
 
+function localProductName(r: RankedProductResult): string {
+  return getLocalizedProductName(r.productType, locale.value)
+}
+
+function localIndustry(r: RankedProductResult): string {
+  return getLocalizedIndustry(r.productType.industry, locale.value)
+}
+
 const filteredProducts = computed(() => {
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return props.rankedProducts
   return props.rankedProducts.filter(
     (r) =>
+      localProductName(r).toLowerCase().includes(q) ||
       r.productType.name.toLowerCase().includes(q) ||
+      localIndustry(r).toLowerCase().includes(q) ||
       r.productType.industry.toLowerCase().includes(q),
   )
 })
@@ -229,12 +239,12 @@ watch(
       <template v-else-if="selectedProduct">
         <img
           :src="productImage(selectedProduct)"
-          :alt="selectedProduct.productType.name"
+          :alt="localProductName(selectedProduct)"
           class="picker-trigger-img"
           aria-hidden="true"
         />
-        <span class="picker-trigger-label picker-trigger-selected-name">{{ selectedProduct.productType.name }}</span>
-        <span class="picker-trigger-industry">{{ selectedProduct.productType.industry }}</span>
+        <span class="picker-trigger-label picker-trigger-selected-name">{{ localProductName(selectedProduct) }}</span>
+        <span class="picker-trigger-industry">{{ localIndustry(selectedProduct) }}</span>
       </template>
       <template v-else-if="selectedId === null && allowNone">
         <span class="picker-trigger-label picker-trigger-none">{{ noneLabelKey ? t(noneLabelKey) : t('productPicker.noneLabel') }}</span>
@@ -315,13 +325,13 @@ watch(
             >
               <img
                 :src="productImage(r)"
-                :alt="r.productType.name"
+                :alt="localProductName(r)"
                 class="picker-item-img"
                 aria-hidden="true"
               />
                <div class="picker-item-body">
-                 <span class="picker-item-name">{{ r.productType.name }}</span>
-                 <span class="picker-item-industry">{{ r.productType.industry }}</span>
+                 <span class="picker-item-name">{{ localProductName(r) }}</span>
+                 <span class="picker-item-industry">{{ localIndustry(r) }}</span>
                  <span v-if="availabilityReasonDetail(r)" class="picker-item-context">{{ availabilityReasonDetail(r) }}</span>
                </div>
                <span
@@ -362,13 +372,13 @@ watch(
             >
               <img
                 :src="productImage(r)"
-                :alt="r.productType.name"
+                :alt="localProductName(r)"
                 class="picker-item-img"
                 aria-hidden="true"
               />
                <div class="picker-item-body">
-                 <span class="picker-item-name">{{ r.productType.name }}</span>
-                 <span class="picker-item-industry">{{ r.productType.industry }}</span>
+                 <span class="picker-item-name">{{ localProductName(r) }}</span>
+                 <span class="picker-item-industry">{{ localIndustry(r) }}</span>
                  <span v-if="availabilityReasonDetail(r)" class="picker-item-context">{{ availabilityReasonDetail(r) }}</span>
                </div>
                <span
@@ -408,13 +418,13 @@ watch(
             >
               <img
                 :src="productImage(r)"
-                :alt="r.productType.name"
+                :alt="localProductName(r)"
                 class="picker-item-img"
                 aria-hidden="true"
               />
                <div class="picker-item-body">
-                 <span class="picker-item-name">{{ r.productType.name }}</span>
-                 <span class="picker-item-industry">{{ r.productType.industry }}</span>
+                 <span class="picker-item-name">{{ localProductName(r) }}</span>
+                 <span class="picker-item-industry">{{ localIndustry(r) }}</span>
                  <span v-if="availabilityReasonDetail(r)" class="picker-item-context">{{ availabilityReasonDetail(r) }}</span>
                </div>
                <span

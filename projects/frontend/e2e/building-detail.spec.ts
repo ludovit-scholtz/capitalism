@@ -1688,6 +1688,64 @@ test.describe('Building detail upgrades', () => {
     await expect(page.locator('.config-price-hint').getByText(/Wooden Chair/i)).toBeVisible()
   })
 
+  test('new B2B_SALES unit defaults sale visibility to Group', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-b2b-defvis',
+      playerId: player.id,
+      name: 'B2B Default Visibility Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-b2b-defvis',
+          companyId: 'company-b2b-defvis',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Default Visibility Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-b2b-defvis')
+    await expect(page.getByRole('heading', { name: 'Default Visibility Factory' })).toBeVisible()
+
+    // Enter edit mode
+    await page.getByRole('button', { name: /Edit Building/i }).click()
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+
+    // Click an empty cell at (0,0) and place a B2B_SALES unit
+    await getGridCell(plannedSection, 0, 0).click()
+    await expect(page.getByRole('button', { name: 'B2B Sales' })).toBeVisible()
+    await page.getByRole('button', { name: 'B2B Sales' }).click()
+
+    // Click the placed cell to open the config panel
+    await getGridCell(plannedSection, 0, 0).click()
+
+    // Sale Visibility field should default to "Group"
+    const visibilitySelect = page
+      .locator('.config-field')
+      .filter({ has: page.getByText(/Sale Visibility/) })
+      .locator('select')
+    await expect(visibilitySelect).toHaveValue('GROUP')
+  })
+
   test('shows configured resource image, sourcing costs, and new-unit cost while planning', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

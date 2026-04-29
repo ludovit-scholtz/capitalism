@@ -109,12 +109,12 @@ It will use real world map. The game will start in single city and later other c
 
 ### Units
 
-- [ ]  In the grid show the picture of the product instead of cell-item-avatar
+- [x]  In the grid show the picture of the product instead of cell-item-avatar
 
 #### B2B sales unit
 
-- [ ]  The product selection is not localized
-- [ ]  Make the sale visibility default to be Group
+- [x]  The product selection is not localized
+- [x]  Make the sale visibility default to be Group
 
 #### Public sales unit
 
@@ -123,7 +123,12 @@ It will use real world map. The game will start in single city and later other c
 - [x]  Show more info about the product price when editing the sales unit. At the moment person does not know what price he should set for the public sales. The game must be fun to play it, and players should be well informed about decisions they are making.
 - [x]  Public sales slowly increases the brand awareness for the company, product category and product. If the quality of the product is lower then the city average, the brand will slowly decline. If the quality is higher then the city average or if the company is the only seller of the product in the city, the brand is slowly increasing. The marketing of the units is much more efficient way to improve the brand, but without the marketing if the company invests to R&D and has better products then competition, their products should be more demanding.
 
-**Status: 88% complete** (April 2026)
+**Status: 100% complete** (April 2026)
+
+**Shipped (April 2026 — unit grid imagery and B2B improvements):**
+- Unit/building grid cells now display the real product emoji image (from `getProductImageUrl`) instead of the generic monogram avatar whenever a product type is configured or held in inventory. Resource tiles still use the stored image URL. Fallback monogram is retained only when no product/resource is resolved.
+- B2B sales product picker is fully localized: product names and industry labels are rendered using the locale-aware `getLocalizedProductName` / `getLocalizedIndustry` helpers in all three supported locales (en, sk, de). The search filter also matches localized names.
+- New B2B sales units default to `GROUP` sale visibility instead of null/none, reducing misconfiguration risk for players who sell to business partners. The starter factory layout preset also uses GROUP as the default.
 
 **Shipped (April 2026):** City-aware pricing guidance panel in the public sales unit editor shows the city market reference price (product base price × FX rate), a below/at/above-market badge with contextual hints, and a brand momentum tip. The minimum price input is now bounded to the city average price. Passive brand awareness mechanics in PublicSalesPhase: superior-quality sellers and sole-city sellers gain small awareness increments each tick; inferior-quality sellers see slow awareness decay. All three backend tests (gain, decay, only-seller) pass. `cityAveragePrice` added to `PublicSalesAnalytics` GraphQL type.
 
