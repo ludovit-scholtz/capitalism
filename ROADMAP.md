@@ -198,7 +198,7 @@ It will use real world map. The game will start in single city and later other c
 
 **Remaining:**
 - [ ] When backend is restarted it must store all news from the changelog csv to the game server database. At the moment i see only few news and changelog csv is not imported.
-- [ ] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports.
+- [x] Create weekly and monthly report of the most used products and its profits from the manufacturing up to the sales in and do it for every city. Create separate categories in the news room for the weekly and monthly reports. **100% complete** — Weekly (`WEEKLY`) and monthly (`MONTHLY`) city market reports are now auto-generated at tick boundaries (every 168 ticks for weekly, every 720 ticks for monthly) by the new `MarketReportPhase`. Each report aggregates `PublicSalesRecord` data per city, ranks up to 10 products by revenue with gross margin %, seller count, and average price, generates bilingual HTML content (EN/SK/DE) with a styled table layout, persists as `CityMarketReport` rows (idempotent), and is published to the MasterApi newsroom as `MARKET_REPORT` entries by `MarketReportPublisherHostedService`. The frontend newsroom adds a dedicated 📊 Market Reports filter tab with teal-themed pill and special card styling for market report entries. 10 backend integration tests cover generation, idempotency, localization, ordering, DB round-trip, and GraphQL query/filter.
 
 ## FX Exahcnge
 

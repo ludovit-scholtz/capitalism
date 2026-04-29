@@ -1444,7 +1444,7 @@ export interface GameNewsFeed {
 
 export interface GameNewsEntry {
   id: string
-  entryType: 'NEWS' | 'CHANGELOG'
+  entryType: 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'
   status: 'DRAFT' | 'PUBLISHED'
   targetServerKey: string | null
   createdByEmail: string

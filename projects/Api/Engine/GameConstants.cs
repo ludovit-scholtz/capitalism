@@ -13,6 +13,12 @@ public static class GameConstants
     public const int DaysPerYear = 365;
     public const int TicksPerYear = TicksPerDay * DaysPerYear;
 
+    /// <summary>Game ticks in one in-game week (7 days × 24 ticks/day).</summary>
+    public const int TicksPerWeek = TicksPerDay * 7;
+
+    /// <summary>Game ticks in one in-game month (30 days × 24 ticks/day).</summary>
+    public const int TicksPerMonth = TicksPerDay * 30;
+
     /// <summary>Base holding capacity (units) per unit level for purchase, sales, mining, and manufacturing units.</summary>
     public static decimal StorageCapacity(int level) => level switch
     {
@@ -711,4 +717,10 @@ public static class GameConstants
     /// 500 000 is safely below the minimum correct CZK lot price (~1.6 M CZK for a mine lot).
     /// </summary>
     public const decimal EurAnchoredLotBasePriceThreshold = 500_000m;
+
+    /// <summary>
+    /// Email address used as the requester identity when the game server automatically
+    /// publishes system-generated entries (e.g. city market reports) to the MasterApi newsroom.
+    /// </summary>
+    public const string SystemRequesterEmail = "system@capitalism.internal";
 }

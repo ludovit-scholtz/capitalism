@@ -155,8 +155,10 @@ public class Program
         builder.Services.AddScoped<ITickPhase, BankInterestPhase>();
         builder.Services.AddScoped<ITickPhase, TaxPhase>();
         builder.Services.AddScoped<ITickPhase, DividendPhase>();
+        builder.Services.AddScoped<ITickPhase, MarketReportPhase>();
         builder.Services.AddHostedService<GameTickHostedService>();
         builder.Services.AddHostedService<MasterServerRegistrationHostedService>();
+        builder.Services.AddHostedService<MarketReportPublisherHostedService>();
 
         var app = builder.Build();
 
