@@ -125,6 +125,22 @@ test.describe('Manufacturing encyclopedia', () => {
     await expect(page.getByRole('heading', { name: 'Step 6 - Buy first sales-shop lot' })).toBeVisible()
   })
 
+  test('clicking onboarding screenshot opens fullscreen dialog preview', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia/onboarding-help')
+
+    await page.locator('.onboarding-help-card .help-image-trigger').first().click()
+    await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toBeVisible()
+    await expect(page.locator('.fullscreen-help-image')).toBeVisible()
+
+    await page.getByRole('button', { name: 'Close preview' }).click()
+    await expect(page.getByRole('dialog', { name: 'Fullscreen help image preview' })).toHaveCount(0)
+  })
+
   test('uses six-column layout on wide screens and keeps encyclopedia card images compact', async ({ page }) => {
     setupMockApi(page, {
       resourceTypes: [woodResource],

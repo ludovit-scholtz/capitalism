@@ -74,6 +74,7 @@ It will use real world map. The game will start in single city and later other c
 
 ### Encyclopedia (100% complete)
 
+- [ ] use full hd screenshot of the pages. use the playwright tests to acquire the real screenshots please
 - [x] The resources pictures are very big. Make it 6 columns on wide screen please.
 - [x] Create section for the help with the game play. Update copilot instructions with any change to the basic flow also update the documentation in the encyclopedia.
 - [x] Create help section with onboarding help. Please document the onboarding and create also pictures so that users can easier be onboarded

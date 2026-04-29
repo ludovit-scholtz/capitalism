@@ -229,6 +229,25 @@ npx playwright test --project=chromium e2e/onboarding.spec.ts
 npx playwright test --debug --project=chromium
 ```
 
+### Encyclopedia help screenshots (real FullHD)
+- Use Playwright-generated screenshots for encyclopedia help content. Do not use hand-drawn or external mockups when documenting in-game onboarding/factory guidance.
+- Capture at exact FullHD viewport: `1920x1080`.
+- Canonical command:
+```bash
+cd projects/frontend
+CI=true npx playwright test --project=chromium e2e/encyclopedia-screenshots.spec.ts
+```
+- Output folder must be: `projects/frontend/docs/screenshots/encyclopedia-help/`.
+- Required minimum captures:
+  - `encyclopedia-onboarding-help-1920x1080.png`
+  - `encyclopedia-factory-layout-help-1920x1080.png`
+  - `encyclopedia-resources-definition-1920x1080.png`
+  - `encyclopedia-onboarding-help-fullscreen-dialog-1920x1080.png`
+- Screenshot quality rules:
+  - Use production-mode Playwright run (`CI=true`) to match shipped styling.
+  - Keep default app locale unless a locale-specific screenshot is explicitly required.
+  - Do not crop UI chrome out of the screenshot; capture the full viewport for authenticity.
+
 ## Backend testing
 - Integration tests in `Api.Tests/GraphQlIntegrationTests.cs` use `WebApplicationFactory` with a unique inmemory or postgresql database per test factory instance.
 - Test factory in `Api.Tests/Infrastructure/ApiWebApplicationFactory.cs`.

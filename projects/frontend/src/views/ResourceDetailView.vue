@@ -247,13 +247,7 @@ function navigateToEntry(slug: string) {
 }
 
 function goBack() {
-  const topic = String(route.query.topic ?? 'resources-definition')
-  const topicSlug = ['onboarding-help', 'factory-layout-help', 'resources-definition'].includes(topic) ? topic : 'resources-definition'
-  router.push({
-    name: 'encyclopedia-topic',
-    params: { topicSlug },
-    query: showProProducts.value ? { showPro: '1' } : {},
-  })
+  router.push({ name: 'encyclopedia', query: showProProducts.value ? { showPro: '1' } : {} })
 }
 </script>
 

@@ -46,6 +46,7 @@ const search = ref('')
 const industry = ref('ALL')
 const resources = ref<ResourceType[]>([])
 const products = ref<ProductType[]>([])
+const fullscreenImage = ref<{ src: string; alt: string } | null>(null)
 
 const topicSlugs: EncyclopediaTopicSlug[] = ['onboarding-help', 'factory-layout-help', 'resources-definition']
 
@@ -306,14 +307,23 @@ function selectTopic(topicSlug: EncyclopediaTopicSlug) {
   router.push({ name: 'encyclopedia-topic', params: { topicSlug }, query: route.query })
 }
 
+function openImageFullscreen(src: string | null, alt: string) {
+  if (!src) {
+    return
+  }
+
+  fullscreenImage.value = { src, alt }
+}
+
+function closeImageFullscreen() {
+  fullscreenImage.value = null
+}
+
 function navigateToEntry(slug: string) {
   router.push({
     name: 'encyclopedia-detail',
     params: { slug },
-    query: {
-      ...(showProProducts.value ? { showPro: '1' } : {}),
-      topic: selectedTopic.value,
-    },
+    query: showProProducts.value ? { showPro: '1' } : {},
   })
 }
 </script>
@@ -367,7 +377,15 @@ function navigateToEntry(slug: string) {
           <p class="text-muted m-0">{{ t('encyclopedia.onboardingGuideSubtitle') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
             <article v-for="card in onboardingGuideCards" :key="card.titleKey" class="onboarding-help-card rounded-xl border border-divider bg-page overflow-hidden">
-              <img v-if="getGuideCardImage(card)" :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-36 object-cover" />
+              <button
+                v-if="getGuideCardImage(card)"
+                type="button"
+                class="help-image-trigger block w-full"
+                :aria-label="t('encyclopedia.openImageFullscreen', { title: t(card.titleKey) })"
+                @click="openImageFullscreen(getGuideCardImage(card), t(card.titleKey))"
+              >
+                <img :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-36 object-cover" />
+              </button>
               <div class="p-4 flex flex-col gap-2">
                 <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
                 <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
@@ -383,7 +401,15 @@ function navigateToEntry(slug: string) {
           <p class="text-muted m-0">{{ t('encyclopedia.manufacturingGuideSubtitle') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
             <article v-for="card in manufacturingGuideCards" :key="card.titleKey" class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden">
-              <img v-if="getGuideCardImage(card)" :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-28 object-cover" />
+              <button
+                v-if="getGuideCardImage(card)"
+                type="button"
+                class="help-image-trigger block w-full"
+                :aria-label="t('encyclopedia.openImageFullscreen', { title: t(card.titleKey) })"
+                @click="openImageFullscreen(getGuideCardImage(card), t(card.titleKey))"
+              >
+                <img :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-28 object-cover" />
+              </button>
               <div class="p-4 flex flex-col gap-2">
                 <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
                 <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
@@ -495,5 +521,29 @@ function navigateToEntry(slug: string) {
         </div>
       </div>
     </section>
+
+    <div
+      v-if="fullscreenImage"
+      class="fixed inset-0 z-[200] bg-black/90 p-4 lg:p-8 flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('encyclopedia.fullscreenDialogLabel')"
+      @click.self="closeImageFullscreen"
+      @keydown.esc="closeImageFullscreen"
+    >
+      <button
+        type="button"
+        class="absolute top-4 right-4 rounded-lg bg-page/90 text-body px-3 py-2 text-sm font-semibold"
+        :aria-label="t('encyclopedia.closeFullscreenImage')"
+        @click="closeImageFullscreen"
+      >
+        {{ t('encyclopedia.closeFullscreenImage') }}
+      </button>
+      <img
+        :src="fullscreenImage.src"
+        :alt="fullscreenImage.alt"
+        class="fullscreen-help-image max-w-full max-h-full object-contain rounded-xl border border-divider"
+      />
+    </div>
   </div>
 </template>
