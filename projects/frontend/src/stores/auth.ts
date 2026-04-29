@@ -132,6 +132,31 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  function deriveMostUsedCityId(playerValue: Player | null): string | null {
+    if (!playerValue) return null
+    const cityUsage = new Map<string, number>()
+
+    for (const company of playerValue.companies ?? []) {
+      for (const building of company.buildings ?? []) {
+        cityUsage.set(building.cityId, (cityUsage.get(building.cityId) ?? 0) + 1)
+      }
+    }
+
+    if (cityUsage.size === 0) {
+      return playerValue.onboardingCityId ?? null
+    }
+
+    let bestCityId: string | null = null
+    let bestCount = -1
+    for (const [cityId, count] of cityUsage.entries()) {
+      if (count > bestCount) {
+        bestCount = count
+        bestCityId = cityId
+      }
+    }
+    return bestCityId
+  }
+
   const isAuthenticated = computed(() => !!token.value || !!getStoredToken())
   const isAdmin = computed(() => player.value?.role === 'ADMIN')
   const isProSubscriber = computed(() => !!player.value?.proSubscriptionEndsAtUtc && new Date(player.value.proSubscriptionEndsAtUtc).getTime() > Date.now())
@@ -159,6 +184,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchCurrentPlayer() {
     const data = await gqlRequest<{ me: Player }>(`{ me {${PLAYER_SELECTION}} }`)
+    if (!selectedCityId.value) {
+      const preferredCityId = deriveMostUsedCityId(data.me)
+      if (preferredCityId) {
+        switchCity(preferredCityId)
+      }
+    }
     if (!deepEqual(player.value, data.me)) {
       player.value = data.me
     }

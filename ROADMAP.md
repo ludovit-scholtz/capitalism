@@ -23,11 +23,11 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped (increment 2 — core gameplay views):** Migrated five high-traffic views from legacy scoped CSS to Tailwind v4 utilities: `LeaderboardView` (wealth rankings with gradient hero, tab switcher, medal cards), `NewsView` (news/changelog feed with pill badges, unread indicators, and market-report table styles), `CompanySettingsView` (company profile, overhead dashboard, salary table), `PersonalLedgerView` (personal wealth breakdown, share trade history, dividend history), and `ManufacturingEncyclopediaView` (catalog grid with search, industry filter, and resource/product cards). All E2E selector classes preserved; scoped CSS fully removed from all five files (total ~1,200 style-lines eliminated). Files reduced well below the 500-line limit.
 
-### Context switching
+### Context switching (100% complete)
 
-- [ ] When user logs in, the city should be selected according to the player most used city. However i see ?? in the navbar for the city selection.
-- [ ] Remove from the new building flow the city selection. City must be selected with the context switching.
-- [ ] In the city map remove the cities switcher. Use the navbar context switcher to switch between the cities.
+- [x] When user logs in, the city should be selected according to the player most used city. However i see ?? in the navbar for the city selection.
+- [x] Remove from the new building flow the city selection. City must be selected with the context switching.
+- [x] In the city map remove the cities switcher. Use the navbar context switcher to switch between the cities.
 
 ### Currencies and bank accounts (0% complete)
 

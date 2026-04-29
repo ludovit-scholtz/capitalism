@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
@@ -11,6 +12,7 @@ const { t, locale } = useI18n()
 const router = useRouter()
 const route = useRoute()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 
 const companyId = computed(() => route.params.companyId as string)
 
@@ -21,7 +23,6 @@ const cities = ref<City[]>([])
 const availableLots = ref<BuildingLot[]>([])
 const selectedLotId = ref('')
 const selectedType = ref('')
-const selectedCityId = ref('')
 const selectedMediaType = ref('')
 const buildingName = ref('')
 const submitting = ref(false)
@@ -201,13 +202,27 @@ onMounted(async () => {
     selectedType.value = typeParam
   }
 
-  // Pre-select city if passed as query param
-  const cityParam = route.query.city as string | undefined
-  if (cityParam && cities.value.find((c) => c.id === cityParam)) {
-    selectedCityId.value = cityParam
-  } else if (auth.selectedCityId && cities.value.find((c) => c.id === auth.selectedCityId)) {
-    // Fall back to the active city from the city navbar/filter so the player doesn't need to choose again.
-    selectedCityId.value = auth.selectedCityId
+  if (!selectedCityId.value && cities.value.length > 0) {
+    const cityUsage = new Map<string, number>()
+    for (const company of auth.player?.companies ?? []) {
+      for (const building of company.buildings ?? []) {
+        cityUsage.set(building.cityId, (cityUsage.get(building.cityId) ?? 0) + 1)
+      }
+    }
+    let preferredCityId: string | null = null
+    let preferredCount = -1
+    for (const [cityId, count] of cityUsage.entries()) {
+      if (count > preferredCount) {
+        preferredCount = count
+        preferredCityId = cityId
+      }
+    }
+
+    const preferredCity = preferredCityId ? cities.value.find((c) => c.id === preferredCityId) : null
+    const fallbackCity = preferredCity ?? cities.value[0]
+    if (fallbackCity) {
+      auth.switchCity(fallbackCity.id)
+    }
   }
 })
 
@@ -383,7 +398,7 @@ async function buyBuilding() {
           </div>
         </div>
 
-        <!-- Step 2: Name + City (shown after type is selected) -->
+        <!-- Step 2: Name (city comes from navbar context switcher) -->
         <div v-if="selectedType" class="mb-8 flex flex-col gap-4">
           <!-- Building name -->
           <div class="flex flex-col gap-1.5">
@@ -438,20 +453,11 @@ async function buyBuilding() {
             </div>
           </div>
 
-          <!-- City selection -->
-          <div class="flex flex-col gap-1.5">
-            <label class="text-sm font-semibold">{{ t('buildings.selectCity') }}</label>
-            <div class="city-select-grid flex flex-wrap gap-2">
-              <button
-                v-for="city in cities"
-                :key="city.id"
-                class="city-option inline-flex items-center gap-1.5 px-4 py-2 border-2 border-divider rounded-lg bg-page text-body cursor-pointer transition-all hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                :class="selectedCityId === city.id ? 'selected border-brand bg-[rgba(0,71,255,0.08)]' : ''"
-                @click="selectedCityId = city.id"
-              >
-                <span class="font-semibold text-sm">{{ city.name }}</span>
-                <span class="text-xs text-muted">{{ city.countryCode }}</span>
-              </button>
+          <div class="flex items-start gap-2 px-4 py-3 border border-divider rounded-lg bg-page">
+            <span class="text-sm">📍</span>
+            <div class="flex flex-col gap-0.5">
+              <span class="text-xs text-muted">{{ t('buildings.selectCity') }}</span>
+              <strong class="text-sm">{{ selectedCityObj?.name ?? t('common.selectCity') }}</strong>
             </div>
           </div>
 

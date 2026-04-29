@@ -46,6 +46,15 @@ async function authenticateViaLocalStorage(page: import('@playwright/test').Page
   }, `token-${playerId}`)
 }
 
+async function switchCityViaContextSwitcher(
+  page: import('@playwright/test').Page,
+  cityName: 'Bratislava' | 'Prague' | 'Vienna',
+) {
+  await page.locator('.ctx-trigger').click()
+  await page.locator('.ctx-city-option', { hasText: cityName }).click()
+  await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText(cityName)
+}
+
 // ── Tests ────────────────────────────────────────────────────────────────────
 
 test.describe('City Map View', () => {
@@ -1647,85 +1656,64 @@ test.describe('City Map — construction completion transition', () => {
   })
 })
 
-// ── City picker and multi-city navigation ────────────────────────────────────
+// ── Navbar context-switcher multi-city navigation ───────────────────────────
 
-test.describe('City Map — city picker', () => {
-  test('shows city picker when multiple cities are available', async ({ page }) => {
+test.describe('City Map — navbar context switcher', () => {
+  test('shows all seeded cities in the navbar context switcher', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
     await page.goto('/city/city-ba')
 
-    // Default mock has 3 cities → picker should be visible
-    await expect(page.locator('#city-select')).toBeVisible()
-    // Bratislava should be the currently selected city
-    await expect(page.locator('#city-select')).toHaveValue('city-ba')
+    await page.locator('.ctx-trigger').click()
+    await expect(page.locator('.ctx-city-option', { hasText: 'Bratislava' })).toBeVisible()
+    await expect(page.locator('.ctx-city-option', { hasText: 'Prague' })).toBeVisible()
+    await expect(page.locator('.ctx-city-option', { hasText: 'Vienna' })).toBeVisible()
   })
 
-  test('city picker lists all available cities', async ({ page }) => {
-    const { player } = setupAuthenticatedPlayer(page)
-    await authenticateViaLocalStorage(page, player.id)
-
-    await page.goto('/city/city-ba')
-
-    // All three seeded cities should appear as options in the select element
-    const select = page.locator('#city-select')
-    await expect(select).toBeVisible()
-    const optionTexts = await page.locator('#city-select option').allTextContents()
-    expect(optionTexts.join(' ')).toContain('Bratislava')
-    expect(optionTexts.join(' ')).toContain('Prague')
-    expect(optionTexts.join(' ')).toContain('Vienna')
-  })
-
-  test('switching city via picker navigates to the new city URL', async ({ page }) => {
+  test('switching city via navbar context switcher navigates to the new city URL', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
     await page.goto('/city/city-ba')
     await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
 
-    // Select Prague from the picker
-    await page.locator('#city-select').selectOption('city-pr')
+    await switchCityViaContextSwitcher(page, 'Prague')
 
-    // URL should update to the Prague city route
     await page.waitForURL(/\/city\/city-pr/)
     await expect(page).toHaveURL(/\/city\/city-pr/)
   })
 
-  test('city map heading updates when switching cities via picker', async ({ page }) => {
+  test('city map heading updates when switching cities via navbar context switcher', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
     await page.goto('/city/city-ba')
     await expect(page.getByRole('heading', { name: /Bratislava/i })).toBeVisible()
 
-    // Switch to Prague
-    await page.locator('#city-select').selectOption('city-pr')
+    await switchCityViaContextSwitcher(page, 'Prague')
     await page.waitForURL(/\/city\/city-pr/)
     await expect(page.getByRole('heading', { name: /Prague/i })).toBeVisible()
   })
 
-  test('switching to Vienna (third city) shows Vienna heading', async ({ page }) => {
+  test('switching to Vienna (third city) via navbar context switcher shows Vienna heading', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
     await page.goto('/city/city-ba')
 
-    // Switch to Vienna
-    await page.locator('#city-select').selectOption('city-vi')
+    await switchCityViaContextSwitcher(page, 'Vienna')
     await page.waitForURL(/\/city\/city-vi/)
     await expect(page.getByRole('heading', { name: /Vienna/i })).toBeVisible()
   })
 
-  test('city picker shows correct selected city when navigating directly to Prague', async ({ page }) => {
+  test('navbar context switcher shows Prague as selected when navigating directly to Prague', async ({ page }) => {
     const { player } = setupAuthenticatedPlayer(page)
     await authenticateViaLocalStorage(page, player.id)
 
-    // Navigate directly to Prague (not via picker)
     await page.goto('/city/city-pr')
 
-    // Picker should reflect Prague as the selected option
-    await expect(page.locator('#city-select')).toHaveValue('city-pr')
+    await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Prague')
   })
 })
 

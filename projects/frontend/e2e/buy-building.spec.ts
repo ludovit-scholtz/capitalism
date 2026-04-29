@@ -8,6 +8,15 @@ async function authenticate(page: Parameters<typeof test>[0]['page'], playerId: 
   }, `token-${playerId}`)
 }
 
+async function switchCityViaContextSwitcher(
+  page: Parameters<typeof test>[0]['page'],
+  cityName: 'Bratislava' | 'Prague' | 'Vienna',
+) {
+  await page.locator('.ctx-trigger').click()
+  await page.locator('.ctx-city-option', { hasText: cityName }).click()
+  await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText(cityName)
+}
+
 test.describe('Buy Building View', () => {
   test('shows compatible land after selecting city and building type', async ({ page }) => {
     const player = makePlayer({
@@ -31,10 +40,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page
-      .locator('.city-select-grid')
-      .getByRole('button', { name: /Bratislava/i })
-      .click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     const starterFactoryLot = page.getByRole('button', { name: /Factory Site B1/i })
     await expect(starterFactoryLot).toBeVisible()
@@ -64,10 +70,7 @@ test.describe('Buy Building View', () => {
 
     await page.getByRole('button', { name: /Factory/i }).click()
     await page.getByLabel('Building Name').fill('Danube Works')
-    await page
-      .locator('.city-select-grid')
-      .getByRole('button', { name: /Bratislava/i })
-      .click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
     await page.getByRole('button', { name: /Factory Site B1/i }).click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
 
@@ -116,10 +119,7 @@ test.describe('Buy Building View', () => {
 
     await page.getByRole('button', { name: /Media House/i }).click()
     await page.getByLabel('Building Name').fill('Pulse TV')
-    await page
-      .locator('.city-select-grid')
-      .getByRole('button', { name: /Bratislava/i })
-      .click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
     await page.getByRole('button', { name: /Media House Lot A1/i }).click()
 
     const buyNowButton = page.getByRole('button', { name: /^Buy Now$/i })
@@ -203,10 +203,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.locator('.type-card', { hasText: 'Bank' }).click()
-    await page
-      .locator('.city-select-grid')
-      .getByRole('button', { name: /Bratislava/i })
-      .click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // Should show insufficient funds warning
     await expect(page.locator('.capital-warn')).toBeVisible()
@@ -294,10 +291,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.locator('.type-card', { hasText: 'Bank' }).click()
-    await page
-      .locator('.city-select-grid')
-      .getByRole('button', { name: /Bratislava/i })
-      .click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
     // Select any lot
     await page.locator('.lot-card').first().click()
     await page.getByRole('button', { name: /^Buy Now$/i }).click()
@@ -331,8 +325,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    // Scope to .city-select-grid to avoid matching account-switcher button
-    await page.locator('.city-select-grid').getByText('Prague').click()
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     // Funding gap warning must be visible with "missing account" message
     const guidance = page.locator('.funding-guidance')
@@ -369,7 +362,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.locator('.city-select-grid').getByText('Prague').click()
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     // Funding gap warning must be shown before any lot selection
     await expect(page.locator('.funding-guidance')).toBeVisible()
@@ -438,7 +431,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.locator('.city-select-grid').getByText('Prague').click()
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     // Select the lot to trigger lot-total comparison
     await page.locator('.lot-card', { hasText: 'Prague Starter Site' }).click()
@@ -516,7 +509,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.locator('.city-select-grid').getByText('Prague').click()
+    await switchCityViaContextSwitcher(page, 'Prague')
 
     // Funding gap warning must NOT be shown
     await expect(page.locator('.funding-guidance')).toBeHidden()
@@ -549,8 +542,7 @@ test.describe('Buy Building View', () => {
     await page.goto('/buy-building/company-1')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    // Scope to city-select-grid to avoid matching account-switcher button
-    await page.locator('.city-select-grid').getByText('Bratislava').click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // No funding gap warning for EUR city
     await expect(page.locator('.funding-guidance')).toBeHidden()
@@ -609,10 +601,8 @@ test.describe('Buy Building View', () => {
     // Select Factory type — city should already be pre-selected as Prague
     await page.getByRole('button', { name: /Factory/i }).click()
 
-    // Prague city button should appear as selected in the city grid
-    const pragueButton = page.locator('.city-select-grid').getByRole('button', { name: /Prague/i })
-    await expect(pragueButton).toBeVisible()
-    await expect(pragueButton).toHaveClass(/selected/)
+    // Active city in context switcher should resolve to Prague from persisted selection
+    await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText('Prague')
 
     // Lots for Prague should load automatically without manual city click
     await expect(page.getByRole('button', { name: /Prague Auto Factory/i })).toBeVisible()
@@ -688,7 +678,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await page.goto('/buy-building/company-mine')
 
     await page.getByRole('button', { name: /Mine/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // Industrial Plot A1 has Iron Ore resource — badge should be visible on the lot card
     const lotCard = page.locator('.lot-card', { hasText: 'Industrial Plot A1' })
@@ -708,7 +698,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await page.goto('/buy-building/company-mine')
 
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // Factory Site B1 has no resource — no badge should be shown
     const lotCard = page.locator('.lot-card', { hasText: 'Factory Site B1' })
@@ -728,7 +718,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await page.goto('/buy-building/company-mine')
 
     await page.getByRole('button', { name: /Mine/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // Select the mine lot with Iron Ore
     await page.locator('.lot-card', { hasText: 'Industrial Plot A1' }).click()
@@ -757,7 +747,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await page.goto('/buy-building/company-mine')
 
     await page.getByRole('button', { name: /Mine/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
     await page.locator('.lot-card', { hasText: 'Industrial Plot A1' }).click()
 
     // Resource premium badge should be visible in the selected lot summary
@@ -781,7 +771,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
 
     // Select Factory type — the mine lot also supports FACTORY
     await page.getByRole('button', { name: /Factory/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
     await page.locator('.lot-card', { hasText: 'Industrial Plot A1' }).click()
 
     // Deposit summary should NOT appear when building type is not MINE
@@ -798,7 +788,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await page.goto('/buy-building/company-mine')
 
     await page.getByRole('button', { name: /Mine/i }).click()
-    await page.locator('.city-select-grid').getByRole('button', { name: /Bratislava/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
 
     // The Industrial Plot A1 mock has a price of ~32 million — must show large currency amount
     const lotCard = page.locator('.lot-card', { hasText: 'Industrial Plot A1' })

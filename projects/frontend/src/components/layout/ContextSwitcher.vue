@@ -21,6 +21,27 @@ const isOpen = ref(false)
 const switchingKey = ref<string | null>(null)
 const cities = ref<City[]>([])
 
+function deriveMostUsedCityId(): string | null {
+  const cityUsage = new Map<string, number>()
+  for (const company of auth.player?.companies ?? []) {
+    for (const building of company.buildings ?? []) {
+      cityUsage.set(building.cityId, (cityUsage.get(building.cityId) ?? 0) + 1)
+    }
+  }
+  if (cityUsage.size === 0) {
+    return auth.player?.onboardingCityId ?? null
+  }
+  let bestCityId: string | null = null
+  let bestCount = -1
+  for (const [cityId, count] of cityUsage.entries()) {
+    if (count > bestCount) {
+      bestCount = count
+      bestCityId = cityId
+    }
+  }
+  return bestCityId
+}
+
 // ── City helpers ──────────────────────────────────────────────────────────────
 
 /** Normalise 2-letter country code for display (upper-case, max 2 chars). */
@@ -34,16 +55,23 @@ async function loadCities() {
     if (data?.cities) {
       cities.value = data.cities
     }
-    if (!selectedCityId.value && cities.value.length > 0) {
-      const first = cities.value[0]
-      if (first) auth.switchCity(first.id)
+    if (cities.value.length > 0) {
+      const activeCity = selectedCityId.value ? cities.value.find((city) => city.id === selectedCityId.value) : null
+      if (!activeCity) {
+        const preferredCityId = deriveMostUsedCityId()
+        const preferredCity = preferredCityId ? cities.value.find((city) => city.id === preferredCityId) : null
+        const fallbackCity = preferredCity ?? cities.value[0]
+        if (fallbackCity) {
+          auth.switchCity(fallbackCity.id)
+        }
+      }
     }
   } catch {
     /* ignore — best effort */
   }
 }
 
-const selectedCity = computed(() => cities.value.find((c) => c.id === selectedCityId.value))
+const selectedCity = computed(() => cities.value.find((c) => c.id === selectedCityId.value) ?? cities.value[0] ?? null)
 
 /** Building count in each city for the currently active company (or all companies if PERSON). */
 const buildingCountByCity = computed<Record<string, number>>(() => {

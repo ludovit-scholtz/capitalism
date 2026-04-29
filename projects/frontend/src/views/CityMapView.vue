@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '@/stores/auth'
@@ -27,6 +28,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const { selectedCityId } = storeToRefs(auth)
 const gameStateStore = useGameStateStore()
 
 const cityId = computed(() => route.params.id as string)
@@ -35,7 +37,6 @@ const highlightedBuildingId = computed(() => (typeof route.query.building === 's
 const loading = ref(true)
 const error = ref<string | null>(null)
 const city = ref<City | null>(null)
-const allCities = ref<City[]>([])
 const lots = ref<BuildingLot[]>([])
 const companies = ref<Company[]>([])
 const selectedLot = ref<BuildingLot | null>(null)
@@ -232,7 +233,7 @@ async function fetchData() {
       await auth.fetchMe()
     }
 
-    const [cityData, lotsData, companiesData, citiesData] = await Promise.all([
+    const [cityData, lotsData, companiesData] = await Promise.all([
       gqlRequest<{ city: City }>(
         `query GetCity($id: UUID!) {
           city(id: $id) {
@@ -259,18 +260,11 @@ async function fetchData() {
       auth.isAuthenticated
         ? gqlRequest<{ myCompanies: Company[] }>(`{ myCompanies { id name cash foundedAtUtc buildings { id } } }`)
         : Promise.resolve({ myCompanies: [] as Company[] }),
-      // allCities is a session-level cache: fetch once on first load, reuse on subsequent city switches
-      allCities.value.length > 0
-        ? Promise.resolve({ cities: allCities.value })
-        : gqlRequest<{ cities: City[] }>(`{ cities { id name countryCode } }`),
     ])
 
     city.value = cityData.city
     lots.value = lotsData.cityLots
     companies.value = companiesData.myCompanies
-    if (allCities.value.length === 0) {
-      allCities.value = citiesData.cities
-    }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load city data'
   } finally {
@@ -544,12 +538,6 @@ async function confirmPurchase() {
   }
 }
 
-function switchCity(id: string) {
-  if (id !== cityId.value) {
-    router.push({ name: 'city-map', params: { id } })
-  }
-}
-
 watch(filteredLots, () => {
   if (map) {
     updateMarkers()
@@ -565,9 +553,19 @@ watch(
   },
 )
 
+watch(selectedCityId, (nextCityId) => {
+  if (!nextCityId || nextCityId === cityId.value) {
+    return
+  }
+  router.push({ name: 'city-map', params: { id: nextCityId } })
+})
+
 // Reload data and reinitialize map when city changes via the picker or back navigation.
 // fetchData() handles its own error state (sets error.value), so no extra try-catch needed here.
 watch(cityId, async () => {
+  if (selectedCityId.value !== cityId.value) {
+    auth.switchCity(cityId.value)
+  }
   selectedLot.value = null
   purchaseMode.value = false
   purchaseError.value = null
@@ -592,6 +590,9 @@ watch(cityId, async () => {
 })
 
 onMounted(async () => {
+  if (selectedCityId.value !== cityId.value) {
+    auth.switchCity(cityId.value)
+  }
   await fetchData()
   void fetchMediaHouses()
   void fetchWeatherForecast()
@@ -634,20 +635,6 @@ watch(viewMode, async (mode) => {
         <p class="subtitle">{{ t('cityMap.subtitle') }}</p>
       </div>
       <div class="header-controls">
-        <!-- City picker: shown when more than one city is available -->
-        <div v-if="allCities.length > 1" class="city-picker" :aria-label="t('cityMap.cityPickerLabel')">
-          <label class="city-picker-label" for="city-select">🏙️ {{ t('cityMap.cityPickerLabel') }}</label>
-          <select
-            id="city-select"
-            class="city-picker-select"
-            :value="cityId"
-            @change="switchCity(($event.target as HTMLSelectElement).value)"
-          >
-            <option v-for="c in allCities" :key="c.id" :value="c.id">
-              {{ c.name }} ({{ c.countryCode }})
-            </option>
-          </select>
-        </div>
         <div class="view-toggle">
           <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button>
           <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">📋 {{ t('cityMap.listView') }}</button>
