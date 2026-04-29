@@ -156,29 +156,120 @@ namespace Api.Data.Migrations
                     """
                 :
                     """
-                    INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
-                    SELECT p."Id",
-                           LPAD((9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id"))::text, 16, '0'),
-                           'EUR',
-                           COALESCE(
-                               CASE
-                                   WHEN p."PersonalCash" IS NULL THEN NULL
-                                   WHEN p."PersonalCash"::text ~ '^\s*[-+]?\d+(\.\d+)?\s*$' THEN (p."PersonalCash"::text)::numeric
-                                   ELSE NULL
-                               END,
-                               0
-                           ),
-                           NULL,
-                           FALSE,
-                           CURRENT_TIMESTAMP,
-                           p."Id"
-                    FROM "Players" p
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM "BankAccounts" existing
-                                                WHERE existing."PlayerId"::text = p."Id"::text
-                          AND existing."CurrencyCode" = 'EUR'
-                    )
+                    DO $$
+                    DECLARE
+                        player_id_type TEXT;
+                        bank_account_id_type TEXT;
+                    BEGIN
+                        SELECT pg_catalog.format_type(a.atttypid, a.atttypmod)
+                        INTO player_id_type
+                        FROM pg_attribute a
+                        JOIN pg_class c ON c.oid = a.attrelid
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = 'public'
+                          AND c.relname = 'Players'
+                          AND a.attname = 'Id'
+                          AND a.attnum > 0
+                          AND NOT a.attisdropped;
+
+                        SELECT pg_catalog.format_type(a.atttypid, a.atttypmod)
+                        INTO bank_account_id_type
+                        FROM pg_attribute a
+                        JOIN pg_class c ON c.oid = a.attrelid
+                        JOIN pg_namespace n ON n.oid = c.relnamespace
+                        WHERE n.nspname = 'public'
+                          AND c.relname = 'BankAccounts'
+                          AND a.attname = 'Id'
+                          AND a.attnum > 0
+                          AND NOT a.attisdropped;
+
+                        IF player_id_type IS NULL OR bank_account_id_type IS NULL THEN
+                            RAISE EXCEPTION 'Players.Id or BankAccounts.Id column not found during PersonalCash migration backfill';
+                        END IF;
+
+                        IF bank_account_id_type = 'uuid' AND player_id_type = 'uuid' THEN
+                            EXECUTE '
+                                INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                SELECT p."Id",
+                                       LPAD((9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id"))::text, 16, ''0''),
+                                       ''EUR'',
+                                       COALESCE(
+                                           CASE
+                                               WHEN p."PersonalCash" IS NULL THEN NULL
+                                               WHEN p."PersonalCash"::text ~ ''^\s*[-+]?\d+(\.\d+)?\s*$'' THEN (p."PersonalCash"::text)::numeric
+                                               ELSE NULL
+                                           END,
+                                           0
+                                       ),
+                                       NULL,
+                                       FALSE,
+                                       CURRENT_TIMESTAMP,
+                                       p."Id"
+                                FROM "Players" p
+                                WHERE NOT EXISTS (
+                                    SELECT 1
+                                    FROM "BankAccounts" existing
+                                    WHERE existing."PlayerId"::text = p."Id"::text
+                                      AND existing."CurrencyCode" = ''EUR''
+                                )';
+                        ELSIF bank_account_id_type = 'uuid' THEN
+                            EXECUTE '
+                                INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                SELECT (
+                                           SUBSTRING(MD5(''player-settlement-'' || p."Id"::text), 1, 8) || ''-'' ||
+                                           SUBSTRING(MD5(''player-settlement-'' || p."Id"::text), 9, 4) || ''-'' ||
+                                           SUBSTRING(MD5(''player-settlement-'' || p."Id"::text), 13, 4) || ''-'' ||
+                                           SUBSTRING(MD5(''player-settlement-'' || p."Id"::text), 17, 4) || ''-'' ||
+                                           SUBSTRING(MD5(''player-settlement-'' || p."Id"::text), 21, 12)
+                                       )::uuid,
+                                       LPAD((9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id"))::text, 16, ''0''),
+                                       ''EUR'',
+                                       COALESCE(
+                                           CASE
+                                               WHEN p."PersonalCash" IS NULL THEN NULL
+                                               WHEN p."PersonalCash"::text ~ ''^\s*[-+]?\d+(\.\d+)?\s*$'' THEN (p."PersonalCash"::text)::numeric
+                                               ELSE NULL
+                                           END,
+                                           0
+                                       ),
+                                       NULL,
+                                       FALSE,
+                                       CURRENT_TIMESTAMP,
+                                       p."Id"
+                                FROM "Players" p
+                                WHERE NOT EXISTS (
+                                    SELECT 1
+                                    FROM "BankAccounts" existing
+                                    WHERE existing."PlayerId"::text = p."Id"::text
+                                      AND existing."CurrencyCode" = ''EUR''
+                                )';
+                        ELSE
+                            EXECUTE '
+                                INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
+                                SELECT p."Id",
+                                       LPAD((9000000000000000 + ROW_NUMBER() OVER (ORDER BY p."Id"))::text, 16, ''0''),
+                                       ''EUR'',
+                                       COALESCE(
+                                           CASE
+                                               WHEN p."PersonalCash" IS NULL THEN NULL
+                                               WHEN p."PersonalCash"::text ~ ''^\s*[-+]?\d+(\.\d+)?\s*$'' THEN (p."PersonalCash"::text)::numeric
+                                               ELSE NULL
+                                           END,
+                                           0
+                                       ),
+                                       NULL,
+                                       FALSE,
+                                       CURRENT_TIMESTAMP,
+                                       p."Id"
+                                FROM "Players" p
+                                WHERE NOT EXISTS (
+                                    SELECT 1
+                                    FROM "BankAccounts" existing
+                                    WHERE existing."PlayerId"::text = p."Id"::text
+                                      AND existing."CurrencyCode" = ''EUR''
+                                )';
+                        END IF;
+                    END $$;
                     """;
         }
     }

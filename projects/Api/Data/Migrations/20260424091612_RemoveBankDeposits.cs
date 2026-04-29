@@ -394,7 +394,16 @@ namespace Api.Data.Migrations
                 :
                     """
                     INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId", "BankBuildingId", "DepositInterestRatePercent", "DepositedAtTick", "IsBaseCapitalDeposit", "ClosedAtTick", "ClosedAtUtc", "TotalInterestPaid")
-                    SELECT legacy."Id",
+                    SELECT CASE
+                               WHEN legacy."Id"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN (legacy."Id"::text)::uuid
+                               ELSE (
+                                   SUBSTRING(MD5('bank-deposit-' || legacy."Id"::text), 1, 8) || '-' ||
+                                   SUBSTRING(MD5('bank-deposit-' || legacy."Id"::text), 9, 4) || '-' ||
+                                   SUBSTRING(MD5('bank-deposit-' || legacy."Id"::text), 13, 4) || '-' ||
+                                   SUBSTRING(MD5('bank-deposit-' || legacy."Id"::text), 17, 4) || '-' ||
+                                   SUBSTRING(MD5('bank-deposit-' || legacy."Id"::text), 21, 12)
+                               )::uuid
+                           END,
                            LPAD((9200000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."Id"))::text, 16, '0'),
                            city."CurrencyCode",
                            COALESCE(
@@ -405,7 +414,11 @@ namespace Api.Data.Migrations
                                END,
                                0
                            ),
-                           legacy."DepositorCompanyId",
+                           CASE
+                               WHEN legacy."DepositorCompanyId" IS NULL THEN NULL
+                               WHEN legacy."DepositorCompanyId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN (legacy."DepositorCompanyId"::text)::uuid
+                               ELSE NULL
+                           END,
                            FALSE,
                            COALESCE(
                                CASE
@@ -416,7 +429,11 @@ namespace Api.Data.Migrations
                                CURRENT_TIMESTAMP
                            ),
                            NULL,
-                           legacy."BankBuildingId",
+                           CASE
+                               WHEN legacy."BankBuildingId" IS NULL THEN NULL
+                               WHEN legacy."BankBuildingId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN (legacy."BankBuildingId"::text)::uuid
+                               ELSE NULL
+                           END,
                            COALESCE(
                                CASE
                                    WHEN legacy."DepositInterestRatePercent" IS NULL THEN NULL

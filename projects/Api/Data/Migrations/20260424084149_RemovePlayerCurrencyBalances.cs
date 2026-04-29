@@ -178,7 +178,16 @@ namespace Api.Data.Migrations
                                             AND existing."CurrencyCode" = legacy."CurrencyCode";
 
                                         INSERT INTO "BankAccounts" ("Id", "AccountNumber", "CurrencyCode", "Balance", "CompanyId", "IsGovernmentAccount", "CreatedAtUtc", "PlayerId")
-                                        SELECT legacy."Id",
+                                        SELECT CASE
+                                                   WHEN legacy."Id"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN (legacy."Id"::text)::uuid
+                                                   ELSE (
+                                                       SUBSTRING(MD5('player-currency-' || legacy."PlayerId"::text || '-' || legacy."CurrencyCode"), 1, 8) || '-' ||
+                                                       SUBSTRING(MD5('player-currency-' || legacy."PlayerId"::text || '-' || legacy."CurrencyCode"), 9, 4) || '-' ||
+                                                       SUBSTRING(MD5('player-currency-' || legacy."PlayerId"::text || '-' || legacy."CurrencyCode"), 13, 4) || '-' ||
+                                                       SUBSTRING(MD5('player-currency-' || legacy."PlayerId"::text || '-' || legacy."CurrencyCode"), 17, 4) || '-' ||
+                                                       SUBSTRING(MD5('player-currency-' || legacy."PlayerId"::text || '-' || legacy."CurrencyCode"), 21, 12)
+                                                   )::uuid
+                                               END,
                                                      LPAD((9100000000000000 + ROW_NUMBER() OVER (ORDER BY legacy."PlayerId", legacy."CurrencyCode"))::text, 16, '0'),
                                                      legacy."CurrencyCode",
                                                  COALESCE(
@@ -199,7 +208,11 @@ namespace Api.Data.Migrations
                                                              END,
                                                              CURRENT_TIMESTAMP
                                                          ),
-                                                     legacy."PlayerId"
+                                                     CASE
+                                                         WHEN legacy."PlayerId" IS NULL THEN NULL
+                                                         WHEN legacy."PlayerId"::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$' THEN (legacy."PlayerId"::text)::uuid
+                                                         ELSE NULL
+                                                     END
                                         FROM "PlayerCurrencyBalances" AS legacy
                                         WHERE NOT EXISTS (
                                                 SELECT 1
