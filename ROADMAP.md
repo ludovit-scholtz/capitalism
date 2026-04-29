@@ -74,11 +74,8 @@ It will use real world map. The game will start in single city and later other c
 
 ### Encyclopedia (100% complete)
 
-- [ ] use full hd screenshot of the pages. use the playwright tests to acquire the real screenshots please
-- [x] The resources pictures are very big. Make it 6 columns on wide screen please.
-- [x] Create section for the help with the game play. Update copilot instructions with any change to the basic flow also update the documentation in the encyclopedia.
-- [x] Create help section with onboarding help. Please document the onboarding and create also pictures so that users can easier be onboarded
-- [x] Create help section with manufacturing unit setup. Please document the manufacturing setup and create also pictures so that users can understand the game better
+- [ ] Update help section with onboarding help. Please document the onboarding and create also  full hd pictures from the onboarding process so that users can easier be onboarded. For each step create 100 word definition describing what they players are doing.
+- [ ] Update help section with manufacturing unit setup in the factories. Create list of the topics. Please document the manufacturing setup, how units are created, what every unit type is doing and create also full hd pictures so that users can understand the game better. For every topic also create at least 100 word description on what player is doing.
 
 ### Referal program (0% complete)
 
