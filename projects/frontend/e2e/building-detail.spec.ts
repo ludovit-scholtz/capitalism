@@ -15563,6 +15563,80 @@ test.describe('Mine building edit mode', () => {
   })
 })
 
+// ── Power plant unit-type picker coverage ───────────────────────────────────
+
+test.describe('Power plant edit mode — unit type picker', () => {
+  function makeEmptyPowerPlantForPicker() {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-power-picker',
+      playerId: player.id,
+      name: 'Picker Energy Corp',
+      cash: 900000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-power-picker',
+          companyId: 'company-power-picker',
+          cityId: 'city-ba',
+          type: 'POWER_PLANT',
+          name: 'Picker Power Plant',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 0,
+          powerOutput: 50,
+          powerPlantType: 'COAL',
+          powerStatus: 'POWERED',
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [],
+        },
+      ],
+    })
+    return player
+  }
+
+  test('power plant unit picker shows all power-generation unit options and allows placement', async ({ page }) => {
+    const player = makeEmptyPowerPlantForPicker()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-power-picker')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = page
+      .locator('.grid-section')
+      .filter({ has: page.getByRole('heading', { name: 'Planned Upgrade' }) })
+      .first()
+    await expect(plannedSection).toBeVisible()
+
+    const emptyCell = plannedSection.locator('.unit-row').nth(0).locator('.grid-cell').nth(0)
+    await emptyCell.click()
+    await expect(page.getByText('Select a unit type to place')).toBeVisible()
+
+    await expect(page.locator('.picker-option').filter({ hasText: 'Power Generation' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Battery Storage' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Fuel Procurement' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Wind Turbine' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Water Turbine' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Mechanical Energy Storage' })).toBeVisible()
+    await expect(page.locator('.picker-option').filter({ hasText: 'Energy Producer' })).toBeVisible()
+
+    await expect(page.locator('.picker-option').filter({ hasText: 'Manufacturing' })).toHaveCount(0)
+    await expect(page.locator('.picker-option').filter({ hasText: 'Mining' })).toHaveCount(0)
+
+    await page.locator('.picker-option').filter({ hasText: 'Energy Producer' }).click()
+    await expect(emptyCell).toContainText('Energy Producer')
+  })
+})
+
 // ── Sales shop unit-type picker coverage ─────────────────────────────────────
 
 test.describe('Sales shop edit mode — unit type picker', () => {

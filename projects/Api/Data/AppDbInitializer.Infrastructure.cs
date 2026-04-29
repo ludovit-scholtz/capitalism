@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text;
 using Api.Data.Entities;
 using Api.Utilities;
@@ -417,32 +417,30 @@ public sealed partial class AppDbInitializer
         await EnsureMiningLotsForCityAsync(prague, resources, mineLotSeeds);
     }
 
-                // Wood: 25,000t at 65% quality → 16,250,000 EUR premium
-                // 25000 × 10 EUR × 0.65 × 100 = 16,250,000 EUR ✓ (≥ 15M minimum)
-                (Key: "lot:ba-mine-wood-1", Resource: "wood", Name: "Carpathian Timber Reserve",
-                 Desc: "Extensive managed forest on the forested slopes north of Bratislava. Timber reserve with 25,000 tonnes of recoverable wood at 65% yield.",
-                 Lat: 48.2120, Lon: 17.0840, Quality: 0.65m, Quantity: 25_000m),
-                // Coal: 35,000t at 65% quality → 18,200,000 EUR premium
-                // 35000 × 8 EUR × 0.65 × 100 = 18,200,000 EUR ✓ (≥ 15M minimum)
-                (Key: "lot:ba-mine-coal-1", Resource: "coal", Name: "Záhorie Coal Field",
-                 Desc: "Productive coal deposit in the Záhorie lowlands west of Bratislava. Estimated 35,000 tonnes of recoverable coal at 65% grade.",
-                 Lat: 48.1200, Lon: 16.9600, Quality: 0.65m, Quantity: 35_000m),
-                // Cotton: 15,000t at 70% quality → 15,750,000 EUR premium
-                // 15000 × 15 EUR × 0.70 × 100 = 15,750,000 EUR ✓ (≥ 15M minimum)
-                (Key: "lot:ba-mine-cotton-1", Resource: "cotton", Name: "Danube Lowland Cotton Fields",
-                 Desc: "Fertile alluvial plains south of the city along the Danube. Agricultural cotton estate with 15,000 tonnes of harvestable cotton at 70% quality.",
-                 Lat: 48.0850, Lon: 17.0600, Quality: 0.70m, Quantity: 15_000m),
-                // Grain: 60,000t at 55% quality → 16,500,000 EUR premium
-                // 60000 × 5 EUR × 0.55 × 100 = 16,500,000 EUR ✓ (≥ 15M minimum)
-                (Key: "lot:ba-mine-grain-1", Resource: "grain", Name: "Bratislava Grain Belt",
-                 Desc: "Rich agricultural flatlands south-east of the city. Major grain-growing estate with 60,000 tonnes of harvestable grain at 55% premium quality.",
-                 Lat: 48.0640, Lon: 17.2100, Quality: 0.55m, Quantity: 60_000m),
-                // Silicon: 5,000kg at 75% quality → 15,000,000 EUR premium
-                // 5000 × 40 EUR × 0.75 × 100 = 15,000,000 EUR ✓ (≥ 15M minimum)
-                (Key: "lot:ba-mine-silicon-1", Resource: "silicon", Name: "Small Carpathian Quartz Vein",
-                 Desc: "High-purity quartz vein in the Small Carpathians. Silicon-bearing deposit estimated at 5,000 kg of semiconductor-grade material at 75% purity.",
-                 Lat: 48.2350, Lon: 17.1480, Quality: 0.75m, Quantity: 5_000m),
-             Desc: "Gold-bearing vein in the Alpine foothills south of Vienna. 3,500 kg of recoverable gold at 80% purity — one of Austria's premium precious metal deposits.",
+    /// <summary>
+    /// Idempotent upgrade: ensures Vienna has mining lots covering all 8 resource types.
+    /// Vienna center: 48.2082, 16.3738. Currency: EUR.
+    /// </summary>
+    private async Task EnsureViennaMiningLotsAsync()
+    {
+        var vienna = await dbContext.Cities.FirstOrDefaultAsync(c => c.Name == "Vienna");
+        if (vienna == null) return;
+
+        var resources = await dbContext.ResourceTypes.ToDictionaryAsync(r => r.Slug);
+
+        var mineLotSeeds = new[]
+        {
+            // Iron Ore: 15,000t at 65% quality -> 24,375,000 EUR
+            (Key: "lot:vi-mine-iron-1", Resource: "iron-ore", Name: "Vienna Basin Iron Ore Site",
+             Desc: "Iron ore deposit in the Vienna basin north-east of the city. 15,000 tonnes at 65% purity, near rail infrastructure.",
+             Lat: 48.2480, Lon: 16.5200, Quality: 0.65m, Quantity: 15_000m),
+            // Coal: 32,000t at 62% quality -> 15,872,000 EUR (32000 x 8 x 0.62 x 100)
+            (Key: "lot:vi-mine-coal-1", Resource: "coal", Name: "Lower Austria Coal Seam",
+             Desc: "Coal seam in the rolling hills west of Vienna. 32,000 tonnes of recoverable coal at 62% grade.",
+             Lat: 48.1650, Lon: 16.1800, Quality: 0.62m, Quantity: 32_000m),
+            // Gold: 3,500kg at 80% quality -> 140,000,000 EUR
+            (Key: "lot:vi-mine-gold-1", Resource: "gold", Name: "Alpine Gold Vein",
+             Desc: "Gold-bearing vein in the Alpine foothills south of Vienna. 3,500 kg of recoverable gold at 80% purity -- one of Austria's premium precious metal deposits.",
              Lat: 48.0850, Lon: 16.2100, Quality: 0.80m, Quantity: 3_500m),
             // Wood: 20,000t at 70% quality → 14,000,000 EUR
             (Key: "lot:vi-mine-wood-1", Resource: "wood", Name: "Vienna Woods Timber Reserve",

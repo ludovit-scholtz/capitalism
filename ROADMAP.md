@@ -39,9 +39,9 @@ It will use real world map. The game will start in single city and later other c
 - [ ] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
 - [ ] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
 
-### Power plants (0% complete)
+### Power plants (100% complete)
 
-- [ ] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
+- [x] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
 
 ### Units (100% complete)
 

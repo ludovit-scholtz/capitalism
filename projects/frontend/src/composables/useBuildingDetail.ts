@@ -400,6 +400,7 @@ export function useBuildingDetail() {
     FACTORY: ['PURCHASE', 'MANUFACTURING', 'BRANDING', 'STORAGE', 'B2B_SALES'],
     SALES_SHOP: ['PURCHASE', 'MARKETING', 'STORAGE', 'PUBLIC_SALES'],
     RESEARCH_DEVELOPMENT: ['PRODUCT_QUALITY', 'BRAND_QUALITY'],
+    POWER_PLANT: ['POWER_GENERATION', 'BATTERY_STORAGE', 'FUEL_PURCHASE', 'WIND_TURBINE', 'WATER_TURBINE', 'ENERGY_STORAGE', 'ENERGY_PRODUCING'],
   }
 
   const unitColors: Record<string, string> = {
@@ -413,6 +414,13 @@ export function useBuildingDetail() {
     PUBLIC_SALES: '#00c853',
     PRODUCT_QUALITY: '#0047ff',
     BRAND_QUALITY: '#9333ea',
+    POWER_GENERATION: '#f59e0b',
+    BATTERY_STORAGE: '#a855f7',
+    FUEL_PURCHASE: '#2563eb',
+    WIND_TURBINE: '#14b8a6',
+    WATER_TURBINE: '#0ea5e9',
+    ENERGY_STORAGE: '#64748b',
+    ENERGY_PRODUCING: '#ef4444',
   }
 
   const activeUnits = computed(() => building.value?.units ?? [])
