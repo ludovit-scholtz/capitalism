@@ -54,6 +54,10 @@ public sealed partial class Mutation
 
         var company = building.Company;
         var cityCurrencyCode = building.City?.CurrencyCode ?? "EUR";
+        var currentTick = await db.GameStates
+            .AsNoTracking()
+            .Select(gs => gs.CurrentTick)
+            .FirstOrDefaultDeterministicAsync();
 
         var bankAccount = building.BankAccount
             ?? await BuildingBankAccountProvisioning.EnsureBuildingAssignedAccountAsync(
@@ -81,6 +85,33 @@ public sealed partial class Mutation
         {
             sourceAccount.Balance -= input.Amount;
             bankAccount.Balance += input.Amount;
+
+            var nowUtc = DateTime.UtcNow;
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                BuildingId = building.Id,
+                BankAccountId = sourceAccount.Id,
+                Category = LedgerCategory.BankAccountTransferOut,
+                Description = $"Funding transfer to building account {bankAccount.AccountNumber} ({building.Name})",
+                Amount = -input.Amount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+            });
+
+            db.LedgerEntries.Add(new LedgerEntry
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = company.Id,
+                BuildingId = building.Id,
+                BankAccountId = bankAccount.Id,
+                Category = LedgerCategory.BankAccountTransferIn,
+                Description = $"Funding transfer from company account {sourceAccount.AccountNumber} to {building.Name}",
+                Amount = input.Amount,
+                RecordedAtTick = currentTick,
+                RecordedAtUtc = nowUtc,
+            });
         }
 
         // Clear any suspension that was due to insufficient funds.

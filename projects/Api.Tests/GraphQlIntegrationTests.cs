@@ -34733,6 +34733,80 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(3, rows[1].GetProperty("recordedAtTick").GetInt64());
     }
 
+    [Fact]
+    public async Task BankStatement_WithAccountFilter_UsesAuthoritativeAccountBalanceForCurrentAndRunning()
+    {
+        await using var isolated = new ApiWebApplicationFactory();
+        var client = isolated.CreateClient();
+        var token = await RegisterAndGetTokenAsync(client, "bs-account-anchor@example.com");
+
+        var playerId = await GetCurrentPlayerIdAsync(isolated, token);
+
+        await using var scope = isolated.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = playerId,
+            Name = "Account Anchor Co",
+            Cash = 0m,
+            FoundedAtUtc = DateTime.UtcNow,
+            FoundedAtTick = 1,
+        };
+        db.Companies.Add(company);
+
+        var account = new BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            Balance = 5_000m,
+            CompanyId = company.Id,
+            CreatedAtUtc = DateTime.UtcNow,
+            IsGovernmentAccount = false,
+        };
+        db.BankAccounts.Add(account);
+
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = account.Id,
+            Category = LedgerCategory.BankAccountTransferOut,
+            Description = "Manual adjustment for statement anchor test",
+            Amount = -1_200m,
+            RecordedAtTick = 1,
+            RecordedAtUtc = DateTime.UtcNow.AddMinutes(-1),
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            client,
+            """
+            query BankStatementWithAccount($companyId: UUID!, $accountId: UUID!) {
+              bankStatement(companyId: $companyId, accountId: $accountId, limit: 50) {
+                currentBalance
+                rows {
+                  amount
+                  runningBalance
+                }
+              }
+            }
+            """,
+            new { companyId = company.Id, accountId = account.Id },
+            token);
+
+        var stmt = result.GetProperty("data").GetProperty("bankStatement");
+        Assert.Equal(5_000m, stmt.GetProperty("currentBalance").GetDecimal());
+
+        var rows = stmt.GetProperty("rows");
+        Assert.Equal(1, rows.GetArrayLength());
+        Assert.Equal(-1_200m, rows[0].GetProperty("amount").GetDecimal());
+        Assert.Equal(5_000m, rows[0].GetProperty("runningBalance").GetDecimal());
+    }
+
     // Helper: gets current player ID using an isolated factory and token
     private static async Task<Guid> GetCurrentPlayerIdAsync(ApiWebApplicationFactory factory, string token)
     {

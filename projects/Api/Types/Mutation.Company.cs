@@ -48,6 +48,17 @@ public sealed partial class Mutation
             "EUR",
             httpContextAccessor.HttpContext!.RequestAborted);
         fundingAccount.Balance += 1_000_000m;
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = company.Id,
+            BankAccountId = fundingAccount.Id,
+            Category = LedgerCategory.FounderContribution,
+            Description = "Initial founder company funding",
+            Amount = 1_000_000m,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
         db.Shareholdings.Add(new Shareholding
         {
             Id = Guid.NewGuid(),

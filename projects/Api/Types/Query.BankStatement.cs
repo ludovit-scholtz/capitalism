@@ -42,17 +42,18 @@ public sealed partial class Query
         var pageOffset = Math.Max(offset ?? 0, 0);
 
         string? filterCurrencyCode = null;
+        BankAccount? selectedAccount = null;
         if (accountId.HasValue)
         {
-            var acct = await db.BankAccounts
+            selectedAccount = await db.BankAccounts
                 .AsNoTracking()
                 .FirstOrDefaultAsync(a => a.Id == accountId.Value && a.CompanyId == companyId);
-            if (acct is null)
+            if (selectedAccount is null)
             {
                 throw new GraphQLException(new Error("Selected bank account not found for this company.", "ACCOUNT_NOT_FOUND"));
             }
 
-            filterCurrencyCode = acct.CurrencyCode;
+            filterCurrencyCode = selectedAccount.CurrencyCode;
         }
 
         // Load entries for the company or for one specific bank account.
@@ -72,8 +73,19 @@ public sealed partial class Query
             .ThenBy(e => e.RecordedAtUtc)
             .ToListAsync();
 
-        // Compute running balance for each entry (cumulative sum in chronological order).
-        decimal runningBalance = 0m;
+        // Use authoritative account balances instead of ledger-only sums to avoid drift.
+        // For account view: selected account balance.
+        // For company view: sum of active company bank accounts.
+        var currentBalance = selectedAccount is not null
+            ? selectedAccount.Balance
+            : (await db.BankAccounts
+                .AsNoTracking()
+                .Where(a => a.CompanyId == companyId && a.ClosedAtUtc == null)
+                .SumAsync(a => (decimal?)a.Balance) ?? 0m);
+
+        // Compute running balances in chronological order, anchored to current balance.
+        var openingBalance = currentBalance - allEntries.Sum(e => e.Amount);
+        decimal runningBalance = openingBalance;
         var balanceMap = new Dictionary<Guid, decimal>(allEntries.Count);
         foreach (var entry in allEntries)
         {
@@ -108,8 +120,6 @@ public sealed partial class Query
                 .Select(b => b.City?.CurrencyCode)
                 .FirstOrDefault(c => !string.IsNullOrEmpty(c))
             ?? "EUR";
-
-        var currentBalance = allEntries.Sum(e => e.Amount);
 
         return new BankStatementResult
         {

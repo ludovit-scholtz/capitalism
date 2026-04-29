@@ -29,10 +29,10 @@ It will use real world map. The game will start in single city and later other c
 - [x] Remove from the new building flow the city selection. City must be selected with the context switching.
 - [x] In the city map remove the cities switcher. Use the navbar context switcher to switch between the cities.
 
-### Currencies and bank accounts (0% complete)
+### Currencies and bank accounts (100% complete)
 
-- [ ] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
-- [ ] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
+- [x] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
+- [x] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
 
 ### Number formatting (100% complete)
 

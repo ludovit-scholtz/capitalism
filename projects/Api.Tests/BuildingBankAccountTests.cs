@@ -291,6 +291,26 @@ public sealed class BuildingBankAccountTests
 
         // Total company liquidity is unchanged by internal account-to-account transfer.
         Assert.Equal(500_000m, fund.GetProperty("remainingCompanyCash").GetDecimal());
+
+        await using var verifyScope = factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var transferOut = await verifyDb.LedgerEntries
+            .AsNoTracking()
+            .SingleAsync(entry =>
+                entry.CompanyId == company.Id
+                && entry.Category == LedgerCategory.BankAccountTransferOut
+                && entry.BankAccountId == fundingAccount.Id);
+
+        var transferIn = await verifyDb.LedgerEntries
+            .AsNoTracking()
+            .SingleAsync(entry =>
+                entry.CompanyId == company.Id
+                && entry.Category == LedgerCategory.BankAccountTransferIn
+                && entry.BankAccountId == buildingAccount.Id);
+
+        Assert.Equal(-10_000m, transferOut.Amount);
+        Assert.Equal(10_000m, transferIn.Amount);
     }
 
     [Fact]
