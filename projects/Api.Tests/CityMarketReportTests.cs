@@ -3,10 +3,12 @@ using System.Text.Json;
 using Api.Data;
 using Api.Data.Entities;
 using Api.Engine;
+using Api.Engine.Phases;
 using Api.Tests.Infrastructure;
 using Api.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Api.Tests;
 
@@ -489,5 +491,295 @@ public sealed class CityMarketReportTests
             Assert.Equal(bratiCity.Id.ToString(), item.GetProperty("cityId").GetString());
             Assert.Equal("WEEKLY", item.GetProperty("reportType").GetString());
         }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // MarketReportPhase tick-boundary tests
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task MarketReportPhase_AtWeeklyBoundary_GeneratesReport()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Seed sales data covering the last week's window.
+        var tickBoundary = GameConstants.TicksPerWeek; // 168
+        await SeedSalesDataAsync(db, "Bratislava", 50m, 10, tickOffset: tickBoundary - 11L);
+
+        var gs = await db.GameStates.FirstDeterministicAsync();
+        gs.CurrentTick = tickBoundary; // put us exactly on a weekly boundary
+        await db.SaveChangesAsync();
+
+        var phase = new MarketReportPhase(
+            NullLogger<MarketReportPhase>.Instance);
+
+        var context = new TickContext
+        {
+            Db = db,
+            GameState = gs,
+        };
+
+        await phase.ProcessAsync(context);
+        await db.SaveChangesAsync();
+
+        var reports = await db.CityMarketReports
+            .Where(r => r.ReportType == MarketReportType.Weekly && r.TickTo == tickBoundary)
+            .ToListAsync();
+
+        Assert.True(reports.Count > 0, "Expected at least one weekly report at the weekly boundary.");
+    }
+
+    [Fact]
+    public async Task MarketReportPhase_NotAtBoundary_DoesNotGenerateReport()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await SeedSalesDataAsync(db, "Bratislava", 50m, 5, tickOffset: 200_000L);
+
+        var gs = await db.GameStates.FirstDeterministicAsync();
+        // Tick 200_005 is not on a weekly (168) or monthly (720) boundary.
+        var nonBoundaryTick = 200_005L;
+        gs.CurrentTick = nonBoundaryTick;
+        await db.SaveChangesAsync();
+
+        var phase = new MarketReportPhase(
+            NullLogger<MarketReportPhase>.Instance);
+
+        var context = new TickContext { Db = db, GameState = gs };
+
+        await phase.ProcessAsync(context);
+        await db.SaveChangesAsync();
+
+        var reports = await db.CityMarketReports
+            .Where(r => r.TickTo == nonBoundaryTick)
+            .ToListAsync();
+
+        Assert.Empty(reports);
+    }
+
+    [Fact]
+    public async Task MarketReportPhase_AtMonthlyBoundary_GeneratesMonthlyReport()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tickBoundary = GameConstants.TicksPerMonth; // 720
+        await SeedSalesDataAsync(db, "Bratislava", 55m, 10, tickOffset: tickBoundary - 11L);
+
+        var gs = await db.GameStates.FirstDeterministicAsync();
+        gs.CurrentTick = tickBoundary;
+        await db.SaveChangesAsync();
+
+        var phase = new MarketReportPhase(
+            NullLogger<MarketReportPhase>.Instance);
+
+        var context = new TickContext { Db = db, GameState = gs };
+
+        await phase.ProcessAsync(context);
+        await db.SaveChangesAsync();
+
+        // Tick 720 is also tick 0 mod 168*4.28... so a monthly boundary.
+        // Both weekly AND monthly reports should be generated.
+        var monthlyReports = await db.CityMarketReports
+            .Where(r => r.ReportType == MarketReportType.Monthly && r.TickTo == tickBoundary)
+            .ToListAsync();
+
+        Assert.True(monthlyReports.Count > 0, "Expected a monthly report at the monthly boundary.");
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Multi-city and profitability model tests
+    // ──────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GenerateReports_MultipleActiveCities_CreatesOneReportPerCity()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Seed sales data for Bratislava AND Prague in the same window.
+        var tickOffset = 300_000L;
+        await SeedSalesDataAsync(db, "Bratislava", 50m, 5, tickOffset);
+        await SeedSalesDataAsync(db, "Prague", 80m, 5, tickOffset);
+
+        var reports = await CityMarketReportService.GenerateReportsAsync(
+            db, MarketReportType.Weekly, tickFrom: tickOffset + 1, tickTo: tickOffset + 5);
+
+        var cityNames = reports.Select(r =>
+        {
+            var data = CityMarketReportService.DeserializeData(r);
+            return data?.CityName ?? string.Empty;
+        }).ToHashSet();
+
+        Assert.Contains("Bratislava", cityNames);
+        Assert.Contains("Prague", cityNames);
+    }
+
+    [Fact]
+    public async Task GenerateReports_GrossMargin_HighMarkupProduct_ShowsPositiveMargin()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Get a product with a known basePrice.
+        var product = await db.ProductTypes.FirstAsync(p => p.BasePrice > 0m);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var player = new Player
+        {
+            Id = Guid.NewGuid(),
+            Email = $"margin-test-{Guid.NewGuid():N}@test.com",
+            DisplayName = "Margin Tester",
+            PasswordHash = "hash",
+            Role = PlayerRole.Player
+        };
+        db.Players.Add(player);
+
+        var company = new Company
+        {
+            Id = Guid.NewGuid(),
+            PlayerId = player.Id,
+            Name = $"Margin Corp {Guid.NewGuid():N}",
+            Cash = 0m
+        };
+        db.Companies.Add(company);
+
+        var building = new Building
+        {
+            Id = Guid.NewGuid(),
+            CityId = city.Id,
+            CompanyId = company.Id,
+            Type = BuildingType.SalesShop,
+            Latitude = 48.3,
+            Longitude = 17.3,
+            Name = "Margin Shop",
+            PowerStatus = PowerStatus.Powered,
+        };
+        db.Buildings.Add(building);
+
+        var unit = new BuildingUnit
+        {
+            Id = Guid.NewGuid(),
+            BuildingId = building.Id,
+            UnitType = UnitType.PublicSales,
+            GridX = 0,
+            GridY = 0,
+            Level = 1,
+        };
+        db.BuildingUnits.Add(unit);
+
+        // Sell at 10× base price → gross margin ≈ 90 %.
+        var highPrice = product.BasePrice * 10m;
+        var qty = 100m;
+        var testTick = 400_000L;
+
+        db.PublicSalesRecords.Add(new PublicSalesRecord
+        {
+            Id = Guid.NewGuid(),
+            BuildingUnitId = unit.Id,
+            BuildingId = building.Id,
+            CompanyId = company.Id,
+            CityId = city.Id,
+            ProductTypeId = product.Id,
+            Tick = testTick,
+            QuantitySold = qty,
+            PricePerUnit = highPrice,
+            Revenue = qty * highPrice,
+            Demand = 150m,
+            SalesCapacity = 150m,
+            TrendFactor = 1m,
+        });
+
+        await db.SaveChangesAsync();
+
+        var reports = await CityMarketReportService.GenerateReportsAsync(
+            db, MarketReportType.Weekly, tickFrom: testTick, tickTo: testTick);
+
+        var cityReport = reports.FirstOrDefault(r => r.CityId == city.Id);
+        Assert.NotNull(cityReport);
+
+        var data = CityMarketReportService.DeserializeData(cityReport);
+        Assert.NotNull(data);
+
+        var stat = data.TopProducts.FirstOrDefault(p => p.ProductTypeId == product.Id);
+        Assert.NotNull(stat);
+
+        // At 10× base price, gross margin should be 90% (revenue - cost = 9/10 of revenue).
+        Assert.True(stat.GrossMarginPct > 80m, $"Expected gross margin > 80% at 10× base price, got {stat.GrossMarginPct}%");
+        Assert.True(stat.GrossMarginPct <= 100m, "Gross margin cannot exceed 100%");
+    }
+
+    [Fact]
+    public async Task GenerateReports_HtmlContent_ContainsProductRankingTable()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        await SeedSalesDataAsync(db, "Bratislava", 50m, 3, tickOffset: 500_000L);
+
+        var reports = await CityMarketReportService.GenerateReportsAsync(
+            db, MarketReportType.Monthly, tickFrom: 500_001, tickTo: 500_003);
+
+        var cityReport = reports.FirstOrDefault(r =>
+        {
+            var data = CityMarketReportService.DeserializeData(r);
+            return data?.CityName == "Bratislava";
+        });
+        Assert.NotNull(cityReport);
+
+        var localizations = CityMarketReportService.BuildLocalizations(cityReport);
+        Assert.Equal(3, localizations.Count);
+
+        foreach (var (locale, _, _, html) in localizations)
+        {
+            Assert.Contains("mr-table", html, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("mr-summary", html, StringComparison.OrdinalIgnoreCase);
+            // Ensure no raw HTML-unsafe characters in product names.
+            Assert.DoesNotContain("<script", html, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task GenerateReports_CurrencyCode_MatchesCityInHtml()
+    {
+        await using var factory = new ApiWebApplicationFactory();
+        _ = factory.CreateClient();
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        // Prague uses CZK.
+        await SeedSalesDataAsync(db, "Prague", 80m, 3, tickOffset: 600_000L);
+
+        var reports = await CityMarketReportService.GenerateReportsAsync(
+            db, MarketReportType.Weekly, tickFrom: 600_001, tickTo: 600_003);
+
+        var pragueReport = reports.FirstOrDefault(r =>
+        {
+            var data = CityMarketReportService.DeserializeData(r);
+            return data?.CityName == "Prague";
+        });
+        Assert.NotNull(pragueReport);
+
+        var data = CityMarketReportService.DeserializeData(pragueReport);
+        Assert.NotNull(data);
+        Assert.Equal("CZK", data.CurrencyCode);
+
+        var localizations = CityMarketReportService.BuildLocalizations(pragueReport);
+        var enLocalization = localizations.First(l => l.Locale == "en");
+        Assert.Contains("CZK", enLocalization.HtmlContent);
     }
 }

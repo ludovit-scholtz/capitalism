@@ -774,14 +774,14 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 100,
+                        limit = 500,
                     }
                 });
 
             Assert.False(result.TryGetProperty("errors", out _));
             var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
 
-            // The CSV has 39 rows; after import the feed should contain substantially more than the 4 hardcoded seeds.
+            // CHANGELOG.csv grows over time; use limit=500 above to ensure all rows are returned.
             var changelogItems = items.Where(item =>
                 item.GetProperty("entryType").GetString() == "CHANGELOG"
                 && item.GetProperty("status").GetString() == "PUBLISHED").ToList();
@@ -794,7 +794,7 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                     && (l.GetProperty("title").GetString() ?? string.Empty)
                            .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
 
-            Assert.NotNull(bankCap);
+            Assert.True(bankCap.ValueKind != System.Text.Json.JsonValueKind.Undefined, "Expected Bank capitalization entry in feed but not found.");
             var bankCapLocales = bankCap.GetProperty("localizations").EnumerateArray()
                 .Select(l => l.GetProperty("locale").GetString())
                 .ToHashSet();
