@@ -658,7 +658,9 @@ test.describe('Global Exchange — transit-reranking proof', () => {
 
 test.describe('Global Exchange — sourcing decision legibility', () => {
   test('all four key metrics are present for every city offer card (resource, city, quality, delivered)', async ({ page }) => {
-    setupMockApi(page)
+    const cities = makeDefaultCities()
+    const resources = makeDefaultResources()
+    setupMockApi(page, { cities, resourceTypes: resources })
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
 
