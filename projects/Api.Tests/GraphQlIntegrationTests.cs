@@ -2972,13 +2972,20 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     {
         // Company rankings must expose currencyCode and totalWealthUsd so the leaderboard
         // can render correct local currency labels and USD-normalised sort order.
-        var token = await RegisterAndGetTokenAsync("co-rankings-test@test.com", "Company Rankings Tester");
+        // Uses an isolated factory to avoid contamination from banking/loan tests in the
+        // shared factory that may leave companies with negative bank-account balances.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(isolatedClient, "co-rankings-test@test.com", "Company Rankings Tester");
         await ExecuteGraphQlAsync(
+            isolatedClient,
             "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
             new { input = new { name = "Rankings Co" } },
             token);
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             "{ companyRankings { companyName currencyCode totalWealthUsd } }",
             null,
             null);

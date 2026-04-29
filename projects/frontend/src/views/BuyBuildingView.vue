@@ -689,12 +689,7 @@ async function buyBuilding() {
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
               <span v-if="selectedPropertyAreaSqm != null" class="text-[0.8125rem] text-muted">{{ t('buildings.propertySize') }}: {{ formatSqm(selectedPropertyAreaSqm) }}</span>
-              <span
-                v-if="lot.resourceType"
-                class="buy-building-resource-badge self-start"
-                data-testid="buy-building-resource-badge"
-                :title="t('cityMap.resourcePremiumTooltip')"
-              >
+              <span v-if="lot.resourceType" class="buy-building-resource-badge self-start" data-testid="buy-building-resource-badge" :title="t('cityMap.resourcePremiumTooltip')">
                 ⛏ {{ lot.resourceType.name }}
               </span>
             </button>
@@ -710,21 +705,17 @@ async function buyBuilding() {
               <span>{{ districtLabel(selectedLot.district) }}</span>
               <span
                 >{{ t('buildings.askingPrice') }}: <strong class="text-body">{{ formatCurrency(selectedLot.price) }}</strong>
-                <span
-                  v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice"
-                  class="buy-building-resource-premium-badge ml-1"
-                  :title="t('cityMap.resourcePremiumTooltip')"
-                >{{ t('cityMap.resourcePremium') }}</span>
+                <span v-if="selectedLot.resourceType && selectedLot.price > selectedLot.basePrice" class="buy-building-resource-premium-badge ml-1" :title="t('cityMap.resourcePremiumTooltip')">{{
+                  t('cityMap.resourcePremium')
+                }}</span>
               </span>
               <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
-              <span v-if="selectedPropertyAreaSqm != null">{{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong></span>
+              <span v-if="selectedPropertyAreaSqm != null"
+                >{{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong></span
+              >
             </div>
             <!-- Mining deposit investment summary (shown when MINE selected and lot has resource) -->
-            <div
-              v-if="selectedType === 'MINE' && selectedLot.resourceType"
-              class="buy-building-mining-summary"
-              data-testid="buy-building-mining-summary"
-            >
+            <div v-if="selectedType === 'MINE' && selectedLot.resourceType" class="buy-building-mining-summary" data-testid="buy-building-mining-summary">
               <h4 class="buy-building-mining-summary-title">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
               <div class="buy-building-mining-summary-grid">
                 <div class="buy-building-mining-summary-item">

@@ -5,7 +5,6 @@ import { BUILDING_DETAIL_KEY } from '@/composables/useBuildingDetail'
 import type { EditableGridUnit } from '@/composables/useBuildingDetail'
 import type { ExchangeSortBy } from '@/lib/globalExchange'
 import AdvancedItemSelector from '@/components/buildings/AdvancedItemSelector.vue'
-import BuildingBankAccountPanel from '@/components/buildings/BuildingBankAccountPanel.vue'
 import ProductPicker from '@/components/buildings/ProductPicker.vue'
 import UnitResourceHistoryPanel from '@/components/buildings/UnitResourceHistoryPanel.vue'
 
@@ -85,7 +84,6 @@ const {
   getUnitInventoryCostLabel,
   getUnitConstructionCost,
   getLocalizedIndustry,
-  loadBuilding,
   submitUnitUpgrade,
   SUPPORTED_INDUSTRIES,
 } = bd
@@ -166,11 +164,6 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
           <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
-        </div>
-
-        <div class="unit-insight-card">
-          <h5>{{ t('buildingBankAccount.assignmentTitle') }}</h5>
-          <BuildingBankAccountPanel :building-id="building?.id ?? ''" :company-id="building?.companyId ?? ''" :currency-code="cityCurrencyCode" :loading="false" @updated="loadBuilding" />
         </div>
 
         <!-- Unit-specific configuration -->
@@ -389,11 +382,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 <span class="pricing-guide-label">{{ t('buildingDetail.config.cityAveragePriceLabel') }}</span>
                 <span class="pricing-guide-value">{{ formatCurrency(publicSalesCityAveragePrice) }} {{ cityCurrencyCode }}</span>
               </div>
-              <div
-                v-if="publicSalesPriceTier != null"
-                class="pricing-tier-badge"
-                :class="`pricing-tier-badge--${publicSalesPriceTier}`"
-              >
+              <div v-if="publicSalesPriceTier != null" class="pricing-tier-badge" :class="`pricing-tier-badge--${publicSalesPriceTier}`">
                 {{ t(`buildingDetail.config.priceTier.${publicSalesPriceTier}`) }}
               </div>
               <p class="pricing-guide-hint">

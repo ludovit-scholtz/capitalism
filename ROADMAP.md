@@ -43,11 +43,11 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
 
-### Units (0% complete)
+### Units (100% complete)
 
-- [ ] Do not show bank account change if unit is selected in a grid while editing the building
-- [ ] When new unit is selected in the grid, automatically select that unit. So if i create new purchase unit in position 1,1 i do not want the user to click on that unit again to configure it.
-- [ ] Fix css styles after tailwind migration. Make sure the design is professional.
+- [x] Do not show bank account change if unit is selected in a grid while editing the building
+- [x] When new unit is selected in the grid, automatically select that unit. So if i create new purchase unit in position 1,1 i do not want the user to click on that unit again to configure it.
+- [x] Fix css styles after tailwind migration. Make sure the design is professional.
 
 ### Audits (0% complete)
 
