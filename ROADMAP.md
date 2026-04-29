@@ -173,7 +173,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
-### R&D Building (65% complete)
+### R&D Building (80% complete)
 
 **Shipped in this increment:**
 - ✅ Fixed CATEGORY scope validation bug: BRAND_QUALITY units with CATEGORY scope can now be configured using a direct `industryCategory` field (e.g. "FURNITURE") without requiring a `productTypeId`. The old validation incorrectly required a product type for both CATEGORY and PRODUCT scopes.
@@ -181,9 +181,10 @@ It will use real world map. The game will start in single city and later other c
 - ✅ R&D operating costs raised to be materially impactful: PRODUCT_QUALITY and BRAND_QUALITY labor hours increased from 0.55 → 2.0 and energy from 0.09 → 0.22, making R&D roughly 3× more expensive than a marketing unit in the same city.
 - ✅ Ledger entries for R&D units now use clear labels: "R&D Salary: Product Quality Research" and "R&D Salary: Brand Quality Research" so players can directly connect research investment with financial consequences in the ledger.
 - ✅ 5 new backend tests covering: category scope validation via GraphQL, R&D cost exceeding marketing cost by ≥3×, R&D ledger label correctness, and combined brand (product+category) contributing more public sales than product-only brand.
+- ✅ **R&D product selector strategic UX upgrade:** Products the company actively manufactures (MANUFACTURING units) are now surfaced at the top with a dedicated green "Currently Producing" section header and "Producing" badge (score 80). Products only sold or stocked appear below in an "Active in your portfolio" section (score 50). Each R&D picker item shows a contextual detail: "Your company has a factory actively making this product" or "Your company sells or stocks this product." A hint guides players who have not yet started any manufacturing. The backend `rankedProductTypes` query now emits a distinct `manufacturing` reason (score 80) separate from `used_by_company` (score 50), and the mock API and frontend types are fully aligned. 4 new backend tests, 3 new E2E tests, and all locale files (en/sk/de) updated.
 
 **Remaining:**
-- [ ] When selecting the product, make sure to show at the top the products the company is currently producing.
+- [ ] When backend is restarted it must store all news from the changelog csv to the game server database.
 
 ### Appartment and commercial buildings (90% complete)
 

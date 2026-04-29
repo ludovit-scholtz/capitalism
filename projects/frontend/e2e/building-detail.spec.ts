@@ -2226,6 +2226,227 @@ test.describe('Building detail upgrades', () => {
     await expect(firstHeader).toContainText('Currently Producing')
   })
 
+  test('R&D product picker shows "Active in your portfolio" section for sales-only products', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-rd-portfolio',
+      playerId: player.id,
+      name: 'Portfolio Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-shop-portfolio',
+          companyId: 'company-rd-portfolio',
+          cityId: 'city-ba',
+          type: 'SALES_SHOP',
+          name: 'Portfolio Shop',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 1,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'portfolio-sales',
+              buildingId: 'building-shop-portfolio',
+              unitType: 'PUBLIC_SALES',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              productTypeId: 'prod-chair',
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+        {
+          id: 'building-rd-portfolio',
+          companyId: 'company-rd-portfolio',
+          cityId: 'city-ba',
+          type: 'RESEARCH_DEVELOPMENT',
+          name: 'Portfolio Lab',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'portfolio-rd-unit',
+              buildingId: 'building-rd-portfolio',
+              unitType: 'PRODUCT_QUALITY',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-rd-portfolio')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+    await expect(page.getByText('Research Product')).toBeVisible()
+
+    const researchProductField = page.locator('.config-field').filter({ has: page.getByText('Research Product') })
+    await researchProductField.locator('.picker-trigger').click()
+
+    // "Currently Producing" section should NOT be visible (no manufacturing units)
+    await expect(
+      page.locator('.product-picker-panel .picker-section-header', { hasText: 'Currently Producing' }),
+    ).toBeHidden()
+
+    // "Active in your portfolio" section SHOULD be visible (product in PUBLIC_SALES)
+    await expect(
+      page.locator('.product-picker-panel .picker-section-header', { hasText: 'Active in your portfolio' }),
+    ).toBeVisible()
+
+    // Wooden Chair should have "In portfolio" badge
+    const woodenChairItem = page.locator('.product-picker-panel .picker-item').filter({
+      has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }),
+    })
+    await expect(woodenChairItem).toBeVisible()
+    await expect(woodenChairItem.locator('.picker-item-badge')).toContainText('In portfolio')
+  })
+
+  test('R&D product picker manufacturing items show context detail about factory production', async ({ page }) => {
+    const player = makePlayer()
+    player.companies.push({
+      id: 'company-rd-ctx',
+      playerId: player.id,
+      name: 'Context Co',
+      cash: 500000,
+      foundedAtUtc: '2026-01-01T00:00:00Z',
+      buildings: [
+        {
+          id: 'building-factory-ctx',
+          companyId: 'company-rd-ctx',
+          cityId: 'city-ba',
+          type: 'FACTORY',
+          name: 'Context Factory',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'ctx-mfg',
+              buildingId: 'building-factory-ctx',
+              unitType: 'MANUFACTURING',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              productTypeId: 'prod-chair',
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+        {
+          id: 'building-rd-ctx',
+          companyId: 'company-rd-ctx',
+          cityId: 'city-ba',
+          type: 'RESEARCH_DEVELOPMENT',
+          name: 'Context Lab',
+          latitude: 48.15,
+          longitude: 17.11,
+          level: 1,
+          powerConsumption: 2,
+          isForSale: false,
+          builtAtUtc: '2026-01-01T00:00:00Z',
+          pendingConfiguration: null,
+          units: [
+            {
+              id: 'ctx-rd-unit',
+              buildingId: 'building-rd-ctx',
+              unitType: 'PRODUCT_QUALITY',
+              gridX: 0,
+              gridY: 0,
+              level: 1,
+              linkUp: false,
+              linkDown: false,
+              linkLeft: false,
+              linkRight: false,
+              linkUpLeft: false,
+              linkUpRight: false,
+              linkDownLeft: false,
+              linkDownRight: false,
+            },
+          ],
+        },
+      ],
+    })
+
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+    await page.addInitScript((token) => {
+      localStorage.setItem('auth_token', token)
+      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+    }, `token-${player.id}`)
+
+    await page.goto('/building/building-rd-ctx')
+    await page.getByRole('button', { name: 'Edit Building' }).click()
+
+    const plannedSection = getGridSection(page, 'Planned Upgrade')
+    await getGridCell(plannedSection, 0, 0).click()
+    await expect(page.getByText('Research Product')).toBeVisible()
+
+    const researchProductField = page.locator('.config-field').filter({ has: page.getByText('Research Product') })
+    await researchProductField.locator('.picker-trigger').click()
+
+    // Manufacturing context detail should be visible on the Wooden Chair item
+    const woodenChairItem = page.locator('.product-picker-panel .picker-item').filter({
+      has: page.locator('.picker-item-name', { hasText: 'Wooden Chair' }),
+    })
+    await expect(woodenChairItem).toBeVisible()
+    await expect(woodenChairItem.locator('.picker-item-context')).toContainText('factory')
+
+    // Catalog section should be present with remaining products
+    await expect(
+      page.locator('.product-picker-panel .picker-section-header', { hasText: 'All products' }),
+    ).toBeVisible()
+  })
+
   test('factory purchase selector shows raw materials and only intermediate products', async ({ page }) => {
     const player = makePlayer()
     player.companies.push({

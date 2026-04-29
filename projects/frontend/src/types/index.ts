@@ -497,7 +497,7 @@ export type ProductAvailabilityReason = 'connected_upstream' | 'current_stock' |
 
 export interface RankedProductResult {
   productType: ProductType
-  rankingReason: 'connected' | 'used_by_company' | 'catalog'
+  rankingReason: 'connected' | 'manufacturing' | 'used_by_company' | 'catalog'
   rankingScore: number
   availabilityReason?: ProductAvailabilityReason
 }

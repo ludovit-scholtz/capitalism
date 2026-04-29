@@ -4379,25 +4379,64 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           .filter((item) => item.productTypeId)
           .forEach((item) => connectedProductIds.add(item.productTypeId!))
       } else if (unitType === 'PRODUCT_QUALITY' || unitType === 'BRAND_QUALITY') {
-        // Promote products used across all company buildings: manufactured, sold, or stocked
+        // Separate manufacturing products (score 80) from sales/inventory products (score 50).
+        // Products actively manufactured are the highest R&D priority.
         const activePlayer = state.players.find((p) => p.id === state.currentUserId)
         const allCompanyBuildings = (activePlayer?.companies ?? []).flatMap((c) => c.buildings)
+        const manufacturingIds = new Set<string>()
         allCompanyBuildings.forEach((b) => {
           const allUnits = [...(b.units ?? []), ...(b.pendingConfiguration?.units ?? [])]
           allUnits
-            .filter((u) => (u.unitType === 'MANUFACTURING' || u.unitType === 'PUBLIC_SALES' || u.unitType === 'B2B_SALES') && u.productTypeId)
+            .filter((u) => u.unitType === 'MANUFACTURING' && u.productTypeId)
+            .forEach((u) => manufacturingIds.add(u.productTypeId!))
+        })
+        allCompanyBuildings.forEach((b) => {
+          const allUnits = [...(b.units ?? []), ...(b.pendingConfiguration?.units ?? [])]
+          // Sales/inventory: only add if NOT already in manufacturing
+          allUnits
+            .filter((u) => (u.unitType === 'PUBLIC_SALES' || u.unitType === 'B2B_SALES') && u.productTypeId && !manufacturingIds.has(u.productTypeId!))
             .forEach((u) => usedByCompanyIds.add(u.productTypeId!))
-          // Also inventory products
           allUnits
             .filter((u) => u.inventoryItems && u.inventoryItems.length > 0)
             .flatMap((u) => u.inventoryItems ?? [])
-            .filter((item) => item.productTypeId)
+            .filter((item) => item.productTypeId && !manufacturingIds.has(item.productTypeId!))
             .forEach((item) => usedByCompanyIds.add(item.productTypeId!))
+        })
+
+        // Sort: connected first (score 100), manufacturing second (score 80), used_by_company third (score 50), catalog (score 10)
+        const enriched = state.productTypes.map((product) => {
+          const isConnected = connectedProductIds.has(product.id)
+          const isManufacturing = !isConnected && manufacturingIds.has(product.id)
+          const isUsedByCompany = !isConnected && !isManufacturing && usedByCompanyIds.has(product.id)
+          return {
+            rankingReason: isConnected
+              ? 'connected'
+              : isManufacturing
+                ? 'manufacturing'
+                : isUsedByCompany
+                  ? 'used_by_company'
+                  : 'catalog',
+            rankingScore: isConnected ? 100 : isManufacturing ? 80 : isUsedByCompany ? 50 : 10,
+            productType: {
+              ...product,
+              isUnlockedForCurrentPlayer: product.isProOnly ? hasActiveProSubscription : true,
+            },
+          }
+        })
+        enriched.sort((a, b) => {
+          if (b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore
+          return a.productType.name.localeCompare(b.productType.name)
+        })
+
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ data: { rankedProductTypes: enriched } }),
         })
       }
 
-      // Sort: connected first (score 100), used_by_company second (score 50), catalog (score 10)
-      const enriched = state.productTypes.map((product) => {
+      // General case: connected + catalog ranking for PUBLIC_SALES, B2B_SALES, STORAGE, etc.
+      const enrichedGeneral = state.productTypes.map((product) => {
         const isConnected = connectedProductIds.has(product.id)
         const isUsedByCompany = !isConnected && usedByCompanyIds.has(product.id)
         return {
@@ -4409,7 +4448,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           },
         }
       })
-      enriched.sort((a, b) => {
+      enrichedGeneral.sort((a, b) => {
         if (b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore
         return a.productType.name.localeCompare(b.productType.name)
       })
@@ -4417,7 +4456,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ data: { rankedProductTypes: enriched } }),
+        body: JSON.stringify({ data: { rankedProductTypes: enrichedGeneral } }),
       })
     }
 

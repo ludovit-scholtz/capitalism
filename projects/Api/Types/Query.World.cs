@@ -317,8 +317,11 @@ public sealed partial class Query
         }
         else if (normalizedUnitType is "PRODUCT_QUALITY" or "BRAND_QUALITY")
         {
-            // Promote products actively used by this player's companies across all buildings:
-            // manufactured, sold (public or B2B), or currently stocked in inventory.
+            // Promote products actively used by this player's companies across all buildings.
+            // Manufacturing products receive the highest R&D priority (score 80) because
+            // product-quality and brand-quality research has the most direct impact on
+            // products the company already makes. Products only sold or stocked receive
+            // secondary priority (score 50) so the player can still find and research them.
             var companyIds = await db.Companies
                 .Where(c => c.PlayerId == userId)
                 .Select(c => c.Id)
@@ -329,22 +332,46 @@ public sealed partial class Query
                 .Select(b => b.Id)
                 .ToListAsync();
 
-            // Products in active MANUFACTURING, PUBLIC_SALES, or B2B_SALES units.
-            var unitProductIds = await db.BuildingUnits
+            // Products actively being MANUFACTURED (highest R&D priority).
+            var manufacturingProductIds = await db.BuildingUnits
                 .Where(u => companyBuildingIds.Contains(u.BuildingId)
-                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
+                    && u.UnitType == "MANUFACTURING"
                     && u.ProductTypeId.HasValue)
                 .Select(u => u.ProductTypeId!.Value)
                 .Distinct()
                 .ToListAsync();
 
-            // Products in pending configuration plan units (planned but not yet applied).
-            var pendingUnitProductIds = await db.BuildingConfigurationPlanUnits
+            // Products in pending MANUFACTURING configuration plan units.
+            var pendingManufacturingIds = await db.BuildingConfigurationPlanUnits
                 .Where(u => db.BuildingConfigurationPlans
                     .Where(p => companyBuildingIds.Contains(p.BuildingId))
                     .Select(p => p.Id)
                     .Contains(u.BuildingConfigurationPlanId)
-                    && (u.UnitType == "MANUFACTURING" || u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
+                    && u.UnitType == "MANUFACTURING"
+                    && u.ProductTypeId.HasValue)
+                .Select(u => u.ProductTypeId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            var allManufacturingIds = manufacturingProductIds.Concat(pendingManufacturingIds)
+                .Distinct().ToHashSet();
+
+            // Products in PUBLIC_SALES or B2B_SALES units NOT already covered by manufacturing.
+            var salesProductIds = await db.BuildingUnits
+                .Where(u => companyBuildingIds.Contains(u.BuildingId)
+                    && (u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
+                    && u.ProductTypeId.HasValue)
+                .Select(u => u.ProductTypeId!.Value)
+                .Distinct()
+                .ToListAsync();
+
+            // Products in pending sales configuration plan units.
+            var pendingSalesIds = await db.BuildingConfigurationPlanUnits
+                .Where(u => db.BuildingConfigurationPlans
+                    .Where(p => companyBuildingIds.Contains(p.BuildingId))
+                    .Select(p => p.Id)
+                    .Contains(u.BuildingConfigurationPlanId)
+                    && (u.UnitType == "PUBLIC_SALES" || u.UnitType == "B2B_SALES")
                     && u.ProductTypeId.HasValue)
                 .Select(u => u.ProductTypeId!.Value)
                 .Distinct()
@@ -359,7 +386,12 @@ public sealed partial class Query
                 .Distinct()
                 .ToListAsync();
 
-            foreach (var id in unitProductIds.Concat(pendingUnitProductIds).Concat(inventoryProductIds).Distinct())
+            // Register manufacturing products first (highest R&D priority).
+            foreach (var id in allManufacturingIds)
+                promotedIds.TryAdd(id, ProductRankingReason.Manufacturing);
+
+            // Register sales/inventory products with secondary priority (if not already manufacturing).
+            foreach (var id in salesProductIds.Concat(pendingSalesIds).Concat(inventoryProductIds).Distinct())
                 promotedIds.TryAdd(id, ProductRankingReason.UsedByCompany);
         }
 
@@ -369,7 +401,12 @@ public sealed partial class Query
             {
                 if (promotedIds.TryGetValue(p.Id, out var reason))
                 {
-                    var score = reason == ProductRankingReason.Connected ? 100 : 50;
+                    var score = reason switch
+                    {
+                        ProductRankingReason.Connected => 100,
+                        ProductRankingReason.Manufacturing => 80,
+                        _ => 50, // UsedByCompany
+                    };
                     return new RankedProductResult { ProductType = p, RankingReason = reason, RankingScore = score };
                 }
                 return new RankedProductResult { ProductType = p, RankingReason = ProductRankingReason.Catalog, RankingScore = 10 };

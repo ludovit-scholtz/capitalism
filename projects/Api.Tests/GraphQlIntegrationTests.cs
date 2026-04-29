@@ -31674,8 +31674,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(items.GetArrayLength() > 0);
         var first = items[0];
         Assert.Equal("bread", first.GetProperty("productType").GetProperty("slug").GetString());
-        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
-        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+        Assert.Equal("manufacturing", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(80, first.GetProperty("rankingScore").GetInt32());
     }
 
     [Fact]
@@ -31729,7 +31729,155 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var items = result.GetProperty("data").GetProperty("rankedProductTypes");
         var first = items[0];
         Assert.Equal("basic-medicine", first.GetProperty("productType").GetProperty("slug").GetString());
-        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
+        Assert.Equal("manufacturing", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(80, first.GetProperty("rankingScore").GetInt32());
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_ManufacturingRankedAboveSalesOnly()
+    {
+        // Products actively manufactured should rank at score 80 (manufacturing),
+        // while products only in PUBLIC_SALES (not manufacturing) rank at score 50 (used_by_company).
+        var email = $"rpt-mfg-vs-sales-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptMfgVsSales");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var woodenChairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
+        var breadId = await GetProductGuidBySlugAsync(db, "bread");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptMfgVsSalesCo", Cash = 200_000m };
+        db.Companies.Add(company);
+
+        var factoryBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "RptMfgFactory",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(factoryBuilding);
+        // Wooden Chair is being manufactured → should get manufacturing reason (score 80).
+        db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = factoryBuilding.Id, UnitType = "MANUFACTURING",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = woodenChairId,
+        });
+
+        var shopBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "RptMfgShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(shopBuilding);
+        // Bread is only in PUBLIC_SALES (not manufactured) → should get used_by_company reason (score 50).
+        db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = shopBuilding.Id, UnitType = "PUBLIC_SALES",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = breadId,
+        });
+
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptMfgRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes").EnumerateArray().ToList();
+        var chairItem = items.FirstOrDefault(i => i.GetProperty("productType").GetProperty("slug").GetString() == "wooden-chair");
+        var breadItem = items.FirstOrDefault(i => i.GetProperty("productType").GetProperty("slug").GetString() == "bread");
+
+        Assert.True(chairItem.ValueKind != System.Text.Json.JsonValueKind.Undefined, "wooden-chair should be in results");
+        Assert.True(breadItem.ValueKind != System.Text.Json.JsonValueKind.Undefined, "bread should be in results");
+
+        Assert.Equal("manufacturing", chairItem.GetProperty("rankingReason").GetString());
+        Assert.Equal(80, chairItem.GetProperty("rankingScore").GetInt32());
+
+        Assert.Equal("used_by_company", breadItem.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, breadItem.GetProperty("rankingScore").GetInt32());
+
+        // Manufacturing products must come before sales-only products in the list.
+        var chairIndex = items.FindIndex(i => i.GetProperty("productType").GetProperty("slug").GetString() == "wooden-chair");
+        var breadIndex = items.FindIndex(i => i.GetProperty("productType").GetProperty("slug").GetString() == "bread");
+        Assert.True(chairIndex < breadIndex, "Manufacturing product (wooden-chair) must appear before sales-only product (bread)");
+    }
+
+    [Fact]
+    public async Task RankedProductTypes_ProductQualityContext_SalesOnlyProductRankedAsUsedByCompany()
+    {
+        // A product only in PUBLIC_SALES (not manufactured) gets used_by_company reason (score 50).
+        var email = $"rpt-sales-only-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "RptSalesOnly");
+
+        await using var scope = isolatedFactory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var woodenChairId = await GetProductGuidBySlugAsync(db, "wooden-chair");
+
+        var company = new Api.Data.Entities.Company { PlayerId = player.Id, Name = "RptSalesOnlyCo", Cash = 100_000m };
+        db.Companies.Add(company);
+
+        var shopBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.SalesShop, Name = "RptSalesShop",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(shopBuilding);
+        // Wooden Chair is only in PUBLIC_SALES, not being manufactured.
+        db.BuildingUnits.Add(new Api.Data.Entities.BuildingUnit
+        {
+            BuildingId = shopBuilding.Id, UnitType = "PUBLIC_SALES",
+            GridX = 0, GridY = 0, Level = 1, ProductTypeId = woodenChairId,
+        });
+
+        var rdBuilding = new Api.Data.Entities.Building
+        {
+            CompanyId = company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.ResearchDevelopment, Name = "RptSalesRD",
+            Level = 1, Latitude = city.Latitude, Longitude = city.Longitude,
+        };
+        db.Buildings.Add(rdBuilding);
+        await db.SaveChangesAsync();
+
+        var query = """
+            query RankedProducts($buildingId: UUID!, $unitType: String!) {
+              rankedProductTypes(buildingId: $buildingId, unitType: $unitType) {
+                rankingReason rankingScore productType { slug }
+              }
+            }
+            """;
+        var result = await ExecuteGraphQlAsync(isolatedClient, query,
+            new { buildingId = rdBuilding.Id.ToString(), unitType = "PRODUCT_QUALITY" }, token);
+
+        var items = result.GetProperty("data").GetProperty("rankedProductTypes").EnumerateArray().ToList();
+        var chairItem = items.FirstOrDefault(i => i.GetProperty("productType").GetProperty("slug").GetString() == "wooden-chair");
+
+        Assert.True(chairItem.ValueKind != System.Text.Json.JsonValueKind.Undefined, "wooden-chair should be in results");
+        Assert.Equal("used_by_company", chairItem.GetProperty("rankingReason").GetString());
+        Assert.Equal(50, chairItem.GetProperty("rankingScore").GetInt32());
     }
 
     [Fact]
@@ -32571,8 +32719,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(items.GetArrayLength() > 0);
         var first = items[0];
         Assert.Equal("wooden-table", first.GetProperty("productType").GetProperty("slug").GetString());
-        Assert.Equal("used_by_company", first.GetProperty("rankingReason").GetString());
-        Assert.Equal(50, first.GetProperty("rankingScore").GetInt32());
+        Assert.Equal("manufacturing", first.GetProperty("rankingReason").GetString());
+        Assert.Equal(80, first.GetProperty("rankingScore").GetInt32());
     }
 
     [Fact]
