@@ -78,6 +78,35 @@ test.describe('Manufacturing encyclopedia', () => {
     await expect(page.locator('.composition-node.ingredient').nth(1)).toContainText('10 packs')
   })
 
+  test('shows gameplay help, onboarding help, and manufacturing setup help with visual cards', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia')
+
+    await expect(page.getByRole('heading', { name: 'Gameplay Help' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Onboarding Help' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Manufacturing Unit Setup Help' })).toBeVisible()
+
+    await expect(page.locator('.onboarding-help-card')).toHaveCount(4)
+    await expect(page.locator('.manufacturing-help-card')).toHaveCount(4)
+    await expect(page.locator('.help-card-image').first()).toBeVisible()
+  })
+
+  test('uses six-column layout on wide screens and keeps encyclopedia card images compact', async ({ page }) => {
+    setupMockApi(page, {
+      resourceTypes: [woodResource],
+      productTypes: [electronicComponents, electronicTableProduct],
+    })
+
+    await page.goto('/encyclopedia')
+
+    await expect(page.locator('.encyclopedia-grid')).toHaveClass(/2xl:grid-cols-6/)
+    await expect(page.locator('.resource-card--resource img').first()).toHaveClass(/h-32/)
+  })
+
   test('localizes encyclopedia resource names when language changes', async ({ page }) => {
     setupMockApi(page, {
       resourceTypes: [{ ...woodResource, imageUrl: null }],

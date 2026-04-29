@@ -72,12 +72,12 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Occupancy must be always a number. When there is no occupancy there must be 0%
 - [ ] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
-### Encyclopedia (0% complete)
+### Encyclopedia (100% complete)
 
-- [ ] The resources pictures are very big. Make it 6 columns on wide screen please.
-- [ ] Create section for the help with the game play. Update copilot instructions with any change to the basic flow also update the documentation in the encyclopedia.
-- [ ] Create help section with onboarding help. Please document the onboarding and create also pictures so that users can easier be onboarded
-- [ ] Create help section with manufacturing unit setup. Please document the manufacturing setup and create also pictures so that users can understand the game better
+- [x] The resources pictures are very big. Make it 6 columns on wide screen please.
+- [x] Create section for the help with the game play. Update copilot instructions with any change to the basic flow also update the documentation in the encyclopedia.
+- [x] Create help section with onboarding help. Please document the onboarding and create also pictures so that users can easier be onboarded
+- [x] Create help section with manufacturing unit setup. Please document the manufacturing setup and create also pictures so that users can understand the game better
 
 ### Referal program (100% complete)
 
