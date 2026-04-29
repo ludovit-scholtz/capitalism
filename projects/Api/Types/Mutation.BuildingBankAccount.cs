@@ -326,6 +326,20 @@ public sealed partial class Mutation
                     .Build());
         }
 
+        // Block closure if any active or overdue loan still uses this account for scheduled repayments.
+        var hasActiveLoan = await db.Loans
+            .AnyAsync(l => l.BorrowerBankAccountId == account.Id
+                && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
+
+        if (hasActiveLoan)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("This account is still the scheduled repayment account for an active loan. Reassign the repayment account or fully repay the loan before closing this account.")
+                    .SetCode("ACTIVE_LOAN_REPAYMENT_ACCOUNT")
+                    .Build());
+        }
+
         var closedAtUtc = DateTime.UtcNow;
         account.ClosedAtUtc = closedAtUtc;
 

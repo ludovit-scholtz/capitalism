@@ -507,6 +507,8 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
       friendlyMsg = t('bank.closeAccountBlockedInUse')
     } else if (msg.includes('NON_ZERO_BALANCE')) {
       friendlyMsg = t('bank.closeAccountNonZeroHint')
+    } else if (msg.includes('ACTIVE_LOAN_REPAYMENT_ACCOUNT')) {
+      friendlyMsg = t('bank.closeAccountBlockedActiveLoan')
     }
     closeAccountErrors.value = { ...closeAccountErrors.value, [accountId]: friendlyMsg }
   } finally {

@@ -2440,6 +2440,7 @@ export default {
     closeAccountSuccess: 'Account closed successfully.',
     closeAccountBlockedInUse: 'This account is still assigned to a building. Reassign the building to a different account first.',
     closeAccountNonZeroHint: 'Transfer all remaining funds to another account before this account can be closed.',
+    closeAccountBlockedActiveLoan: 'This account is still the scheduled repayment account for an active loan. Reassign the repayment account or fully repay the loan before closing.',
     accountReadyToClose: 'Ready to close — zero balance',
     openAccountHint: 'Earn {rate} annual interest by opening your account here. New currency accounts can start with 0 balance and be funded later from Forex.',
     zeroBalanceFundingHint: 'Open the account with 0 balance for a new currency, then fund it from the Forex page.',
