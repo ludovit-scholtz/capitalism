@@ -43,7 +43,7 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] When I edit powerplant building, and click the empty unit in the grid, I do not see any options to setup any of the unit. Make it to work similarily as the factory for example where every unit will have special feature.
 
-### Units
+### Units (0% complete)
 
 - [ ] Do not show bank account change if unit is selected in a grid while editing the building
 - [ ] When new unit is selected in the grid, automatically select that unit. So if i create new purchase unit in position 1,1 i do not want the user to click on that unit again to configure it.
@@ -53,12 +53,12 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] In root directory create audits folder, and every week do the audit of the security. List all potential risks and create the action plan to resolve them. The main focus should be on question: Can one player gain unfair advantege of another player by executing an api call or exploting some unfair game mechanics?
 
-### Media house (100% complete)
+### Media house (20% complete)
 
 - [ ] When media house is in the construction, allow the marketing units to configure it.
 - [ ] When media house is in the construction, do not make any caluclations for the marketing units, only charge the unit labor and energy costs.
 
-### Mining (80% complete)
+### Mining (20% complete)
 
 - [ ] Make sure every mining land property has the custom resource defined what is in that property. It must have the quality and resource amount defined. 
 - [ ] For each resource must be always available at least one property in each city
@@ -66,20 +66,20 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Make sure user can filter the land by the resource type when buying the mining property.
 - [ ] Make sure the prices for the purchase of the land is very expensive ~ $20M to $200M depending on the quality of the resource and the amount of resource there is available to be mined.
 
-### Appartment and commercial buildings (90% complete)
+### Appartment and commercial buildings (10% complete)
 
 - [ ] I do not see the appartment building size. Make sure when buying the property the size of the commercial building or appartment building is clearly stated. Fix the current buildings which does not have the total area filled in.
 - [ ] Occupancy must be always a number. When there is no occupancy there must be 0%
 - [ ] I do not see the occupancy to be changed. Make sure the occupancy rules are applied.
 
-### Encyclopedia
+### Encyclopedia (0% complete)
 
 - [ ] The resources pictures are very big. Make it 6 columns on wide screen please.
 - [ ] Create section for the help with the game play. Update copilot instructions with any change to the basic flow also update the documentation in the encyclopedia.
 - [ ] Create help section with onboarding help. Please document the onboarding and create also pictures so that users can easier be onboarded
 - [ ] Create help section with manufacturing unit setup. Please document the manufacturing setup and create also pictures so that users can understand the game better
 
-### Referal program
+### Referal program (0% complete)
 
 - [ ] Create page in master frontend to setup the referal code. Allow referal code to be filled only once. Make sure the existing referal code is used.
 - [ ] Create page in master frontend for any user to be a referal. If user wants to be a referal he must fill in his name, and tax domicil.
