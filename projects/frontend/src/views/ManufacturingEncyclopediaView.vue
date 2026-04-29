@@ -66,6 +66,55 @@ const industries = computed(() => ['ALL', ...new Set(visibleProducts.value.map((
 
 const hiddenProProductCount = computed(() => (showProProducts.value ? 0 : products.value.filter((product) => product.isProOnly).length))
 
+const resourcesBySlug = computed(() => new Map(resources.value.map((resource) => [resource.slug, resource])))
+const productsBySlug = computed(() => new Map(products.value.map((product) => [product.slug, product])))
+
+const onboardingGuideCards = [
+  {
+    titleKey: 'encyclopedia.onboardingGuideStepIndustryTitle',
+    bodyKey: 'encyclopedia.onboardingGuideStepIndustryBody',
+    resourceSlug: 'wood',
+  },
+  {
+    titleKey: 'encyclopedia.onboardingGuideStepProductTitle',
+    bodyKey: 'encyclopedia.onboardingGuideStepProductBody',
+    productSlug: 'wooden-chair',
+  },
+  {
+    titleKey: 'encyclopedia.onboardingGuideStepFactoryTitle',
+    bodyKey: 'encyclopedia.onboardingGuideStepFactoryBody',
+    productSlug: 'bread',
+  },
+  {
+    titleKey: 'encyclopedia.onboardingGuideStepShopTitle',
+    bodyKey: 'encyclopedia.onboardingGuideStepShopBody',
+    productSlug: 'basic-medicine',
+  },
+]
+
+const manufacturingGuideCards = [
+  {
+    titleKey: 'encyclopedia.manufacturingGuideStepPurchaseTitle',
+    bodyKey: 'encyclopedia.manufacturingGuideStepPurchaseBody',
+    resourceSlug: 'grain',
+  },
+  {
+    titleKey: 'encyclopedia.manufacturingGuideStepManufactureTitle',
+    bodyKey: 'encyclopedia.manufacturingGuideStepManufactureBody',
+    productSlug: 'bread',
+  },
+  {
+    titleKey: 'encyclopedia.manufacturingGuideStepStorageTitle',
+    bodyKey: 'encyclopedia.manufacturingGuideStepStorageBody',
+    productSlug: 'wooden-chair',
+  },
+  {
+    titleKey: 'encyclopedia.manufacturingGuideStepPublicSalesTitle',
+    bodyKey: 'encyclopedia.manufacturingGuideStepPublicSalesBody',
+    productSlug: 'basic-medicine',
+  },
+]
+
 const catalogEntries = computed<CatalogEntry[]>(() => {
   const query = search.value.trim().toLowerCase()
   const entries: CatalogEntry[] = [
@@ -202,6 +251,24 @@ function getProductAccessText(product: ProductType) {
   return isProductLocked(product) ? t('catalog.proRequired') : t('catalog.proUnlocked')
 }
 
+function getGuideCardImage(card: { resourceSlug?: string; productSlug?: string }) {
+  if (card.resourceSlug) {
+    const resource = resourcesBySlug.value.get(card.resourceSlug)
+    if (resource) {
+      return getResourceImageUrl(resource)
+    }
+  }
+
+  if (card.productSlug) {
+    const product = productsBySlug.value.get(card.productSlug)
+    if (product) {
+      return getProductImageUrl(product)
+    }
+  }
+
+  return null
+}
+
 function navigateToEntry(slug: string) {
   router.push({
     name: 'encyclopedia-detail',
@@ -280,7 +347,7 @@ function navigateToEntry(slug: string) {
       </div>
 
       <!-- Resource grid -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+      <div class="encyclopedia-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mt-6">
         <p v-if="catalogEntries.length === 0" class="search-empty-state text-center col-span-full py-12 text-muted">
           {{ t('encyclopedia.searchNoResults') }}
         </p>
@@ -300,7 +367,7 @@ function navigateToEntry(slug: string) {
             v-if="entry.imageUrl"
             :src="entry.imageUrl ?? undefined"
             :alt="entry.title"
-            class="w-full aspect-video object-cover bg-page"
+            class="w-full h-32 object-cover bg-page"
           />
           <div class="p-4 flex flex-col gap-3">
             <!-- Heading row -->
@@ -339,6 +406,73 @@ function navigateToEntry(slug: string) {
             <span class="text-xs font-semibold text-brand">{{ t('encyclopedia.viewDetail') }} →</span>
           </div>
         </article>
+      </div>
+
+      <div class="encyclopedia-help-section mt-10 rounded-2xl border border-divider bg-card p-6 lg:p-8 flex flex-col gap-8">
+        <section class="flex flex-col gap-3">
+          <h3 class="m-0">{{ t('encyclopedia.helpSectionTitle') }}</h3>
+          <p class="text-muted m-0">{{ t('encyclopedia.helpSectionSubtitle') }}</p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+            <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
+              <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardMarketsTitle') }}</h4>
+              <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardMarketsBody') }}</p>
+            </article>
+            <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
+              <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardFlowTitle') }}</h4>
+              <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardFlowBody') }}</p>
+            </article>
+            <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
+              <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardIterationTitle') }}</h4>
+              <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardIterationBody') }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="flex flex-col gap-3">
+          <h3 class="m-0">{{ t('encyclopedia.onboardingGuideTitle') }}</h3>
+          <p class="text-muted m-0">{{ t('encyclopedia.onboardingGuideSubtitle') }}</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
+            <article
+              v-for="card in onboardingGuideCards"
+              :key="card.titleKey"
+              class="onboarding-help-card rounded-xl border border-divider bg-page overflow-hidden"
+            >
+              <img
+                v-if="getGuideCardImage(card)"
+                :src="getGuideCardImage(card) ?? undefined"
+                :alt="t(card.titleKey)"
+                class="help-card-image w-full h-28 object-cover"
+              />
+              <div class="p-4 flex flex-col gap-2">
+                <h4 class="m-0 text-base">{{ t(card.titleKey) }}</h4>
+                <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="flex flex-col gap-3">
+          <h3 class="m-0">{{ t('encyclopedia.manufacturingGuideTitle') }}</h3>
+          <p class="text-muted m-0">{{ t('encyclopedia.manufacturingGuideSubtitle') }}</p>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
+            <article
+              v-for="card in manufacturingGuideCards"
+              :key="card.titleKey"
+              class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden"
+            >
+              <img
+                v-if="getGuideCardImage(card)"
+                :src="getGuideCardImage(card) ?? undefined"
+                :alt="t(card.titleKey)"
+                class="help-card-image w-full h-28 object-cover"
+              />
+              <div class="p-4 flex flex-col gap-2">
+                <h4 class="m-0 text-base">{{ t(card.titleKey) }}</h4>
+                <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
+              </div>
+            </article>
+          </div>
+        </section>
       </div>
     </section>
   </div>
