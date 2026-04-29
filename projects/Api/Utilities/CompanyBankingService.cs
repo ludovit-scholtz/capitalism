@@ -69,6 +69,7 @@ public static class CompanyBankingService
             }
 
             account.Balance -= debit;
+            account.ConcurrencyToken = Guid.NewGuid();
             remaining -= debit;
         }
 
@@ -98,6 +99,7 @@ public static class CompanyBankingService
         }
 
         creditedAccount.Balance += amount;
+        creditedAccount.ConcurrencyToken = Guid.NewGuid();
         return true;
     }
 

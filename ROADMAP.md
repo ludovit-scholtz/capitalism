@@ -55,7 +55,7 @@ It will use real world map. The game will start in single city and later other c
 **Shipped (city-aware salary settings):** Company settings salary table now shows each city's own currency code — Prague wages display as CZK, New York as USD, Delhi as INR, etc. The `CompanyCitySalarySettingResult` GraphQL type now includes a `currencyCode` field per city, and both the base wage and effective wage columns use the city's local currency formatter instead of the company's primary currency. A currency badge next to each city name and a clarifying note below the table make it unambiguous that wages are not cross-currency-converted. Backend and E2E tests verify the per-city currency codes are correct.
 
 - [ ] Allow to close down bank account if the balance of the account is equal exactly to 0.
-- [ ] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
+- [x] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
 
 ### Number formatting (100% complete)
 

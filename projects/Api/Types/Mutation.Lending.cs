@@ -9,251 +9,19 @@ using Microsoft.EntityFrameworkCore;
 namespace Api.Types;
 
 /// <summary>
-/// Bank lending marketplace mutations: publishing, updating, deactivating loan offers,
-/// and accepting loans between player-owned companies.
+/// Bank lending mutations: accepting collateral-based loans from any bank (including government banks).
+/// Players select a bank, pledge one of their buildings as collateral, and borrow up to 70% of its
+/// appraised value — provided the bank has sufficient deposit capacity.
 /// </summary>
 public sealed partial class Mutation
 {
-    // ── Bank Lending Marketplace ──────────────────────────────────────────────────
+    // ── Bank Lending ────────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Publishes a new loan offer from a bank building.
-    /// Only the owning company can publish offers; rate must be 0.1–200%, duration 24–87600 ticks.
-    /// </summary>
-    [Authorize]
-    public async Task<LoanOffer> PublishLoanOffer(
-        PublishLoanOfferInput input,
-        [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-
-        // Validate the bank building is owned by this player's company.
-        var bankBuilding = await db.Buildings
-            .Include(b => b.Company)
-            .FirstOrDefaultAsync(b => b.Id == input.BankBuildingId && b.Type == BuildingType.Bank);
-
-        if (bankBuilding is null)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Bank building not found.")
-                    .SetCode("BANK_NOT_FOUND")
-                    .Build());
-        }
-
-        if (bankBuilding.Company.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You do not own this bank building.")
-                    .SetCode("BANK_NOT_FOUND")
-                    .Build());
-        }
-
-        // Validate input.
-        if (input.AnnualInterestRatePercent < 0.1m || input.AnnualInterestRatePercent > 200m)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Interest rate must be between 0.1% and 200%.")
-                    .SetCode("INVALID_INTEREST_RATE")
-                    .Build());
-        }
-
-        if (input.MaxPrincipalPerLoan < 1_000m)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Maximum principal per loan must be at least $1,000.")
-                    .SetCode("INVALID_PRINCIPAL")
-                    .Build());
-        }
-
-        if (input.TotalCapacity < input.MaxPrincipalPerLoan)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Total capacity must be at least as large as the maximum principal per loan.")
-                    .SetCode("INVALID_CAPACITY")
-                    .Build());
-        }
-
-        if (input.DurationTicks < 24 || input.DurationTicks > 87_600)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Loan duration must be between 24 ticks (1 in-game day) and 87,600 ticks (10 in-game years).")
-                    .SetCode("INVALID_DURATION")
-                    .Build());
-        }
-
-        // Enforce 90% reserve rule: total committed loan capacity across active offers
-        // cannot exceed 90% of the bank's total deposits.
-        var lendableCapacity = bankBuilding.TotalDeposits * 0.9m;
-        var existingCommittedCapacity = await db.LoanOffers
-            .Where(o => o.BankBuildingId == bankBuilding.Id && o.IsActive)
-            .SumAsync(o => (decimal?)(o.TotalCapacity - o.UsedCapacity)) ?? 0m;
-        var outstandingPrincipal = await db.Loans
-            .Where(l => l.BankBuildingId == bankBuilding.Id && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
-            .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
-
-        var totalAlreadyCommitted = existingCommittedCapacity + outstandingPrincipal;
-        var availableToOffer = Math.Max(0m, lendableCapacity - totalAlreadyCommitted);
-
-        if (input.TotalCapacity > availableToOffer)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage($"The bank can only commit {availableToOffer:C0} to new loan offers (90% of deposits minus existing commitments). Reduce the total capacity or grow your deposit base.")
-                    .SetCode("EXCEEDS_RESERVE_RATIO")
-                    .Build());
-        }
-
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
-
-        var offer = new LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bankBuilding.Id,
-            LenderCompanyId = bankBuilding.CompanyId,
-            AnnualInterestRatePercent = input.AnnualInterestRatePercent,
-            MaxPrincipalPerLoan = input.MaxPrincipalPerLoan,
-            TotalCapacity = input.TotalCapacity,
-            UsedCapacity = 0m,
-            DurationTicks = input.DurationTicks,
-            IsActive = true,
-            CreatedAtTick = currentTick,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-
-        db.LoanOffers.Add(offer);
-        await db.SaveChangesAsync();
-
-        return offer;
-    }
-
-    /// <summary>
-    /// Updates an existing loan offer. Only the bank's owning player can update it.
-    /// Ongoing loans are not affected; changes apply to new loans only.
-    /// </summary>
-    [Authorize]
-    public async Task<LoanOffer> UpdateLoanOffer(
-        UpdateLoanOfferInput input,
-        [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-
-        var offer = await db.LoanOffers
-            .Include(o => o.LenderCompany)
-            .FirstOrDefaultAsync(o => o.Id == input.LoanOfferId);
-
-        if (offer is null || offer.LenderCompany.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Loan offer not found or you do not own it.")
-                    .SetCode("OFFER_NOT_FOUND")
-                    .Build());
-        }
-
-        if (input.AnnualInterestRatePercent.HasValue)
-        {
-            if (input.AnnualInterestRatePercent.Value < 0.1m || input.AnnualInterestRatePercent.Value > 200m)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("Interest rate must be between 0.1% and 200%.")
-                        .SetCode("INVALID_INTEREST_RATE")
-                        .Build());
-            }
-            offer.AnnualInterestRatePercent = input.AnnualInterestRatePercent.Value;
-        }
-
-        if (input.MaxPrincipalPerLoan.HasValue)
-        {
-            if (input.MaxPrincipalPerLoan.Value < 1_000m)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("Maximum principal per loan must be at least $1,000.")
-                        .SetCode("INVALID_PRINCIPAL")
-                        .Build());
-            }
-            offer.MaxPrincipalPerLoan = input.MaxPrincipalPerLoan.Value;
-        }
-
-        if (input.TotalCapacity.HasValue)
-        {
-            var newCapacity = input.TotalCapacity.Value;
-            if (newCapacity < offer.UsedCapacity)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage($"Total capacity cannot be reduced below currently used capacity ({offer.UsedCapacity:C0}).")
-                        .SetCode("INVALID_CAPACITY")
-                        .Build());
-            }
-            offer.TotalCapacity = newCapacity;
-        }
-
-        if (input.DurationTicks.HasValue)
-        {
-            if (input.DurationTicks.Value < 24 || input.DurationTicks.Value > 87_600)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("Loan duration must be between 24 ticks and 87,600 ticks.")
-                        .SetCode("INVALID_DURATION")
-                        .Build());
-            }
-            offer.DurationTicks = input.DurationTicks.Value;
-        }
-
-        if (input.IsActive.HasValue)
-        {
-            offer.IsActive = input.IsActive.Value;
-        }
-
-        await db.SaveChangesAsync();
-        return offer;
-    }
-
-    /// <summary>
-    /// Deactivates a loan offer so it no longer appears to borrowers.
-    /// Existing loans are not affected.
-    /// </summary>
-    [Authorize]
-    public async Task<LoanOffer> DeactivateLoanOffer(
-        Guid loanOfferId,
-        [Service] AppDbContext db,
-        [Service] IHttpContextAccessor httpContextAccessor)
-    {
-        var userId = httpContextAccessor.HttpContext!.User.GetRequiredUserId();
-
-        var offer = await db.LoanOffers
-            .Include(o => o.LenderCompany)
-            .FirstOrDefaultAsync(o => o.Id == loanOfferId);
-
-        if (offer is null || offer.LenderCompany.PlayerId != userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Loan offer not found or you do not own it.")
-                    .SetCode("OFFER_NOT_FOUND")
-                    .Build());
-        }
-
-        offer.IsActive = false;
-        await db.SaveChangesAsync();
-        return offer;
-    }
-
-    /// <summary>
-    /// Accepts a loan offer: creates a Loan record, transfers cash from lender to borrower,
-    /// and records ledger entries for both parties.
-    /// Guards: cannot borrow from own company; principal must not exceed remaining capacity; lender must have cash.
+    /// Requests a collateral-backed loan from a bank building.
+    /// The borrower must own the company; a collateral building is required; the bank must be open
+    /// (BaseCapitalDeposited = true) and have sufficient deposit capacity (90% of TotalDeposits).
+    /// Self-lending is blocked at both company and player level.
     /// </summary>
     [Authorize]
     public async Task<Loan> AcceptLoan(
@@ -276,217 +44,16 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Load the offer with lender company.
-        // Borrower-facing UI now passes bankBuildingId as loanOfferId (direct bank borrowing).
-        // If no explicit offer exists, treat the ID as a bank ID and process directly.
-        var offer = await db.LoanOffers
-            .Include(o => o.LenderCompany)
-            .Include(o => o.BankBuilding)
-            .ThenInclude(b => b.City)
-            .FirstOrDefaultAsync(o => o.Id == input.LoanOfferId);
-
-        if (offer is null)
-        {
-            return await AcceptLoanFromBankDirectAsync(input, borrower, db, httpContextAccessor);
-        }
-
-        if (offer is null || !offer.IsActive)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Loan offer not found or is no longer active.")
-                    .SetCode("OFFER_NOT_FOUND")
-                    .Build());
-        }
-
-        // Self-lending guard.
-        if (offer.LenderCompanyId == input.BorrowerCompanyId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("A company cannot borrow from itself.")
-                    .SetCode("SELF_LENDING_NOT_ALLOWED")
-                    .Build());
-        }
-
-        // Same player guard.
-        if (offer.LenderCompany.PlayerId == userId)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("You cannot borrow from your own bank.")
-                    .SetCode("SELF_LENDING_NOT_ALLOWED")
-                    .Build());
-        }
-
-        if (input.PrincipalAmount < 1_000m)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("Minimum loan amount is $1,000.")
-                    .SetCode("INVALID_PRINCIPAL")
-                    .Build());
-        }
-
-        if (input.PrincipalAmount > offer.MaxPrincipalPerLoan)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage($"Requested principal exceeds the maximum per-loan limit of {offer.MaxPrincipalPerLoan:C0}.")
-                    .SetCode("EXCEEDS_MAX_PRINCIPAL")
-                    .Build());
-        }
-
-        var remainingCapacity = offer.TotalCapacity - offer.UsedCapacity;
-        if (input.PrincipalAmount > remainingCapacity)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage($"The offer only has {remainingCapacity:C0} of lending capacity remaining.")
-                    .SetCode("INSUFFICIENT_CAPACITY")
-                    .Build());
-        }
-
-        var lenderAccounts = await LoadActiveCompanyBankAccountsAsync(db, offer.LenderCompanyId, httpContextAccessor.HttpContext!.RequestAborted);
-
-        // Lender must have the cash.
-        if (CompanyBankingService.GetTotalBalance(lenderAccounts) < input.PrincipalAmount)
-        {
-            throw new GraphQLException(
-                ErrorBuilder.New()
-                    .SetMessage("The lender does not have sufficient funds to cover this loan at this time.")
-                    .SetCode("LENDER_INSUFFICIENT_FUNDS")
-                    .Build());
-        }
-
-        // ── Collateral validation (optional) ──────────────────────────────────────
-        Building? collateralBuilding = null;
-        decimal? collateralAppraisedValue = null;
-
-        if (input.CollateralBuildingId.HasValue)
-        {
-            // Building must exist and be owned by the borrower's company.
-            collateralBuilding = await db.Buildings
-                .FirstOrDefaultAsync(b => b.Id == input.CollateralBuildingId.Value
-                                         && b.CompanyId == borrower.Id);
-
-            if (collateralBuilding is null)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("Collateral building not found or is not owned by your company.")
-                        .SetCode("COLLATERAL_NOT_OWNED")
-                        .Build());
-            }
-
-            // Building must not already be pledged as collateral for another active loan.
-            var alreadyPledged = await db.Loans
-                .AnyAsync(l => l.CollateralBuildingId == input.CollateralBuildingId.Value
-                               && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue));
-            if (alreadyPledged)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage("This building is already pledged as collateral for another active loan.")
-                        .SetCode("COLLATERAL_ALREADY_PLEDGED")
-                        .Build());
-            }
-
-            // Compute appraised value and 70% LTV cap.
-            collateralAppraisedValue = Utilities.WealthCalculator.GetBuildingValue(collateralBuilding);
-            var maxBorrowable = decimal.Round(collateralAppraisedValue.Value * 0.70m, 2, MidpointRounding.AwayFromZero);
-
-            // Compute existing secured exposure on this building (should be 0 after the check above,
-            // but guard defensively in case of concurrent requests).
-            var existingSecuredExposure = await db.Loans
-                .Where(l => l.CollateralBuildingId == input.CollateralBuildingId.Value
-                            && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
-                .SumAsync(l => (decimal?)l.RemainingPrincipal) ?? 0m;
-
-            var collateralRemainingCapacity = maxBorrowable - existingSecuredExposure;
-
-            if (input.PrincipalAmount > collateralRemainingCapacity)
-            {
-                throw new GraphQLException(
-                    ErrorBuilder.New()
-                        .SetMessage($"The requested principal of {input.PrincipalAmount:C0} exceeds the collateral lending capacity of {collateralRemainingCapacity:C0} (70% of appraised value {collateralAppraisedValue:C0}, minus {existingSecuredExposure:C0} existing secured debt).")
-                        .SetCode("EXCEEDS_COLLATERAL_LIMIT")
-                        .Build());
-            }
-        }
-
-        var currentTick = await db.GameStates.AsNoTracking().Select(gs => gs.CurrentTick).FirstOrDefaultDeterministicAsync();
-
-        // Tick-based repayment schedule: principal is paid each tick over the agreed duration.
-        var ticksPerPayment = 1L;
-        var totalPayments = (int)Math.Max(1L, offer.DurationTicks);
-        var dueTick = currentTick + offer.DurationTicks;
-        var bankCurrencyCode = offer.BankBuilding?.City?.CurrencyCode ?? "EUR";
-        var borrowerAccount = await ResolveLoanSettlementAccountAsync(
-            db,
-            borrower.Id,
-            bankCurrencyCode,
-            input.BankAccountId,
-            httpContextAccessor.HttpContext.RequestAborted);
-        var paymentAmount = ComputeEstimatedTickPayment(input.PrincipalAmount, offer.AnnualInterestRatePercent, totalPayments);
-
-        // Transfer cash.
-        CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
-        borrowerAccount.Balance += input.PrincipalAmount;
-        offer.UsedCapacity += input.PrincipalAmount;
-
-        var loan = new Loan
-        {
-            Id = Guid.NewGuid(),
-            LoanOfferId = offer.Id,
-            BorrowerCompanyId = borrower.Id,
-            BankBuildingId = offer.BankBuildingId,
-            LenderCompanyId = offer.LenderCompanyId,
-            OriginalPrincipal = input.PrincipalAmount,
-            RemainingPrincipal = input.PrincipalAmount,
-            AnnualInterestRatePercent = offer.AnnualInterestRatePercent,
-            DurationTicks = offer.DurationTicks,
-            StartTick = currentTick,
-            DueTick = dueTick,
-            NextPaymentTick = currentTick + ticksPerPayment,
-            PaymentAmount = paymentAmount,
-            PaymentsMade = 0,
-            TotalPayments = totalPayments,
-            BorrowerBankAccountId = borrowerAccount.Id,
-            Status = LoanStatus.Active,
-            MissedPayments = 0,
-            AccumulatedPenalty = 0m,
-            AcceptedAtUtc = DateTime.UtcNow,
-            CollateralBuildingId = collateralBuilding?.Id,
-            CollateralAppraisedValue = collateralAppraisedValue,
-        };
-
-        db.Loans.Add(loan);
-
-        // Ledger: borrower receives cash (loan origination).
-        var collateralNote = collateralBuilding is not null
-            ? $" (secured against {collateralBuilding.Name})"
-            : string.Empty;
-        db.LedgerEntries.Add(new LedgerEntry
-        {
-            Id = Guid.NewGuid(),
-            CompanyId = borrower.Id,
-            Category = LedgerCategory.LoanOrigination,
-            Description = $"Loan received from {offer.LenderCompany.Name} – {offer.AnnualInterestRatePercent}% p.a. over {offer.DurationTicks} hours{collateralNote}",
-            Amount = input.PrincipalAmount,
-            RecordedAtTick = currentTick,
-            RecordedAtUtc = DateTime.UtcNow
-        });
-
-        await db.SaveChangesAsync();
-
-        return loan;
+        return await AcceptLoanFromBankDirectAsync(input, borrower, db, userId, httpContextAccessor);
     }
 
+    /// <param name="userId">Pre-extracted from the JWT claim to avoid double-extraction; also used for player-level self-lending check (bank.Company.PlayerId).</param>
+    /// <param name="httpContextAccessor">Still required to pass RequestAborted to async helpers.</param>
     private async Task<Loan> AcceptLoanFromBankDirectAsync(
         AcceptLoanInput input,
         Company borrower,
         AppDbContext db,
+        Guid userId,
         IHttpContextAccessor httpContextAccessor)
     {
         var bank = await db.Buildings
@@ -500,6 +67,25 @@ public sealed partial class Mutation
                 ErrorBuilder.New()
                     .SetMessage("Bank not found or is not open for lending.")
                     .SetCode("BANK_NOT_FOUND")
+                    .Build());
+        }
+
+        // Self-lending guard: borrower cannot borrow from their own bank.
+        if (bank.CompanyId == borrower.Id)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("A company cannot borrow from its own bank.")
+                    .SetCode("SELF_LENDING_NOT_ALLOWED")
+                    .Build());
+        }
+
+        if (bank.Company?.PlayerId == userId)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("You cannot borrow from a bank you own.")
+                    .SetCode("SELF_LENDING_NOT_ALLOWED")
                     .Build());
         }
 
@@ -609,8 +195,40 @@ public sealed partial class Mutation
             input.BankAccountId,
             httpContextAccessor.HttpContext.RequestAborted);
 
-        CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
-        borrowerAccount.Balance += input.PrincipalAmount;
+        // ── Atomic debit / credit ────────────────────────────────────────────────────────────────
+        // lenderAccounts is the full account list for bank.CompanyId loaded earlier in this method
+        // via LoadActiveCompanyBankAccountsAsync. TryDebit distributes the debit across those accounts
+        // in order of preference and bumps each touched account's ConcurrencyToken.
+        // If it returns false (balance insufficient at execution time) we abort immediately — the
+        // borrower is never credited and no loan record is created, preventing money minting.
+        // If a concurrent request already debited the same account and persisted first, SaveChangesAsync
+        // below will detect the ConcurrencyToken mismatch and throw DbUpdateConcurrencyException,
+        // which we catch and surface as CONCURRENT_MODIFICATION.
+        var debitSucceeded = CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
+        if (!debitSucceeded)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The lender does not have sufficient funds to complete this loan disbursement at execution time.")
+                    .SetCode("LENDER_INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        // Credit borrower via TryCredit (mirrors how the lender was debited and bumps the token).
+        // borrowerAccount was resolved and currency-validated by ResolveLoanSettlementAccountAsync.
+        var creditSucceeded = CompanyBankingService.TryCredit(
+            new[] { borrowerAccount },
+            input.PrincipalAmount,
+            borrowerAccount.CurrencyCode,
+            out _);
+        if (!creditSucceeded)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Failed to credit the borrower's settlement account.")
+                    .SetCode("CREDIT_FAILED")
+                    .Build());
+        }
 
         var internalOffer = new LoanOffer
         {
@@ -655,18 +273,47 @@ public sealed partial class Mutation
 
         db.LoanOffers.Add(internalOffer);
         db.Loans.Add(loan);
+
+        // Borrower ledger — cash inflow
         db.LedgerEntries.Add(new LedgerEntry
         {
             Id = Guid.NewGuid(),
             CompanyId = borrower.Id,
             Category = LedgerCategory.LoanOrigination,
-            Description = $"Loan received from {bank.Company.Name} via {bank.Name} - {annualRate}% p.a. over {durationTicks} hours (secured against {collateralBuilding.Name})",
+            Description = $"Loan received from {bank.Company!.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} in-game hours (secured against {collateralBuilding.Name})",
             Amount = input.PrincipalAmount,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow,
         });
 
-        await db.SaveChangesAsync();
+        // Lender ledger — cash outflow (negative = funds disbursed from the bank)
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = bank.CompanyId,
+            Category = LedgerCategory.LoanOrigination,
+            Description = $"Loan disbursed to {borrower.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} in-game hours",
+            Amount = -input.PrincipalAmount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another concurrent loan request modified the same lender account between our balance
+            // check and SaveChangesAsync. The ConcurrencyToken mismatch means EF could not persist
+            // the debit, so no funds moved and no loan was created. The caller should retry.
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The bank account was modified by a concurrent transaction. Please try again.")
+                    .SetCode("CONCURRENT_MODIFICATION")
+                    .Build());
+        }
+
         return loan;
     }
 

@@ -26015,116 +26015,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
     #region Bank Lending Marketplace
 
-    [Fact]
-    public async Task PublishLoanOffer_ByBankOwner_Succeeds()
-    {
-        var email = $"bank-pub-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "Bank Pub Tester");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstDeterministicAsync();
-        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "BankCo", Cash = 500_000m };
-        db.Companies.Add(company);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "My Bank", Level = 1, TotalDeposits = 300_000m, BaseCapitalDeposited = true };
-        db.Buildings.Add(bank);
-        await db.SaveChangesAsync();
 
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation Pub($input: PublishLoanOfferInput!) {
-              publishLoanOffer(input: $input) {
-                id annualInterestRatePercent maxPrincipalPerLoan totalCapacity usedCapacity durationTicks isActive
-              }
-            }
-            """,
-            new { input = new { bankBuildingId = bank.Id.ToString(), annualInterestRatePercent = 12.5m, maxPrincipalPerLoan = 50_000m, totalCapacity = 200_000m, durationTicks = 1440L } },
-            token);
 
-        var data = result.GetProperty("data").GetProperty("publishLoanOffer");
-        Assert.Equal(12.5m, data.GetProperty("annualInterestRatePercent").GetDecimal());
-        Assert.Equal(50_000m, data.GetProperty("maxPrincipalPerLoan").GetDecimal());
-        Assert.Equal(200_000m, data.GetProperty("totalCapacity").GetDecimal());
-        Assert.Equal(0m, data.GetProperty("usedCapacity").GetDecimal());
-        Assert.Equal(1440L, data.GetProperty("durationTicks").GetInt64());
-        Assert.True(data.GetProperty("isActive").GetBoolean());
-    }
 
-    [Fact]
-    public async Task PublishLoanOffer_NonBankBuilding_ReturnsError()
-    {
-        var email = $"bank-nonbank-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "NonBank Tester");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstDeterministicAsync();
-        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "FactoryCo", Cash = 500_000m };
-        db.Companies.Add(company);
-        var factory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "My Factory", Level = 1 };
-        db.Buildings.Add(factory);
-        await db.SaveChangesAsync();
 
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation Pub($input: PublishLoanOfferInput!) {
-              publishLoanOffer(input: $input) { id }
-            }
-            """,
-            new { input = new { bankBuildingId = factory.Id.ToString(), annualInterestRatePercent = 12.5m, maxPrincipalPerLoan = 50_000m, totalCapacity = 200_000m, durationTicks = 1440L } },
-            token);
 
-        var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0);
-        Assert.Equal("BANK_NOT_FOUND", errors[0].GetProperty("extensions").GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task PublishLoanOffer_InvalidInterestRate_ReturnsError()
-    {
-        var email = $"bank-rate-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "Rate Tester");
-
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstDeterministicAsync();
-        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "RateCo", Cash = 500_000m };
-        db.Companies.Add(company);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "Rate Bank", Level = 1 };
-        db.Buildings.Add(bank);
-        await db.SaveChangesAsync();
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation Pub($input: PublishLoanOfferInput!) {
-              publishLoanOffer(input: $input) { id }
-            }
-            """,
-            new { input = new { bankBuildingId = bank.Id.ToString(), annualInterestRatePercent = 0m, maxPrincipalPerLoan = 50_000m, totalCapacity = 200_000m, durationTicks = 1440L } },
-            token);
-
-        var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0);
-        Assert.Equal("INVALID_INTEREST_RATE", errors[0].GetProperty("extensions").GetProperty("code").GetString());
-    }
-
-    [Fact]
-    public async Task PublishLoanOffer_Unauthenticated_ReturnsError()
-    {
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation Pub($input: PublishLoanOfferInput!) {
-              publishLoanOffer(input: $input) { id }
-            }
-            """,
-            new { input = new { bankBuildingId = Guid.NewGuid().ToString(), annualInterestRatePercent = 12.5m, maxPrincipalPerLoan = 50_000m, totalCapacity = 200_000m, durationTicks = 1440L } });
-
-        var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0);
-    }
 
     [Fact]
     public async Task AcceptLoan_ByBorrower_TransfersCashAndCreatesLoan()
@@ -26145,24 +26042,14 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BorrowerCo", Cash = 1_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "LenderBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "LenderBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 10m };
         db.Buildings.Add(bank);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 10m,
-            MaxPrincipalPerLoan = 100_000m,
-            TotalCapacity = 300_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 500_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "BorrowerColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
+
         await db.SaveChangesAsync();
 
         var lenderBalanceBefore = await db.BankAccounts
@@ -26181,7 +26068,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
               }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 50_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 50_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var loan = result.GetProperty("data").GetProperty("acceptLoan");
@@ -26192,8 +26079,6 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(loan.GetProperty("totalPayments").GetInt32() > 0);
 
         // Verify settlement transfer between company bank accounts
-        await db.Entry(offer).ReloadAsync();
-
         var lenderBalanceAfter = await db.BankAccounts
             .Where(account => account.CompanyId == lenderCompany.Id && account.ClosedAtUtc == null)
             .SumAsync(account => account.Balance);
@@ -26203,7 +26088,6 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
 
         Assert.Equal(lenderBalanceBefore - 50_000m, lenderBalanceAfter);
         Assert.Equal(borrowerBalanceBefore + 50_000m, borrowerBalanceAfter);
-        Assert.Equal(50_000m, offer.UsedCapacity);
     }
 
     [Fact]
@@ -26218,24 +26102,14 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var city = await db.Cities.FirstDeterministicAsync();
         var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "SelfLendCo", Cash = 500_000m };
         db.Companies.Add(company);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "SelfBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "SelfBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 500_000m, LendingInterestRatePercent = 10m };
         db.Buildings.Add(bank);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = company.Id,
-            AnnualInterestRatePercent = 10m,
-            MaxPrincipalPerLoan = 100_000m,
-            TotalCapacity = 300_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = company.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 500_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
+        var collateralBuilding = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "SelfColFactory", Level = 1 };
+        db.Buildings.Add(collateralBuilding);
+
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
@@ -26244,7 +26118,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = company.Id.ToString(), principalAmount = 10_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = company.Id.ToString(), principalAmount = 10_000m, collateralBuildingId = collateralBuilding.Id.ToString() } },
             token);
 
         var errors = result.GetProperty("errors");
@@ -26253,8 +26127,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task AcceptLoan_ExceedsMaxPrincipal_ReturnsError()
+    public async Task AcceptLoan_ExceedsCollateralLimit_ReturnsError()
     {
+        // collateral factory level=1 appraised=200_000, 70% LTV cap = 140_000; requesting 160_000 should fail
         var lenderEmail = $"cap-lender-{Guid.NewGuid():N}@test.com";
         var borrowerEmail = $"cap-borrower-{Guid.NewGuid():N}@test.com";
         var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "CapLender");
@@ -26271,40 +26146,31 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "CapBorrowerCo", Cash = 1_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "CapBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "CapBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 2_000_000m, LendingInterestRatePercent = 8m };
         db.Buildings.Add(bank);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 10m,
-            MaxPrincipalPerLoan = 10_000m,
-            TotalCapacity = 50_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 2_000_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
+        // Collateral factory level=1 → appraised 200_000; 70% cap = 140_000
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "CapColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
+
         await db.SaveChangesAsync();
 
-        // Request more than MaxPrincipalPerLoan
+        // Request 160_000 which exceeds 70% LTV of 200_000 appraised = 140_000
         var result = await ExecuteGraphQlAsync(
             """
             mutation Accept($input: AcceptLoanInput!) {
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 80_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 160_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var errors = result.GetProperty("errors");
         Assert.True(errors.GetArrayLength() > 0);
         var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
-        Assert.Equal("EXCEEDS_MAX_PRINCIPAL", code);
+        Assert.Equal("EXCEEDS_COLLATERAL_LIMIT", code);
     }
 
     [Fact]
@@ -26376,10 +26242,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "MylLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "MylBorrowerCo", Cash = 1_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "MylBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "MylBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 300_000m, LendingInterestRatePercent = 8m };
         db.Buildings.Add(bank);
-        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 8m, MaxPrincipalPerLoan = 50_000m, TotalCapacity = 200_000m, UsedCapacity = 0m, DurationTicks = 720L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 200_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "MylColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
         await db.SaveChangesAsync();
 
         // Accept the loan
@@ -26389,7 +26256,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 30_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 30_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         // Query my loans
@@ -26408,41 +26275,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal("MylLenderCo", l.GetProperty("lenderCompanyName").GetString());
     }
 
-    [Fact]
-    public async Task DeactivateLoanOffer_ByOwner_HidesFromBorrowers()
-    {
-        var lenderEmail = $"deact-lender-{Guid.NewGuid():N}@test.com";
-        var borrowerEmail = $"deact-borrower-{Guid.NewGuid():N}@test.com";
-        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "DeactLender");
-        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "DeactBorrower");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
-        var city = await db.Cities.FirstDeterministicAsync();
-        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "DeactLenderCo", Cash = 500_000m };
-        db.Companies.Add(lenderCompany);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "DeactBank", Level = 1 };
-        db.Buildings.Add(bank);
-        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 9m, MaxPrincipalPerLoan = 10_000m, TotalCapacity = 50_000m, UsedCapacity = 0m, DurationTicks = 720L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
-        db.LoanOffers.Add(offer);
-        await db.SaveChangesAsync();
-
-        // Deactivate it
-        var deactResult = await ExecuteGraphQlAsync(
-            "mutation Deact($id: UUID!) { deactivateLoanOffer(loanOfferId: $id) { id isActive } }",
-            new { id = offer.Id.ToString() },
-            lenderToken);
-        var deactOffer = deactResult.GetProperty("data").GetProperty("deactivateLoanOffer");
-        Assert.False(deactOffer.GetProperty("isActive").GetBoolean());
-
-        // Borrower should not see it
-        var listResult = await ExecuteGraphQlAsync("query { loanOffers { id } }", null, borrowerToken);
-        var ids = listResult.GetProperty("data").GetProperty("loanOffers")
-            .EnumerateArray().Select(o => o.GetProperty("id").GetString()).ToList();
-        Assert.DoesNotContain(offer.Id.ToString(), ids);
-    }
 
     [Fact]
     public async Task LoanRepayment_TickEngine_ReducesPrincipalAndMovesBalance()
@@ -26462,16 +26295,17 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "TrLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "TrBorrowerCo", Cash = 200_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "TrBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "TrBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 200_000m, LendingInterestRatePercent = 12m };
         db.Buildings.Add(bank);
-        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 12m, MaxPrincipalPerLoan = 50_000m, TotalCapacity = 200_000m, UsedCapacity = 0m, DurationTicks = 1440L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 50_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "TrColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
         await db.SaveChangesAsync();
 
         // Accept loan
         await ExecuteGraphQlAsync(
             "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id nextPaymentTick } }",
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 10_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 10_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var loanFromDb = await db.Loans.FirstAsync(l => l.BorrowerCompanyId == borrowerCompany.Id);
@@ -26580,37 +26414,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(penaltyEntry, "Missed payment penalty should create a ledger entry.");
     }
 
-    [Fact]
-    public async Task UpdateLoanOffer_ByOwner_UpdatesFields()
-    {
-        var email = $"upd-offer-{Guid.NewGuid():N}@test.com";
-        var token = await RegisterAndGetTokenAsync(email, "UpdateOffer Tester");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var player = await db.Players.FirstAsync(p => p.Email == email);
-        var city = await db.Cities.FirstDeterministicAsync();
-        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "UpdateOfferCo", Cash = 500_000m };
-        db.Companies.Add(company);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = company.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "UpdateBank", Level = 1 };
-        db.Buildings.Add(bank);
-        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = company.Id, AnnualInterestRatePercent = 10m, MaxPrincipalPerLoan = 10_000m, TotalCapacity = 50_000m, UsedCapacity = 0m, DurationTicks = 720L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
-        db.LoanOffers.Add(offer);
-        await db.SaveChangesAsync();
-
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation Update($input: UpdateLoanOfferInput!) {
-              updateLoanOffer(input: $input) { id annualInterestRatePercent isActive }
-            }
-            """,
-            new { input = new { loanOfferId = offer.Id.ToString(), annualInterestRatePercent = (decimal?)18.5m, isActive = (bool?)false } },
-            token);
-
-        var updated = result.GetProperty("data").GetProperty("updateLoanOffer");
-        Assert.Equal(18.5m, updated.GetProperty("annualInterestRatePercent").GetDecimal());
-        Assert.False(updated.GetProperty("isActive").GetBoolean());
-    }
 
     [Fact]
     public async Task GetBankLoans_ByBankOwner_ReturnsIssuedLoans()
@@ -26630,16 +26434,17 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "BLLenderCo", Cash = 500_000m };
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BLBorrowerCo", Cash = 1_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "BLBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "BLBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 300_000m, LendingInterestRatePercent = 11m };
         db.Buildings.Add(bank);
-        var offer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 11m, MaxPrincipalPerLoan = 20_000m, TotalCapacity = 100_000m, UsedCapacity = 0m, DurationTicks = 720L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 100_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "BLColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
         await db.SaveChangesAsync();
 
         // Borrower accepts
         await ExecuteGraphQlAsync(
             "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id } }",
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 15_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 15_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         // Lender queries bank loans
@@ -26658,7 +26463,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     [Fact]
     public async Task AcceptLoan_InsufficientBankCapacity_ReturnsError()
     {
-        // Offer has TotalCapacity=5000, UsedCapacity=4900 — requesting 200 would exceed capacity
+        // Bank has TotalDeposits=2000, 90% lendable = 1800; pre-existing loan of 1700 leaves ~100 lendable; requesting 200 exceeds capacity
         var lenderEmail = $"cap-full-lender-{Guid.NewGuid():N}@test.com";
         var borrowerEmail = $"cap-full-borrower-{Guid.NewGuid():N}@test.com";
         var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "CapFullLender");
@@ -26675,34 +26480,30 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "CapFullBorrowerCo", Cash = 1_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "CapFullBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "CapFullBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 2_000m, LendingInterestRatePercent = 10m };
         db.Buildings.Add(bank);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 10m,
-            MaxPrincipalPerLoan = 10_000m,
-            TotalCapacity = 5_000m,
-            UsedCapacity = 4_900m, // nearly exhausted — only 100 available
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 500_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "CapFullColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
+
+        // Pre-existing loan of 1700 to exhaust most of the 1800 lendable capacity
+        var internalOffer = new Api.Data.Entities.LoanOffer { Id = Guid.NewGuid(), BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, AnnualInterestRatePercent = 10m, MaxPrincipalPerLoan = 2_000m, TotalCapacity = 2_000m, UsedCapacity = 1_700m, DurationTicks = 1440L, IsActive = true, CreatedAtTick = 1L, CreatedAtUtc = DateTime.UtcNow };
+        db.LoanOffers.Add(internalOffer);
+        var gs = await db.GameStates.FirstDeterministicAsync();
+        db.Loans.Add(new Api.Data.Entities.Loan { Id = Guid.NewGuid(), LoanOfferId = internalOffer.Id, BorrowerCompanyId = borrowerCompany.Id, BankBuildingId = bank.Id, LenderCompanyId = lenderCompany.Id, OriginalPrincipal = 1_700m, RemainingPrincipal = 1_700m, AnnualInterestRatePercent = 10m, DurationTicks = 1440L, StartTick = gs.CurrentTick, DueTick = gs.CurrentTick + 1440L, NextPaymentTick = gs.CurrentTick + 720L, PaymentAmount = 100m, PaymentsMade = 0, TotalPayments = 2, Status = Api.Data.Entities.LoanStatus.Active, AcceptedAtUtc = DateTime.UtcNow });
+
         await db.SaveChangesAsync();
 
-        // Request 200 which exceeds remaining capacity of 100
+        // Request 200 which exceeds remaining capacity (~100)
         var result = await ExecuteGraphQlAsync(
             """
             mutation Accept($input: AcceptLoanInput!) {
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 200m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 200m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var errors = result.GetProperty("errors");
@@ -26901,26 +26702,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "ColBorrowerCo", Cash = 5_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "ColBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "ColBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 2_000_000m, LendingInterestRatePercent = 8m };
         // Factory owned by borrower (appraised value = 200_000 * level 1 = 200_000; 70% = 140_000)
         var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "BorrowerFactory", Level = 1 };
         db.Buildings.AddRange(bank, collateralFactory);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 8m,
-            MaxPrincipalPerLoan = 200_000m,
-            TotalCapacity = 500_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 1_000_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
         await db.SaveChangesAsync();
 
         // Borrow 100_000 (< 140_000 = 70% of 200_000 factory value) with collateral
@@ -26932,7 +26720,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
               }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 100_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 100_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var loan = result.GetProperty("data").GetProperty("acceptLoan");
@@ -26961,26 +26749,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "LTVBorrowerCo", Cash = 5_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "LTVBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "LTVBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 2_000_000m, LendingInterestRatePercent = 8m };
         // Factory level 1 → appraised 200_000; 70% cap = 140_000
         var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "LTVFactory", Level = 1 };
         db.Buildings.AddRange(bank, collateralFactory);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 8m,
-            MaxPrincipalPerLoan = 300_000m,
-            TotalCapacity = 1_000_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 1_000_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
         await db.SaveChangesAsync();
 
         // Try to borrow 160_000 (> 140_000 = 70% of 200_000)
@@ -26990,7 +26765,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 160_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 160_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var errors = result.GetProperty("errors");
@@ -27021,26 +26796,13 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var otherCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = otherPlayer.Id, Name = "NOOtherCo", Cash = 50_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany, otherCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "NOBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "NOBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 2_000_000m, LendingInterestRatePercent = 8m };
         // Factory owned by OTHER, not borrower
         var otherFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = otherCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "OtherFactory", Level = 1 };
         db.Buildings.AddRange(bank, otherFactory);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 8m,
-            MaxPrincipalPerLoan = 200_000m,
-            TotalCapacity = 500_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 1_000_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
         await db.SaveChangesAsync();
 
         var result = await ExecuteGraphQlAsync(
@@ -27049,7 +26811,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 50_000m, collateralBuildingId = otherFactory.Id.ToString() } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 50_000m, collateralBuildingId = otherFactory.Id.ToString() } },
             borrowerToken);
 
         var errors = result.GetProperty("errors");
@@ -27076,12 +26838,15 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "PledgedBorrowerCo", Cash = 5_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "PledgedBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "PledgedBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 2_000_000m, LendingInterestRatePercent = 8m };
         // Factory level 1 → appraised 200_000; 70% = 140_000
         var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "PledgedFactory", Level = 1 };
         db.Buildings.AddRange(bank, collateralFactory);
 
-        var offer = new Api.Data.Entities.LoanOffer
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 1_000_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
+        // Internal offer needed for the FK on existingLoan.LoanOfferId
+        var internalOffer = new Api.Data.Entities.LoanOffer
         {
             Id = Guid.NewGuid(),
             BankBuildingId = bank.Id,
@@ -27091,18 +26856,18 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             TotalCapacity = 1_000_000m,
             UsedCapacity = 0m,
             DurationTicks = 1440L,
-            IsActive = true,
+            IsActive = false,
             CreatedAtTick = 1L,
             CreatedAtUtc = DateTime.UtcNow
         };
-        db.LoanOffers.Add(offer);
+        db.LoanOffers.Add(internalOffer);
 
         // First loan: successfully pledges the factory
         var gs = await db.GameStates.FirstDeterministicAsync();
         var existingLoan = new Api.Data.Entities.Loan
         {
             Id = Guid.NewGuid(),
-            LoanOfferId = offer.Id,
+            LoanOfferId = internalOffer.Id,
             BorrowerCompanyId = borrowerCompany.Id,
             BankBuildingId = bank.Id,
             LenderCompanyId = lenderCompany.Id,
@@ -27124,14 +26889,14 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         db.Loans.Add(existingLoan);
         await db.SaveChangesAsync();
 
-        // Second loan attempt on the same building
+        // Second loan attempt on the same building — should be rejected
         var result = await ExecuteGraphQlAsync(
             """
             mutation Accept($input: AcceptLoanInput!) {
               acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 30_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 30_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
             borrowerToken);
 
         var errors = result.GetProperty("errors");
@@ -27191,9 +26956,9 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
-    public async Task AcceptLoan_NoCollateral_StillWorks()
+    public async Task AcceptLoan_NoCollateral_ReturnsCollateralRequired()
     {
-        // Ensures the collateral field remains optional and unsecured loans still work.
+        // Collateral is now required; omitting it must return COLLATERAL_REQUIRED error.
         var lenderEmail = $"unsec-lender-{Guid.NewGuid():N}@test.com";
         var borrowerEmail = $"unsec-borrower-{Guid.NewGuid():N}@test.com";
         var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "UnsecLender");
@@ -27210,43 +26975,26 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "UnsecBorrowerCo", Cash = 1_000m };
         db.Companies.AddRange(lenderCompany, borrowerCompany);
 
-        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "UnsecBank", Level = 1 };
+        var bank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "UnsecBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 300_000m };
         db.Buildings.Add(bank);
 
-        var offer = new Api.Data.Entities.LoanOffer
-        {
-            Id = Guid.NewGuid(),
-            BankBuildingId = bank.Id,
-            LenderCompanyId = lenderCompany.Id,
-            AnnualInterestRatePercent = 10m,
-            MaxPrincipalPerLoan = 100_000m,
-            TotalCapacity = 300_000m,
-            UsedCapacity = 0m,
-            DurationTicks = 1440L,
-            IsActive = true,
-            CreatedAtTick = 1L,
-            CreatedAtUtc = DateTime.UtcNow
-        };
-        db.LoanOffers.Add(offer);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 200_000m, IsGovernmentAccount = false, CreatedAtUtc = DateTime.UtcNow });
+
         await db.SaveChangesAsync();
 
-        // No collateralBuildingId — should succeed as unsecured loan
+        // No collateralBuildingId — should return COLLATERAL_REQUIRED
         var result = await ExecuteGraphQlAsync(
             """
             mutation Accept($input: AcceptLoanInput!) {
-              acceptLoan(input: $input) {
-                id status originalPrincipal collateralBuildingId collateralAppraisedValue
-              }
+              acceptLoan(input: $input) { id }
             }
             """,
-            new { input = new { loanOfferId = offer.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 20_000m } },
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 20_000m } },
             borrowerToken);
 
-        var loan = result.GetProperty("data").GetProperty("acceptLoan");
-        Assert.Equal("ACTIVE", loan.GetProperty("status").GetString());
-        Assert.Equal(20_000m, loan.GetProperty("originalPrincipal").GetDecimal());
-        Assert.Equal(JsonValueKind.Null, loan.GetProperty("collateralBuildingId").ValueKind);
-        Assert.Equal(JsonValueKind.Null, loan.GetProperty("collateralAppraisedValue").ValueKind);
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Should return error when collateral is not provided.");
+        Assert.Equal("COLLATERAL_REQUIRED", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]
@@ -27309,6 +27057,347 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(
             loan.Status == Api.Data.Entities.LoanStatus.Repaid || loan.RemainingPrincipal == 0m,
             $"Loan should be REPAID after final payment. Actual status: {loan.Status}, remaining: {loan.RemainingPrincipal}");
+    }
+
+    [Fact]
+    public async Task AcceptLoan_FromGovernmentBank_Succeeds()
+    {
+        // Government bank (IsGovernmentAccount=true) can issue loans; borrower gets principal.
+        var govEmail = $"gov-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"gov-borrower-{Guid.NewGuid():N}@test.com";
+        var govToken = await RegisterAndGetTokenAsync(govEmail, "GovLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "GovBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var govPlayer = await db.Players.FirstAsync(p => p.Email == govEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var govCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = govPlayer.Id, Name = "GovBankCo", Cash = 5_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "GovBorrowerCo", Cash = 1_000m };
+        db.Companies.AddRange(govCompany, borrowerCompany);
+
+        var govBank = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = govCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Bank, Name = "GovernmentBank", Level = 1, BaseCapitalDeposited = true, TotalDeposits = 10_000_000m, LendingInterestRatePercent = 5m };
+        db.Buildings.Add(govBank);
+
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount { Id = Guid.NewGuid(), CompanyId = govCompany.Id, AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"), CurrencyCode = city.CurrencyCode, Balance = 5_000_000m, IsGovernmentAccount = true, CreatedAtUtc = DateTime.UtcNow });
+
+        var collateralFactory = new Api.Data.Entities.Building { Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id, Type = Api.Data.Entities.BuildingType.Factory, Name = "GovColFactory", Level = 1 };
+        db.Buildings.Add(collateralFactory);
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id status originalPrincipal annualInterestRatePercent collateralBuildingId
+              }
+            }
+            """,
+            new { input = new { loanOfferId = govBank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 50_000m, collateralBuildingId = collateralFactory.Id.ToString() } },
+            borrowerToken);
+
+        var loan = result.GetProperty("data").GetProperty("acceptLoan");
+        Assert.Equal("ACTIVE", loan.GetProperty("status").GetString());
+        Assert.Equal(50_000m, loan.GetProperty("originalPrincipal").GetDecimal());
+        Assert.Equal(5m, loan.GetProperty("annualInterestRatePercent").GetDecimal());
+        Assert.Equal(collateralFactory.Id.ToString(), loan.GetProperty("collateralBuildingId").GetString());
+    }
+
+    // ── Atomic debit/credit regression tests ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AcceptLoan_LenderHasNoActualFunds_ReturnsError_BorrowerBalanceUnchanged()
+    {
+        // Lender bank has TotalDeposits (capacity check passes) but zero account balance.
+        // The LENDER_INSUFFICIENT_FUNDS guard must fire and leave the borrower's balance untouched.
+        var lenderEmail = $"lender-no-funds-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"borrower-no-funds-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "Lender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "Borrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "EmptyBankCo", Cash = 0m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BorrowerCo", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        // Bank has capacity on paper but NO actual liquidity accounts.
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "EmptyBank", Level = 1,
+            BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+
+        var collateralBuilding = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral", Level = 1,
+        };
+        db.Buildings.Add(collateralBuilding);
+
+        var borrowerAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 5_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(borrowerAccount);
+        await db.SaveChangesAsync();
+
+        var borrowerBalanceBefore = borrowerAccount.Balance;
+
+        var result = await ExecuteGraphQlAsync(
+            "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id } }",
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 20_000m, collateralBuildingId = collateralBuilding.Id.ToString() } },
+            borrowerToken);
+
+        // Mutation must fail.
+        Assert.True(result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("LENDER_INSUFFICIENT_FUNDS", code);
+
+        // Borrower balance must be unchanged — no money was minted.
+        await db.Entry(borrowerAccount).ReloadAsync();
+        Assert.Equal(borrowerBalanceBefore, borrowerAccount.Balance);
+
+        // No loan record must have been created.
+        var loanCount = await db.Loans.CountAsync(l => l.BorrowerCompanyId == borrowerCompany.Id);
+        Assert.Equal(0, loanCount);
+
+        // No ledger entry must have been created for either party.
+        Assert.False(await db.LedgerEntries.AnyAsync(e => e.CompanyId == borrowerCompany.Id || e.CompanyId == lenderCompany.Id));
+    }
+
+    [Fact]
+    public async Task AcceptLoan_SequentialExhaustion_SecondLoanFails_TotalBalancePreserved()
+    {
+        // Bank has exactly 50,000 — enough for one 40,000 loan but not two.
+        // Verifies sequential exhaustion protection and that total money is conserved.
+        var lenderEmail = $"lender-seq-{Guid.NewGuid():N}@test.com";
+        var borrower1Email = $"borrower1-seq-{Guid.NewGuid():N}@test.com";
+        var borrower2Email = $"borrower2-seq-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "Lender");
+        var borrower1Token = await RegisterAndGetTokenAsync(borrower1Email, "Borrower1");
+        var borrower2Token = await RegisterAndGetTokenAsync(borrower2Email, "Borrower2");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrower1Player = await db.Players.FirstAsync(p => p.Email == borrower1Email);
+        var borrower2Player = await db.Players.FirstAsync(p => p.Email == borrower2Email);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LenderCo", Cash = 0m };
+        var borrower1Company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrower1Player.Id, Name = "Borrower1", Cash = 0m };
+        var borrower2Company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrower2Player.Id, Name = "Borrower2", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrower1Company, borrower2Company);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "TestBank", Level = 1,
+            BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+
+        // Bank has EXACTLY 50,000 — enough for one 40,000 loan.
+        var bankAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 50_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        var collateral1 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrower1Company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral1", Level = 1,
+        };
+        var collateral2 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrower2Company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral2", Level = 1,
+        };
+        db.Buildings.AddRange(collateral1, collateral2);
+        await db.SaveChangesAsync();
+
+        const decimal loanAmount = 40_000m;
+        const string acceptMutation = "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id status } }";
+
+        // First loan takes 40,000 from the bank — should succeed.
+        var result1 = await ExecuteGraphQlAsync(
+            acceptMutation,
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrower1Company.Id.ToString(), principalAmount = loanAmount, collateralBuildingId = collateral1.Id.ToString() } },
+            borrower1Token);
+        Assert.False(result1.TryGetProperty("errors", out _), "First loan should succeed.");
+
+        // Second loan of 40,000 — bank only has 10,000 left; should fail.
+        var result2 = await ExecuteGraphQlAsync(
+            acceptMutation,
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrower2Company.Id.ToString(), principalAmount = loanAmount, collateralBuildingId = collateral2.Id.ToString() } },
+            borrower2Token);
+        Assert.True(result2.TryGetProperty("errors", out var errs2) && errs2.GetArrayLength() > 0, "Second loan should fail.");
+
+        // Verify total money is conserved: lender gave 40,000 to borrower1; borrower2 got nothing.
+        var lenderBalance = await db.BankAccounts.Where(a => a.CompanyId == lenderCompany.Id && a.ClosedAtUtc == null).SumAsync(a => a.Balance);
+        var borrower1Balance = await db.BankAccounts.Where(a => a.CompanyId == borrower1Company.Id && a.ClosedAtUtc == null).SumAsync(a => a.Balance);
+        var borrower2Balance = await db.BankAccounts.Where(a => a.CompanyId == borrower2Company.Id && a.ClosedAtUtc == null).SumAsync(a => a.Balance);
+
+        Assert.Equal(50_000m - loanAmount, lenderBalance);
+        Assert.Equal(loanAmount, borrower1Balance);
+        Assert.Equal(0m, borrower2Balance);
+
+        // Total money in system must equal the original 50,000 — no money minted or destroyed.
+        Assert.Equal(50_000m, lenderBalance + borrower1Balance + borrower2Balance);
+
+        // Exactly one loan created.
+        var loanCount = await db.Loans.CountAsync(l => l.BankBuildingId == bank.Id);
+        Assert.Equal(1, loanCount);
+    }
+
+    [Fact]
+    public async Task AcceptLoan_BothSidesGetLedgerEntry_LenderNegativeBorrowerPositive()
+    {
+        // After a successful loan, both the lender and borrower must have LoanOrigination ledger entries.
+        // Lender's entry must be negative (outflow); borrower's must be positive (inflow).
+        var lenderEmail = $"lender-ledger-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"borrower-ledger-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "Lender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "Borrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LenderCo2", Cash = 0m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BorrowerCo2", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "TestBank2", Level = 1,
+            BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 500_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        var collateralBuilding = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral3", Level = 1,
+        };
+        db.Buildings.Add(collateralBuilding);
+        await db.SaveChangesAsync();
+
+        const decimal loanAmount = 30_000m;
+        await ExecuteGraphQlAsync(
+            "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id } }",
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = loanAmount, collateralBuildingId = collateralBuilding.Id.ToString() } },
+            borrowerToken);
+
+        // Lender must have a negative LoanOrigination entry.
+        var lenderEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == lenderCompany.Id && e.Category == Api.Data.Entities.LedgerCategory.LoanOrigination);
+        Assert.NotNull(lenderEntry);
+        Assert.Equal(-loanAmount, lenderEntry.Amount);
+
+        // Borrower must have a positive LoanOrigination entry.
+        var borrowerEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == borrowerCompany.Id && e.Category == Api.Data.Entities.LedgerCategory.LoanOrigination);
+        Assert.NotNull(borrowerEntry);
+        Assert.Equal(loanAmount, borrowerEntry.Amount);
+    }
+
+    [Fact]
+    public async Task AcceptLoan_ConcurrencyToken_PreventsDoubleDebit_WhenSecondContextHasStaleToken()
+    {
+        // Directly verifies the ConcurrencyToken mechanism using two EF scopes, simulating
+        // what happens when two concurrent loan requests both load the same lender bank account.
+        //
+        // Scope 1 loads, debits, and saves successfully (bumping the store token).
+        // Scope 2 loaded the same account before scope 1 saved, so its tracked "original" token
+        // is now stale. When scope 2 tries to save, EF detects the mismatch and throws
+        // DbUpdateConcurrencyException — preventing the double-debit / money-minting race.
+
+        var ownerEmail = $"ct-test-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "Owner");
+
+        await using var setupScope = _factory.Services.CreateAsyncScope();
+        var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await setupDb.Cities.FirstDeterministicAsync();
+        var player = await setupDb.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "CtTestCo", Cash = 0m };
+        setupDb.Companies.Add(company);
+
+        var account = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 100_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        setupDb.BankAccounts.Add(account);
+        await setupDb.SaveChangesAsync();
+
+        var accountId = account.Id;
+        var originalToken = account.ConcurrencyToken; // Token value after initial save.
+
+        // Scope 1: load, debit, save — simulates the first concurrent loan request persisting.
+        await using var scope1 = _factory.Services.CreateAsyncScope();
+        var db1 = scope1.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account1 = await db1.BankAccounts.FindAsync(accountId);
+        Assert.NotNull(account1);
+        account1.Balance -= 40_000m;
+        account1.ConcurrencyToken = Guid.NewGuid(); // TryDebit bumps the token.
+        await db1.SaveChangesAsync(); // Succeeds; store token is now scope1's new value.
+
+        // Scope 2: simulates a request that loaded the entity BEFORE scope1's save.
+        // We load the entity fresh (which would now have scope1's token) and then
+        // override the tracked "original" token with the stale pre-scope1 value to
+        // replicate the race condition.
+        await using var scope2 = _factory.Services.CreateAsyncScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account2 = await db2.BankAccounts.FindAsync(accountId);
+        Assert.NotNull(account2);
+
+        // Rewind the original value to simulate scope2 having loaded before scope1's save.
+        db2.Entry(account2).Property(a => a.ConcurrencyToken).OriginalValue = originalToken;
+
+        account2.Balance -= 40_000m;
+        account2.ConcurrencyToken = Guid.NewGuid(); // TryDebit bumps the token again.
+
+        // SaveChangesAsync must fail: store has scope1's token; scope2 expects originalToken.
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db2.SaveChangesAsync());
+
+        // Verify the lender balance was reduced exactly once (only scope1's debit persisted).
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var finalAccount = await verifyDb.BankAccounts.FindAsync(accountId);
+        Assert.NotNull(finalAccount);
+        Assert.Equal(60_000m, finalAccount.Balance); // 100,000 − 40,000 = 60,000
     }
 
     #endregion
@@ -27766,37 +27855,7 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.True(data.GetProperty("baseCapitalDeposited").GetBoolean());
     }
 
-    [Fact]
-    public async Task PublishLoanOffer_ExceedsReserveRatio_ReturnsError()
-    {
-        var ownerEmail = $"bank-reserve-{Guid.NewGuid():N}@test.com";
-        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "ReserveOwner");
 
-        await using var scope = _factory.Services.CreateAsyncScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
-        var city = await db.Cities.FirstDeterministicAsync();
-
-        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = "ReserveCo", Cash = 1_000_000m };
-        db.Companies.Add(company);
-        // Bank with only $1M in deposits → lendable = $900k
-        var bank = CreateTestBank(db, company, city.Id, totalDeposits: 1_000_000m);
-        await db.SaveChangesAsync();
-
-        // Try to offer $950k — exceeds the 90% ($900k) limit
-        var result = await ExecuteGraphQlAsync(
-            """
-            mutation Pub($input: PublishLoanOfferInput!) {
-              publishLoanOffer(input: $input) { id }
-            }
-            """,
-            new { input = new { bankBuildingId = bank.Id.ToString(), annualInterestRatePercent = 8m, maxPrincipalPerLoan = 50_000m, totalCapacity = 950_000m, durationTicks = 1440L } },
-            ownerToken);
-
-        var errors = result.GetProperty("errors");
-        Assert.True(errors.GetArrayLength() > 0);
-        Assert.Equal("EXCEEDS_RESERVE_RATIO", errors[0].GetProperty("extensions").GetProperty("code").GetString());
-    }
 
     [Fact]
     public async Task BankInterestPhase_PaysInterestToDepositor()

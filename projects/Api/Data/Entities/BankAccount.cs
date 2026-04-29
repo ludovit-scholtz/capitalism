@@ -100,4 +100,11 @@ public sealed class BankAccount
 
     /// <summary>UTC timestamp when this account was created.</summary>
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Optimistic-concurrency token. Bumped on every balance mutation so that concurrent
+    /// requests targeting the same account produce a <see cref="Microsoft.EntityFrameworkCore.DbUpdateConcurrencyException"/>
+    /// on the second writer, preventing double-spend / money-minting races.
+    /// </summary>
+    public Guid ConcurrencyToken { get; set; } = Guid.NewGuid();
 }
