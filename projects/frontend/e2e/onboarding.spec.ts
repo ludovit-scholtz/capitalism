@@ -3502,9 +3502,9 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(page.locator('.city-card', { hasText: 'Prague' })).toBeVisible()
     await expect(page.locator('.city-card', { hasText: 'Vienna' })).toBeVisible()
 
-    // Vienna is selectable (click makes it active)
+    // Vienna is selectable; city click now auto-advances to the IPO step.
     await page.locator('.city-card', { hasText: 'Vienna' }).click()
-    await expect(page.locator('.city-card', { hasText: 'Vienna' })).toHaveClass(/selected|active/)
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
   })
 
   test('All 7 global cities are shown on step 2 — including New York, London, Beijing, Delhi', async ({ page }) => {
@@ -3544,9 +3544,9 @@ test.describe('City selection — Vienna as starter city', () => {
     await expect(nyCard).toBeVisible()
     await expect(nyCard.locator('.city-currency', { hasText: 'USD' })).toBeVisible()
 
-    // Card is also selectable
+    // Card is also selectable and advances to the IPO step.
     await nyCard.click()
-    await expect(nyCard).toHaveClass(/selected|active/)
+    await expect(page.getByRole('heading', { name: 'Choose Your IPO Plan' })).toBeVisible()
   })
 
   test('Delhi city card is selectable and persists the choice to step 3', async ({ page }) => {

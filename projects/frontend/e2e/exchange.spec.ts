@@ -11,6 +11,14 @@ function parseQualityRange(text: string | null): number {
 // ── Exchange browsing surface ─────────────────────────────────────────────────
 
 test.describe('Global Exchange page', () => {
+  test('makeDefaultResources returns isolated objects per call', async () => {
+    const first = makeDefaultResources()
+    first[0]!.name = 'Mutated Wood Name'
+
+    const second = makeDefaultResources()
+    expect(second[0]!.name).toBe('Wood')
+  })
+
   test('shows exchange page with heading and subtitle', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')

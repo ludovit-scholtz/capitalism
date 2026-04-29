@@ -1665,7 +1665,13 @@ const chemResource: MockResourceType = {
 }
 
 export function makeDefaultResources(): MockResourceType[] {
-  return [woodResource, grainResource, chemResource]
+  // Return fresh objects for every call so test-local mutations never leak
+  // into other specs running in the same Playwright worker process.
+  return [
+    { ...woodResource },
+    { ...grainResource },
+    { ...chemResource },
+  ]
 }
 
 export function makeBratislava(): MockCity {
