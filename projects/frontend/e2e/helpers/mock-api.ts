@@ -903,6 +903,29 @@ export type MockState = {
   goldAmmPools: MockGoldAmmPool[]
   /** Player gold token balance for the Gold AMM exchange. */
   goldBalance: MockGoldBalance
+  /** City market reports returned by the cityMarketReports query. */
+  marketReports: Array<{
+    id: string
+    cityId: string
+    cityName: string
+    reportType: 'WEEKLY' | 'MONTHLY'
+    tickFrom: number
+    tickTo: number
+    totalRevenue: number
+    totalQuantitySold: number
+    uniqueProducts: number
+    topProducts: Array<{
+      productTypeId: string
+      productName: string
+      industry: string
+      totalRevenue: number
+      totalQuantitySold: number
+      averagePricePerUnit: number
+      basePrice: number
+      grossMarginPct: number
+      sellerCount: number
+    }>
+  }>
 }
 
 const mockStateByPage = new WeakMap<Page, MockState>()
@@ -2149,6 +2172,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
     myBankAccounts: [],
     goldAmmPools: [],
     goldBalance: { balance: 0, blockedInPools: 0, availableBalance: 0 },
+    marketReports: [],
     ...initial,
   }
 
@@ -5888,6 +5912,20 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           items,
         },
       })
+    }
+
+    if (query.includes('cityMarketReports')) {
+      const vars = body.variables ?? {}
+      let reports = [...state.marketReports]
+      if (vars.cityId) {
+        reports = reports.filter((r) => r.cityId === vars.cityId)
+      }
+      if (vars.reportType) {
+        reports = reports.filter((r) => r.reportType === vars.reportType)
+      }
+      const limit = Math.min(vars.limit ?? 10, 100)
+      reports = reports.slice(0, limit)
+      return routeJson({ cityMarketReports: reports })
     }
 
     if (query.includes('gameAdminSession') && !query.includes('buildingBankAccount') && !query.includes('assignBuildingBankAccount') && !query.includes('createCompanyBankAccount')) {

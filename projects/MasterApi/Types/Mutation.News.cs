@@ -27,7 +27,7 @@ public sealed partial class Mutation
         {
             throw new GraphQLException(
                 ErrorBuilder.New()
-                    .SetMessage("Entry type must be NEWS or CHANGELOG.")
+                    .SetMessage("Entry type must be NEWS, CHANGELOG, or MARKET_REPORT.")
                     .SetCode("INVALID_ENTRY_TYPE")
                     .Build());
         }

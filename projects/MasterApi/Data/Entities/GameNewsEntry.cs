@@ -61,11 +61,13 @@ public static class GameNewsEntryType
 {
     public const string News = "NEWS";
     public const string Changelog = "CHANGELOG";
+    public const string MarketReport = "MARKET_REPORT";
 
     public static readonly IReadOnlySet<string> All = new HashSet<string>(StringComparer.Ordinal)
     {
         News,
         Changelog,
+        MarketReport,
     };
 }
 

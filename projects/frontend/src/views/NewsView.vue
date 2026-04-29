@@ -12,7 +12,7 @@ const { t, locale } = useI18n()
 const auth = useAuthStore()
 const newsStore = useNewsStore()
 
-const filter = ref<'ALL' | 'NEWS' | 'CHANGELOG'>('ALL')
+const filter = ref<'ALL' | 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'>('ALL')
 const viewError = ref<string | null>(null)
 
 /** IDs that were unread when the page first loaded – used to keep "New" badges
@@ -67,6 +67,18 @@ function shouldShowSummary(entry: GameNewsEntry): boolean {
   return true
 }
 
+function entryTypeLabel(entryType: string): string {
+  if (entryType === 'CHANGELOG') return t('news.filterChangelog')
+  if (entryType === 'MARKET_REPORT') return t('news.filterMarketReport')
+  return t('news.filterNews')
+}
+
+function entryTypePillClass(entryType: string): string {
+  if (entryType === 'CHANGELOG') return 'news-pill-changelog'
+  if (entryType === 'MARKET_REPORT') return 'news-pill-market'
+  return 'news-pill-news'
+}
+
 async function loadFeed() {
   viewError.value = null
 
@@ -113,6 +125,14 @@ onMounted(async () => {
           <button type="button" class="news-filter" :class="{ active: filter === 'CHANGELOG' }" @click="filter = 'CHANGELOG'">
             {{ t('news.filterChangelog') }}
           </button>
+          <button
+            type="button"
+            class="news-filter news-filter-market"
+            :class="{ active: filter === 'MARKET_REPORT' }"
+            @click="filter = 'MARKET_REPORT'"
+          >
+            📊 {{ t('news.filterMarketReport') }}
+          </button>
         </div>
       </div>
     </section>
@@ -131,16 +151,25 @@ onMounted(async () => {
 
       <div v-else-if="entries.length === 0" class="state-card">
         <p class="state-title">{{ t('news.emptyTitle') }}</p>
-        <p class="state-copy">{{ t('news.emptyBody') }}</p>
+        <p v-if="filter === 'MARKET_REPORT'" class="state-copy">{{ t('news.marketReportEmptyBody') }}</p>
+        <p v-else class="state-copy">{{ t('news.emptyBody') }}</p>
       </div>
 
       <div v-else class="news-entry-list">
-        <article v-for="entry in entries" :key="entry.id" class="news-card" :class="{ 'news-card-unread': initiallyUnreadIds.has(entry.id) }">
+        <article
+          v-for="entry in entries"
+          :key="entry.id"
+          class="news-card"
+          :class="{
+            'news-card-unread': initiallyUnreadIds.has(entry.id),
+            'news-card-market': entry.entryType === 'MARKET_REPORT',
+          }"
+        >
           <div class="news-card-header">
             <div class="news-card-meta">
               <div class="news-card-pills">
-                <span class="news-pill" :class="entry.entryType === 'CHANGELOG' ? 'news-pill-changelog' : 'news-pill-news'">
-                  {{ entry.entryType === 'CHANGELOG' ? t('news.filterChangelog') : t('news.filterNews') }}
+                <span class="news-pill" :class="entryTypePillClass(entry.entryType)">
+                  {{ entryTypeLabel(entry.entryType) }}
                 </span>
                 <span v-if="initiallyUnreadIds.has(entry.id)" class="news-unread-badge">{{ t('news.unread') }}</span>
               </div>
@@ -213,6 +242,12 @@ onMounted(async () => {
   color: #ffd7a3;
 }
 
+.news-filter-market.active {
+  background: rgba(0, 200, 150, 0.18);
+  border-color: rgba(0, 200, 150, 0.5);
+  color: #7af5d9;
+}
+
 .news-content {
   padding-top: 2rem;
 }
@@ -250,6 +285,11 @@ onMounted(async () => {
   border: 1px solid var(--color-border);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
   box-shadow: var(--shadow-sm);
+}
+
+.news-card-market {
+  border-color: rgba(0, 200, 150, 0.25);
+  background: linear-gradient(180deg, rgba(0, 200, 150, 0.04), rgba(255, 255, 255, 0));
 }
 
 .news-card-header {
@@ -319,6 +359,11 @@ onMounted(async () => {
   color: #8db3ff;
 }
 
+.news-pill-market {
+  background: rgba(0, 200, 150, 0.16);
+  color: #7af5d9;
+}
+
 .news-card-summary {
   margin-bottom: 1rem;
   color: var(--color-text-secondary);
@@ -333,6 +378,93 @@ onMounted(async () => {
   margin: 0.85rem 0 0.85rem 1.25rem;
 }
 
+/* ── Market Report card body styles ───────────────────────────── */
+
+.news-card-body :deep(.market-report) {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.news-card-body :deep(.mr-summary) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 2.5rem;
+  padding: 1rem 1.25rem;
+  background: rgba(0, 200, 150, 0.06);
+  border-radius: var(--radius-md, 0.5rem);
+  border: 1px solid rgba(0, 200, 150, 0.15);
+}
+
+.news-card-body :deep(.mr-summary-item) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.news-card-body :deep(.mr-label) {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.news-card-body :deep(.mr-value) {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.news-card-body :deep(.mr-value-highlight) {
+  color: #7af5d9;
+}
+
+.news-card-body :deep(.mr-table) {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.news-card-body :deep(.mr-table th) {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary, #aaa);
+  white-space: nowrap;
+}
+
+.news-card-body :deep(.mr-table td) {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.news-card-body :deep(.mr-rank) {
+  font-weight: 700;
+  width: 2rem;
+  text-align: center;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.news-card-body :deep(.mr-rank-top1) { color: #ffd700; }
+.news-card-body :deep(.mr-rank-top2) { color: #c0c0c0; }
+.news-card-body :deep(.mr-rank-top3) { color: #cd7f32; }
+
+.news-card-body :deep(.mr-industry) {
+  color: var(--color-text-secondary, #aaa);
+  font-size: 0.78rem;
+}
+
+.news-card-body :deep(.mr-positive) { color: #7af5a9; font-weight: 600; }
+.news-card-body :deep(.mr-neutral)  { color: #ffd7a3; font-weight: 600; }
+.news-card-body :deep(.mr-negative) { color: #f87171; font-weight: 600; }
+
+.news-card-body :deep(.mr-empty) {
+  color: var(--color-text-secondary, #aaa);
+  font-style: italic;
+  padding: 1rem 0;
+}
+
 @media (max-width: 720px) {
   .news-card-header {
     flex-direction: column;
@@ -340,6 +472,13 @@ onMounted(async () => {
 
   .news-card-date {
     white-space: normal;
+  }
+
+  .news-card-body :deep(.mr-table th:nth-child(4)),
+  .news-card-body :deep(.mr-table td:nth-child(4)),
+  .news-card-body :deep(.mr-table th:nth-child(6)),
+  .news-card-body :deep(.mr-table td:nth-child(6)) {
+    display: none;
   }
 }
 </style>

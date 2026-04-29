@@ -774,27 +774,34 @@ public sealed class MasterApiIntegrationTests : IClassFixture<MasterApiWebApplic
                         registrationKey = "test-registration-key",
                         serverKey = "capitalism-local",
                         includeDrafts = false,
-                        limit = 100,
+                        limit = 500,
                     }
                 });
 
             Assert.False(result.TryGetProperty("errors", out _));
             var items = result.GetProperty("data").GetProperty("gameNewsFeed").GetProperty("items").EnumerateArray().ToList();
 
-            // The CSV has 39 rows; after import the feed should contain substantially more than the 4 hardcoded seeds.
+            // CHANGELOG.csv grows over time; use limit=500 above to ensure all rows are returned.
             var changelogItems = items.Where(item =>
                 item.GetProperty("entryType").GetString() == "CHANGELOG"
                 && item.GetProperty("status").GetString() == "PUBLISHED").ToList();
             Assert.True(changelogItems.Count >= 4, $"Expected at least 4 CHANGELOG entries, got {changelogItems.Count}");
 
             // Verify one specific CSV-imported entry (Bank capitalization, GUID 4e587c8a-...) is present and well-formed.
-            var bankCap = changelogItems.FirstOrDefault(item =>
+            // Use Any() + First() instead of FirstOrDefault() to avoid the value-type default(JsonElement)
+            // ambiguity where ValueKind could be Undefined on a valid empty array scenario.
+            bool hasBankCap = changelogItems.Any(item =>
                 item.GetProperty("localizations").EnumerateArray().Any(l =>
                     l.GetProperty("locale").GetString() == "en"
                     && (l.GetProperty("title").GetString() ?? string.Empty)
                            .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
+            Assert.True(hasBankCap, "Expected 'Bank capitalization' entry in the feed but it was not found.");
 
-            Assert.NotNull(bankCap);
+            var bankCap = changelogItems.First(item =>
+                item.GetProperty("localizations").EnumerateArray().Any(l =>
+                    l.GetProperty("locale").GetString() == "en"
+                    && (l.GetProperty("title").GetString() ?? string.Empty)
+                           .Contains("Bank capitalization", StringComparison.OrdinalIgnoreCase)));
             var bankCapLocales = bankCap.GetProperty("localizations").EnumerateArray()
                 .Select(l => l.GetProperty("locale").GetString())
                 .ToHashSet();

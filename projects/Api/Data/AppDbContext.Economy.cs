@@ -277,5 +277,15 @@ public sealed partial class AppDbContext
             e.HasOne(t => t.Pool).WithMany().HasForeignKey(t => t.PoolId).OnDelete(DeleteBehavior.Cascade);
             e.HasIndex(t => new { t.PlayerId, t.ExecutedAtTick });
         });
+
+        modelBuilder.Entity<CityMarketReport>(e =>
+        {
+            e.HasKey(r => r.Id);
+            e.Property(r => r.ReportType).HasMaxLength(20);
+            e.HasOne(r => r.City).WithMany().HasForeignKey(r => r.CityId).OnDelete(DeleteBehavior.Cascade);
+            // Unique constraint: one report per city per type per tick window.
+            e.HasIndex(r => new { r.CityId, r.ReportType, r.TickFrom }).IsUnique();
+            e.HasIndex(r => r.GeneratedAtUtc);
+        });
     }
 }

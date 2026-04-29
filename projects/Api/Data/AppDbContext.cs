@@ -123,6 +123,9 @@ public sealed partial class AppDbContext(DbContextOptions<AppDbContext> options)
     /// <summary>Audit trail for gold AMM swap executions.</summary>
     public DbSet<GoldAmmTradeRecord> GoldAmmTradeRecords => Set<GoldAmmTradeRecord>();
 
+    /// <summary>Generated weekly and monthly city market reports.</summary>
+    public DbSet<CityMarketReport> CityMarketReports => Set<CityMarketReport>();
+
     /// <inheritdoc/>
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
