@@ -366,17 +366,8 @@ function navigateToEntry(slug: string) {
           <h2 class="m-0">{{ t('encyclopedia.onboardingGuideTitle') }}</h2>
           <p class="text-muted m-0">{{ t('encyclopedia.onboardingGuideSubtitle') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-2">
-            <article
-              v-for="card in onboardingGuideCards"
-              :key="card.titleKey"
-              class="onboarding-help-card rounded-xl border border-divider bg-page overflow-hidden"
-            >
-              <img
-                v-if="getGuideCardImage(card)"
-                :src="getGuideCardImage(card) ?? undefined"
-                :alt="t(card.titleKey)"
-                class="help-card-image w-full h-36 object-cover"
-              />
+            <article v-for="card in onboardingGuideCards" :key="card.titleKey" class="onboarding-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <img v-if="getGuideCardImage(card)" :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-36 object-cover" />
               <div class="p-4 flex flex-col gap-2">
                 <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
                 <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
@@ -391,17 +382,8 @@ function navigateToEntry(slug: string) {
           <h2 class="m-0">{{ t('encyclopedia.manufacturingGuideTitle') }}</h2>
           <p class="text-muted m-0">{{ t('encyclopedia.manufacturingGuideSubtitle') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
-            <article
-              v-for="card in manufacturingGuideCards"
-              :key="card.titleKey"
-              class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden"
-            >
-              <img
-                v-if="getGuideCardImage(card)"
-                :src="getGuideCardImage(card) ?? undefined"
-                :alt="t(card.titleKey)"
-                class="help-card-image w-full h-28 object-cover"
-              />
+            <article v-for="card in manufacturingGuideCards" :key="card.titleKey" class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <img v-if="getGuideCardImage(card)" :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-28 object-cover" />
               <div class="p-4 flex flex-col gap-2">
                 <h3 class="m-0 text-base">{{ t(card.titleKey) }}</h3>
                 <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
@@ -412,105 +394,105 @@ function navigateToEntry(slug: string) {
       </div>
 
       <div v-if="selectedTopic === 'resources-definition'" class="flex flex-col gap-2">
-      <div class="flex flex-col gap-1">
-        <h2 class="m-0">{{ t('encyclopedia.resourcesTitle') }}</h2>
-        <p class="text-muted">{{ t('encyclopedia.resourcesHelp') }}</p>
-        <p v-if="hiddenProProductCount > 0 && !showProProducts" class="text-muted text-sm">
-          {{ t('encyclopedia.proHiddenNotice', { count: hiddenProProductCount }) }}
-        </p>
-      </div>
+        <div class="flex flex-col gap-1">
+          <h2 class="m-0">{{ t('encyclopedia.resourcesTitle') }}</h2>
+          <p class="text-muted">{{ t('encyclopedia.resourcesHelp') }}</p>
+          <p v-if="hiddenProProductCount > 0 && !showProProducts" class="text-muted text-sm">
+            {{ t('encyclopedia.proHiddenNotice', { count: hiddenProProductCount }) }}
+          </p>
+        </div>
 
-      <!-- Filters -->
-      <div class="flex items-center gap-4 flex-wrap mt-6">
-        <input v-model="search" type="search" class="flex-1 min-w-60 border border-divider rounded-xl bg-page text-body px-4 py-3" :placeholder="t('encyclopedia.searchPlaceholder')" />
-        <select v-model="industry" class="border border-divider rounded-xl bg-page text-body px-4 py-3" :aria-label="t('encyclopedia.filterByIndustry')">
-          <option v-for="option in industries" :key="option" :value="option">
-            {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
-          </option>
-        </select>
-        <label class="inline-flex items-center gap-2 text-muted font-semibold cursor-pointer">
-          <input v-model="showProProducts" type="checkbox" class="accent-[var(--color-primary)]" />
-          <span>{{ t('encyclopedia.showProProducts') }}</span>
-        </label>
-      </div>
+        <!-- Filters -->
+        <div class="flex items-center gap-4 flex-wrap mt-6">
+          <input v-model="search" type="search" class="flex-1 min-w-60 border border-divider rounded-xl bg-page text-body px-4 py-3" :placeholder="t('encyclopedia.searchPlaceholder')" />
+          <select v-model="industry" class="border border-divider rounded-xl bg-page text-body px-4 py-3" :aria-label="t('encyclopedia.filterByIndustry')">
+            <option v-for="option in industries" :key="option" :value="option">
+              {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
+            </option>
+          </select>
+          <label class="inline-flex items-center gap-2 text-muted font-semibold cursor-pointer">
+            <input v-model="showProProducts" type="checkbox" class="accent-[var(--color-primary)]" />
+            <span>{{ t('encyclopedia.showProProducts') }}</span>
+          </label>
+        </div>
 
-      <!-- Resource grid -->
-      <div class="encyclopedia-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mt-6">
-        <p v-if="catalogEntries.length === 0" class="search-empty-state text-center col-span-full py-12 text-muted">
-          {{ t('encyclopedia.searchNoResults') }}
-        </p>
-        <article
-          v-for="entry in catalogEntries"
-          :key="entry.id"
-          class="resource-card--link bg-card border border-divider rounded-2xl overflow-hidden cursor-pointer hover:border-brand focus-visible:border-brand focus-visible:outline-none transition-colors"
-          :class="`resource-card--${entry.kind}`"
-          role="button"
-          tabindex="0"
-          :aria-label="t('encyclopedia.viewDetail') + ': ' + entry.title"
-          @click="navigateToEntry(entry.slug)"
-          @keydown.enter="navigateToEntry(entry.slug)"
-          @keydown.space.prevent="navigateToEntry(entry.slug)"
-        >
-          <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="w-full h-32 object-cover bg-page" />
-          <div class="p-4 flex flex-col gap-3">
-            <!-- Heading row -->
-            <div class="flex justify-between items-start gap-4">
-              <div>
-                <p class="text-xs font-bold uppercase tracking-[0.05em] text-muted mb-1">
-                  {{ entry.badge }}
-                </p>
-                <h3 class="m-0 text-base font-semibold">{{ entry.title }}</h3>
+        <!-- Resource grid -->
+        <div class="encyclopedia-grid grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6 gap-4 mt-6">
+          <p v-if="catalogEntries.length === 0" class="search-empty-state text-center col-span-full py-12 text-muted">
+            {{ t('encyclopedia.searchNoResults') }}
+          </p>
+          <article
+            v-for="entry in catalogEntries"
+            :key="entry.id"
+            class="resource-card--link bg-card border border-divider rounded-2xl overflow-hidden cursor-pointer hover:border-brand focus-visible:border-brand focus-visible:outline-none transition-colors"
+            :class="`resource-card--${entry.kind}`"
+            role="button"
+            tabindex="0"
+            :aria-label="t('encyclopedia.viewDetail') + ': ' + entry.title"
+            @click="navigateToEntry(entry.slug)"
+            @keydown.enter="navigateToEntry(entry.slug)"
+            @keydown.space.prevent="navigateToEntry(entry.slug)"
+          >
+            <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="w-full h-32 object-cover bg-page" />
+            <div class="p-4 flex flex-col gap-3">
+              <!-- Heading row -->
+              <div class="flex justify-between items-start gap-4">
+                <div>
+                  <p class="text-xs font-bold uppercase tracking-[0.05em] text-muted mb-1">
+                    {{ entry.badge }}
+                  </p>
+                  <h3 class="m-0 text-base font-semibold">{{ entry.title }}</h3>
+                </div>
+                <span class="px-2.5 py-1 rounded-full bg-brand/10 text-brand text-xs font-semibold shrink-0">
+                  {{ entry.pill }}
+                </span>
               </div>
-              <span class="px-2.5 py-1 rounded-full bg-brand/10 text-brand text-xs font-semibold shrink-0">
-                {{ entry.pill }}
+
+              <!-- Pro access badge -->
+              <span
+                v-if="entry.accessText"
+                class="inline-flex items-center justify-center w-fit px-2 py-0.5 rounded-full border text-[0.72rem] font-bold"
+                :class="{
+                  'text-orange-400 border-orange-500/50 bg-orange-500/10': entry.accessClass === 'locked',
+                  'text-green-400 border-green-500/50 bg-green-500/10': entry.accessClass === 'unlocked',
+                }"
+              >
+                {{ entry.accessText }}
               </span>
+
+              <!-- Description (keep class for E2E) -->
+              <p class="resource-description text-sm text-muted">{{ entry.description }}</p>
+
+              <!-- Meta (keep class for E2E) -->
+              <div class="resource-meta flex flex-wrap gap-2 text-xs text-muted">
+                <span v-for="metaEntry in entry.meta" :key="metaEntry">{{ metaEntry }}</span>
+              </div>
+
+              <span class="text-xs font-semibold text-brand">{{ t('encyclopedia.viewDetail') }} →</span>
             </div>
+          </article>
+        </div>
 
-            <!-- Pro access badge -->
-            <span
-              v-if="entry.accessText"
-              class="inline-flex items-center justify-center w-fit px-2 py-0.5 rounded-full border text-[0.72rem] font-bold"
-              :class="{
-                'text-orange-400 border-orange-500/50 bg-orange-500/10': entry.accessClass === 'locked',
-                'text-green-400 border-green-500/50 bg-green-500/10': entry.accessClass === 'unlocked',
-              }"
-            >
-              {{ entry.accessText }}
-            </span>
-
-            <!-- Description (keep class for E2E) -->
-            <p class="resource-description text-sm text-muted">{{ entry.description }}</p>
-
-            <!-- Meta (keep class for E2E) -->
-            <div class="resource-meta flex flex-wrap gap-2 text-xs text-muted">
-              <span v-for="metaEntry in entry.meta" :key="metaEntry">{{ metaEntry }}</span>
+        <div class="encyclopedia-help-section mt-10 rounded-2xl border border-divider bg-card p-6 lg:p-8 flex flex-col gap-8">
+          <section class="flex flex-col gap-3">
+            <h3 class="m-0">{{ t('encyclopedia.helpSectionTitle') }}</h3>
+            <p class="text-muted m-0">{{ t('encyclopedia.helpSectionSubtitle') }}</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+              <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
+                <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardMarketsTitle') }}</h4>
+                <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardMarketsBody') }}</p>
+              </article>
+              <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
+                <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardFlowTitle') }}</h4>
+                <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardFlowBody') }}</p>
+              </article>
+              <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
+                <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardIterationTitle') }}</h4>
+                <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardIterationBody') }}</p>
+              </article>
             </div>
-
-            <span class="text-xs font-semibold text-brand">{{ t('encyclopedia.viewDetail') }} →</span>
-          </div>
-        </article>
-      </div>
-
-      <div class="encyclopedia-help-section mt-10 rounded-2xl border border-divider bg-card p-6 lg:p-8 flex flex-col gap-8">
-        <section class="flex flex-col gap-3">
-          <h3 class="m-0">{{ t('encyclopedia.helpSectionTitle') }}</h3>
-          <p class="text-muted m-0">{{ t('encyclopedia.helpSectionSubtitle') }}</p>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-            <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
-              <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardMarketsTitle') }}</h4>
-              <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardMarketsBody') }}</p>
-            </article>
-            <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
-              <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardFlowTitle') }}</h4>
-              <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardFlowBody') }}</p>
-            </article>
-            <article class="rounded-xl border border-divider bg-page p-4 flex flex-col gap-2">
-              <h4 class="m-0 text-base">{{ t('encyclopedia.gameplayGuideCardIterationTitle') }}</h4>
-              <p class="m-0 text-sm text-muted">{{ t('encyclopedia.gameplayGuideCardIterationBody') }}</p>
-            </article>
-          </div>
-        </section>
-      </div>
+          </section>
+        </div>
       </div>
     </section>
   </div>

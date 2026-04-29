@@ -298,7 +298,7 @@ function goBack() {
           <div class="resource-meta">
             <div class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.basePrice') }}</span>
-              <strong class="meta-value">{{ formatMoney((selectedResource?.basePrice ?? selectedProduct?.basePrice) ?? 0, 'EUR', locale) }}</strong>
+              <strong class="meta-value">{{ formatMoney(selectedResource?.basePrice ?? selectedProduct?.basePrice ?? 0, 'EUR', locale) }}</strong>
             </div>
             <div v-if="selectedResource" class="meta-item">
               <span class="meta-label">{{ t('resourceDetail.weight') }}</span>
@@ -322,11 +322,7 @@ function goBack() {
             </div>
           </div>
           <div v-if="selectedResource" class="hero-cta">
-            <RouterLink
-              to="/exchange"
-              class="btn-exchange-link"
-              :aria-label="t('resourceDetail.checkExchangePrices')"
-            >
+            <RouterLink to="/exchange" class="btn-exchange-link" :aria-label="t('resourceDetail.checkExchangePrices')">
               {{ t('resourceDetail.checkExchangePrices') }}
             </RouterLink>
           </div>
