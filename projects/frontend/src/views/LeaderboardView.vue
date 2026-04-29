@@ -153,89 +153,135 @@ const currentGameTime = computed(() => {
   const utc = gameStateStore.gameState?.currentGameTimeUtc
   return utc ? formatInGameTime(utc, locale.value) : null
 })
+
+function getRankClasses(index: number, ownerId: string | null) {
+  return {
+    'border-l-4 border-l-[#ffd700]': index === 0,
+    'border-l-4 border-l-[#c0c0c0]': index === 1,
+    'border-l-4 border-l-[#cd7f32]': index === 2,
+    'border-[color:var(--color-secondary)]': ownerId === currentPlayerId.value,
+  }
+}
+
+function getRankGradient(index: number): string | undefined {
+  if (index === 0) return 'background: linear-gradient(90deg, rgba(255,215,0,0.06) 0%, var(--color-surface) 40%)'
+  if (index === 1) return 'background: linear-gradient(90deg, rgba(192,192,192,0.06) 0%, var(--color-surface) 40%)'
+  if (index === 2) return 'background: linear-gradient(90deg, rgba(205,127,50,0.06) 0%, var(--color-surface) 40%)'
+  return undefined
+}
 </script>
 
 <template>
-  <div class="leaderboard-view">
-    <div class="leaderboard-hero">
-      <div class="container">
-        <p class="leaderboard-eyebrow">{{ t('leaderboard.eyebrow') }}</p>
-        <h1 class="leaderboard-title">{{ t('leaderboard.title') }}</h1>
-        <p class="leaderboard-subtitle">{{ t('leaderboard.subtitle') }}</p>
-        <div class="leaderboard-hero-meta">
+  <div class="min-h-screen">
+    <!-- Hero -->
+    <div
+      class="border-b border-divider py-12 text-center"
+      style="background: linear-gradient(160deg, #0d1117 0%, rgba(0, 71, 255, 0.14) 100%)"
+    >
+      <div class="container mx-auto px-4">
+        <p class="text-[0.75rem] font-bold tracking-[0.1em] uppercase text-brand mb-2">
+          {{ t('leaderboard.eyebrow') }}
+        </p>
+        <h1
+          class="text-4xl sm:text-[2.25rem] font-extrabold mb-3"
+          style="background: linear-gradient(135deg, var(--color-primary), var(--color-secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text"
+        >
+          {{ t('leaderboard.title') }}
+        </h1>
+        <p class="text-base text-muted max-w-[540px] mx-auto">{{ t('leaderboard.subtitle') }}</p>
+        <div class="flex justify-center mt-4 gap-3 flex-wrap">
           <span
-            class="leaderboard-tick-chip"
+            class="inline-flex items-center gap-1.5 bg-white/[0.07] border border-white/[0.12] rounded-full px-3 py-1 text-[0.78rem] text-muted cursor-default select-none"
             :title="currentTick !== null ? t('leaderboard.tickHint') + ' #' + currentTick : t('leaderboard.tickHint')"
           >
-            <span class="leaderboard-tick-label">{{ t('leaderboard.tick') }}</span>
-            <span class="leaderboard-tick-value">{{ currentGameTime !== null ? currentGameTime : '—' }}</span>
+            <span class="font-semibold text-brand uppercase tracking-[0.04em] text-[0.72rem]">
+              {{ t('leaderboard.tick') }}
+            </span>
+            <span class="tabular-nums font-bold text-body">
+              {{ currentGameTime !== null ? currentGameTime : '—' }}
+            </span>
           </span>
         </div>
       </div>
     </div>
 
-    <div class="container leaderboard-content">
+    <!-- Content -->
+    <div class="container mx-auto px-4 pt-10 pb-16">
       <!-- Tab switcher -->
-      <div class="tab-switcher" role="tablist">
-        <button role="tab" :aria-selected="activeTab === 'players'" class="tab-btn" :class="{ active: activeTab === 'players' }" @click="activeTab = 'players'">
+      <div class="flex gap-2 max-w-[800px] mx-auto mb-6" role="tablist">
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'players'"
+          class="flex-1 py-3 px-4 border border-divider rounded-xl bg-card font-semibold text-muted cursor-pointer transition-colors hover:border-brand hover:text-body"
+          :class="{ 'bg-brand !text-white border-brand': activeTab === 'players' }"
+          @click="activeTab = 'players'"
+        >
           👤 {{ t('leaderboard.tabPlayers') }}
         </button>
-        <button role="tab" :aria-selected="activeTab === 'companies'" class="tab-btn" :class="{ active: activeTab === 'companies' }" @click="activeTab = 'companies'">
+        <button
+          role="tab"
+          :aria-selected="activeTab === 'companies'"
+          class="flex-1 py-3 px-4 border border-divider rounded-xl bg-card font-semibold text-muted cursor-pointer transition-colors hover:border-brand hover:text-body"
+          :class="{ 'bg-brand !text-white border-brand': activeTab === 'companies' }"
+          @click="activeTab = 'companies'"
+        >
           🏢 {{ t('leaderboard.tabCompanies') }}
         </button>
       </div>
 
       <!-- Player rankings tab -->
       <template v-if="activeTab === 'players'">
-        <div v-if="playerLoading" class="state-box">
-          <span class="state-icon">⏳</span>
+        <div v-if="playerLoading" class="flex flex-col items-center gap-3 py-12 text-center">
+          <span class="text-4xl">⏳</span>
           <p>{{ t('common.loading') }}</p>
         </div>
 
-        <div v-else-if="playerError" class="state-box state-error">
-          <span class="state-icon">⚠️</span>
+        <div v-else-if="playerError" class="flex flex-col items-center gap-3 py-12 text-center text-bad">
+          <span class="text-4xl">⚠️</span>
           <p>{{ playerError }}</p>
           <button class="btn btn-secondary" aria-label="Retry loading leaderboard" @click="retryActiveTab">
             {{ t('common.tryAgain') }}
           </button>
         </div>
 
-        <div v-else-if="rankings.length === 0" class="state-box">
-          <span class="state-icon">🏆</span>
-          <p class="state-title">{{ t('leaderboard.emptyTitle') }}</p>
-          <p class="state-desc">{{ t('leaderboard.emptyDesc') }}</p>
+        <div v-else-if="rankings.length === 0" class="flex flex-col items-center gap-3 py-12 text-center">
+          <span class="text-4xl">🏆</span>
+          <p class="text-xl font-bold">{{ t('leaderboard.emptyTitle') }}</p>
+          <p class="text-muted max-w-[400px]">{{ t('leaderboard.emptyDesc') }}</p>
           <RouterLink to="/onboarding" class="btn btn-primary">{{ t('leaderboard.startEmpire') }}</RouterLink>
         </div>
 
-        <div v-else class="rankings-list">
+        <div v-else class="flex flex-col gap-3 max-w-[800px] mx-auto mb-12">
           <div
             v-for="(rank, index) in rankings"
             :key="rank.playerId"
-            class="rank-card"
-            :class="{
-              'rank-top3': index < 3,
-              'rank-gold': index === 0,
-              'rank-silver': index === 1,
-              'rank-bronze': index === 2,
-              'rank-self': rank.playerId === currentPlayerId,
-            }"
+            class="rank-card flex items-center flex-wrap sm:flex-nowrap gap-4 bg-card border border-divider rounded-xl p-4 md:p-5 hover:border-brand transition-colors"
+            :class="getRankClasses(index, rank.playerId)"
+            :style="getRankGradient(index)"
           >
-            <div class="rank-badge">{{ rankBadge(index) }}</div>
-            <div class="rank-info">
-              <div class="rank-name">
+            <div class="text-2xl font-extrabold min-w-[2.5rem] text-center text-brand leading-none">
+              {{ rankBadge(index) }}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="text-base font-bold flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
                 {{ rank.displayName }}
-                <span v-if="rank.playerId === currentPlayerId" class="you-badge">{{ t('leaderboard.you') }}</span>
+                <span
+                  v-if="rank.playerId === currentPlayerId"
+                  class="you-badge text-[0.6875rem] font-bold bg-[color:var(--color-secondary)] text-black px-[0.4rem] py-[0.1rem] rounded-full tracking-[0.04em] uppercase shrink-0"
+                >{{ t('leaderboard.you') }}</span>
               </div>
-              <div class="rank-companies">
+              <div class="text-[0.8125rem] text-muted mt-0.5">
                 {{ t('leaderboard.companiesCount', { n: rank.companyCount }) }}
               </div>
             </div>
-            <div class="rank-wealth">
-              <div class="total-wealth">{{ formatWealth(rank.totalWealthUsd) }}</div>
-              <div class="wealth-breakdown">
-                <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.personalCash) }} </span>
-                <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.stocksTooltip')"> 📈 {{ formatWealth(rank.sharesValue) }} </span>
+            <div class="w-full sm:w-auto text-left sm:text-right pl-[calc(2.5rem+1rem)] sm:pl-0">
+              <div class="total-wealth text-xl font-extrabold text-[color:var(--color-secondary)]">
+                {{ formatWealth(rank.totalWealthUsd) }}
+              </div>
+              <div class="text-xs text-muted mt-1 flex gap-1 flex-wrap justify-start sm:justify-end">
+                <span :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.personalCash) }} </span>
+                <span class="opacity-40">·</span>
+                <span :title="t('leaderboard.stocksTooltip')"> 📈 {{ formatWealth(rank.sharesValue) }} </span>
               </div>
             </div>
           </div>
@@ -244,398 +290,92 @@ const currentGameTime = computed(() => {
 
       <!-- Company rankings tab -->
       <template v-else-if="activeTab === 'companies'">
-        <div v-if="companyLoading" class="state-box">
-          <span class="state-icon">⏳</span>
+        <div v-if="companyLoading" class="flex flex-col items-center gap-3 py-12 text-center">
+          <span class="text-4xl">⏳</span>
           <p>{{ t('common.loading') }}</p>
         </div>
 
-        <div v-else-if="companyError" class="state-box state-error">
-          <span class="state-icon">⚠️</span>
+        <div v-else-if="companyError" class="flex flex-col items-center gap-3 py-12 text-center text-bad">
+          <span class="text-4xl">⚠️</span>
           <p>{{ companyError }}</p>
           <button class="btn btn-secondary" aria-label="Retry loading leaderboard" @click="retryActiveTab">
             {{ t('common.tryAgain') }}
           </button>
         </div>
 
-        <div v-else-if="companyRankings.length === 0" class="state-box">
-          <span class="state-icon">🏢</span>
-          <p class="state-title">{{ t('leaderboard.emptyCompanyTitle') }}</p>
-          <p class="state-desc">{{ t('leaderboard.emptyCompanyDesc') }}</p>
+        <div v-else-if="companyRankings.length === 0" class="flex flex-col items-center gap-3 py-12 text-center">
+          <span class="text-4xl">🏢</span>
+          <p class="text-xl font-bold">{{ t('leaderboard.emptyCompanyTitle') }}</p>
+          <p class="text-muted max-w-[400px]">{{ t('leaderboard.emptyCompanyDesc') }}</p>
           <RouterLink to="/onboarding" class="btn btn-primary">{{ t('leaderboard.startEmpire') }}</RouterLink>
         </div>
 
-        <div v-else class="rankings-list">
+        <div v-else class="flex flex-col gap-3 max-w-[800px] mx-auto mb-12">
           <div
             v-for="(rank, index) in companyRankings"
             :key="rank.companyId"
-            class="rank-card"
-            :class="{
-              'rank-top3': index < 3,
-              'rank-gold': index === 0,
-              'rank-silver': index === 1,
-              'rank-bronze': index === 2,
-              'rank-self': rank.playerId === currentPlayerId,
-            }"
+            class="rank-card flex items-center flex-wrap sm:flex-nowrap gap-4 bg-card border border-divider rounded-xl p-4 md:p-5 hover:border-brand transition-colors"
+            :class="getRankClasses(index, rank.playerId)"
+            :style="getRankGradient(index)"
           >
-            <div class="rank-badge">{{ rankBadge(index) }}</div>
-            <div class="rank-info">
-              <div class="rank-name">
-                {{ rank.companyName }}
-                <span v-if="rank.playerId === currentPlayerId" class="you-badge">{{ t('leaderboard.you') }}</span>
-              </div>
-              <div class="rank-companies">{{ t('leaderboard.ownedBy', { name: rank.ownerDisplayName }) }} · {{ t('leaderboard.buildingsCount', { n: rank.buildingCount }) }}</div>
+            <div class="text-2xl font-extrabold min-w-[2.5rem] text-center text-brand leading-none">
+              {{ rankBadge(index) }}
             </div>
-            <div class="rank-wealth">
-              <div class="total-wealth">{{ formatWealth(rank.totalWealthUsd) }}</div>
-              <div class="wealth-breakdown">
-                <span class="breakdown-item" :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.cash, rank.currencyCode) }} </span>
-                <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.buildingsTooltip')"> 🏗️ {{ formatWealth(rank.buildingValue, rank.currencyCode) }} </span>
-                <span class="breakdown-sep">·</span>
-                <span class="breakdown-item" :title="t('leaderboard.inventoryTooltip')"> 📦 {{ formatWealth(rank.inventoryValue, rank.currencyCode) }} </span>
+            <div class="flex-1 min-w-0">
+              <div class="text-base font-bold flex items-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis">
+                {{ rank.companyName }}
+                <span
+                  v-if="rank.playerId === currentPlayerId"
+                  class="you-badge text-[0.6875rem] font-bold bg-[color:var(--color-secondary)] text-black px-[0.4rem] py-[0.1rem] rounded-full tracking-[0.04em] uppercase shrink-0"
+                >{{ t('leaderboard.you') }}</span>
+              </div>
+              <div class="text-[0.8125rem] text-muted mt-0.5">
+                {{ t('leaderboard.ownedBy', { name: rank.ownerDisplayName }) }} ·
+                {{ t('leaderboard.buildingsCount', { n: rank.buildingCount }) }}
+              </div>
+            </div>
+            <div class="w-full sm:w-auto text-left sm:text-right pl-[calc(2.5rem+1rem)] sm:pl-0">
+              <div class="total-wealth text-xl font-extrabold text-[color:var(--color-secondary)]">
+                {{ formatWealth(rank.totalWealthUsd) }}
+              </div>
+              <div class="text-xs text-muted mt-1 flex gap-1 flex-wrap justify-start sm:justify-end">
+                <span :title="t('leaderboard.cashTooltip')"> 💵 {{ formatWealth(rank.cash, rank.currencyCode) }} </span>
+                <span class="opacity-40">·</span>
+                <span :title="t('leaderboard.buildingsTooltip')"> 🏗️ {{ formatWealth(rank.buildingValue, rank.currencyCode) }} </span>
+                <span class="opacity-40">·</span>
+                <span :title="t('leaderboard.inventoryTooltip')"> 📦 {{ formatWealth(rank.inventoryValue, rank.currencyCode) }} </span>
               </div>
             </div>
           </div>
         </div>
       </template>
 
-      <div class="leaderboard-explainer">
-        <h3>{{ t('leaderboard.howItWorksTitle') }}</h3>
-        <p>
+      <!-- How it works -->
+      <div class="max-w-[800px] mx-auto bg-card border border-divider rounded-xl p-6">
+        <h3 class="text-base font-bold mb-2">{{ t('leaderboard.howItWorksTitle') }}</h3>
+        <p class="text-[0.9rem] text-muted mb-3">
           {{ activeTab === 'players' ? t('leaderboard.playerHowItWorksBody') : t('leaderboard.companyHowItWorksBody') }}
         </p>
-        <ul class="formula-list" v-if="activeTab === 'players'">
+        <ul v-if="activeTab === 'players'" class="formula-list list-none p-0 flex flex-col gap-1.5 text-sm text-muted">
           <li>
-            💵 <strong>{{ t('leaderboard.cashLabel') }}</strong> — {{ t('leaderboard.personalCashExplain') }}
+            💵 <strong class="text-body">{{ t('leaderboard.cashLabel') }}</strong> — {{ t('leaderboard.personalCashExplain') }}
           </li>
           <li>
-            📈 <strong>{{ t('leaderboard.stocksLabel') }}</strong> — {{ t('leaderboard.stocksExplain') }}
+            📈 <strong class="text-body">{{ t('leaderboard.stocksLabel') }}</strong> — {{ t('leaderboard.stocksExplain') }}
           </li>
         </ul>
-        <ul class="formula-list" v-else>
+        <ul v-else class="formula-list list-none p-0 flex flex-col gap-1.5 text-sm text-muted">
           <li>
-            💵 <strong>{{ t('leaderboard.cashLabel') }}</strong> — {{ t('leaderboard.cashExplain') }}
+            💵 <strong class="text-body">{{ t('leaderboard.cashLabel') }}</strong> — {{ t('leaderboard.cashExplain') }}
           </li>
           <li>
-            🏗️ <strong>{{ t('leaderboard.buildingsLabel') }}</strong> — {{ t('leaderboard.buildingsExplain') }}
+            🏗️ <strong class="text-body">{{ t('leaderboard.buildingsLabel') }}</strong> — {{ t('leaderboard.buildingsExplain') }}
           </li>
           <li>
-            📦 <strong>{{ t('leaderboard.inventoryLabel') }}</strong> — {{ t('leaderboard.inventoryExplain') }}
+            📦 <strong class="text-body">{{ t('leaderboard.inventoryLabel') }}</strong> — {{ t('leaderboard.inventoryExplain') }}
           </li>
         </ul>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.leaderboard-view {
-  min-height: 100vh;
-}
-
-.leaderboard-hero {
-  background: linear-gradient(160deg, #0d1117 0%, rgba(0, 71, 255, 0.14) 100%);
-  border-bottom: 1px solid var(--color-border);
-  padding: 3rem 0 2.5rem;
-  text-align: center;
-}
-
-.leaderboard-eyebrow {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--color-primary);
-  margin-bottom: 0.5rem;
-}
-
-.leaderboard-title {
-  font-size: 2.25rem;
-  font-weight: 800;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 0.75rem;
-}
-
-.leaderboard-subtitle {
-  font-size: 1rem;
-  color: var(--color-text-secondary);
-  max-width: 540px;
-  margin: 0 auto;
-}
-
-.leaderboard-hero-meta {
-  display: flex;
-  justify-content: center;
-  margin-top: 1rem;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
-.leaderboard-tick-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  background: rgba(255, 255, 255, 0.07);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 9999px;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.78rem;
-  color: var(--color-text-secondary);
-  cursor: default;
-  user-select: none;
-}
-
-.leaderboard-tick-label {
-  font-weight: 600;
-  color: var(--color-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 0.72rem;
-}
-
-.leaderboard-tick-value {
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--color-text-primary);
-}
-
-.leaderboard-content {
-  padding: 2.5rem 1rem 4rem;
-}
-
-/* ── Tab switcher ──────────────────────────────────────────────────────────── */
-.tab-switcher {
-  display: flex;
-  gap: 0.5rem;
-  max-width: 800px;
-  margin: 0 auto 1.5rem;
-}
-
-.tab-btn {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s;
-}
-
-.tab-btn:hover {
-  border-color: var(--color-primary);
-  color: var(--color-text);
-}
-
-.tab-btn.active {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-}
-
-/* ── States ─────────────────────────────────────────────────────────────────── */
-.state-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 3rem 1rem;
-  text-align: center;
-}
-
-.state-icon {
-  font-size: 2.5rem;
-}
-
-.state-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.state-desc {
-  color: var(--color-text-secondary);
-  max-width: 400px;
-}
-
-.state-error {
-  color: var(--color-danger, #f85149);
-}
-
-/* ── Rank cards ─────────────────────────────────────────────────────────────── */
-.rankings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-width: 800px;
-  margin: 0 auto 3rem;
-}
-
-.rank-card {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
-  transition: border-color 0.15s;
-}
-
-.rank-card:hover {
-  border-color: var(--color-primary);
-}
-
-.rank-top3 {
-  border-left: 3px solid var(--color-primary);
-}
-
-.rank-gold {
-  border-left-color: #ffd700;
-  background: linear-gradient(90deg, rgba(255, 215, 0, 0.06) 0%, var(--color-surface) 40%);
-}
-
-.rank-silver {
-  border-left-color: #c0c0c0;
-  background: linear-gradient(90deg, rgba(192, 192, 192, 0.06) 0%, var(--color-surface) 40%);
-}
-
-.rank-bronze {
-  border-left-color: #cd7f32;
-  background: linear-gradient(90deg, rgba(205, 127, 50, 0.06) 0%, var(--color-surface) 40%);
-}
-
-.rank-self {
-  border-color: var(--color-secondary);
-}
-
-.rank-badge {
-  font-size: 1.5rem;
-  font-weight: 800;
-  min-width: 2.5rem;
-  text-align: center;
-  color: var(--color-primary);
-  line-height: 1;
-}
-
-.rank-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.rank-name {
-  font-size: 1rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.you-badge {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  background: var(--color-secondary);
-  color: #000;
-  padding: 0.1rem 0.4rem;
-  border-radius: 9999px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.rank-companies {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-  margin-top: 0.125rem;
-}
-
-.rank-wealth {
-  text-align: right;
-}
-
-.total-wealth {
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: var(--color-secondary);
-}
-
-.wealth-breakdown {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary);
-  margin-top: 0.25rem;
-  display: flex;
-  gap: 0.25rem;
-  justify-content: flex-end;
-  flex-wrap: wrap;
-}
-
-.breakdown-sep {
-  opacity: 0.4;
-}
-
-/* ── How it works ────────────────────────────────────────────────────────────── */
-.leaderboard-explainer {
-  max-width: 800px;
-  margin: 0 auto;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 1.5rem;
-}
-
-.leaderboard-explainer h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  margin-bottom: 0.5rem;
-}
-
-.leaderboard-explainer p {
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 0.75rem;
-}
-
-.formula-list {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-}
-
-.formula-list strong {
-  color: var(--color-text);
-}
-
-/* ── Responsive ───────────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .leaderboard-title {
-    font-size: 1.75rem;
-  }
-
-  .rank-card {
-    flex-wrap: wrap;
-  }
-
-  .rank-wealth {
-    width: 100%;
-    text-align: left;
-    padding-left: calc(2.5rem + 1rem);
-  }
-
-  .wealth-breakdown {
-    justify-content: flex-start;
-  }
-}
-</style>
