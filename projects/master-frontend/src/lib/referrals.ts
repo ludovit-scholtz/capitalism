@@ -253,7 +253,9 @@ export function getReferralDashboard(email: string): ReferralDashboardRow[] {
       return directCodeSet.has(player.appliedReferralCode)
     })
 
-    const activeSubscriptions = directUsers.filter((entry) => entry.player.hasActiveSubscription).length
+    const activeSubscriptions = directUsers.filter(
+      (entry) => entry.player.hasActiveSubscription,
+    ).length
     const secondLevelActiveSubscriptions = secondLevelUsers.filter(
       ([, player]) => player.hasActiveSubscription,
     ).length
