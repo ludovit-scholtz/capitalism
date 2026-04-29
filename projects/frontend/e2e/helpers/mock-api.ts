@@ -895,6 +895,9 @@ export type MockState = {
     companyName: string | null
     ownerType?: 'PERSON' | 'COMPANY'
     ownerDisplayName?: string
+    bankBuildingId?: string | null
+    cityId?: string | null
+    isDepositAccount?: boolean
   }>
   /** Gold AMM pools for the Gold AMM exchange. */
   goldAmmPools: MockGoldAmmPool[]
@@ -924,15 +927,21 @@ function normalizeMockBankAccount(
     companyName: string | null
     ownerType?: 'PERSON' | 'COMPANY'
     ownerDisplayName?: string
+    bankBuildingId?: string | null
+    cityId?: string | null
+    isDepositAccount?: boolean
   },
   defaultPersonalName: string,
 ) {
   const ownerType = account.ownerType ?? (account.companyId ? 'COMPANY' : 'PERSON')
   const ownerDisplayName = account.ownerDisplayName ?? account.companyName ?? defaultPersonalName
+  // isDepositAccount: explicit flag if provided, otherwise infer from bankBuildingId being set
+  const isDepositAccount = account.isDepositAccount ?? (account.bankBuildingId != null && account.bankBuildingId !== '')
   return {
     ...account,
     ownerType,
     ownerDisplayName,
+    isDepositAccount,
   }
 }
 
@@ -6606,6 +6615,54 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ data: { closeBankAccount: deposit ?? null, withdrawDeposit: deposit ?? null } }),
+      })
+    }
+
+    if (query.includes('closeCompanyBankAccount')) {
+      const bankAccountId = body.variables?.input?.bankAccountId
+      const accountIdx = state.myBankAccounts.findIndex((a) => a.id === bankAccountId)
+      if (accountIdx >= 0) {
+        const account = state.myBankAccounts[accountIdx]
+        if (!account) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [{ message: 'Bank account not found or already closed.', extensions: { code: 'ACCOUNT_NOT_FOUND' } }],
+            }),
+          })
+        }
+        if (account.balance !== 0) {
+          return route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              errors: [{ message: `Balance must be zero. Current: ${account.balance}`, extensions: { code: 'NON_ZERO_BALANCE' } }],
+            }),
+          })
+        }
+        state.myBankAccounts.splice(accountIdx, 1)
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              closeCompanyBankAccount: {
+                id: bankAccountId,
+                accountNumber: account.accountNumber,
+                currencyCode: account.currencyCode,
+                closedAtUtc: new Date().toISOString(),
+              },
+            },
+          }),
+        })
+      }
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: 'Bank account not found or already closed.', extensions: { code: 'ACCOUNT_NOT_FOUND' } }],
+        }),
       })
     }
 

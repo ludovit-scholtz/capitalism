@@ -87,6 +87,22 @@ public sealed class CreateCompanyBankAccountResult
     public CompanyBankAccountSummary Account { get; set; } = new();
 }
 
+/// <summary>Result of the <c>closeCompanyBankAccount</c> mutation.</summary>
+public sealed class CloseCompanyBankAccountResult
+{
+    /// <summary>Unique identifier of the closed bank account.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>16-digit account number of the closed account.</summary>
+    public string AccountNumber { get; set; } = string.Empty;
+
+    /// <summary>ISO 4217 currency code of the closed account.</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+
+    /// <summary>UTC timestamp when the account was closed.</summary>
+    public DateTime ClosedAtUtc { get; set; }
+}
+
 /// <summary>Result of the <c>transferFunds</c> mutation.</summary>
 public sealed class TransferFundsResult
 {
@@ -141,4 +157,11 @@ public sealed class PlayerBankAccountSummary
 
     /// <summary>ID of the city where the bank building is located. Resolved from bank building, primary city, or government bank.</summary>
     public Guid? CityId { get; set; }
+
+    /// <summary>
+    /// True when this account is a deposit account held at a specific bank building (BankBuildingId set on entity).
+    /// False for regular company treasury or personal settlement accounts.
+    /// Deposit accounts must be closed via the bank withdrawal flow; regular accounts via closeCompanyBankAccount.
+    /// </summary>
+    public bool IsDepositAccount { get; set; }
 }

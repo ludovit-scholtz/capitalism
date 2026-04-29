@@ -44,6 +44,10 @@ const depositLoading = ref(false)
 const depositError = ref<string | null>(null)
 const depositSuccess = ref(false)
 
+// Close account state
+const closingAccountId = ref<string | null>(null)
+const closeAccountErrors = ref<Record<string, string>>({})
+
 // Accept modal state
 const showAcceptModal = ref(false)
 const selectedOffer = ref<LoanOfferSummary | null>(null)
@@ -171,7 +175,9 @@ const MY_BANK_ACCOUNTS_QUERY = `
       companyName
       ownerType
       ownerDisplayName
+      bankBuildingId
       cityId
+      isDepositAccount
     }
   }
 `
@@ -193,6 +199,17 @@ const CLOSE_BANK_ACCOUNT_MUTATION = `
       id
       isActive
       withdrawnAtUtc
+    }
+  }
+`
+
+const CLOSE_COMPANY_BANK_ACCOUNT_MUTATION = `
+  mutation CloseCompanyBankAccountById($input: CloseCompanyBankAccountInput!) {
+    closeCompanyBankAccount(input: $input) {
+      id
+      accountNumber
+      currencyCode
+      closedAtUtc
     }
   }
 `
@@ -472,13 +489,30 @@ async function submitDeposit() {
   }
 }
 
-async function closeBankAccount(accountId: string) {
+async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
   if (!confirm(t('bank.confirmCloseAccount'))) return
+  closingAccountId.value = accountId
+  closeAccountErrors.value = { ...closeAccountErrors.value, [accountId]: '' }
   try {
-    await gqlRequest(CLOSE_BANK_ACCOUNT_MUTATION, { input: { depositId: accountId, amount: 0 } })
+    if (isDepositAccount) {
+      await gqlRequest(CLOSE_BANK_ACCOUNT_MUTATION, { input: { depositId: accountId, amount: 0 } })
+    } else {
+      await gqlRequest(CLOSE_COMPANY_BANK_ACCOUNT_MUTATION, { input: { bankAccountId: accountId } })
+    }
     await loadData()
   } catch (err) {
-    error.value = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error ? err.message : String(err)
+    let friendlyMsg = msg
+    if (msg.includes('ACCOUNT_IN_USE')) {
+      friendlyMsg = t('bank.closeAccountBlockedInUse')
+    } else if (msg.includes('NON_ZERO_BALANCE')) {
+      friendlyMsg = t('bank.closeAccountNonZeroHint')
+    } else if (msg.includes('ACTIVE_LOAN_REPAYMENT_ACCOUNT')) {
+      friendlyMsg = t('bank.closeAccountBlockedActiveLoan')
+    }
+    closeAccountErrors.value = { ...closeAccountErrors.value, [accountId]: friendlyMsg }
+  } finally {
+    closingAccountId.value = null
   }
 }
 </script>
@@ -686,8 +720,41 @@ async function closeBankAccount(accountId: string) {
                     <span class="deposit-stat-value">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
                   </div>
                 </div>
-                <button v-if="account.balance == 0" class="btn btn-danger btn-sm mt-3" @click="closeBankAccount(account.id)">
-                  {{ t('bank.closeAccount') }}
+                <!-- Zero-balance ready-to-close indicator (non-deposit accounts only) -->
+                <p
+                  v-if="account.balance == 0 && !account.isDepositAccount"
+                  class="account-ready-close mt-2 text-xs font-medium text-success"
+                >
+                  ✓ {{ t('bank.accountReadyToClose') }}
+                </p>
+                <!-- Non-zero balance hint -->
+                <p
+                  v-else-if="account.balance != 0 && !account.isDepositAccount"
+                  class="account-nonzero-hint mt-2 text-xs text-muted"
+                >
+                  {{ t('bank.closeAccountNonZeroHint') }}
+                </p>
+                <!-- Close error feedback -->
+                <p v-if="closeAccountErrors[account.id]" class="close-account-error mt-2 text-xs text-error" role="alert">
+                  {{ closeAccountErrors[account.id] }}
+                </p>
+                <!-- Close button (non-deposit accounts with zero balance only) -->
+                <button
+                  v-if="account.balance == 0 && !account.isDepositAccount"
+                  class="btn btn-danger btn-sm mt-3"
+                  :disabled="closingAccountId === account.id"
+                  @click="closeBankAccount(account.id, false)"
+                >
+                  {{ closingAccountId === account.id ? '…' : t('bank.closeAccount') }}
+                </button>
+                <!-- Deposit account zero-balance close (existing flow) -->
+                <button
+                  v-else-if="account.balance == 0 && account.isDepositAccount"
+                  class="btn btn-danger btn-sm mt-3"
+                  :disabled="closingAccountId === account.id"
+                  @click="closeBankAccount(account.id, true)"
+                >
+                  {{ closingAccountId === account.id ? '…' : t('bank.closeAccount') }}
                 </button>
               </div>
             </div>

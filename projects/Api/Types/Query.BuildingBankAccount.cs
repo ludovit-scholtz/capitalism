@@ -203,6 +203,7 @@ public sealed partial class Query
             OwnerDisplayName = a.Company?.Name ?? a.Player?.DisplayName ?? string.Empty,
             BankBuildingId = ResolveBankBuildingId(a),
             CityId = ResolveCityId(a),
+            IsDepositAccount = a.BankBuildingId.HasValue,
         }).ToList();
 
         Guid? ResolveBankBuildingId(BankAccount account)

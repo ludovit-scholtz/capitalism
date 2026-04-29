@@ -28449,6 +28449,436 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task CloseCompanyBankAccount_ZeroBalance_ClosesAccount()
+    {
+        // A zero-balance company treasury account can be closed immediately.
+        var ownerEmail = $"close-co-acct-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "CloseCoAcct");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"CloseCoAcctCo-{Guid.NewGuid():N}", Cash = 0m };
+        db.Companies.Add(company);
+
+        var account = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            CompanyId = company.Id,
+            Balance = 0m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) {
+                    id
+                    accountNumber
+                    currencyCode
+                    closedAtUtc
+                }
+            }
+            """,
+            new { input = new { bankAccountId = account.Id.ToString() } },
+            ownerToken);
+
+        var data = result.GetProperty("data").GetProperty("closeCompanyBankAccount");
+        Assert.Equal(account.Id.ToString(), data.GetProperty("id").GetString());
+        Assert.Equal("EUR", data.GetProperty("currencyCode").GetString());
+
+        await db.Entry(account).ReloadAsync();
+        Assert.NotNull(account.ClosedAtUtc);
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_NonZeroBalance_ReturnsError()
+    {
+        // A non-zero account cannot be closed until funds are transferred out.
+        var ownerEmail = $"close-nonzero-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "CloseNonZero");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"CloseNonZeroCo-{Guid.NewGuid():N}", Cash = 0m };
+        db.Companies.Add(company);
+
+        var account = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            CompanyId = company.Id,
+            Balance = 500m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = account.Id.ToString() } },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Non-zero balance close should fail.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("NON_ZERO_BALANCE", code);
+
+        // Account must still be open
+        await db.Entry(account).ReloadAsync();
+        Assert.Null(account.ClosedAtUtc);
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_AssignedToBuilding_ReturnsError()
+    {
+        // An account that is still the active bank account for a building cannot be closed.
+        var ownerEmail = $"close-in-use-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "CloseInUse");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"CloseInUseCo-{Guid.NewGuid():N}", Cash = 0m };
+        db.Companies.Add(company);
+
+        var account = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = company.Id,
+            Balance = 0m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(account);
+
+        // Assign this account to a building
+        var lot = await db.BuildingLots.FirstAsync(l => l.CityId == city.Id);
+        var building = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            Name = "CloseInUseFactory",
+            Type = Api.Data.Entities.BuildingType.Factory,
+            CompanyId = company.Id,
+            CityId = city.Id,
+            Latitude = lot.Latitude,
+            Longitude = lot.Longitude,
+            BankAccountId = account.Id,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(building);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = account.Id.ToString() } },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Account in use by building should not be closeable.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ACCOUNT_IN_USE", code);
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_OtherPlayersAccount_ReturnsError()
+    {
+        // A player cannot close an account belonging to another player's company.
+        var ownerEmail = $"close-other-owner-{Guid.NewGuid():N}@test.com";
+        var attackerEmail = $"close-attacker-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "CloseOtherOwner");
+        var attackerToken = await RegisterAndGetTokenAsync(attackerEmail, "CloseAttacker");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"CloseOtherOwnerCo-{Guid.NewGuid():N}", Cash = 0m };
+        db.Companies.Add(company);
+
+        var account = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = "EUR",
+            CompanyId = company.Id,
+            Balance = 0m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(account);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = account.Id.ToString() } },
+            attackerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Closing another player's account should fail.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("UNAUTHORIZED", code);
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_Unauthenticated_ReturnsError()
+    {
+        // Unauthenticated callers must be rejected immediately.
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = Guid.NewGuid().ToString() } },
+            token: null);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Unauthenticated closeCompanyBankAccount should fail.");
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_ActiveLoanRepaymentAccount_ReturnsError()
+    {
+        // A zero-balance account that is still the scheduled repayment account for an
+        // active loan must not be closeable, even though the balance is exactly 0.
+        var ownerEmail = $"close-loan-repay-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "CloseLoanRepay");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"LoanBorrowerCo-{Guid.NewGuid():N}", Cash = 0m };
+        db.Companies.Add(borrowerCompany);
+
+        // A second player + company acts as the lender (the bank building must belong to it).
+        var lenderEmail = $"close-loan-lender-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "CloseLoanLender");
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"LoanLenderCo-{Guid.NewGuid():N}", Cash = 500_000m };
+        db.Companies.Add(lenderCompany);
+
+        // Create a bank building owned by the lender for the loan offer.
+        var lot = await db.BuildingLots.FirstAsync(l => l.CityId == city.Id);
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            Name = "LoanTestBank",
+            Type = Api.Data.Entities.BuildingType.Bank,
+            CompanyId = lenderCompany.Id,
+            CityId = city.Id,
+            Latitude = lot.Latitude,
+            Longitude = lot.Longitude,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(bank);
+
+        // The repayment account for the borrower — zero balance, regular company account.
+        var repaymentAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = borrowerCompany.Id,
+            Balance = 0m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(repaymentAccount);
+
+        // A loan offer from the lender bank.
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 10m,
+            MaxPrincipalPerLoan = 10_000m,
+            TotalCapacity = 100_000m,
+            UsedCapacity = 5_000m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.LoanOffers.Add(offer);
+
+        var gameState = await db.GameStates.FirstDeterministicAsync();
+
+        // Manually create an active loan whose repayment is scheduled against repaymentAccount.
+        var loan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer.Id,
+            BorrowerCompanyId = borrowerCompany.Id,
+            BorrowerBankAccountId = repaymentAccount.Id,   // ← this is the repayment account
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 5_000m,
+            RemainingPrincipal = 5_000m,
+            AnnualInterestRatePercent = 10m,
+            DurationTicks = 1440L,
+            StartTick = gameState.CurrentTick,
+            DueTick = gameState.CurrentTick + 1440L,
+            NextPaymentTick = gameState.CurrentTick + 720L,
+            PaymentAmount = 300m,
+            PaymentsMade = 0,
+            TotalPayments = 2,
+            Status = Api.Data.Entities.LoanStatus.Active,
+            MissedPayments = 0,
+            AccumulatedPenalty = 0m,
+            AcceptedAtUtc = DateTime.UtcNow,
+        };
+        db.Loans.Add(loan);
+        await db.SaveChangesAsync();
+
+        // Attempting to close the zero-balance repayment account must be rejected.
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = repaymentAccount.Id.ToString() } },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Account used for loan repayment should not be closeable.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ACTIVE_LOAN_REPAYMENT_ACCOUNT", code);
+    }
+
+    [Fact]
+    public async Task CloseCompanyBankAccount_OverdueLoanRepaymentAccount_ReturnsError()
+    {
+        // An OVERDUE loan repayment account must also be blocked, not just ACTIVE loans.
+        var ownerEmail = $"close-overdue-loan-{Guid.NewGuid():N}@test.com";
+        var ownerToken = await RegisterAndGetTokenAsync(ownerEmail, "CloseOverdueLoan");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var owner = await db.Players.FirstAsync(p => p.Email == ownerEmail);
+        var city = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = owner.Id, Name = $"OverdueBorrowerCo-{Guid.NewGuid():N}", Cash = 0m };
+        db.Companies.Add(borrowerCompany);
+
+        var lenderEmail = $"close-overdue-lender-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "CloseOverdueLender");
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"OverdueLenderCo-{Guid.NewGuid():N}", Cash = 500_000m };
+        db.Companies.Add(lenderCompany);
+
+        var lot = await db.BuildingLots.FirstAsync(l => l.CityId == city.Id);
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            Name = "OverdueLoanBank",
+            Type = Api.Data.Entities.BuildingType.Bank,
+            CompanyId = lenderCompany.Id,
+            CityId = city.Id,
+            Latitude = lot.Latitude,
+            Longitude = lot.Longitude,
+            BuiltAtUtc = DateTime.UtcNow,
+        };
+        db.Buildings.Add(bank);
+
+        var repaymentAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode,
+            CompanyId = borrowerCompany.Id,
+            Balance = 0m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(repaymentAccount);
+
+        var offer = new Api.Data.Entities.LoanOffer
+        {
+            Id = Guid.NewGuid(),
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            AnnualInterestRatePercent = 10m,
+            MaxPrincipalPerLoan = 10_000m,
+            TotalCapacity = 100_000m,
+            UsedCapacity = 5_000m,
+            DurationTicks = 1440L,
+            IsActive = true,
+            CreatedAtTick = 1L,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.LoanOffers.Add(offer);
+
+        var gameState = await db.GameStates.FirstDeterministicAsync();
+
+        var loan = new Api.Data.Entities.Loan
+        {
+            Id = Guid.NewGuid(),
+            LoanOfferId = offer.Id,
+            BorrowerCompanyId = borrowerCompany.Id,
+            BorrowerBankAccountId = repaymentAccount.Id,
+            BankBuildingId = bank.Id,
+            LenderCompanyId = lenderCompany.Id,
+            OriginalPrincipal = 5_000m,
+            RemainingPrincipal = 5_000m,
+            AnnualInterestRatePercent = 10m,
+            DurationTicks = 1440L,
+            StartTick = gameState.CurrentTick,
+            DueTick = gameState.CurrentTick + 1440L,
+            NextPaymentTick = gameState.CurrentTick + 720L,
+            PaymentAmount = 300m,
+            PaymentsMade = 0,
+            TotalPayments = 2,
+            Status = Api.Data.Entities.LoanStatus.Overdue,  // ← overdue, not active
+            MissedPayments = 1,
+            AccumulatedPenalty = 50m,
+            AcceptedAtUtc = DateTime.UtcNow,
+        };
+        db.Loans.Add(loan);
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation CloseAcct($input: CloseCompanyBankAccountInput!) {
+                closeCompanyBankAccount(input: $input) { id }
+            }
+            """,
+            new { input = new { bankAccountId = repaymentAccount.Id.ToString() } },
+            ownerToken);
+
+        var errors = result.GetProperty("errors");
+        Assert.True(errors.GetArrayLength() > 0, "Account used for overdue loan repayment should not be closeable.");
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("ACTIVE_LOAN_REPAYMENT_ACCOUNT", code);
+    }
+
+    [Fact]
     public async Task SetBankRates_ByNonOwner_ReturnsError()
     {
         // A player who does not own the bank must not be able to set rates.
