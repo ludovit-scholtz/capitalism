@@ -45,10 +45,7 @@ const filteredProducts = computed(() => {
   if (!q) return props.rankedProducts
   return props.rankedProducts.filter(
     (r) =>
-      localProductName(r).toLowerCase().includes(q) ||
-      r.productType.name.toLowerCase().includes(q) ||
-      localIndustry(r).toLowerCase().includes(q) ||
-      r.productType.industry.toLowerCase().includes(q),
+      localProductName(r).toLowerCase().includes(q) || r.productType.name.toLowerCase().includes(q) || localIndustry(r).toLowerCase().includes(q) || r.productType.industry.toLowerCase().includes(q),
   )
 })
 
@@ -197,12 +194,9 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
               <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
             </div>
-            <span
-              v-if="availabilityReasonLabel(entry)"
-              class="picker-item-badge"
-              :class="availabilityReasonClass(entry)"
-              :title="availabilityReasonLabel(entry)"
-            >{{ availabilityReasonLabel(entry) }}</span>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
             <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
           </div>
         </template>
@@ -233,20 +227,14 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
               <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
             </div>
-            <span
-              v-if="availabilityReasonLabel(entry)"
-              class="picker-item-badge"
-              :class="availabilityReasonClass(entry)"
-              :title="availabilityReasonLabel(entry)"
-            >{{ availabilityReasonLabel(entry) }}</span>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
             <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
           </div>
         </template>
 
-        <div
-          v-if="rdContext && groupedProducts.manufacturing.length === 0 && groupedProducts.usedByCompany.length === 0 && !searchQuery"
-          class="picker-rd-hint"
-        >
+        <div v-if="rdContext && groupedProducts.manufacturing.length === 0 && groupedProducts.usedByCompany.length === 0 && !searchQuery" class="picker-rd-hint">
           {{ t('productPicker.rdNoActiveProducts') }}
         </div>
 
@@ -275,21 +263,15 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
               <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
             </div>
-            <span
-              v-if="availabilityReasonLabel(entry)"
-              class="picker-item-badge"
-              :class="availabilityReasonClass(entry)"
-              :title="availabilityReasonLabel(entry)"
-            >{{ availabilityReasonLabel(entry) }}</span>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
             <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
           </div>
         </template>
 
         <template v-if="groupedProducts.catalog.length > 0">
-          <div
-            v-if="groupedProducts.connected.length > 0 || groupedProducts.manufacturing.length > 0 || groupedProducts.usedByCompany.length > 0"
-            class="picker-section-header"
-          >
+          <div v-if="groupedProducts.connected.length > 0 || groupedProducts.manufacturing.length > 0 || groupedProducts.usedByCompany.length > 0" class="picker-section-header">
             {{ t('productPicker.sectionCatalog') }}
           </div>
           <div
@@ -313,12 +295,9 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
               <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
               <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
             </div>
-            <span
-              v-if="availabilityReasonLabel(entry)"
-              class="picker-item-badge"
-              :class="availabilityReasonClass(entry)"
-              :title="availabilityReasonLabel(entry)"
-            >{{ availabilityReasonLabel(entry) }}</span>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
             <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
           </div>
         </template>
