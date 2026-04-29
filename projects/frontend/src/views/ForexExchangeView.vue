@@ -2,6 +2,8 @@
 
 <script setup lang="ts">
 /* oxlint-disable no-unused-vars */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// Split-file SFC: script symbols are consumed by ForexExchangeView.template.html.
  
  
 import { computed, onMounted, ref, watch } from 'vue'
