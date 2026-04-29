@@ -1,13 +1,30 @@
 using Api.Configuration;
 using Api.Data;
 using Api.Tests.Infrastructure;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using System.Reflection;
 
 namespace Api.Tests;
 
 public sealed class DatabaseMigrationBootstrapTests
 {
+    [Fact]
+    public void AllMigrationClasses_HaveEfMetadata()
+    {
+        var migrationsWithoutMetadata = typeof(AppDbContext).Assembly.GetTypes()
+            .Where(t => t is { IsAbstract: false } && typeof(Migration).IsAssignableFrom(t))
+            .Where(t => t.GetCustomAttribute<MigrationAttribute>() is null
+                || t.GetCustomAttribute<DbContextAttribute>() is null)
+            .Select(t => t.FullName)
+            .OrderBy(name => name)
+            .ToList();
+
+        Assert.Empty(migrationsWithoutMetadata);
+    }
+
     [Fact]
     public void ShouldRepairSchemaArtifact_SkipsPendingMigration()
     {

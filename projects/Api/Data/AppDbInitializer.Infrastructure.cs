@@ -423,6 +423,25 @@ public sealed partial class AppDbInitializer
                     NULL;
                 END;
 
+                BEGIN
+                    EXECUTE 'ALTER TABLE "Cities" ADD COLUMN IF NOT EXISTS "FuelPriceIndex" numeric NOT NULL DEFAULT 1.0';
+                    EXECUTE 'UPDATE "Cities" SET "FuelPriceIndex" = 0.95 WHERE "Name" = ''Prague''';
+                    EXECUTE 'UPDATE "Cities" SET "FuelPriceIndex" = 1.05 WHERE "Name" = ''Vienna''';
+                    EXECUTE 'UPDATE "Cities" SET "FuelPriceIndex" = 0.80 WHERE "Name" = ''New York''';
+                    EXECUTE 'UPDATE "Cities" SET "FuelPriceIndex" = 1.25 WHERE "Name" = ''London''';
+                    EXECUTE 'UPDATE "Cities" SET "FuelPriceIndex" = 0.70 WHERE "Name" = ''Beijing''';
+                    EXECUTE 'UPDATE "Cities" SET "FuelPriceIndex" = 0.65 WHERE "Name" = ''Delhi''';
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+
+                BEGIN
+                    EXECUTE 'ALTER TABLE "Buildings" ADD COLUMN IF NOT EXISTS "DispatchTargetPercent" integer NOT NULL DEFAULT 100';
+                    EXECUTE 'ALTER TABLE "Buildings" ADD COLUMN IF NOT EXISTS "FuelReserveMwh" numeric NOT NULL DEFAULT 0';
+                EXCEPTION WHEN OTHERS THEN
+                    NULL;
+                END;
+
                 FOR col IN
                     SELECT c.table_name, c.column_name
                     FROM information_schema.columns c

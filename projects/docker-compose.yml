@@ -28,7 +28,7 @@
     restart: on-failure
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=https://+:44364
+      - ASPNETCORE_URLS=http://+:44364
       - ConnectionStrings__MasterCatalog=Host=postgresmaster;Port=5432;Database=gamemaster;Username=postgres;Password=password;SSL Mode=Disable
   game1:
     build:
@@ -44,9 +44,9 @@
     restart: on-failure
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_URLS=https://+:44356
+      - ASPNETCORE_URLS=http://+:44356
       - ConnectionStrings__GameCatalog=Host=postgresmaster;Port=5432;Database=game1;Username=postgres;Password=password;SSL Mode=Disable
-      - MasterServer__ApiUrl=https://masterapi:44364/graphql
+      - MasterServer__ApiUrl=http://masterapi:44364/graphql
 
 volumes:
   postgres_data:

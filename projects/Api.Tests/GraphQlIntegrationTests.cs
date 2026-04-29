@@ -6493,12 +6493,12 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         // EUR city: founder contribution must equal exactly 200,000 (no FX conversion).
         Assert.Equal(200_000m, founderEntry.Amount);
-        Assert.Contains("200,000", founderEntry.Description);
+        Assert.Contains("200000", NormalizeAmountSeparators(founderEntry.Description));
         Assert.Contains("EUR", founderEntry.Description);
 
         // Default IPO raise target is 400,000 EUR, no FX conversion in EUR city.
         Assert.Equal(400_000m, ipoEntry.Amount);
-        Assert.Contains("400,000", ipoEntry.Description);
+        Assert.Contains("400000", NormalizeAmountSeparators(ipoEntry.Description));
         Assert.Contains("EUR", ipoEntry.Description);
 
         // Both entries must be linked to the company's bank account.
@@ -6552,11 +6552,13 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         // Descriptions must mention CZK and the EUR source amounts.
         Assert.Contains("CZK", founderEntry.Description);
-        Assert.Contains("200,000", founderEntry.Description);
+        Assert.Contains("EUR", founderEntry.Description);
+        Assert.Contains("200000", NormalizeAmountSeparators(founderEntry.Description));
         Assert.Contains("FX", founderEntry.Description);
 
         Assert.Contains("CZK", ipoEntry.Description);
-        Assert.Contains("400,000", ipoEntry.Description);
+        Assert.Contains("EUR", ipoEntry.Description);
+        Assert.Contains("400000", NormalizeAmountSeparators(ipoEntry.Description));
         Assert.Contains("FX", ipoEntry.Description);
 
         // Both entries must be linked to the company's CZK bank account.
@@ -6566,6 +6568,12 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var fundingAccount = await db.BankAccounts.AsNoTracking().FirstAsync(a => a.Id == founderEntry.BankAccountId!.Value);
         Assert.Equal("CZK", fundingAccount.CurrencyCode);
     }
+
+    private static string NormalizeAmountSeparators(string value) => value
+        .Replace(",", string.Empty, StringComparison.Ordinal)
+        .Replace(" ", string.Empty, StringComparison.Ordinal)
+        .Replace("\u00A0", string.Empty, StringComparison.Ordinal)
+        .Replace("\u202F", string.Empty, StringComparison.Ordinal);
 
     [Fact]
     public async Task FinishOnboarding_LedgerEntriesSurvivedFromStartOnboarding_BankStatementShowsOpeningCapital()
