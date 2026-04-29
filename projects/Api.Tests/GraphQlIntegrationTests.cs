@@ -27107,6 +27107,299 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal(collateralFactory.Id.ToString(), loan.GetProperty("collateralBuildingId").GetString());
     }
 
+    // ── Atomic debit/credit regression tests ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task AcceptLoan_LenderHasNoActualFunds_ReturnsError_BorrowerBalanceUnchanged()
+    {
+        // Lender bank has TotalDeposits (capacity check passes) but zero account balance.
+        // The LENDER_INSUFFICIENT_FUNDS guard must fire and leave the borrower's balance untouched.
+        var lenderEmail = $"lender-no-funds-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"borrower-no-funds-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "Lender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "Borrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "EmptyBankCo", Cash = 0m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BorrowerCo", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        // Bank has capacity on paper but NO actual liquidity accounts.
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "EmptyBank", Level = 1,
+            BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+
+        var collateralBuilding = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral", Level = 1,
+        };
+        db.Buildings.Add(collateralBuilding);
+
+        var borrowerAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 5_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(borrowerAccount);
+        await db.SaveChangesAsync();
+
+        var borrowerBalanceBefore = borrowerAccount.Balance;
+
+        var result = await ExecuteGraphQlAsync(
+            "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id } }",
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = 20_000m, collateralBuildingId = collateralBuilding.Id.ToString() } },
+            borrowerToken);
+
+        // Mutation must fail.
+        Assert.True(result.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0);
+        var code = errors[0].GetProperty("extensions").GetProperty("code").GetString();
+        Assert.Equal("LENDER_INSUFFICIENT_FUNDS", code);
+
+        // Borrower balance must be unchanged — no money was minted.
+        await db.Entry(borrowerAccount).ReloadAsync();
+        Assert.Equal(borrowerBalanceBefore, borrowerAccount.Balance);
+
+        // No loan record must have been created.
+        var loanCount = await db.Loans.CountAsync(l => l.BorrowerCompanyId == borrowerCompany.Id);
+        Assert.Equal(0, loanCount);
+
+        // No ledger entry must have been created for either party.
+        Assert.False(await db.LedgerEntries.AnyAsync(e => e.CompanyId == borrowerCompany.Id || e.CompanyId == lenderCompany.Id));
+    }
+
+    [Fact]
+    public async Task AcceptLoan_SequentialExhaustion_SecondLoanFails_TotalBalancePreserved()
+    {
+        // Bank has exactly 50,000 — enough for one 40,000 loan but not two.
+        // Verifies sequential exhaustion protection and that total money is conserved.
+        var lenderEmail = $"lender-seq-{Guid.NewGuid():N}@test.com";
+        var borrower1Email = $"borrower1-seq-{Guid.NewGuid():N}@test.com";
+        var borrower2Email = $"borrower2-seq-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "Lender");
+        var borrower1Token = await RegisterAndGetTokenAsync(borrower1Email, "Borrower1");
+        var borrower2Token = await RegisterAndGetTokenAsync(borrower2Email, "Borrower2");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrower1Player = await db.Players.FirstAsync(p => p.Email == borrower1Email);
+        var borrower2Player = await db.Players.FirstAsync(p => p.Email == borrower2Email);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LenderCo", Cash = 0m };
+        var borrower1Company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrower1Player.Id, Name = "Borrower1", Cash = 0m };
+        var borrower2Company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrower2Player.Id, Name = "Borrower2", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrower1Company, borrower2Company);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "TestBank", Level = 1,
+            BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+
+        // Bank has EXACTLY 50,000 — enough for one 40,000 loan.
+        var bankAccount = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 50_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        db.BankAccounts.Add(bankAccount);
+
+        var collateral1 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrower1Company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral1", Level = 1,
+        };
+        var collateral2 = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrower2Company.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral2", Level = 1,
+        };
+        db.Buildings.AddRange(collateral1, collateral2);
+        await db.SaveChangesAsync();
+
+        const decimal loanAmount = 40_000m;
+        const string acceptMutation = "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id status } }";
+
+        // First loan takes 40,000 from the bank — should succeed.
+        var result1 = await ExecuteGraphQlAsync(
+            acceptMutation,
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrower1Company.Id.ToString(), principalAmount = loanAmount, collateralBuildingId = collateral1.Id.ToString() } },
+            borrower1Token);
+        Assert.False(result1.TryGetProperty("errors", out _), "First loan should succeed.");
+
+        // Second loan of 40,000 — bank only has 10,000 left; should fail.
+        var result2 = await ExecuteGraphQlAsync(
+            acceptMutation,
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrower2Company.Id.ToString(), principalAmount = loanAmount, collateralBuildingId = collateral2.Id.ToString() } },
+            borrower2Token);
+        Assert.True(result2.TryGetProperty("errors", out var errs2) && errs2.GetArrayLength() > 0, "Second loan should fail.");
+
+        // Verify total money is conserved: lender gave 40,000 to borrower1; borrower2 got nothing.
+        var lenderBalance = await db.BankAccounts.Where(a => a.CompanyId == lenderCompany.Id && a.ClosedAtUtc == null).SumAsync(a => a.Balance);
+        var borrower1Balance = await db.BankAccounts.Where(a => a.CompanyId == borrower1Company.Id && a.ClosedAtUtc == null).SumAsync(a => a.Balance);
+        var borrower2Balance = await db.BankAccounts.Where(a => a.CompanyId == borrower2Company.Id && a.ClosedAtUtc == null).SumAsync(a => a.Balance);
+
+        Assert.Equal(50_000m - loanAmount, lenderBalance);
+        Assert.Equal(loanAmount, borrower1Balance);
+        Assert.Equal(0m, borrower2Balance);
+
+        // Total money in system must equal the original 50,000 — no money minted or destroyed.
+        Assert.Equal(50_000m, lenderBalance + borrower1Balance + borrower2Balance);
+
+        // Exactly one loan created.
+        var loanCount = await db.Loans.CountAsync(l => l.BankBuildingId == bank.Id);
+        Assert.Equal(1, loanCount);
+    }
+
+    [Fact]
+    public async Task AcceptLoan_BothSidesGetLedgerEntry_LenderNegativeBorrowerPositive()
+    {
+        // After a successful loan, both the lender and borrower must have LoanOrigination ledger entries.
+        // Lender's entry must be negative (outflow); borrower's must be positive (inflow).
+        var lenderEmail = $"lender-ledger-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"borrower-ledger-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(lenderEmail, "Lender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "Borrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var city = await db.Cities.FirstDeterministicAsync();
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "LenderCo2", Cash = 0m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "BorrowerCo2", Cash = 0m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Bank, Name = "TestBank2", Level = 1,
+            BaseCapitalDeposited = true, TotalDeposits = 1_000_000m, LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.Add(bank);
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = lenderCompany.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 500_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        var collateralBuilding = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(), CompanyId = borrowerCompany.Id, CityId = city.Id,
+            Type = Api.Data.Entities.BuildingType.Factory, Name = "Collateral3", Level = 1,
+        };
+        db.Buildings.Add(collateralBuilding);
+        await db.SaveChangesAsync();
+
+        const decimal loanAmount = 30_000m;
+        await ExecuteGraphQlAsync(
+            "mutation Accept($input: AcceptLoanInput!) { acceptLoan(input: $input) { id } }",
+            new { input = new { loanOfferId = bank.Id.ToString(), borrowerCompanyId = borrowerCompany.Id.ToString(), principalAmount = loanAmount, collateralBuildingId = collateralBuilding.Id.ToString() } },
+            borrowerToken);
+
+        // Lender must have a negative LoanOrigination entry.
+        var lenderEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == lenderCompany.Id && e.Category == Api.Data.Entities.LedgerCategory.LoanOrigination);
+        Assert.NotNull(lenderEntry);
+        Assert.Equal(-loanAmount, lenderEntry.Amount);
+
+        // Borrower must have a positive LoanOrigination entry.
+        var borrowerEntry = await db.LedgerEntries.FirstOrDefaultAsync(e =>
+            e.CompanyId == borrowerCompany.Id && e.Category == Api.Data.Entities.LedgerCategory.LoanOrigination);
+        Assert.NotNull(borrowerEntry);
+        Assert.Equal(loanAmount, borrowerEntry.Amount);
+    }
+
+    [Fact]
+    public async Task AcceptLoan_ConcurrencyToken_PreventsDoubleDebit_WhenSecondContextHasStaleToken()
+    {
+        // Directly verifies the ConcurrencyToken mechanism using two EF scopes, simulating
+        // what happens when two concurrent loan requests both load the same lender bank account.
+        //
+        // Scope 1 loads, debits, and saves successfully (bumping the store token).
+        // Scope 2 loaded the same account before scope 1 saved, so its tracked "original" token
+        // is now stale. When scope 2 tries to save, EF detects the mismatch and throws
+        // DbUpdateConcurrencyException — preventing the double-debit / money-minting race.
+
+        var ownerEmail = $"ct-test-{Guid.NewGuid():N}@test.com";
+        await RegisterAndGetTokenAsync(ownerEmail, "Owner");
+
+        await using var setupScope = _factory.Services.CreateAsyncScope();
+        var setupDb = setupScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var city = await setupDb.Cities.FirstDeterministicAsync();
+        var player = await setupDb.Players.FirstAsync(p => p.Email == ownerEmail);
+
+        var company = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "CtTestCo", Cash = 0m };
+        setupDb.Companies.Add(company);
+
+        var account = new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(), CompanyId = company.Id,
+            AccountNumber = Guid.NewGuid().ToString("N")[..16],
+            CurrencyCode = city.CurrencyCode, Balance = 100_000m, IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        };
+        setupDb.BankAccounts.Add(account);
+        await setupDb.SaveChangesAsync();
+
+        var accountId = account.Id;
+        var originalToken = account.ConcurrencyToken; // Token value after initial save.
+
+        // Scope 1: load, debit, save — simulates the first concurrent loan request persisting.
+        await using var scope1 = _factory.Services.CreateAsyncScope();
+        var db1 = scope1.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account1 = await db1.BankAccounts.FindAsync(accountId);
+        Assert.NotNull(account1);
+        account1.Balance -= 40_000m;
+        account1.ConcurrencyToken = Guid.NewGuid(); // TryDebit bumps the token.
+        await db1.SaveChangesAsync(); // Succeeds; store token is now scope1's new value.
+
+        // Scope 2: simulates a request that loaded the entity BEFORE scope1's save.
+        // We load the entity fresh (which would now have scope1's token) and then
+        // override the tracked "original" token with the stale pre-scope1 value to
+        // replicate the race condition.
+        await using var scope2 = _factory.Services.CreateAsyncScope();
+        var db2 = scope2.ServiceProvider.GetRequiredService<AppDbContext>();
+        var account2 = await db2.BankAccounts.FindAsync(accountId);
+        Assert.NotNull(account2);
+
+        // Rewind the original value to simulate scope2 having loaded before scope1's save.
+        db2.Entry(account2).Property(a => a.ConcurrencyToken).OriginalValue = originalToken;
+
+        account2.Balance -= 40_000m;
+        account2.ConcurrencyToken = Guid.NewGuid(); // TryDebit bumps the token again.
+
+        // SaveChangesAsync must fail: store has scope1's token; scope2 expects originalToken.
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db2.SaveChangesAsync());
+
+        // Verify the lender balance was reduced exactly once (only scope1's debit persisted).
+        await using var verifyScope = _factory.Services.CreateAsyncScope();
+        var verifyDb = verifyScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var finalAccount = await verifyDb.BankAccounts.FindAsync(accountId);
+        Assert.NotNull(finalAccount);
+        Assert.Equal(60_000m, finalAccount.Balance); // 100,000 − 40,000 = 60,000
+    }
+
     #endregion
 
     #region Bank Deposits

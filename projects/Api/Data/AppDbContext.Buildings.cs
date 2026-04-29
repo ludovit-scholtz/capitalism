@@ -50,6 +50,7 @@ public sealed partial class AppDbContext
             e.HasOne(a => a.Company).WithMany(c => c.BankAccounts).HasForeignKey(a => a.CompanyId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(a => a.Player).WithMany().HasForeignKey(a => a.PlayerId).OnDelete(DeleteBehavior.SetNull);
             e.HasOne(a => a.BankBuilding).WithMany().HasForeignKey(a => a.BankBuildingId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(a => a.ConcurrencyToken).IsConcurrencyToken();
         });
 
         modelBuilder.Entity<BuildingUnit>(e =>

@@ -195,8 +195,26 @@ public sealed partial class Mutation
             input.BankAccountId,
             httpContextAccessor.HttpContext.RequestAborted);
 
-        CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
+        // ── Atomic debit / credit ────────────────────────────────────────────────────────────────
+        // TryDebit modifies the in-memory lender accounts AND bumps each account's ConcurrencyToken.
+        // If it returns false (balance insufficient at execution time) we abort immediately — the
+        // borrower is never credited and no loan record is created, preventing money minting.
+        // If a concurrent request already debited the same account and persisted first, SaveChangesAsync
+        // below will detect the ConcurrencyToken mismatch and throw DbUpdateConcurrencyException,
+        // which we catch and surface as CONCURRENT_MODIFICATION.
+        var debitSucceeded = CompanyBankingService.TryDebit(lenderAccounts, input.PrincipalAmount);
+        if (!debitSucceeded)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The lender does not have sufficient funds to complete this loan disbursement at execution time.")
+                    .SetCode("LENDER_INSUFFICIENT_FUNDS")
+                    .Build());
+        }
+
+        // Credit borrower only after lender debit confirmed.
         borrowerAccount.Balance += input.PrincipalAmount;
+        borrowerAccount.ConcurrencyToken = Guid.NewGuid();
 
         var internalOffer = new LoanOffer
         {
@@ -241,6 +259,8 @@ public sealed partial class Mutation
 
         db.LoanOffers.Add(internalOffer);
         db.Loans.Add(loan);
+
+        // Borrower ledger — cash inflow
         db.LedgerEntries.Add(new LedgerEntry
         {
             Id = Guid.NewGuid(),
@@ -252,7 +272,34 @@ public sealed partial class Mutation
             RecordedAtUtc = DateTime.UtcNow,
         });
 
-        await db.SaveChangesAsync();
+        // Lender ledger — cash outflow (negative = funds disbursed from the bank)
+        db.LedgerEntries.Add(new LedgerEntry
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = bank.CompanyId,
+            Category = LedgerCategory.LoanOrigination,
+            Description = $"Loan disbursed to {borrower.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} in-game hours",
+            Amount = -input.PrincipalAmount,
+            RecordedAtTick = currentTick,
+            RecordedAtUtc = DateTime.UtcNow,
+        });
+
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // Another concurrent loan request modified the same lender account between our balance
+            // check and SaveChangesAsync. The ConcurrencyToken mismatch means EF could not persist
+            // the debit, so no funds moved and no loan was created. The caller should retry.
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("The bank account was modified by a concurrent transaction. Please try again.")
+                    .SetCode("CONCURRENT_MODIFICATION")
+                    .Build());
+        }
+
         return loan;
     }
 
