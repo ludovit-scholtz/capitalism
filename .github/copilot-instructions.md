@@ -1123,6 +1123,19 @@ Root-cause of a CI failure (April 2026, PR #enforce-bank-account-guidance):
 2. **Use the full operation name** (e.g. `query.includes('unitUpgradeInfo')`) rather than shortened forms. Abbreviated checks save nothing and cause hard-to-diagnose cross-handler pollution.
 3. **When adding a new mock handler, search for any existing handler whose `query.includes(...)` condition could match the new query's operation name or its parameter types.** Run a quick sanity check: does any existing substring appear inside `operationName` or inside type annotations like `UUID!`, `String!`, `Int!`?
 
+## E2E fixture isolation and onboarding auto-advance assertions
+
+Root-cause of CI instability (April 2026, PR #190 follow-up):
+- `makeDefaultResources()` returned module-level object references (`woodResource`, `grainResource`, `chemResource`) directly.
+- Tests that mutated a resource fixture in one spec leaked state into later specs in the same Playwright worker, causing order-dependent failures (for example empty/incorrect exchange rows in full-suite runs while isolated runs stayed green).
+- Onboarding city-selection tests still asserted `.city-card.selected` after click, but the current flow auto-advances city selection directly to the IPO step, so the city card is unmounted before class assertions run.
+
+**Rules to prevent recurrence:**
+1. **All shared mock factory helpers must return fresh cloned objects, never exported singleton objects.** For arrays of entities use object cloning per item (for example `{ ...woodResource }`) so test-local mutations cannot leak across specs.
+2. **When adding or editing `makeDefault*` helpers in `e2e/helpers/mock-api.ts`, add/keep a regression test proving call isolation** (mutate result A, assert result B remains unchanged).
+3. **For onboarding flow tests, assert durable step outcomes (next-step heading/URL/state), not transient selected classes on unmounted step cards.** City-card click assertions must validate transition to IPO step rather than `.selected` class persistence.
+4. **If a test fails only in full-suite parallel mode but passes in isolation, treat it as shared mutable fixture leakage first.** Inspect module-level constants returned by factory helpers before changing app logic.
+
 ## Tailwind CSS migration — preserve all E2E selector classes, never break dark-mode defaults
 
 Root-cause of CI failures (April 2026, PR #128 Tailwind migration):

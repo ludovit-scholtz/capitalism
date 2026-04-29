@@ -1665,7 +1665,9 @@ const chemResource: MockResourceType = {
 }
 
 export function makeDefaultResources(): MockResourceType[] {
-  return [woodResource, grainResource, chemResource]
+  // Return fresh objects for every call so test-local mutations never leak
+  // into other specs running in the same Playwright worker process.
+  return [{ ...woodResource }, { ...grainResource }, { ...chemResource }]
 }
 
 export function makeBratislava(): MockCity {
@@ -4386,9 +4388,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         const manufacturingIds = new Set<string>()
         allCompanyBuildings.forEach((b) => {
           const allUnits = [...(b.units ?? []), ...(b.pendingConfiguration?.units ?? [])]
-          allUnits
-            .filter((u) => u.unitType === 'MANUFACTURING' && u.productTypeId)
-            .forEach((u) => manufacturingIds.add(u.productTypeId!))
+          allUnits.filter((u) => u.unitType === 'MANUFACTURING' && u.productTypeId).forEach((u) => manufacturingIds.add(u.productTypeId!))
         })
         allCompanyBuildings.forEach((b) => {
           const allUnits = [...(b.units ?? []), ...(b.pendingConfiguration?.units ?? [])]
@@ -4409,13 +4409,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
           const isManufacturing = !isConnected && manufacturingIds.has(product.id)
           const isUsedByCompany = !isConnected && !isManufacturing && usedByCompanyIds.has(product.id)
           return {
-            rankingReason: isConnected
-              ? 'connected'
-              : isManufacturing
-                ? 'manufacturing'
-                : isUsedByCompany
-                  ? 'used_by_company'
-                  : 'catalog',
+            rankingReason: isConnected ? 'connected' : isManufacturing ? 'manufacturing' : isUsedByCompany ? 'used_by_company' : 'catalog',
             rankingScore: isConnected ? 100 : isManufacturing ? 80 : isUsedByCompany ? 50 : 10,
             productType: {
               ...product,
@@ -4652,13 +4646,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const fuelPurchaseCapacityMwhPerTick = isThermal ? fuelUnits.reduce((sum, u) => sum + u.level * 10, 0) : 0
       const energyProducingCapacityMw = isThermal ? epUnits.reduce((sum, u) => sum + u.level * 20, 0) : 0
       const currentReserve = building.fuelReserveMwh ?? 0
-      const fuelConstrainedOutputMw = isThermal && energyProducingCapacityMw > 0
-        ? Math.max(0, energyProducingCapacityMw - currentReserve)
-        : 0
-      const fuelReservePercent = maxFuelReserveMwh > 0
-        ? Math.min(100, Math.round((currentReserve / maxFuelReserveMwh) * 100))
-        : 0
-      const fuelTypeLabel = (building.powerPlantType === 'GAS') ? 'Natural Gas' : (building.powerPlantType === 'COAL') ? 'Coal' : ''
+      const fuelConstrainedOutputMw = isThermal && energyProducingCapacityMw > 0 ? Math.max(0, energyProducingCapacityMw - currentReserve) : 0
+      const fuelReservePercent = maxFuelReserveMwh > 0 ? Math.min(100, Math.round((currentReserve / maxFuelReserveMwh) * 100)) : 0
+      const fuelTypeLabel = building.powerPlantType === 'GAS' ? 'Natural Gas' : building.powerPlantType === 'COAL' ? 'Coal' : ''
       const fuelCostPerMwhEur = building.powerPlantType === 'GAS' ? 3.6 : building.powerPlantType === 'COAL' ? 3 : 0
 
       const powerPlantAnalytics = {
@@ -5694,10 +5684,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       }
       const impliedPrice = direction === 'FIAT_TO_GOLD' ? amount / outputAmount : outputAmount / amount
       const slippagePercent = Math.abs((impliedPrice - pool.impliedGoldPrice) / pool.impliedGoldPrice) * 100
-      const availableInputBalance =
-        direction === 'FIAT_TO_GOLD'
-          ? (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0)
-          : state.goldBalance.availableBalance
+      const availableInputBalance = direction === 'FIAT_TO_GOLD' ? (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0) : state.goldBalance.availableBalance
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -5768,7 +5755,10 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
               outputAmount: Math.round(outputAmount * 1e8) / 1e8,
               feeAmount,
               impliedPrice: pool.impliedGoldPrice,
-              newFiatBalance: direction === 'FIAT_TO_GOLD' ? (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0) : (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0),
+              newFiatBalance:
+                direction === 'FIAT_TO_GOLD'
+                  ? (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0)
+                  : (state.playerCurrencyBalances.find((b) => b.currencyCode === currencyCode)?.balance ?? 0),
               newGoldBalance: state.goldBalance.balance,
             },
           },
@@ -5782,7 +5772,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const pool = state.goldAmmPools.find((p) => p.id === vars?.poolId)
       if (!pool) return routeJsonError('Pool not found.', 'POOL_NOT_FOUND')
       const fiatAmount = vars?.fiatAmount ?? 0
-      const goldAmount = (pool.goldReserve > 0 && pool.fiatReserve > 0) ? (fiatAmount * pool.goldReserve) / pool.fiatReserve : (vars?.maxGoldAmount ?? fiatAmount)
+      const goldAmount = pool.goldReserve > 0 && pool.fiatReserve > 0 ? (fiatAmount * pool.goldReserve) / pool.fiatReserve : (vars?.maxGoldAmount ?? fiatAmount)
       if (state.goldBalance.availableBalance < goldAmount) return routeJsonError('Insufficient available gold (some may be locked in pools).', 'INSUFFICIENT_GOLD')
       pool.fiatReserve += fiatAmount
       pool.goldReserve += goldAmount
@@ -5799,9 +5789,15 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         existingPos.goldProvided += goldAmount
       } else {
         pool.myPosition = {
-          id: posId, poolId: pool.id, currencyCode: pool.currencyCode,
-          liquidityShares: newShares, sharePercent: (newShares / pool.totalLiquidityShares) * 100,
-          claimableFiat: 0, claimableGold: 0, fiatProvided: fiatAmount, goldProvided: goldAmount,
+          id: posId,
+          poolId: pool.id,
+          currencyCode: pool.currencyCode,
+          liquidityShares: newShares,
+          sharePercent: (newShares / pool.totalLiquidityShares) * 100,
+          claimableFiat: 0,
+          claimableGold: 0,
+          fiatProvided: fiatAmount,
+          goldProvided: goldAmount,
         }
       }
       return route.fulfill({
@@ -5810,8 +5806,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         body: JSON.stringify({
           data: {
             addGoldAmmLiquidity: {
-              poolId: pool.id, positionId: posId, fiatProvided: fiatAmount, goldProvided: goldAmount,
-              poolFiatReserve: pool.fiatReserve, poolGoldReserve: pool.goldReserve,
+              poolId: pool.id,
+              positionId: posId,
+              fiatProvided: fiatAmount,
+              goldProvided: goldAmount,
+              poolFiatReserve: pool.fiatReserve,
+              poolGoldReserve: pool.goldReserve,
             },
           },
         }),
@@ -5842,7 +5842,9 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         body: JSON.stringify({
           data: {
             removeGoldAmmLiquidity: {
-              positionId: vars?.positionId, fiatReturned, goldReturned,
+              positionId: vars?.positionId,
+              fiatReturned,
+              goldReturned,
               remainingShares: pool.myPosition?.liquidityShares ?? 0,
             },
           },
@@ -5865,12 +5867,23 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
       const fxRate = state.fxRates.find((r) => r.quoteCurrencyCode === currencyCode)
       const currencySymbol = fxRate ? fxRate.quoteCurrencySymbol : currencyCode
       const newPool: MockGoldAmmPool = {
-        id: poolId, currencyCode, currencySymbol,
-        fiatReserve: fiatAmount, goldReserve: goldAmount,
-        totalLiquidityShares: 1000, impliedGoldPrice: fiatAmount / goldAmount,
+        id: poolId,
+        currencyCode,
+        currencySymbol,
+        fiatReserve: fiatAmount,
+        goldReserve: goldAmount,
+        totalLiquidityShares: 1000,
+        impliedGoldPrice: fiatAmount / goldAmount,
         myPosition: {
-          id: posId, poolId, currencyCode, liquidityShares: 1000, sharePercent: 100,
-          claimableFiat: 0, claimableGold: 0, fiatProvided: fiatAmount, goldProvided: goldAmount,
+          id: posId,
+          poolId,
+          currencyCode,
+          liquidityShares: 1000,
+          sharePercent: 100,
+          claimableFiat: 0,
+          claimableGold: 0,
+          fiatProvided: fiatAmount,
+          goldProvided: goldAmount,
         },
       }
       state.goldAmmPools.push(newPool)
@@ -5882,7 +5895,12 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
         body: JSON.stringify({
           data: {
             createGoldAmmPool: {
-              poolId, positionId: posId, currencyCode, fiatProvided: fiatAmount, goldProvided: goldAmount, liquidityShares: 1000,
+              poolId,
+              positionId: posId,
+              currencyCode,
+              fiatProvided: fiatAmount,
+              goldProvided: goldAmount,
+              liquidityShares: 1000,
             },
           },
         }),
@@ -6034,9 +6052,7 @@ export function setupMockApi(page: Page, initial?: Partial<MockState>): MockStat
             .filter((player) => player.email !== 'government@capitalism.game')
             .map(buildGameAdminPlayer)
             .sort((left, right) => left.displayName.localeCompare(right.displayName)),
-          invisiblePlayers: state.players
-            .filter((player) => player.email !== 'government@capitalism.game' && player.isInvisibleInChat)
-            .map(buildGameAdminPlayer),
+          invisiblePlayers: state.players.filter((player) => player.email !== 'government@capitalism.game' && player.isInvisibleInChat).map(buildGameAdminPlayer),
           governmentPlayer: (() => {
             const govPlayer = state.players.find((player) => player.email === 'government@capitalism.game')
             return govPlayer ? buildGameAdminPlayer(govPlayer) : null

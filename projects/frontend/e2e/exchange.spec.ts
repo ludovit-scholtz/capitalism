@@ -11,6 +11,14 @@ function parseQualityRange(text: string | null): number {
 // ── Exchange browsing surface ─────────────────────────────────────────────────
 
 test.describe('Global Exchange page', () => {
+  test('makeDefaultResources returns isolated objects per call', async () => {
+    const first = makeDefaultResources()
+    first[0]!.name = 'Mutated Wood Name'
+
+    const second = makeDefaultResources()
+    expect(second[0]!.name).toBe('Wood')
+  })
+
   test('shows exchange page with heading and subtitle', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
@@ -37,9 +45,7 @@ test.describe('Global Exchange page', () => {
     await expect(page.locator('.resource-row').first()).toBeVisible()
   })
 
-  test('shows exchange price, transit cost, and delivered price for each city offer', async ({
-    page,
-  }) => {
+  test('shows exchange price, transit cost, and delivered price for each city offer', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -65,18 +71,13 @@ test.describe('Global Exchange page', () => {
     await expect(firstCard.getByText('Quality')).toBeVisible()
   })
 
-  test('local city shows minimum transit cost (same city, distance zero)', async ({
-    page,
-  }) => {
+  test('local city shows minimum transit cost (same city, distance zero)', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
 
     // Bratislava is the first city tab (selected by default). Same-city transit has minimum cost of $0.01.
-    const bratislavaCard = page
-      .locator('.city-offer-card')
-      .filter({ hasText: 'Bratislava' })
-      .first()
+    const bratislavaCard = page.locator('.city-offer-card').filter({ hasText: 'Bratislava' }).first()
     await expect(bratislavaCard).toBeVisible()
     await expect(bratislavaCard.locator('.transit-cost')).toBeVisible()
     // Must show a positive transit cost (minimum $0.01 even for same-city)
@@ -89,10 +90,7 @@ test.describe('Global Exchange page', () => {
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
 
     // Prague is ~310 km from Bratislava and should have a positive transit cost shown as "+$X.XX · Y km"
-    const pragueCard = page
-      .locator('.city-offer-card')
-      .filter({ hasText: 'Prague' })
-      .first()
+    const pragueCard = page.locator('.city-offer-card').filter({ hasText: 'Prague' }).first()
     await expect(pragueCard).toBeVisible()
     await expect(pragueCard.locator('.transit-cost').filter({ hasText: 'km' })).toBeVisible()
   })
@@ -136,9 +134,7 @@ test.describe('Global Exchange page', () => {
 // ── City switching ─────────────────────────────────────────────────────────────
 
 test.describe('Global Exchange — city switching', () => {
-  test('switching to a different city tab reloads exchange data for that destination', async ({
-    page,
-  }) => {
+  test('switching to a different city tab reloads exchange data for that destination', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
@@ -151,19 +147,14 @@ test.describe('Global Exchange — city switching', () => {
     // Exchange data reloads — once loading resolves, Prague offers must still be visible
     // (Prague selecting itself means no transit cost for Prague offers)
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
-    const pragueCard = page
-      .locator('.city-offer-card')
-      .filter({ hasText: 'Prague' })
-      .first()
+    const pragueCard = page.locator('.city-offer-card').filter({ hasText: 'Prague' }).first()
     await expect(pragueCard).toBeVisible()
     // Prague→Prague transit must show minimum cost (non-zero)
     await expect(pragueCard.locator('.transit-cost')).toBeVisible()
     await expect(pragueCard.locator('.transit-cost')).toContainText('+')
   })
 
-  test('at least two cities show different delivered prices for Wood, proving city differentiation', async ({
-    page,
-  }) => {
+  test('at least two cities show different delivered prices for Wood, proving city differentiation', async ({ page }) => {
     // Use custom city data with different rent per sqm to guarantee price differences.
     const cities = makeDefaultCities()
     // Override Vienna to have very high rent → higher exchange price.
@@ -287,9 +278,7 @@ test.describe('Global Exchange — navigation', () => {
 test.describe('Global Exchange — mobile layout (375px)', () => {
   test.use({ viewport: { width: 375, height: 812 } })
 
-  test('exchange page is usable at 375px: city tabs, resource rows, and metrics visible', async ({
-    page,
-  }) => {
+  test('exchange page is usable at 375px: city tabs, resource rows, and metrics visible', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
@@ -319,9 +308,7 @@ test.describe('Global Exchange — mobile layout (375px)', () => {
 // ── Full journey: inspect resource and compare city options ───────────────────
 
 test.describe('Global Exchange — player journey', () => {
-  test('player can browse exchange, inspect Wood resource, and compare two city delivered prices', async ({
-    page,
-  }) => {
+  test('player can browse exchange, inspect Wood resource, and compare two city delivered prices', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
@@ -342,7 +329,10 @@ test.describe('Global Exchange — player journey', () => {
     await expect(deliveredPrices).toHaveCount(7)
 
     // Step 5: One card is the best option (lowest delivered price) – local card has minimum transit
-    const localCard = woodRow.locator('.city-offer-card').filter({ has: page.locator('.transit-cost') }).first()
+    const localCard = woodRow
+      .locator('.city-offer-card')
+      .filter({ has: page.locator('.transit-cost') })
+      .first()
     await expect(localCard).toBeVisible()
 
     // Step 6: At least one remote card shows transit cost with distance
@@ -361,9 +351,7 @@ test.describe('Global Exchange — player journey', () => {
     await expect(grainRow.locator('.delivered-price').first()).toBeVisible()
   })
 
-  test('player can inspect Chemical Minerals (Healthcare input)', async ({
-    page,
-  }) => {
+  test('player can inspect Chemical Minerals (Healthcare input)', async ({ page }) => {
     // Chemical Minerals (slug: chemical-minerals) is included in the default mock resources
     const resources = makeDefaultResources()
     setupMockApi(page, { resourceTypes: resources })
@@ -455,9 +443,7 @@ test.describe('Global Exchange — error and empty states', () => {
     await expect(page.locator('.exchange-error')).toBeVisible()
   })
 
-  test('empty resource list shows no-match message when all resources are filtered out', async ({
-    page,
-  }) => {
+  test('empty resource list shows no-match message when all resources are filtered out', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
@@ -493,9 +479,7 @@ test.describe('Global Exchange — quality and abundance data', () => {
     await expect(abundanceValue).toContainText('%')
   })
 
-  test('high-abundance resource has higher quality than low-abundance resource in same city', async ({
-    page,
-  }) => {
+  test('high-abundance resource has higher quality than low-abundance resource in same city', async ({ page }) => {
     // Bratislava: Wood abundance=0.7 → quality ≈77%; ChemMinerals abundance=0.3 → quality ≈53%
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
@@ -587,9 +571,7 @@ test.describe('Global Exchange — post-onboarding context', () => {
 // ── Transit-reranking: cheapest sticker ≠ best delivered ──────────────────────
 
 test.describe('Global Exchange — transit-reranking proof', () => {
-  test('city with lowest exchange price is NOT always the best delivered option', async ({
-    page,
-  }) => {
+  test('city with lowest exchange price is NOT always the best delivered option', async ({ page }) => {
     // Bratislava is the DESTINATION (first city tab by default).
     // Prague has highest Wood abundance → lowest sticker price.
     // But Prague is ~310 km away, so its transit cost flips the ranking.
@@ -617,9 +599,7 @@ test.describe('Global Exchange — transit-reranking proof', () => {
     await expect(pragueCard.locator('.delivered-price')).toBeVisible()
   })
 
-  test('category filter narrows visible resource rows without losing offer cards', async ({
-    page,
-  }) => {
+  test('category filter narrows visible resource rows without losing offer cards', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -669,10 +649,7 @@ test.describe('Global Exchange — transit-reranking proof', () => {
     await expect(pragueLocalCard.first()).toBeVisible()
 
     // Bratislava is now remote → must show positive transit cost
-    const braRemoteCard = page
-      .locator('.city-offer-card')
-      .filter({ hasText: 'Bratislava' })
-      .first()
+    const braRemoteCard = page.locator('.city-offer-card').filter({ hasText: 'Bratislava' }).first()
     await expect(braRemoteCard.locator('.transit-cost').filter({ hasText: 'km' })).toBeVisible()
   })
 })
@@ -680,9 +657,7 @@ test.describe('Global Exchange — transit-reranking proof', () => {
 // ── Sourcing decision legibility ──────────────────────────────────────────────
 
 test.describe('Global Exchange — sourcing decision legibility', () => {
-  test('all four key metrics are present for every city offer card (resource, city, quality, delivered)', async ({
-    page,
-  }) => {
+  test('all four key metrics are present for every city offer card (resource, city, quality, delivered)', async ({ page }) => {
     setupMockApi(page)
     await page.goto('/exchange')
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
@@ -719,9 +694,7 @@ test.describe('Global Exchange — sourcing decision legibility', () => {
     }
   })
 
-  test('Grain resource row appears with all city offers (Food Processing raw input)', async ({
-    page,
-  }) => {
+  test('Grain resource row appears with all city offers (Food Processing raw input)', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -738,9 +711,7 @@ test.describe('Global Exchange — sourcing decision legibility', () => {
     await expect(grainRow.locator('.best-badge')).toHaveCount(1)
   })
 
-  test('Chemical Minerals resource row appears with all city offers (Healthcare raw input)', async ({
-    page,
-  }) => {
+  test('Chemical Minerals resource row appears with all city offers (Healthcare raw input)', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -758,9 +729,7 @@ test.describe('Global Exchange — sourcing decision legibility', () => {
 // ── Cross-linking: exchange ↔ encyclopedia ────────────────────────────────────
 
 test.describe('Global Exchange — production chain cross-links', () => {
-  test('each resource row has a "View production chain" link to the encyclopedia', async ({
-    page,
-  }) => {
+  test('each resource row has a "View production chain" link to the encyclopedia', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -776,9 +745,7 @@ test.describe('Global Exchange — production chain cross-links', () => {
     await expect(woodLink).toContainText('View production chain')
   })
 
-  test('clicking "View production chain" link navigates to encyclopedia resource detail', async ({
-    page,
-  }) => {
+  test('clicking "View production chain" link navigates to encyclopedia resource detail', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -791,9 +758,7 @@ test.describe('Global Exchange — production chain cross-links', () => {
     await expect(page).toHaveURL('/encyclopedia/resources/wood')
   })
 
-  test('Grain resource row has production chain link pointing to grain encyclopedia page', async ({
-    page,
-  }) => {
+  test('Grain resource row has production chain link pointing to grain encyclopedia page', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -801,15 +766,10 @@ test.describe('Global Exchange — production chain cross-links', () => {
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
 
     const grainRow = page.locator('.resource-row[data-slug="grain"]')
-    await expect(grainRow.locator('.production-chain-link')).toHaveAttribute(
-      'href',
-      '/encyclopedia/resources/grain',
-    )
+    await expect(grainRow.locator('.production-chain-link')).toHaveAttribute('href', '/encyclopedia/resources/grain')
   })
 
-  test('Chemical Minerals row has production chain link to chemical-minerals encyclopedia page', async ({
-    page,
-  }) => {
+  test('Chemical Minerals row has production chain link to chemical-minerals encyclopedia page', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -817,10 +777,7 @@ test.describe('Global Exchange — production chain cross-links', () => {
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
 
     const chemRow = page.locator('.resource-row[data-slug="chemical-minerals"]')
-    await expect(chemRow.locator('.production-chain-link')).toHaveAttribute(
-      'href',
-      '/encyclopedia/resources/chemical-minerals',
-    )
+    await expect(chemRow.locator('.production-chain-link')).toHaveAttribute('href', '/encyclopedia/resources/chemical-minerals')
   })
 })
 
@@ -854,9 +811,7 @@ test.describe('Global Exchange — deep-link query params from purchase unit', (
     await expect(pragueCityTab).toHaveClass(/active/)
   })
 
-  test('?resource=grain&city=city-vi pre-fills search and selects Vienna destination', async ({
-    page,
-  }) => {
+  test('?resource=grain&city=city-vi pre-fills search and selects Vienna destination', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -1218,15 +1173,7 @@ test.describe('Global Exchange — Products marketplace tab', () => {
     const cities = makeDefaultCities()
     const bratislava = cities.find((c) => c.name === 'Bratislava')!
 
-    const makeProductListing = (
-      id: string,
-      productName: string,
-      productSlug: string,
-      industry: string,
-      basePrice: number,
-      pricePerUnit: number,
-      unitSymbol: string,
-    ) => ({
+    const makeProductListing = (id: string, productName: string, productSlug: string, industry: string, basePrice: number, pricePerUnit: number, unitSymbol: string) => ({
       orderId: `order-${id}`,
       productTypeId: `prod-${id}`,
       productName,
@@ -1272,9 +1219,7 @@ test.describe('Global Exchange — Products marketplace tab', () => {
 // ── Tick-refresh stability ─────────────────────────────────────────────────────
 
 test.describe('Global Exchange — tick-refresh stability', () => {
-  test('background tick refresh does not blank the resource rows or show a loading spinner', async ({
-    page,
-  }) => {
+  test('background tick refresh does not blank the resource rows or show a loading spinner', async ({ page }) => {
     const state = setupMockApi(page)
     state.gameState.currentTick = 10
     state.gameState.tickIntervalSeconds = 1
@@ -1342,9 +1287,7 @@ test.describe('Global Exchange — tick-refresh stability', () => {
     await expect(page.locator('.exchange-loading')).toHaveCount(0)
   })
 
-  test('market mode tab (Products) is preserved across a background tick refresh', async ({
-    page,
-  }) => {
+  test('market mode tab (Products) is preserved across a background tick refresh', async ({ page }) => {
     const state = setupMockApi(page)
     state.gameState.currentTick = 20
     state.gameState.tickIntervalSeconds = 1
@@ -1369,9 +1312,7 @@ test.describe('Global Exchange — tick-refresh stability', () => {
 // ── Quality variability bands ─────────────────────────────────────────────────
 
 test.describe('Global Exchange — quality variability bands', () => {
-  test('each offer card shows a quality range (min–max) not just a single value', async ({
-    page,
-  }) => {
+  test('each offer card shows a quality range (min–max) not just a single value', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
@@ -1412,9 +1353,7 @@ test.describe('Global Exchange — quality variability bands', () => {
     await expect(firstCard.locator('.quality-band-center')).not.toHaveCount(0)
   })
 
-  test('high-abundance resource (Wood 70%) shows narrower quality range than low-abundance (ChemMinerals 30%)', async ({
-    page,
-  }) => {
+  test('high-abundance resource (Wood 70%) shows narrower quality range than low-abundance (ChemMinerals 30%)', async ({ page }) => {
     const cities = makeDefaultCities()
     const resources = makeDefaultResources()
     setupMockApi(page, { cities, resourceTypes: resources })
