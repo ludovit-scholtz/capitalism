@@ -196,7 +196,9 @@ public sealed partial class Mutation
             httpContextAccessor.HttpContext.RequestAborted);
 
         // ── Atomic debit / credit ────────────────────────────────────────────────────────────────
-        // TryDebit modifies the in-memory lender accounts AND bumps each account's ConcurrencyToken.
+        // lenderAccounts is the full account list for bank.CompanyId loaded earlier in this method
+        // via LoadActiveCompanyBankAccountsAsync. TryDebit distributes the debit across those accounts
+        // in order of preference and bumps each touched account's ConcurrencyToken.
         // If it returns false (balance insufficient at execution time) we abort immediately — the
         // borrower is never credited and no loan record is created, preventing money minting.
         // If a concurrent request already debited the same account and persisted first, SaveChangesAsync
@@ -212,9 +214,21 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        // Credit borrower only after lender debit confirmed.
-        borrowerAccount.Balance += input.PrincipalAmount;
-        borrowerAccount.ConcurrencyToken = Guid.NewGuid();
+        // Credit borrower via TryCredit (mirrors how the lender was debited and bumps the token).
+        // borrowerAccount was resolved and currency-validated by ResolveLoanSettlementAccountAsync.
+        var creditSucceeded = CompanyBankingService.TryCredit(
+            new[] { borrowerAccount },
+            input.PrincipalAmount,
+            borrowerAccount.CurrencyCode,
+            out _);
+        if (!creditSucceeded)
+        {
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Failed to credit the borrower's settlement account.")
+                    .SetCode("CREDIT_FAILED")
+                    .Build());
+        }
 
         var internalOffer = new LoanOffer
         {
