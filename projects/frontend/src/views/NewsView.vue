@@ -73,10 +73,13 @@ function entryTypeLabel(entryType: string): string {
   return t('news.filterNews')
 }
 
+/** Returns E2E locator class plus Tailwind color utilities for the pill. */
 function entryTypePillClass(entryType: string): string {
-  if (entryType === 'CHANGELOG') return 'news-pill-changelog'
-  if (entryType === 'MARKET_REPORT') return 'news-pill-market'
-  return 'news-pill-news'
+  if (entryType === 'CHANGELOG')
+    return 'news-pill-changelog bg-[rgba(0,71,255,0.16)] text-[#8db3ff]'
+  if (entryType === 'MARKET_REPORT')
+    return 'news-pill-market bg-[rgba(0,200,150,0.16)] text-[#7af5d9]'
+  return 'news-pill-news bg-[rgba(0,200,83,0.16)] text-[#7af5a9]'
 }
 
 async function loadFeed() {
@@ -109,26 +112,66 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="news-view">
-    <section class="news-hero">
-      <div class="container news-hero-inner">
-        <p class="news-eyebrow">{{ t('news.eyebrow') }}</p>
-        <h1 class="news-title">{{ t('news.title') }}</h1>
-        <p class="news-subtitle">{{ t('news.subtitle') }}</p>
-        <div class="news-filter-row" role="tablist">
-          <button type="button" class="news-filter" :class="{ active: filter === 'ALL' }" @click="filter = 'ALL'">
+  <div class="pb-16">
+    <!-- Hero -->
+    <section
+      class="py-14 border-b border-divider [background:radial-gradient(circle_at_top_left,rgba(255,138,0,0.18),transparent_40%),radial-gradient(circle_at_top_right,rgba(0,71,255,0.18),transparent_42%)]"
+    >
+      <div class="container grid gap-4">
+        <p class="text-[0.72rem] font-bold uppercase tracking-[0.18em] text-[#ffc07a]">
+          {{ t('news.eyebrow') }}
+        </p>
+        <h1 class="text-[clamp(2rem,4vw,3.2rem)] leading-[1.02] font-bold">
+          {{ t('news.title') }}
+        </h1>
+        <p class="text-muted max-w-2xl">{{ t('news.subtitle') }}</p>
+
+        <!-- Filter pills -->
+        <div class="flex flex-wrap gap-3" role="tablist">
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
+            :class="
+              filter === 'ALL'
+                ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
+                : 'border-divider text-muted'
+            "
+            @click="filter = 'ALL'"
+          >
             {{ t('news.filterAll') }}
           </button>
-          <button type="button" class="news-filter" :class="{ active: filter === 'NEWS' }" @click="filter = 'NEWS'">
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
+            :class="
+              filter === 'NEWS'
+                ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
+                : 'border-divider text-muted'
+            "
+            @click="filter = 'NEWS'"
+          >
             {{ t('news.filterNews') }}
           </button>
-          <button type="button" class="news-filter" :class="{ active: filter === 'CHANGELOG' }" @click="filter = 'CHANGELOG'">
+          <button
+            type="button"
+            class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
+            :class="
+              filter === 'CHANGELOG'
+                ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
+                : 'border-divider text-muted'
+            "
+            @click="filter = 'CHANGELOG'"
+          >
             {{ t('news.filterChangelog') }}
           </button>
           <button
             type="button"
-            class="news-filter news-filter-market"
-            :class="{ active: filter === 'MARKET_REPORT' }"
+            class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
+            :class="
+              filter === 'MARKET_REPORT'
+                ? 'bg-[rgba(0,200,150,0.18)] border-[rgba(0,200,150,0.5)] text-[#7af5d9]'
+                : 'border-divider text-muted'
+            "
             @click="filter = 'MARKET_REPORT'"
           >
             📊 {{ t('news.filterMarketReport') }}
@@ -137,48 +180,77 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="container news-content">
-      <div v-if="newsStore.loading" class="state-card">
+    <!-- Content -->
+    <section class="container pt-8">
+      <!-- Loading -->
+      <div v-if="newsStore.loading" class="state-card p-6 rounded-2xl border border-divider bg-card grid gap-4">
         <p>{{ t('common.loading') }}</p>
       </div>
 
-      <div v-else-if="viewError" class="state-card state-card-error">
+      <!-- Error -->
+      <div
+        v-else-if="viewError"
+        class="state-card state-card-error p-6 rounded-2xl border border-[rgba(248,113,113,0.5)] bg-card grid gap-4"
+      >
         <p>{{ viewError }}</p>
         <button type="button" class="btn btn-secondary" @click="loadFeed">
           {{ t('common.tryAgain') }}
         </button>
       </div>
 
-      <div v-else-if="entries.length === 0" class="state-card">
-        <p class="state-title">{{ t('news.emptyTitle') }}</p>
-        <p v-if="filter === 'MARKET_REPORT'" class="state-copy">{{ t('news.marketReportEmptyBody') }}</p>
-        <p v-else class="state-copy">{{ t('news.emptyBody') }}</p>
+      <!-- Empty -->
+      <div v-else-if="entries.length === 0" class="state-card p-6 rounded-2xl border border-divider bg-card grid gap-4">
+        <p class="text-lg font-bold">{{ t('news.emptyTitle') }}</p>
+        <p v-if="filter === 'MARKET_REPORT'" class="text-muted">{{ t('news.marketReportEmptyBody') }}</p>
+        <p v-else class="text-muted">{{ t('news.emptyBody') }}</p>
       </div>
 
-      <div v-else class="news-entry-list">
+      <!-- Entry list -->
+      <div v-else class="grid gap-5">
         <article
           v-for="entry in entries"
           :key="entry.id"
-          class="news-card"
+          class="news-card p-6 rounded-2xl border shadow-sm"
           :class="{
+            'news-card-market border-[rgba(0,200,150,0.25)]': entry.entryType === 'MARKET_REPORT',
+            'border-divider': entry.entryType !== 'MARKET_REPORT',
             'news-card-unread': initiallyUnreadIds.has(entry.id),
-            'news-card-market': entry.entryType === 'MARKET_REPORT',
+          }"
+          :style="{
+            background:
+              entry.entryType === 'MARKET_REPORT'
+                ? 'linear-gradient(180deg,rgba(0,200,150,0.04),rgba(255,255,255,0))'
+                : 'linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))',
+            borderLeft: initiallyUnreadIds.has(entry.id) ? '4px solid rgba(255,138,0,0.7)' : undefined,
           }"
         >
-          <div class="news-card-header">
-            <div class="news-card-meta">
-              <div class="news-card-pills">
-                <span class="news-pill" :class="entryTypePillClass(entry.entryType)">
+          <!-- Card header -->
+          <div class="flex justify-between gap-4 mb-4 max-sm:flex-col">
+            <div class="grid gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
+                <span
+                  class="inline-flex items-center px-[0.65rem] py-[0.3rem] rounded-full text-[0.74rem] uppercase tracking-[0.08em]"
+                  :class="entryTypePillClass(entry.entryType)"
+                >
                   {{ entryTypeLabel(entry.entryType) }}
                 </span>
-                <span v-if="initiallyUnreadIds.has(entry.id)" class="news-unread-badge">{{ t('news.unread') }}</span>
+                <span
+                  v-if="initiallyUnreadIds.has(entry.id)"
+                  class="news-unread-badge inline-flex items-center px-[0.55rem] py-[0.2rem] rounded-full text-[0.7rem] uppercase tracking-[0.08em] bg-[rgba(255,138,0,0.18)] text-[#ffd7a3] border border-[rgba(255,138,0,0.35)]"
+                >
+                  {{ t('news.unread') }}
+                </span>
               </div>
-              <h2 class="news-card-title">{{ getLocalization(entry)?.title ?? t('news.untitled') }}</h2>
+              <h2 class="mt-1.5 text-2xl font-bold">
+                {{ getLocalization(entry)?.title ?? t('news.untitled') }}
+              </h2>
             </div>
-            <p class="news-card-date">{{ formatDate(entry.publishedAtUtc ?? entry.updatedAtUtc) }}</p>
+            <p class="text-muted text-[0.82rem] whitespace-nowrap max-sm:whitespace-normal">
+              {{ formatDate(entry.publishedAtUtc ?? entry.updatedAtUtc) }}
+            </p>
           </div>
 
-          <p v-if="shouldShowSummary(entry)" class="news-card-summary">
+          <p v-if="shouldShowSummary(entry)" class="mb-4 text-muted text-base">
             {{ getLocalization(entry)?.summary }}
           </p>
 
@@ -190,185 +262,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.news-view {
-  padding-bottom: 4rem;
-}
-
-.news-hero {
-  padding: 3.5rem 0 2rem;
-  background: radial-gradient(circle at top left, rgba(255, 138, 0, 0.18), transparent 40%), radial-gradient(circle at top right, rgba(0, 71, 255, 0.18), transparent 42%);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.news-hero-inner {
-  display: grid;
-  gap: 1rem;
-}
-
-.news-eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.18em;
-  color: #ffc07a;
-  font-size: 0.72rem;
-}
-
-.news-title {
-  font-size: clamp(2rem, 4vw, 3.2rem);
-  line-height: 1.02;
-}
-
-.news-subtitle {
-  max-width: 45rem;
-  color: var(--color-text-secondary);
-}
-
-.news-filter-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-.news-filter {
-  padding: 0.7rem 1rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--color-text-secondary);
-}
-
-.news-filter.active {
-  background: rgba(255, 138, 0, 0.18);
-  border-color: rgba(255, 138, 0, 0.5);
-  color: #ffd7a3;
-}
-
-.news-filter-market.active {
-  background: rgba(0, 200, 150, 0.18);
-  border-color: rgba(0, 200, 150, 0.5);
-  color: #7af5d9;
-}
-
-.news-content {
-  padding-top: 2rem;
-}
-
-.state-card {
-  padding: 1.5rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  display: grid;
-  gap: 1rem;
-}
-
-.state-card-error {
-  border-color: rgba(248, 113, 113, 0.5);
-}
-
-.state-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-}
-
-.state-copy {
-  color: var(--color-text-secondary);
-}
-
-.news-entry-list {
-  display: grid;
-  gap: 1.25rem;
-}
-
-.news-card {
-  padding: 1.5rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
-  box-shadow: var(--shadow-sm);
-}
-
-.news-card-market {
-  border-color: rgba(0, 200, 150, 0.25);
-  background: linear-gradient(180deg, rgba(0, 200, 150, 0.04), rgba(255, 255, 255, 0));
-}
-
-.news-card-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.news-card-meta {
-  display: grid;
-  gap: 0.5rem;
-}
-
-.news-card-pills {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.news-card-unread {
-  border-left: 3px solid rgba(255, 138, 0, 0.7);
-}
-
-.news-unread-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: rgba(255, 138, 0, 0.18);
-  color: #ffd7a3;
-  border: 1px solid rgba(255, 138, 0, 0.35);
-}
-
-.news-card-title {
-  margin-top: 0.4rem;
-  font-size: 1.5rem;
-}
-
-.news-card-date {
-  color: var(--color-text-secondary);
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-
-.news-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.3rem 0.65rem;
-  border-radius: 999px;
-  font-size: 0.74rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.news-pill-news {
-  background: rgba(0, 200, 83, 0.16);
-  color: #7af5a9;
-}
-
-.news-pill-changelog {
-  background: rgba(0, 71, 255, 0.16);
-  color: #8db3ff;
-}
-
-.news-pill-market {
-  background: rgba(0, 200, 150, 0.16);
-  color: #7af5d9;
-}
-
-.news-card-summary {
-  margin-bottom: 1rem;
-  color: var(--color-text-secondary);
-  font-size: 1rem;
-}
+/* ── Only :deep() rules for v-html content remain – cannot be expressed as Tailwind ── */
 
 .news-card-body :deep(p) + :deep(p) {
   margin-top: 0.85rem;
@@ -466,14 +360,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 720px) {
-  .news-card-header {
-    flex-direction: column;
-  }
-
-  .news-card-date {
-    white-space: normal;
-  }
-
   .news-card-body :deep(.mr-table th:nth-child(4)),
   .news-card-body :deep(.mr-table td:nth-child(4)),
   .news-card-body :deep(.mr-table th:nth-child(6)),

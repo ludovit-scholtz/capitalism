@@ -212,57 +212,82 @@ function navigateToEntry(slug: string) {
 </script>
 
 <template>
-  <div class="encyclopedia-view container">
-    <header class="hero">
+  <div class="container py-8 pb-16 flex flex-col gap-8">
+    <!-- Hero -->
+    <header class="flex flex-wrap justify-between items-end gap-4 max-sm:items-stretch">
       <div>
-        <p class="eyebrow">{{ t('encyclopedia.eyebrow') }}</p>
-        <h1>{{ t('encyclopedia.title') }}</h1>
-        <p class="subtitle">{{ t('encyclopedia.subtitle') }}</p>
+        <p class="text-sm text-muted mb-1">{{ t('encyclopedia.eyebrow') }}</p>
+        <h1 class="m-0">{{ t('encyclopedia.title') }}</h1>
+        <p class="text-muted mt-1">{{ t('encyclopedia.subtitle') }}</p>
       </div>
-      <div class="hero-stats">
-        <div class="stat-card">
+      <div class="flex flex-wrap gap-4 justify-end max-sm:justify-stretch">
+        <div
+          class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1"
+        >
           <strong>{{ catalogEntries.length }}</strong>
-          <span>{{ t('encyclopedia.resourcesCount') }}</span>
+          <span class="text-muted text-sm">{{ t('encyclopedia.resourcesCount') }}</span>
         </div>
-        <div class="stat-card">
+        <div
+          class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1"
+        >
           <strong>{{ visibleProducts.length }}</strong>
-          <span>{{ t('encyclopedia.productsCount') }}</span>
+          <span class="text-muted text-sm">{{ t('encyclopedia.productsCount') }}</span>
         </div>
       </div>
     </header>
 
-    <div v-if="loading" class="loading">{{ t('common.loading') }}</div>
-    <div v-else-if="error" class="error-message" role="alert">{{ error }}</div>
-    <section v-else class="resources-section">
-      <div class="section-header">
-        <h2>{{ t('encyclopedia.resourcesTitle') }}</h2>
-        <p>{{ t('encyclopedia.resourcesHelp') }}</p>
-        <p v-if="hiddenProProductCount > 0 && !showProProducts" class="catalog-note">
+    <!-- Loading / error -->
+    <div v-if="loading" class="text-muted py-12 text-center">{{ t('common.loading') }}</div>
+    <div
+      v-else-if="error"
+      class="bg-card border border-divider rounded-2xl p-6 text-center text-muted"
+      role="alert"
+    >
+      {{ error }}
+    </div>
+
+    <!-- Main section -->
+    <section v-else class="flex flex-col gap-2">
+      <div class="flex flex-col gap-1">
+        <h2 class="m-0">{{ t('encyclopedia.resourcesTitle') }}</h2>
+        <p class="text-muted">{{ t('encyclopedia.resourcesHelp') }}</p>
+        <p v-if="hiddenProProductCount > 0 && !showProProducts" class="text-muted text-sm">
           {{ t('encyclopedia.proHiddenNotice', { count: hiddenProProductCount }) }}
         </p>
       </div>
 
-      <div class="filters">
-        <input v-model="search" type="search" class="filter-input" :placeholder="t('encyclopedia.searchPlaceholder')" />
-        <select v-model="industry" class="filter-select" :aria-label="t('encyclopedia.filterByIndustry')">
+      <!-- Filters -->
+      <div class="flex items-center gap-4 flex-wrap mt-6">
+        <input
+          v-model="search"
+          type="search"
+          class="flex-1 min-w-60 border border-divider rounded-xl bg-page text-body px-4 py-3"
+          :placeholder="t('encyclopedia.searchPlaceholder')"
+        />
+        <select
+          v-model="industry"
+          class="border border-divider rounded-xl bg-page text-body px-4 py-3"
+          :aria-label="t('encyclopedia.filterByIndustry')"
+        >
           <option v-for="option in industries" :key="option" :value="option">
             {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
           </option>
         </select>
-        <label class="filter-toggle">
-          <input v-model="showProProducts" type="checkbox" />
+        <label class="inline-flex items-center gap-2 text-muted font-semibold cursor-pointer">
+          <input v-model="showProProducts" type="checkbox" class="accent-[var(--color-primary)]" />
           <span>{{ t('encyclopedia.showProProducts') }}</span>
         </label>
       </div>
 
-      <div class="resource-grid">
-        <p v-if="catalogEntries.length === 0" class="search-empty-state">
+      <!-- Resource grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+        <p v-if="catalogEntries.length === 0" class="search-empty-state text-center col-span-full py-12 text-muted">
           {{ t('encyclopedia.searchNoResults') }}
         </p>
         <article
           v-for="entry in catalogEntries"
           :key="entry.id"
-          class="resource-card resource-card--link"
+          class="resource-card--link bg-card border border-divider rounded-2xl overflow-hidden cursor-pointer hover:border-brand focus-visible:border-brand focus-visible:outline-none transition-colors"
           :class="`resource-card--${entry.kind}`"
           role="button"
           tabindex="0"
@@ -271,228 +296,50 @@ function navigateToEntry(slug: string) {
           @keydown.enter="navigateToEntry(entry.slug)"
           @keydown.space.prevent="navigateToEntry(entry.slug)"
         >
-          <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="resource-image" />
-          <div class="resource-body">
-            <div class="resource-heading">
+          <img
+            v-if="entry.imageUrl"
+            :src="entry.imageUrl ?? undefined"
+            :alt="entry.title"
+            class="w-full aspect-video object-cover bg-page"
+          />
+          <div class="p-4 flex flex-col gap-3">
+            <!-- Heading row -->
+            <div class="flex justify-between items-start gap-4">
               <div>
-                <p class="resource-kind">{{ entry.badge }}</p>
-                <h3>{{ entry.title }}</h3>
+                <p class="text-xs font-bold uppercase tracking-[0.05em] text-muted mb-1">
+                  {{ entry.badge }}
+                </p>
+                <h3 class="m-0 text-base font-semibold">{{ entry.title }}</h3>
               </div>
-              <span class="resource-unit">{{ entry.pill }}</span>
+              <span class="px-2.5 py-1 rounded-full bg-brand/10 text-brand text-xs font-semibold shrink-0">
+                {{ entry.pill }}
+              </span>
             </div>
-            <span v-if="entry.accessText" class="product-access-badge" :class="entry.accessClass ?? undefined">
+
+            <!-- Pro access badge -->
+            <span
+              v-if="entry.accessText"
+              class="inline-flex items-center justify-center w-fit px-2 py-0.5 rounded-full border text-[0.72rem] font-bold"
+              :class="{
+                'text-orange-400 border-orange-500/50 bg-orange-500/10': entry.accessClass === 'locked',
+                'text-green-400 border-green-500/50 bg-green-500/10': entry.accessClass === 'unlocked',
+              }"
+            >
               {{ entry.accessText }}
             </span>
-            <p class="resource-description">{{ entry.description }}</p>
-            <div class="resource-meta">
+
+            <!-- Description (keep class for E2E) -->
+            <p class="resource-description text-sm text-muted">{{ entry.description }}</p>
+
+            <!-- Meta (keep class for E2E) -->
+            <div class="resource-meta flex flex-wrap gap-2 text-xs text-muted">
               <span v-for="metaEntry in entry.meta" :key="metaEntry">{{ metaEntry }}</span>
             </div>
-            <span class="resource-view-detail">{{ t('encyclopedia.viewDetail') }} →</span>
+
+            <span class="text-xs font-semibold text-brand">{{ t('encyclopedia.viewDetail') }} →</span>
           </div>
         </article>
       </div>
     </section>
   </div>
 </template>
-
-<style scoped>
-.encyclopedia-view {
-  padding: 2rem 1rem 3rem;
-  display: grid;
-  gap: 2rem;
-}
-
-.hero,
-.section-header,
-.filters,
-.hero-stats,
-.resource-meta {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.hero {
-  justify-content: space-between;
-  align-items: flex-end;
-}
-
-.eyebrow,
-.subtitle,
-.section-header p,
-.catalog-note,
-.resource-description,
-.resource-meta {
-  color: var(--color-text-secondary);
-}
-
-.hero h1,
-.section-header h2,
-.resource-heading h3 {
-  margin: 0;
-}
-
-.hero-stats {
-  justify-content: flex-end;
-}
-
-.stat-card,
-.resource-card {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-}
-
-.stat-card {
-  padding: 1rem 1.25rem;
-  min-width: 120px;
-  display: grid;
-  gap: 0.25rem;
-}
-
-.resource-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 1rem;
-  margin-top: 1.5rem;
-}
-
-.resource-card {
-  overflow: hidden;
-}
-
-.resource-image {
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background: var(--color-bg);
-  object-fit: cover;
-}
-
-.resource-body {
-  padding: 1rem;
-  display: grid;
-  gap: 0.75rem;
-}
-
-.product-access-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: fit-content;
-  padding: 0.2rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.product-access-badge.locked {
-  color: var(--color-tertiary);
-  border-color: rgba(255, 109, 0, 0.45);
-  background: rgba(255, 109, 0, 0.12);
-}
-
-.product-access-badge.unlocked {
-  color: var(--color-secondary);
-  border-color: rgba(0, 200, 83, 0.45);
-  background: rgba(0, 200, 83, 0.12);
-}
-
-.resource-heading {
-  display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.resource-kind {
-  margin: 0 0 0.3rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-}
-
-.resource-unit {
-  padding: 0.25rem 0.6rem;
-  border-radius: 999px;
-  background: rgba(0, 71, 255, 0.08);
-  color: var(--color-primary);
-  font-weight: 600;
-  font-size: 0.75rem;
-}
-
-.filters {
-  align-items: center;
-  margin-top: 1.5rem;
-}
-
-.filter-input,
-.filter-select {
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-bg);
-  color: var(--color-text);
-  padding: 0.75rem 0.9rem;
-}
-
-.filter-input {
-  flex: 1;
-  min-width: 240px;
-}
-
-.filter-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-}
-
-.filter-toggle input {
-  accent-color: var(--color-primary);
-}
-
-.resource-card--link {
-  cursor: pointer;
-  transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
-}
-
-.resource-card--link:hover,
-.resource-card--link:focus-visible {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
-  outline: none;
-}
-
-.resource-view-detail {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.search-empty-state {
-  grid-column: 1 / -1;
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--color-text-secondary);
-  font-size: 0.95rem;
-}
-
-@media (max-width: 720px) {
-  .hero {
-    align-items: stretch;
-  }
-
-  .hero-stats {
-    justify-content: stretch;
-  }
-
-  .stat-card {
-    flex: 1;
-  }
-}
-</style>
