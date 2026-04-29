@@ -373,7 +373,7 @@ docker-compose logs --no-color --tail=200 postgresmaster masterapi game1
 - `makeDefaultBuildingLots()` factory in `e2e/helpers/mock-api.ts` provides 5 mock lots for E2E tests: 1 premium mine/factory lot (`Industrial Plot A1`), 1 affordable factory-only starter lot (`Factory Site B1`), 1 commercial lot, 1 residential lot, and 1 business lot. Use `state.buildingLots` to customize lot ownership in tests.
 - When adding new city map E2E tests, always include `city-map.spec.ts` in the run; it is the canonical spec for the `/city/:id` route.
 - Bratislava coordinates (for validation): lat 47.8–48.4°N, lon 16.8–17.5°E.
-- The lot detail panel shows both `appraisedValue` (basePrice) and `price` (asking price) separately. When a lot has a raw material deposit and `price > basePrice`, a "resource premium" badge is shown next to the asking price. This implements the ROADMAP requirement: "The price to purchase the land includes also the base price for the raw material."
+- The lot detail panel shows both `appraisedValue` (basePrice) and `price` (asking price) separately. When a lot has a raw material deposit and `price > basePrice`, a "resource premium" badge is shown next to the asking price. This implements the PRODUCT-DEFINITION.md and ROADMAP.md requirement: "The price to purchase the land includes also the base price for the raw material."
 - A PR titled `[WIP]` must not be left in that state. Drive every PR to a production-ready, fully-tested state before reporting complete.
 - Always confirm CI would pass by running the full local validation pipeline (backend Release build + tests, frontend lint + unit tests + build, full Playwright suite) before reporting completion.
 - Remove `[WIP]` from the PR title when all acceptance criteria are met, all tests pass, and the code has been reviewed.
@@ -418,7 +418,7 @@ Root-cause of a past quality failure (March 2026, PR #46):
 **When the diff is empty and the PR title implies work to be done:**
 1. **Do not simply reply "it's already done."** Always investigate whether there are quality gaps, test coverage holes, or product-definition misalignments even when the core implementation exists.
 2. Run the full test suite (`dotnet test` + `npm run test:unit` + `npx playwright test`) and fix any failures.
-3. Check the product definition (ROADMAP.md and the linked issue) against the existing implementation and identify missing coverage.
+3. Check the product definition (PRODUCT-DEFINITION.md and ROADMAP.md and the linked issue) against the existing implementation and identify missing coverage.
 4. Add missing backend tests (validation errors, duplicate prevention, all industry paths, unauthenticated calls).
 5. Add missing E2E tests (skip-path, edge cases named in the issue acceptance criteria).
 6. Update the copilot instructions with root-cause lessons so the failure does not repeat.
@@ -437,7 +437,7 @@ Root-cause of a quality failure (March 2026, PR #51 onboarding follow-up):
 - Review feedback was therefore about product-definition alignment and proof quality, not just red CI.
 
 **When a first-session or guided-flow feature is "green but not ready":**
-1. Re-read the relevant ROADMAP acceptance text and inspect the actual rendered UI, not just the tests.
+1. Re-read the relevant PRODUCT-DEFINITION.md and ROADMAP.md acceptance text and inspect the actual rendered UI, not just the tests.
 2. Verify the completion state exposes the concrete business context a player needs (paying bank-account balance, numeric price target, current tick/time, next action).
 3. Add or tighten E2E assertions for those concrete values so future regressions are caught.
 4. Add backend assertions for authoritative starter configuration values when the guided flow depends on them (for example min/max prices, product/resource bindings, and unit links).
@@ -594,11 +594,11 @@ Root-cause of a silent production bug (March 2026, PR #93):
 
 Root-cause of a UX gap (March 2026, PR #93):
 - Industry card descriptions were a single bland sentence: "Craft wooden furniture from harvested timber."
-- The ROADMAP explicitly requires: "Each option should explain the fantasy, likely first product, and why a player might choose it."
+- The PRODUCT-DEFINITION.md and ROADMAP.md explicitly require: "Each option should explain the fantasy, likely first product, and why a player might choose it."
 - No tests verified the content quality of the industry cards.
 
 **Rules to prevent recurrence:**
-1. **When implementing any wizard selection step (industry, city, product), match the ROADMAP's content requirements exactly.** For industry cards this means: fantasy description, first product name + price, and a "why choose" tagline.
+1. **When implementing any wizard selection step (industry, city, product), match the PRODUCT-DEFINITION.md and ROADMAP.md content requirements exactly.** For industry cards this means: fantasy description, first product name + price, and a "why choose" tagline.
 2. **Industry descriptions must use i18n keys** (not hardcoded English strings in the component) so all three locales (en, sk, de) are kept in sync.
 3. **Add E2E tests that assert the specific content values** (product names, key description words, why tags) are visible on the cards — not just that the cards are rendered.
 4. **The `.card-first-product` badge is the canonical selector** for industry first-product hints; `.card-why` is the canonical selector for the tagline. Tests must use these selectors when verifying card content.
@@ -610,11 +610,11 @@ Root-cause of a quality failure (March 2026, PR #93 initial session):
 - A silent supply chain bug (MaxPrice blocking Food Processing) and poor UX copy (1-sentence industry descriptions not matching ROADMAP) both went undetected.
 
 **When the diff is empty and the feature appears "already implemented":**
-1. Run the full supply chain end-to-end for **every variant** defined in the ROADMAP, not just the first happy path.
-2. Compare every visible UI string against the ROADMAP's content requirements for that screen. Short descriptions that don't explain fantasy/product/why are UX gaps.
+1. Run the full supply chain end-to-end for **every variant** defined in the PRODUCT-DEFINITION.md and ROADMAP.md, not just the first happy path.
+2. Compare every visible UI string against the PRODUCT-DEFINITION.md and ROADMAP.md content requirements for that screen. Short descriptions that don't explain fantasy/product/why are UX gaps.
 3. Run `dotnet test` with a filter targeting the specific feature area to find failures the happy-path tests mask.
-4. Screenshot every wizard step and compare against the ROADMAP description before declaring done.
-5. A feature is only "done" when ALL of: CI passes, product copy matches ROADMAP, all industries work end-to-end, and tests cover every defined variant.
+4. Screenshot every wizard step and compare against the PRODUCT-DEFINITION.md and ROADMAP.md description before declaring done.
+5. A feature is only "done" when ALL of: CI passes, product copy matches PRODUCT-DEFINITION.md and ROADMAP.md, all industries work end-to-end, and tests cover every defined variant.
 
 ## TypeScript build — always use `npm run build` not `npm run build:ssr` for type checking
 
@@ -652,7 +652,7 @@ Root-cause of a gap (March 2026, PR #107):
 1. **When adding a test for one industry variant, always add equivalent tests for all other starter industries (FURNITURE, FOOD_PROCESSING, HEALTHCARE).** Do not stop at the first happy-path industry.
 2. **When the configure-guide or wizard teaches a price/margin concept, assert the concrete numeric value for each industry** — not just that "some price" is shown.
 3. **Backend `FinishOnboarding` result must include `selectedProduct.basePrice`** so the frontend configure-guide can show the industry-specific benchmark. Test this with a dedicated backend test covering all 3 industries.
-4. **For any ROADMAP teaching moment** (price configuration, tick explanation, bank-balance display), add both a backend test validating the data is returned and an E2E test validating the data is displayed.
+4. **For any PRODUCT-DEFINITION.md or ROADMAP.md teaching moment** (price configuration, tick explanation, bank-balance display), add both a backend test validating the data is returned and an E2E test validating the data is displayed.
 
 ## Encyclopedia / discovery-layer quality — cover all industry chains end-to-end
 
@@ -664,8 +664,8 @@ Root-cause of a quality failure (March 2026, PR #109):
 
 **Rules to prevent recurrence:**
 1. **For any encyclopedia, catalog, or discovery feature: add backend and E2E tests for EVERY industry chain**, not just the first one you verify. Specifically for the starter industries: FURNITURE (Wood→Wooden Chair), FOOD_PROCESSING (Grain→Bread), and HEALTHCARE (Chemical Minerals→Basic Medicine).
-2. **Always add an E2E test for mobile viewport** (375px wide) when the ROADMAP or issue specifies that mobile/tablet layouts must be supported. The test should navigate to the key screen, interact with search/filter, and confirm relationship data is visible without horizontal overflow.
-3. **When a backend test uses `slug: "wood"` as the only example, it is not sufficient for ROADMAP alignment.** Add parallel tests for `grain` and `chemical-minerals` slugs to prove all starter industry chains are queryable.
+2. **Always add an E2E test for mobile viewport** (375px wide) when the PRODUCT-DEFINITION.md or ROADMAP.md specifies that mobile/tablet layouts must be supported. The test should navigate to the key screen, interact with search/filter, and confirm relationship data is visible without horizontal overflow.
+3. **When a backend test uses `slug: "wood"` as the only example, it is not sufficient for PRODUCT-DEFINITION.md or ROADMAP.md alignment.** Add parallel tests for `grain` and `chemical-minerals` slugs to prove all starter industry chains are queryable.
 4. **The quality bar for "done" on a discovery feature is**: all starter industry chains are navigable (resource detail → downstream product detail) in both E2E and backend tests, mobile viewport is covered, and all 8 resource slugs are verified as present.
 
 ## Exchange / market feature quality — cross-industry tick-engine coverage required
@@ -685,15 +685,15 @@ Root-cause of a quality gap (March 2026, PR #115 city global exchange):
 
 ## Guided wizard — always show auto-configured layouts to the player
 
-Root-cause of a ROADMAP alignment gap (March 2026, PR #125 guest onboarding):
+Root-cause of a PRODUCT-DEFINITION.md or ROADMAP.md alignment gap (March 2026, PR #125 guest onboarding):
 - The onboarding wizard successfully auto-configured the factory layout on the backend via `ConfigureStarterFactory` (PURCHASE → MANUFACTURING → STORAGE → B2BSales) and the shop via `AddStarterShop` (PURCHASE → PUBLIC_SALES).
 - But the completion screen (step 5) only showed the factory and shop names — it did NOT show the configured unit layout to the player.
-- The ROADMAP explicitly says: "This will set the factory layout for them. Wizard will show them important areas on the screen."
+- The PRODUCT-DEFINITION.md and ROADMAP.md explicitly say: "This will set the factory layout for them. Wizard will show them important areas on the screen."
 - Fix: updated the `finishOnboarding` GraphQL query to request `units { id unitType gridX gridY level linkRight }` from both factory and salesShop, then added a `factory-layout-panel` with a `unit-chain` visual display showing each unit type with an icon and an arrow between them.
 
 **Rules to prevent recurrence:**
 1. **When a wizard step says it will "set" or "configure" something, the wizard must also SHOW what was configured** — not just confirm it happened. "Factory configured and ready to produce" is insufficient; the player needs to see the unit chain.
-2. **Read ROADMAP phrases like "Wizard will show them important areas on the screen" as concrete UI requirements**, not just aspirational copy. They specify that the wizard must display the configured layout before the player is sent elsewhere.
+2. **Read PRODUCT-DEFINITION.md and ROADMAP.md phrases like "Wizard will show them important areas on the screen" as concrete UI requirements**, not just aspirational copy. They specify that the wizard must display the configured layout before the player is sent elsewhere.
 3. **After any auto-configuration step (factory setup, shop setup, etc.), add the configured layout to the completion/summary screen.** For building units: show the unit type chain with icons and arrows sorted by gridX position.
 4. **GraphQL queries for completion results must request enough data to display what was configured.** If the backend configures units, the mutation result must include `units { id unitType gridX gridY level linkRight }` so the frontend can render the chain.
 5. **Add E2E tests that assert the configured unit types are VISIBLE on the completion screen** — `expect(page.locator('[aria-label="Factory layout"] .unit-chain-label', { hasText: 'Manufacturing' })).toBeVisible()` — not just that "factory was set up" text is present.
@@ -709,8 +709,8 @@ Root-cause of flickering (current issue):
 1. **When using `useTickRefresh`, modify fetch functions to accept an `isRefresh` parameter.** Set `loading` only when `!isRefresh`.
 2. **Call fetch functions with `isRefresh: true` in `useTickRefresh` callbacks** to avoid showing loading states during automatic refreshes.
 3. **Ensure ledger data is tax-year scoped and drill-downs align with the selected year.** Use `ledgerDrillDown(companyId, category, gameYear?)` with the same `gameYear` as the ledger query.
-4. **Add drill-downs for all major statement items as per ROADMAP:** revenue (sales items), costs (purchases, labor, energy, marketing), assets (building list), etc.
-5. **For ledger improvements, always verify against ROADMAP requirements:** income statement, cash flow, balance sheet, drillable details, tax info, history.
+4. **Add drill-downs for all major statement items as per PRODUCT-DEFINITION.md and ROADMAP.md:** revenue (sales items), costs (purchases, labor, energy, marketing), assets (building list), etc.
+5. **For ledger improvements, always verify against PRODUCT-DEFINITION.md and ROADMAP.md requirements:** income statement, cash flow, balance sheet, drillable details, tax info, history.
 
 ## City coverage — always test all three seeded cities
 
@@ -859,30 +859,30 @@ Root-cause of a quality failure (April 2026, PR fixing suspension alert race con
 ## Dynamic salary demand signal — "game currency collected by salaries in past 10 ticks"
 
 Root-cause of a quality gap (April 2026, PR #263 salary-driven public sales):
-- The ROADMAP explicitly states: "Quantity sold to public changes every tick with... the game currency collected by salaries in past 10 ticks".
+- The PRODUCT-DEFINITION.md and ROADMAP.md explicitly state: "Quantity sold to public changes every tick with... the game currency collected by salaries in past 10 ticks".
 - The first implementation used `BaseSalaryPerManhour` (a static city attribute) as a proxy, which is only a wage *level* indicator — it does not capture whether companies are actually paying wages in the city.
-- The ROADMAP requires the **actual LedgerEntry LaborCost amounts paid in the city over the past 10 ticks** as the dynamic signal. Static city wage is fine as a baseline, but it must be blended with the real-economy signal.
+- The PRODUCT-DEFINITION.md and ROADMAP.md require the **actual LedgerEntry LaborCost amounts paid in the city over the past 10 ticks** as the dynamic signal. Static city wage is fine as a baseline, but it must be blended with the real-economy signal.
 
 **Rules to prevent recurrence:**
-1. **When the ROADMAP says "game currency collected from X" it always means actual LedgerEntry records**, not a static entity field. Translate "collected from salaries" → query `LedgerEntry.Category == LaborCost` grouped by city for the past N ticks.
+1. **When the PRODUCT-DEFINITION.md and ROADMAP.md say "game currency collected from X" it always means actual LedgerEntry records**, not a static entity field. Translate "collected from salaries" → query `LedgerEntry.Category == LaborCost` grouped by city for the past N ticks.
 2. **Always implement static + dynamic blend:** static = city wage level factor (early-game safety net); dynamic = actual ledger spending (live economic activity). Blend: `0.5 × static + 0.5 × dynamic` when dynamic data exists; pure static when no ledger data yet (neutral baseline, no penalty).
 3. **Load the recent salary window in `TickProcessor.BuildContextAsync` as a pre-loaded dictionary** (`RecentSalaryByCity: Dictionary<Guid, decimal>`) — one query for all cities, never N+1. The window is `CurrentTick - GameConstants.RecentSalaryWindowTicks`.
 4. **Add `RecentSalaryWindowTicks` and `ExpectedSalaryParticipationRate` constants to `GameConstants`** so the normalisation formula is readable and centrally configured. The participation rate (0.001 = 0.1% of population) converts raw salary totals to a dimensionless [0.5, 2.0] factor relative to the reference wage.
 5. **Test the dynamic signal with a seeded-ledger integration test:** create two identical cities, seed LaborCost entries only in one, process one tick, assert the active city sells more units. This directly proves the ROADMAP requirement.
 6. **The demand driver panel (`ComputeDemandDrivers` / `GetPublicSalesAnalytics`)** must also reflect the blended factor and indicate whether the description is based on static wages alone or also includes recent spending activity.
 
-## ROADMAP chart history window — "last 100 ticks" means show all returned data
+## PRODUCT-DEFINITION.md and ROADMAP.md chart history window — "last 100 ticks" means show all returned data
 
 Root-cause of a quality gap (April 2026, PR #279 public sales analytics):
-- The ROADMAP says the public sales unit should show "the chart showing revenue earned in each tick in last 100 ticks".
+- The PRODUCT-DEFINITION.md and ROADMAP.md say the public sales unit should show "the chart showing revenue earned in each tick in last 100 ticks".
 - The backend correctly caps at 100 records via `.Take(100)`.
 - The frontend chart templates used `.slice(-30)` — showing only 30 of the 100 returned ticks.
 - This was a silent ROADMAP drift that no test caught because all fixture data had fewer than 30 ticks.
 
 **Rules to prevent recurrence:**
-1. **When the ROADMAP specifies a history window (e.g., "last 100 ticks"), verify both the backend limit AND the frontend slice.** The backend `.Take(N)` and the frontend `.slice(-M)` must be consistent with the ROADMAP window.
+1. **When the PRODUCT-DEFINITION.md and ROADMAP.md specify a history window (e.g., "last 100 ticks"), verify both the backend limit AND the frontend slice.** The backend `.Take(N)` and the frontend `.slice(-M)` must be consistent with the PRODUCT-DEFINITION.md and ROADMAP.md window.
 2. **Remove frontend `.slice()` when the backend already enforces the correct limit.** If the API returns at most 100 records, the frontend should show all of them (no slice needed).
-3. **Add an E2E test that seeds exactly N ticks of history (the ROADMAP window) and asserts bar count equals N.** This test locks in both the backend limit and the frontend rendering of the full window.
+3. **Add an E2E test that seeds exactly N ticks of history (the PRODUCT-DEFINITION.md and ROADMAP.md window) and asserts bar count equals N.** This test locks in both the backend limit and the frontend rendering of the full window.
 4. **Profit/revenue/quantity/price charts must all use the same data window consistently.** If the backend sends 100 revenue ticks, the quantity chart (which uses the same `revenueHistory` array) must also show all 100.
 
 ## Price-elasticity demand model — below-base pricing must boost demand, not leave it neutral
@@ -905,7 +905,7 @@ if (price < basePrice)
 This gives the discounted seller a deterministically higher `competitiveness`, `stockTurnoverCap`, and city demand attractiveness — so it always sells more than the base-price seller regardless of test ordering.
 
 **Rules to prevent recurrence:**
-1. **When the ROADMAP says price decreases should increase quantity sold, the pricing model must return priceIndex > 1.0 for below-base prices.** Returning 1.0 (neutral) violates the ROADMAP and makes tests order-dependent.
+1. **When the PRODUCT-DEFINITION.md and ROADMAP.md say price decreases should increase quantity sold, the pricing model must return priceIndex > 1.0 for below-base prices.** Returning 1.0 (neutral) violates the PRODUCT-DEFINITION.md and ROADMAP.md and makes tests order-dependent.
 2. **A test that passes alone but fails in the full suite is a signal that the implementation is non-deterministic**, not that the test is "flaky". Always fix the implementation rather than retrying or suppressing.
 3. **When adding a `ComputePriceIndex`-like function, always add an integration test that proves a discounted seller sells MORE than a base-price seller in isolated cities.** If the test passes alone but fails in the full suite, diagnose the shared-state interference before labelling it flaky.
 4. **Unit tests for `ComputePriceIndex` must cover both directions**: above-base (penalty, [0,1]) and below-base (boost, (1, MaxDiscountBoostFactor]).
@@ -1000,7 +1000,7 @@ Root-cause of a recurring CI failure pattern (April 2026, PR #360 dashboard/ledg
 
 Root-cause of a product-critical quality failure (April 2026, PR #4):
 - The `PersonalTaxReserve` was implemented as grow-only: `SellShares` accumulated the reserve but no code path ever reduced it.
-- The product copy and ROADMAP both said "will be settled at the tax year-end", but no settlement code existed.
+- The product copy and PRODUCT-DEFINITION.md and ROADMAP.md both said "will be settled at the tax year-end", but no settlement code existed.
 - Repeated personal share sales could permanently trap a player's liquidity — once the spendable balance in the player's personal settlement bank account was fully reserved for tax, `BuyShares` would always reject with `INSUFFICIENT_PERSONAL_FUNDS` and the player was soft-locked forever.
 - Additionally, the `BuyShares_PersonAccount_CannotUseTaxReservedCash` test had an escape hatch: it accepted both `INSUFFICIENT_PERSONAL_FUNDS` **and** `INSUFFICIENT_PUBLIC_FLOAT` as passing outcomes, meaning the test could pass even if the spendable-balance check was entirely removed.
 
