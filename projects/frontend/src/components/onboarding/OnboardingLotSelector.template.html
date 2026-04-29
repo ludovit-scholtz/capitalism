@@ -1,0 +1,96 @@
+  <section class="lot-selector">
+    <div class="selector-toolbar">
+      <div class="selector-stats">
+        <strong>{{ t('cityMap.lotCount', { count: filteredLots.length }) }}</strong>
+        <span>{{ t('onboarding.mapLegend') }}</span>
+      </div>
+
+      <div class="toolbar-actions">
+        <div class="view-toggle" role="group" :aria-label="t('onboarding.mapViewLabel')">
+          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">☰ {{ t('cityMap.listView') }}</button>
+        </div>
+        <button class="toggle-btn" :class="{ active: showAvailableOnly }" @click="showAvailableOnly = !showAvailableOnly">
+          {{ t('cityMap.filterAvailable') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="selector-layout">
+      <div class="visual-panel">
+        <div v-if="viewMode === 'map'" ref="mapContainer" class="map-panel" />
+        <div v-else class="list-panel">
+          <button v-for="lot in filteredLots" :key="lot.id" class="lot-list-item" :class="{ selected: selectedLotId === lot.id }" @click="selectLot(lot.id)">
+            <div class="lot-list-header">
+              <strong>{{ lot.name }}</strong>
+              <span class="lot-price">{{ formatCurrency(lot.price) }}</span>
+            </div>
+            <div class="lot-list-meta">
+              <span>{{ t('cityMap.district') }}: {{ t(`cityMap.districts.${lot.district}`) }}</span>
+              <span>{{ lot.suitableTypes.split(',').map(formatBuildingType).join(', ') }}</span>
+            </div>
+            <div class="lot-badges">
+              <span v-if="isRecommended(lot)" class="badge recommended">{{ t('onboarding.recommendedLot') }}</span>
+              <span v-if="!isAffordable(lot)" class="badge muted">{{ t('onboarding.needsMoreCash') }}</span>
+              <span v-else class="badge affordable">{{ t('onboarding.affordableNow') }}</span>
+              <span v-if="lot.ownerCompanyId" class="badge muted">{{ t('cityMap.owned') }}</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <aside class="detail-panel">
+        <template v-if="selectedLot">
+          <div class="detail-header">
+            <h3>{{ selectedLot.name }}</h3>
+            <span v-if="isRecommended(selectedLot)" class="badge recommended">
+              {{ t('onboarding.recommendedLot') }}
+            </span>
+          </div>
+
+          <p class="detail-description">{{ selectedLot.description }}</p>
+
+          <dl class="detail-grid">
+            <div>
+              <dt>{{ t('cityMap.district') }}</dt>
+              <dd>{{ t(`cityMap.districts.${selectedLot.district}`) }}</dd>
+            </div>
+            <div v-if="city">
+              <dt>{{ t('cityMap.deliveryDistance') }}</dt>
+              <dd>{{ formatDistance(calculateDistance(selectedLot, city)) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('cityMap.price') }}</dt>
+              <dd>{{ formatCurrency(selectedLot.price) }}</dd>
+            </div>
+            <div v-if="city">
+              <dt>{{ t('cityMap.priceWithDelivery') }}</dt>
+              <dd>{{ formatCurrency(selectedLot.price + calculateDeliveryCost(calculateDistance(selectedLot, city))) }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('cityMap.suitableFor') }}</dt>
+              <dd>{{ selectedLot.suitableTypes.split(',').map(formatBuildingType).join(', ') }}</dd>
+            </div>
+            <div>
+              <dt>{{ t('onboarding.cashAfterPurchase') }}</dt>
+              <dd :class="{ danger: !isAffordable(selectedLot) }">
+                {{ formatCurrency(Math.max(props.moneyAvailable - selectedLot.price, 0)) }}
+              </dd>
+            </div>
+          </dl>
+
+          <p v-if="selectedLot.ownerCompanyId" class="status-message" role="status">
+            {{ t('onboarding.lotUnavailableBody') }}
+          </p>
+          <p v-else-if="!isAffordable(selectedLot)" class="status-message warning" role="status">
+            {{ t('onboarding.needsMoreCash') }}
+          </p>
+          <p v-else class="status-message success" role="status">
+            {{ t('onboarding.readyToPurchase', { type: formatBuildingType(requiredBuildingType) }) }}
+          </p>
+        </template>
+
+        <p v-else class="empty-selection">{{ t('cityMap.selectLot') }}</p>
+      </aside>
+    </div>
+  </section>

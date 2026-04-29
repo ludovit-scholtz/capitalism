@@ -1,6 +1,3 @@
-<template src="./ForexExchangeView.template.html"></template>
-
-<script setup lang="ts">
 /* oxlint-disable no-unused-vars */
  
  
@@ -513,7 +510,3 @@ watch(activeTab, async (tab) => {
   await router.replace({ query: nextQuery })
 })
 
-
-</script>
-
-<style scoped src="./ForexExchangeView.styles.css"></style>

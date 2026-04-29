@@ -1,0 +1,210 @@
+.product-picker-panel {
+  z-index: 9999;
+  max-height: 340px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.picker-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-surface, #fff);
+  flex-shrink: 0;
+}
+
+.picker-search-input {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: var(--color-background, #f9fafb);
+  color: var(--color-text, #111);
+  box-sizing: border-box;
+}
+
+.picker-search-input:focus {
+  outline: 2px solid var(--color-primary, #4f46e5);
+  outline-offset: -1px;
+}
+
+.picker-panel-body {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.picker-loading,
+.picker-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.picker-empty-no-connected {
+  padding: 20px 16px;
+  line-height: 1.5;
+}
+
+.picker-section-header {
+  padding: 4px 10px 2px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6b7280);
+  background: var(--color-background, #f3f4f6);
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.picker-section-header--rd {
+  color: #065f46;
+  background: #ecfdf5;
+  border-top-color: #a7f3d0;
+}
+
+.picker-section-header--rd-secondary {
+  color: #1e40af;
+  background: #eff6ff;
+  border-top-color: #bfdbfe;
+}
+
+.picker-rd-hint {
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  border-bottom: 1px solid var(--color-border-light, #f0f0f0);
+}
+
+.picker-section-icon {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-bottom: 1px solid var(--color-border-light, #f0f0f0);
+  min-height: 44px;
+}
+
+.picker-item:last-child {
+  border-bottom: none;
+}
+
+.picker-item:hover:not(.picker-item-locked) {
+  background: var(--color-hover, #f0f9ff);
+}
+
+.picker-item:focus {
+  outline: 2px solid var(--color-primary, #4f46e5);
+  outline-offset: -2px;
+}
+
+.picker-item-selected {
+  background: var(--color-primary-light, #ede9fe) !important;
+}
+
+.picker-item-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.picker-item-none {
+  font-style: italic;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.875rem;
+}
+
+.picker-item-img {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-background, #f3f4f6);
+}
+
+.picker-item-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.picker-item-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text, #111);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-item-industry {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.picker-item-context {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6b7280);
+  line-height: 1.35;
+}
+
+.picker-item-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.badge-connected {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-used {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.badge-active-production {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-stock {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-connected-stock {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.badge-pro {
+  background: #fef3c7;
+  color: #92400e;
+}

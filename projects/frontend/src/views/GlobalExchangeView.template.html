@@ -1,0 +1,139 @@
+  <div class="exchange-view">
+    <div class="exchange-hero">
+      <div class="container">
+        <p class="exchange-eyebrow">{{ t('globalExchange.eyebrow') }}</p>
+        <h1 class="exchange-title">{{ t('globalExchange.title') }}</h1>
+        <p class="exchange-subtitle">{{ t('globalExchange.subtitle') }}</p>
+        <div class="exchange-hero-meta">
+          <span class="exchange-tick-chip" :title="currentTick !== null ? t('globalExchange.tickHint', { tick: currentTick }) : undefined">
+            <span class="exchange-tick-label">{{ t('globalExchange.snapshotTime') }}</span>
+            <span class="exchange-tick-value">{{ formattedSnapshotTime || '—' }}</span>
+          </span>
+          <span v-if="marketMode === 'resources'" class="exchange-supply-chip">{{ t('globalExchange.endlessSupply') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="container exchange-body">
+      <!-- Market mode toggle: Resources / Products -->
+      <div class="market-mode-tabs" role="tablist" :aria-label="'Market type'">
+        <button role="tab" :aria-selected="marketMode === 'resources'" :class="['mode-tab', { active: marketMode === 'resources' }]" @click="marketMode = 'resources'">
+          {{ t('globalExchange.modeResources') }}
+        </button>
+        <button role="tab" :aria-selected="marketMode === 'products'" :class="['mode-tab', 'mode-tab-products', { active: marketMode === 'products' }]" @click="marketMode = 'products'">
+          {{ t('globalExchange.modeProducts') }}
+        </button>
+      </div>
+
+      <!-- ── Resources mode ── -->
+      <template v-if="marketMode === 'resources'">
+        <div v-if="cities.length > 0" class="exchange-city-tabs city-tabs" role="tablist" :aria-label="t('common.city')">
+          <button
+            v-for="city in cities"
+            :key="city.id"
+            role="tab"
+            :aria-selected="selectedCityId === city.id"
+            :class="['exchange-city-tab', 'city-tab', { active: selectedCityId === city.id }]"
+            @click="auth.switchCity(city.id)"
+          >
+            {{ city.name }}
+          </button>
+        </div>
+
+        <!-- Search and filter row -->
+        <div class="exchange-filters">
+          <div class="search-wrapper">
+            <input v-model="search" type="search" class="search-input" :placeholder="t('globalExchange.searchPlaceholder')" :aria-label="t('globalExchange.searchPlaceholder')" />
+          </div>
+          <div class="category-filter">
+            <label for="category-select" class="filter-label">{{ t('globalExchange.filterCategory') }}</label>
+            <select id="category-select" v-model="selectedCategory" class="filter-select">
+              <option v-for="cat in categories" :key="cat" :value="cat">
+                {{ cat === 'ALL' ? t('globalExchange.allCategories') : localizedCategory(cat) }}
+              </option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Loading / error -->
+        <p v-if="loading" class="exchange-loading">{{ t('common.loading') }}</p>
+        <p v-else-if="error" class="exchange-error">{{ error }}</p>
+        <p v-else-if="exchangeRows.length === 0" class="exchange-empty">
+          {{ t('globalExchange.noResults') }}
+        </p>
+
+        <!-- Resource rows -->
+        <template v-else>
+          <div v-for="row in exchangeRows" :key="row.resourceId" class="resource-row" :data-slug="row.resourceSlug">
+            <div class="resource-row-header">
+              <span class="resource-name">{{ row.resourceName }}</span>
+              <span class="resource-category-badge">{{ localizedCategory(row.category) }}</span>
+              <RouterLink :to="`/encyclopedia/resources/${row.resourceSlug}`" class="production-chain-link" :aria-label="`${t('globalExchange.viewProductionChain')}: ${row.resourceName}`">{{
+                t('globalExchange.viewProductionChain')
+              }}</RouterLink>
+            </div>
+
+            <div class="city-offers-grid">
+              <div v-for="offer in row.offers" :key="offer.cityId" :class="['city-offer-card', { 'best-offer': offer.cityId === row.bestCityId }]">
+                <div class="offer-card-header">
+                  <strong class="offer-city-name">{{ offer.cityName }}</strong>
+                  <span v-if="offer.cityId === row.bestCityId" class="best-badge" :title="t('globalExchange.bestDeliveredHint')">{{ t('globalExchange.bestDelivered') }}</span>
+                </div>
+
+                <div class="offer-metrics">
+                  <div class="offer-metric">
+                    <span class="metric-label">{{ t('globalExchange.exchangePrice') }}</span>
+                    <span class="metric-value exchange-price"> {{ formatPrice(offer.exchangePricePerUnit) }}/{{ offer.unitSymbol }} </span>
+                  </div>
+                  <div class="offer-metric">
+                    <span class="metric-label">{{ t('globalExchange.transitCost') }}</span>
+                    <span class="metric-value transit-cost">
+                      +{{ formatPrice(offer.transitCostPerUnit) }} · {{ offer.distanceKm }} km
+                      <span
+                        v-if="offer.fuelPriceIndex && offer.fuelPriceIndex !== 1"
+                        class="fuel-badge"
+                        :class="offer.fuelPriceIndex > 1 ? 'fuel-high' : 'fuel-low'"
+                        :title="t('globalExchange.fuelPriceHint')"
+                      >⛽ ×{{ offer.fuelPriceIndex.toFixed(2) }}</span>
+                    </span>
+                  </div>
+                  <div class="offer-metric delivered-metric">
+                    <span class="metric-label">{{ t('globalExchange.deliveredPrice') }}</span>
+                    <span class="metric-value delivered-price"> {{ formatPrice(offer.deliveredPricePerUnit) }}/{{ offer.unitSymbol }} </span>
+                  </div>
+                  <div class="offer-metric">
+                    <span class="metric-label">{{ t('globalExchange.quality') }}</span>
+                    <span class="metric-value quality-value">
+                      <span class="quality-range"> {{ formatPercent(offer.qualityMin) }}&nbsp;–&nbsp;{{ formatPercent(offer.qualityMax) }} </span>
+                      <span class="quality-band-bar" :title="t('globalExchange.qualityBandHint')">
+                        <span
+                          class="quality-band-fill"
+                          :style="{
+                            left: `${offer.qualityMin * 100}%`,
+                            width: `${(offer.qualityMax - offer.qualityMin) * 100}%`,
+                          }"
+                        ></span>
+                        <span class="quality-band-center" :style="{ left: `${offer.estimatedQuality * 100}%` }"></span>
+                      </span>
+                    </span>
+                  </div>
+                  <div class="offer-metric">
+                    <span class="metric-label">{{ t('globalExchange.abundance') }}</span>
+                    <span class="metric-value">{{ formatPercent(offer.localAbundance) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <p v-if="row.offers.length === 0" class="no-offers-hint">
+                {{ t('globalExchange.noOffersForResource') }}
+              </p>
+            </div>
+          </div>
+        
+      </template>
+
+      <!-- ── Products mode ── -->
+
+      </template>
+    </div>
+  </div>

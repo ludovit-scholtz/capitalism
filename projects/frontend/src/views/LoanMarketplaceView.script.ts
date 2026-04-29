@@ -1,6 +1,3 @@
-<template src="./LoanMarketplaceView.template.html"></template>
-
-<script setup lang="ts">
 /* oxlint-disable no-unused-vars */
  
  
@@ -521,7 +518,3 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
   }
 }
 
-
-</script>
-
-<style scoped src="./LoanMarketplaceView.styles.css"></style>

@@ -1,6 +1,3 @@
-<template src="./BuyBuildingView.template.html"></template>
-
-<script setup lang="ts">
 /* oxlint-disable no-unused-vars */
  
 import { ref, computed, onMounted, watch } from 'vue'
@@ -398,7 +395,3 @@ async function buyBuilding() {
   }
 }
 
-
-</script>
-
-<style scoped src="./BuyBuildingView.styles.css"></style>

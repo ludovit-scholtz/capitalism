@@ -1,6 +1,3 @@
-<template src="./OnboardingView.template.html"></template>
-
-<script setup lang="ts">
 /* oxlint-disable no-unused-vars */
  
  
@@ -1151,7 +1148,3 @@ useTickRefresh(async () => {
   }
 })
 
-
-</script>
-
-<style scoped src="./OnboardingView.styles.css"></style>

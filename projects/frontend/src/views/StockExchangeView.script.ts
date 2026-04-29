@@ -1,6 +1,3 @@
-<template src="./StockExchangeView.template.html"></template>
-
-<script setup lang="ts">
 /* oxlint-disable no-unused-vars */
  
  
@@ -748,7 +745,3 @@ useTickRefresh(async () => {
   await restoreScrollPosition(scrollPos)
 })
 
-
-</script>
-
-<style scoped src="./StockExchangeView.styles.css"></style>

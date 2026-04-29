@@ -1,0 +1,91 @@
+  <div class="building-bank-account-panel" :class="{ loading: accountLoading || props.loading }">
+    <div v-if="accountLoading" class="bba-skeleton">
+      <div class="bba-skeleton-row"></div>
+      <div class="bba-skeleton-row bba-skeleton-row-sm"></div>
+    </div>
+
+    <template v-else-if="accountInfo">
+      <div v-if="isSuspended || hasMissingAccount" class="bba-alert" :class="{ 'bba-alert-warning': hasMissingAccount, 'bba-alert-danger': hasInsufficientFunds }" role="alert" aria-live="polite">
+        <span class="bba-alert-icon">{{ hasInsufficientFunds ? 'ÔÜá´ŞĆ' : '­čĺí' }}</span>
+        <span class="bba-alert-message">{{ suspensionLabel }}</span>
+      </div>
+
+      <div class="bba-info-row">
+        <span v-if="accountInfo.hasBankAccount" class="bba-account-number">
+          {{ t('buildingBankAccount.accountLabel') }}
+          <code>{{ accountInfo.accountNumber }}</code>
+        </span>
+        <span v-else class="bba-no-account">
+          {{ t('buildingBankAccount.noAccountAssigned') }}
+        </span>
+
+        <span v-if="accountInfo.hasBankAccount" class="bba-balance" :class="{ 'bba-balance-low': (accountInfo.balance ?? 0) < 100 }">
+          {{ formatCurrency(accountInfo.balance ?? 0) }}
+        </span>
+      </div>
+
+      <div v-if="props.showAssignmentControls" class="bba-manage-panel">
+        <p class="bba-manage-title">{{ t('buildingBankAccount.assignmentTitle') }}</p>
+        <p class="bba-manage-hint">{{ t('buildingBankAccount.assignmentHint', { currency: props.currencyCode }) }}</p>
+
+        <div v-if="availableCompanyAccounts.length > 0" class="bba-assign-form">
+          <label class="bba-manage-label" :for="accountSelectId">{{ t('buildingBankAccount.accountSelectLabel') }}</label>
+          <div class="bba-assign-controls">
+            <select :id="accountSelectId" v-model="selectedBankAccountId" class="bba-account-select" :disabled="accountsLoading || assignmentLoading || createLoading">
+              <option v-for="account in availableCompanyAccounts" :key="account.id" :value="account.id">
+                {{ formatAccountOption(account) }}
+              </option>
+            </select>
+            <button class="btn btn-secondary btn-sm" :disabled="!canAssignSelectedAccount || assignmentLoading || createLoading" @click="assignSelectedAccount">
+              {{ assignmentLoading ? t('common.loading') : t('buildingBankAccount.assignBtn') }}
+            </button>
+          </div>
+        </div>
+        <p v-else class="bba-manage-empty">{{ t('buildingBankAccount.noCompanyAccountAvailable', { currency: props.currencyCode }) }}</p>
+
+        <button v-if="canCreateCompanyAccount" class="btn btn-secondary btn-sm bba-create-btn" :disabled="createLoading || assignmentLoading" @click="createAndAssignCompanyAccount">
+          {{ createLoading ? t('common.loading') : t('buildingBankAccount.createBtn', { currency: props.currencyCode }) }}
+        </button>
+
+        <p v-if="assignmentError" class="bba-manage-error" role="alert">{{ assignmentError }}</p>
+        <p v-if="assignmentSuccess" class="bba-manage-success" role="status">{{ assignmentSuccess }}</p>
+      </div>
+      <div v-if="isSuspended || hasMissingAccount" class="bba-guidance">
+        <span class="bba-guidance-label">{{ t('buildingBankAccount.guidance') }}</span>
+        <router-link to="/forex" class="bba-guidance-link">
+          {{ t('buildingBankAccount.guidanceForex') }}
+        </router-link>
+        <router-link to="/bank-management" class="bba-guidance-link">
+          {{ t('buildingBankAccount.guidanceBank') }}
+        </router-link>
+      </div>
+
+      <details
+        v-if="accountInfo.hasBankAccount"
+        class="bba-fund-panel"
+        :open="isFundPanelOpen"
+        @toggle="isFundPanelOpen = ($event.target as HTMLDetailsElement).open"
+      >
+        <summary class="bba-fund-summary">{{ t('buildingBankAccount.fundTitle') }}</summary>
+        <div class="bba-fund-body">
+          <p class="bba-fund-hint">{{ t('buildingBankAccount.fundHint', { currency: props.currencyCode }) }}</p>
+          <form class="bba-fund-form" @submit.prevent="fundBuildingAccount">
+            <input
+              v-model="fundAmount"
+              type="number"
+              min="0"
+              step="0.01"
+              class="bba-fund-input"
+              :placeholder="t('buildingBankAccount.fundAmountPlaceholder')"
+              :aria-label="t('buildingBankAccount.fundAmountLabel')"
+            />
+            <button type="submit" class="btn btn-secondary btn-sm" :disabled="fundLoading">
+              {{ fundLoading ? t('common.loading') : t('buildingBankAccount.fundSubmit') }}
+            </button>
+          </form>
+          <p v-if="fundError" class="bba-fund-error" role="alert">{{ fundError }}</p>
+          <p v-if="fundSuccess" class="bba-fund-success" role="status">{{ fundSuccess }}</p>
+        </div>
+      </details>
+    </template>
+  </div>

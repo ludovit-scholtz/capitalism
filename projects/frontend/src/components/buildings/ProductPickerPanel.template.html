@@ -1,0 +1,176 @@
+  <div
+    class="product-picker-panel"
+    role="listbox"
+    :aria-label="t('productPicker.ariaLabel')"
+    :style="panelStyle ? { position: 'fixed', top: panelStyle.top, left: panelStyle.left, width: panelStyle.width } : {}"
+  >
+    <div class="picker-search">
+      <input
+        ref="searchInputRef"
+        :value="searchQuery"
+        type="text"
+        class="picker-search-input"
+        :placeholder="t('productPicker.searchPlaceholder')"
+        :aria-label="t('productPicker.searchPlaceholder')"
+        @input="emit('update:searchQuery', ($event.target as HTMLInputElement).value)"
+      />
+    </div>
+
+    <div class="picker-panel-body">
+      <div v-if="loading" class="picker-loading">{{ t('productPicker.loading') }}</div>
+
+      <div v-else-if="filteredProducts.length === 0 && searchQuery" class="picker-empty">
+        {{ t('productPicker.noResults') }}
+      </div>
+
+      <div v-else-if="rankedProducts.length === 0" class="picker-empty picker-empty-no-connected">
+        {{ t(emptyStateKey ?? 'productPicker.noConnectedProducts') }}
+      </div>
+
+      <template v-else>
+        <div
+          v-if="allowNone"
+          class="picker-item picker-item-none"
+          :class="{ 'picker-item-selected': selectedId === null }"
+          role="option"
+          :aria-selected="selectedId === null"
+          tabindex="0"
+          @click="emit('select', null)"
+          @keydown.enter.space.prevent="emit('select', null)"
+        >
+          {{ noneLabelKey ? t(noneLabelKey) : t('productPicker.noneLabel') }}
+        </div>
+
+        <template v-if="groupedProducts.connected.length > 0">
+          <div class="picker-section-header">{{ t('productPicker.sectionConnected') }}</div>
+          <div
+            v-for="entry in groupedProducts.connected"
+            :key="entry.productType.id"
+            class="picker-item"
+            :class="{
+              'picker-item-selected': selectedId === entry.productType.id,
+              'picker-item-locked': isLocked(entry),
+            }"
+            role="option"
+            :aria-selected="selectedId === entry.productType.id"
+            :aria-disabled="isLocked(entry)"
+            tabindex="0"
+            @click="emitSelectIfAllowed(entry)"
+            @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
+          >
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <div class="picker-item-body">
+              <span class="picker-item-name">{{ localProductName(entry) }}</span>
+              <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
+              <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
+            </div>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
+            <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
+          </div>
+        </template>
+
+        <template v-if="groupedProducts.manufacturing.length > 0">
+          <div class="picker-section-header picker-section-header--rd">
+            <span class="picker-section-icon" aria-hidden="true">🏭</span>
+            {{ t('productPicker.sectionActiveProductLines') }}
+          </div>
+          <div
+            v-for="entry in groupedProducts.manufacturing"
+            :key="entry.productType.id"
+            class="picker-item"
+            :class="{
+              'picker-item-selected': selectedId === entry.productType.id,
+              'picker-item-locked': isLocked(entry),
+            }"
+            role="option"
+            :aria-selected="selectedId === entry.productType.id"
+            :aria-disabled="isLocked(entry)"
+            tabindex="0"
+            @click="emitSelectIfAllowed(entry)"
+            @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
+          >
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <div class="picker-item-body">
+              <span class="picker-item-name">{{ localProductName(entry) }}</span>
+              <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
+              <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
+            </div>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
+            <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
+          </div>
+        </template>
+
+        <div v-if="rdContext && groupedProducts.manufacturing.length === 0 && groupedProducts.usedByCompany.length === 0 && !searchQuery" class="picker-rd-hint">
+          {{ t('productPicker.rdNoActiveProducts') }}
+        </div>
+
+        <template v-if="groupedProducts.usedByCompany.length > 0">
+          <div class="picker-section-header" :class="{ 'picker-section-header--rd-secondary': rdContext }">
+            {{ rdContext ? t('productPicker.sectionActivePortfolio') : t('productPicker.sectionUsedByCompany') }}
+          </div>
+          <div
+            v-for="entry in groupedProducts.usedByCompany"
+            :key="entry.productType.id"
+            class="picker-item"
+            :class="{
+              'picker-item-selected': selectedId === entry.productType.id,
+              'picker-item-locked': isLocked(entry),
+            }"
+            role="option"
+            :aria-selected="selectedId === entry.productType.id"
+            :aria-disabled="isLocked(entry)"
+            tabindex="0"
+            @click="emitSelectIfAllowed(entry)"
+            @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
+          >
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <div class="picker-item-body">
+              <span class="picker-item-name">{{ localProductName(entry) }}</span>
+              <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
+              <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
+            </div>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
+            <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
+          </div>
+        </template>
+
+        <template v-if="groupedProducts.catalog.length > 0">
+          <div v-if="groupedProducts.connected.length > 0 || groupedProducts.manufacturing.length > 0 || groupedProducts.usedByCompany.length > 0" class="picker-section-header">
+            {{ t('productPicker.sectionCatalog') }}
+          </div>
+          <div
+            v-for="entry in groupedProducts.catalog"
+            :key="entry.productType.id"
+            class="picker-item"
+            :class="{
+              'picker-item-selected': selectedId === entry.productType.id,
+              'picker-item-locked': isLocked(entry),
+            }"
+            role="option"
+            :aria-selected="selectedId === entry.productType.id"
+            :aria-disabled="isLocked(entry)"
+            tabindex="0"
+            @click="emitSelectIfAllowed(entry)"
+            @keydown.enter.space.prevent="emitSelectIfAllowed(entry)"
+          >
+            <img :src="productImage(entry)" :alt="localProductName(entry)" class="picker-item-img" aria-hidden="true" />
+            <div class="picker-item-body">
+              <span class="picker-item-name">{{ localProductName(entry) }}</span>
+              <span class="picker-item-industry">{{ localIndustry(entry) }}</span>
+              <span v-if="availabilityReasonDetail(entry)" class="picker-item-context">{{ availabilityReasonDetail(entry) }}</span>
+            </div>
+            <span v-if="availabilityReasonLabel(entry)" class="picker-item-badge" :class="availabilityReasonClass(entry)" :title="availabilityReasonLabel(entry)">{{
+              availabilityReasonLabel(entry)
+            }}</span>
+            <span v-if="isLocked(entry)" class="picker-item-badge badge-pro">{{ t('catalog.proBadge') }}</span>
+          </div>
+        </template>
+      </template>
+    </div>
+  </div>

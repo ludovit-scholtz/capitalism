@@ -1,0 +1,188 @@
+/* Progress bar — state variants only; layout uses Tailwind */
+.progress-segment {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 80px;
+}
+
+.progress-step {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border: 2px solid var(--color-border);
+  transition: all 0.3s ease;
+}
+
+.progress-segment.active .progress-step {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 16px rgba(0, 71, 255, 0.3);
+}
+
+.progress-segment.done .progress-step {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(0, 200, 83, 0.3);
+}
+
+.progress-label {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  max-width: 100px;
+  line-height: 1.2;
+}
+
+.progress-segment.active .progress-label {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.progress-line {
+  flex: 1;
+  height: 2px;
+  background: var(--color-border);
+  margin-top: 20px;
+  transition: background 0.3s ease;
+}
+
+.progress-line.active {
+  background: linear-gradient(90deg, var(--color-success), var(--color-primary));
+}
+
+/* Card selection states — used by .industry-card, .city-card, .product-card, .ipo-card */
+.industry-card,
+.city-card,
+.product-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1.5rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.city-card {
+  text-align: left;
+}
+
+.industry-card:hover,
+.city-card:hover,
+.product-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 71, 255, 0.1);
+}
+
+.industry-card.selected,
+.city-card.selected,
+.product-card.selected {
+  border-color: var(--color-primary);
+  background: rgba(0, 71, 255, 0.08);
+  box-shadow:
+    0 0 0 1px var(--color-primary),
+    0 4px 16px rgba(0, 71, 255, 0.15);
+}
+
+.card-first-product {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: rgba(0, 71, 255, 0.08);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.2rem 0.5rem;
+  display: inline-block;
+}
+
+.ipo-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 1rem 1.1rem;
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ipo-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+}
+
+.ipo-card.selected {
+  border-color: var(--color-primary);
+  background: rgba(0, 71, 255, 0.08);
+  box-shadow:
+    0 0 0 1px var(--color-primary),
+    0 4px 16px rgba(0, 71, 255, 0.15);
+}
+
+/* Budget warning state */
+.budget-card.warning strong {
+  color: var(--color-tertiary);
+}
+
+/* Startup pack status badges */
+.startup-pack-status.claimed {
+  background: rgba(0, 200, 83, 0.18);
+  color: var(--color-secondary);
+}
+
+.startup-pack-status.expired {
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--color-danger);
+}
+
+/* Mission status variants */
+.mission-status--blocking {
+  border-color: rgba(255, 149, 0, 0.5) !important;
+  background: rgba(255, 149, 0, 0.05);
+}
+
+.mission-status--awaiting {
+  border-color: rgba(0, 122, 255, 0.4) !important;
+  background: rgba(0, 122, 255, 0.04);
+}
+
+.badge-configure {
+  background: rgba(255, 149, 0, 0.15);
+  color: var(--color-warning, #ff9500);
+}
+
+.badge-awaiting {
+  background: rgba(0, 122, 255, 0.12);
+  color: var(--color-primary, #007aff);
+}
+
+/* Auth tab toggle */
+.btn-tab.active {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .progress-label {
+    display: none;
+  }
+}
+

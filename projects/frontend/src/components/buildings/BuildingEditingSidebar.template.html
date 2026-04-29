@@ -1,0 +1,398 @@
+  <div class="sidebar" v-if="selectedCell && isEditing">
+    <div v-if="showUnitPicker" class="unit-picker">
+      <div class="picker-header">
+        <h3>{{ t('buildingDetail.selectUnitType') }}</h3>
+        <button class="btn btn-ghost" @click="showUnitPicker = false">{{ t('common.close') }}</button>
+      </div>
+      <p class="picker-subtitle">{{ t('buildingDetail.allowedUnits') }}</p>
+      <div class="picker-grid">
+        <button v-for="unitType in allowedUnits" :key="unitType" class="picker-option" @click="placeUnit(unitType)">
+          <span class="picker-color" :style="{ background: getUnitColor(unitType) }"></span>
+          <div class="picker-info">
+            <span class="picker-name">{{ t(`buildingDetail.unitTypes.${unitType}`) }}</span>
+            <span class="picker-desc">{{ t(`buildingDetail.unitDescriptions.${unitType}`) }}</span>
+            <span class="picker-cost">{{ t('buildingDetail.unitCost', { cost: formatCurrency(getUnitConstructionCost(unitType)) }) }}</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <div v-if="!showUnitPicker && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)" class="unit-config">
+      <div class="unit-config-header">
+        <h3>{{ t('buildingDetail.unitConfiguration') }}</h3>
+        <button class="btn btn-ghost" @click="setReadOnlySelectedCell(null)">{{ t('common.close') }}</button>
+      </div>
+      <div class="unit-detail">
+        <h4>{{ t(`buildingDetail.unitTypes.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</h4>
+        <p class="unit-desc">{{ t(`buildingDetail.unitDescriptions.${getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType}`) }}</p>
+        <div class="unit-stats">
+          <span class="stat">{{ t('common.level') }}: {{ getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.level }}</span>
+          <span class="stat">{{ t('buildingDetail.gridPosition', { x: selectedCell.x, y: selectedCell.y }) }}</span>
+          <span v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="stat">
+            {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }) }}
+          </span>
+          <span
+            class="stat"
+            v-if="getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) > 0"
+            :title="getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!) + ' ticks'"
+          >
+            {{ t('buildingDetail.unitUnavailableFor', { time: formatTickDuration(getDisplayedTicks(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!), locale) }) }}
+          </span>
+        </div>
+        <div class="unit-links">
+          <span class="link-label">{{ t('buildingDetail.links') }}:</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUp" class="link-badge">{{ t('buildingDetail.linkUp') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDown" class="link-badge">{{ t('buildingDetail.linkDown') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkLeft" class="link-badge">{{ t('buildingDetail.linkLeft') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkRight" class="link-badge">{{ t('buildingDetail.linkRight') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpLeft" class="link-badge">{{ t('buildingDetail.linkUpLeft') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkUpRight" class="link-badge">{{ t('buildingDetail.linkUpRight') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownLeft" class="link-badge">{{ t('buildingDetail.linkDownLeft') }}</span>
+          <span v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.linkDownRight" class="link-badge">{{ t('buildingDetail.linkDownRight') }}</span>
+        </div>
+
+        <!-- Unit-specific configuration -->
+        <div class="unit-config-fields" v-if="isEditing && getDraftUnitAt(selectedCell.x, selectedCell.y)">
+          <h5>{{ t('buildingDetail.unitSettings') }}</h5>
+
+          <!-- Purchase unit config -->
+          <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'PURCHASE'">
+            <!-- Factory-specific onboarding guide for the Purchase unit -->
+            <p v-if="building?.type === 'FACTORY'" class="config-onboarding-hint">
+              {{ t('buildingDetail.config.factoryPurchaseGuide') }}
+            </p>
+            <div class="config-field">
+              <label class="config-label">{{ t('buildingDetail.config.inputItem') }}</label>
+              <button type="button" class="btn btn-secondary purchase-selector-trigger" @click="openPurchaseSelector">
+                {{ selectedPurchaseSelection ? t('buildingDetail.purchaseSelector.changeSelection') : t('buildingDetail.purchaseSelector.chooseSelection') }}
+              </button>
+              <div class="purchase-selection-summary">
+                <strong>
+                  {{
+                    selectedPurchaseSelection
+                      ? selectedPurchaseSelection.kind === 'resource'
+                        ? getResourceName(selectedDraftPurchaseUnit?.resourceTypeId ?? null)
+                        : getProductName(selectedDraftPurchaseUnit?.productTypeId ?? null)
+                      : t('buildingDetail.purchaseSelector.notSelected')
+                  }}
+                </strong>
+                <span v-if="selectedPurchaseVendorSummary" class="purchase-selection-meta">
+                  {{ selectedPurchaseVendorSummary }}
+                </span>
+                <span v-else class="purchase-selection-meta">
+                  {{ t('buildingDetail.purchaseSelector.vendorAuto') }}
+                </span>
+              </div>
+            </div>
+            <p class="config-help">{{ t('buildingDetail.proAccessHint') }}</p>
+            <div class="config-field">
+              <label class="config-label"
+                >{{ t('buildingDetail.config.maxPrice') }} <span class="currency-badge">{{ cityCurrencyCode }}</span></label
+              >
+              <input
+                type="number"
+                class="form-input"
+                :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.maxPrice"
+                @input="updateSelectedUnitConfig('maxPrice', ($event.target as HTMLInputElement).valueAsNumber || null)"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div class="config-field">
+              <label class="config-label">{{ t('buildingDetail.config.minQuality') }}</label>
+              <input
+                type="number"
+                class="form-input"
+                :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.minQuality"
+                @input="updateSelectedUnitConfig('minQuality', ($event.target as HTMLInputElement).valueAsNumber || null)"
+                min="0"
+                max="1"
+                step="0.01"
+              />
+            </div>
+            <div class="config-field">
+              <label class="config-label">{{ t('buildingDetail.config.procurementMode') }}</label>
+              <p class="config-help">{{ t('buildingDetail.config.procurementModeHelp') }}</p>
+              <div class="procurement-mode-options">
+                <label
+                  v-for="mode in ['OPTIMAL', 'EXCHANGE', 'LOCAL']"
+                  :key="mode"
+                  class="procurement-mode-option"
+                  :class="{ selected: (getDraftUnitAt(selectedCell.x, selectedCell.y)!.purchaseSource ?? 'OPTIMAL') === mode }"
+                >
+                  <input
+                    type="radio"
+                    :name="`procurement-mode-${selectedCell.x}-${selectedCell.y}`"
+                    :value="mode"
+                    :checked="(getDraftUnitAt(selectedCell.x, selectedCell.y)!.purchaseSource ?? 'OPTIMAL') === mode"
+                    @change="updateSelectedUnitConfig('purchaseSource', mode)"
+                    class="procurement-mode-radio"
+                  />
+                  <span class="procurement-mode-label">{{ t(`buildingDetail.config.procurementMode_${mode}`) }}</span>
+                  <span class="procurement-mode-desc">{{ t(`buildingDetail.config.procurementModeDesc_${mode}`) }}</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- City lock (shown when EXCHANGE mode is selected) -->
+            <div class="config-field" v-if="(getDraftUnitAt(selectedCell.x, selectedCell.y)!.purchaseSource ?? 'OPTIMAL') === 'EXCHANGE'">
+              <label class="config-label">{{ t('buildingDetail.config.lockedCity') }}</label>
+              <p class="config-help">{{ t('buildingDetail.config.lockedCityHelp') }}</p>
+              <select
+                class="form-input"
+                :value="getDraftUnitAt(selectedCell.x, selectedCell.y)!.lockedCityId ?? ''"
+                @change="updateSelectedUnitConfig('lockedCityId', ($event.target as HTMLSelectElement).value || null)"
+              >
+                <option value="">{{ t('buildingDetail.config.lockedCityAny') }}</option>
+                <option v-for="city in cities" :key="city.id" :value="city.id">{{ city.name }}</option>
+              </select>
+            </div>
+          
+          <!-- Manufacturing unit config -->
+
+          <!-- B2B Sales unit config -->
+
+          <!-- Public Sales unit config -->
+
+
+
+              </p>
+              <p class="pricing-guide-brand-hint">{{ t('buildingDetail.config.brandMomentumHint') }}</p>
+            </div>
+          </template>
+
+          <!-- Marketing unit config -->
+
+          <!-- Branding unit config -->
+
+          <!-- Storage unit config — no configuration needed; storage is universal -->
+
+        </div>
+
+        <!-- Read-only unit details for non-editing mode -->
+        <div class="unit-config-readonly" v-if="!isEditing && getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)">
+
+
+
+        </div>
+
+        <div v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
+          <h5>{{ t('buildingDetail.inventory.title') }}</h5>
+          <div class="inventory-summary-grid">
+            <div class="inventory-summary-stat">
+              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.load') }}</span>
+              <strong>
+                {{
+                  t('buildingDetail.inventory.quantity', {
+                    quantity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.quantity),
+                    capacity: formatUnitQuantity(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.capacity),
+                  })
+                }}
+              </strong>
+            </div>
+            <div class="inventory-summary-stat">
+              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.distinctItems') }}</span>
+              <strong>{{ getUnitInventoryItemCount(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}</strong>
+            </div>
+            <div class="inventory-summary-stat" v-if="getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality != null">
+              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.averageQuality') }}</span>
+              <strong>{{ formatPercent(getUnitInventorySummary(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))!.averageQuality) }}</strong>
+            </div>
+            <div class="inventory-summary-stat" v-if="getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))">
+              <span class="inventory-summary-label">{{ t('buildingDetail.inventory.sourcingCosts') }}</span>
+              <strong>{{ getUnitInventoryCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }}</strong>
+            </div>
+          </div>
+          <div v-if="getUnitInventories(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)).length > 0" class="inventory-table">
+            <div class="inventory-table-header">
+              <span class="inventory-col-item">{{ t('buildingDetail.inventory.item') }}</span>
+              <span class="inventory-col-quantity">{{ t('buildingDetail.inventory.amount') }}</span>
+              <span class="inventory-col-quality">{{ t('buildingDetail.inventory.quality') }}</span>
+              <span class="inventory-col-cost">{{ t('buildingDetail.inventory.sourcingCost') }}</span>
+            </div>
+            <div v-for="inventory in getUnitInventories(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" :key="inventory.id" class="inventory-table-row">
+              <div class="inventory-col-item">
+                <img v-if="getInventoryItemImageUrl(inventory)" class="inventory-item-image" :src="getInventoryItemImageUrl(inventory)!" :alt="getInventoryItemName(inventory)" />
+                <span v-else class="inventory-item-avatar">{{ getInventoryItemMonogram(inventory) }}</span>
+                <div class="inventory-item-stack">
+                  <span class="inventory-item-name">{{ getInventoryItemName(inventory) }}</span>
+                </div>
+              </div>
+              <div class="inventory-col-quantity">
+                <span class="inventory-item-quantity">{{ formatUnitQuantity(inventory.quantity) }}</span>
+              </div>
+              <div class="inventory-col-quality">
+                <span class="inventory-item-quality">{{ formatPercent(inventory.quality) }}</span>
+              </div>
+              <div class="inventory-col-cost">
+                <span class="inventory-item-cost">{{ getInventoryItemSourcingCostLabel(inventory) }}</span>
+                <span v-if="getInventoryItemSourcingCostPerUnitLabel(inventory)" class="inventory-item-secondary">
+                  {{ getInventoryItemSourcingCostPerUnitLabel(inventory) }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <p v-else class="inventory-empty">{{ t('buildingDetail.inventory.empty') }}</p>
+          <div class="detail-capacity">
+            <span class="detail-capacity-fill" :style="{ width: `${selectedPlannedUnitFlowSegments.fillWidth}%` }"></span>
+            <span
+              v-if="selectedPlannedUnitFlowSegments.inflowWidth > 0"
+              class="detail-capacity-inflow"
+              :style="{ left: `${selectedPlannedUnitFlowSegments.inflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.inflowWidth}%` }"
+            ></span>
+            <span
+              v-if="selectedPlannedUnitFlowSegments.outflowWidth > 0"
+              class="detail-capacity-outflow"
+              :style="{ left: `${selectedPlannedUnitFlowSegments.outflowLeft}%`, width: `${selectedPlannedUnitFlowSegments.outflowWidth}%` }"
+            ></span>
+          </div>
+        </div>
+
+        <UnitResourceHistoryPanel
+          v-if="selectedHistoryItemOptions.length > 0"
+          :items="selectedHistoryItemOptions"
+          :selected-item-key="selectedHistoryItemKey"
+          :history="selectedUnitResourceHistory"
+          @update:selected-item-key="selectedHistoryItemKey = $event"
+        />
+
+        <div v-if="getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y))" class="unit-insight-card">
+          <h5>{{ t('buildingDetail.costSummaryTitle') }}</h5>
+          <div class="unit-stats">
+            <span class="stat">
+              {{ t('buildingDetail.unitCost', { cost: getDraftUnitConstructionCostLabel(getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)) }) }}
+            </span>
+          </div>
+        </div>
+
+        <div
+          v-if="selectedPurchaseUnit && 'resourceTypeId' in selectedPurchaseUnit && selectedPurchaseUnit.resourceTypeId && ['EXCHANGE', 'OPTIMAL'].includes(selectedPurchaseUnit.purchaseSource ?? '')"
+          class="unit-insight-card"
+        >
+          <h5>{{ t('buildingDetail.exchange.title') }}</h5>
+          <p class="config-help">{{ t('buildingDetail.exchange.subtitle') }}</p>
+          <p class="config-help exchange-selection-hint">{{ t('buildingDetail.exchange.selectionHint') }}</p>
+          <p class="config-help" v-if="exchangeOffersLoading">{{ t('common.loading') }}</p>
+
+        </div>
+
+        <div class="unit-actions" v-if="isEditing">
+          <button class="btn btn-danger btn-sm" @click="removeDraftUnit(selectedCell.x, selectedCell.y)">
+            {{ t('buildingDetail.removeUnit') }}
+          </button>
+        </div>
+
+        <!-- Unit Upgrade Panel (edit-mode only) -->
+        <div v-if="isEditing && selectedCellUpgradeInfo !== null" class="unit-insight-card unit-upgrade-panel" :aria-label="t('buildingDetail.accessibility.unitUpgrade')">
+          <h5>{{ t('buildingDetail.unitUpgrade.sectionTitle') }}</h5>
+
+          <!-- Upgrade in progress (from pending configuration) -->
+          <div v-if="selectedCellPendingUpgrade" class="unit-upgrade-in-progress">
+            <div class="unit-upgrade-progress-badge">⏳</div>
+            <div class="unit-upgrade-progress-body">
+              <strong>{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</strong>
+              <p class="unit-upgrade-progress-desc" :title="selectedCellPendingUpgrade.ticksRemaining + ' ticks remaining'">
+                {{
+                  t('buildingDetail.unitUpgrade.pendingBody', {
+                    level: selectedCellPendingUpgrade.level,
+                    time: formatTickDuration(selectedCellPendingUpgrade.ticksRemaining, locale),
+                  })
+                }}
+              </p>
+              <p class="unit-upgrade-downtime-notice">
+                {{ t('buildingDetail.unitUpgrade.pendingDowntimeNotice') }}
+              </p>
+            </div>
+          </div>
+
+          <!-- Max level state -->
+          <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level">
+            <span class="unit-upgrade-max-badge">★</span>
+            <span>{{ t('buildingDetail.unitUpgrade.maxLevel') }}</span>
+            <p class="unit-upgrade-max-note">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
+          </div>
+
+          <!-- Not upgradable -->
+          <div v-else-if="!selectedCellUpgradeInfo.isUpgradable" class="unit-upgrade-not-available">
+            <p>{{ t('buildingDetail.unitUpgrade.notUpgradable') }}</p>
+          </div>
+
+          <!-- Upgrade available -->
+          <div v-else class="unit-upgrade-available">
+            <div class="unit-upgrade-levels">
+              <span class="unit-upgrade-level current-level">{{ t('buildingDetail.unitUpgrade.currentLevel', { level: selectedCellUpgradeInfo.currentLevel }) }}</span>
+              <span class="unit-upgrade-arrow">→</span>
+              <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
+            </div>
+            <!-- Full before/after stat table -->
+            <div class="unit-upgrade-stats" :aria-label="t('buildingDetail.accessibility.upgradeImpact')">
+              <div class="unit-upgrade-stat-row">
+                <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ selectedCellUpgradeInfo.currentStat.toFixed(1) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</span>
+                </span>
+              </div>
+              <!-- Storage capacity row — shown for all unit types that buffer inventory -->
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.storageCapacityDelta')">
+                <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ selectedCellUpgradeInfo.currentStorageCapacity.toFixed(0) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ selectedCellUpgradeInfo.nextStorageCapacity.toFixed(0) }}</span>
+                  <span class="stat-delta stat-delta-positive">+{{ (selectedCellUpgradeInfo.nextStorageCapacity - selectedCellUpgradeInfo.currentStorageCapacity).toFixed(0) }}</span>
+                </span>
+              </div>
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.laborCostDelta')">
+                <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick) }}</span>
+                  <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick - selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
+                </span>
+              </div>
+              <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.energyCostDelta')">
+                <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
+                <span class="unit-upgrade-stat-values">
+                  <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
+                  <span class="stat-arrow"> → </span>
+                  <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick) }}</span>
+                  <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick - selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
+                </span>
+              </div>
+            </div>
+            <!-- Downtime notice shown before confirming the upgrade -->
+            <p class="unit-upgrade-downtime-notice available" :title="selectedCellUpgradeInfo.upgradeTicks + ' ticks'">
+              {{ t('buildingDetail.unitUpgrade.availableDowntimeNotice', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) }) }}
+            </p>
+            <div class="unit-upgrade-meta">
+              <span class="unit-upgrade-cost">{{ t('buildingDetail.unitUpgrade.cost', { cost: formatCurrency(selectedCellUpgradeInfo.upgradeCost) }) }}</span>
+              <span class="unit-upgrade-duration" :title="t('buildingDetail.unitUpgrade.durationTicks', { ticks: selectedCellUpgradeInfo.upgradeTicks })">{{
+                t('buildingDetail.unitUpgrade.duration', { time: formatTickDuration(selectedCellUpgradeInfo.upgradeTicks, locale) })
+              }}</span>
+            </div>
+            <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
+            <!-- Staged state: unit has been queued for upgrade via Store Upgrade -->
+            <div v-if="isSelectedCellStaged" class="unit-upgrade-staged">
+              <span class="unit-upgrade-staged-badge">✓ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
+              <p class="unit-upgrade-stage-info">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
+              <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
+                {{ t('buildingDetail.unitUpgrade.removeStagedUpgrade') }}
+              </button>
+            </div>
+            <!-- Not yet staged: show Stage and Upgrade Now buttons -->
+            <div v-else class="unit-upgrade-actions">
+              <button class="btn btn-primary btn-sm unit-upgrade-stage-btn" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
+                {{ t('buildingDetail.unitUpgrade.stageButton') }}
+              </button>
+              <button class="btn btn-ghost btn-sm unit-upgrade-confirm-btn" :disabled="schedulingUpgrade" @click="submitUnitUpgrade(selectedCellUpgradeInfo!.unitId)">
+                {{ schedulingUpgrade ? t('buildingDetail.unitUpgrade.confirmingButton') : t('buildingDetail.unitUpgrade.confirmButton') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>

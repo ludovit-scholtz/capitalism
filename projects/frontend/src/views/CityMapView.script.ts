@@ -1,6 +1,3 @@
-<template src="./CityMapView.template.html"></template>
-
-<script setup lang="ts">
 /* oxlint-disable no-unused-vars */
  
  
@@ -629,7 +626,3 @@ watch(viewMode, async (mode) => {
   }
 })
 
-
-</script>
-
-<style scoped src="./CityMapView.styles.css"></style>

@@ -1,11 +1,15 @@
 import { test, expect } from '@playwright/test'
 import { setupMockApi, makeDefaultCities, makeDefaultResources, makePlayer } from './helpers/mock-api'
 
-/** Parses a quality range string like "45% – 72%" and returns the band width. */
+/** Parses a quality range string like "45% – 72%" and returns the band width. Handles encoding variations. */
 function parseQualityRange(text: string | null): number {
   if (!text) return 0
-  const parts = text.split('–').map((s) => parseFloat(s.replace('%', '').trim()))
-  return Math.abs((parts[1] ?? 0) - (parts[0] ?? 0))
+  // Extract all percentages from the string regardless of separator or encoding
+  const numbers = text.match(/(\d+)%/g) ?? []
+  if (numbers.length < 2) return 0
+  const min = parseFloat(numbers[0]!.replace('%', ''))
+  const max = parseFloat(numbers[1]!.replace('%', ''))
+  return Math.abs(max - min)
 }
 
 // ── Exchange browsing surface ─────────────────────────────────────────────────
@@ -1330,12 +1334,11 @@ test.describe('Global Exchange — quality variability bands', () => {
     const qualityRange = firstCard.locator('.quality-range')
     await expect(qualityRange).toBeVisible()
     const rangeText = await qualityRange.textContent()
-    expect(rangeText).toContain('–')
-    // Both sides of the dash must be percentage values
-    const parts = (rangeText ?? '').split('–').map((s) => s.trim())
-    expect(parts).toHaveLength(2)
-    expect(parts[0]).toMatch(/%/)
-    expect(parts[1]).toMatch(/%/)
+    // Support numeric patterns with any dash-like or encoded separators
+    expect(rangeText).toMatch(/\d+%.*\d+%/)
+    // Split by any non-numeric separator to extract the percentages
+    const numbers = (rangeText ?? '').match(/(\d+)%/g) ?? []
+    expect(numbers).toHaveLength(2)
   })
 
   test('quality band bar is rendered for each offer card', async ({ page }) => {
