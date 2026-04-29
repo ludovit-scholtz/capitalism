@@ -539,11 +539,7 @@ function navigateToEntry(slug: string) {
       >
         {{ t('encyclopedia.closeFullscreenImage') }}
       </button>
-      <img
-        :src="fullscreenImage.src"
-        :alt="fullscreenImage.alt"
-        class="fullscreen-help-image max-w-full max-h-full object-contain rounded-xl border border-divider"
-      />
+      <img :src="fullscreenImage.src" :alt="fullscreenImage.alt" class="fullscreen-help-image max-w-full max-h-full object-contain rounded-xl border border-divider" />
     </div>
   </div>
 </template>
