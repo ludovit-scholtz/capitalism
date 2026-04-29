@@ -105,7 +105,8 @@ export default {
     removeLocalAdmin: 'Lokalen Admin entfernen',
     grantLocalAdmin: 'Lokalen Admin gewähren',
     governmentTitle: 'Staatliches Systemkonto',
-    governmentBody: 'Die Regierung ist ein interner Simulationsteilnehmer, der Währung hält, Banken besitzt und Steuerflüsse verwaltet. Es erscheint nicht in der öffentlichen Rangliste. Imitieren Sie es, um Guthaben zu prüfen, Wirtschaftsabläufe zu debuggen oder Notfalleingriffe vorzunehmen.',
+    governmentBody:
+      'Die Regierung ist ein interner Simulationsteilnehmer, der Währung hält, Banken besitzt und Steuerflüsse verwaltet. Es erscheint nicht in der öffentlichen Rangliste. Imitieren Sie es, um Guthaben zu prüfen, Wirtschaftsabläufe zu debuggen oder Notfalleingriffe vorzunehmen.',
     impersonateGovernment: 'Regierung imitieren',
     governmentNotSeeded: 'Regierungskonto nicht gefunden. Initialisierung erneut ausführen.',
     newsComposerTitle: 'News- und Changelog-Editor',
@@ -540,7 +541,8 @@ export default {
     noOffersForResource: 'Für diesen Rohstoff sind keine Börsenangebote verfügbar.',
     exchangePrice: 'Börse',
     transitCost: 'Transit',
-    fuelPriceHint: 'Lokaler Kraftstoffpreisindex für diese Transportkosten. Werte über ×1,00 bedeuten teureren Kraftstoff (z.B. London ×1,25); Werte unter ×1,00 bedeuten subventionierten Kraftstoff (z.B. Delhi ×0,65).',
+    fuelPriceHint:
+      'Lokaler Kraftstoffpreisindex für diese Transportkosten. Werte über ×1,00 bedeuten teureren Kraftstoff (z.B. London ×1,25); Werte unter ×1,00 bedeuten subventionierten Kraftstoff (z.B. Delhi ×0,65).',
     deliveredPrice: 'Geliefert',
     quality: 'Qualität',
     qualityBandHint: 'Die tatsächliche Qualität schwankt jeden Tick innerhalb dieses Bereichs. Höhere Verfügbarkeit bedeutet gleichmäßigere Qualität.',
@@ -678,7 +680,8 @@ export default {
     triggerPlaceholder: 'Produkt auswählen…',
     helpText: 'Zuerst werden nur Produkte aus verbundenen Einheiten oder aktuellem Bestand angezeigt.',
     noConnectedProducts: 'Keine Produkte verfügbar. Verbinden Sie zuerst vorgelagerte Einheiten oder füllen Sie diese Einheit mit Bestand, um kontextbezogene Optionen freizuschalten.',
-    rdProductHelp: 'Produkte, die Ihr Unternehmen herstellt, werden zuerst angezeigt, damit Sie die Forschung auf Ihre aktiven Produktionslinien konzentrieren können. Produkte, die Sie verkaufen oder lagern, erscheinen danach.',
+    rdProductHelp:
+      'Produkte, die Ihr Unternehmen herstellt, werden zuerst angezeigt, damit Sie die Forschung auf Ihre aktiven Produktionslinien konzentrieren können. Produkte, die Sie verkaufen oder lagern, erscheinen danach.',
     rdProductEmpty: 'Keine aktiven Produkte gefunden. Beginnen Sie mit der Herstellung oder dem Verkauf von Produkten, damit sie beim nächsten Mal zuerst erscheinen.',
     rdNoActiveProducts: 'Ihr Unternehmen produziert noch keine Produkte. Starten Sie eine Fabrik, um Ihre aktiven Produktionslinien hier zu sehen.',
     invalidSelectionWarning: 'Das zuvor gewählte Produkt ist nicht mehr verfügbar. Bitte wählen Sie eine Alternative.',
@@ -1124,7 +1127,8 @@ export default {
         at: 'Ein Preis auf dem Stadtdurchschnitt bietet einen ausgewogenen Kompromiss zwischen Verkaufsvolumen und Marge.',
         above: 'Ein Preis über dem Stadtdurchschnitt verringert die Nachfrage, erhöht aber Ihre Marge pro Einheit. Funktioniert am besten mit überlegener Qualität oder starker Markenbekanntheit.',
       },
-      brandMomentumHint: 'Markentipp: Wenn die Qualität Ihres Produkts über dem Stadtdurchschnitt liegt oder Sie der einzige Verkäufer in dieser Stadt sind, wird durch den Verkauf hier schrittweise das Markenbewusstsein aufgebaut. Minderwertige Qualität schwächt es langsam.',
+      brandMomentumHint:
+        'Markentipp: Wenn die Qualität Ihres Produkts über dem Stadtdurchschnitt liegt oder Sie der einzige Verkäufer in dieser Stadt sind, wird durch den Verkauf hier schrittweise das Markenbewusstsein aufgebaut. Minderwertige Qualität schwächt es langsam.',
       sourceExchange: 'Börse',
       sourceLocal: 'Lokal',
       sourceOptimal: 'Optimaler Preis',
@@ -1619,11 +1623,15 @@ export default {
     mediaTypeTv: 'Fernsehen',
     mediaTypeHint: 'Wählen Sie den Sendekanal. TV hat die größte Reichweite (×2,0), Radio ist moderat (×1,5), Zeitung ist Basis (×1,0).',
     mediaTypeGuideTitle: 'Medien-Strategie-Leitfaden',
-    mediaTypeGuideNewspaper: 'Niedrigste Einstiegskosten in den Medienmarkt. Zeitungen sind günstig zu bauen und auszubauen, ideal für den frühen Markenaufbau. Inhalte wachsen stetig mit einem bescheidenen Budget. Am besten für Unternehmen geeignet, die eine breite, konsistente Abdeckung ohne großen Kapitaleinsatz wünschen.',
-    mediaTypeGuideRadio: 'Mittlere Reichweite mit einem 1,5×-Kanal-Multiplikator. Radio eignet sich für Unternehmen, die ein stadtweites Publikum ansprechen wollen. Jeder Tick ist 50% wertvoller als bei Zeitungen. Gut für wachsende Imperien mit mehreren Produktlinien.',
-    mediaTypeGuideTV: 'Höchste Reichweite mit einem 2,0×-Multiplikator — das wirkungsvollste Werbemedium im Spiel. TV-Sender sind teurer zu betreiben, aber die Dominanz in dieser Kategorie bietet unübertroffene Markenverstärkung. Am besten für reife Imperien.',
+    mediaTypeGuideNewspaper:
+      'Niedrigste Einstiegskosten in den Medienmarkt. Zeitungen sind günstig zu bauen und auszubauen, ideal für den frühen Markenaufbau. Inhalte wachsen stetig mit einem bescheidenen Budget. Am besten für Unternehmen geeignet, die eine breite, konsistente Abdeckung ohne großen Kapitaleinsatz wünschen.',
+    mediaTypeGuideRadio:
+      'Mittlere Reichweite mit einem 1,5×-Kanal-Multiplikator. Radio eignet sich für Unternehmen, die ein stadtweites Publikum ansprechen wollen. Jeder Tick ist 50% wertvoller als bei Zeitungen. Gut für wachsende Imperien mit mehreren Produktlinien.',
+    mediaTypeGuideTV:
+      'Höchste Reichweite mit einem 2,0×-Multiplikator — das wirkungsvollste Werbemedium im Spiel. TV-Sender sind teurer zu betreiben, aber die Dominanz in dieser Kategorie bietet unübertroffene Markenverstärkung. Am besten für reife Imperien.',
     mediaTypeStrategyTitle: 'Warum ein Medienhaus besitzen?',
-    mediaTypeStrategyBody: 'Ein Medienhaus produziert keine Waren — es produziert Einfluss. Durch die Ansammlung von Inhaltswert steigt Ihr Kanal im Stadtranking. Werbetreibende leiten Budgets über den höchstplatzierten Kanal, sodass Sie Werbeeinnahmen erzielen UND Ihre eigene Marke Priorität erhält. Ein dominantes Medienhaus ist ein strategischer Vorteil, der sich im Laufe der Zeit vervielfältigt.',
+    mediaTypeStrategyBody:
+      'Ein Medienhaus produziert keine Waren — es produziert Einfluss. Durch die Ansammlung von Inhaltswert steigt Ihr Kanal im Stadtranking. Werbetreibende leiten Budgets über den höchstplatzierten Kanal, sodass Sie Werbeeinnahmen erzielen UND Ihre eigene Marke Priorität erhält. Ein dominantes Medienhaus ist ein strategischer Vorteil, der sich im Laufe der Zeit vervielfältigt.',
   },
   tickClock: {
     sectionTitle: 'Weltzeit',
@@ -2190,7 +2198,8 @@ export default {
     cityReferenceRate: 'Städtischer Durchschnittsmiete',
     adjustedMarketRate: 'Satz für Ihren Standort',
     locationIndex: 'Standortindex',
-    locationIndexTooltip: 'Dieser Standortqualitätsfaktor passt die städtische Durchschnittsmiete für Ihr spezifisches Grundstück an. Höhere Werte bedeuten besseren Fußgängerverkehr oder Nähe zum Stadtzentrum.',
+    locationIndexTooltip:
+      'Dieser Standortqualitätsfaktor passt die städtische Durchschnittsmiete für Ihr spezifisches Grundstück an. Höhere Werte bedeuten besseren Fußgängerverkehr oder Nähe zum Stadtzentrum.',
     yourRent: 'Ihre aktuelle Miete',
     rentVsMarket: 'vs. Marktsatz',
     rentPositionLabel: 'Preisposition',
@@ -2228,7 +2237,8 @@ export default {
       accumulated: 'Investiertes Forschungsbudget (USD)',
       target: 'Ziel für 100 % Qualität – ohne Wettbewerb (USD)',
       topCompetitor: 'Höchstes Konkurrenzbudget (USD)',
-      decayHint: 'Forschungsbudgets werden in USD normalisiert für fairen stadtübergreifenden Vergleich und verfallen um 0,1 % pro Takt. Investieren Sie weiter, um Ihre Qualitätsführerschaft zu halten oder auszubauen.',
+      decayHint:
+        'Forschungsbudgets werden in USD normalisiert für fairen stadtübergreifenden Vergleich und verfallen um 0,1 % pro Takt. Investieren Sie weiter, um Ihre Qualitätsführerschaft zu halten oder auszubauen.',
     },
   },
   supplyChain: {
@@ -2472,7 +2482,8 @@ export default {
     closeAccountSuccess: 'Konto erfolgreich geschlossen.',
     closeAccountBlockedInUse: 'Dieses Konto ist noch einem Gebäude zugewiesen. Weisen Sie das Gebäude zuerst einem anderen Konto zu.',
     closeAccountNonZeroHint: 'Übertragen Sie alle verbleibenden Mittel auf ein anderes Konto, bevor dieses Konto geschlossen werden kann.',
-    closeAccountBlockedActiveLoan: 'Dieses Konto ist noch das geplante Rückzahlungskonto für einen aktiven Kredit. Ändern Sie das Rückzahlungskonto oder zahlen Sie den Kredit vollständig zurück, bevor Sie dieses Konto schließen.',
+    closeAccountBlockedActiveLoan:
+      'Dieses Konto ist noch das geplante Rückzahlungskonto für einen aktiven Kredit. Ändern Sie das Rückzahlungskonto oder zahlen Sie den Kredit vollständig zurück, bevor Sie dieses Konto schließen.',
     accountReadyToClose: 'Bereit zur Schließung — Nullguthaben',
     openAccountHint: 'Erzielen Sie {rate} Jahreszins, indem Sie hier ein Konto eröffnen. Konten in einer neuen Währung können mit 0 Guthaben starten und später über Forex finanziert werden.',
     zeroBalanceFundingHint: 'Eröffnen Sie das Konto für eine neue Währung mit 0 Guthaben und finanzieren Sie es danach über die Forex-Seite.',
@@ -2621,7 +2632,8 @@ export default {
     myPositionsTitle: 'Meine Positionen',
     feeAccrual: 'Handelsgebühren (1% pro Tausch) akkumulieren automatisch im Pool und werden beim Entfernen Ihrer Liquidität anteilig zurückgegeben.',
     claimableHint: 'Aus Handelsgebühren angesammelt. Wird beim Entfernen der Liquidität zurückgegeben.',
-    blockedGoldWarning: 'Ein Teil Ihres Goldes ist in Pools gesperrt und kann nicht für Tauschgeschäfte verwendet werden. Gehen Sie zu Meine Positionen, um Liquidität zu entfernen und es zu entsperren.',
+    blockedGoldWarning:
+      'Ein Teil Ihres Goldes ist in Pools gesperrt und kann nicht für Tauschgeschäfte verwendet werden. Gehen Sie zu Meine Positionen, um Liquidität zu entfernen und es zu entsperren.',
     addLiquidityHint: 'Fügen Sie Fiat und XAU-Gold zu einem Pool hinzu. Das Verhältnis wird durch den aktuellen Pool-Preis bestimmt — Sie können nicht in einem beliebigen Verhältnis hinzufügen.',
     createPoolHint: 'Das Erstellen eines Pools legt den Anfangspreis für dieses Währungspaar fest. Sie sind der erste Liquiditätsanbieter und verdienen alle Gebühren, bis andere beitreten.',
     goldBalance: 'Goldguthaben',

@@ -105,7 +105,8 @@ export default {
     removeLocalAdmin: 'Odobrať lokálneho admina',
     grantLocalAdmin: 'Prideliť lokálneho admina',
     governmentTitle: 'Systémový účet vlády',
-    governmentBody: 'Vláda je interný účastník simulácie, ktorý drží menu, vlastní banky a spravuje daňové toky. V verejnom rebríčku sa nezobrazuje. Vydávajte sa za vládu na kontrolu zostatkov, ladenie ekonomických tokov alebo núdzové zásahy.',
+    governmentBody:
+      'Vláda je interný účastník simulácie, ktorý drží menu, vlastní banky a spravuje daňové toky. V verejnom rebríčku sa nezobrazuje. Vydávajte sa za vládu na kontrolu zostatkov, ladenie ekonomických tokov alebo núdzové zásahy.',
     impersonateGovernment: 'Vydávať sa za vládu',
     governmentNotSeeded: 'Vládny účet sa nenašiel. Spustite inicializáciu znova.',
     newsComposerTitle: 'Publikovanie noviniek a changelogu',
@@ -539,7 +540,8 @@ export default {
     noOffersForResource: 'Pre túto surovinu nie sú k dispozícii žiadne ponuky burzy.',
     exchangePrice: 'Burza',
     transitCost: 'Doprava',
-    fuelPriceHint: 'Miestny index ceny paliva aplikovaný na tieto prepravné náklady. Hodnoty nad ×1,00 znamenajú drahšie palivo (napr. Londýn ×1,25); hodnoty pod ×1,00 znamenajú dotované palivo (napr. Dillí ×0,65).',
+    fuelPriceHint:
+      'Miestny index ceny paliva aplikovaný na tieto prepravné náklady. Hodnoty nad ×1,00 znamenajú drahšie palivo (napr. Londýn ×1,25); hodnoty pod ×1,00 znamenajú dotované palivo (napr. Dillí ×0,65).',
     deliveredPrice: 'Doručenie',
     quality: 'Kvalita',
     qualityBandHint: 'Skutočná kvalita sa mení v tomto rozsahu každý tick. Vyššia dostupnosť znamená predvídateľnejšiu kvalitu.',
@@ -677,7 +679,8 @@ export default {
     triggerPlaceholder: 'Vyberte produkt…',
     helpText: 'Najprv sa zobrazujú len produkty z prepojených jednotiek alebo aktuálnych zásob.',
     noConnectedProducts: 'Žiadne produkty nie sú dostupné. Najprv prepojte nadväzujúce jednotky alebo naplňte túto jednotku zásobami, aby sa odomkli kontextové možnosti.',
-    rdProductHelp: 'Produkty, ktoré vaša spoločnosť vyrába, sa zobrazujú ako prvé, aby ste mohli sústrediť výskum na aktívne výrobné linky. Produkty, ktoré predávate alebo skladujete, sa zobrazujú ako druhé.',
+    rdProductHelp:
+      'Produkty, ktoré vaša spoločnosť vyrába, sa zobrazujú ako prvé, aby ste mohli sústrediť výskum na aktívne výrobné linky. Produkty, ktoré predávate alebo skladujete, sa zobrazujú ako druhé.',
     rdProductEmpty: 'Žiadne aktívne produkty nenájdené. Začnite vyrábať alebo predávať produkty a nabudúce sa zobrazia ako prvé.',
     rdNoActiveProducts: 'Vaša spoločnosť zatiaľ nič nevyrába. Spustite továreň, aby ste tu videli aktívne výrobné linky.',
     invalidSelectionWarning: 'Predtým zvolený produkt už nie je dostupný. Prosím vyberte náhradu.',
@@ -1121,7 +1124,8 @@ export default {
         at: 'Cena na úrovni priemeru mesta ponúka vyvážený kompromis medzi objemom predaja a maržou.',
         above: 'Cena nad priemerom mesta znižuje dopyt, ale zvyšuje maržu na jednotku. Funguje najlepšie pri vynikajúcej kvalite alebo silnom povedomí o značke.',
       },
-      brandMomentumHint: 'Tip pre značku: Ak je kvalita vášho produktu nad priemerom mesta, alebo ste jediným predajcom v tomto meste, predaj tu postupne buduje povedomie o značke. Nižšia kvalita ho pomaly oslabuje.',
+      brandMomentumHint:
+        'Tip pre značku: Ak je kvalita vášho produktu nad priemerom mesta, alebo ste jediným predajcom v tomto meste, predaj tu postupne buduje povedomie o značke. Nižšia kvalita ho pomaly oslabuje.',
       sourceExchange: 'Burza',
       sourceLocal: 'Lokálny',
       sourceOptimal: 'Optimálna cena',
@@ -1614,11 +1618,15 @@ export default {
     mediaTypeTv: 'Televízia',
     mediaTypeHint: 'Vyberte vysielací kanál. TV má najväčší dosah (×2,0), Rádio je stredné (×1,5), Noviny sú základné (×1,0).',
     mediaTypeGuideTitle: 'Sprievodca stratégiou médií',
-    mediaTypeGuideNewspaper: 'Najnižšie vstupné náklady na trh médií. Noviny sú dostupné na budovanie a vylepšovanie, ideálne pre rané budovanie značky. Obsah rastie stabilne s miernym rozpočtom. Najlepšie pre spoločnosti, ktoré chcú konzistentné pokrytie bez veľkého kapitálu.',
-    mediaTypeGuideRadio: 'Stredný dosah s multiplikátorom 1,5×. Rádio je vhodné pre spoločnosti zamerané na celomestské publikum. Každý tik je o 50% hodnotnejší ako noviny. Vhodné pre rastúce impériá s viacerými produktovými líniami.',
-    mediaTypeGuideTV: 'Najvyšší dosah s multiplikátorom 2,0× — najsilnejší reklamný prostriedok v hre. TV stanice sú nákladnejšie, ale dominancia v tejto kategórii prináša bezkonkurenčné zosilnenie značky. Najlepšie pre zrelé impériá.',
+    mediaTypeGuideNewspaper:
+      'Najnižšie vstupné náklady na trh médií. Noviny sú dostupné na budovanie a vylepšovanie, ideálne pre rané budovanie značky. Obsah rastie stabilne s miernym rozpočtom. Najlepšie pre spoločnosti, ktoré chcú konzistentné pokrytie bez veľkého kapitálu.',
+    mediaTypeGuideRadio:
+      'Stredný dosah s multiplikátorom 1,5×. Rádio je vhodné pre spoločnosti zamerané na celomestské publikum. Každý tik je o 50% hodnotnejší ako noviny. Vhodné pre rastúce impériá s viacerými produktovými líniami.',
+    mediaTypeGuideTV:
+      'Najvyšší dosah s multiplikátorom 2,0× — najsilnejší reklamný prostriedok v hre. TV stanice sú nákladnejšie, ale dominancia v tejto kategórii prináša bezkonkurenčné zosilnenie značky. Najlepšie pre zrelé impériá.',
     mediaTypeStrategyTitle: 'Prečo vlastniť mediálny dom?',
-    mediaTypeStrategyBody: 'Mediálny dom nevyrába tovar — produkuje vplyv. Akumuláciou hodnoty obsahu váš kanál stúpa v mestskom rebríčku. Inzerenti smerujú rozpočty cez kanál s najvyšším hodnotením, takže zarábate na reklame A vaša vlastná značka má prioritné umiestnenie. Dominantný mediálny dom je strategická výhoda, ktorá sa časom znásobuje.',
+    mediaTypeStrategyBody:
+      'Mediálny dom nevyrába tovar — produkuje vplyv. Akumuláciou hodnoty obsahu váš kanál stúpa v mestskom rebríčku. Inzerenti smerujú rozpočty cez kanál s najvyšším hodnotením, takže zarábate na reklame A vaša vlastná značka má prioritné umiestnenie. Dominantný mediálny dom je strategická výhoda, ktorá sa časom znásobuje.',
   },
   tickClock: {
     sectionTitle: 'Svetové hodiny',
@@ -1807,8 +1815,7 @@ export default {
     overheadDriverScale: 'Faktor rozsahu',
     salaryImpactHint:
       'Vyšší násobok zvyšuje priebežné mzdové náklady v tomto meste, ale môže zlepšiť kvalitu pracovníkov a konkurencieschopnosť. Nižší násobok znižuje náklady, ale môže ovplyvniť výkonnosť.',
-    salaryLocalCurrencyNote:
-      'Mzdy sú denominované v miestnej mene každého mesta. Napríklad mzdy v Prahe sú v CZK a mzdy v New Yorku sú v USD — nie sú prepočítané na primárnu menu vašej firmy.',
+    salaryLocalCurrencyNote: 'Mzdy sú denominované v miestnej mene každého mesta. Napríklad mzdy v Prahe sú v CZK a mzdy v New Yorku sú v USD — nie sú prepočítané na primárnu menu vašej firmy.',
     dividendHelp: 'Určite, aká časť ročného zisku po zdanení sa vyplatí akcionárom. 20% je vyvážený základ, ktorý stále ponecháva priestor na reinvestície.',
     baseSalary: 'Základná mzda / hodina',
     salaryMultiplier: 'Mzdový násobok',
@@ -2220,7 +2227,8 @@ export default {
       accumulated: 'Investovaný výskumný rozpočet (USD)',
       target: 'Cieľ pre 100 % kvalitu – bez konkurencie (USD)',
       topCompetitor: 'Najvyšší rozpočet konkurenta (USD)',
-      decayHint: 'Výskumné rozpočty sú normalizované v USD pre spravodlivé porovnanie naprieč mestami a klesajú o 0,1 % za tik. Pokračujte v investíciách, aby ste si udržali alebo zvýšili vedúce postavenie v kvalite.',
+      decayHint:
+        'Výskumné rozpočty sú normalizované v USD pre spravodlivé porovnanie naprieč mestami a klesajú o 0,1 % za tik. Pokračujte v investíciách, aby ste si udržali alebo zvýšili vedúce postavenie v kvalite.',
     },
   },
   supplyChain: {

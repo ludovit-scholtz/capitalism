@@ -288,15 +288,11 @@ function navigateToEntry(slug: string) {
         <p class="text-muted mt-1">{{ t('encyclopedia.subtitle') }}</p>
       </div>
       <div class="flex flex-wrap gap-4 justify-end max-sm:justify-stretch">
-        <div
-          class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1"
-        >
+        <div class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1">
           <strong>{{ catalogEntries.length }}</strong>
           <span class="text-muted text-sm">{{ t('encyclopedia.resourcesCount') }}</span>
         </div>
-        <div
-          class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1"
-        >
+        <div class="stat-card bg-card border border-divider rounded-2xl px-5 py-4 min-w-[120px] grid gap-1 max-sm:flex-1">
           <strong>{{ visibleProducts.length }}</strong>
           <span class="text-muted text-sm">{{ t('encyclopedia.productsCount') }}</span>
         </div>
@@ -305,11 +301,7 @@ function navigateToEntry(slug: string) {
 
     <!-- Loading / error -->
     <div v-if="loading" class="text-muted py-12 text-center">{{ t('common.loading') }}</div>
-    <div
-      v-else-if="error"
-      class="bg-card border border-divider rounded-2xl p-6 text-center text-muted"
-      role="alert"
-    >
+    <div v-else-if="error" class="bg-card border border-divider rounded-2xl p-6 text-center text-muted" role="alert">
       {{ error }}
     </div>
 
@@ -325,17 +317,8 @@ function navigateToEntry(slug: string) {
 
       <!-- Filters -->
       <div class="flex items-center gap-4 flex-wrap mt-6">
-        <input
-          v-model="search"
-          type="search"
-          class="flex-1 min-w-60 border border-divider rounded-xl bg-page text-body px-4 py-3"
-          :placeholder="t('encyclopedia.searchPlaceholder')"
-        />
-        <select
-          v-model="industry"
-          class="border border-divider rounded-xl bg-page text-body px-4 py-3"
-          :aria-label="t('encyclopedia.filterByIndustry')"
-        >
+        <input v-model="search" type="search" class="flex-1 min-w-60 border border-divider rounded-xl bg-page text-body px-4 py-3" :placeholder="t('encyclopedia.searchPlaceholder')" />
+        <select v-model="industry" class="border border-divider rounded-xl bg-page text-body px-4 py-3" :aria-label="t('encyclopedia.filterByIndustry')">
           <option v-for="option in industries" :key="option" :value="option">
             {{ option === 'ALL' ? t('encyclopedia.allIndustries') : getIndustryLabel(option) }}
           </option>
@@ -363,12 +346,7 @@ function navigateToEntry(slug: string) {
           @keydown.enter="navigateToEntry(entry.slug)"
           @keydown.space.prevent="navigateToEntry(entry.slug)"
         >
-          <img
-            v-if="entry.imageUrl"
-            :src="entry.imageUrl ?? undefined"
-            :alt="entry.title"
-            class="w-full h-32 object-cover bg-page"
-          />
+          <img v-if="entry.imageUrl" :src="entry.imageUrl ?? undefined" :alt="entry.title" class="w-full h-32 object-cover bg-page" />
           <div class="p-4 flex flex-col gap-3">
             <!-- Heading row -->
             <div class="flex justify-between items-start gap-4">
@@ -432,17 +410,8 @@ function navigateToEntry(slug: string) {
           <h3 class="m-0">{{ t('encyclopedia.onboardingGuideTitle') }}</h3>
           <p class="text-muted m-0">{{ t('encyclopedia.onboardingGuideSubtitle') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
-            <article
-              v-for="card in onboardingGuideCards"
-              :key="card.titleKey"
-              class="onboarding-help-card rounded-xl border border-divider bg-page overflow-hidden"
-            >
-              <img
-                v-if="getGuideCardImage(card)"
-                :src="getGuideCardImage(card) ?? undefined"
-                :alt="t(card.titleKey)"
-                class="help-card-image w-full h-28 object-cover"
-              />
+            <article v-for="card in onboardingGuideCards" :key="card.titleKey" class="onboarding-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <img v-if="getGuideCardImage(card)" :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-28 object-cover" />
               <div class="p-4 flex flex-col gap-2">
                 <h4 class="m-0 text-base">{{ t(card.titleKey) }}</h4>
                 <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
@@ -455,17 +424,8 @@ function navigateToEntry(slug: string) {
           <h3 class="m-0">{{ t('encyclopedia.manufacturingGuideTitle') }}</h3>
           <p class="text-muted m-0">{{ t('encyclopedia.manufacturingGuideSubtitle') }}</p>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mt-2">
-            <article
-              v-for="card in manufacturingGuideCards"
-              :key="card.titleKey"
-              class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden"
-            >
-              <img
-                v-if="getGuideCardImage(card)"
-                :src="getGuideCardImage(card) ?? undefined"
-                :alt="t(card.titleKey)"
-                class="help-card-image w-full h-28 object-cover"
-              />
+            <article v-for="card in manufacturingGuideCards" :key="card.titleKey" class="manufacturing-help-card rounded-xl border border-divider bg-page overflow-hidden">
+              <img v-if="getGuideCardImage(card)" :src="getGuideCardImage(card) ?? undefined" :alt="t(card.titleKey)" class="help-card-image w-full h-28 object-cover" />
               <div class="p-4 flex flex-col gap-2">
                 <h4 class="m-0 text-base">{{ t(card.titleKey) }}</h4>
                 <p class="m-0 text-sm text-muted">{{ t(card.bodyKey) }}</p>
