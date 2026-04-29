@@ -47,6 +47,8 @@ public sealed partial class Mutation
         return await AcceptLoanFromBankDirectAsync(input, borrower, db, userId, httpContextAccessor);
     }
 
+    /// <param name="userId">Pre-extracted from the JWT claim to avoid double-extraction; also used for player-level self-lending check (bank.Company.PlayerId).</param>
+    /// <param name="httpContextAccessor">Still required to pass RequestAborted to async helpers.</param>
     private async Task<Loan> AcceptLoanFromBankDirectAsync(
         AcceptLoanInput input,
         Company borrower,
@@ -244,7 +246,7 @@ public sealed partial class Mutation
             Id = Guid.NewGuid(),
             CompanyId = borrower.Id,
             Category = LedgerCategory.LoanOrigination,
-            Description = $"Loan received from {bank.Company!.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} ticks (secured against {collateralBuilding.Name})",
+            Description = $"Loan received from {bank.Company!.Name} via {bank.Name} – {annualRate}% p.a. over {durationTicks} in-game hours (secured against {collateralBuilding.Name})",
             Amount = input.PrincipalAmount,
             RecordedAtTick = currentTick,
             RecordedAtUtc = DateTime.UtcNow,
