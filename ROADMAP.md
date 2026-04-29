@@ -35,7 +35,7 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped:** The government system account is now excluded from all public leaderboard queries (`rankings` and `companyRankings`). It remains a fully-functional internal simulation participant that owns banks, holds currency, and participates in economic flows. A dedicated "Government system account" section has been added to the admin operations dashboard so authorized administrators can view the government's balances and impersonate it via a clearly-labeled, admin-only button.
 
-### Currencies and bank accounts (93% complete)
+### Currencies and bank accounts (100% complete)
 
 - [x] Fix the onboarding process. Make the initial player desposit in the currency where player pick up to do the business. At the moment 200k eur stays on the personal account, but it should be his first deposit to the business account. Make sure all operations like initial deposit to the player from government and IPO investment to company by public shareholders are clearly visible on the bank account.
 - [x] In forex exchange show the fx rate list table and make the base currency for each other rate to be the selected city currency
@@ -54,7 +54,10 @@ It will use real world map. The game will start in single city and later other c
 
 **Shipped (city-aware salary settings):** Company settings salary table now shows each city's own currency code — Prague wages display as CZK, New York as USD, Delhi as INR, etc. The `CompanyCitySalarySettingResult` GraphQL type now includes a `currencyCode` field per city, and both the base wage and effective wage columns use the city's local currency formatter instead of the company's primary currency. A currency badge next to each city name and a clarifying note below the table make it unambiguous that wages are not cross-currency-converted. Backend and E2E tests verify the per-city currency codes are correct.
 
-- [ ] Allow to close down bank account if the balance of the account is equal exactly to 0.
+- [x] Allow to close down bank account if the balance of the account is equal exactly to 0.
+
+**Shipped (zero-balance account closure):** Players can now permanently close a company bank account when its balance is exactly zero. The new `closeCompanyBankAccount` GraphQL mutation validates ownership, rejects government and deposit accounts, blocks closure if the account is still assigned as a building's active bank account (returning `ACCOUNT_IN_USE` with the building name), and rejects any non-zero balance with a clear `NON_ZERO_BALANCE` error code. The bank accounts tab in the Loan Marketplace now shows a "Ready to close — zero balance" badge for eligible accounts, displays an inline error if closure is blocked (e.g. still assigned to a building), and shows a non-zero-balance hint for accounts that need funds transferred out first. Five backend integration tests cover: happy-path closure, non-zero rejection, building-assignment rejection, wrong-owner rejection, and unauthenticated rejection.
+
 - [x] Remove Loan Offers. Make sure every player can access any bank, including the government banks, and ask for a loan if he has a building available as collateral, and if the bank has enough deposits to provide loans.
 
 ### Number formatting (100% complete)

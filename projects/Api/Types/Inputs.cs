@@ -581,6 +581,17 @@ public sealed class CloseBankAccountInput
     public decimal Amount { get; set; }
 }
 
+/// <summary>
+/// Input for permanently closing a regular company bank account whose balance is exactly zero.
+/// Use this for non-deposit accounts (company treasury accounts with no bank-building association).
+/// Deposit accounts held at a bank building must be closed via <c>closeBankAccount</c> instead.
+/// </summary>
+public sealed class CloseCompanyBankAccountInput
+{
+    /// <summary>The company bank account to close. Must be a non-deposit account owned by one of the caller's companies.</summary>
+    public Guid BankAccountId { get; set; }
+}
+
 /// <summary>Input for adding funds to an existing bank deposit (top-up).</summary>
 public sealed class TopUpDepositInput
 {

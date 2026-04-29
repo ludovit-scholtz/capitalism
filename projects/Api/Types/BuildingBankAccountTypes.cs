@@ -87,6 +87,22 @@ public sealed class CreateCompanyBankAccountResult
     public CompanyBankAccountSummary Account { get; set; } = new();
 }
 
+/// <summary>Result of the <c>closeCompanyBankAccount</c> mutation.</summary>
+public sealed class CloseCompanyBankAccountResult
+{
+    /// <summary>Unique identifier of the closed bank account.</summary>
+    public Guid Id { get; set; }
+
+    /// <summary>16-digit account number of the closed account.</summary>
+    public string AccountNumber { get; set; } = string.Empty;
+
+    /// <summary>ISO 4217 currency code of the closed account.</summary>
+    public string CurrencyCode { get; set; } = "EUR";
+
+    /// <summary>UTC timestamp when the account was closed.</summary>
+    public DateTime ClosedAtUtc { get; set; }
+}
+
 /// <summary>Result of the <c>transferFunds</c> mutation.</summary>
 public sealed class TransferFundsResult
 {
