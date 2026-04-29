@@ -163,6 +163,7 @@ test.describe('Bank Account Close', () => {
         companyId: COMPANY_ID,
         companyName: 'Close Test Corp',
         bankBuildingId: 'bank-building-1',
+        isDepositAccount: true,
         cityId: 'city-ba',
       },
     ]

@@ -157,4 +157,11 @@ public sealed class PlayerBankAccountSummary
 
     /// <summary>ID of the city where the bank building is located. Resolved from bank building, primary city, or government bank.</summary>
     public Guid? CityId { get; set; }
+
+    /// <summary>
+    /// True when this account is a deposit account held at a specific bank building (BankBuildingId set on entity).
+    /// False for regular company treasury or personal settlement accounts.
+    /// Deposit accounts must be closed via the bank withdrawal flow; regular accounts via closeCompanyBankAccount.
+    /// </summary>
+    public bool IsDepositAccount { get; set; }
 }

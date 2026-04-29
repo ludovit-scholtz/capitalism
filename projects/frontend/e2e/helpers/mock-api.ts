@@ -897,6 +897,7 @@ export type MockState = {
     ownerDisplayName?: string
     bankBuildingId?: string | null
     cityId?: string | null
+    isDepositAccount?: boolean
   }>
   /** Gold AMM pools for the Gold AMM exchange. */
   goldAmmPools: MockGoldAmmPool[]
@@ -928,15 +929,19 @@ function normalizeMockBankAccount(
     ownerDisplayName?: string
     bankBuildingId?: string | null
     cityId?: string | null
+    isDepositAccount?: boolean
   },
   defaultPersonalName: string,
 ) {
   const ownerType = account.ownerType ?? (account.companyId ? 'COMPANY' : 'PERSON')
   const ownerDisplayName = account.ownerDisplayName ?? account.companyName ?? defaultPersonalName
+  // isDepositAccount: explicit flag if provided, otherwise infer from bankBuildingId being set
+  const isDepositAccount = account.isDepositAccount ?? (account.bankBuildingId != null && account.bankBuildingId !== '')
   return {
     ...account,
     ownerType,
     ownerDisplayName,
+    isDepositAccount,
   }
 }
 

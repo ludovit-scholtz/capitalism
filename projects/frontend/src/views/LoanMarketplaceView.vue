@@ -177,6 +177,7 @@ const MY_BANK_ACCOUNTS_QUERY = `
       ownerDisplayName
       bankBuildingId
       cityId
+      isDepositAccount
     }
   }
 `
@@ -719,14 +720,14 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
                 </div>
                 <!-- Zero-balance ready-to-close indicator (non-deposit accounts only) -->
                 <p
-                  v-if="account.balance == 0 && !account.bankBuildingId"
+                  v-if="account.balance == 0 && !account.isDepositAccount"
                   class="account-ready-close mt-2 text-xs font-medium text-success"
                 >
                   ✓ {{ t('bank.accountReadyToClose') }}
                 </p>
                 <!-- Non-zero balance hint -->
                 <p
-                  v-else-if="account.balance != 0 && !account.bankBuildingId"
+                  v-else-if="account.balance != 0 && !account.isDepositAccount"
                   class="account-nonzero-hint mt-2 text-xs text-muted"
                 >
                   {{ t('bank.closeAccountNonZeroHint') }}
@@ -737,7 +738,7 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
                 </p>
                 <!-- Close button (non-deposit accounts with zero balance only) -->
                 <button
-                  v-if="account.balance == 0 && !account.bankBuildingId"
+                  v-if="account.balance == 0 && !account.isDepositAccount"
                   class="btn btn-danger btn-sm mt-3"
                   :disabled="closingAccountId === account.id"
                   @click="closeBankAccount(account.id, false)"
@@ -746,7 +747,7 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
                 </button>
                 <!-- Deposit account zero-balance close (existing flow) -->
                 <button
-                  v-else-if="account.balance == 0 && account.bankBuildingId"
+                  v-else-if="account.balance == 0 && account.isDepositAccount"
                   class="btn btn-danger btn-sm mt-3"
                   :disabled="closingAccountId === account.id"
                   @click="closeBankAccount(account.id, true)"

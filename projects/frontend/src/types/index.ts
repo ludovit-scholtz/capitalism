@@ -1839,6 +1839,7 @@ export interface PlayerBankAccountSummary {
   ownerDisplayName: string
   bankBuildingId: string | null
   cityId: string | null
+  isDepositAccount: boolean
 }
 
 /** Result from the `fundBuildingBankAccount` mutation. */
