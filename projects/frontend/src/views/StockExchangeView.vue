@@ -701,7 +701,7 @@ function buildPieSlices(ownership: CompanyOwnership): PieSlice[] {
 }
 
 /** Converts a list of pie slices into SVG path data for a donut chart. */
-function buildDonutPaths(slices: PieSlice[], cx: number, cy: number, r: number, innerR: number) {
+function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, innerR: number) {
   const paths: { d: string; color: string; label: string; ratio: number; isPublicFloat?: boolean; isOther?: boolean }[] = []
   if (slices.length === 0) return paths
 
@@ -1023,7 +1023,7 @@ useTickRefresh(async () => {
                                   <div class="ownership-chart">
                                     <svg viewBox="0 0 160 160" width="160" height="160" :aria-label="t('stockExchange.shareholdersPieChartLabel')" role="img" class="ownership-donut">
                                       <template v-if="buildPieSlices(ow).length > 0">
-                                        <path v-for="(seg, idx) in buildDonutPaths(buildPieSlices(ow), 80, 80, 72, 44)" :key="idx" :d="seg.d" :fill="seg.color" class="donut-segment" />
+                                        <path v-for="(seg, idx) in buildDonuts(buildPieSlices(ow), 80, 80, 72, 44)" :key="idx" :d="seg.d" :fill="seg.color" class="donut-segment" />
                                       </template>
                                       <circle v-else cx="80" cy="80" r="72" fill="#e0e0e0" /></svg
                                     ><!-- Legend -->
@@ -2163,3 +2163,4 @@ useTickRefresh(async () => {
   text-align: right;
 }
 </style>
+

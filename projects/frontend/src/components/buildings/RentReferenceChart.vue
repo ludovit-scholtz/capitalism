@@ -48,7 +48,7 @@ const xAdjustedRateFixed = xFor(1.0) // always at ratio 1.0
 //   0 → 0.6:  100% (flat)
 //   0.6 → 1.1: linear 100% → 90%
 //   1.1 → 1.5: 50% (flat, with a vertical drop at 1.1)
-const curvePath = (() => {
+const curve = (() => {
   const y100 = yFor(100)
   const y90 = yFor(90)
   const y50 = yFor(50)
@@ -185,7 +185,7 @@ const cityRateLabelAnchor = computed(() =>
       </text>
 
       <!-- ── Occupancy curve ──────────────────────────────────────────────── -->
-      <path :d="curvePath" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round" />
+      <path :d="curve" fill="none" stroke="#22c55e" stroke-width="2" stroke-linejoin="round" />
 
       <!-- ── Plot-area border ────────────────────────────────────────────── -->
       <rect
@@ -374,3 +374,4 @@ const cityRateLabelAnchor = computed(() =>
     </p>
   </div>
 </template>
+

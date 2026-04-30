@@ -62,7 +62,7 @@ export default {
     title: 'Noviny a changelog',
     subtitle: 'Sledujte produktové novinky, balančné zmeny a oficiálne správy zdieľané naprieč hernou sieťou.',
     filterAll: 'Všetky záznamy',
-    filterNews: 'Noviny',
+    filters: 'Noviny',
     filterChangelog: 'Changelog',
     filterMarketReport: 'Trhové správy',
     loadFailed: 'Nepodarilo sa načítať feed noviniek.',
@@ -414,7 +414,7 @@ export default {
     deadlineExact: 'Ponuka vyprší {date}.',
     claim: 'Aktivovať štartovací balík',
     maybeLater: 'Možno neskôr',
-    freePath: 'Hra zadarmo pokračuje aj vtedy, keď túto ponuku preskočíte.',
+    free: 'Hra zadarmo pokračuje aj vtedy, keď túto ponuku preskočíte.',
     dismissedBody: 'Ponuka bola uložená na váš dashboard až do vypršania.',
     claimedTitle: 'Štartovací balík je aktívny',
     claimedBody: 'Váš Pro prístup je aktívny do {date}.',
@@ -1745,12 +1745,12 @@ export default {
     },
     mediaHouseChannelType: 'Typ kanála',
     selectMediaType: '— Vyberte typ kanála —',
-    mediaTypeNewspaper: 'Noviny',
+    mediaTypespaper: 'Noviny',
     mediaTypeRadio: 'Rádio',
     mediaTypeTv: 'Televízia',
     mediaTypeHint: 'Vyberte vysielací kanál. TV má najväčší dosah (×2,0), Rádio je stredné (×1,5), Noviny sú základné (×1,0).',
     mediaTypeGuideTitle: 'Sprievodca stratégiou médií',
-    mediaTypeGuideNewspaper:
+    mediaTypeGuidespaper:
       'Najnižšie vstupné náklady na trh médií. Noviny sú dostupné na budovanie a vylepšovanie, ideálne pre rané budovanie značky. Obsah rastie stabilne s miernym rozpočtom. Najlepšie pre spoločnosti, ktoré chcú konzistentné pokrytie bez veľkého kapitálu.',
     mediaTypeGuideRadio:
       'Stredný dosah s multiplikátorom 1,5×. Rádio je vhodné pre spoločnosti zamerané na celomestské publikum. Každý tik je o 50% hodnotnejší ako noviny. Vhodné pre rastúce impériá s viacerými produktovými líniami.',
@@ -1947,7 +1947,7 @@ export default {
     overheadDriverScale: 'Faktor rozsahu',
     salaryImpactHint:
       'Vyšší násobok zvyšuje priebežné mzdové náklady v tomto meste, ale môže zlepšiť kvalitu pracovníkov a konkurencieschopnosť. Nižší násobok znižuje náklady, ale môže ovplyvniť výkonnosť.',
-    salaryLocalCurrencyNote: 'Mzdy sú denominované v miestnej mene každého mesta. Napríklad mzdy v Prahe sú v CZK a mzdy v New Yorku sú v USD — nie sú prepočítané na primárnu menu vašej firmy.',
+    salaryLocalCurrencyNote: 'Mzdy sú denominované v miestnej mene každého mesta. Napríklad mzdy v Prahe sú v CZK a mzdy v  Yorku sú v USD — nie sú prepočítané na primárnu menu vašej firmy.',
     dividendHelp: 'Určite, aká časť ročného zisku po zdanení sa vyplatí akcionárom. 20% je vyvážený základ, ktorý stále ponecháva priestor na reinvestície.',
     baseSalary: 'Základná mzda / hodina',
     salaryMultiplier: 'Mzdový násobok',
@@ -2920,3 +2920,4 @@ export default {
     noMatchingDestination: 'Nemáte iný účet v rovnakej mene. Najprv si nejaký otvorte.',
   },
 }
+

@@ -703,7 +703,7 @@ function buildPieSlices(ownership: CompanyOwnership): PieSlice[] {
 }
 
 /** Converts a list of pie slices into SVG path data for a donut chart. */
-function buildDonutPaths(slices: PieSlice[], cx: number, cy: number, r: number, innerR: number) {
+function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, innerR: number) {
   const paths: { d: string; color: string; label: string; ratio: number; isPublicFloat?: boolean; isOther?: boolean }[] = []
   if (slices.length === 0) return paths
 
@@ -744,4 +744,5 @@ useTickRefresh(async () => {
   await loadData(true)
   await restoreScrollPosition(scrollPos)
 })
+
 

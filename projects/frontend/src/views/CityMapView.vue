@@ -219,7 +219,7 @@
                   <label>{{ t('cityMap.mediaHouseChannelType') }}</label
                   ><select v-model="selectedMediaType" class="form-select" required>
                     <option value="">{{ t('cityMap.selectMediaType') }}</option>
-                    <option value="NEWSPAPER">┬ş─Ź├┤ÔľĹ {{ t('cityMap.mediaTypeNewspaper') }} (Ôöť┼Ü1.0)</option>
+                    <option value="NEWSPAPER">┬ş─Ź├┤ÔľĹ {{ t('cityMap.mediaTypespaper') }} (Ôöť┼Ü1.0)</option>
                     <option value="RADIO">┬ş─Ź├┤ÔĽŚ {{ t('cityMap.mediaTypeRadio') }} (Ôöť┼Ü1.5)</option>
                     <option value="TV">┬ş─Ź├┤ÔĽĹ {{ t('cityMap.mediaTypeTv') }} (Ôöť┼Ü2.0)</option>
                   </select>
@@ -1124,3 +1124,4 @@ watch(viewMode, async (mode) => {
 </script>
 
 <style scoped src="./CityMapView.styles.css"></style>
+

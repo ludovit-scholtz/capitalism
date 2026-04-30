@@ -164,3 +164,4 @@ export function idbCount(db: IDBDatabase): Promise<number> {
     req.onerror = () => reject(req.error)
   })
 }
+

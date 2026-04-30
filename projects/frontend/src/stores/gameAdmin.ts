@@ -8,8 +8,8 @@ import type {
     GameAdminDashboard,
     GameAdminPlayer,
     GameAdminSession,
-    GameNewsEntry,
-  GameNewsLocalization,
+    GamesEntry,
+  GamesLocalization,
   GlobalGameAdminGrant,
 } from '@/types'
 
@@ -317,13 +317,13 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     return true
   }
 
-  async function upsertGameNewsEntry(entry: {
+  async function upsertGamesEntry(entry: {
     entryId: string | null
-    entryType: GameNewsEntry['entryType']
-    status: GameNewsEntry['status']
-    localizations: GameNewsLocalization[]
+    entryType: GamesEntry['entryType']
+    status: GamesEntry['status']
+    localizations: GamesLocalization[]
   }) {
-    const data = await gqlRequest<{ upsertGameNewsEntry: GameNewsEntry }>(
+    const data = await gqlRequest<{ upsertGameNewsEntry: GamesEntry }>(
       `mutation UpsertGameNewsEntry($input: UpsertGameNewsEntryInput!) {
         upsertGameNewsEntry(input: $input) {
           id
@@ -393,7 +393,8 @@ export const useGameAdminStore = defineStore('gameAdmin', () => {
     setLocalGameAdminRole,
     assignGlobalGameAdminRole,
     removeGlobalGameAdminRole,
-    upsertGameNewsEntry,
+    upsertGamesEntry,
     clear,
   }
 })
+

@@ -4,22 +4,22 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 import RichTextEditor from '@/components/admin/RichTextEditor.vue'
-import { createEmptyNewsDraft, NEWS_EDITOR_LOCALES, pickGameNewsLocalization, upsertNewsLocalization } from '@/lib/news'
+import { createEmptysDraft, NEWS_EDITOR_LOCALES, pickGamesLocalization, upsertsLocalization } from '@/lib/news'
 import { gqlRequest } from '@/lib/graphql'
 import { useAuthStore } from '@/stores/auth'
 import { useGameAdminStore } from '@/stores/gameAdmin'
-import { useNewsStore } from '@/stores/news'
-import type { AccountContextType, GameAdminPlayer, GameNewsEntry, GameNewsFeed } from '@/types'
+import { usesStore } from '@/stores/news'
+import type { AccountContextType, GameAdminPlayer, GamesEntry, GamesFeed } from '@/types'
 
 const { t, locale } = useI18n()
 const router = useRouter()
 const auth = useAuthStore()
 const adminStore = useGameAdminStore()
-const newsStore = useNewsStore()
+const newsStore = usesStore()
 
-const newsEditor = ref(createEmptyNewsDraft())
+const newsEditor = ref(createEmptysDraft())
 const activeLocale = ref<(typeof NEWS_EDITOR_LOCALES)[number]>('en')
-const adminFeed = ref<GameNewsFeed | null>(null)
+const adminFeed = ref<GamesFeed | null>(null)
 const adminFeedLoading = ref(false)
 const adminFeedError = ref<string | null>(null)
 const globalAdminEmail = ref('')
@@ -38,7 +38,7 @@ async function loadAdminFeed() {
   adminFeedError.value = null
 
   try {
-    const data = await gqlRequest<{ gameNewsFeed: GameNewsFeed }>(
+    const data = await gqlRequest<{ gameNewsFeed: GamesFeed }>(
       `query AdminNewsFeed {
         gameNewsFeed(includeDrafts: true) {
           unreadCount
@@ -88,11 +88,11 @@ async function loadDashboard() {
 }
 
 function resetComposer() {
-  newsEditor.value = createEmptyNewsDraft()
+  newsEditor.value = createEmptysDraft()
   activeLocale.value = 'en'
 }
 
-function editEntry(entry: GameNewsEntry) {
+function editEntry(entry: GamesEntry) {
   newsEditor.value = {
     entryId: entry.id,
     entryType: entry.entryType,
@@ -105,7 +105,7 @@ function editEntry(entry: GameNewsEntry) {
 function updateLocalization<K extends 'title' | 'summary' | 'htmlContent'>(key: K, value: string) {
   newsEditor.value = {
     ...newsEditor.value,
-    localizations: upsertNewsLocalization(newsEditor.value.localizations, activeLocale.value, { [key]: value }),
+    localizations: upsertsLocalization(newsEditor.value.localizations, activeLocale.value, { [key]: value }),
   }
 }
 
@@ -128,11 +128,11 @@ function formatDate(value: string | null) {
   }).format(new Date(value))
 }
 
-function getLocalizedEntry(entry: GameNewsEntry) {
-  return pickGameNewsLocalization(entry.localizations, locale.value)
+function getLocalizedEntry(entry: GamesEntry) {
+  return pickGamesLocalization(entry.localizations, locale.value)
 }
 
-function canEditEntry(entry: GameNewsEntry) {
+function canEditEntry(entry: GamesEntry) {
   return entry.targetServerKey !== null || canManageRootFeatures.value || adminStore.session?.hasGlobalAdminRole
 }
 
@@ -141,7 +141,7 @@ async function saveEntry() {
   actionMessage.value = null
 
   try {
-    await adminStore.upsertGameNewsEntry(newsEditor.value)
+    await adminStore.upsertGamesEntry(newsEditor.value)
     await Promise.all([loadAdminFeed(), newsStore.fetchUnreadCount()])
     actionMessage.value = t('admin.newsSaved')
     resetComposer()
@@ -443,7 +443,7 @@ onMounted(async () => {
                 <label class="form-label">
                   {{ t('admin.entryType') }}
                   <select v-model="newsEditor.entryType" class="form-select">
-                    <option value="NEWS">{{ t('news.filterNews') }}</option>
+                    <option value="NEWS">{{ t('news.filters') }}</option>
                     <option value="CHANGELOG">{{ t('news.filterChangelog') }}</option>
                   </select>
                 </label>
@@ -566,3 +566,4 @@ onMounted(async () => {
 </template>
 
 <style scoped src="./GameAdminDashboardView.styles.css"></style>
+

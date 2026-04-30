@@ -64,3 +64,4 @@ export function createApp() {
 // Client-side mounting
 const { app } = createApp()
 app.mount('#app')
+

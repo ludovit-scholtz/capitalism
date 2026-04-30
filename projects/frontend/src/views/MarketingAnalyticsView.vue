@@ -100,7 +100,7 @@ async function loadCompanies() {
       if (first) selectedCompanyId.value = first.id
     }
   } catch {
-    // ignore ÔÇö company load is best-effort
+    // ignore - company load is best-effort
   }
 }
 
@@ -151,7 +151,7 @@ const roiLabel = computed(() => {
   const spend = analytics.value.totalMarketingSpend
   const rev = analytics.value.totalRevenue
   if (spend <= 0) return null
-  return (rev / spend).toFixed(1) + '├Ś'
+  return (rev / spend).toFixed(1) + 'x'
 })
 
 function balanceClass(bvp: string): string {
@@ -227,12 +227,12 @@ const filteredAnalyticsRows = computed<CampaignAnalyticsRow[]>(() => {
   return analytics.value.rows.filter((row) => typeof row.cityName === 'string' && row.cityName.toLowerCase() === selectedCityName.toLowerCase())
 })
 function formatPct(val: number | null): string {
-  if (val === null || val === undefined) return 'ÔÇö'
+  if (val === null || val === undefined) return '-'
   return Math.round(val * 100) + '%'
 }
 
 function formatPricePremium(val: number | null): string {
-  if (val === null || val === undefined) return 'ÔÇö'
+  if (val === null || val === undefined) return '-'
   const sign = val >= 0 ? '+' : ''
   return sign + val.toFixed(1) + '%'
 }
@@ -243,7 +243,7 @@ function rowTitle(row: CampaignAnalyticsRow): string {
 }
 
 function formatFactor(factor: string | null): string {
-  if (!factor) return 'ÔÇö'
+  if (!factor) return '-'
   const key = `campaignAnalytics.factor_${factor}`
   const val = t(key)
   return val === key ? factor : val
@@ -320,7 +320,7 @@ function formatFactor(factor: string | null): string {
 
       <!-- Global recommendation -->
       <div v-if="analytics.globalRecommendation" class="ca-global-rec" aria-label="Portfolio insight">
-        <span class="ca-global-rec-icon" aria-hidden="true">┬ş─Ź─║├ş</span>
+        <span class="ca-global-rec-icon" aria-hidden="true">💡</span>
         <div>
           <strong class="ca-global-rec-title">{{ t('campaignAnalytics.globalRecommendation') }}</strong>
           <p class="ca-global-rec-body">{{ analytics.globalRecommendation }}</p>
@@ -440,12 +440,12 @@ function formatFactor(factor: string | null): string {
           <!-- Demand driver comparison -->
           <div v-if="row.topPositiveFactor || row.topNegativeFactor" class="ca-factors">
             <div v-if="row.topPositiveFactor" class="ca-factor ca-factor-positive">
-              <span class="ca-factor-icon" aria-hidden="true">├ö─żÔľô</span>
+              <span class="ca-factor-icon" aria-hidden="true">📈</span>
               <span class="ca-factor-label">{{ t('campaignAnalytics.topPositive') }}:</span>
               <strong>{{ formatFactor(row.topPositiveFactor) }}</strong>
             </div>
             <div v-if="row.topNegativeFactor" class="ca-factor ca-factor-negative">
-              <span class="ca-factor-icon" aria-hidden="true">├ö─żÔĽŁ</span>
+              <span class="ca-factor-icon" aria-hidden="true">📉</span>
               <span class="ca-factor-label">{{ t('campaignAnalytics.topNegative') }}:</span>
               <strong>{{ formatFactor(row.topNegativeFactor) }}</strong>
             </div>
@@ -453,7 +453,7 @@ function formatFactor(factor: string | null): string {
 
           <!-- Recommendation -->
           <div v-if="row.recommendation" class="ca-recommendation">
-            <span class="ca-rec-icon" aria-hidden="true">├ö─ç─║</span>
+            <span class="ca-rec-icon" aria-hidden="true">✅</span>
             <p class="ca-rec-text">{{ row.recommendation }}</p>
           </div>
         </article>

@@ -62,12 +62,12 @@ export default {
     title: 'Newsroom und Changelog',
     subtitle: 'Verfolgen Sie Produktupdates, Balance-Änderungen und die offizielle Zeitung, die im gesamten Spielnetz geteilt wird.',
     filterAll: 'Alle Einträge',
-    filterNews: 'Zeitung',
+    filters: 'Zeitung',
     filterChangelog: 'Changelog',
     filterMarketReport: 'Marktberichte',
     loadFailed: 'Der News-Feed konnte nicht geladen werden.',
     emptyTitle: 'Noch keine veröffentlichten Einträge',
-    emptyBody: 'Sobald Administratoren News oder Changelog-Einträge veröffentlichen, erscheinen sie hier.',
+    emptyBody: 'Sobald Administratoren News- oder Changelog-Einträge veröffentlichen, erscheinen sie hier.',
     marketReportEmptyBody: 'Wöchentliche und monatliche Stadtmarktberichte erscheinen hier, sobald genügend Handelsaktivität aufgezeichnet wurde. Berichte werden automatisch generiert.',
     untitled: 'Eintrag ohne Titel',
     unread: 'Neu',
@@ -416,7 +416,7 @@ export default {
     deadlineExact: 'Das Angebot endet am {date}.',
     claim: 'Startup-Paket aktivieren',
     maybeLater: 'Vielleicht später',
-    freePath: 'Das kostenlose Spiel geht weiter, auch wenn Sie dieses Angebot überspringen.',
+    free: 'Das kostenlose Spiel geht weiter, auch wenn Sie dieses Angebot überspringen.',
     dismissedBody: 'Das Angebot bleibt bis zum Ablauf in Ihrem Dashboard gespeichert.',
     claimedTitle: 'Startup-Paket aktiviert',
     claimedBody: 'Ihr Pro-Zugang ist bis {date} aktiv.',
@@ -1750,12 +1750,12 @@ export default {
     },
     mediaHouseChannelType: 'Kanaltyp',
     selectMediaType: '— Kanaltyp auswählen —',
-    mediaTypeNewspaper: 'Zeitung',
+    mediaTypespaper: 'Zeitung',
     mediaTypeRadio: 'Radio',
     mediaTypeTv: 'Fernsehen',
     mediaTypeHint: 'Wählen Sie den Sendekanal. TV hat die größte Reichweite (×2,0), Radio ist moderat (×1,5), Zeitung ist Basis (×1,0).',
     mediaTypeGuideTitle: 'Medien-Strategie-Leitfaden',
-    mediaTypeGuideNewspaper:
+    mediaTypeGuidespaper:
       'Niedrigste Einstiegskosten in den Medienmarkt. Zeitungen sind günstig zu bauen und auszubauen, ideal für den frühen Markenaufbau. Inhalte wachsen stetig mit einem bescheidenen Budget. Am besten für Unternehmen geeignet, die eine breite, konsistente Abdeckung ohne großen Kapitaleinsatz wünschen.',
     mediaTypeGuideRadio:
       'Mittlere Reichweite mit einem 1,5×-Kanal-Multiplikator. Radio eignet sich für Unternehmen, die ein stadtweites Publikum ansprechen wollen. Jeder Tick ist 50% wertvoller als bei Zeitungen. Gut für wachsende Imperien mit mehreren Produktlinien.',
@@ -1954,7 +1954,7 @@ export default {
     salaryImpactHint:
       'Ein höherer Multiplikator erhöht die laufenden Arbeitskosten in dieser Stadt, kann aber die Mitarbeiterqualität und Wettbewerbsfähigkeit verbessern. Ein niedrigerer Multiplikator senkt die Kosten, kann aber die Betriebsleistung beeinträchtigen.',
     salaryLocalCurrencyNote:
-      'Löhne werden in der Landeswährung jeder Stadt ausgewiesen. Prager Löhne zum Beispiel sind in CZK, New Yorker Löhne in USD — sie werden nicht in die Hauptwährung Ihres Unternehmens umgerechnet.',
+      'Löhne werden in der Landeswährung jeder Stadt ausgewiesen. Prager Löhne zum Beispiel sind in CZK,  Yorker Löhne in USD — sie werden nicht in die Hauptwährung Ihres Unternehmens umgerechnet.',
     dividendHelp: 'Legen Sie fest, welcher Anteil des jährlichen Gewinns nach Steuern an Aktionäre ausgeschüttet wird. 20% ist ein ausgewogener Standard mit Raum für Reinvestitionen.',
     baseSalary: 'Grundlohn / Stunde',
     salaryMultiplier: 'Lohnmultiplikator',
@@ -2934,3 +2934,4 @@ export default {
     noMatchingDestination: 'Kein anderes Konto in derselben Währung. Eröffnen Sie zuerst eins.',
   },
 }
+

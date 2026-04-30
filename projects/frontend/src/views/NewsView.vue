@@ -3,19 +3,19 @@ import DOMPurify from 'dompurify'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { pickGameNewsLocalization } from '@/lib/news'
+import { pickGamesLocalization } from '@/lib/news'
 import { useAuthStore } from '@/stores/auth'
-import { useNewsStore } from '@/stores/news'
-import type { GameNewsEntry } from '@/types'
+import { usesStore } from '@/stores/news'
+import type { GamesEntry } from '@/types'
 
 const { t, locale } = useI18n()
 const auth = useAuthStore()
-const newsStore = useNewsStore()
+const newsStore = usesStore()
 
 const filter = ref<'ALL' | 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'>('ALL')
 const viewError = ref<string | null>(null)
 
-/** IDs that were unread when the page first loaded – used to keep "New" badges
+/** IDs that were unread when the page first loaded – used to keep "" badges
  *  visible even after the background markRead call completes. */
 const initiallyUnreadIds = ref<Set<string>>(new Set())
 
@@ -28,8 +28,8 @@ const entries = computed(() => {
   return items.filter((entry) => entry.entryType === filter.value)
 })
 
-function getLocalization(entry: GameNewsEntry) {
-  return pickGameNewsLocalization(entry.localizations, locale.value)
+function getLocalization(entry: GamesEntry) {
+  return pickGamesLocalization(entry.localizations, locale.value)
 }
 
 function formatDate(value: string | null) {
@@ -57,7 +57,7 @@ function htmlToPlainText(html: string): string {
  * For CHANGELOG entries the summary is hidden when it is empty or would merely
  * repeat the plain-text content that is already rendered in the HTML body.
  */
-function shouldShowSummary(entry: GameNewsEntry): boolean {
+function shouldShowSummary(entry: GamesEntry): boolean {
   const loc = getLocalization(entry)
   if (!loc?.summary) return false
   if (entry.entryType === 'CHANGELOG') {
@@ -70,7 +70,7 @@ function shouldShowSummary(entry: GameNewsEntry): boolean {
 function entryTypeLabel(entryType: string): string {
   if (entryType === 'CHANGELOG') return t('news.filterChangelog')
   if (entryType === 'MARKET_REPORT') return t('news.filterMarketReport')
-  return t('news.filterNews')
+  return t('news.filters')
 }
 
 /** Returns E2E locator class plus Tailwind color utilities for the pill. */
@@ -92,7 +92,7 @@ async function loadFeed() {
         .filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead)
         .map((entry) => entry.id)
 
-      // Capture unread state BEFORE markRead so the "New" badge stays
+      // Capture unread state BEFORE markRead so the "" badge stays
       // visible for the duration of the page visit even after the
       // background mark-read call updates the store.
       initiallyUnreadIds.value = new Set(unreadEntryIds)
@@ -150,7 +150,7 @@ onMounted(async () => {
             "
             @click="filter = 'NEWS'"
           >
-            {{ t('news.filterNews') }}
+            {{ t('news.filters') }}
           </button>
           <button
             type="button"
@@ -368,3 +368,4 @@ onMounted(async () => {
   }
 }
 </style>
+

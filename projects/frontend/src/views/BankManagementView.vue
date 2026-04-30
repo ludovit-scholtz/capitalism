@@ -451,7 +451,7 @@ const hasCustomerAccount = computed(() => myActiveDepositsHere.value.length > 0)
 const myAccountBalance = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.amount, 0))
 const myAccountInterestEarned = computed(() => myActiveDepositsHere.value.reduce((sum, d) => sum + d.totalInterestPaid, 0))
 // The oldest tranche is used first for partial withdrawals.
-const myOldestDeposit = computed<BankDepositSummary | null>(() => {
+const myestDeposit = computed<BankDepositSummary | null>(() => {
   const sorted = [...myActiveDepositsHere.value].sort((a, b) => a.depositedAtTick - b.depositedAtTick)
   return sorted[0] ?? null
 })
@@ -490,7 +490,7 @@ async function submitCustomerDeposit() {
 }
 
 async function submitWithdraw() {
-  const deposit = myOldestDeposit.value
+  const deposit = myestDeposit.value
   if (!deposit || !activeCompany.value) {
     withdrawError.value = 'No active deposit found to withdraw from.'
     return
@@ -1008,3 +1008,4 @@ function navigateToForexTransfer() {
 </template>
 
 <style scoped src="./BankManagementView.styles.css"></style>
+

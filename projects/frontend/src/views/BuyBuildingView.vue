@@ -461,7 +461,7 @@ async function buyBuilding() {
               required
             >
               <option value="">{{ t('cityMap.selectMediaType') }}</option>
-              <option value="NEWSPAPER">📰 {{ t('cityMap.mediaTypeNewspaper') }} (×1.0)</option>
+              <option value="NEWSPAPER">📰 {{ t('cityMap.mediaTypespaper') }} (×1.0)</option>
               <option value="RADIO">📻 {{ t('cityMap.mediaTypeRadio') }} (×1.5)</option>
               <option value="TV">📺 {{ t('cityMap.mediaTypeTv') }} (×2.0)</option>
             </select>
@@ -470,8 +470,8 @@ async function buyBuilding() {
             <!-- Strategy guide cards -->
             <div class="mt-2 grid gap-2">
               <div class="rounded-lg border border-divider bg-surface p-3">
-                <p class="mb-1.5 text-xs font-bold text-foreground">📰 {{ t('cityMap.mediaTypeNewspaper') }}</p>
-                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuideNewspaper') }}</p>
+                <p class="mb-1.5 text-xs font-bold text-foreground">📰 {{ t('cityMap.mediaTypespaper') }}</p>
+                <p class="text-xs text-muted">{{ t('cityMap.mediaTypeGuidespaper') }}</p>
               </div>
               <div class="rounded-lg border border-divider bg-surface p-3">
                 <p class="mb-1.5 text-xs font-bold text-foreground">📻 {{ t('cityMap.mediaTypeRadio') }}</p>
@@ -753,3 +753,4 @@ async function buyBuilding() {
     </div>
   </div>
 </template>
+

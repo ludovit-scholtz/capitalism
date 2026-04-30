@@ -19,13 +19,13 @@ function visitTranslationStrings(
   path = '',
 ) {
   for (const [key, value] of Object.entries(messages)) {
-    const nextPath = path ? `${path}.${key}` : key
+    const next = path ? `${path}.${key}` : key
     if (typeof value === 'string') {
-      visit(nextPath, value)
+      visit(next, value)
       continue
     }
 
-    visitTranslationStrings(value, visit, nextPath)
+    visitTranslationStrings(value, visit, next)
   }
 }
 
@@ -227,3 +227,4 @@ describe('i18n', () => {
     })
   })
 })
+

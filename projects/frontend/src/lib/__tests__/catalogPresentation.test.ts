@@ -111,7 +111,7 @@ describe('getLocalizedIndustry', () => {
 
   it('falls back to humanized identifier for unknown industry', () => {
     expect(getLocalizedIndustry('MINING', 'en')).toBe('Mining')
-    expect(getLocalizedIndustry('NEW_INDUSTRY', 'en')).toBe('New Industry')
+    expect(getLocalizedIndustry('NEW_INDUSTRY', 'en')).toBe(' Industry')
   })
 })
 
@@ -415,3 +415,4 @@ describe('getProductImageUrl', () => {
     expect(decoded).toContain('</svg>')
   })
 })
+

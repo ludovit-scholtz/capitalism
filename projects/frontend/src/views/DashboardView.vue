@@ -21,9 +21,9 @@ import DashboardTabNav from '@/components/dashboard/DashboardTabNav.vue'
 import BuildingHeaderFinancials from '@/components/buildings/BuildingHeaderFinancials.vue'
 import type { Company, GameState, ScheduledActionSummary, CityPowerBalance, CompanyLedgerSummary, City, BuildingUnitOperationalStatus } from '@/types'
 
-// Module-level cache for city names ÔÇö cities are static and never change during a session.
+// Module-level cache for city names - cities are static and never change during a session.
 const _cityNamesCache: Record<string, string> = {}
-// Module-level cache for city currencies ÔÇö cities are static and never change during a session.
+// Module-level cache for city currencies - cities are static and never change during a session.
 const _cityCurrenciesCache: Record<string, string> = {}
 
 const { t, locale } = useI18n()
@@ -43,9 +43,9 @@ const companyLedgers = ref<Record<string, CompanyLedgerSummary>>({})
 const ledgerLoading = ref(false)
 const cityNames = ref<Record<string, string>>({})
 const cityCurrencies = ref<Record<string, string>>({})
-/** Map from buildingId Ôćĺ per-unit operational statuses for supply-chain live status display. */
+/** Map from buildingId -> per-unit operational statuses for supply-chain live status display. */
 const buildingUnitStatuses = ref<Record<string, BuildingUnitOperationalStatus[]>>({})
-/** Map from buildingId Ôćĺ aggregated financial totals (revenue, costs, profit). */
+/** Map from buildingId -> aggregated financial totals (revenue, costs, profit). */
 const buildingFinancials = ref<Record<string, { totalSales: number; totalCosts: number; totalProfit: number }>>({})
 const buildingFinancialsLoading = ref(false)
 const createCompanyName = ref('')
@@ -100,20 +100,20 @@ function tabsForCompany(company: Company) {
   ]
 }
 const buildingTypeIcons: Record<string, string> = {
-  MINE: 'ÔŤĆ´ŞĆ',
-  FACTORY: '­čĆş',
-  SALES_SHOP: '­čĆ¬',
-  RESEARCH_DEVELOPMENT: '­čöČ',
-  APARTMENT: '­čĆó',
-  COMMERCIAL: '­čĆŤ´ŞĆ',
-  MEDIA_HOUSE: '­čô║',
-  BANK: '­čĆŽ',
-  EXCHANGE: '­čôŐ',
-  POWER_PLANT: 'ÔÜí',
+  MINE: '⛏️',
+  FACTORY: '🏭',
+  SALES_SHOP: '🏬',
+  RESEARCH_DEVELOPMENT: '🧪',
+  APARTMENT: '🏠',
+  COMMERCIAL: '🏢',
+  MEDIA_HOUSE: '📰',
+  BANK: '🏦',
+  EXCHANGE: '📈',
+  POWER_PLANT: '⚡',
 }
 
 function getBuildingIcon(type: string): string {
-  return buildingTypeIcons[type] || '­čĆŚ´ŞĆ'
+  return buildingTypeIcons[type] || '🏗️'
 }
 
 function formatBuildingType(type: string): string {
@@ -256,14 +256,14 @@ async function loadPendingActions() {
       pendingActions.value = data.myPendingActions
     }
   } catch {
-    // best-effort ÔÇö pending actions list is non-critical
+    // best-effort - pending actions list is non-critical
   } finally {
     pendingActionsLoading.value = false
   }
 }
 
 async function loadCityNames() {
-  // Cities are static ÔÇö serve from module-level cache after first successful load.
+  // Cities are static - serve from module-level cache after first successful load.
   if (Object.keys(_cityNamesCache).length > 0) {
     if (!deepEqual(cityNames.value, _cityNamesCache)) {
       cityNames.value = { ..._cityNamesCache }
@@ -286,7 +286,7 @@ async function loadCityNames() {
     cityNames.value = nameMap
     cityCurrencies.value = currencyMap
   } catch {
-    // best-effort ÔÇö city names are non-critical
+    // best-effort - city names are non-critical
   }
 }
 
@@ -316,7 +316,7 @@ async function loadLedgers(companyIds: string[], isRefresh = false) {
       }
     }
   } catch {
-    // best-effort ÔÇö ledger data is non-critical
+    // best-effort - ledger data is non-critical
   } finally {
     if (!isRefresh) ledgerLoading.value = false
   }
@@ -343,7 +343,7 @@ async function loadBuildingUnitStatuses(buildingIds: string[]) {
       }
     }
   } catch {
-    // best-effort ÔÇö unit status is non-critical
+    // best-effort - unit status is non-critical
   }
 }
 
@@ -369,7 +369,7 @@ async function loadBuildingFinancials(buildingIds: string[], isRefresh = false) 
       }
     }
   } catch {
-    // best-effort ÔÇö financial summary is non-critical
+    // best-effort - financial summary is non-critical
   } finally {
     if (!isRefresh) buildingFinancialsLoading.value = false
   }
@@ -540,7 +540,7 @@ async function createCompany() {
           </div>
 
           <div class="person-account-ledger-link mb-5">
-            <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5"> ­čôĺ {{ t('dashboard.viewPersonalLedger') }} </RouterLink>
+            <RouterLink to="/personal-ledger" class="btn btn-primary inline-flex items-center gap-1.5"> 📒 {{ t('dashboard.viewPersonalLedger') }} </RouterLink>
           </div>
         </div>
       </section>
@@ -570,10 +570,10 @@ async function createCompany() {
             <div class="company-actions flex flex-wrap gap-2 items-start">
               <RouterLink :to="`/buy-building/${company.id}`" class="btn btn-primary"> {{ t('dashboard.buyBuilding') }} </RouterLink>
               <RouterLink v-if="company.buildings.length > 0 && company.buildings[0]" :to="`/city/${company.buildings[0].cityId}`" class="btn btn-secondary">
-                ­čŚ║´ŞĆ {{ t('nav.cityMap') }}
+                🗺️ {{ t('nav.cityMap') }}
               </RouterLink>
-              <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> ­čôĺ {{ t('dashboard.viewLedger') }} </RouterLink>
-              <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ÔÜÖ´ŞĆ {{ t('dashboard.companySettings') }} </RouterLink>
+              <RouterLink :to="`/ledger/${company.id}`" class="btn btn-ghost"> 📒 {{ t('dashboard.viewLedger') }} </RouterLink>
+              <RouterLink :to="`/company/${company.id}/settings`" class="btn btn-ghost"> ⚙️ {{ t('dashboard.companySettings') }} </RouterLink>
             </div>
           </div>
 
@@ -612,7 +612,7 @@ async function createCompany() {
                     <span class="bg-brand text-white px-2 py-0.5 rounded text-[0.6875rem] font-bold">Lv.{{ building.level }}</span>
                     <span class="text-[0.6875rem] text-muted">{{ building.units.length }} units</span>
                     <span v-if="building.powerStatus && building.powerStatus !== 'POWERED'" :class="powerStatusClass(building.powerStatus)" :aria-label="getBuildingPowerLabel(building.powerStatus)">
-                      {{ building.powerStatus === 'OFFLINE' ? '­čö┤' : '­ččí' }} {{ getBuildingPowerLabel(building.powerStatus) }}
+                      {{ building.powerStatus === 'OFFLINE' ? '❌' : '⚡' }} {{ getBuildingPowerLabel(building.powerStatus) }}
                     </span>
                   </div>
                 </RouterLink>
@@ -631,7 +631,7 @@ async function createCompany() {
             <div v-if="filteredBuildingsByCity.length > 0 && filteredBuildingsByCity[0]" class="mt-3 flex flex-wrap gap-2">
               <template v-for="cityId in [...new Set(filteredBuildingsByCity.map((b) => b.cityId))]" :key="cityId">
                 <div v-if="cityPowerBalances[cityId] && cityPowerBalances[cityId].powerPlantCount > 0" :class="powerBalanceClass(cityPowerBalances[cityId].status)" :aria-label="t('powerGrid.title')">
-                  <span class="flex-shrink-0">ÔÜí</span>
+                  <span class="flex-shrink-0">⚡</span>
                   <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
                   <span v-if="cityPowerBalances[cityId].status === 'BALANCED'">
                     {{ cityPowerBalances[cityId].totalSupplyMw }} / {{ cityPowerBalances[cityId].totalDemandMw }} {{ t('powerGrid.unit') }}
@@ -643,7 +643,7 @@ async function createCompany() {
                   v-else
                   class="power-balance power-balance--legacy flex items-center gap-2 px-3 py-2 rounded text-sm border border-[var(--color-border)] bg-[var(--color-bg-secondary)] text-[var(--color-text-secondary)]"
                 >
-                  <span>ÔÜí</span>
+                  <span>⚡</span>
                   <span class="font-semibold">{{ t('powerGrid.powerCardTitle') }}</span>
                   <span>{{ t('powerGrid.powerCardNoPower') }}</span>
                 </div>
@@ -691,10 +691,10 @@ async function createCompany() {
               <div class="grid gap-3.5 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))] mb-6">
                 <article
                   v-for="(benefit, i) in [
-                    { icon: '­čĆş', title: t('dashboard.proBenefitProducts'), body: t('dashboard.proBenefitProductsBody') },
-                    { icon: '­čôł', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
-                    { icon: '­čöô', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
-                    { icon: 'ÔÜí', title: t('dashboard.proBenefitPriority'), body: t('dashboard.proBenefitPriorityBody') },
+                    { icon: '🏭', title: t('dashboard.proBenefitProducts'), body: t('dashboard.proBenefitProductsBody') },
+                    { icon: '📊', title: t('dashboard.proBenefitAdvanced'), body: t('dashboard.proBenefitAdvancedBody') },
+                    { icon: '🚀', title: t('dashboard.proBenefitUnlock'), body: t('dashboard.proBenefitUnlockBody') },
+                    { icon: '⚡', title: t('dashboard.proBenefitPriority'), body: t('dashboard.proBenefitPriorityBody') },
                   ]"
                   :key="i"
                   class="flex gap-3.5 items-start p-4 rounded-lg bg-[rgba(13,17,23,0.32)] border border-[rgba(48,54,61,0.8)]"

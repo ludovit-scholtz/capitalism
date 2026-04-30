@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-import { useNewsStore } from '@/stores/news'
+import { usesStore } from '@/stores/news'
 
 const gqlRequestMock = vi.fn()
 
@@ -9,7 +9,7 @@ vi.mock('@/lib/graphql', () => ({
   gqlRequest: (...args: unknown[]) => gqlRequestMock(...args),
 }))
 
-describe('useNewsStore', () => {
+describe('usesStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     gqlRequestMock.mockReset()
@@ -17,17 +17,17 @@ describe('useNewsStore', () => {
 
   it('fetchFeed passes includeDrafts to the local game API query', async () => {
     gqlRequestMock.mockResolvedValue({
-      gameNewsFeed: {
+      gamesFeed: {
         unreadCount: 2,
         items: [],
       },
     })
 
-    const store = useNewsStore()
+    const store = usesStore()
     await store.fetchFeed(true)
 
     expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('gameNewsFeed(includeDrafts: $includeDrafts)'),
+      expect.stringContaining('gamesFeed(includeDrafts: $includeDrafts)'),
       { includeDrafts: true },
     )
     expect(store.unreadCount).toBe(2)
@@ -35,16 +35,16 @@ describe('useNewsStore', () => {
 
   it('fetchUnreadCount always queries the published feed only', async () => {
     gqlRequestMock.mockResolvedValue({
-      gameNewsFeed: {
+      gamesFeed: {
         unreadCount: 5,
       },
     })
 
-    const store = useNewsStore()
+    const store = usesStore()
     const unreadCount = await store.fetchUnreadCount()
 
     expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('query GameNewsUnreadCount($includeDrafts: Boolean!)'),
+      expect.stringContaining('query GamesUnreadCount($includeDrafts: Boolean!)'),
       { includeDrafts: false },
     )
     expect(unreadCount).toBe(5)
@@ -53,10 +53,10 @@ describe('useNewsStore', () => {
 
   it('markRead updates matching entries locally after a successful mutation', async () => {
     gqlRequestMock.mockResolvedValueOnce({
-      markGameNewsRead: true,
+      markGamesRead: true,
     })
 
-    const store = useNewsStore()
+    const store = usesStore()
     store.feed = {
       unreadCount: 2,
       items: [
@@ -93,7 +93,7 @@ describe('useNewsStore', () => {
     await store.markRead(['entry-1'])
 
     expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('mutation MarkGameNewsRead($input: MarkGameNewsReadInput!)'),
+      expect.stringContaining('mutation MarkGamesRead($input: MarkGamesReadInput!)'),
       { input: { entryIds: ['entry-1'] } },
     )
     expect(store.feed?.items[0]?.isRead).toBe(true)
@@ -101,3 +101,4 @@ describe('useNewsStore', () => {
     expect(store.unreadCount).toBe(1)
   })
 })
+

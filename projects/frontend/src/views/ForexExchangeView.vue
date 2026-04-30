@@ -59,7 +59,7 @@ const activeTab = ref<ForexTab>(getInitialTab())
 /** Whether the player has bank accounts and should use the bank-account-native swap form. */
 const hasBankAccounts = computed(() => myBankAccounts.value.length > 0)
 
-// ÔöÇÔöÇ City-based FX rate board ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// City-based FX rate board
 
 /** The city currently selected in the navbar. */
 const selectedCity = computed<City | null>(() => {
@@ -70,13 +70,13 @@ const selectedCity = computed<City | null>(() => {
 /** ISO 4217 code of the selected city's currency. Defaults to EUR. */
 const baseCurrencyCode = computed(() => selectedCity.value?.currencyCode ?? 'EUR')
 
-/** Symbol for the base currency (e.g. "ÔéČ" for EUR). */
+/** Symbol for the base currency (e.g. "€" for EUR). */
 const baseCurrencySymbol = computed(() => {
-  if (baseCurrencyCode.value === 'EUR') return 'ÔéČ'
+  if (baseCurrencyCode.value === 'EUR') return '€'
   return rates.value.find((r) => r.quoteCurrencyCode === baseCurrencyCode.value)?.quoteCurrencySymbol ?? baseCurrencyCode.value
 })
 
-/** Map of currencyCode Ôćĺ EUR-based rate (units per 1 EUR). EUR itself = 1. */
+/** Map of currencyCode -> EUR-based rate (units per 1 EUR). EUR itself = 1. */
 const eurRatesMap = computed<Record<string, number>>(() => {
   const map: Record<string, number> = { EUR: 1 }
   rates.value.forEach((r) => {
@@ -113,7 +113,7 @@ const cityRateBoard = computed<CityRateRow[]>(() => {
     .map((code) => {
       const targetEurRate = eurRatesMap.value[code] ?? 1
       const crossRate = targetEurRate / baseEurRate
-      const symbol = code === 'EUR' ? 'ÔéČ' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
+      const symbol = code === 'EUR' ? '€' : (rates.value.find((r) => r.quoteCurrencyCode === code)?.quoteCurrencySymbol ?? code)
       const rateEntry = rates.value.find((r) => r.quoteCurrencyCode === code)
       return {
         targetCode: code,
@@ -151,12 +151,12 @@ const toBalances = computed<CurrencyBalance[]>(() => {
   })
 })
 
-/** Helper ÔÇö find a bank account in myBankAccounts by ID. */
+/** Helper - find a bank account in myBankAccounts by ID. */
 function findAccountById(id: string): PlayerBankAccountSummary | undefined {
   return myBankAccounts.value.find((a) => a.id === id)
 }
 
-/** Resolved source currency code ÔÇö from bank account when available, otherwise manual picker. */
+/** Resolved source currency code - from bank account when available, otherwise manual picker. */
 const resolvedFromCurrency = computed(() => {
   if (hasBankAccounts.value && fromBankAccountId.value) {
     return findAccountById(fromBankAccountId.value)?.currencyCode ?? fromCurrency.value
@@ -184,7 +184,7 @@ const fromSymbol = computed(() => {
   if (hasBankAccounts.value && fromBankAccountId.value) {
     return findAccountById(fromBankAccountId.value)?.currencySymbol ?? resolvedFromCurrency.value
   }
-  if (fromCurrency.value === 'EUR') return 'ÔéČ'
+  if (fromCurrency.value === 'EUR') return '€'
   const r = rates.value.find((r) => r.quoteCurrencyCode === fromCurrency.value)
   return r?.quoteCurrencySymbol ?? fromCurrency.value
 })
@@ -193,7 +193,7 @@ const toSymbol = computed(() => {
   if (hasBankAccounts.value && toBankAccountId.value) {
     return findAccountById(toBankAccountId.value)?.currencySymbol ?? resolvedToCurrency.value
   }
-  if (toCurrency.value === 'EUR') return 'ÔéČ'
+  if (toCurrency.value === 'EUR') return '€'
   const r = rates.value.find((r) => r.quoteCurrencyCode === toCurrency.value)
   return r?.quoteCurrencySymbol ?? toCurrency.value
 })
@@ -587,16 +587,16 @@ watch(activeTab, async (tab) => {
               <div v-if="selectedCity" class="swap-city-badge flex items-center gap-1.5 rounded-lg border border-divider bg-card-raised px-3 py-1.5 text-xs text-muted">
                 <span class="font-bold text-brand">{{ baseCurrencySymbol }}</span>
                 <span class="font-semibold text-body">{{ baseCurrencyCode }}</span>
-                <span class="text-subtle">ÔÇö {{ selectedCity.name }}</span>
+                <span class="text-subtle">- {{ selectedCity.name }}</span>
               </div>
             </div>
 
             <!-- Bank account mode notice -->
             <div v-if="hasBankAccounts" class="ba-notice flex items-center gap-2 rounded-lg border border-divider bg-card-raised px-4 py-2.5 text-sm text-muted" role="note">
-              <span class="text-lg">­čĆŽ</span>
+              <span class="text-lg">🏦</span>
               <span>{{ t('forex.bankAccountMode') }}</span>
               <RouterLink v-if="auth.player?.companies?.length" :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`" class="ml-1 text-xs font-semibold text-brand hover:underline">
-                {{ t('forex.viewBankStatement') }} Ôćĺ
+                {{ t('forex.viewBankStatement') }} ->
               </RouterLink>
             </div>
 
@@ -608,7 +608,7 @@ watch(activeTab, async (tab) => {
                 :to="`/bank-statement/${auth.player.companies[0]?.id ?? ''}`"
                 class="statement-link inline-block text-xs font-semibold text-brand hover:underline"
               >
-                {{ t('forex.viewBankStatement') }} Ôćĺ
+                {{ t('forex.viewBankStatement') }} ->
               </RouterLink>
               <div v-if="balances.length === 0" class="text-sm italic text-muted">
                 {{ t('forex.balancesEmpty') }}
@@ -625,7 +625,7 @@ watch(activeTab, async (tab) => {
             <!-- Swap success banner -->
             <div v-if="swapResult" class="swap-result-banner flex flex-col gap-1.5 rounded-lg border border-good bg-good/10 px-4 py-3 font-semibold text-good" role="status">
               <div class="flex items-center gap-2">
-                <span>Ôťô</span>
+                <span>✓</span>
                 <span>
                   {{
                     t('forex.swapResultDetail', {
@@ -709,7 +709,7 @@ watch(activeTab, async (tab) => {
                   aria-label="Swap currencies"
                   @click="swapCurrencies"
                 >
-                  Ôçů
+                  ⇅
                 </button>
               </div>
 
@@ -757,7 +757,7 @@ watch(activeTab, async (tab) => {
                     </span>
                     <div class="flex-1 px-3 py-2.5 text-base font-bold text-good">
                       <span v-if="quote">{{ formatAmount(quote.toAmount) }}</span>
-                      <span v-else class="text-muted font-normal">ÔÇö</span>
+                      <span v-else class="text-muted font-normal">-</span>
                     </div>
                   </div>
                 </div>
@@ -846,7 +846,7 @@ watch(activeTab, async (tab) => {
                 </div>
               </div>
 
-              <!-- Cross-rate table: 1 base Ôćĺ X target -->
+              <!-- Cross-rate table: 1 base -> X target -->
               <div>
                 <p class="mb-3 text-sm text-muted">
                   {{ t('forex.rateTableIntro', { base: `1 ${baseCurrencySymbol} ${baseCurrencyCode}` }) }}
@@ -881,7 +881,7 @@ watch(activeTab, async (tab) => {
                         </td>
                         <td class="px-3 py-3 text-right font-mono text-muted align-middle">
                           <span class="text-sm">{{ formatRate(row.afterFeeRate) }}</span>
-                          <span class="ml-1 text-xs text-subtle">Ôłĺ1%</span>
+                          <span class="ml-1 text-xs text-subtle">-1%</span>
                         </td>
                       </tr>
                     </tbody>
@@ -952,7 +952,7 @@ watch(activeTab, async (tab) => {
 </template>
 
 <style scoped>
-/* Table row hover ÔÇö cannot target child <td> elements with Tailwind parent-hover */
+/* Table row hover - cannot target child <td> elements with Tailwind parent-hover */
 .history-row td {
   border-bottom: 1px solid var(--color-border-light, rgba(48, 54, 61, 0.5));
 }

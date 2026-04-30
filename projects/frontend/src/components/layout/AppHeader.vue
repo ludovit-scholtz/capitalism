@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { computed, ref } from 'vue'
 import { formatInGameTime } from '@/lib/gameTime'
 import { useGameStateStore } from '@/stores/gameState'
-import { useNewsStore } from '@/stores/news'
+import { usesStore } from '@/stores/news'
 import { useGameAdminStore } from '@/stores/gameAdmin'
 import { useChatStore } from '@/stores/chat'
 import ContextSwitcher from '@/components/layout/ContextSwitcher.vue'
@@ -18,7 +18,7 @@ themeStore.init()
 const { t, locale } = useI18n()
 const auth = useAuthStore()
 const gameStateStore = useGameStateStore()
-const newsStore = useNewsStore()
+const newsStore = usesStore()
 const gameAdminStore = useGameAdminStore()
 const chatStore = useChatStore()
 const { gameState } = storeToRefs(gameStateStore)
@@ -352,3 +352,4 @@ function handleChatToggle() {
   }
 }
 </style>
+

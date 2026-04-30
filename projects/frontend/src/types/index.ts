@@ -1235,7 +1235,7 @@ export interface CityMediaHouseInfo {
   mediaType: string | null
   ownerCompanyId: string
   ownerCompanyName: string
-  /** 1.0 = Newspaper, 1.5 = Radio, 2.0 = TV */
+  /** 1.0 = spaper, 1.5 = Radio, 2.0 = TV */
   effectivenessMultiplier: number
   /** POWERED | CONSTRAINED | OFFLINE */
   powerStatus: string
@@ -1437,12 +1437,12 @@ export interface UnitUpgradeInfo {
   nextStorageCapacity: number
 }
 
-export interface GameNewsFeed {
+export interface GamesFeed {
   unreadCount: number
-  items: GameNewsEntry[]
+  items: GamesEntry[]
 }
 
-export interface GameNewsEntry {
+export interface GamesEntry {
   id: string
   entryType: 'NEWS' | 'CHANGELOG' | 'MARKET_REPORT'
   status: 'DRAFT' | 'PUBLISHED'
@@ -1453,10 +1453,10 @@ export interface GameNewsEntry {
   updatedAtUtc: string
   publishedAtUtc: string | null
   isRead: boolean
-  localizations: GameNewsLocalization[]
+  localizations: GamesLocalization[]
 }
 
-export interface GameNewsLocalization {
+export interface GamesLocalization {
   locale: string
   title: string
   summary: string
@@ -1913,3 +1913,4 @@ export interface MediaHouseAnalyticsResult {
   strategyRating: string
   strategyTip: string
 }
+
