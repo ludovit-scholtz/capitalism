@@ -113,10 +113,8 @@ function entryTypeLabel(entryType: string): string {
 
 /** Returns E2E locator class plus Tailwind color utilities for the pill. */
 function entryTypePillClass(entryType: string): string {
-  if (entryType === 'CHANGELOG')
-    return 'news-pill-changelog bg-[rgba(0,71,255,0.16)] text-[#8db3ff]'
-  if (entryType === 'MARKET_REPORT')
-    return 'news-pill-market bg-[rgba(0,200,150,0.16)] text-[#7af5d9]'
+  if (entryType === 'CHANGELOG') return 'news-pill-changelog bg-[rgba(0,71,255,0.16)] text-[#8db3ff]'
+  if (entryType === 'MARKET_REPORT') return 'news-pill-market bg-[rgba(0,200,150,0.16)] text-[#7af5d9]'
   return 'news-pill-news bg-[rgba(0,200,83,0.16)] text-[#7af5a9]'
 }
 
@@ -127,9 +125,7 @@ async function loadFeed() {
   try {
     const feed = await newsStore.fetchFeed(false)
     if (auth.isAuthenticated) {
-      const unreadEntryIds = feed.items
-        .filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead)
-        .map((entry) => entry.id)
+      const unreadEntryIds = feed.items.filter((entry) => entry.status === 'PUBLISHED' && !entry.isRead).map((entry) => entry.id)
 
       // Capture unread state BEFORE markRead so the "" badge stays
       // visible for the duration of the page visit even after the
@@ -170,48 +166,44 @@ onMounted(async () => {
           <button
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
-            :class="
-              filter === 'ALL'
-                ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
-                : 'border-divider text-muted'
+            :class="filter === 'ALL' ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]' : 'border-divider text-muted'"
+            @click="
+              filter = 'ALL'
+              currentPage = 1
             "
-            @click="filter = 'ALL'; currentPage = 1"
           >
             {{ t('news.filterAll') }}
           </button>
           <button
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
-            :class="
-              filter === 'NEWS'
-                ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
-                : 'border-divider text-muted'
+            :class="filter === 'NEWS' ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]' : 'border-divider text-muted'"
+            @click="
+              filter = 'NEWS'
+              currentPage = 1
             "
-            @click="filter = 'NEWS'; currentPage = 1"
           >
             {{ t('news.filters') }}
           </button>
           <button
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
-            :class="
-              filter === 'CHANGELOG'
-                ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]'
-                : 'border-divider text-muted'
+            :class="filter === 'CHANGELOG' ? 'bg-[rgba(255,138,0,0.18)] border-[rgba(255,138,0,0.5)] text-[#ffd7a3]' : 'border-divider text-muted'"
+            @click="
+              filter = 'CHANGELOG'
+              currentPage = 1
             "
-            @click="filter = 'CHANGELOG'; currentPage = 1"
           >
             {{ t('news.filterChangelog') }}
           </button>
           <button
             type="button"
             class="px-4 py-2.5 rounded-full border transition-colors cursor-pointer"
-            :class="
-              filter === 'MARKET_REPORT'
-                ? 'bg-[rgba(0,200,150,0.18)] border-[rgba(0,200,150,0.5)] text-[#7af5d9]'
-                : 'border-divider text-muted'
+            :class="filter === 'MARKET_REPORT' ? 'bg-[rgba(0,200,150,0.18)] border-[rgba(0,200,150,0.5)] text-[#7af5d9]' : 'border-divider text-muted'"
+            @click="
+              filter = 'MARKET_REPORT'
+              currentPage = 1
             "
-            @click="filter = 'MARKET_REPORT'; currentPage = 1"
           >
             📊 {{ t('news.filterMarketReport') }}
           </button>
@@ -227,10 +219,7 @@ onMounted(async () => {
       </div>
 
       <!-- Error -->
-      <div
-        v-else-if="viewError"
-        class="state-card state-card-error p-6 rounded-2xl border border-[rgba(248,113,113,0.5)] bg-card grid gap-4"
-      >
+      <div v-else-if="viewError" class="state-card state-card-error p-6 rounded-2xl border border-[rgba(248,113,113,0.5)] bg-card grid gap-4">
         <p>{{ viewError }}</p>
         <button type="button" class="btn btn-secondary" @click="loadFeed">
           {{ t('common.tryAgain') }}
@@ -246,31 +235,18 @@ onMounted(async () => {
 
       <!-- Entry list -->
       <div v-else class="grid gap-5">
-        <div
-          v-if="totalPages > 1"
-          class="pagination-controls flex items-center justify-between gap-4 rounded-xl border border-divider bg-card px-4 py-3 max-sm:flex-col max-sm:items-stretch"
-        >
+        <div v-if="totalPages > 1" class="pagination-controls flex items-center justify-between gap-4 rounded-xl border border-divider bg-card px-4 py-3 max-sm:flex-col max-sm:items-stretch">
           <p class="text-sm text-muted">
             {{ t('news.paginationStatus', { from: pageFrom, to: pageTo, total: filteredEntries.length }) }}
           </p>
           <div class="flex items-center gap-2">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              :disabled="!canGoPrev"
-              @click="goToPrevPage"
-            >
+            <button type="button" class="btn btn-secondary" :disabled="!canGoPrev" @click="goToPrevPage">
               {{ t('news.previousPage') }}
             </button>
             <p class="text-sm text-muted min-w-30 text-center">
               {{ t('news.pageLabel', { page: currentPage, total: totalPages }) }}
             </p>
-            <button
-              type="button"
-              class="btn btn-secondary"
-              :disabled="!canGoNext"
-              @click="goToNextPage"
-            >
+            <button type="button" class="btn btn-secondary" :disabled="!canGoNext" @click="goToNextPage">
               {{ t('news.nextPage') }}
             </button>
           </div>
@@ -286,10 +262,7 @@ onMounted(async () => {
             'news-card-unread': initiallyUnreadIds.has(entry.id),
           }"
           :style="{
-            background:
-              entry.entryType === 'MARKET_REPORT'
-                ? 'linear-gradient(180deg,rgba(0,200,150,0.04),rgba(255,255,255,0))'
-                : 'linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))',
+            background: entry.entryType === 'MARKET_REPORT' ? 'linear-gradient(180deg,rgba(0,200,150,0.04),rgba(255,255,255,0))' : 'linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0))',
             borderLeft: initiallyUnreadIds.has(entry.id) ? '4px solid rgba(255,138,0,0.7)' : undefined,
           }"
         >
@@ -297,10 +270,7 @@ onMounted(async () => {
           <div class="flex justify-between gap-4 mb-4 max-sm:flex-col">
             <div class="grid gap-2">
               <div class="flex items-center gap-2 flex-wrap">
-                <span
-                  class="inline-flex items-center px-[0.65rem] py-[0.3rem] rounded-full text-[0.74rem] uppercase tracking-[0.08em]"
-                  :class="entryTypePillClass(entry.entryType)"
-                >
+                <span class="inline-flex items-center px-[0.65rem] py-[0.3rem] rounded-full text-[0.74rem] uppercase tracking-[0.08em]" :class="entryTypePillClass(entry.entryType)">
                   {{ entryTypeLabel(entry.entryType) }}
                 </span>
                 <span
@@ -409,18 +379,33 @@ onMounted(async () => {
   color: var(--color-text-secondary, #aaa);
 }
 
-.news-card-body :deep(.mr-rank-top1) { color: #ffd700; }
-.news-card-body :deep(.mr-rank-top2) { color: #c0c0c0; }
-.news-card-body :deep(.mr-rank-top3) { color: #cd7f32; }
+.news-card-body :deep(.mr-rank-top1) {
+  color: #ffd700;
+}
+.news-card-body :deep(.mr-rank-top2) {
+  color: #c0c0c0;
+}
+.news-card-body :deep(.mr-rank-top3) {
+  color: #cd7f32;
+}
 
 .news-card-body :deep(.mr-industry) {
   color: var(--color-text-secondary, #aaa);
   font-size: 0.78rem;
 }
 
-.news-card-body :deep(.mr-positive) { color: #7af5a9; font-weight: 600; }
-.news-card-body :deep(.mr-neutral)  { color: #ffd7a3; font-weight: 600; }
-.news-card-body :deep(.mr-negative) { color: #f87171; font-weight: 600; }
+.news-card-body :deep(.mr-positive) {
+  color: #7af5a9;
+  font-weight: 600;
+}
+.news-card-body :deep(.mr-neutral) {
+  color: #ffd7a3;
+  font-weight: 600;
+}
+.news-card-body :deep(.mr-negative) {
+  color: #f87171;
+  font-weight: 600;
+}
 
 .news-card-body :deep(.mr-empty) {
   color: var(--color-text-secondary, #aaa);
@@ -437,4 +422,3 @@ onMounted(async () => {
   }
 }
 </style>
-
