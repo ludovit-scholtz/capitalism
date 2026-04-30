@@ -15,6 +15,7 @@
     "test:e2e:video": "set VIDEO_RECORDING=true && playwright test --config playwright-video.config.ts",
     "test:screenshots": "playwright test --ignore-snapshots e2e/encyclopedia-screenshots.spec.ts e2e/forex-help-screenshots.spec.ts e2e/onboarding-help-screenshots.spec.ts e2e/sales-shop-help-screenshots.spec.ts e2e/stock-exchange-help-screenshots.spec.ts",
     "i18n:missing": "node scripts/find-missing-translation-keys.mjs",
+    "i18n:template-missing": "node scripts/find-missing-template-translation-keys.mjs",
     "type-check": "vue-tsc --build",
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint . --fix",

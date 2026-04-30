@@ -23,6 +23,9 @@ export default {
     availableFunds: 'Dostupné prostriedky',
     company: 'Spoločnosť',
     clearFilter: 'Zrušiť filter',
+    all: 'Všetko',
+    selectCity: 'Vyberte mesto',
+    unknownError: 'Niečo sa pokazilo. Skúste to znova.',
     ticks: 'tikov',
   },
   languages: {
@@ -201,6 +204,7 @@ export default {
     viewFullLeaderboard: 'Zobrazi\u0165 cel\u00fd rebr\u00ed\u010dek',
   },
   auth: {
+    login: 'Prihlásenie',
     loginTitle: 'Prihl\u00e1senie',
     registerTitle: 'Registr\u00e1cia',
     email: 'E-mail',
@@ -216,6 +220,7 @@ export default {
     passwordTooShort: 'Heslo mus\u00ed ma\u0165 aspo\u0148 8 znakov.',
     loginToAccess: 'Prihláste sa pre prístup',
     loginFailed: 'Prihl\u00e1senie zlyhalo. Skontrolujte prihlasovacie \u00fadaje a sk\u00faste znova.',
+    loginRequired: 'Pred pokračovaním sa prihláste.',
   },
   onboarding: {
     title: 'Začnite svoje impérium',
@@ -486,6 +491,7 @@ export default {
     personTabCreateCompany: 'Založiť firmu',
     personTabLedger: 'Účtovná kniha',
     personLedgerTabBody: 'Sledujte osobné bohatstvo, daňovú rezervu, obchody s akciami a dividendové príjmy v osobnej účtovnej knihe.',
+    noBuildingsInCity: 'V tomto meste zatiaľ nemáte žiadne budovy.',
   },
   leaderboard: {
     eyebrow: 'Kompetítívne poradie',
@@ -910,6 +916,8 @@ export default {
     fundingGapTextMissing: 'Na nákup budov v {city} potrebujete zostatok v {currency}. Navštívte Forex na výmenu EUR za {currency}.',
     fundingGapTitleInsufficient: 'Nedostatok prostriedkov v {currency}',
     fundingGapTextInsufficient: 'Váš zostatok v {currency} nestačí na nákup tejto budovy v {city}. Doplňte ho cez Forex Exchange.',
+    fundingGapBodyMissing: 'Na nákup budov v meste {city} potrebujete zostatok v mene {currency}.',
+    fundingGapBodyInsufficient: 'Váš zostatok v mene {currency} je na nákup tejto budovy v meste {city} príliš nízky.',
     fundingGapRequired: 'Potrebné',
     fundingGapAvailable: 'Dostupné',
     fundingGapShortfall: 'Rozdiel',
@@ -1620,6 +1628,7 @@ export default {
     purchase: 'Kúpiť pozemok',
     purchasing: 'Kupujem...',
     buildingType: 'Typ budovy',
+    mediaType: 'Typ média',
     buildingName: 'Názov budovy',
     buildingNamePlaceholder: 'Zadajte názov budovy',
     selectBuildingType: 'Vyberte typ budovy',

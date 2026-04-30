@@ -23,6 +23,9 @@ export default {
     availableFunds: 'Verfügbare Mittel',
     company: 'Unternehmen',
     clearFilter: 'Filter löschen',
+    all: 'Alle',
+    selectCity: 'Stadt auswählen',
+    unknownError: 'Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.',
     ticks: 'Ticks',
   },
   languages: {
@@ -201,6 +204,7 @@ export default {
     viewFullLeaderboard: 'Vollst\u00e4ndige Rangliste anzeigen',
   },
   auth: {
+    login: 'Anmeldung',
     loginTitle: 'Anmelden',
     registerTitle: 'Konto erstellen',
     email: 'E-Mail',
@@ -216,6 +220,7 @@ export default {
     passwordTooShort: 'Das Passwort muss mindestens 8 Zeichen lang sein.',
     loginToAccess: 'Anmelden für Zugriff',
     loginFailed: 'Anmeldung fehlgeschlagen. Bitte überprüfen Sie Ihre Zugangsdaten und versuchen Sie es erneut.',
+    loginRequired: 'Bitte melden Sie sich an, um fortzufahren.',
   },
   onboarding: {
     title: 'Starten Sie Ihr Imperium',
@@ -487,6 +492,7 @@ export default {
     personTabCreateCompany: 'Unternehmen gründen',
     personTabLedger: 'Hauptbuch',
     personLedgerTabBody: 'Verfolgen Sie Ihr persönliches Vermögen, die Steuerrückstellung, Aktiengeschäfte und Dividendeneinnahmen im persönlichen Hauptbuch.',
+    noBuildingsInCity: 'In dieser Stadt gibt es noch keine Gebäude.',
   },
   leaderboard: {
     eyebrow: 'Wettbewerbliche Rangliste',
@@ -911,6 +917,8 @@ export default {
     fundingGapTextMissing: 'Sie benötigen ein {currency}-Guthaben, um Gebäude in {city} zu kaufen. Besuchen Sie die Forex-Börse, um EUR in {currency} umzutauschen.',
     fundingGapTitleInsufficient: 'Unzureichendes {currency}-Guthaben',
     fundingGapTextInsufficient: 'Ihr {currency}-Guthaben reicht nicht aus, um dieses Gebäude in {city} zu kaufen. Laden Sie es über die Forex-Börse auf.',
+    fundingGapBodyMissing: 'Für den Gebäudekauf in {city} benötigen Sie ein Guthaben in {currency}.',
+    fundingGapBodyInsufficient: 'Ihr Guthaben in {currency} reicht nicht aus, um dieses Gebäude in {city} zu kaufen.',
     fundingGapRequired: 'Benötigt',
     fundingGapAvailable: 'Verfügbar',
     fundingGapShortfall: 'Fehlbetrag',
@@ -1625,6 +1633,7 @@ export default {
     purchase: 'Grundstück kaufen',
     purchasing: 'Wird gekauft...',
     buildingType: 'Gebäudetyp',
+    mediaType: 'Medientyp',
     buildingName: 'Gebäudename',
     buildingNamePlaceholder: 'Gebäudename eingeben',
     selectBuildingType: 'Gebäudetyp auswählen',

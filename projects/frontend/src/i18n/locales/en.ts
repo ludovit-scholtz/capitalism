@@ -23,6 +23,9 @@ export default {
     availableFunds: 'Available funds',
     company: 'Company',
     clearFilter: 'Clear filter',
+    all: 'All',
+    selectCity: 'Select city',
+    unknownError: 'Something went wrong. Please try again.',
     ticks: 'ticks',
   },
   languages: {
@@ -202,6 +205,7 @@ export default {
     viewFullLeaderboard: 'View Full Leaderboard',
   },
   auth: {
+    login: 'Login',
     loginTitle: 'Sign In',
     registerTitle: 'Create Account',
     email: 'Email',
@@ -217,6 +221,7 @@ export default {
     noAccount: "Don't have an account?",
     loginFailed: 'Login failed. Please check your credentials and try again.',
     loginToAccess: 'Log in to access',
+    loginRequired: 'Please log in to continue.',
   },
   onboarding: {
     title: 'Start Your Empire',
@@ -486,6 +491,7 @@ export default {
     personTabCreateCompany: 'Create company',
     personTabLedger: 'Ledger',
     personLedgerTabBody: 'Track your personal wealth, tax reserve, stock trades, and dividend income in the personal ledger.',
+    noBuildingsInCity: 'No buildings in this city yet.',
   },
   leaderboard: {
     eyebrow: 'Competitive Rankings',
@@ -912,6 +918,8 @@ export default {
     fundingGapTextMissing: 'You need a {currency} balance to buy buildings in {city}. Visit the Forex Exchange to swap your EUR for {currency}.',
     fundingGapTitleInsufficient: 'Insufficient {currency} balance',
     fundingGapTextInsufficient: 'Your {currency} balance is not enough to buy this building in {city}. Top up via the Forex Exchange.',
+    fundingGapBodyMissing: 'You need a {currency} balance to buy buildings in {city}.',
+    fundingGapBodyInsufficient: 'Your {currency} balance is too low to buy this building in {city}.',
     fundingGapRequired: 'Required',
     fundingGapAvailable: 'Available',
     fundingGapShortfall: 'Shortfall',
@@ -1621,6 +1629,7 @@ export default {
     purchase: 'Purchase Lot',
     purchasing: 'Purchasing...',
     buildingType: 'Building Type',
+    mediaType: 'Media type',
     buildingName: 'Building Name',
     buildingNamePlaceholder: 'Auto-generated if left empty',
     selectBuildingType: 'Select building type',
