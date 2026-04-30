@@ -35,15 +35,9 @@
         </button>
       </div>
 
-      <div v-if="loading" class="loading-state">
-        <div class="spinner" />
-        <span>{{ t('common.loading') }}</span>
-      </div>
+      <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
-      <div v-else-if="error" class="error-state">
-        <p class="error-message">{{ error }}</p>
-        <button class="btn btn-secondary" @click="() => loadData()">{{ t('common.retry') }}</button>
-      </div>
+      <UiStateError v-else-if="error" :message="error" :retry-label="t('common.retry')" @retry="loadData" />
 
       <template v-else>
         <!-- ÔöÇÔöÇ BORROW TAB ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ -->
@@ -132,9 +126,9 @@
               <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.chooseBankToBorrow') }}</h2>
               <p class="section-subtitle max-w-3xl text-sm text-muted sm:text-base">{{ t('bank.chooseBankToBorrowHint') }}</p>
             </div>
-            <div v-if="sortedBanksForBorrow.length === 0" class="empty-state">
-              <p>{{ t('bank.noBanksAvailable') }}</p>
-            </div>
+            <UiStateEmpty v-if="sortedBanksForBorrow.length === 0">
+              {{ t('bank.noBanksAvailable') }}
+            </UiStateEmpty>
             <div v-else class="banks-for-borrow-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               <div v-for="bank in sortedBanksForBorrow" :key="bank.bankBuildingId" class="bank-borrow-card flex flex-col gap-4 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
                 <div class="bank-borrow-card-header">
@@ -221,9 +215,9 @@
           <section class="banks-list-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
             <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.allBanks') }}</h2>
 
-            <div v-if="allBanks.length === 0" class="empty-state">
-              <p>{{ t('bank.noBanksAvailable') }}</p>
-            </div>
+            <UiStateEmpty v-if="allBanks.length === 0">
+              {{ t('bank.noBanksAvailable') }}
+            </UiStateEmpty>
 
             <template v-else>
               <!-- Sort/filter controls -->
@@ -257,9 +251,9 @@
                 </div>
               </div>
 
-              <div v-if="filteredAndSortedBanks.length === 0" class="empty-state">
-                <p>{{ t('bank.noBanksAvailable') }}</p>
-              </div>
+              <UiStateEmpty v-if="filteredAndSortedBanks.length === 0">
+                {{ t('bank.noBanksAvailable') }}
+              </UiStateEmpty>
 
               <div v-else class="banks-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 <div v-for="bank in filteredAndSortedBanks" :key="bank.bankBuildingId" class="bank-card flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
@@ -471,6 +465,9 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
+import UiStateEmpty from '@/components/ui/UiStateEmpty.vue'
 import type { LoanOfferSummary, LoanSummary, Company, BankDepositSummary, BankInfoSummary, CollateralEligibilitySummary, PlayerBankAccountSummary } from '@/types'
 import { formatLoanDuration, computeTotalRepayment, computePaymentAmount, computeTotalPayments, loanStatusClass, formatCurrency, formatPercent } from '@/lib/loanHelpers'
 
@@ -998,17 +995,6 @@ async function closeBankAccount(accountId: string, isDepositAccount: boolean) {
 .page-subtitle {
   color: var(--color-text-secondary);
   margin-top: var(--spacing-xs);
-}
-
-.loading-state,
-.empty-state,
-.error-state {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xl);
-  color: var(--color-text-secondary);
-  justify-content: center;
 }
 
 .section-title {

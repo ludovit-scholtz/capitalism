@@ -8,6 +8,9 @@ import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useScrollPreservation } from '@/composables/useScrollPreservation'
 import { deepEqual } from '@/lib/utils'
 import { getActiveCompany } from '@/lib/accountContext'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
+import UiStateEmpty from '@/components/ui/UiStateEmpty.vue'
 import type { LoanOfferSummary, LoanSummary, BankDepositSummary, BankInfoSummary, Company, PlayerBankAccountSummary } from '@/types'
 import { formatLoanDuration, formatCurrency, formatPercent, loanStatusClass } from '@/lib/loanHelpers'
 
@@ -545,15 +548,9 @@ function navigateToForexTransfer() {
       </template>
     </div>
 
-    <div v-if="loading" class="loading-state">
-      <div class="spinner" />
-      <span>{{ t('common.loading') }}</span>
-    </div>
+    <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
-    <div v-else-if="error" class="error-state">
-      <p class="error-message">{{ error }}</p>
-      <button class="btn btn-secondary" @click="() => loadData()">{{ t('common.retry') }}</button>
-    </div>
+    <UiStateError v-else-if="error" :message="error" :retry-label="t('common.retry')" @retry="loadData" />
 
     <template v-else>
       <!-- ── OWNER VIEW ─────────────────────────────────────────────── -->
@@ -713,9 +710,9 @@ function navigateToForexTransfer() {
         <!-- Depositors section -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
           <h2 class="section-title">{{ t('bank.bankDepositors') }}</h2>
-          <div v-if="bankDeposits.length === 0" class="empty-state">
-            <p>{{ t('bank.noBankDepositors') }}</p>
-          </div>
+          <UiStateEmpty v-if="bankDeposits.length === 0">
+            {{ t('bank.noBankDepositors') }}
+          </UiStateEmpty>
           <div v-else class="depositors-table">
             <table>
               <thead>
@@ -766,9 +763,9 @@ function navigateToForexTransfer() {
         <!-- Issued Loans -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="loans-section">
           <h2 class="section-title">{{ t('bank.issuedLoans') }}</h2>
-          <div v-if="issuedLoans.length === 0" class="empty-state">
-            <p>{{ t('bank.noIssuedLoans') }}</p>
-          </div>
+          <UiStateEmpty v-if="issuedLoans.length === 0">
+            {{ t('bank.noIssuedLoans') }}
+          </UiStateEmpty>
           <div v-else class="loans-table">
             <table>
               <thead>
@@ -944,9 +941,9 @@ function navigateToForexTransfer() {
           <!-- Direct loan request -->
           <section class="customer-loans-section rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
             <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.borrowFromThisBank') }}</h2>
-            <div v-if="!directBorrowingOption" class="empty-state">
-              <p>{{ t('bank.noOffersFromBank') }}</p>
-            </div>
+            <UiStateEmpty v-if="!directBorrowingOption">
+              {{ t('bank.noOffersFromBank') }}
+            </UiStateEmpty>
             <div v-else class="customer-offers-grid mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               <div class="customer-offer-card rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
                 <div class="customer-offer-header">
@@ -1023,17 +1020,6 @@ function navigateToForexTransfer() {
 
 .page-subtitle {
   color: var(--color-text-secondary);
-}
-
-.loading-state,
-.empty-state,
-.error-state {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xl);
-  color: var(--color-text-secondary);
-  justify-content: center;
 }
 
 .stats-row {
