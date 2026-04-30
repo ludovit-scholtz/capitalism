@@ -100,11 +100,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div
-    v-if="isVisible && formattedGameTime"
-    class="game-time-chip hidden sm:inline-flex items-center gap-1.5 px-2.5 border border-divider rounded-md h-9"
-    :title="t('nav.gameTime')"
-  >
+  <div v-if="isVisible && formattedGameTime" class="game-time-chip hidden sm:inline-flex items-center gap-1.5 px-2.5 border border-divider rounded-md h-9" :title="t('nav.gameTime')">
     <span class="game-time-chip-progress" :style="{ width: `${tickProgressPercent}%` }" aria-hidden="true" />
     <font-awesome-icon :icon="['fas', 'clock']" class="game-time-chip-content text-muted text-[0.75rem]" />
     <span class="game-time-chip-content text-[0.75rem] text-muted tabular-nums whitespace-nowrap">{{ formattedGameTime }}</span>
