@@ -26,19 +26,34 @@ function fmtProfit(value: number | null): string {
 </script>
 
 <template>
-  <div class="building-header-financials flex min-h-9 flex-wrap items-center gap-3 border border-divider border-t-0 bg-[var(--color-surface-muted,rgba(255,255,255,0.03))] px-4 py-2" :aria-label="t('buildingDetail.accessibility.financialSummary')">
+  <div
+    class="building-header-financials flex min-h-9 flex-wrap items-center gap-3 border border-divider border-t-0 bg-[var(--color-surface-muted,rgba(255,255,255,0.03))] px-4 py-2"
+    :aria-label="t('buildingDetail.accessibility.financialSummary')"
+  >
     <template v-if="loading">
       <div class="bh-metric flex min-w-16 flex-col gap-0.5">
-        <span class="bh-label bh-skeleton bh-skeleton-label block h-2 w-10 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"></span>
-        <span class="bh-value bh-skeleton bh-skeleton-value mt-0.5 block h-3 w-14 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"></span>
+        <span
+          class="bh-label bh-skeleton bh-skeleton-label block h-2 w-10 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"
+        ></span>
+        <span
+          class="bh-value bh-skeleton bh-skeleton-value mt-0.5 block h-3 w-14 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"
+        ></span>
       </div>
       <div class="bh-metric flex min-w-16 flex-col gap-0.5">
-        <span class="bh-label bh-skeleton bh-skeleton-label block h-2 w-10 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"></span>
-        <span class="bh-value bh-skeleton bh-skeleton-value mt-0.5 block h-3 w-14 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"></span>
+        <span
+          class="bh-label bh-skeleton bh-skeleton-label block h-2 w-10 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"
+        ></span>
+        <span
+          class="bh-value bh-skeleton bh-skeleton-value mt-0.5 block h-3 w-14 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"
+        ></span>
       </div>
       <div class="bh-metric bh-metric-profit ml-1 border-l border-divider pl-3 max-[480px]:ml-0 max-[480px]:border-l-0 max-[480px]:pl-0 flex min-w-16 flex-col gap-0.5">
-        <span class="bh-label bh-skeleton bh-skeleton-label block h-2 w-10 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"></span>
-        <span class="bh-value bh-skeleton bh-skeleton-value mt-0.5 block h-3 w-14 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"></span>
+        <span
+          class="bh-label bh-skeleton bh-skeleton-label block h-2 w-10 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"
+        ></span>
+        <span
+          class="bh-value bh-skeleton bh-skeleton-value mt-0.5 block h-3 w-14 rounded-sm bg-gradient-to-r from-divider via-divider/60 to-divider bg-[length:200%_100%] animate-[bh-shimmer_1.4s_ease-in-out_infinite]"
+        ></span>
       </div>
     </template>
     <template v-else-if="hasData">
@@ -82,5 +97,4 @@ function fmtProfit(value: number | null): string {
     background-position: -200% 0;
   }
 }
-
 </style>

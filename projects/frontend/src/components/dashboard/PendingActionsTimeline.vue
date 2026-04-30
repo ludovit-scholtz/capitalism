@@ -64,12 +64,7 @@ function actionDebugTitle(action: ScheduledActionSummary): string {
             <span class="action-building-name overflow-hidden text-ellipsis whitespace-nowrap text-[0.8125rem] text-muted">{{ action.buildingName }}</span>
           </div>
           <div class="action-meta mb-2 flex items-center gap-4">
-            <span
-              v-if="props.currentTick !== null"
-              class="applies-at text-xs text-muted"
-              role="timer"
-              :title="actionDebugTitle(action)"
-            >
+            <span v-if="props.currentTick !== null" class="applies-at text-xs text-muted" role="timer" :title="actionDebugTitle(action)">
               {{ t('pendingActions.appliesAtTime', { time: formatApplyTime(action.appliesAtTick) }) }}
             </span>
           </div>
@@ -77,18 +72,7 @@ function actionDebugTitle(action: ScheduledActionSummary): string {
             <div
               class="progress-bar h-full rounded-sm bg-brand transition-[width] duration-500 ease-in-out"
               :style="{
-                width:
-                  action.totalTicksRequired > 0
-                    ? Math.max(
-                        0,
-                        Math.min(
-                          100,
-                          ((action.totalTicksRequired - action.ticksRemaining) /
-                            action.totalTicksRequired) *
-                            100,
-                        ),
-                      ) + '%'
-                    : '100%',
+                width: action.totalTicksRequired > 0 ? Math.max(0, Math.min(100, ((action.totalTicksRequired - action.ticksRemaining) / action.totalTicksRequired) * 100)) + '%' : '100%',
               }"
               role="progressbar"
               :aria-valuenow="action.totalTicksRequired - action.ticksRemaining"
