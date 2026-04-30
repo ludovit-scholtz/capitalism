@@ -4052,9 +4052,6 @@ export function useBuildingDetail() {
               cityReferenceRentPerSqm
               adjustedMarketRentPerSqm
               populationIndex
-              lotResourceTypeId
-              lotMaterialQuality
-              lotMaterialQuantity
               units {
                 id
                 buildingId
