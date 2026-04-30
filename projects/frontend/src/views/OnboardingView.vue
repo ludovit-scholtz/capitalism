@@ -1370,7 +1370,9 @@ useTickRefresh(async () => {
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price }">
             <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span
-            ><strong :class="!!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price ? 'text-[var(--color-tertiary)]' : ''">{{ formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0)) }}</strong>
+            ><strong :class="!!selectedFactoryLot && companyStartingCash < selectedFactoryLot.price ? 'text-[var(--color-tertiary)]' : ''">{{
+              formatCurrency(Math.max(companyStartingCash - (selectedFactoryLot?.price ?? 0), 0))
+            }}</strong>
           </article>
         </div>
         <div class="bg-card-raised border border-divider rounded-lg p-4">
@@ -1421,7 +1423,9 @@ useTickRefresh(async () => {
           </article>
           <article class="budget-card flex flex-col gap-1.5 p-4 rounded-lg bg-page border border-divider" :class="{ warning: !!selectedShopLot && starterCash < selectedShopLot.price }">
             <span class="text-muted text-xs">{{ t('onboarding.cashAfterPurchase') }}</span
-            ><strong :class="!!selectedShopLot && starterCash < selectedShopLot.price ? 'text-[var(--color-tertiary)]' : ''">{{ formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0)) }}</strong>
+            ><strong :class="!!selectedShopLot && starterCash < selectedShopLot.price ? 'text-[var(--color-tertiary)]' : ''">{{
+              formatCurrency(Math.max(starterCash - (selectedShopLot?.price ?? 0), 0))
+            }}</strong>
           </article>
         </div>
         <div class="bg-card-raised border border-divider rounded-lg p-4">

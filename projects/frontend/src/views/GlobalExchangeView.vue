@@ -491,7 +491,8 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
                         class="fuel-badge"
                         :class="offer.fuelPriceIndex > 1 ? 'fuel-high' : 'fuel-low'"
                         :title="t('globalExchange.fuelPriceHint')"
-                      >⛽ ×{{ offer.fuelPriceIndex.toFixed(2) }}</span>
+                        >⛽ ×{{ offer.fuelPriceIndex.toFixed(2) }}</span
+                      >
                     </span>
                   </div>
                   <div class="offer-metric delivered-metric">
@@ -1199,4 +1200,3 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
   }
 }
 </style>
-
