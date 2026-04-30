@@ -12,6 +12,9 @@ import { deepEqual } from '@/lib/utils'
 import { buildGlobalExchangeProductQuote } from '@/lib/globalExchangeProductQuotes'
 import { formatMoney } from '@/lib/currencyFormat'
 import { formatInGameTime } from '@/lib/gameTime'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
+import UiStateEmpty from '@/components/ui/UiStateEmpty.vue'
 import type { GlobalExchangeOffer, GlobalExchangeProductListing, GlobalExchangeProductQuote, ResourceType, ProductType } from '@/types'
 
 interface City {
@@ -450,11 +453,11 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         </div>
 
         <!-- Loading / error -->
-        <p v-if="loading" class="exchange-loading">{{ t('common.loading') }}</p>
-        <p v-else-if="error" class="exchange-error">{{ error }}</p>
-        <p v-else-if="exchangeRows.length === 0" class="exchange-empty">
+        <UiStateLoading v-if="loading" class="exchange-loading" :label="t('common.loading')" />
+        <UiStateError v-else-if="error" class="exchange-error" :message="error" :retry-label="t('common.retry')" @retry="loadOffers" />
+        <UiStateEmpty v-else-if="exchangeRows.length === 0" class="exchange-empty">
           {{ t('globalExchange.noResults') }}
-        </p>
+        </UiStateEmpty>
 
         <!-- Resource rows -->
         <template v-else>
@@ -547,11 +550,11 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         <p class="products-mode-hint">{{ t('globalExchange.modeProductsHint') }}</p>
 
         <!-- Loading / error -->
-        <p v-if="productListingsLoading" class="exchange-loading">{{ t('common.loading') }}</p>
-        <p v-else-if="productListingsError" class="exchange-error">{{ productListingsError }}</p>
-        <p v-else-if="productRowsEmpty" class="exchange-empty">
+        <UiStateLoading v-if="productListingsLoading" class="exchange-loading" :label="t('common.loading')" />
+        <UiStateError v-else-if="productListingsError" class="exchange-error" :message="productListingsError" :retry-label="t('common.retry')" @retry="loadProductListings" />
+        <UiStateEmpty v-else-if="productRowsEmpty" class="exchange-empty">
           {{ t('globalExchange.noProductResults') }}
-        </p>
+        </UiStateEmpty>
 
         <!-- Product rows -->
         <template v-else>
@@ -793,20 +796,6 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
   color: var(--color-text);
   font-size: 0.875rem;
   min-width: 140px;
-}
-
-/* Status states */
-.exchange-loading,
-.exchange-error,
-.exchange-empty {
-  padding: 2rem;
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-size: 0.9375rem;
-}
-
-.exchange-error {
-  color: var(--color-error, #ef4444);
 }
 
 .products-empty-state {

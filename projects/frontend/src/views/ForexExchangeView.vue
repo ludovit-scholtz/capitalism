@@ -9,6 +9,8 @@ import GoldAmmSection from '@/components/forex/GoldAmmSection.vue'
 import BankAccountTransferPanel from '@/components/banking/BankAccountTransferPanel.vue'
 import BankAccountSelector from '@/components/banking/BankAccountSelector.vue'
 import ForexBankAccountSelector from '@/components/forex/ForexBankAccountSelector.vue'
+import UiStateLoading from '@/components/ui/UiStateLoading.vue'
+import UiStateError from '@/components/ui/UiStateError.vue'
 import type { City, FxRate, ForexQuote, ForexTradeResult, ForexTradeHistoryEntry, CurrencyBalance, PlayerBankAccountSummary } from '@/types'
 
 const { t } = useI18n()
@@ -517,14 +519,9 @@ watch(activeTab, async (tab) => {
         <p class="text-base text-muted">{{ t('forex.subtitle') }}</p>
       </div>
 
-      <div v-if="loading" class="text-center py-12 text-muted">
-        <span>{{ t('common.loading') }}</span>
-      </div>
+      <UiStateLoading v-if="loading" :label="t('common.loading')" />
 
-      <div v-else-if="error" class="flex flex-col items-center gap-4 py-12 text-center text-muted">
-        <p class="text-bad">{{ error }}</p>
-        <button class="btn btn-secondary" @click="loadData">{{ t('common.retry') }}</button>
-      </div>
+      <UiStateError v-else-if="error" :message="error" :retry-label="t('common.retry')" @retry="loadData" />
 
       <template v-else>
         <div class="flex flex-col gap-8">
