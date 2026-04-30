@@ -91,10 +91,7 @@ function getLineNumber(content, index) {
 }
 
 function extractI18nKeysFromVue(content) {
-  const keyRegexes = [
-    /\$t\(\s*['"]([A-Za-z0-9_.-]+)['"]/g,
-    /\bt\(\s*['"]([A-Za-z0-9_.-]+)['"]/g,
-  ]
+  const keyRegexes = [/\$t\(\s*['"]([A-Za-z0-9_.-]+)['"]/g, /\bt\(\s*['"]([A-Za-z0-9_.-]+)['"]/g]
 
   const occurrences = []
   for (const regex of keyRegexes) {
