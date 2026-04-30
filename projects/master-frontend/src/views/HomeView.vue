@@ -122,6 +122,8 @@ onMounted(() => {
             <a class="nav-btn nav-btn--gold" href="/referrals/setup">Referral Setup</a>
             <a class="nav-btn nav-btn--gold" href="/referrals/become">Become Referral</a>
             <a class="nav-btn nav-btn--gold" href="/referrals/dashboard">Referral Dashboard</a>
+            <a class="nav-btn nav-btn--gold" href="/support">Support</a>
+            <a class="nav-btn nav-btn--gold" href="/support/admin">Support Admin</a>
             <a class="nav-btn nav-btn--gold" href="/account">⬛ My Gold</a>
             <a class="nav-btn nav-btn--gold" href="/gold-admin">⚙ Gold Admin</a>
             <button class="nav-btn nav-btn--ghost" type="button" @click="logout">Sign out</button>

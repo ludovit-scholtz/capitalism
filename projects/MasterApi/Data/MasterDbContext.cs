@@ -23,6 +23,10 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
 
     public DbSet<GoldTokenTransaction> GoldTokenTransactions => Set<GoldTokenTransaction>();
 
+    public DbSet<SupportTicket> SupportTickets => Set<SupportTicket>();
+
+    public DbSet<SupportTicketAuditEvent> SupportTicketAuditEvents => Set<SupportTicketAuditEvent>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         var gameServer = modelBuilder.Entity<GameServerNode>();
@@ -117,5 +121,38 @@ public sealed class MasterDbContext(DbContextOptions<MasterDbContext> options) :
         goldTx.Property(tx => tx.Amount).HasColumnType("decimal(18,8)");
         goldTx.Property(tx => tx.BalanceBefore).HasColumnType("decimal(18,8)");
         goldTx.Property(tx => tx.BalanceAfter).HasColumnType("decimal(18,8)");
+
+        var supportTicket = modelBuilder.Entity<SupportTicket>();
+        supportTicket.HasKey(ticket => ticket.Id);
+        supportTicket.HasIndex(ticket => new { ticket.CreatedByPlayerAccountId, ticket.CreatedAtUtc });
+        supportTicket.HasIndex(ticket => new { ticket.Status, ticket.UpdatedAtUtc });
+        supportTicket.HasIndex(ticket => new { ticket.TicketType, ticket.CreatedAtUtc });
+        supportTicket.Property(ticket => ticket.CreatedByEmail).HasMaxLength(200);
+        supportTicket.Property(ticket => ticket.CreatedByDisplayName).HasMaxLength(120);
+        supportTicket.Property(ticket => ticket.TicketType).HasMaxLength(24);
+        supportTicket.Property(ticket => ticket.Status).HasMaxLength(24);
+        supportTicket.Property(ticket => ticket.Title).HasMaxLength(220);
+        supportTicket.Property(ticket => ticket.ModerationState).HasMaxLength(24);
+        supportTicket.Property(ticket => ticket.ModerationReason).HasMaxLength(1000);
+        supportTicket.Property(ticket => ticket.ModeratedByEmail).HasMaxLength(200);
+        supportTicket.Property(ticket => ticket.ExtractedUrlsJson).HasMaxLength(10000);
+        supportTicket.Property(ticket => ticket.ExtractedImagesJson).HasMaxLength(10000);
+        supportTicket.HasOne(ticket => ticket.CreatedByPlayerAccount)
+            .WithMany()
+            .HasForeignKey(ticket => ticket.CreatedByPlayerAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+        supportTicket.HasMany(ticket => ticket.AuditEvents)
+            .WithOne(eventItem => eventItem.SupportTicket)
+            .HasForeignKey(eventItem => eventItem.SupportTicketId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        var supportAudit = modelBuilder.Entity<SupportTicketAuditEvent>();
+        supportAudit.HasKey(eventItem => eventItem.Id);
+        supportAudit.HasIndex(eventItem => new { eventItem.SupportTicketId, eventItem.CreatedAtUtc });
+        supportAudit.Property(eventItem => eventItem.EventType).HasMaxLength(64);
+        supportAudit.Property(eventItem => eventItem.ActorEmail).HasMaxLength(200);
+        supportAudit.Property(eventItem => eventItem.ActorDisplayName).HasMaxLength(120);
+        supportAudit.Property(eventItem => eventItem.Note).HasMaxLength(1000);
+        supportAudit.Property(eventItem => eventItem.MetadataJson).HasMaxLength(10000);
     }
 }

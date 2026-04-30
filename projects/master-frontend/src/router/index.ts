@@ -38,6 +38,16 @@ const router = createRouter({
       name: 'referral-dashboard',
       component: () => import('@/views/ReferralDashboardView.vue'),
     },
+    {
+      path: '/support',
+      name: 'support',
+      component: () => import('@/views/SupportView.vue'),
+    },
+    {
+      path: '/support/admin',
+      name: 'support-admin',
+      component: () => import('@/views/SupportAdminView.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

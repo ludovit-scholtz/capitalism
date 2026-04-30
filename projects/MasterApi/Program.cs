@@ -93,6 +93,11 @@ public class Program
 
         builder.Services
             .AddGraphQLServer()
+            .ModifyRequestOptions(options =>
+            {
+                options.IncludeExceptionDetails = builder.Environment.IsDevelopment()
+                    || builder.Environment.IsEnvironment("Testing");
+            })
             .AddAuthorization()
             .AddQueryType<MasterApi.Types.Query>()
             .AddMutationType<MasterApi.Types.Mutation>();
