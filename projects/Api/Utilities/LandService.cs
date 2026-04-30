@@ -10,9 +10,13 @@ namespace Api.Utilities;
 /// </summary>
 public static class LandService
 {
+    private sealed record CityResourceProfile(CityResource CityResource, bool IsNativeInCity);
+
     private const decimal MinPopulationIndex = 0.35m;
     private const decimal MaxPopulationIndex = 1.85m;
     private const double NeighborhoodRadiusKm = 1.5d;
+    private const decimal MineLotMinPrice = 20_000_000m;
+    private const decimal MineLotMaxPrice = 200_000_000m;
 
     /// <summary>
     /// Strategic multiplier applied to the quality-discounted spot value of the raw material
@@ -46,6 +50,45 @@ public static class LandService
             .Where(building => cityIdSet == null || cityIdSet.Contains(building.CityId))
             .ToListAsync();
 
+        var cityResources = await db.CityResources
+            .Include(cr => cr.ResourceType)
+            .Where(cr => cityIdSet == null || cityIdSet.Contains(cr.CityId))
+            .ToListAsync();
+
+        var allResources = await db.ResourceTypes
+            .OrderBy(resource => resource.Name)
+            .ToListAsync();
+
+        var cityResourcesByCity = new Dictionary<Guid, IReadOnlyList<CityResourceProfile>>();
+        foreach (var city in cities)
+        {
+            var byResourceId = cityResources
+                .Where(cr => cr.CityId == city.Id)
+                .ToDictionary(cr => cr.ResourceTypeId);
+
+            var resolvedResources = new List<CityResourceProfile>(allResources.Count);
+            foreach (var resource in allResources)
+            {
+                if (byResourceId.TryGetValue(resource.Id, out var cityResource))
+                {
+                    resolvedResources.Add(new CityResourceProfile(cityResource, true));
+                    continue;
+                }
+
+                // Some cities have partial CityResources seed data. For mine-lot coverage,
+                // synthesize a neutral fallback profile so every resource stays available.
+                resolvedResources.Add(new CityResourceProfile(new CityResource
+                {
+                    CityId = city.Id,
+                    ResourceTypeId = resource.Id,
+                    ResourceType = resource,
+                    Abundance = 0.5m,
+                }, false));
+            }
+
+            cityResourcesByCity[city.Id] = resolvedResources;
+        }
+
         // Load EUR-based FX rates so lot prices are expressed in the city's local currency.
         // EUR/EUR = 1 is always added as a baseline so EUR-currency cities are unaffected.
         var fxRateRows = await db.FxRates
@@ -56,32 +99,69 @@ public static class LandService
             .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.FetchedAtUtc).First().Rate);
         fxRatesByCurrency["EUR"] = 1m;
 
-        EnsureMinimumAvailableLots(db, cities, lots, buildings, currentTick, fxRatesByCurrency);
+        EnsureMinimumAvailableLots(
+            db,
+            cities,
+            lots,
+            buildings,
+            currentTick,
+            fxRatesByCurrency,
+            cityResourcesByCity);
     }
 
-    public static void EnsureMinimumAvailableLots(
+    private static void EnsureMinimumAvailableLots(
         AppDbContext db,
         IReadOnlyCollection<City> cities,
         IReadOnlyCollection<BuildingLot> existingLots,
         IReadOnlyCollection<Building> buildings,
         long currentTick,
-        Dictionary<string, decimal>? fxRatesByCurrency = null)
+        Dictionary<string, decimal>? fxRatesByCurrency = null,
+        IReadOnlyDictionary<Guid, IReadOnlyList<CityResourceProfile>>? cityResourcesByCity = null)
     {
         foreach (var city in cities)
         {
             var cityFxRate = fxRatesByCurrency?.GetValueOrDefault(city.CurrencyCode, 1m) ?? 1m;
             var cityBuildings = buildings.Where(building => building.CityId == city.Id).ToList();
             var cityLots = existingLots.Where(lot => lot.CityId == city.Id).ToList();
+            var cityResources = cityResourcesByCity?.GetValueOrDefault(city.Id) ?? [];
+
+            // Every mine lot must expose a concrete deposit payload for the buy-building UX.
+            if (cityResources.Count > 0)
+            {
+                EnsureMineDepositData(cityLots, cityResources, city, cityBuildings, currentTick, cityFxRate);
+            }
 
             foreach (var buildingType in BuildingType.All)
             {
+                if (buildingType == BuildingType.Mine && cityResources.Count > 0)
+                {
+                    EnsurePerResourceMineCoverage(
+                        db,
+                        city,
+                        cityLots,
+                        cityBuildings,
+                        cityResources,
+                        currentTick,
+                        cityFxRate);
+                }
+
                 var availableCount = cityLots.Count(lot => lot.OwnerCompanyId == null && SupportsBuildingType(lot, buildingType));
                 var missingCount = Math.Max(0, GameConstants.MinimumAvailableLotsPerBuildingType - availableCount);
 
                 for (var offset = 0; offset < missingCount; offset++)
                 {
                     var sequence = cityLots.Count + 1;
-                    var generatedLot = CreateGeneratedLot(city, buildingType, sequence, cityBuildings, currentTick, cityFxRate);
+                    BuildingLot generatedLot;
+                    if (buildingType == BuildingType.Mine && cityResources.Count > 0)
+                    {
+                        var resource = cityResources[(sequence - 1) % cityResources.Count];
+                        generatedLot = CreateGeneratedMineLot(city, resource, sequence, cityBuildings, currentTick, cityFxRate);
+                    }
+                    else
+                    {
+                        generatedLot = CreateGeneratedLot(city, buildingType, sequence, cityBuildings, currentTick, cityFxRate);
+                    }
+
                     db.BuildingLots.Add(generatedLot);
                     cityLots.Add(generatedLot);
                 }
@@ -166,7 +246,156 @@ public static class LandService
         }
 
         var premium = materialQuantity.Value * resourceType.BasePrice * materialQuality.Value * ResourcePremiumCaptureRate;
-        return decimal.Round(premium, 2, MidpointRounding.AwayFromZero);
+        var clamped = Clamp(premium, MineLotMinPrice, MineLotMaxPrice);
+        return decimal.Round(clamped, 2, MidpointRounding.AwayFromZero);
+    }
+
+    private static void EnsurePerResourceMineCoverage(
+        AppDbContext db,
+        City city,
+        List<BuildingLot> cityLots,
+        IReadOnlyCollection<Building> cityBuildings,
+        IReadOnlyList<CityResourceProfile> cityResources,
+        long currentTick,
+        decimal cityFxRate)
+    {
+        var availableMineLots = cityLots
+            .Where(lot => lot.OwnerCompanyId == null && SupportsBuildingType(lot, BuildingType.Mine))
+            .ToList();
+
+        foreach (var resource in cityResources)
+        {
+            var hasCoverage = availableMineLots.Any(lot =>
+                lot.ResourceTypeId == resource.CityResource.ResourceTypeId
+                && lot.MaterialQuality is > 0m
+                && lot.MaterialQuantity is > 0m);
+
+            if (hasCoverage)
+            {
+                continue;
+            }
+
+            var sequence = cityLots.Count + 1;
+            var generatedLot = CreateGeneratedMineLot(city, resource, sequence, cityBuildings, currentTick, cityFxRate);
+            db.BuildingLots.Add(generatedLot);
+            cityLots.Add(generatedLot);
+            availableMineLots.Add(generatedLot);
+        }
+    }
+
+    private static void EnsureMineDepositData(
+        List<BuildingLot> cityLots,
+        IReadOnlyList<CityResourceProfile> cityResources,
+        City city,
+        IReadOnlyCollection<Building> cityBuildings,
+        long currentTick,
+        decimal cityFxRate)
+    {
+        var cityResourceById = cityResources.ToDictionary(profile => profile.CityResource.ResourceTypeId);
+
+        var mineLotsMissingDeposit = cityLots
+            .Where(lot => SupportsBuildingType(lot, BuildingType.Mine)
+                && (lot.ResourceTypeId is null
+                    || lot.ResourceType is null
+                    || lot.MaterialQuality is null or <= 0m
+                    || lot.MaterialQuantity is null or <= 0m))
+            .ToList();
+
+        foreach (var lot in mineLotsMissingDeposit)
+        {
+            var resourceIndex = Math.Abs(HashCode.Combine(lot.Id, city.Id)) % cityResources.Count;
+            var resource = cityResources[resourceIndex];
+            ApplyMineDepositProfile(lot, resource);
+            RefreshLandState(lot, city, cityBuildings, currentTick, cityFxRate);
+        }
+
+        // Enforce quality bands for all mine lots with deposit data:
+        // native city resource => 50%-100%, fallback resource => 0%-50%.
+        var mineLotsWithDeposit = cityLots
+            .Where(lot => SupportsBuildingType(lot, BuildingType.Mine)
+                && lot.ResourceTypeId is not null
+                && lot.ResourceType is not null
+                && lot.MaterialQuality is > 0m
+                && lot.MaterialQuantity is > 0m)
+            .ToList();
+
+        foreach (var lot in mineLotsWithDeposit)
+        {
+            var resourceTypeId = lot.ResourceTypeId!.Value;
+            if (!cityResourceById.TryGetValue(resourceTypeId, out var profile))
+            {
+                continue;
+            }
+
+            var quality = lot.MaterialQuality!.Value;
+            if (IsQualityInExpectedBand(quality, profile.IsNativeInCity))
+            {
+                continue;
+            }
+
+            ApplyMineDepositProfile(lot, profile);
+            RefreshLandState(lot, city, cityBuildings, currentTick, cityFxRate);
+        }
+    }
+
+    private static BuildingLot CreateGeneratedMineLot(
+        City city,
+        CityResourceProfile cityResource,
+        int sequence,
+        IReadOnlyCollection<Building> cityBuildings,
+        long currentTick,
+        decimal cityFxRate)
+    {
+        var lot = CreateGeneratedLot(city, BuildingType.Mine, sequence, cityBuildings, currentTick, cityFxRate);
+        lot.Name = $"{cityResource.CityResource.ResourceType.Name} Deposit {sequence:00}";
+        lot.Description = $"Procedurally generated extraction parcel in {city.Name} with a mapped {cityResource.CityResource.ResourceType.Name} reserve.";
+        ApplyMineDepositProfile(lot, cityResource);
+        RefreshLandState(lot, city, cityBuildings, currentTick, cityFxRate);
+        return lot;
+    }
+
+    private static void ApplyMineDepositProfile(BuildingLot lot, CityResourceProfile cityResourceProfile)
+    {
+        var cityResource = cityResourceProfile.CityResource;
+        var abundance = Clamp(cityResource.Abundance, 0.2m, 1.0m);
+        var resource = cityResource.ResourceType;
+
+        // Randomized quality bands:
+        // native city resources => 50%-100%, fallback resources => 0%-50%.
+        var quality = cityResourceProfile.IsNativeInCity
+            ? RandomInRange(0.5m, 1.0m)
+            : RandomInRange(0.0m, 0.5m);
+        var targetPremium = Clamp(MineLotMinPrice + ((MineLotMaxPrice - MineLotMinPrice) * abundance * 0.65m), MineLotMinPrice, MineLotMaxPrice);
+
+        var denom = Math.Max(resource.BasePrice * quality * ResourcePremiumCaptureRate, 0.0001m);
+        var quantity = decimal.Round(targetPremium / denom, 2, MidpointRounding.AwayFromZero);
+
+        lot.ResourceTypeId = resource.Id;
+        lot.ResourceType = resource;
+        lot.MaterialQuality = quality;
+        lot.MaterialQuantity = Math.Max(quantity, 1m);
+    }
+
+    private static bool IsQualityInExpectedBand(decimal quality, bool isNativeInCity)
+    {
+        if (isNativeInCity)
+        {
+            return quality >= 0.5m && quality <= 1.0m;
+        }
+
+        return quality >= 0m && quality <= 0.5m;
+    }
+
+    private static decimal RandomInRange(decimal minInclusive, decimal maxInclusive)
+    {
+        if (maxInclusive <= minInclusive)
+        {
+            return minInclusive;
+        }
+
+        var sample = (decimal)Random.Shared.NextDouble();
+        var value = minInclusive + ((maxInclusive - minInclusive) * sample);
+        return decimal.Round(Clamp(value, minInclusive, maxInclusive), 4, MidpointRounding.AwayFromZero);
     }
 
     public static decimal ComputePopulationIndex(

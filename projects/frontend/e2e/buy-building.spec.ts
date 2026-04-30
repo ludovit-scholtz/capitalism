@@ -771,6 +771,30 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await expect(summary).toContainText(/18/)
   })
 
+  test('mine lot cards show material quality and quantity instead of population index', async ({ page }) => {
+    const player = setupMineTestPlayer()
+    const state = setupMockApi(page, { players: [player] })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Mine/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
+
+    const mineLotCard = page.locator('.lot-card', { hasText: 'Industrial Plot A1' })
+    await expect(mineLotCard).toBeVisible()
+    await expect(mineLotCard).toContainText(/72%/)
+    await expect(mineLotCard).toContainText(/18,?000/)
+    await expect(mineLotCard).not.toContainText(/Population/i)
+
+    await mineLotCard.click()
+    const selectedSummary = page.locator('[data-testid="buy-building-mining-summary"]')
+    await expect(selectedSummary).toContainText(/72%/)
+    await expect(selectedSummary).toContainText(/18,?000/)
+  })
+
   test('selecting mine lot shows resource premium in asking price area', async ({ page }) => {
     const player = setupMineTestPlayer()
     const state = setupMockApi(page, { players: [player] })
@@ -810,6 +834,50 @@ test.describe('Buy Building — Mining lot resource display', () => {
 
     // Deposit summary should NOT appear when building type is not MINE
     await expect(page.locator('[data-testid="buy-building-mining-summary"]')).toHaveCount(0)
+  })
+
+  test('mine lot list can be filtered by resource type', async ({ page }) => {
+    const player = setupMineTestPlayer()
+    const lots = makeDefaultBuildingLots()
+    lots.push({
+      id: 'lot-industrial-chem-1',
+      cityId: 'city-ba',
+      name: 'Industrial Plot C1',
+      description: 'Heavy-industry lot above a Chemical Minerals deposit.',
+      district: 'Industrial Zone',
+      latitude: 48.153,
+      longitude: 17.128,
+      populationIndex: 0.66,
+      basePrice: 80000,
+      price: 25480000,
+      suitableTypes: 'FACTORY,MINE',
+      ownerCompanyId: null,
+      buildingId: null,
+      ownerCompany: null,
+      building: null,
+      resourceType: { id: 'res-chem', name: 'Chemical Minerals', slug: 'chemical-minerals' },
+      materialQuality: 0.64,
+      materialQuantity: 16000,
+    })
+
+    const state = setupMockApi(page, { players: [player], buildingLots: lots })
+    state.currentUserId = player.id
+    state.currentToken = `token-${player.id}`
+
+    await authenticate(page, player.id)
+    await page.goto('/buy-building/company-mine')
+
+    await page.getByRole('button', { name: /Mine/i }).click()
+    await switchCityViaContextSwitcher(page, 'Bratislava')
+
+    // Two mine resources are visible before filtering.
+    await expect(page.locator('.lot-card', { hasText: 'Industrial Plot A1' })).toBeVisible()
+    await expect(page.locator('.lot-card', { hasText: 'Industrial Plot C1' })).toBeVisible()
+
+    // Filter to Iron Ore and verify only iron lot remains.
+    await page.locator('.resource-filter-btn', { hasText: /Iron Ore/i }).click()
+    await expect(page.locator('.lot-card', { hasText: 'Industrial Plot A1' })).toBeVisible()
+    await expect(page.locator('.lot-card', { hasText: 'Industrial Plot C1' })).toHaveCount(0)
   })
 
   test('asking price shows premium range (>€15M) for premium mine lot', async ({ page }) => {
