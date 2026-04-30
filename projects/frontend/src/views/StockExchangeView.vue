@@ -2,6 +2,9 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { gqlRequest } from '@/lib/graphql'
+import StockMarketListingRow from '@/components/stock/StockMarketListingRow.vue'
+import StockPersonPortfolio from '@/components/stock/StockPersonPortfolio.vue'
+import StockSummaryCards from '@/components/stock/StockSummaryCards.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTickRefresh } from '@/composables/useTickRefresh'
 import { useGameStateStore } from '@/stores/gameState'
@@ -615,122 +618,11 @@ function formatCurrency(value: number): string {
   }).format(value)
 }
 
-function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`
-}
-
 function formatShares(value: number): string {
   return new Intl.NumberFormat(locale.value, {
     minimumFractionDigits: Number.isInteger(value) ? 0 : 2,
     maximumFractionDigits: Number.isInteger(value) ? 0 : 4,
   }).format(value)
-}
-
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat(locale.value, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value))
-}
-
-// --- Pie chart helpers ---
-
-const PIE_COLORS = ['#4e79a7', '#f28e2b', '#e15759', '#76b7b2', '#59a14f', '#edc948', '#b07aa1', '#ff9da7', '#9c755f', '#bab0ac']
-
-const PUBLIC_FLOAT_COLOR = '#c8c8c8'
-const PIE_OTHER_THRESHOLD = 0.02 // holders < 2% are grouped as "Other"
-const PIE_MAX_NAMED_SLICES = 8 // at most 8 named slices before grouping
-
-type PieSlice = {
-  label: string
-  ratio: number
-  color: string
-  isPublicFloat?: boolean
-  isOther?: boolean
-}
-
-function buildPieSlices(ownership: CompanyOwnership): PieSlice[] {
-  if (ownership.totalSharesIssued <= 0) return []
-
-  const slices: PieSlice[] = []
-  const holders = ownership.shareholders
-  let namedSliceCount = 0
-
-  // Separate prominent holders from minor ones
-  const prominentHolders = holders.filter((h) => h.ownershipRatio >= PIE_OTHER_THRESHOLD)
-  const minorHolders = holders.filter((h) => h.ownershipRatio < PIE_OTHER_THRESHOLD)
-
-  // If there are too many, cap and push rest to "other"
-  const displayHolders = prominentHolders.length > PIE_MAX_NAMED_SLICES ? prominentHolders.slice(0, PIE_MAX_NAMED_SLICES) : prominentHolders
-  const overflowHolders = prominentHolders.length > PIE_MAX_NAMED_SLICES ? [...prominentHolders.slice(PIE_MAX_NAMED_SLICES), ...minorHolders] : minorHolders
-
-  for (const holder of displayHolders) {
-    slices.push({
-      label: holder.holderName,
-      ratio: holder.ownershipRatio,
-      // ?? fallback needed for TypeScript strict noUncheckedIndexedAccess, never reached at runtime
-      color: PIE_COLORS[namedSliceCount % PIE_COLORS.length] ?? '#808080',
-    })
-    namedSliceCount++
-  }
-
-  // Group "other" named shareholders
-  const otherNamedRatio = overflowHolders.reduce((sum, h) => sum + h.ownershipRatio, 0)
-  if (otherNamedRatio > 0.0001) {
-    slices.push({
-      label: t('stockExchange.shareholdersOther'),
-      ratio: otherNamedRatio,
-      // ?? fallback needed for TypeScript strict noUncheckedIndexedAccess, never reached at runtime
-      color: PIE_COLORS[namedSliceCount % PIE_COLORS.length] ?? '#808080',
-      isOther: true,
-    })
-  }
-
-  // Public float slice
-  const floatRatio = ownership.totalSharesIssued > 0 ? ownership.publicFloatShares / ownership.totalSharesIssued : 0
-  if (floatRatio > 0.0001) {
-    slices.push({
-      label: t('stockExchange.shareholdersPublicFloatLabel'),
-      ratio: floatRatio,
-      color: PUBLIC_FLOAT_COLOR,
-      isPublicFloat: true,
-    })
-  }
-
-  return slices
-}
-
-/** Converts a list of pie slices into SVG path data for a donut chart. */
-function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, innerR: number) {
-  const paths: { d: string; color: string; label: string; ratio: number; isPublicFloat?: boolean; isOther?: boolean }[] = []
-  if (slices.length === 0) return paths
-
-  let startAngle = -Math.PI / 2 // Start at 12 o'clock
-
-  for (const slice of slices) {
-    const sweep = slice.ratio * 2 * Math.PI
-    const endAngle = startAngle + sweep
-
-    // Outer arc
-    const x1 = cx + r * Math.cos(startAngle)
-    const y1 = cy + r * Math.sin(startAngle)
-    const x2 = cx + r * Math.cos(endAngle)
-    const y2 = cy + r * Math.sin(endAngle)
-    // Inner arc (for donut)
-    const ix1 = cx + innerR * Math.cos(endAngle)
-    const iy1 = cy + innerR * Math.sin(endAngle)
-    const ix2 = cx + innerR * Math.cos(startAngle)
-    const iy2 = cy + innerR * Math.sin(startAngle)
-
-    const largeArc = sweep > Math.PI ? 1 : 0
-
-    const d = `M ${x1} ${y1}` + ` A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}` + ` L ${ix1} ${iy1}` + ` A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix2} ${iy2}` + ` Z`
-
-    paths.push({ d, color: slice.color, label: slice.label, ratio: slice.ratio, isPublicFloat: slice.isPublicFloat, isOther: slice.isOther })
-    startAngle = endAngle
-  }
-
-  return paths
 }
 
 onMounted(() => {
@@ -769,33 +661,8 @@ useTickRefresh(async () => {
         <p>{{ error }}</p>
         <button class="btn btn-secondary" @click="() => void loadData()">{{ t('common.tryAgain') }}</button>
       </div>
-      <template v-else
-        ><section v-if="personAccount" class="summary-grid grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(160px,1fr))]">
-          <article class="summary-card">
-            <span class="summary-label">{{ t('stockExchange.totalNetWealth') }}</span
-            ><strong>{{ formatCurrency(personAccount.totalNetWealth) }}</strong>
-          </article>
-          <article class="summary-card">
-            <span class="summary-label">{{ t('stockExchange.availableCash') }}</span
-            ><strong>{{ formatCurrency(personAccount.availableCash) }}</strong>
-          </article>
-          <article class="summary-card summary-card--warning" :class="{ 'summary-card--inactive': personAccount.taxReserve === 0 }">
-            <span class="summary-label">{{ t('stockExchange.taxReserveLabel') }}</span
-            ><strong>{{ formatCurrency(personAccount.taxReserve) }}</strong
-            ><span class="summary-hint">{{ t('stockExchange.taxReserveHint') }}</span>
-          </article>
-          <article class="summary-card">
-            <span class="summary-label">{{ t('stockExchange.portfolioValue') }}</span
-            ><strong>{{ formatCurrency(portfolioValue) }}</strong>
-          </article>
-          <article class="summary-card">
-            <span class="summary-label">{{ t('stockExchange.recentDividends') }}</span
-            ><strong>{{ formatCurrency(recentDividendTotal) }}</strong>
-          </article>
-          <article class="summary-card summary-card--link">
-            <RouterLink to="/personal-ledger" class="ledger-link" :title="t('nav.personalLedger')">{{ t('stockExchange.viewPersonalLedger') }}</RouterLink>
-          </article>
-        </section>
+      <div v-else class="grid gap-6">
+        <StockSummaryCards v-if="personAccount" :person-account="personAccount" :portfolio-value="portfolioValue" :recent-dividend-total="recentDividendTotal" :locale="locale" />
         <section class="panel">
           <div class="section-header">
             <div>
@@ -844,250 +711,39 @@ useTickRefresh(async () => {
                 </tr>
               </thead>
               <tbody>
-                <template v-for="listing in paginatedListings" :key="listing.companyId"
-                  ><tr class="listing-row" :class="{ 'listing-row--expanded': expandedCompany === listing.companyId }">
-                    <td class="company-cell">
-                      <span class="company-name">{{ listing.companyName }}</span
-                      ><span v-if="listing.canClaimControl && !isControlledCompany(listing.companyId)" class="listing-chip listing-chip--control">{{ t('stockExchange.controlReady') }}</span
-                      ><span v-if="listing.canMerge" class="listing-chip listing-chip--merge">{{ t('stockExchange.mergeReady') }}</span
-                      ><span v-else-if="listing.playerOwnedShares + listing.controlledCompanyOwnedShares > 0" class="listing-chip listing-chip--owned">{{ t('stockExchange.ownedBadge') }}</span>
-                    </td>
-                    <td class="price-cell">
-                      <div class="price-stack">
-                        <span class="price-main">{{ formatCurrency(listing.sharePrice) }}</span
-                        ><span class="price-meta"> {{ t('stockExchange.bidAskHint', { bid: formatCurrency(listing.bidPrice), ask: formatCurrency(listing.askPrice) }) }} </span>
-                      </div>
-                    </td>
-                    <td>{{ formatCurrency(listing.marketValue) }}</td>
-                    <td>{{ formatShares(listing.publicFloatShares) }}</td>
-                    <td>
-                      <div class="ownership-cell">
-                        <span>{{ formatPercent(listing.combinedControlledOwnershipRatio) }}</span
-                        ><span v-if="listing.playerOwnedShares > 0" class="owned-shares-hint"> {{ t('stockExchange.personalShares', { shares: formatShares(listing.playerOwnedShares) }) }} </span
-                        ><span v-if="listing.controlledCompanyOwnedShares > 0" class="owned-shares-hint">
-                          {{ t('stockExchange.controlledCompanyShares', { shares: formatShares(listing.controlledCompanyOwnedShares) }) }}
-                        </span>
-                      </div>
-                    </td>
-                    <td class="dividend-cell">
-                      <span class="dividend-badge">{{ formatPercent(listing.dividendPayoutRatio) }}</span>
-                    </td>
-                    <td v-if="personAccount" class="actions-cell">
-                      <button class="btn btn-primary btn-sm" :class="{ 'btn-active': expandedCompany === listing.companyId }" @click="toggleTradePanel(listing.companyId)">
-                        {{ expandedCompany === listing.companyId ? t('stockExchange.closeTrade') : t('stockExchange.openTrade') }}</button
-                      ><button
-                        v-if="listing.canClaimControl && !isControlledCompany(listing.companyId)"
-                        class="btn btn-ghost btn-sm"
-                        :disabled="actionLoadingKey === `switch-${listing.companyId}`"
-                        @click="switchToCompanyAccount(listing.companyId)"
-                      >
-                        {{ t('stockExchange.claimControl') }}</button
-                      ><button v-if="listing.canMerge" class="btn btn-warning btn-sm" @click="openMergeDialog(listing.companyId)">{{ t('stockExchange.mergeCompany') }}</button>
-                    </td>
-                  </tr>
-                  <tr v-if="expandedCompany === listing.companyId" class="trade-panel-row">
-                    <td :colspan="personAccount ? 7 : 6">
-                      <div class="trade-panel">
-                        <div class="company-snapshot">
-                          <dl class="snapshot-grid">
-                            <div class="snapshot-item">
-                              <dt>{{ t('stockExchange.totalSharesLabel') }}</dt>
-                              <dd>{{ formatShares(listing.totalSharesIssued) }}</dd>
-                            </div>
-                            <div class="snapshot-item">
-                              <dt>{{ t('stockExchange.publicFloatLabel') }}</dt>
-                              <dd>
-                                {{ formatShares(listing.publicFloatShares) }} <span class="snapshot-pct">({{ formatPercent(listing.publicFloatShares / listing.totalSharesIssued) }})</span>
-                              </dd>
-                            </div>
-                            <div class="snapshot-item">
-                              <dt>{{ t('stockExchange.dividendPayoutLabel') }}</dt>
-                              <dd>{{ formatPercent(listing.dividendPayoutRatio) }}</dd>
-                            </div>
-                          </dl>
-                        </div>
-                        <div class="trade-price-context">
-                          <div class="trade-price-item">
-                            <span class="trade-price-label">{{ t('stockExchange.askPriceLabel') }}</span
-                            ><strong class="trade-price-value trade-price-ask">{{ formatCurrency(listing.askPrice) }}</strong
-                            ><span class="trade-price-hint">{{ t('stockExchange.askPriceHint') }}</span>
-                          </div>
-                          <div class="trade-price-item">
-                            <span class="trade-price-label">{{ t('stockExchange.bidPriceLabel') }}</span
-                            ><strong class="trade-price-value trade-price-bid">{{ formatCurrency(listing.bidPrice) }}</strong
-                            ><span class="trade-price-hint">{{ t('stockExchange.bidPriceHint') }}</span>
-                          </div>
-                        </div>
-                        <div class="trade-form">
-                          <div class="trade-order-panel">
-                            <div class="trade-order-header">
-                              <div class="trade-order-context">
-                                <span class="trade-order-caption">{{ t('stockExchange.tradeAccountLabel') }}</span
-                                ><strong class="trade-order-name">{{ activeTradeAccountName }}</strong>
-                                <p class="trade-order-hint">{{ activeTradeAccountType === 'COMPANY' ? t('stockExchange.tradeAccountHintCompany') : t('stockExchange.tradeAccountHintPerson') }}</p>
-                                <label class="trade-order-caption mt-2 block">{{ t('stockExchange.settlementAccountLabel') }}</label
-                                ><select v-model="selectedSettlementBankAccountId" class="trade-input mt-1" :aria-label="t('stockExchange.settlementAccountLabel')">
-                                  <option value="">{{ t('stockExchange.selectSettlementAccount') }}</option>
-                                  <option v-for="account in activeSettlementAccounts" :key="account.id" :value="account.id">{{ account.accountNumber }} · {{ formatCurrency(account.balance) }}</option>
-                                </select>
-                                <p v-if="activeSettlementAccounts.length === 0" class="trade-order-hint mt-1">{{ t('stockExchange.noUsdSettlementAccount') }}</p>
-                              </div>
-                              <span v-if="activeTradeAccountCash !== null" class="trade-account-cash"> {{ formatCurrency(activeTradeAccountCash) }} </span>
-                            </div>
-                            <div class="trade-order-controls">
-                              <!-- Label row: Quantity / Buy / Sell — hidden on mobile via CSS -->
-                              <div class="trade-controls-labels" aria-hidden="true">
-                                <span class="trade-field-label">{{ t('stockExchange.quantity') }}</span
-                                ><span class="trade-field-label">{{ t('stockExchange.buyLabel') }}</span
-                                ><span class="trade-field-label">{{ t('stockExchange.sellLabel') }}</span>
-                              </div>
-                              <!-- Controls row: input and both buttons share the same grid row for precise alignment -->
-                              <div class="trade-controls-inputs">
-                                <input
-                                  :value="quantityByCompany[listing.companyId] ?? 100"
-                                  type="number"
-                                  min="1"
-                                  step="1"
-                                  class="trade-input"
-                                  :aria-label="`${t('stockExchange.quantity')} ${listing.companyName}`"
-                                  @input="updateQuantity(listing.companyId, Number(($event.target as HTMLInputElement).value))"
-                                /><button class="btn btn-primary trade-action-btn" :disabled="actionLoadingKey === `buy-${listing.companyId}`" @click="executeTrade('buy', listing.companyId)">
-                                  {{ t('stockExchange.buyAt', { price: formatCurrency(listing.askPrice) }) }}</button
-                                ><button class="btn btn-secondary trade-action-btn" :disabled="actionLoadingKey === `sell-${listing.companyId}`" @click="executeTrade('sell', listing.companyId)">
-                                  {{ t('stockExchange.sellAt', { price: formatCurrency(listing.bidPrice) }) }}
-                                </button>
-                              </div>
-                              <!-- Estimates row: empty placeholder / est. cost / est. proceeds -->
-                              <div class="trade-controls-estimates">
-                                <span aria-hidden="true"></span
-                                ><span class="trade-est" aria-live="polite"> {{ t('stockExchange.estimatedCost', { total: formatCurrency(estimatedBuyCost(listing)) }) }} </span
-                                ><span class="trade-est" aria-live="polite"> {{ t('stockExchange.estimatedProceeds', { total: formatCurrency(estimatedSellProceeds(listing)) }) }} </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        <p v-if="successByCompany[listing.companyId]" class="trade-feedback trade-feedback--success" role="status">{{ successByCompany[listing.companyId] }}</p>
-                        <p v-if="errorByCompany[listing.companyId]" class="trade-feedback trade-feedback--error" role="alert">{{ errorByCompany[listing.companyId] }}</p>
-                        <div class="history-panel">
-                          <div class="history-panel__header">
-                            <h3>{{ t('stockExchange.priceHistoryTitle') }}</h3>
-                            <span class="history-panel__hint">{{ t('stockExchange.priceHistoryHint') }}</span>
-                          </div>
-                          <p v-if="priceHistoryLoadingByCompany[listing.companyId]" class="history-panel__state">{{ t('common.loading') }}</p>
-                          <p v-else-if="priceHistoryErrorByCompany[listing.companyId]" class="history-panel__state history-panel__state--error">{{ priceHistoryErrorByCompany[listing.companyId] }}</p>
-                          <p v-else-if="!priceHistoryByCompany[listing.companyId]?.length" class="history-panel__state">{{ t('stockExchange.priceHistoryEmpty') }}</p>
-                          <div v-else class="history-table-wrapper">
-                            <table class="history-table" :aria-label="`${listing.companyName} ${t('stockExchange.priceHistoryTitle')}`">
-                              <thead>
-                                <tr>
-                                  <th>{{ t('stockExchange.tick') }}</th>
-                                  <th>{{ t('stockExchange.sharePrice') }}</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr v-for="point in priceHistoryByCompany[listing.companyId]" :key="`${listing.companyId}-${point.tick}-${point.recordedAtUtc}`">
-                                  <td>{{ point.tick }}</td>
-                                  <td>{{ formatCurrency(point.price) }}</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                        <!-- Shareholders ownership panel -->
-                        <div class="shareholders-panel">
-                          <div class="history-panel__header">
-                            <h3>{{ t('stockExchange.shareholdersTitle') }}</h3>
-                            <span class="history-panel__hint">{{ t('stockExchange.shareholdersDesc') }}</span>
-                          </div>
-                          <p v-if="shareholdersLoadingByCompany[listing.companyId]" class="history-panel__state">{{ t('stockExchange.shareholdersLoading') }}</p>
-                          <p v-else-if="shareholdersErrorByCompany[listing.companyId]" class="history-panel__state history-panel__state--error">{{ shareholdersErrorByCompany[listing.companyId] }}</p>
-                          <template v-else-if="shareholdersByCompany[listing.companyId]"
-                            ><div v-for="ow in [shareholdersByCompany[listing.companyId]]" :key="ow ? ow.companyId : listing.companyId">
-                              <template v-if="ow"
-                                ><div class="shareholders-summary">
-                                  <span class="shareholders-summary__item">
-                                    {{ t('stockExchange.shareholdersTotalLabel') }}: <strong>{{ formatShares(ow.totalSharesIssued) }}</strong></span
-                                  ><span class="shareholders-summary__item"> {{ t('stockExchange.shareholdersCountLabel', { count: ow.shareholderCount }) }} </span
-                                  ><span v-if="ow.shareholders.length > 0" class="shareholders-summary__item">
-                                    {{ t('stockExchange.shareholdersLargestHolder') }}: <strong>{{ ow.shareholders[0]?.holderName }}</strong> ({{
-                                      formatPercent(ow.shareholders[0]?.ownershipRatio ?? 0)
-                                    }})
-                                  </span>
-                                </div>
-                                <p v-if="ow.shareholders.length === 0" class="history-panel__state">{{ t('stockExchange.shareholdersEmpty') }}</p>
-                                <p v-else-if="ow.shareholders.length === 1 && ow.publicFloatShares === 0" class="history-panel__state shareholders-single-owner">
-                                  {{ t('stockExchange.shareholdersSingleOwner') }}
-                                </p>
-                                <div v-if="ow.shareholders.length > 0" class="shareholders-layout">
-                                  <!-- Pie chart -->
-                                  <div class="ownership-chart">
-                                    <svg viewBox="0 0 160 160" width="160" height="160" :aria-label="t('stockExchange.shareholdersPieChartLabel')" role="img" class="ownership-donut">
-                                      <template v-if="buildPieSlices(ow).length > 0">
-                                        <path v-for="(seg, idx) in buildDonuts(buildPieSlices(ow), 80, 80, 72, 44)" :key="idx" :d="seg.d" :fill="seg.color" class="donut-segment" />
-                                      </template>
-                                      <circle v-else cx="80" cy="80" r="72" fill="#e0e0e0" /></svg
-                                    ><!-- Legend -->
-                                    <ul class="ownership-legend" :aria-label="t('stockExchange.shareholdersPieChartLabel')">
-                                      <li v-for="(seg, idx) in buildPieSlices(ow)" :key="idx" class="ownership-legend__item">
-                                        <span class="ownership-legend__swatch" :style="{ background: seg.color }" /><span class="ownership-legend__label">{{ seg.label }}</span
-                                        ><span class="ownership-legend__pct">{{ formatPercent(seg.ratio) }}</span>
-                                      </li>
-                                    </ul>
-                                  </div>
-                                  <!-- Shareholders table -->
-                                  <div class="shareholders-table-wrapper">
-                                    <table class="shareholders-table" :aria-label="`${listing.companyName} ${t('stockExchange.shareholdersTitle')}`">
-                                      <thead>
-                                        <tr>
-                                          <th>{{ t('stockExchange.shareholdersHolder') }}</th>
-                                          <th>{{ t('stockExchange.shareholdersShares') }}</th>
-                                          <th>{{ t('stockExchange.shareholdersOwnership') }}</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        <tr v-for="holder in ow.shareholders" :key="`${holder.holderPlayerId ?? holder.holderCompanyId}`" class="shareholder-row">
-                                          <td>
-                                            <span class="holder-name">{{ holder.holderName }}</span
-                                            ><span class="holder-type-badge" :class="holder.holderType === 'PERSON' ? 'holder-type-badge--person' : 'holder-type-badge--company'">
-                                              {{ holder.holderType === 'PERSON' ? t('stockExchange.shareholdersTypePerson') : t('stockExchange.shareholdersTypeCompany') }}
-                                            </span>
-                                          </td>
-                                          <td>{{ formatShares(holder.shareCount) }}</td>
-                                          <td>
-                                            <div class="ownership-bar-cell">
-                                              <div class="ownership-bar"><div class="ownership-bar__fill" :style="{ width: `${Math.min(holder.ownershipRatio * 100, 100)}%` }" /></div>
-                                              <span class="ownership-bar__pct">{{ formatPercent(holder.ownershipRatio) }}</span>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                        <!-- Public float row -->
-                                        <tr v-if="ow.publicFloatShares > 0" class="shareholder-row shareholder-row--float">
-                                          <td>
-                                            <span class="holder-name">{{ t('stockExchange.shareholdersPublicFloat') }}</span
-                                            ><span class="holder-type-badge holder-type-badge--float">Float</span>
-                                          </td>
-                                          <td>{{ formatShares(ow.publicFloatShares) }}</td>
-                                          <td>
-                                            <div class="ownership-bar-cell">
-                                              <div class="ownership-bar ownership-bar--float">
-                                                <div class="ownership-bar__fill" :style="{ width: `${Math.min((ow.publicFloatShares / ow.totalSharesIssued) * 100, 100)}%` }" />
-                                              </div>
-                                              <span class="ownership-bar__pct">{{ formatPercent(ow.publicFloatShares / ow.totalSharesIssued) }}</span>
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div></template
-                              >
-                            </div></template
-                          >
-                        </div>
-                      </div>
-                    </td>
-                  </tr></template
-                >
+                <StockMarketListingRow
+                  v-for="listing in paginatedListings"
+                  :key="listing.companyId"
+                  :listing="listing"
+                  :locale="locale"
+                  :show-actions="!!personAccount"
+                  :expanded="expandedCompany === listing.companyId"
+                  :is-controlled-company="isControlledCompany(listing.companyId)"
+                  :action-loading-key="actionLoadingKey"
+                  :active-trade-account-name="activeTradeAccountName"
+                  :active-trade-account-type="activeTradeAccountType"
+                  :active-trade-account-cash="activeTradeAccountCash"
+                  :active-settlement-accounts="activeSettlementAccounts"
+                  :selected-settlement-bank-account-id="selectedSettlementBankAccountId"
+                  :quantity="quantityByCompany[listing.companyId] ?? 100"
+                  :estimated-buy-cost="estimatedBuyCost(listing)"
+                  :estimated-sell-proceeds="estimatedSellProceeds(listing)"
+                  :success-message="successByCompany[listing.companyId] ?? null"
+                  :error-message="errorByCompany[listing.companyId] ?? null"
+                  :price-history="priceHistoryByCompany[listing.companyId] ?? []"
+                  :price-history-loading="priceHistoryLoadingByCompany[listing.companyId] ?? false"
+                  :price-history-error="priceHistoryErrorByCompany[listing.companyId] ?? null"
+                  :shareholders="shareholdersByCompany[listing.companyId] ?? null"
+                  :shareholders-loading="shareholdersLoadingByCompany[listing.companyId] ?? false"
+                  :shareholders-error="shareholdersErrorByCompany[listing.companyId] ?? null"
+                  @toggle-trade-panel="toggleTradePanel(listing.companyId)"
+                  @switch-to-company="switchToCompanyAccount(listing.companyId)"
+                  @open-merge="openMergeDialog(listing.companyId)"
+                  @update:settlement-bank-account-id="selectedSettlementBankAccountId = $event"
+                  @update-quantity="updateQuantity(listing.companyId, $event)"
+                  @buy="executeTrade('buy', listing.companyId)"
+                  @sell="executeTrade('sell', listing.companyId)"
+                />
               </tbody>
             </table>
             <div v-if="totalPages > 1" class="pagination-bar">
@@ -1097,106 +753,8 @@ useTickRefresh(async () => {
             </div>
           </div>
         </section>
-        <section v-if="personAccount" class="panel">
-          <div class="section-header">
-            <div>
-              <h2>{{ t('stockExchange.portfolioTitle') }}</h2>
-              <p>{{ t('stockExchange.portfolioDesc') }}</p>
-            </div>
-          </div>
-          <p v-if="personAccount.shareholdings.length === 0" class="empty-state">{{ t('stockExchange.portfolioEmpty') }}</p>
-          <div v-else class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>{{ t('stockExchange.company') }}</th>
-                  <th>{{ t('stockExchange.ownedShares') }}</th>
-                  <th>{{ t('stockExchange.holdingOwnership') }}</th>
-                  <th>{{ t('stockExchange.sharePrice') }}</th>
-                  <th>{{ t('stockExchange.holdingMarketValue') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="holding in personAccount.shareholdings" :key="holding.companyId">
-                  <td>{{ holding.companyName }}</td>
-                  <td>{{ formatShares(holding.shareCount) }}</td>
-                  <td>{{ formatPercent(holding.ownershipRatio) }}</td>
-                  <td>{{ formatCurrency(holding.sharePrice) }}</td>
-                  <td>{{ formatCurrency(holding.marketValue) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <section v-if="personAccount" class="panel">
-          <div class="section-header">
-            <div>
-              <h2>{{ t('stockExchange.dividendHistoryTitle') }}</h2>
-              <p>{{ t('stockExchange.dividendHistoryDesc') }}</p>
-            </div>
-          </div>
-          <p v-if="personAccount.dividendPayments.length === 0" class="empty-state">{{ t('stockExchange.dividendEmpty') }}</p>
-          <div v-else class="table-wrapper">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>{{ t('stockExchange.company') }}</th>
-                  <th>{{ t('stockExchange.dividendYear') }}</th>
-                  <th>{{ t('stockExchange.dividendPerShare') }}</th>
-                  <th>{{ t('stockExchange.dividendAmount') }}</th>
-                  <th>{{ t('stockExchange.recordedAt') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="payment in personAccount.dividendPayments" :key="payment.id">
-                  <td>{{ payment.companyName }}</td>
-                  <td>{{ payment.gameYear }}</td>
-                  <td>{{ formatCurrency(payment.amountPerShare) }}</td>
-                  <td>{{ formatCurrency(payment.totalAmount) }}</td>
-                  <td>{{ formatDateTime(payment.recordedAtUtc) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-        <section v-if="personAccount" class="panel">
-          <div class="section-header">
-            <div>
-              <h2>{{ t('stockExchange.tradeHistoryTitle') }}</h2>
-              <p>{{ t('stockExchange.tradeHistoryDesc') }}</p>
-            </div>
-          </div>
-          <p v-if="personAccount.stockTrades.length === 0" class="empty-state">{{ t('stockExchange.tradeHistoryEmpty') }}</p>
-          <div v-else class="table-wrapper">
-            <table class="data-table" :aria-label="t('stockExchange.tradeHistoryTitle')">
-              <thead>
-                <tr>
-                  <th>{{ t('stockExchange.company') }}</th>
-                  <th>{{ t('stockExchange.tradeDirection') }}</th>
-                  <th>{{ t('stockExchange.tradeQuantity') }}</th>
-                  <th>{{ t('stockExchange.tradePrice') }}</th>
-                  <th>{{ t('stockExchange.tradeTotal') }}</th>
-                  <th>{{ t('stockExchange.recordedAt') }}</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="trade in personAccount.stockTrades" :key="trade.id" class="trade-history-row">
-                  <td>{{ trade.companyName }}</td>
-                  <td>
-                    <span :class="trade.direction === 'BUY' ? 'direction-badge direction-badge--buy' : 'direction-badge direction-badge--sell'">{{
-                      trade.direction === 'BUY' ? t('stockExchange.tradeBuy') : t('stockExchange.tradeSell')
-                    }}</span>
-                  </td>
-                  <td>{{ formatShares(trade.shareCount) }}</td>
-                  <td>{{ formatCurrency(trade.pricePerShare) }}</td>
-                  <td>{{ formatCurrency(trade.totalValue) }}</td>
-                  <td>{{ formatDateTime(trade.recordedAtUtc) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section></template
-      >
+        <StockPersonPortfolio v-if="personAccount" :person-account="personAccount" :locale="locale" />
+      </div>
     </div>
   </div>
   <!-- Merge company dialog -->
@@ -1489,26 +1047,6 @@ useTickRefresh(async () => {
 .listing-chip--owned {
   background: color-mix(in srgb, var(--color-primary) 16%, transparent);
   color: var(--color-primary);
-}
-
-.direction-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.direction-badge--buy {
-  background: color-mix(in srgb, #22c55e 18%, transparent);
-  color: #16a34a;
-}
-
-.direction-badge--sell {
-  background: color-mix(in srgb, #ef4444 18%, transparent);
-  color: #dc2626;
 }
 
 .actions-cell {
@@ -2163,4 +1701,3 @@ useTickRefresh(async () => {
   text-align: right;
 }
 </style>
-
