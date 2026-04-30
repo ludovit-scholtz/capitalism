@@ -85,6 +85,22 @@ It will use real world map. The game will start in single city and later other c
 
 - [ ] Add pagination to the news items. By default show last 10 items
 
+### Support system (0% complete)
+
+- [ ] Design MasterApi support-ticket entities with ticket type, status, title, markdown source, sanitized preview, creator, timestamps, moderation fields, and immutable audit trail so workflow and security checks are fully traceable.
+- [ ] Implement support-ticket GraphQL mutations and queries for create, list, filter, sort, and status update flows, including strict authorization so users only see their own tickets while admins can access all tickets.
+- [ ] Implement ticket type validation allowing only Suggestion, Bug, and Other values, and reject malformed type inputs with consistent error codes to keep frontend filters and reporting deterministic.
+- [ ] Implement ticket status lifecycle with Submitted, In Progress, and Finished states, including explicit transition rules and administrator-only status updates so progress tracking remains reliable and auditable.
+- [ ] Build master-frontend user ticket page with sortable and filterable table by creation date and title, showing current state, last update, and ticket type for fast personal support tracking.
+- [ ] Build master-frontend admin ticket management page listing all users' tickets with default newest-first ordering and filters for type, date, and title to support high-volume triage operations.
+- [ ] Integrate a high-quality markdown WYSIWYG editor for ticket creation and editing, with image embed support, toolbar formatting controls, and client-side validation for required fields and content length.
+- [ ] Implement secure attachment and link handling pipeline that stores raw markdown and extracted URLs/images, flags unsafe content, and blocks formatted rendering until administrator review is explicitly approved.
+- [ ] Build admin moderation workflow that first displays raw markdown and raw link or image targets, then allows explicit safe-confirm action to unlock sanitized formatted preview for trusted content.
+- [ ] Implement markdown sanitization rules for rendered previews to prevent XSS, script URLs, unsafe HTML, and malicious embeds, while preserving allowed formatting that keeps support tickets readable and user-friendly.
+- [ ] Add notification and activity logging so users see status-change events and admins see moderation and workflow actions, including actor identity and timestamps for every critical support-ticket operation.
+- [ ] Add backend integration tests for permission boundaries, filter and sort behavior, status transitions, markdown sanitization, and moderation-gated rendering rules to prevent future regressions in support security.
+- [ ] Add master-frontend end-to-end tests covering user ticket submission, WYSIWYG markdown editing, table filtering and sorting, admin moderation approval flow, and visibility differences between normal users and administrators.
+
 ### Master ranking point system (0% complete)
 
 - [ ] Design MasterApi ranking entities for player points, bounty definitions, bounty reward records, daily scopes, server scopes, and one-time uniqueness keys so hourly evaluation can run idempotently without duplicate rewards or race conditions.
