@@ -6,6 +6,17 @@ It will use real world map. The game will start in single city and later other c
 
 ## Issues to work on
 
+
+### Dashboard speed
+
+- [ ] When I go to /dashboard it takes few seconds to load with few players in the game server. Make sure it is optimized well and takes less then 100ms to load.
+
+### Bots
+
+- [ ] Create NPC bot console app
+- [ ] If the bot did not setup a company yet, create an account and resolve the onboarding process
+- [ ] On npc bot console app run check the current state of the account and check if it is profitable to change the current settings
+
 ### Architecture optimization (24% complete)
 
 - [ ] Make sure to split big files into the components on frontend or better classes on backend. Make sure no file is bigger then 500 lines.
@@ -32,22 +43,6 @@ It will use real world map. The game will start in single city and later other c
 - [ ] Update all components to use Tailwind utilities
 
 **Shipped (increment 2 — core gameplay views):** Migrated five high-traffic views from legacy scoped CSS to Tailwind v4 utilities: `LeaderboardView` (wealth rankings with gradient hero, tab switcher, medal cards), `NewsView` (news/changelog feed with pill badges, unread indicators, and market-report table styles), `CompanySettingsView` (company profile, overhead dashboard, salary table), `PersonalLedgerView` (personal wealth breakdown, share trade history, dividend history), and `ManufacturingEncyclopediaView` (catalog grid with search, industry filter, and resource/product cards). All E2E selector classes preserved; scoped CSS fully removed from all five files (total ~1,200 style-lines eliminated). Files reduced well below the 500-line limit.
-
-### Context switching (100% complete)
-
-- [x] When user logs in, the city should be selected according to the player most used city. However i see ?? in the navbar for the city selection.
-- [x] Remove from the new building flow the city selection. City must be selected with the context switching.
-- [x] In the city map remove the cities switcher. Use the navbar context switcher to switch between the cities.
-
-### Currencies and bank accounts (100% complete)
-
-- [x] Investigate and fix why the current balance at the bank account does not match the balance of the last item in the bank statement.
-- [x] Every operation which changes the bank account balance must be listed in the ledger entry and visible in the statement
-
-### Number formatting (100% complete)
-
-- [x] In the number formatting component define also the size of the field the frontend has to show the number. If there is enough space, show number 12376909 as 12,376,909 and if there is limitted space, show it as 12M.
-- [x] Add to the title the original number to be formatted and currency after it. When player stay with mouse over the number, he should see the original number input.
 
 ### Power plants (100% complete)
 

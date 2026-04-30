@@ -660,6 +660,14 @@ If user's personal account is ranked in top 100 players in any game server, user
 
 If user's company is ranked in top 10 players in any game server, user receives the bounty reward. This can be applied only once per day from any game server.
 
+## NPC bots
+
+In the game are basic NPC bots which plays the same way as basic users. They are run by the scheduled console app. Their role is to find the best products to produce and sell at the market while utilizing the marketing and research. The bots must play in a way to reach in game profit with level 1 units.
+
+Bots are written in c# as the console apps and on scheduled time once an hour analyze the product what they want to produce and sell, and if they have the capacity to reorganize their factories and sales shops.
+
+Game administrators can start new bot.
+
 # Technical implementation
 
 Game server frontend is Vue.js with source code located at projects/frontend using Tailwind styling.
