@@ -272,7 +272,16 @@ watch([selectedCityId, selectedType], async ([cityId, buildingType]) => {
 
     availableLots.value = data.cityLots.filter((lot) => {
       const supportedTypes = lot.suitableTypes.split(',').map((item) => item.trim())
-      return !lot.ownerCompanyId && supportedTypes.includes(buildingType)
+      if (lot.ownerCompanyId || !supportedTypes.includes(buildingType)) {
+        return false
+      }
+
+      // Mining lots must always expose deposit metadata in the purchase flow.
+      if (buildingType === 'MINE') {
+        return lot.resourceType != null && lot.materialQuality != null && lot.materialQuantity != null
+      }
+
+      return true
     })
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : t('cityMap.purchaseError')
@@ -667,7 +676,13 @@ async function buyBuilding() {
                 <span class="text-sm font-bold text-good shrink-0">{{ formatCurrency(lot.price) }}</span>
               </div>
               <span class="text-[0.8125rem] text-muted">{{ districtLabel(lot.district) }}</span>
-              <span class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
+              <span v-if="selectedType === 'MINE' && lot.materialQuality != null" class="text-[0.8125rem] text-muted">
+                {{ t('cityMap.rawMaterialQuality') }}: {{ Math.round(lot.materialQuality * 100) }}%
+              </span>
+              <span v-if="selectedType === 'MINE' && lot.materialQuantity != null" class="text-[0.8125rem] text-muted">
+                {{ t('cityMap.rawMaterialQuantity') }}: {{ lot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}
+              </span>
+              <span v-if="selectedType !== 'MINE'" class="text-[0.8125rem] text-muted"> {{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(lot.populationIndex) }} </span>
               <span class="text-[0.8125rem] text-muted"> {{ t('buildings.appraisedValue') }}: {{ formatCurrency(lot.basePrice) }} </span>
               <span v-if="selectedPropertyAreaSqm != null" class="text-[0.8125rem] text-muted">{{ t('buildings.propertySize') }}: {{ formatSqm(selectedPropertyAreaSqm) }}</span>
               <span
@@ -698,7 +713,13 @@ async function buyBuilding() {
                   >{{ t('cityMap.resourcePremium') }}</span
                 >
               </span>
-              <span>{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
+              <span v-if="selectedType === 'MINE' && selectedLot.materialQuality != null"
+                >{{ t('cityMap.rawMaterialQuality') }}: <strong class="text-body">{{ Math.round(selectedLot.materialQuality * 100) }}%</strong></span
+              >
+              <span v-if="selectedType === 'MINE' && selectedLot.materialQuantity != null"
+                >{{ t('cityMap.rawMaterialQuantity') }}: <strong class="text-body">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</strong></span
+              >
+              <span v-if="selectedType !== 'MINE'">{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
               <span v-if="selectedPropertyAreaSqm != null"
                 >{{ t('buildings.propertySize') }}: <strong class="text-body">{{ formatSqm(selectedPropertyAreaSqm) }}</strong></span
               >

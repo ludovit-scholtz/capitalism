@@ -495,6 +495,171 @@ Make sure to show power-plant P&L chart in building overview.
 - When purchasing subscription and user does not have active referral, user is prompted to add referral code. There is no explicit message that referral code gives discount, so the recommender should promote it.
 - Referral dashboard shows number of registered users under specific referral code, number of second-level referral registrations, number of active subscriptions, and number of second-level active referral subscriptions.
 
+## Support system
+
+At the master frontend user can create a support ticket. The support tickets are of 3 types: 
+
+- I have a suggestion
+- I found a bug
+- Other
+
+The ticket has state: 
+- Submitted
+- In progress
+- Finished
+
+User can see his own tickets and its states in the table where he can filter, sort by creation date or title.
+
+Administrators can see all tickets from all users, can sort and filter by type, date, title. By default the newest tickets are at the top.
+
+The tickets are created in md format. There must be nice wysiwyg editor so that users are happy and can also post the images.
+
+If the post contains images or links make sure to show the raw file to admin and after he confirms it is safe he is able to see the formatted md content.
+
+## Master ranking point system
+
+Master ranking system is player engagement tracker with bounties. There are different type of bounties - with periodic refresh or one time bounties.
+
+Each player can see his points and also the bounties track record for each bounty in the master frontend.
+
+At the UTC midnight (once per day) the ranking of all players is reduced to 99%. This will ensure that old players who are not playing any more in time will loose the ranking.
+
+Ranking system is evaluated once per an hour by the scheduled task at the master backend.
+
+It must be enjoyable for players to see and compete with other players in the master ranking.
+
+Below is the list of the bounties
+
+### Game improver
+- Periodic bounty with refresh interval 1 day at the utc midnight
+- Reward: 5 points
+
+When user fills in the game improvement or bug report form, he receives this bounty. The bounty is limited to one submission per day.
+
+### Recommend a friend
+- Periodic bounty with refresh interval 1 day at the utc midnight
+- Reward: 5 points
+
+When user recommends other player using the referal link and other player register the user receives this bounty
+
+### Recommend a good friend
+- Periodic bounty with refresh interval 1 day at the utc midnight
+- Reward: 100 points
+
+When recommended player purchase the starting pack or activates the subscription, the referee receives the bounty reward
+
+### Retweet a X post
+- One time per post
+- Reward: 5 points
+
+Administrator can set up the bounty for retweeting the post. The player will be awarded the bounty if he retweets, submit the url for the check, and the tweet will tag at least 2 other player's friends.
+
+The retweets are private and only administrators can see the links of the retweets in the bounty records.
+
+### Discord player
+- One time bounty
+- Reward: 50 points
+
+If user joins the game discord and validates through the discord bot, he receives the bounty reward.
+
+Discord username is private for public, but Administrators can check the discord username in the player's bounty rewards.
+
+### Log in to the game
+- Periodic bounty with refresh interval 1 day at the utc midnight, scoped for each game server
+- Reward: 5 points
+
+For every game server where user logs in and loads the user dashboard, if he did not receive the bounty reward he will receive it.
+
+### Manufacturer
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 1 points
+
+If user has a factory and produced any amount of products, he receives the bounty reward. This can be applied only once per day from any game server.
+
+### Wholesaler
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 1 points
+
+If user has a sales shop and sold any amount of products, he receives the bounty reward. This can be applied only once per day from any game server.
+
+### Researcher
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user owns a R&D building and has setup a research budget in any unit, he receives the bounty. This can be applied only once per day from any game server.
+
+### Real estate magnate
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user owns a Appartment or commercial building and has any occupancy, he receives the bounty. This can be applied only once per day from any game server.
+
+### Media owner
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user owns any Media house and has setup any budget for the content creation, he receives the bounty. This can be applied only once per day from any game server.
+
+### Banker
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user owns a bank building and any other user has made a deposit to it, the bank owner user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Lender
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user owns a bank building and any other user has active loan, the bank owner user receives the bounty reward. This can be applied only once per day from any game server.
+
+### FX Trader
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user swaps any currency to any other in game currency, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Stock Trader
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user buys any stocks, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Energy Trader
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user owns any power plant and ships any energy to the market, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Good employer
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 10 points
+
+If user has highest wage rate in any city in which he pays salaries in any game server, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Dividends master
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user's owned company pays out the dividend to shareholders, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Top player
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 5 points
+
+If user's personal account is ranked in top 10 players in any game server, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Great player
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 2 points
+
+If user's personal account is ranked in top 100 players in any game server, user receives the bounty reward. This can be applied only once per day from any game server.
+
+### Company master
+- Periodic bounty with refresh interval 1 day at the utc midnight, applied only once for any game server
+- Reward: 5 points
+
+If user's company is ranked in top 10 players in any game server, user receives the bounty reward. This can be applied only once per day from any game server.
+
 # Technical implementation
 
 Game server frontend is Vue.js with source code located at projects/frontend using Tailwind styling.

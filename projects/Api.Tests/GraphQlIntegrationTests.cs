@@ -14700,8 +14700,8 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         Assert.True(mineLots.Count >= 2,
             "Expected at least 2 seeded mine lots with resource deposits in Bratislava");
 
-        const decimal MinPremiumPrice = 15_000_000m;  // "roughly $20M" — allow some flexibility for lower-quality deposits
-        const decimal MaxPremiumPrice = 250_000_000m; // allow slight overage for high-value (Gold) lots
+        const decimal MinPremiumPrice = 20_000_000m;
+        const decimal MaxPremiumPrice = 200_000_000m;
 
         foreach (var lot in mineLots)
         {
@@ -14720,6 +14720,471 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             $"Mine lot prices should span the band: lowest={prices[0]:C0}, highest={prices[^1]:C0}. " +
             "Higher-quality / more-valuable deposits should command significantly higher prices.");
     }
+
+    [Fact]
+    public async Task CityLots_MineLotsCoverAllResourcesPerCity_WithDepositData()
+    {
+        // Mining roadmap hard requirement:
+        // 1) Every mine lot has resource + quality + quantity.
+        // 2) Every city has at least one mine lot for every resource type.
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var resourcesResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "{ resourceTypes { id slug } }");
+
+        Assert.False(resourcesResult.TryGetProperty("errors", out _), "resourceTypes should not return GraphQL errors");
+        var resourceSlugs = resourcesResult.GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray()
+            .Select(r => r.GetProperty("slug").GetString()!)
+            .Where(slug => !string.IsNullOrWhiteSpace(slug))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var expectedResourceSlugs = new[]
+        {
+            "wood",
+            "iron-ore",
+            "coal",
+            "gold",
+            "chemical-minerals",
+            "cotton",
+            "grain",
+            "silicon",
+        };
+
+        var missingExpectedResourceSlugs = expectedResourceSlugs
+            .Where(slug => !resourceSlugs.Contains(slug))
+            .ToList();
+        Assert.True(missingExpectedResourceSlugs.Count == 0,
+            $"Resource catalog is missing expected raw materials: {string.Join(", ", missingExpectedResourceSlugs)}");
+
+        var resourceIds = resourcesResult.GetProperty("data").GetProperty("resourceTypes")
+            .EnumerateArray()
+            .Select(r => r.GetProperty("id").GetString()!)
+            .Where(id => !string.IsNullOrWhiteSpace(id))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var citiesResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "{ cities { id name resources { resourceType { id } } } }");
+
+        Assert.False(citiesResult.TryGetProperty("errors", out _), "cities should not return GraphQL errors");
+        var cities = citiesResult.GetProperty("data").GetProperty("cities").EnumerateArray().ToList();
+        Assert.True(cities.Count > 0, "Expected at least one city");
+
+        foreach (var city in cities)
+        {
+            var cityId = city.GetProperty("id").GetString();
+            var cityName = city.GetProperty("name").GetString() ?? "Unknown";
+            Assert.False(string.IsNullOrWhiteSpace(cityId), "City id must not be empty");
+
+            var nativeResourceIds = city.GetProperty("resources")
+                .EnumerateArray()
+                .Select(r => r.GetProperty("resourceType").GetProperty("id").GetString()!)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var cityLotsResult = await ExecuteGraphQlAsync(
+                isolatedClient,
+                """
+                query CityLots($cityId: UUID!) {
+                  cityLots(cityId: $cityId) {
+                    id suitableTypes
+                    resourceType { id slug }
+                    materialQuality
+                    materialQuantity
+                  }
+                }
+                """,
+                new { cityId });
+
+            Assert.False(cityLotsResult.TryGetProperty("errors", out _), $"cityLots should not return errors for {cityName}");
+
+            var mineLots = cityLotsResult.GetProperty("data").GetProperty("cityLots")
+                .EnumerateArray()
+                .Where(l => l.GetProperty("suitableTypes").GetString()!.Contains("MINE", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Assert.True(mineLots.Count > 0, $"Expected at least one mine lot in {cityName}");
+
+            foreach (var lot in mineLots)
+            {
+                var resourceNode = lot.GetProperty("resourceType");
+                Assert.True(resourceNode.ValueKind != JsonValueKind.Null,
+                    $"Every mine lot in {cityName} must expose resourceType");
+
+                var qualityNode = lot.GetProperty("materialQuality");
+                var quantityNode = lot.GetProperty("materialQuantity");
+
+                Assert.True(qualityNode.ValueKind != JsonValueKind.Null,
+                    $"Every mine lot in {cityName} must expose materialQuality");
+                Assert.True(quantityNode.ValueKind != JsonValueKind.Null,
+                    $"Every mine lot in {cityName} must expose materialQuantity");
+
+                var quality = qualityNode.GetDecimal();
+                var quantity = quantityNode.GetDecimal();
+                var resourceId = resourceNode.GetProperty("id").GetString()!;
+
+                Assert.True(quality > 0m && quality <= 1m,
+                    $"Mine lot in {cityName} has invalid materialQuality {quality}");
+                Assert.True(quantity > 0m,
+                    $"Mine lot in {cityName} has non-positive materialQuantity {quantity}");
+
+                if (nativeResourceIds.Contains(resourceId))
+                {
+                    Assert.True(quality >= 0.5m,
+                        $"Mine lot in {cityName} for native resource {resourceId} must have quality in 50%-100% band but has {quality:P0}");
+                }
+                else
+                {
+                    Assert.True(quality <= 0.5m,
+                        $"Mine lot in {cityName} for non-native resource {resourceId} must have quality in 0%-50% band but has {quality:P0}");
+                }
+            }
+
+            var coveredResourceIds = mineLots
+                .Select(l => l.GetProperty("resourceType").GetProperty("id").GetString()!)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var missingResourceIds = resourceIds.Where(id => !coveredResourceIds.Contains(id)).ToList();
+            Assert.True(missingResourceIds.Count == 0,
+                $"City {cityName} is missing mine lots for resource ids: {string.Join(", ", missingResourceIds)}");
+        }
+    }
+
+    [Fact]
+    public async Task CityLots_QuerySelfHealsMineLotsMissingResourceData()
+    {
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var cityId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
+        var cityGuid = Guid.Parse(cityId);
+
+        var brokenLotId = Guid.NewGuid();
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.BuildingLots.Add(new BuildingLot
+            {
+                Id = brokenLotId,
+                CityId = cityGuid,
+                Name = "Broken Mine Lot",
+                Description = "Legacy lot missing deposit metadata",
+                District = "Extraction Belt",
+                Latitude = 48.152,
+                Longitude = 17.124,
+                PopulationIndex = 0.75m,
+                BasePrice = 72_975m,
+                Price = 72_975m,
+                SuitableTypes = "MINE",
+                ResourceTypeId = null,
+                MaterialQuality = null,
+                MaterialQuantity = null,
+            });
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            query CityLots($cityId: UUID!) {
+              cityLots(cityId: $cityId) {
+                id
+                suitableTypes
+                resourceType { id slug }
+                materialQuality
+                materialQuantity
+              }
+            }
+            """,
+            new { cityId });
+
+        Assert.False(result.TryGetProperty("errors", out _), "cityLots should not return errors");
+
+        var healedLot = result.GetProperty("data").GetProperty("cityLots")
+            .EnumerateArray()
+            .First(l => l.GetProperty("id").GetGuid() == brokenLotId);
+
+        Assert.True(healedLot.GetProperty("suitableTypes").GetString()!.Contains("MINE", StringComparison.OrdinalIgnoreCase));
+        Assert.True(healedLot.GetProperty("resourceType").ValueKind != JsonValueKind.Null,
+            "Mine lots returned by cityLots must always have resourceType defined.");
+        Assert.True(healedLot.GetProperty("materialQuality").ValueKind != JsonValueKind.Null,
+            "Mine lots returned by cityLots must always have materialQuality defined.");
+        Assert.True(healedLot.GetProperty("materialQuantity").ValueKind != JsonValueKind.Null,
+            "Mine lots returned by cityLots must always have materialQuantity defined.");
+
+        var quality = healedLot.GetProperty("materialQuality").GetDecimal();
+        var quantity = healedLot.GetProperty("materialQuantity").GetDecimal();
+        Assert.True(quality > 0m && quality <= 1m, $"Unexpected healed quality: {quality}");
+        Assert.True(quantity > 0m, $"Unexpected healed quantity: {quantity}");
+    }
+
+        [Fact]
+        public async Task Cities_BratislavaResourceFocus_IncludesWood()
+        {
+                await using var isolatedFactory = new ApiWebApplicationFactory();
+                using var isolatedClient = isolatedFactory.CreateClient();
+
+                var result = await ExecuteGraphQlAsync(
+                        isolatedClient,
+                        """
+                        {
+                            cities {
+                                name
+                                resources {
+                                    resourceType { slug }
+                                }
+                            }
+                        }
+                        """);
+
+                Assert.False(result.TryGetProperty("errors", out _), "cities should not return GraphQL errors");
+
+                var bratislava = result.GetProperty("data").GetProperty("cities")
+                        .EnumerateArray()
+                        .First(city => city.GetProperty("name").GetString() == "Bratislava");
+
+                var resourceSlugs = bratislava.GetProperty("resources")
+                        .EnumerateArray()
+                        .Select(resource => resource.GetProperty("resourceType").GetProperty("slug").GetString()!)
+                        .Where(slug => !string.IsNullOrWhiteSpace(slug))
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                Assert.Contains("wood", resourceSlugs);
+        }
+
+        [Fact]
+        public async Task PurchaseLot_MineLotPurchase_CreatesReplacementLotForSameResource()
+        {
+                await using var isolatedFactory = new ApiWebApplicationFactory();
+                using var isolatedClient = isolatedFactory.CreateClient();
+
+            var playerId = Guid.NewGuid();
+            var companyId = Guid.NewGuid().ToString();
+            var playerEmail = $"mine-replacement-{Guid.NewGuid():N}@test.com";
+            var token = CreateSharedToken(playerId.ToString(), playerEmail, "Mine Replacement User");
+                var bratislavaId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
+
+            await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var companyGuid = Guid.Parse(companyId);
+
+                var player = new Player
+                {
+                    Id = playerId,
+                    Email = playerEmail,
+                    DisplayName = "Mine Replacement User",
+                    PasswordHash = "seeded",
+                    Role = PlayerRole.Player,
+                    ActiveAccountType = AccountContextType.Company,
+                    ActiveCompanyId = companyGuid,
+                    CreatedAtUtc = DateTime.UtcNow,
+                };
+
+                var company = new Company
+                {
+                    Id = companyGuid,
+                    PlayerId = playerId,
+                    Name = "Mine Replacement Co",
+                    Cash = 0m,
+                    TotalSharesIssued = 10_000m,
+                };
+
+                db.Players.Add(player);
+                db.Companies.Add(company);
+                await db.SaveChangesAsync();
+
+                var companyAccount = await CompanyBankingService.EnsurePreferredAccountAsync(db, companyGuid, "EUR");
+                companyAccount.Balance = 500_000_000m;
+                await db.SaveChangesAsync();
+            }
+
+                var initialLotsResult = await ExecuteGraphQlAsync(
+                        isolatedClient,
+                        """
+                        query CityLots($cityId: UUID!) {
+                            cityLots(cityId: $cityId) {
+                                id
+                                ownerCompanyId
+                                suitableTypes
+                                resourceType { slug }
+                            }
+                        }
+                        """,
+                        new { cityId = bratislavaId });
+
+                Assert.False(initialLotsResult.TryGetProperty("errors", out _), "Initial cityLots should succeed");
+
+                var availableWoodMineLot = initialLotsResult.GetProperty("data").GetProperty("cityLots")
+                        .EnumerateArray()
+                        .First(lot =>
+                                lot.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null
+                                && lot.GetProperty("suitableTypes").GetString()!.Contains("MINE", StringComparison.OrdinalIgnoreCase)
+                                && lot.GetProperty("resourceType").ValueKind != JsonValueKind.Null
+                                && lot.GetProperty("resourceType").GetProperty("slug").GetString() == "wood");
+
+                var purchasedLotId = availableWoodMineLot.GetProperty("id").GetGuid();
+
+                var purchaseResult = await ExecuteGraphQlAsync(
+                        isolatedClient,
+                        """
+                        mutation PurchaseLot($input: PurchaseLotInput!) {
+                            purchaseLot(input: $input) {
+                                building { id }
+                            }
+                        }
+                        """,
+                        new
+                        {
+                                input = new
+                                {
+                                        companyId,
+                                        lotId = purchasedLotId,
+                                        buildingType = "MINE",
+                                        buildingName = "Replacement Test Mine"
+                                }
+                        },
+                        token);
+
+                Assert.False(purchaseResult.TryGetProperty("errors", out _), "purchaseLot should succeed for wood mine lot");
+
+                var refreshedLotsResult = await ExecuteGraphQlAsync(
+                        isolatedClient,
+                        """
+                        query CityLots($cityId: UUID!) {
+                            cityLots(cityId: $cityId) {
+                                id
+                                ownerCompanyId
+                                suitableTypes
+                                resourceType { slug }
+                            }
+                        }
+                        """,
+                        new { cityId = bratislavaId });
+
+                Assert.False(refreshedLotsResult.TryGetProperty("errors", out _), "Refreshed cityLots should succeed");
+
+                var remainingAvailableWoodLots = refreshedLotsResult.GetProperty("data").GetProperty("cityLots")
+                        .EnumerateArray()
+                        .Where(lot =>
+                                lot.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null
+                                && lot.GetProperty("suitableTypes").GetString()!.Contains("MINE", StringComparison.OrdinalIgnoreCase)
+                                && lot.GetProperty("resourceType").ValueKind != JsonValueKind.Null
+                                && lot.GetProperty("resourceType").GetProperty("slug").GetString() == "wood")
+                        .ToList();
+
+                Assert.True(remainingAvailableWoodLots.Count > 0,
+                        "After buying a wood mine lot, at least one other purchasable wood mine lot must be generated so no player can monopolize the resource.");
+        }
+
+            [Fact]
+            public async Task CityLots_PragueQueryBackfillsWoodFocus_AndReturnsWoodMineLot()
+            {
+                await using var isolatedFactory = new ApiWebApplicationFactory();
+                using var isolatedClient = isolatedFactory.CreateClient();
+                var pragueId = Guid.Parse(await GetCityIdByNameAsync(isolatedClient, "Prague"));
+
+                await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+                {
+                    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    var woodId = await db.ResourceTypes
+                        .Where(resource => resource.Slug == "wood")
+                        .Select(resource => resource.Id)
+                        .FirstAsync();
+
+                    var pragueWoodRows = await db.CityResources
+                        .Where(cityResource => cityResource.CityId == pragueId && cityResource.ResourceTypeId == woodId)
+                        .ToListAsync();
+                    db.CityResources.RemoveRange(pragueWoodRows);
+
+                    var pragueWoodMineLots = await db.BuildingLots
+                        .Where(lot => lot.CityId == pragueId && lot.ResourceTypeId == woodId)
+                        .ToListAsync();
+                    db.BuildingLots.RemoveRange(pragueWoodMineLots);
+
+                    await db.SaveChangesAsync();
+                }
+
+                var result = await ExecuteGraphQlAsync(
+                    isolatedClient,
+                    """
+                    query CityLots($cityId: UUID!) {
+                      cityLots(cityId: $cityId) {
+                        id
+                        ownerCompanyId
+                        suitableTypes
+                        resourceType { slug }
+                        materialQuality
+                      }
+                    }
+                    """,
+                    new { cityId = pragueId });
+
+                Assert.False(result.TryGetProperty("errors", out _), "cityLots should not return GraphQL errors for Prague");
+
+                var availableWoodMineLots = result.GetProperty("data").GetProperty("cityLots")
+                    .EnumerateArray()
+                    .Where(lot => lot.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null
+                        && lot.GetProperty("suitableTypes").GetString()!.Contains("MINE", StringComparison.OrdinalIgnoreCase)
+                        && lot.GetProperty("resourceType").ValueKind != JsonValueKind.Null
+                        && lot.GetProperty("resourceType").GetProperty("slug").GetString() == "wood")
+                    .ToList();
+
+                Assert.True(availableWoodMineLots.Count > 0,
+                    "Prague cityLots query should restore the missing wood focus resource and return at least one purchasable wood mine lot.");
+
+                foreach (var lot in availableWoodMineLots)
+                {
+                    var quality = lot.GetProperty("materialQuality").GetDecimal();
+                    Assert.True(quality >= 0.5m,
+                        $"Prague wood mine lot quality should be at least 50% because wood is a focused resource in Prague, but got {quality:P0}.");
+                }
+            }
+
+            [Fact]
+            public async Task CityLots_PragueQueryReturnsMineLotsForAllCanonicalResources()
+            {
+                await using var isolatedFactory = new ApiWebApplicationFactory();
+                using var isolatedClient = isolatedFactory.CreateClient();
+                var pragueId = Guid.Parse(await GetCityIdByNameAsync(isolatedClient, "Prague"));
+
+                var result = await ExecuteGraphQlAsync(
+                    isolatedClient,
+                    """
+                    query CityLots($cityId: UUID!) {
+                      cityLots(cityId: $cityId) {
+                        ownerCompanyId
+                        suitableTypes
+                        resourceType { slug }
+                        materialQuality
+                      }
+                    }
+                    """,
+                    new { cityId = pragueId });
+
+                Assert.False(result.TryGetProperty("errors", out _), "cityLots should not return GraphQL errors for Prague");
+
+                var availableMineLots = result.GetProperty("data").GetProperty("cityLots")
+                    .EnumerateArray()
+                    .Where(lot => lot.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null
+                        && lot.GetProperty("suitableTypes").GetString()!.Contains("MINE", StringComparison.OrdinalIgnoreCase)
+                        && lot.GetProperty("resourceType").ValueKind != JsonValueKind.Null)
+                    .ToList();
+
+                var availableSlugs = availableMineLots
+                    .Select(lot => lot.GetProperty("resourceType").GetProperty("slug").GetString()!)
+                    .Where(slug => !string.IsNullOrWhiteSpace(slug))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var expectedSlugs = new[] { "wood", "iron-ore", "coal", "gold", "chemical-minerals", "cotton", "grain", "silicon" };
+                var missingSlugs = expectedSlugs.Where(slug => !availableSlugs.Contains(slug)).ToList();
+                Assert.True(missingSlugs.Count == 0,
+                    $"Prague should have at least one purchasable mine lot for every canonical resource. Missing: {string.Join(", ", missingSlugs)}");
+            }
 
     [Fact]
     public async Task PurchaseLot_UpdatesCompanyCashBalance()
