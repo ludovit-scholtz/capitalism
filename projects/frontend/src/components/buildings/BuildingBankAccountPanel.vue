@@ -364,7 +364,7 @@ watch(
 
     <template v-else-if="accountInfo">
       <div v-if="isSuspended || hasMissingAccount" class="bba-alert" :class="{ 'bba-alert-warning': hasMissingAccount, 'bba-alert-danger': hasInsufficientFunds }" role="alert" aria-live="polite">
-        <span class="bba-alert-icon">{{ hasInsufficientFunds ? '├ö├ť├í┬┤┼×─ć' : '┬ş─Ź─║├ş' }}</span>
+        <span class="bba-alert-icon">{{ hasInsufficientFunds ? '⚠️' : '💡' }}</span>
         <span class="bba-alert-message">{{ suspensionLabel }}</span>
       </div>
 

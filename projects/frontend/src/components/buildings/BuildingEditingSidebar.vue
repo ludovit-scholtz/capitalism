@@ -421,21 +421,21 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 >
                   <option value="">{{ t('buildingDetail.config.noMediaHouse') }}</option>
                   <option v-for="mh in cityMediaHouses" :key="mh.id" :value="mh.id" :disabled="mh.isUnderConstruction || mh.powerStatus === 'OFFLINE'">
-                    {{ mh.name }} ┬Ě {{ mh.mediaType ?? '?' }} ┬Ě ├Ś{{ mh.effectivenessMultiplier.toFixed(1) }} ┬Ě {{ t('buildingDetail.config.contentRanking') }} {{ mh.contentRanking.toFixed(0) }}%
-                    {{ mh.isGovernmentOwned ? ` ┬Ě ${t('buildingDetail.config.govBadge')}` : '' }}
-                    {{ mh.ownerCompanyId === building?.companyId ? ` ┬Ě ${t('buildingDetail.config.yourStation')}` : '' }}
-                    {{ mh.isUnderConstruction ? ` ┬Ě ${t('buildingDetail.config.underConstruction')}` : '' }}
-                    {{ mh.powerStatus === 'OFFLINE' ? ` ┬Ě ${t('buildingDetail.config.offline')}` : '' }}
+                    {{ mh.name }} · {{ mh.mediaType ?? '?' }} · ×{{ mh.effectivenessMultiplier.toFixed(1) }} · {{ t('buildingDetail.config.contentRanking') }} {{ mh.contentRanking.toFixed(0) }}%
+                    {{ mh.isGovernmentOwned ? ` · ${t('buildingDetail.config.govBadge')}` : '' }}
+                    {{ mh.ownerCompanyId === building?.companyId ? ` · ${t('buildingDetail.config.yourStation')}` : '' }}
+                    {{ mh.isUnderConstruction ? ` · ${t('buildingDetail.config.underConstruction')}` : '' }}
+                    {{ mh.powerStatus === 'OFFLINE' ? ` · ${t('buildingDetail.config.offline')}` : '' }}
                   </option>
                 </select>
 
                 <div v-if="selectedDraftMediaHouse" class="rounded-lg border border-divider bg-surface p-2 text-xs text-muted">
                   <p class="font-medium text-foreground">{{ selectedDraftMediaHouse.name }} ({{ selectedDraftMediaHouse.mediaType ?? '?' }})</p>
-                  <p>{{ selectedDraftMediaHouse.cityName }} ┬Ě ├Ś{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
+                  <p>{{ selectedDraftMediaHouse.cityName }} · ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
                   <p>{{ t('buildingDetail.config.contentRanking') }}: {{ selectedDraftMediaHouse.contentRanking.toFixed(0) }}%</p>
                 </div>
               </div>
-              <p v-if="selectedDraftMediaHouse" class="config-hint">{{ t('buildingDetail.config.channelEffect') }} ├Ś{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
+              <p v-if="selectedDraftMediaHouse" class="config-hint">{{ t('buildingDetail.config.channelEffect') }} ×{{ selectedDraftMediaHouse.effectivenessMultiplier.toFixed(1) }}</p>
             </div>
           </template>
 
@@ -524,7 +524,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
             <p class="config-help">{{ t('buildingDetail.proAccessHint') }}</p>
           </template>
 
-          <!-- Storage unit config ÔÇö no configuration needed; storage is universal -->
+          <!-- Storage unit config — no configuration needed; storage is universal -->
           <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'STORAGE'">
             <p class="config-help">{{ t('buildingDetail.config.storageUniversalInfo') }}</p>
           </template>
@@ -753,7 +753,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
 
           <!-- Upgrade in progress (from pending configuration) -->
           <div v-if="selectedCellPendingUpgrade" class="unit-upgrade-in-progress">
-            <div class="unit-upgrade-progress-badge">ÔĆ│</div>
+            <div class="unit-upgrade-progress-badge">⏳</div>
             <div class="unit-upgrade-progress-body">
               <strong>{{ t('buildingDetail.unitUpgrade.pendingTitle') }}</strong>
               <p class="unit-upgrade-progress-desc" :title="selectedCellPendingUpgrade.ticksRemaining + ' ticks remaining'">
@@ -799,7 +799,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                   <span class="stat-next">{{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</span>
                 </span>
               </div>
-              <!-- Storage capacity row ÔÇö shown for all unit types that buffer inventory -->
+              <!-- Storage capacity row — shown for all unit types that buffer inventory -->
               <div class="unit-upgrade-stat-row" :aria-label="t('buildingDetail.accessibility.storageCapacityDelta')">
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
                 <span class="unit-upgrade-stat-values">

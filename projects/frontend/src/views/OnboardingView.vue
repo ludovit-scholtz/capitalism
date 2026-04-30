@@ -301,7 +301,7 @@ const completionCurrencyCode = computed<string>(() => completionResult.value?.ci
 
 /**
  * The auto-configured public sale price for the guest's shop.
- * The backend sets MinPrice = local basePrice ├Ś 1.5 for the PUBLIC_SALES unit during FinishOnboarding.
+ * The backend sets MinPrice = local basePrice × 1.5 for the PUBLIC_SALES unit during FinishOnboarding.
  */
 const guestConfiguredShopPrice = computed(() => {
   const base = selectedProduct.value ? getProductLocalPrice(selectedProduct.value) : null
@@ -862,7 +862,7 @@ async function saveGuestProgress() {
       auth.switchCity(selectedCityId.value)
     }
 
-    // Now authenticated ÔÇö check if this player already completed onboarding
+    // Now authenticated — check if this player already completed onboarding
     if (!auth.player) {
       await auth.fetchMe()
     }
@@ -936,7 +936,7 @@ async function saveGuestProgress() {
       } catch (migrationErr: unknown) {
         const code = migrationErr instanceof GraphQLError ? migrationErr.code : undefined
         if (code === 'LOT_ALREADY_OWNED') {
-          // A lot was taken between the guest simulation and the real purchase ÔÇö restart
+          // A lot was taken between the guest simulation and the real purchase — restart
           // wizard from step 1 so the player can pick fresh lots.
           onboardingCompanyCash.value = null
           completionResult.value = null
@@ -947,7 +947,7 @@ async function saveGuestProgress() {
           error.value = t('onboarding.guestMigrationRetry')
         } else {
           // Any other backend failure (network outage, validation error, auth mismatch,
-          // duplicate submit, etc.) must be shown explicitly ÔÇö NOT masked as a lot-conflict.
+          // duplicate submit, etc.) must be shown explicitly — NOT masked as a lot-conflict.
           error.value = migrationErr instanceof Error ? migrationErr.message : t('onboarding.guestMigrationGenericError')
         }
       } finally {
@@ -985,7 +985,7 @@ function getProductPriceSummary(product: ProductType): string {
   return cities.value
     .slice(0, 3)
     .map((city) => `${city.name}: ${formatCurrency(getProductLocalPrice(product, city.currencyCode), city.currencyCode)}`)
-    .join(' ┬Ě ')
+    .join(' · ')
 }
 
 function getProductName(product: ProductType): string {
@@ -1003,7 +1003,7 @@ function getProductImage(product: ProductType): string {
 function getRecipeIngredientLabel(product: ProductType, index: number): string {
   const recipe = product.recipes[index]
   if (!recipe) return ''
-  return `${recipe.quantity}├Ś ${getLocalizedRecipeIngredientName(recipe, locale.value)}`
+  return `${recipe.quantity}× ${getLocalizedRecipeIngredientName(recipe, locale.value)}`
 }
 
 function getCityResourceName(city: City, index: number): string {
@@ -1086,7 +1086,7 @@ async function loadFirstSaleMission() {
       await markMilestoneComplete()
     }
   } catch (err) {
-    // Best-effort polling ÔÇö log for debugging but don't surface to user
+    // Best-effort polling — log for debugging but don't surface to user
     console.error('[firstSaleMission] Failed to load mission status:', err)
   } finally {
     firstSaleMissionLoading.value = false
@@ -1115,7 +1115,7 @@ async function loadGameState() {
     gameState.value = data.gameState
     startTickCountdown()
   } catch {
-    // ignore ÔÇö tick countdown is best-effort
+    // ignore — tick countdown is best-effort
   }
 }
 

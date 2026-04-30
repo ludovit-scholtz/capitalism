@@ -92,7 +92,7 @@ interface CityRateRow {
   targetSymbol: string
   /** How many units of targetCode equal 1 unit of baseCurrencyCode. */
   rate: number
-  /** After-fee rate: rate ├Ś (1 - 0.01). */
+  /** After-fee rate: rate × (1 - 0.01). */
   afterFeeRate: number
   rateDate: string
 }

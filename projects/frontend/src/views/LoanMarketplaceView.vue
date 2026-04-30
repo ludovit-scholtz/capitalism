@@ -266,7 +266,7 @@
                   <div class="bank-card-header">
                     <div>
                       <h3 class="bank-card-name">{{ bank.bankBuildingName }}</h3>
-                      <span class="bank-card-city">{{ bank.cityName }} ┬Ě {{ bank.lenderCompanyName }}</span>
+                      <span class="bank-card-city">{{ bank.cityName }} · {{ bank.lenderCompanyName }}</span>
                     </div>
                   </div>
                   <div class="bank-card-rates">
@@ -349,7 +349,7 @@
               </div>
               <div class="summary-row">
                 <span>{{ t('bank.paymentAmount') }}</span>
-                <strong>{{ formatCurrency(estimatedPaymentAmount) }} ├Ś {{ estimatedTotalPayments }}</strong>
+                <strong>{{ formatCurrency(estimatedPaymentAmount) }} × {{ estimatedTotalPayments }}</strong>
               </div>
               <div class="summary-row total-row">
                 <span>{{ t('bank.totalRepayment') }}</span>
@@ -374,7 +374,7 @@
                   <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" :disabled="!b.isEligible" class="collateral-radio" />
                   <span class="collateral-option-body">
                     <span class="collateral-option-name">{{ b.buildingName }}</span>
-                    <span class="collateral-option-type">{{ b.buildingType }} ┬Ě Lv{{ b.level }}</span>
+                    <span class="collateral-option-type">{{ b.buildingType }} · Lv{{ b.level }}</span>
                     <span v-if="!b.isEligible" class="collateral-tag ineligible-tag">{{ t('bank.collateralAlreadyPledged') }}</span>
                     <span v-else class="collateral-stats">
                       <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>

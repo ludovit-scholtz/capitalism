@@ -401,7 +401,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         <div class="exchange-hero-meta">
           <span class="exchange-tick-chip" :title="currentTick !== null ? t('globalExchange.tickHint', { tick: currentTick }) : undefined">
             <span class="exchange-tick-label">{{ t('globalExchange.snapshotTime') }}</span>
-            <span class="exchange-tick-value">{{ formattedSnapshotTime || '├ö├ç├Â' }}</span>
+            <span class="exchange-tick-value">{{ formattedSnapshotTime || '—' }}</span>
           </span>
           <span v-if="marketMode === 'resources'" class="exchange-supply-chip">{{ t('globalExchange.endlessSupply') }}</span>
         </div>
@@ -419,7 +419,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         </button>
       </div>
 
-      <!-- ├ö├Â├ç├ö├Â├ç Resources mode ├ö├Â├ç├ö├Â├ç -->
+      <!-- ── Resources mode ── -->
       <template v-if="marketMode === 'resources'">
         <div v-if="cities.length > 0" class="exchange-city-tabs city-tabs" role="tablist" :aria-label="t('common.city')">
           <button
@@ -482,13 +482,13 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
                   <div class="offer-metric">
                     <span class="metric-label">{{ t('globalExchange.transitCost') }}</span>
                     <span class="metric-value transit-cost">
-                      +{{ formatPrice(offer.transitCostPerUnit) }} ÔöČ─Ü {{ offer.distanceKm }} km
+                      +{{ formatPrice(offer.transitCostPerUnit) }} · {{ offer.distanceKm }} km
                       <span
                         v-if="offer.fuelPriceIndex && offer.fuelPriceIndex !== 1"
                         class="fuel-badge"
                         :class="offer.fuelPriceIndex > 1 ? 'fuel-high' : 'fuel-low'"
                         :title="t('globalExchange.fuelPriceHint')"
-                      >├ö┼Ą┼╗ Ôöť┼Ü{{ offer.fuelPriceIndex.toFixed(2) }}</span>
+                      >⛽ ×{{ offer.fuelPriceIndex.toFixed(2) }}</span>
                     </span>
                   </div>
                   <div class="offer-metric delivered-metric">
@@ -498,7 +498,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
                   <div class="offer-metric">
                     <span class="metric-label">{{ t('globalExchange.quality') }}</span>
                     <span class="metric-value quality-value">
-                      <span class="quality-range"> {{ formatPercent(offer.qualityMin) }}&nbsp;├ö├ç├┤&nbsp;{{ formatPercent(offer.qualityMax) }} </span>
+                      <span class="quality-range"> {{ formatPercent(offer.qualityMin) }}&nbsp;–&nbsp;{{ formatPercent(offer.qualityMax) }} </span>
                       <span class="quality-band-bar" :title="t('globalExchange.qualityBandHint')">
                         <span
                           class="quality-band-fill"
@@ -526,7 +526,7 @@ function priceVsBaseClass(pricePerUnit: number, basePrice: number): string {
         </template>
       </template>
 
-      <!-- ├ö├Â├ç├ö├Â├ç Products mode ├ö├Â├ç├ö├Â├ç -->
+      <!-- ── Products mode ── -->
       <template v-else>
         <!-- Product search and filter -->
         <div class="exchange-filters">

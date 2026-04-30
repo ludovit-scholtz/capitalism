@@ -350,7 +350,7 @@ onMounted(loadData)
           <span class="font-bold">{{ formatGold(goldBalance.blockedInPools) }} XAU</span>
         </div>
       </div>
-      <div v-if="goldBalance.blockedInPools > 0" class="mt-3 text-xs font-semibold bg-black/15 rounded px-2 py-1.5">ÔÜá´ŞĆ {{ t('goldAmm.blockedGoldWarning') }}</div>
+      <div v-if="goldBalance.blockedInPools > 0" class="mt-3 text-xs font-semibold bg-black/15 rounded px-2 py-1.5">⚠️ {{ t('goldAmm.blockedGoldWarning') }}</div>
     </div>
 
     <!-- Inner Tab Bar -->
@@ -546,13 +546,13 @@ onMounted(loadData)
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-muted">{{ t('goldAmm.addLiquidityPool') }}</label>
             <select v-model="addPoolId" class="form-select">
-              <option v-for="p in pools" :key="p.id" :value="p.id">{{ p.currencyCode }}/XAU ÔÇö {{ formatFiat(p.fiatReserve) }} {{ p.currencyCode }} + {{ formatGold(p.goldReserve) }} XAU</option>
+              <option v-for="p in pools" :key="p.id" :value="p.id">{{ p.currencyCode }}/XAU — {{ formatFiat(p.fiatReserve) }} {{ p.currencyCode }} + {{ formatGold(p.goldReserve) }} XAU</option>
             </select>
           </div>
 
           <div v-if="selectedAddPool" class="text-xs text-muted rounded-lg border border-divider bg-card-raised px-3 py-2">
             {{ t('goldAmm.impliedPrice') }}: {{ formatFiat(selectedAddPool.impliedGoldPrice) }} {{ selectedAddPool.currencyCode }}/XAU
-            <span v-if="selectedAddPool.myPosition"> ┬Ě {{ t('goldAmm.positionShares') }}: {{ selectedAddPool.myPosition.sharePercent.toFixed(2) }}%</span>
+            <span v-if="selectedAddPool.myPosition"> · {{ t('goldAmm.positionShares') }}: {{ selectedAddPool.myPosition.sharePercent.toFixed(2) }}%</span>
           </div>
 
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -566,7 +566,7 @@ onMounted(loadData)
             </div>
           </div>
 
-          <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">ÔÜá´ŞĆ {{ t('goldAmm.blockedGoldWarning') }}</div>
+          <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">⚠️ {{ t('goldAmm.blockedGoldWarning') }}</div>
 
           <div v-if="addSuccess" class="text-sm text-good" role="status">{{ addSuccess }}</div>
           <div v-if="addError" class="text-sm text-bad" role="alert">{{ addError }}</div>
@@ -601,7 +601,7 @@ onMounted(loadData)
             </div>
           </div>
 
-          <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">ÔÜá´ŞĆ {{ t('goldAmm.blockedGoldWarning') }}</div>
+          <div v-if="goldBalance && goldBalance.blockedInPools > 0" class="text-xs text-caution px-3 py-2 bg-caution/10 rounded-md" role="note">⚠️ {{ t('goldAmm.blockedGoldWarning') }}</div>
 
           <div v-if="createSuccess" class="text-sm text-good" role="status">{{ createSuccess }}</div>
           <div v-if="createError" class="text-sm text-bad" role="alert">{{ createError }}</div>

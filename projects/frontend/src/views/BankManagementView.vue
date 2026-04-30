@@ -366,7 +366,7 @@ useTickRefresh(async () => {
 
 const overdueLoans = computed(() => issuedLoans.value.filter((l) => l.status !== 'ACTIVE' && l.status !== 'REPAID'))
 
-/** The active city currency code ÔÇö from bankInfo when available, fallback to EUR. */
+/** The active city currency code — from bankInfo when available, fallback to EUR. */
 const cityCurrency = computed(() => bankInfo.value?.cityCurrencyCode ?? 'EUR')
 
 /** Helper: format an amount in the bank's local city currency. */
@@ -556,9 +556,9 @@ function navigateToForexTransfer() {
     </div>
 
     <template v-else>
-      <!-- ├ö├Â├ç├ö├Â├ç OWNER VIEW ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+      <!-- ── OWNER VIEW ─────────────────────────────────────────────── -->
       <template v-if="isOwner">
-        <!-- ├ö├Â├ç├ö├Â├ç Base Capital Deposit Required ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+        <!-- ── Base Capital Deposit Required ────────────────────────── -->
         <div v-if="bankInfo && !bankInfo.baseCapitalDeposited" class="base-deposit-required">
           <div class="base-deposit-icon" aria-hidden="true">🏦</div>
           <div class="base-deposit-body">
@@ -650,7 +650,7 @@ function navigateToForexTransfer() {
           </div>
         </div>
 
-        <!-- ├ö├Â├ç├ö├Â├ç Liquidity Health Panel (owner view) ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+        <!-- ── Liquidity Health Panel (owner view) ──────────────────────────── -->
         <section v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" class="liquidity-section">
           <h2 class="section-title">{{ t('bank.liquidityHealth') }}</h2>
           <div class="liquidity-status-banner" :class="`liquidity-${bankInfo.liquidityStatus.toLowerCase()}`">
@@ -708,7 +708,7 @@ function navigateToForexTransfer() {
 
           <p class="capitalization-info">{{ t('bank.capitalRequirementInfo') }}</p>
         </section>
-        <!-- ├ö├Â├ç├ö├Â├ç end liquidity panel ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+        <!-- ── end liquidity panel ─────────────────────────────────────────── -->
 
         <!-- Depositors section -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
@@ -805,7 +805,7 @@ function navigateToForexTransfer() {
         </section> </template
       ><!-- end owner view -->
 
-      <!-- ├ö├Â├ç├ö├Â├ç CUSTOMER VIEW ├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç├ö├Â├ç -->
+      <!-- ── CUSTOMER VIEW ──────────────────────────────────────────── -->
       <template v-else>
         <!-- Bank profile card (rates + capacity) -->
         <div v-if="bankInfo" class="customer-bank-profile rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
@@ -996,7 +996,7 @@ function navigateToForexTransfer() {
                 <span :class="['loan-status', loanStatusClass(loan.status)]">{{ loan.status }}</span>
               </div>
               <div v-if="loan.collateralBuildingId" class="collateral-badge">
-                <span aria-hidden="true">┬ş─Ź─ć┼Ą</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
+                <span aria-hidden="true">🔒</span> {{ t('bank.securedLoan') }}: {{ loan.collateralBuildingName }}
                 <span v-if="loan.collateralAppraisedValue" class="collateral-badge-value"> ({{ fmt(loan.collateralAppraisedValue) }}) </span>
               </div>
             </div>

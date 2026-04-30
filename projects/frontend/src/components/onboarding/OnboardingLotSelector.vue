@@ -238,8 +238,8 @@ onUnmounted(() => {
 
       <div class="toolbar-actions">
         <div class="view-toggle" role="group" :aria-label="t('onboarding.mapViewLabel')">
-          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">­čŚ║´ŞĆ {{ t('cityMap.mapView') }}</button>
-          <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">Ôś░ {{ t('cityMap.listView') }}</button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">­🗺️ {{ t('cityMap.mapView') }}</button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">☰ {{ t('cityMap.listView') }}</button>
         </div>
         <button class="toggle-btn" :class="{ active: showAvailableOnly }" @click="showAvailableOnly = !showAvailableOnly">
           {{ t('cityMap.filterAvailable') }}

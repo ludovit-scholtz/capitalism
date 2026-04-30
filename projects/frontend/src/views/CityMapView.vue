@@ -3,14 +3,14 @@
     <!-- Header -->
     <div class="page-header">
       <div>
-        <button class="btn btn-secondary btn-sm" @click="router.push('/dashboard')">├ö─ç├ë {{ t('cityMap.backToDashboard') }}</button>
-        <h1 v-if="city">┬ş─Ź┼ÜÔĽĹ┬┤┼×─ć {{ city.name }} ├ö├ç├Â {{ t('cityMap.title') }}</h1>
+        <button class="btn btn-secondary btn-sm" @click="router.push('/dashboard')">← {{ t('cityMap.backToDashboard') }}</button>
+        <h1 v-if="city">🗺️ {{ city.name }} — {{ t('cityMap.title') }}</h1>
         <p class="subtitle">{{ t('cityMap.subtitle') }}</p>
       </div>
       <div class="header-controls">
         <div class="view-toggle">
-          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">┬ş─Ź┼ÜÔĽĹ┬┤┼×─ć {{ t('cityMap.mapView') }}</button
-          ><button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">┬ş─Ź├┤┼Ĺ {{ t('cityMap.listView') }}</button>
+          <button class="toggle-btn" :class="{ active: viewMode === 'map' }" @click="viewMode = 'map'">🗺️ {{ t('cityMap.mapView') }}</button
+          ><button class="toggle-btn" :class="{ active: viewMode === 'list' }" @click="viewMode = 'list'">📋 {{ t('cityMap.listView') }}</button>
         </div>
         <div class="filter-toggle">
           <button class="toggle-btn" :class="{ active: !showAvailableOnly }" @click="showAvailableOnly = false">{{ t('cityMap.filterAll') }}</button
@@ -42,7 +42,7 @@
               <div class="lot-list-info">
                 <span class="lot-list-name">{{ lot.name }}</span
                 ><span class="lot-list-district">{{ lot.district }}</span
-                ><span v-if="lot.resourceType" class="lot-list-resource-badge" data-testid="lot-resource-badge"> ├ö┼Ą─ć {{ lot.resourceType.name }} </span>
+                ><span v-if="lot.resourceType" class="lot-list-resource-badge" data-testid="lot-resource-badge"> ⛏ {{ lot.resourceType.name }} </span>
               </div>
               <div class="lot-list-meta">
                 <span class="lot-list-price">{{ formatCurrency(lot.price) }}</span
@@ -65,7 +65,7 @@
           <p class="lot-description">{{ selectedLot.description }}</p>
           <!-- Strategic recommendation badge -->
           <div class="strategic-recommendation" :class="strategicRecommendation(selectedLot).cssClass" data-testid="strategic-recommendation">
-            <span class="rec-icon">┬ş─Ź├ä┬╗</span><span class="rec-label">{{ t(`cityMap.${strategicRecommendation(selectedLot).key}`) }}</span>
+            <span class="rec-icon">🎯</span><span class="rec-label">{{ t(`cityMap.${strategicRecommendation(selectedLot).key}`) }}</span>
           </div>
           <div class="detail-grid">
             <div class="detail-item">
@@ -102,7 +102,7 @@
             <div class="detail-item full-width coordinates-item">
               <span class="detail-label">{{ t('cityMap.coordinates') }}</span
               ><span class="detail-value coordinates-value" data-testid="lot-coordinates">
-                {{ Math.abs(selectedLot.latitude).toFixed(5) }}ÔöČÔľĹ{{ selectedLot.latitude >= 0 ? 'N' : 'S' }}, {{ Math.abs(selectedLot.longitude).toFixed(5) }}ÔöČÔľĹ{{
+                {{ Math.abs(selectedLot.latitude).toFixed(5) }}°{{ selectedLot.latitude >= 0 ? 'N' : 'S' }}, {{ Math.abs(selectedLot.longitude).toFixed(5) }}°{{
                   selectedLot.longitude >= 0 ? 'E' : 'W'
                 }}
               </span>
@@ -111,7 +111,7 @@
           </div>
           <!-- Raw material deposit panel (shown for MINE-eligible lots with resource data) -->
           <div v-if="selectedLot.resourceType && selectedLot.materialQuality != null && selectedLot.materialQuantity != null" class="raw-material-panel" data-testid="raw-material-panel">
-            <h3 class="raw-material-title">├ö┼Ą─ć {{ t('cityMap.rawMaterialTitle') }}</h3>
+            <h3 class="raw-material-title">⛏ {{ t('cityMap.rawMaterialTitle') }}</h3>
             <div class="raw-material-grid">
               <div class="raw-material-item">
                 <span class="detail-label">{{ t('cityMap.rawMaterialResource') }}</span
@@ -139,21 +139,21 @@
                 ><span class="guidance-text">{{ t(`cityMap.${placementGuidanceKey(type)}`) }}</span>
               </li>
             </ul>
-            <p class="transport-cost-note"><span class="transport-icon">┬ş─Ź├ť├ť</span> {{ t('cityMap.transportCostNote') }}</p>
+            <p class="transport-cost-note"><span class="transport-icon">🚚</span> {{ t('cityMap.transportCostNote') }}</p>
           </div>
           <!-- Weather outlook: shown for lots suitable for POWER_PLANT -->
           <div v-if="suitableTypesForLot.includes('POWER_PLANT') && cityWeather" class="weather-outlook-panel" data-testid="weather-outlook-panel">
-            <h3 class="weather-outlook-title">┬ş─Ź├«─ä┬┤┼×─ć {{ t('powerPlant.weatherOutlook') }}</h3>
+            <h3 class="weather-outlook-title">🌤️ {{ t('powerPlant.weatherOutlook') }}</h3>
             <div class="weather-outlook-row">
-              <span class="weather-badge solar-badge">├ö┼Ť├ç┬┤┼×─ć {{ t('powerPlant.solarPercent', { percent: Math.round(cityWeather.currentSolarPercent) }) }}</span
-              ><span class="weather-badge wind-badge">┬ş─Ź─║─ś {{ t('powerPlant.windPercent', { percent: Math.round(cityWeather.currentWindPercent) }) }}</span>
+              <span class="weather-badge solar-badge">☀️ {{ t('powerPlant.solarPercent', { percent: Math.round(cityWeather.currentSolarPercent) }) }}</span
+              ><span class="weather-badge wind-badge">💨 {{ t('powerPlant.windPercent', { percent: Math.round(cityWeather.currentWindPercent) }) }}</span>
             </div>
             <div v-if="cityWeather.forecast.length > 0" class="weather-forecast-bars">
               <div
                 v-for="(tick, i) in cityWeather.forecast.slice(0, 12)"
                 :key="tick.tick"
                 class="forecast-bar-group"
-                :title="`Tick ${tick.tick}: ├ö┼Ť├ç┬┤┼×─ć${Math.round(tick.solarPercent)}% ┬ş─Ź─║─ś${Math.round(tick.windPercent)}%`"
+                :title="`Tick ${tick.tick}: ☀️${Math.round(tick.solarPercent)}% 💨${Math.round(tick.windPercent)}%`"
               >
                 <div class="forecast-bar solar-bar" :style="{ height: Math.round(tick.solarPercent) + '%' }"></div>
                 <div class="forecast-bar wind-bar" :style="{ height: Math.round(tick.windPercent) + '%' }"></div>
@@ -219,9 +219,9 @@
                   <label>{{ t('cityMap.mediaHouseChannelType') }}</label
                   ><select v-model="selectedMediaType" class="form-select" required>
                     <option value="">{{ t('cityMap.selectMediaType') }}</option>
-                    <option value="NEWSPAPER">┬ş─Ź├┤ÔľĹ {{ t('cityMap.mediaTypespaper') }} (Ôöť┼Ü1.0)</option>
-                    <option value="RADIO">┬ş─Ź├┤ÔĽŚ {{ t('cityMap.mediaTypeRadio') }} (Ôöť┼Ü1.5)</option>
-                    <option value="TV">┬ş─Ź├┤ÔĽĹ {{ t('cityMap.mediaTypeTv') }} (Ôöť┼Ü2.0)</option>
+                    <option value="NEWSPAPER">📰 {{ t('cityMap.mediaTypespaper') }} (×1.0)</option>
+                    <option value="RADIO">📻 {{ t('cityMap.mediaTypeRadio') }} (×1.5)</option>
+                    <option value="TV">📺 {{ t('cityMap.mediaTypeTv') }} (×2.0)</option>
                   </select>
                   <p class="form-hint">{{ t('cityMap.mediaTypeHint') }}</p>
                 </div>
@@ -241,8 +241,8 @@
                     >
                       <span class="plant-type-name">{{ t(pt.labelKey) }}</span
                       ><span class="plant-type-mw">{{ t('powerPlant.outputMw', { output: pt.mw }) }}</span
-                      ><span v-if="pt.type === 'SOLAR' && cityWeather" class="plant-weather-badge solar"> ├ö┼Ť├ç┬┤┼×─ć {{ Math.round(cityWeather.currentSolarPercent) }}% </span
-                      ><span v-else-if="pt.type === 'WIND' && cityWeather" class="plant-weather-badge wind"> ┬ş─Ź─║─ś {{ Math.round(cityWeather.currentWindPercent) }}% </span
+                      ><span v-if="pt.type === 'SOLAR' && cityWeather" class="plant-weather-badge solar"> ☀️ {{ Math.round(cityWeather.currentSolarPercent) }}% </span
+                      ><span v-else-if="pt.type === 'WIND' && cityWeather" class="plant-weather-badge wind"> 💨 {{ Math.round(cityWeather.currentWindPercent) }}% </span
                       ><span v-else-if="pt.type === 'SOLAR' || pt.type === 'WIND'" class="plant-type-badge renewable"> {{ t('powerPlant.renewableBadge') }} </span
                       ><span v-else class="plant-type-badge fuel">{{ t('powerPlant.fuelBadge') }}</span
                       ><span class="plant-type-desc">{{ t(pt.descKey) }}</span>
@@ -252,7 +252,7 @@
                 </div>
                 <!-- Mining deposit investment summary (shown when MINE type selected and lot has resource) -->
                 <div v-if="selectedBuildingType === 'MINE' && selectedLot?.resourceType" class="mining-deposit-summary" data-testid="mining-deposit-summary">
-                  <h4 class="deposit-summary-title">├ö┼Ą─ć {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
+                  <h4 class="deposit-summary-title">⛏ {{ t('cityMap.miningDepositSummaryTitle') }}</h4>
                   <div class="deposit-summary-grid">
                     <div class="deposit-summary-item">
                       <span class="deposit-label">{{ t('cityMap.rawMaterialResource') }}</span
@@ -275,7 +275,7 @@
                 <div class="purchase-cost-summary" aria-label="Purchase cost summary">
                   <div class="cost-row">
                     <span class="cost-label">{{ t('cityMap.costLotPrice') }}</span
-                    ><span class="cost-value cost-debit">{{ selectedLot ? formatCurrency(selectedLot.price) : '├ö├ç├Â' }}</span>
+                    ><span class="cost-value cost-debit">{{ selectedLot ? formatCurrency(selectedLot.price) : '—' }}</span>
                   </div>
                   <div v-if="selectedBuildingType" class="cost-row">
                     <span class="cost-label">{{ t('cityMap.costConstruction') }}</span
@@ -311,7 +311,7 @@
             data-testid="construction-banner"
           >
             <div class="post-purchase-body">
-              <strong class="post-purchase-title"> ┬ş─Ź─ć┼Ü┬┤┼×─ć {{ t('cityMap.constructionStartedTitle') }} </strong>
+              <strong class="post-purchase-title"> 🏗️ {{ t('cityMap.constructionStartedTitle') }} </strong>
               <p class="post-purchase-text">
                 {{
                   t('cityMap.constructionStartedBody', {
@@ -336,7 +336,7 @@
               <p class="post-purchase-text">{{ t(`cityMap.${postPurchaseBodyKey(justPurchasedBuildingType ?? 'FACTORY')}`) }}</p>
             </div>
             <RouterLink :to="justPurchasedBuildingType === 'BANK' ? `/bank/${justPurchasedBuildingId}` : `/building/${justPurchasedBuildingId}`" class="btn btn-primary">
-              {{ t('cityMap.setupBuilding') }} ├ö─ç─║
+              {{ t('cityMap.setupBuilding') }} →
             </RouterLink>
           </div>
           <div v-else-if="isOwnedByDifferentControlledCompany" class="purchase-notice">
@@ -349,7 +349,7 @@
             data-testid="under-construction-panel"
           >
             <div class="construction-info">
-              <span class="construction-badge">┬ş─Ź─ć┼Ü┬┤┼×─ć {{ t('cityMap.underConstruction') }}</span>
+              <span class="construction-badge">🏗️ {{ t('cityMap.underConstruction') }}</span>
               <p class="construction-detail">{{ selectedLot.building.name }} ({{ formatBuildingType(selectedLot.building.type) }})</p>
               <p class="construction-ticks-info" data-testid="construction-ticks-remaining" :title="constructionTicksRemaining(selectedLot.building.constructionCompletesAtTick) + ' ticks'">
                 {{ t('cityMap.ticksRemaining', { time: formatTickDuration(constructionTicksRemaining(selectedLot.building.constructionCompletesAtTick), locale) }) }}
@@ -373,7 +373,7 @@
       </div></template
     ><!-- City media houses section -->
     <section class="media-houses-section" aria-labelledby="media-houses-heading">
-      <h2 id="media-houses-heading" class="section-heading">┬ş─Ź├┤ÔĽĹ {{ t('cityMap.mediaHouses.title') }}</h2>
+      <h2 id="media-houses-heading" class="section-heading">📺 {{ t('cityMap.mediaHouses.title') }}</h2>
       <p class="section-subtitle">{{ t('cityMap.mediaHouses.subtitle') }}</p>
       <div v-if="mediaHousesLoading" class="media-houses-loading">{{ t('common.loading') }}</div>
       <div v-else-if="cityMediaHouses.length === 0" class="media-houses-empty">
@@ -382,7 +382,7 @@
       </div>
       <div v-else class="media-houses-grid">
         <div v-for="mh in cityMediaHouses" :key="mh.id" class="media-house-card" :class="{ 'mh-offline': mh.powerStatus === 'OFFLINE', 'mh-construction': mh.isUnderConstruction }">
-          <div class="mh-channel-icon"><span v-if="mh.mediaType === 'TV'">┬ş─Ź├┤ÔĽĹ</span><span v-else-if="mh.mediaType === 'RADIO'">┬ş─Ź├┤ÔĽŚ</span><span v-else>┬ş─Ź├┤ÔľĹ</span></div>
+          <div class="mh-channel-icon"><span v-if="mh.mediaType === 'TV'">📺</span><span v-else-if="mh.mediaType === 'RADIO'">📻</span><span v-else>📰</span></div>
           <div class="mh-info">
             <strong class="mh-name">{{ mh.name }}</strong>
             <div class="mh-badges">
@@ -393,7 +393,7 @@
             </div>
             <div class="mh-owner">{{ t('cityMap.mediaHouses.owner') }}: {{ mh.ownerCompanyName }}</div>
             <div class="mh-effectiveness">
-              {{ t('cityMap.mediaHouses.effectiveness') }}: <strong>Ôöť┼Ü{{ mh.effectivenessMultiplier.toFixed(1) }}</strong
+              {{ t('cityMap.mediaHouses.effectiveness') }}: <strong>×{{ mh.effectivenessMultiplier.toFixed(1) }}</strong
               ><span class="effectiveness-hint">
                 {{ mh.mediaType === 'TV' ? t('cityMap.mediaHouses.tvHint') : mh.mediaType === 'RADIO' ? t('cityMap.mediaHouses.radioHint') : t('cityMap.mediaHouses.newspaperHint') }}
               </span>
@@ -407,14 +407,14 @@
     </section>
     <!-- City Power Planning & Weather Forecast section (always visible) -->
     <section class="city-power-section" aria-labelledby="city-power-heading" data-testid="city-power-section">
-      <h2 id="city-power-heading" class="section-heading">├ö├ť├ş {{ t('powerGrid.weatherSectionTitle') }}</h2>
+      <h2 id="city-power-heading" class="section-heading">⚡ {{ t('powerGrid.weatherSectionTitle') }}</h2>
       <div class="power-planning-grid">
         <!-- Weather forecast card -->
         <div v-if="cityWeather" class="power-card weather-card" data-testid="city-weather-card">
-          <h3 class="power-card-title">┬ş─Ź├«─ä┬┤┼×─ć {{ t('powerGrid.currentConditions') }}</h3>
+          <h3 class="power-card-title">🌤️ {{ t('powerGrid.currentConditions') }}</h3>
           <div class="weather-badges">
-            <span class="weather-big-badge solar" data-testid="solar-badge"> ├ö┼Ť├ç┬┤┼×─ć {{ Math.round(cityWeather.currentSolarPercent) }}% </span
-            ><span class="weather-big-badge wind" data-testid="wind-badge"> ┬ş─Ź─║─ś {{ Math.round(cityWeather.currentWindPercent) }}% </span>
+            <span class="weather-big-badge solar" data-testid="solar-badge"> ☀️ {{ Math.round(cityWeather.currentSolarPercent) }}% </span
+            ><span class="weather-big-badge wind" data-testid="wind-badge"> 💨 {{ Math.round(cityWeather.currentWindPercent) }}% </span>
           </div>
           <div v-if="cityWeather.forecast.length > 0" class="forecast-chart">
             <p class="forecast-chart-label">{{ t('powerGrid.forecastBarsLabel', { count: Math.min(cityWeather.forecast.length, 24) }) }}</p>
@@ -423,7 +423,7 @@
                 v-for="(tick, i) in cityWeather.forecast.slice(0, 24)"
                 :key="tick.tick"
                 class="forecast-bar-group"
-                :title="`Tick ${tick.tick}: ├ö┼Ť├ç┬┤┼×─ć${Math.round(tick.solarPercent)}% ┬ş─Ź─║─ś${Math.round(tick.windPercent)}%`"
+                :title="`Tick ${tick.tick}: ☀️${Math.round(tick.solarPercent)}% 💨${Math.round(tick.windPercent)}%`"
               >
                 <div class="forecast-bar solar-bar" :style="{ height: Math.round(tick.solarPercent) + '%' }"></div>
                 <div class="forecast-bar wind-bar" :style="{ height: Math.round(tick.windPercent) + '%' }"></div>
@@ -436,7 +436,7 @@
         </div>
         <!-- Power balance card -->
         <div class="power-card balance-card" data-testid="city-power-balance-card">
-          <h3 class="power-card-title">┬ş─Ź─ć┼č {{ t('powerGrid.planningTitle') }}</h3>
+          <h3 class="power-card-title">🏭 {{ t('powerGrid.planningTitle') }}</h3>
           <template v-if="cityPowerBalance"
             ><div class="balance-status-row">
               <span
@@ -482,11 +482,11 @@
         </div>
         <!-- Why it matters card -->
         <div class="power-card why-card" data-testid="why-matters-card">
-          <h3 class="power-card-title">┬ş─Ź─║├ş {{ t('powerGrid.whyMattersTitle') }}</h3>
+          <h3 class="power-card-title">💡 {{ t('powerGrid.whyMattersTitle') }}</h3>
           <ul class="why-list">
-            <li class="why-item solar-item">├ö┼Ť├ç┬┤┼×─ć {{ t('powerGrid.whyMattersSolar') }}</li>
-            <li class="why-item wind-item">┬ş─Ź─║─ś {{ t('powerGrid.whyMattersWind') }}</li>
-            <li class="why-item power-item">├ö├ť├ş {{ t('powerGrid.whyMattersPower') }}</li>
+            <li class="why-item solar-item">☀️ {{ t('powerGrid.whyMattersSolar') }}</li>
+            <li class="why-item wind-item">💨 {{ t('powerGrid.whyMattersWind') }}</li>
+            <li class="why-item power-item">⚡ {{ t('powerGrid.whyMattersPower') }}</li>
           </ul>
         </div>
       </div>

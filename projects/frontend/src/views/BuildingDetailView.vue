@@ -830,7 +830,7 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
     box-shadow 0.15s ease;
 }
 
-/* Exclude DiagonalConnector hit-area buttons from cursor and hover rules ÔÇö
+/* Exclude DiagonalConnector hit-area buttons from cursor and hover rules —
    the connector's scoped CSS handles its own interaction states. */
 .link-toggle:not(.diag-hit-area):disabled,
 .link-toggle:not(.diag-hit-area).readonly {
@@ -2059,7 +2059,7 @@ const isMultiUnitBuilding = computed(() => building.value?.type !== 'APARTMENT' 
   gap: 0.5rem;
 }
 
-/* Mini 4├Ś4 layout preview grid */
+/* Mini 4×4 layout preview grid */
 .layout-mini-grid {
   display: grid;
   grid-template-columns: repeat(4, 10px);
