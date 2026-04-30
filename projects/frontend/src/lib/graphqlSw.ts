@@ -44,11 +44,7 @@ export function isMutationOperation(query: string): boolean {
  * queries or variable sets always produce different keys while the same
  * logical request always hits the same entry.
  */
-export function makeGraphQlCacheKey(
-  url: string,
-  query: string,
-  variables: unknown,
-): string {
+export function makeGraphQlCacheKey(url: string, query: string, variables: unknown): string {
   // Normalise the query (collapse whitespace) to improve cache-hit ratio when
   // the same query is sent with different formatting.
   const normalisedQuery = query.replace(/\s+/g, ' ').trim()
@@ -119,11 +115,7 @@ export function idbGet(db: IDBDatabase, key: string): Promise<GqlCacheEntry | un
  * @param entry      The cache entry to write.
  * @param maxEntries Maximum number of entries to retain (defaults to GQL_MAX_ENTRIES).
  */
-export function idbPut(
-  db: IDBDatabase,
-  entry: GqlCacheEntry,
-  maxEntries: number = GQL_MAX_ENTRIES,
-): Promise<void> {
+export function idbPut(db: IDBDatabase, entry: GqlCacheEntry, maxEntries: number = GQL_MAX_ENTRIES): Promise<void> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(GQL_STORE, 'readwrite')
     const store = tx.objectStore(GQL_STORE)
@@ -164,4 +156,3 @@ export function idbCount(db: IDBDatabase): Promise<number> {
     req.onerror = () => reject(req.error)
   })
 }
-

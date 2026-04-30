@@ -251,7 +251,7 @@ function formatFactor(factor: string | null): string {
 </script>
 
 <template>
-<div class="ca-view container">
+  <div class="ca-view container">
     <!-- Page header -->
     <div class="ca-header">
       <div>
@@ -468,4 +468,3 @@ function formatFactor(factor: string | null): string {
 </template>
 
 <style scoped src="./MarketingAnalyticsView.styles.css"></style>
-

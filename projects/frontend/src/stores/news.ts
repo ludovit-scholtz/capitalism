@@ -125,4 +125,3 @@ export const usesStore = defineStore('news', () => {
     clear,
   }
 })
-

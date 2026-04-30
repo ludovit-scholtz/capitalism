@@ -2934,4 +2934,3 @@ export default {
     noMatchingDestination: 'Kein anderes Konto in derselben Währung. Eröffnen Sie zuerst eins.',
   },
 }
-

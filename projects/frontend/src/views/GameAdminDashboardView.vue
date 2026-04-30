@@ -566,4 +566,3 @@ onMounted(async () => {
 </template>
 
 <style scoped src="./GameAdminDashboardView.styles.css"></style>
-

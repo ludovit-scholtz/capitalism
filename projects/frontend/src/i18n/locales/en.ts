@@ -2932,4 +2932,3 @@ export default {
     noMatchingDestination: 'No other bank account in the same currency. Open one first.',
   },
 }
-
