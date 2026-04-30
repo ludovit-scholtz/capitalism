@@ -20,10 +20,7 @@
             >
               <div class="forecast-bar solar-bar" :style="{ height: Math.round(tick.solarPercent) + '%' }"></div>
               <div class="forecast-bar wind-bar" :style="{ height: Math.round(tick.windPercent) + '%' }"></div>
-              <span
-                v-if="i === 0 || i === 23 || (i === cityWeather.forecast.slice(0, 24).length - 1 && i !== 23)"
-                class="forecast-bar-label"
-              >
+              <span v-if="i === 0 || i === 23 || (i === cityWeather.forecast.slice(0, 24).length - 1 && i !== 23)" class="forecast-bar-label">
                 {{ i === 0 ? t('powerGrid.forecastNow') : t('powerGrid.forecastTickLabel', { count: i + 1 }) }}
               </span>
             </div>

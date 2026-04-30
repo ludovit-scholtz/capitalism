@@ -803,7 +803,9 @@ useTickRefresh(async () => {
   margin-bottom: 1rem;
 }
 
-.section-header h2 { margin: 0; }
+.section-header h2 {
+  margin: 0;
+}
 
 .section-header p,
 .market-note,
@@ -811,7 +813,9 @@ useTickRefresh(async () => {
   color: var(--color-text-secondary);
 }
 
-.section-header p { margin: 0.35rem 0 0; }
+.section-header p {
+  margin: 0.35rem 0 0;
+}
 
 .market-controls {
   display: flex;
@@ -837,7 +841,9 @@ useTickRefresh(async () => {
   outline-offset: 1px;
 }
 
-.table-wrapper { overflow-x: auto; }
+.table-wrapper {
+  overflow-x: auto;
+}
 
 .pagination-bar {
   margin-top: 1rem;
@@ -853,7 +859,10 @@ useTickRefresh(async () => {
   color: var(--color-text-secondary);
 }
 
-.data-table { width: 100%; border-collapse: collapse; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
 
 .data-table th,
 .data-table td {
@@ -863,7 +872,9 @@ useTickRefresh(async () => {
   white-space: nowrap;
 }
 
-.data-table tbody tr:last-child td { border-bottom: none; }
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
 
 .market-table th {
   font-size: 0.78rem;
@@ -890,15 +901,23 @@ useTickRefresh(async () => {
   white-space: nowrap;
 }
 
-.sort-btn:hover { color: var(--color-primary); }
+.sort-btn:hover {
+  color: var(--color-primary);
+}
 
 .state-error {
   background: color-mix(in srgb, var(--color-danger, #ef4444) 12%, var(--color-surface));
 }
 
 @media (max-width: 720px) {
-  .stocks-hero { padding-top: 2.5rem; }
-  .panel { padding: 1rem; }
-  .pagination-bar { justify-content: flex-start; }
+  .stocks-hero {
+    padding-top: 2.5rem;
+  }
+  .panel {
+    padding: 1rem;
+  }
+  .pagination-bar {
+    justify-content: flex-start;
+  }
 }
 </style>

@@ -181,16 +181,11 @@ function navigateToForexTransfer() {
 
   <div class="flex flex-col gap-6 lg:flex-row">
     <!-- Account-style deposit relationship -->
-    <section
-      v-if="isAuthenticated && isCompanyAccountActive"
-      class="customer-account-section grow rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8"
-    >
+    <section v-if="isAuthenticated && isCompanyAccountActive" class="customer-account-section grow rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
       <div class="account-header flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="account-header-info flex flex-row gap-2">
           <h2 class="section-title text-2xl font-bold text-body grow">{{ t('bank.myAccount') }}</h2>
-          <span
-            class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted"
-          >
+          <span class="account-company-tag inline-flex w-fit items-center rounded-full border border-divider bg-card-raised px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
             {{ activeCompany?.name }}
           </span>
         </div>
@@ -235,9 +230,7 @@ function navigateToForexTransfer() {
         <div class="account-balance-meta mt-4 flex flex-wrap items-center gap-3 text-sm">
           <span class="account-interest-label">{{ t('bank.totalInterestEarned') }}</span>
           <span class="account-interest-value positive">+{{ fmt(myAccountInterestEarned) }}</span>
-          <span v-if="bankInfo" class="account-rate-badge">
-            {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }}
-          </span>
+          <span v-if="bankInfo" class="account-rate-badge"> {{ formatPercent(bankInfo.depositInterestRatePercent) }} {{ t('bank.perYear') }} </span>
         </div>
       </div>
 
@@ -258,11 +251,7 @@ function navigateToForexTransfer() {
           <span class="form-hint text-sm text-muted">{{ t('bank.maxWithdraw') }}: {{ fmt(myAccountBalance) }}</span>
         </div>
         <div v-if="withdrawError" class="error-message mt-4">{{ withdrawError }}</div>
-        <button
-          class="btn btn-primary mt-4"
-          :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance"
-          @click="submitWithdraw"
-        >
+        <button class="btn btn-primary mt-4" :disabled="withdrawLoading || withdrawAmount <= 0 || withdrawAmount > myAccountBalance" @click="submitWithdraw">
           {{ withdrawLoading ? t('common.loading') : t('bank.confirmWithdraw') }}
         </button>
       </div>
@@ -272,10 +261,7 @@ function navigateToForexTransfer() {
       <div v-if="customerDepositSuccess" class="success-message">{{ t('bank.depositCreated') }}</div>
 
       <!-- First deposit (no account yet) -->
-      <div
-        v-if="!hasCustomerAccount && !customerDepositSuccess"
-        class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm"
-      >
+      <div v-if="!hasCustomerAccount && !customerDepositSuccess" class="account-empty-state mt-6 flex flex-col gap-5 rounded-2xl border border-divider bg-card-raised p-5 shadow-sm">
         <p class="account-empty-hint text-sm text-muted sm:text-base">
           {{ t('bank.openAccountHint', { rate: formatPercent(bankInfo?.depositInterestRatePercent ?? 0) }) }}
         </p>
@@ -336,10 +322,7 @@ function navigateToForexTransfer() {
           <p class="offer-context-hint">{{ t('bank.directBorrowingHint') }}</p>
 
           <div v-if="isAuthenticated && isCompanyAccountActive && directBorrowingOption.remainingCapacity > 0">
-            <button
-              class="btn btn-primary btn-sm"
-              @click="router.push({ name: 'bank-loan-request', params: { buildingId: bankBuildingId } })"
-            >
+            <button class="btn btn-primary btn-sm" @click="router.push({ name: 'bank-loan-request', params: { buildingId: bankBuildingId } })">
               {{ t('bank.acceptLoan') }}
             </button>
           </div>
@@ -354,10 +337,7 @@ function navigateToForexTransfer() {
   </div>
 
   <!-- My Loans at This Bank -->
-  <section
-    v-if="isAuthenticated && myLoansHere.length > 0"
-    class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8"
-  >
+  <section v-if="isAuthenticated && myLoansHere.length > 0" class="my-loans-here-section mt-8 rounded-3xl border border-divider bg-card p-6 shadow-sm sm:p-8">
     <h2 class="section-title text-2xl font-bold text-body">{{ t('bank.myLoans') }}</h2>
     <div class="loans-list mt-6 grid gap-4">
       <div v-for="loan in myLoansHere" :key="loan.id" class="loan-row rounded-2xl border border-divider bg-card-raised p-4 shadow-sm">

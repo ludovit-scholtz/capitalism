@@ -517,11 +517,7 @@ const isCompanyAccountActive = computed(() => auth.player?.activeAccountType ===
         </div>
 
         <!-- Liquidity Health Panel -->
-        <BankLiquidityPanel
-          v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus"
-          :bank-info="bankInfo"
-          :currency-code="cityCurrency"
-        />
+        <BankLiquidityPanel v-if="bankInfo && bankInfo.baseCapitalDeposited && bankInfo.liquidityStatus" :bank-info="bankInfo" :currency-code="cityCurrency" />
 
         <!-- Depositors section -->
         <section v-if="bankInfo?.baseCapitalDeposited" class="depositors-section">
@@ -705,7 +701,6 @@ const isCompanyAccountActive = computed(() => auth.player?.activeAccountType ===
   margin-bottom: var(--spacing-xl);
 }
 
-
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -732,7 +727,6 @@ const isCompanyAccountActive = computed(() => auth.player?.activeAccountType ===
   color: var(--color-text-primary);
 }
 
-
 .offers-table,
 .loans-table {
   overflow-x: auto;
@@ -758,7 +752,6 @@ th {
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-
 
 .loan-status-badge {
   display: inline-block;
@@ -850,7 +843,6 @@ th {
   color: var(--color-text-primary);
   border: 1px solid var(--color-border);
 }
-
 
 /* Bank info and rate configuration */
 .bank-info-section {
@@ -1069,4 +1061,3 @@ th {
   margin-top: var(--spacing-xs, 4px);
 }
 </style>
-

@@ -64,9 +64,7 @@
         </div>
         <div class="raw-material-item">
           <span class="detail-label">{{ t('cityMap.rawMaterialQuality') }}</span
-          ><span class="quality-badge" :class="materialQualityClass(lot.materialQuality)">
-            {{ materialQualityLabel(lot.materialQuality) }} ({{ Math.round(lot.materialQuality * 100) }}%)
-          </span>
+          ><span class="quality-badge" :class="materialQualityClass(lot.materialQuality)"> {{ materialQualityLabel(lot.materialQuality) }} ({{ Math.round(lot.materialQuality * 100) }}%) </span>
         </div>
         <div class="raw-material-item full-width">
           <span class="detail-label">{{ t('cityMap.rawMaterialQuantity') }}</span
@@ -255,12 +253,7 @@
     </template>
 
     <!-- Post-purchase banner: under-construction -->
-    <div
-      v-if="justPurchasedBuildingId && isOwnedByActiveCompany && justPurchasedIsUnderConstruction"
-      class="post-purchase-banner construction-banner"
-      role="status"
-      data-testid="construction-banner"
-    >
+    <div v-if="justPurchasedBuildingId && isOwnedByActiveCompany && justPurchasedIsUnderConstruction" class="post-purchase-banner construction-banner" role="status" data-testid="construction-banner">
       <div class="post-purchase-body">
         <strong class="post-purchase-title"> 🏗️ {{ t('cityMap.constructionStartedTitle') }} </strong>
         <p class="post-purchase-text">
@@ -268,9 +261,7 @@
             t('cityMap.constructionStartedBody', {
               type: fmtBuildingType(justPurchasedBuildingType ?? 'FACTORY'),
               time: formatTickDuration(
-                justPurchasedConstructionCompletesAtTick
-                  ? constructionTicksRemaining(justPurchasedConstructionCompletesAtTick)
-                  : constructionTicksForType(justPurchasedBuildingType ?? 'FACTORY'),
+                justPurchasedConstructionCompletesAtTick ? constructionTicksRemaining(justPurchasedConstructionCompletesAtTick) : constructionTicksForType(justPurchasedBuildingType ?? 'FACTORY'),
                 locale,
               ),
             })
@@ -297,19 +288,11 @@
     </div>
 
     <!-- Under construction (no just-purchased state) -->
-    <div
-      v-else-if="isOwnedByActiveCompany && lot.building && lot.building.isUnderConstruction"
-      class="your-building-actions construction-state"
-      data-testid="under-construction-panel"
-    >
+    <div v-else-if="isOwnedByActiveCompany && lot.building && lot.building.isUnderConstruction" class="your-building-actions construction-state" data-testid="under-construction-panel">
       <div class="construction-info">
         <span class="construction-badge">🏗️ {{ t('cityMap.underConstruction') }}</span>
         <p class="construction-detail">{{ lot.building.name }} ({{ fmtBuildingType(lot.building.type) }})</p>
-        <p
-          class="construction-ticks-info"
-          data-testid="construction-ticks-remaining"
-          :title="constructionTicksRemaining(lot.building.constructionCompletesAtTick) + ' ticks'"
-        >
+        <p class="construction-ticks-info" data-testid="construction-ticks-remaining" :title="constructionTicksRemaining(lot.building.constructionCompletesAtTick) + ' ticks'">
           {{ t('cityMap.ticksRemaining', { time: formatTickDuration(constructionTicksRemaining(lot.building.constructionCompletesAtTick), locale) }) }}
         </p>
       </div>
@@ -395,9 +378,7 @@ const lotStatus = computed(() => {
 
 const isOwnedByActiveCompany = computed(() => !!props.lot.ownerCompanyId && props.lot.ownerCompanyId === props.activeCompany?.id)
 
-const isOwnedByDifferentControlledCompany = computed(
-  () => lotStatus.value === 'yours' && !!props.lot.ownerCompanyId && props.lot.ownerCompanyId !== props.activeCompany?.id,
-)
+const isOwnedByDifferentControlledCompany = computed(() => lotStatus.value === 'yours' && !!props.lot.ownerCompanyId && props.lot.ownerCompanyId !== props.activeCompany?.id)
 
 const canPurchase = computed(() => props.isCompanyAccountActive && isPurchasable(props.isAuthenticated, props.companies.length, props.lot.ownerCompanyId))
 
@@ -650,10 +631,22 @@ async function confirmPurchase() {
   margin-bottom: 0.875rem;
 }
 
-.rec-retail { background: rgba(52, 211, 153, 0.12); color: #34d399; }
-.rec-resource { background: rgba(251, 191, 36, 0.12); color: #f59e0b; }
-.rec-industrial { background: rgba(99, 102, 241, 0.12); color: #818cf8; }
-.rec-balanced { background: rgba(148, 163, 184, 0.1); color: var(--color-text-muted); }
+.rec-retail {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+}
+.rec-resource {
+  background: rgba(251, 191, 36, 0.12);
+  color: #f59e0b;
+}
+.rec-industrial {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
+.rec-balanced {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--color-text-muted);
+}
 
 .detail-grid {
   display: flex;
@@ -721,7 +714,8 @@ async function confirmPurchase() {
   border-radius: 6px;
 }
 
-.owner-info, .building-info {
+.owner-info,
+.building-info {
   display: flex;
   gap: 0.5rem;
   font-size: 0.85rem;
@@ -775,10 +769,22 @@ async function confirmPurchase() {
   border-radius: 4px;
 }
 
-.quality-badge.quality-excellent { background: rgba(52, 211, 153, 0.15); color: #34d399; }
-.quality-badge.quality-good { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.quality-badge.quality-fair { background: rgba(251, 191, 36, 0.15); color: #f59e0b; }
-.quality-badge.quality-poor { background: rgba(239, 68, 68, 0.12); color: #f87171; }
+.quality-badge.quality-excellent {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+.quality-badge.quality-good {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+.quality-badge.quality-fair {
+  background: rgba(251, 191, 36, 0.15);
+  color: #f59e0b;
+}
+.quality-badge.quality-poor {
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
 
 .placement-guidance-panel {
   background: var(--color-surface-secondary, rgba(0, 0, 0, 0.03));
@@ -853,8 +859,14 @@ async function confirmPurchase() {
   border-radius: 6px;
 }
 
-.solar-badge { background: rgba(251, 191, 36, 0.15); color: #f59e0b; }
-.wind-badge { background: rgba(99, 102, 241, 0.12); color: #818cf8; }
+.solar-badge {
+  background: rgba(251, 191, 36, 0.15);
+  color: #f59e0b;
+}
+.wind-badge {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
 
 .weather-forecast-bars {
   display: flex;
@@ -881,8 +893,12 @@ async function confirmPurchase() {
   border-radius: 2px 2px 0 0;
 }
 
-.forecast-bar.solar-bar { background: #fbbf24; }
-.forecast-bar.wind-bar { background: #818cf8; }
+.forecast-bar.solar-bar {
+  background: #fbbf24;
+}
+.forecast-bar.wind-bar {
+  background: #818cf8;
+}
 
 .forecast-bar-label {
   position: absolute;
@@ -924,7 +940,8 @@ async function confirmPurchase() {
   color: var(--color-text-secondary);
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
   width: 100%;
   padding: 0.5rem 0.75rem;
   border: 1px solid var(--color-border);
@@ -967,7 +984,9 @@ async function confirmPurchase() {
   background: var(--color-surface);
   cursor: pointer;
   text-align: left;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
   flex-wrap: wrap;
 }
 
@@ -980,9 +999,19 @@ async function confirmPurchase() {
   background: var(--color-accent-alpha, rgba(59, 130, 246, 0.08));
 }
 
-.card-type-icon { font-size: 1.1rem; flex-shrink: 0; }
-.card-type-name { font-weight: 600; font-size: 0.85rem; }
-.card-type-desc { font-size: 0.75rem; color: var(--color-text-muted); width: 100%; }
+.card-type-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.card-type-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.card-type-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  width: 100%;
+}
 
 .plant-type-cards {
   display: flex;
@@ -1010,14 +1039,42 @@ async function confirmPurchase() {
   background: var(--color-accent-alpha, rgba(59, 130, 246, 0.08));
 }
 
-.plant-type-name { font-weight: 600; font-size: 0.85rem; }
-.plant-type-mw { font-size: 0.8rem; color: var(--color-text-muted); }
-.plant-type-badge, .plant-weather-badge { font-size: 0.7rem; font-weight: 600; padding: 0.1em 0.4em; border-radius: 4px; }
-.plant-type-badge.renewable { background: rgba(52, 211, 153, 0.12); color: #34d399; }
-.plant-type-badge.fuel { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
-.plant-weather-badge.solar { background: rgba(251, 191, 36, 0.15); color: #f59e0b; }
-.plant-weather-badge.wind { background: rgba(99, 102, 241, 0.12); color: #818cf8; }
-.plant-type-desc { font-size: 0.75rem; color: var(--color-text-muted); width: 100%; }
+.plant-type-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.plant-type-mw {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.plant-type-badge,
+.plant-weather-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+}
+.plant-type-badge.renewable {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+}
+.plant-type-badge.fuel {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+.plant-weather-badge.solar {
+  background: rgba(251, 191, 36, 0.15);
+  color: #f59e0b;
+}
+.plant-weather-badge.wind {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+}
+.plant-type-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  width: 100%;
+}
 
 .selected-type-guidance {
   font-size: 0.8rem;
@@ -1025,7 +1082,10 @@ async function confirmPurchase() {
   margin-top: 0.375rem;
 }
 
-.optional-hint { font-weight: 400; color: var(--color-text-muted); }
+.optional-hint {
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
 
 .mining-deposit-summary {
   background: rgba(251, 191, 36, 0.06);
@@ -1035,13 +1095,37 @@ async function confirmPurchase() {
   margin-bottom: 0.75rem;
 }
 
-.deposit-summary-title { font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; }
-.deposit-summary-grid { display: flex; flex-direction: column; gap: 0.375rem; }
-.deposit-summary-item { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
-.deposit-label { color: var(--color-text-muted); }
-.deposit-value { font-weight: 600; }
-.deposit-resource-name { color: var(--color-accent, #3b82f6); }
-.deposit-investment-hint { font-size: 0.75rem; color: var(--color-text-muted); margin-top: 0.375rem; font-style: italic; }
+.deposit-summary-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+.deposit-summary-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.deposit-summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+}
+.deposit-label {
+  color: var(--color-text-muted);
+}
+.deposit-value {
+  font-weight: 600;
+}
+.deposit-resource-name {
+  color: var(--color-accent, #3b82f6);
+}
+.deposit-investment-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  margin-top: 0.375rem;
+  font-style: italic;
+}
 
 .purchase-cost-summary {
   background: var(--color-surface-secondary, rgba(0, 0, 0, 0.04));
@@ -1067,11 +1151,21 @@ async function confirmPurchase() {
   font-weight: 600;
 }
 
-.cost-label { color: var(--color-text-muted); }
-.cost-value { font-weight: 500; }
-.cost-debit { color: #f87171; }
-.cost-positive { color: #34d399; }
-.cost-negative { color: #ef4444; }
+.cost-label {
+  color: var(--color-text-muted);
+}
+.cost-value {
+  font-weight: 500;
+}
+.cost-debit {
+  color: #f87171;
+}
+.cost-positive {
+  color: #34d399;
+}
+.cost-negative {
+  color: #ef4444;
+}
 
 .error-message {
   background: rgba(239, 68, 68, 0.1);
@@ -1103,9 +1197,19 @@ async function confirmPurchase() {
   background: rgba(251, 191, 36, 0.05);
 }
 
-.post-purchase-body { display: flex; flex-direction: column; gap: 0.375rem; }
-.post-purchase-title { font-size: 0.95rem; }
-.post-purchase-text { font-size: 0.82rem; color: var(--color-text-secondary); line-height: 1.5; }
+.post-purchase-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+.post-purchase-title {
+  font-size: 0.95rem;
+}
+.post-purchase-text {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
 
 .construction-progress-bar {
   height: 4px;
@@ -1140,14 +1244,37 @@ async function confirmPurchase() {
   padding: 1rem;
 }
 
-.construction-info { display: flex; flex-direction: column; gap: 0.25rem; }
-.construction-badge { font-size: 0.85rem; font-weight: 700; }
-.construction-detail { font-size: 0.82rem; color: var(--color-text-secondary); }
-.construction-ticks-info { font-size: 0.8rem; color: #f59e0b; }
+.construction-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.construction-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.construction-detail {
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+.construction-ticks-info {
+  font-size: 0.8rem;
+  color: #f59e0b;
+}
 
-.population-index-item { flex-direction: column; gap: 0.25rem; }
-.population-index-display { display: flex; align-items: center; gap: 0.5rem; }
-.population-index-value { font-weight: 700; font-size: 1rem; }
+.population-index-item {
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.population-index-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.population-index-value {
+  font-weight: 700;
+  font-size: 1rem;
+}
 .population-index-tag {
   font-size: 0.72rem;
   font-weight: 700;
@@ -1155,18 +1282,36 @@ async function confirmPurchase() {
   border-radius: 4px;
   text-transform: uppercase;
 }
-.pop-very-high { background: rgba(52, 211, 153, 0.15); color: #34d399; }
-.pop-high { background: rgba(59, 130, 246, 0.15); color: #60a5fa; }
-.pop-medium { background: rgba(148, 163, 184, 0.12); color: var(--color-text-muted); }
-.pop-low { background: rgba(239, 68, 68, 0.1); color: #f87171; }
+.pop-very-high {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+.pop-high {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+.pop-medium {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--color-text-muted);
+}
+.pop-low {
+  background: rgba(239, 68, 68, 0.1);
+  color: #f87171;
+}
 
 .population-index-hint {
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
 
-.coordinates-value { font-family: monospace; font-size: 0.82rem; }
-.coordinates-hint { font-size: 0.72rem; color: var(--color-text-muted); }
+.coordinates-value {
+  font-family: monospace;
+  font-size: 0.82rem;
+}
+.coordinates-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
 
 .btn {
   display: inline-flex;
@@ -1179,13 +1324,31 @@ async function confirmPurchase() {
   cursor: pointer;
   border: none;
   text-decoration: none;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.15s,
+    opacity 0.15s;
   white-space: nowrap;
 }
 
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-primary { background: var(--color-accent, #3b82f6); color: #fff; }
-.btn-primary:hover:not(:disabled) { background: var(--color-accent-hover, #2563eb); }
-.btn-secondary { background: var(--color-surface-secondary, rgba(148, 163, 184, 0.12)); color: var(--color-text-secondary); border: 1px solid var(--color-border); }
-.btn-ghost { background: transparent; color: var(--color-accent, #3b82f6); border: 1px solid var(--color-accent, #3b82f6); }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.btn-primary {
+  background: var(--color-accent, #3b82f6);
+  color: #fff;
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-hover, #2563eb);
+}
+.btn-secondary {
+  background: var(--color-surface-secondary, rgba(148, 163, 184, 0.12));
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border);
+}
+.btn-ghost {
+  background: transparent;
+  color: var(--color-accent, #3b82f6);
+  border: 1px solid var(--color-accent, #3b82f6);
+}
 </style>

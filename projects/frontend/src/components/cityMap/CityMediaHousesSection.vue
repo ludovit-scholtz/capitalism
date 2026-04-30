@@ -8,15 +8,8 @@
       <p class="hint">{{ t('cityMap.mediaHouses.emptyHint') }}</p>
     </div>
     <div v-else class="media-houses-grid">
-      <div
-        v-for="mh in mediaHouses"
-        :key="mh.id"
-        class="media-house-card"
-        :class="{ 'mh-offline': mh.powerStatus === 'OFFLINE', 'mh-construction': mh.isUnderConstruction }"
-      >
-        <div class="mh-channel-icon">
-          <span v-if="mh.mediaType === 'TV'">📺</span><span v-else-if="mh.mediaType === 'RADIO'">📻</span><span v-else>📰</span>
-        </div>
+      <div v-for="mh in mediaHouses" :key="mh.id" class="media-house-card" :class="{ 'mh-offline': mh.powerStatus === 'OFFLINE', 'mh-construction': mh.isUnderConstruction }">
+        <div class="mh-channel-icon"><span v-if="mh.mediaType === 'TV'">📺</span><span v-else-if="mh.mediaType === 'RADIO'">📻</span><span v-else>📰</span></div>
         <div class="mh-info">
           <strong class="mh-name">{{ mh.name }}</strong>
           <div class="mh-badges">

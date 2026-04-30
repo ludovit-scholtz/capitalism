@@ -25,10 +25,7 @@ const fmt = computed(() => (amount: number) => formatCurrency(amount, props.curr
     <div class="liquidity-grid">
       <div class="liquidity-stat">
         <span class="liquidity-stat-label">{{ t('bank.availableCash') }}</span>
-        <span
-          class="liquidity-stat-value"
-          :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'"
-        >
+        <span class="liquidity-stat-value" :class="(bankInfo.availableCash ?? 0) >= (bankInfo.reserveRequirement ?? 0) ? 'positive' : 'negative'">
           {{ fmt(bankInfo.availableCash ?? 0) }}
         </span>
       </div>
@@ -48,9 +45,7 @@ const fmt = computed(() => (amount: number) => formatCurrency(amount, props.curr
         <span class="liquidity-stat-value" :class="(bankInfo.centralBankDebt ?? 0) > 0 ? 'negative' : 'positive'">
           {{ (bankInfo.centralBankDebt ?? 0) > 0 ? fmt(bankInfo.centralBankDebt) : fmt(0) }}
         </span>
-        <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint">
-          {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a.
-        </span>
+        <span v-if="(bankInfo.centralBankDebt ?? 0) > 0" class="liquidity-stat-hint"> {{ t('bank.centralBankRate') }}: {{ formatPercent(bankInfo.centralBankInterestRatePercent ?? 2) }} p.a. </span>
       </div>
     </div>
 
