@@ -391,7 +391,7 @@ onMounted(loadData)
       <p class="text-xs text-muted mb-4">{{ t('goldAmm.swapHint') }}</p>
 
       <div v-if="swapResult" class="bg-good/10 border border-good text-good font-semibold rounded-lg px-4 py-3 mb-4" role="status">
-        Ôťô {{ t('goldAmm.swapSuccess') }}
+        ✅ {{ t('goldAmm.swapSuccess') }}
         <span v-if="swapResult.direction === 'FIAT_TO_GOLD'"> +{{ formatGold(swapResult.outputAmount) }} XAU</span>
         <span v-else> +{{ formatFiat(swapResult.outputAmount) }} {{ swapResult.currencyCode }}</span>
       </div>
@@ -480,7 +480,7 @@ onMounted(loadData)
 
       <div v-if="myPositions.length === 0" class="py-8 text-center">
         <p class="text-sm text-muted italic mb-3">{{ t('goldAmm.noPositions') }}</p>
-        <button class="btn btn-primary" @click="activeTab = 'addLiquidity'">{{ t('goldAmm.tabAddLiquidity') }} Ôćĺ</button>
+        <button class="btn btn-primary" @click="activeTab = 'addLiquidity'">{{ t('goldAmm.tabAddLiquidity') }} →</button>
       </div>
 
       <div v-else class="flex flex-col gap-5">

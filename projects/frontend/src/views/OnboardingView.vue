@@ -339,14 +339,14 @@ const configureGuideBasePrice = computed(() => {
 
 /** Unit type icon mapping for the factory layout display. */
 const unitTypeIcons: Record<string, string> = {
-  PURCHASE: '­čŤĺ',
-  MANUFACTURING: 'ÔÜÖ´ŞĆ',
-  STORAGE: '­čôŽ',
-  B2B_SALES: '­čöŚ',
-  PUBLIC_SALES: '­čĆĚ´ŞĆ',
-  MINING: 'ÔŤĆ´ŞĆ',
-  BRANDING: '­čÄĘ',
-  MARKETING: '­čôú',
+  PURCHASE: '🛒',
+  MANUFACTURING: '⚙️',
+  STORAGE: '📦',
+  B2B_SALES: '🤝',
+  PUBLIC_SALES: '🛍️',
+  MINING: '⛏️',
+  BRANDING: '🏷️',
+  MARKETING: '📣',
 }
 
 /**
@@ -370,7 +370,7 @@ const completionShopUnits = computed(() => {
 
 /**
  * Returns a static guest factory layout showing what will be configured on save.
- * Matches the ConfigureStarterFactory backend output: PURCHASE Ôćĺ MANUFACTURING Ôćĺ STORAGE Ôćĺ B2B_SALES.
+ * Matches the ConfigureStarterFactory backend output: PURCHASE -> MANUFACTURING -> STORAGE -> B2B_SALES.
  */
 const guestFactoryLayout = computed(() => {
   if (!isGuestMode.value || step.value !== 7) return null
@@ -384,7 +384,7 @@ const guestFactoryLayout = computed(() => {
 
 /**
  * Returns a static guest shop layout showing what will be configured on save.
- * Matches the AddStarterShop backend output: PURCHASE Ôćĺ PUBLIC_SALES.
+ * Matches the AddStarterShop backend output: PURCHASE -> PUBLIC_SALES.
  */
 const guestShopLayout = computed(() => {
   if (!isGuestMode.value || step.value !== 7) return null
@@ -395,9 +395,9 @@ const guestShopLayout = computed(() => {
 })
 
 const industryIcons: Record<string, string> = {
-  FURNITURE: '­č¬Ĺ',
-  FOOD_PROCESSING: '­čŹ×',
-  HEALTHCARE: '­čĺŐ',
+  FURNITURE: '🪑',
+  FOOD_PROCESSING: '🍞',
+  HEALTHCARE: '💊',
 }
 
 /** Maps each starter industry to its i18n description key. */
@@ -584,7 +584,7 @@ onMounted(async () => {
       eurFxRates.value = fxRatesData.eurFxRates
 
       // Derive the player's onboarding city from the shop building that was created during
-      // onboarding (onboardingShopBuildingId Ôćĺ building.cityId Ôćĺ city for correct currency).
+      // onboarding (onboardingShopBuildingId -> building.cityId -> city for correct currency).
       const shopBuilding = auth.player?.companies.flatMap((company) => company.buildings).find((building) => building.id === auth.player?.onboardingShopBuildingId)
       if (shopBuilding?.cityId) {
         selectedCityId.value = shopBuilding.cityId

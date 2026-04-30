@@ -743,7 +743,7 @@ function navigateToEntry(slug: string) {
                 <span v-for="metaEntry in entry.meta" :key="metaEntry">{{ metaEntry }}</span>
               </div>
 
-              <span class="text-xs font-semibold text-brand">{{ t('encyclopedia.viewDetail') }} Ôćĺ</span>
+              <span class="text-xs font-semibold text-brand">{{ t('encyclopedia.viewDetail') }} →</span>
             </div>
           </article>
         </div>

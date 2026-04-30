@@ -203,7 +203,7 @@ function emitSelectIfAllowed(entry: RankedProductResult) {
 
         <template v-if="groupedProducts.manufacturing.length > 0">
           <div class="picker-section-header picker-section-header--rd">
-            <span class="picker-section-icon" aria-hidden="true">­čĆş</span>
+            <span class="picker-section-icon" aria-hidden="true">🏭</span>
             {{ t('productPicker.sectionActiveProductLines') }}
           </div>
           <div

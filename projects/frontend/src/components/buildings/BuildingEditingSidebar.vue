@@ -290,7 +290,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
           <template v-if="getDraftUnitAt(selectedCell.x, selectedCell.y)!.unitType === 'B2B_SALES'">
             <!-- No-source warning: shown when no MANUFACTURING or MINING unit has an item configured -->
             <div v-if="!b2bHasUpstreamSource" class="b2b-no-source-warning" role="alert" :aria-label="t('buildingDetail.accessibility.noUpstreamSource')">
-              <span class="b2b-no-source-icon" aria-hidden="true">ÔÜá</span>
+              <span class="b2b-no-source-icon" aria-hidden="true">⚠️</span>
               <div class="b2b-no-source-content">
                 <p class="b2b-no-source-title">{{ t('buildingDetail.config.b2bNoSourceTitle') }}</p>
                 <p class="b2b-no-source-body">{{ t('buildingDetail.config.b2bNoSourceBody') }}</p>
@@ -772,7 +772,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
 
           <!-- Max level state -->
           <div v-else-if="selectedCellUpgradeInfo.isMaxLevel" class="unit-upgrade-max-level">
-            <span class="unit-upgrade-max-badge">Ôśů</span>
+            <span class="unit-upgrade-max-badge">✅</span>
             <span>{{ t('buildingDetail.unitUpgrade.maxLevel') }}</span>
             <p class="unit-upgrade-max-note">{{ t('buildingDetail.unitUpgrade.maxLevelNote') }}</p>
           </div>
@@ -786,7 +786,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
           <div v-else class="unit-upgrade-available">
             <div class="unit-upgrade-levels">
               <span class="unit-upgrade-level current-level">{{ t('buildingDetail.unitUpgrade.currentLevel', { level: selectedCellUpgradeInfo.currentLevel }) }}</span>
-              <span class="unit-upgrade-arrow">Ôćĺ</span>
+              <span class="unit-upgrade-arrow">→</span>
               <span class="unit-upgrade-level next-level">{{ t('buildingDetail.unitUpgrade.nextLevel', { level: selectedCellUpgradeInfo.nextLevel }) }}</span>
             </div>
             <!-- Full before/after stat table -->
@@ -795,7 +795,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 <span class="unit-upgrade-stat-label">{{ selectedCellUpgradeInfo.statLabel }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ selectedCellUpgradeInfo.currentStat.toFixed(1) }}</span>
-                  <span class="stat-arrow"> Ôćĺ </span>
+                  <span class="stat-arrow"> → </span>
                   <span class="stat-next">{{ selectedCellUpgradeInfo.nextStat.toFixed(1) }}</span>
                 </span>
               </div>
@@ -804,7 +804,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.storageCapacity') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ selectedCellUpgradeInfo.currentStorageCapacity.toFixed(0) }}</span>
-                  <span class="stat-arrow"> Ôćĺ </span>
+                  <span class="stat-arrow"> → </span>
                   <span class="stat-next">{{ selectedCellUpgradeInfo.nextStorageCapacity.toFixed(0) }}</span>
                   <span class="stat-delta stat-delta-positive">+{{ (selectedCellUpgradeInfo.nextStorageCapacity - selectedCellUpgradeInfo.currentStorageCapacity).toFixed(0) }}</span>
                 </span>
@@ -813,7 +813,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.laborCost') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
-                  <span class="stat-arrow"> Ôćĺ </span>
+                  <span class="stat-arrow"> → </span>
                   <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick) }}</span>
                   <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextLaborCostPerTick - selectedCellUpgradeInfo.currentLaborCostPerTick) }}</span>
                 </span>
@@ -822,7 +822,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 <span class="unit-upgrade-stat-label">{{ t('buildingDetail.unitUpgrade.energyCost') }}</span>
                 <span class="unit-upgrade-stat-values">
                   <span class="stat-current">{{ formatCurrency(selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
-                  <span class="stat-arrow"> Ôćĺ </span>
+                  <span class="stat-arrow"> → </span>
                   <span class="stat-next">{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick) }}</span>
                   <span class="stat-delta stat-delta-negative">+{{ formatCurrency(selectedCellUpgradeInfo.nextEnergyCostPerTick - selectedCellUpgradeInfo.currentEnergyCostPerTick) }}</span>
                 </span>
@@ -841,7 +841,7 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
             <p v-if="unitUpgradeError" class="form-error">{{ unitUpgradeError }}</p>
             <!-- Staged state: unit has been queued for upgrade via Store Upgrade -->
             <div v-if="isSelectedCellStaged" class="unit-upgrade-staged">
-              <span class="unit-upgrade-staged-badge">Ôťô {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
+              <span class="unit-upgrade-staged-badge">✅ {{ t('buildingDetail.unitUpgrade.stagedBadge') }}</span>
               <p class="unit-upgrade-stage-info">{{ t('buildingDetail.unitUpgrade.stageInfo') }}</p>
               <button class="btn btn-ghost btn-sm" @click="toggleStagedUpgrade(selectedCellUpgradeInfo!.unitId)">
                 {{ t('buildingDetail.unitUpgrade.removeStagedUpgrade') }}
