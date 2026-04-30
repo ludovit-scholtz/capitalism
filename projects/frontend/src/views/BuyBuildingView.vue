@@ -714,12 +714,10 @@ async function buyBuilding() {
                 >
               </span>
               <span v-if="selectedType === 'MINE' && selectedLot.materialQuality != null"
-                >{{ t('cityMap.rawMaterialQuality') }}:
-                <strong class="text-body">{{ Math.round(selectedLot.materialQuality * 100) }}%</strong></span
+                >{{ t('cityMap.rawMaterialQuality') }}: <strong class="text-body">{{ Math.round(selectedLot.materialQuality * 100) }}%</strong></span
               >
               <span v-if="selectedType === 'MINE' && selectedLot.materialQuantity != null"
-                >{{ t('cityMap.rawMaterialQuantity') }}:
-                <strong class="text-body">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</strong></span
+                >{{ t('cityMap.rawMaterialQuantity') }}: <strong class="text-body">{{ selectedLot.materialQuantity.toLocaleString(locale) }} {{ t('cityMap.rawMaterialQuantityUnit') }}</strong></span
               >
               <span v-if="selectedType !== 'MINE'">{{ t('buildings.populationIndex') }}: {{ formatPopulationIndex(selectedLot.populationIndex) }}</span>
               <span v-if="selectedPropertyAreaSqm != null"

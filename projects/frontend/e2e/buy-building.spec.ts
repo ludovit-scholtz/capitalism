@@ -8,10 +8,7 @@ async function authenticate(page: Parameters<typeof test>[0]['page'], playerId: 
   }, `token-${playerId}`)
 }
 
-async function switchCityViaContextSwitcher(
-  page: Parameters<typeof test>[0]['page'],
-  cityName: 'Bratislava' | 'Prague' | 'Vienna',
-) {
+async function switchCityViaContextSwitcher(page: Parameters<typeof test>[0]['page'], cityName: 'Bratislava' | 'Prague' | 'Vienna') {
   await page.locator('.ctx-trigger').click()
   await page.locator('.ctx-city-option', { hasText: cityName }).click()
   await expect(page.locator('.ctx-trigger .ctx-city-name')).toContainText(cityName)
@@ -624,11 +621,14 @@ test.describe('Buy Building View', () => {
     })
 
     // Set Prague as the active city in localStorage before the page loads
-    await page.addInitScript((params) => {
-      localStorage.setItem('auth_token', params.token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-      localStorage.setItem('selected_city_id', params.cityId)
-    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+    await page.addInitScript(
+      (params) => {
+        localStorage.setItem('auth_token', params.token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', params.cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-pr' },
+    )
 
     await page.goto('/buy-building/company-1')
 
@@ -662,11 +662,14 @@ test.describe('Buy Building View', () => {
     state.currentToken = `token-${player.id}`
 
     // Set Prague as the active city
-    await page.addInitScript((params) => {
-      localStorage.setItem('auth_token', params.token)
-      localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
-      localStorage.setItem('selected_city_id', params.cityId)
-    }, { token: `token-${player.id}`, cityId: 'city-pr' })
+    await page.addInitScript(
+      (params) => {
+        localStorage.setItem('auth_token', params.token)
+        localStorage.setItem('auth_expires', new Date(Date.now() + 7200000).toISOString())
+        localStorage.setItem('selected_city_id', params.cityId)
+      },
+      { token: `token-${player.id}`, cityId: 'city-pr' },
+    )
 
     await page.goto('/dashboard')
 
@@ -740,9 +743,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await expect(lotCard.locator('[data-testid="buy-building-resource-badge"]')).toHaveCount(0)
   })
 
-  test('selecting mine lot shows mining deposit summary with resource quality and quantity', async ({
-    page,
-  }) => {
+  test('selecting mine lot shows mining deposit summary with resource quality and quantity', async ({ page }) => {
     const player = setupMineTestPlayer()
     const state = setupMockApi(page, { players: [player] })
     state.currentUserId = player.id
@@ -814,9 +815,7 @@ test.describe('Buy Building — Mining lot resource display', () => {
     await expect(premiumBadge).toContainText(/resource/i)
   })
 
-  test('mining deposit summary is hidden when Factory type selected on mine lot', async ({
-    page,
-  }) => {
+  test('mining deposit summary is hidden when Factory type selected on mine lot', async ({ page }) => {
     const player = setupMineTestPlayer()
     const lots = makeDefaultBuildingLots()
     // Make Industrial Plot A1 also support FACTORY
