@@ -398,3 +398,654 @@ function buildDonuts(slices: PieSlice[], cx: number, cy: number, r: number, inne
   return paths
 }
 </script>
+
+<style scoped>
+/* ── Listing row ─────────────────────────────────────── */
+.listing-row {
+  transition: background-color 0.15s ease;
+}
+
+.listing-row:hover {
+  background: color-mix(in srgb, var(--color-primary) 4%, transparent);
+}
+
+.listing-row--expanded {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.listing-row--expanded td {
+  border-bottom-color: transparent;
+}
+
+.company-cell {
+  display: flex !important;
+  flex-direction: column;
+  gap: 0.3rem;
+  white-space: normal !important;
+}
+
+.company-name {
+  font-weight: 600;
+}
+
+.price-stack {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.price-main {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.price-meta {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}
+
+.ownership-cell {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.owned-shares-hint {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  white-space: normal;
+}
+
+.listing-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.listing-chip--control {
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  color: #b45309;
+}
+
+.listing-chip--owned {
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  color: var(--color-primary);
+}
+
+.listing-chip--merge {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 18%, var(--color-surface));
+  color: var(--color-warning, #f59e0b);
+  border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+}
+
+.actions-cell {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  white-space: nowrap;
+}
+
+.btn-sm {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.btn-active {
+  background: color-mix(in srgb, var(--color-primary) 20%, var(--color-surface));
+}
+
+.dividend-cell {
+  white-space: nowrap;
+}
+
+.dividend-badge {
+  display: inline-block;
+  background: color-mix(in srgb, var(--color-success, #22c55e) 14%, transparent);
+  color: var(--color-success, #22c55e);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Trade panel ─────────────────────────────────────── */
+.trade-panel-row td {
+  padding: 0 !important;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.trade-panel {
+  padding: 1.1rem 1rem;
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+  display: grid;
+  gap: 1rem;
+}
+
+.trade-price-context {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+
+.trade-price-item {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.trade-price-label,
+.trade-price-hint {
+  color: var(--color-text-secondary);
+}
+
+.trade-price-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.trade-price-value {
+  font-size: 1.15rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-price-ask {
+  color: var(--color-danger, #ef4444);
+}
+
+.trade-price-bid {
+  color: var(--color-success, #22c55e);
+}
+
+.trade-price-hint {
+  font-size: 0.75rem;
+}
+
+.trade-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.trade-order-panel {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-primary) 12%);
+}
+
+.trade-order-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.trade-order-context,
+.trade-actions-header {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.trade-order-caption,
+.trade-actions-caption {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.trade-order-name {
+  font-size: 1rem;
+  color: var(--color-text-primary);
+}
+
+.trade-order-hint,
+.trade-actions-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.trade-account-cash {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
+  color: var(--color-text-primary);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.trade-order-controls {
+  display: grid;
+  gap: 0.35rem 0;
+}
+
+.trade-controls-labels,
+.trade-controls-inputs,
+.trade-controls-estimates {
+  display: grid;
+  grid-template-columns: minmax(130px, 160px) 1fr 1fr;
+  gap: 0 0.75rem;
+}
+
+.trade-controls-labels {
+  align-items: end;
+}
+
+.trade-controls-inputs {
+  align-items: stretch;
+}
+
+.trade-controls-estimates {
+  align-items: start;
+}
+
+.trade-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.trade-field-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.trade-action-btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.trade-select,
+.trade-input {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-background);
+  color: var(--color-text);
+  padding: 0.6rem 0.8rem;
+  font-size: 0.9rem;
+}
+
+.trade-select {
+  min-width: 200px;
+}
+
+.trade-input {
+  width: 100%;
+}
+
+.trade-actions-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.trade-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.trade-action-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  align-items: stretch;
+}
+
+.trade-action-group .btn {
+  width: 100%;
+  justify-content: center;
+}
+
+.trade-est {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, var(--color-text-secondary));
+  font-variant-numeric: tabular-nums;
+}
+
+.trade-feedback {
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+}
+
+.trade-feedback--success {
+  background: color-mix(in srgb, var(--color-success, #22c55e) 14%, var(--color-surface));
+  color: var(--color-success, #22c55e);
+}
+
+.trade-feedback--error {
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 14%, var(--color-surface));
+  color: var(--color-danger, #ef4444);
+}
+
+/* ── Company snapshot ────────────────────────────────── */
+.company-snapshot {
+  background: var(--color-surface-secondary, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.snapshot-grid {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.snapshot-item {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.snapshot-item dt {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted, var(--color-text-secondary));
+}
+
+.snapshot-item dd {
+  margin: 0;
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.snapshot-pct {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, var(--color-text-secondary));
+  margin-left: 0.25rem;
+}
+
+/* ── Price history panel ─────────────────────────────── */
+.history-panel {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.history-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.history-panel__header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.history-panel__hint,
+.history-panel__state {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.history-panel__state--error {
+  color: var(--color-danger, #ef4444);
+}
+
+.history-table-wrapper {
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 0.5rem 0.35rem;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+/* ── Shareholders panel ──────────────────────────────── */
+.shareholders-panel {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-border);
+  margin-top: 0.5rem;
+}
+
+.shareholders-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.shareholders-summary__item strong {
+  color: var(--color-text-primary);
+}
+
+.shareholders-single-owner {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.shareholders-layout {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.ownership-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 160px;
+}
+
+.ownership-donut {
+  flex-shrink: 0;
+}
+
+.donut-segment {
+  transition: opacity 0.15s;
+}
+
+.donut-segment:hover {
+  opacity: 0.82;
+}
+
+.ownership-legend {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.78rem;
+  min-width: 140px;
+}
+
+.ownership-legend__item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.ownership-legend__swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.ownership-legend__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary);
+}
+
+.ownership-legend__pct {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.shareholders-table-wrapper {
+  overflow-x: auto;
+  flex: 1;
+  min-width: 0;
+}
+
+.shareholders-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.shareholders-table th {
+  text-align: left;
+  padding: 0.3rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.shareholders-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  vertical-align: middle;
+}
+
+.shareholder-row--float td {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.holder-name {
+  margin-right: 0.35rem;
+  color: var(--color-text-primary);
+}
+
+.holder-type-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.holder-type-badge--person {
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 16%, var(--color-surface));
+  color: var(--color-accent, #6366f1);
+}
+
+.holder-type-badge--company {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 16%, var(--color-surface));
+  color: color-mix(in srgb, var(--color-warning, #f59e0b) 80%, var(--color-text-primary));
+}
+
+.holder-type-badge--float {
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, var(--color-surface));
+  color: var(--color-text-secondary);
+}
+
+.ownership-bar-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ownership-bar {
+  height: 8px;
+  background: color-mix(in srgb, var(--color-accent, #6366f1) 18%, var(--color-surface));
+  border-radius: 4px;
+  flex: 1;
+  min-width: 60px;
+  overflow: hidden;
+}
+
+.ownership-bar--float {
+  background: color-mix(in srgb, var(--color-text-secondary) 14%, var(--color-surface));
+}
+
+.ownership-bar__fill {
+  height: 100%;
+  background: var(--color-accent, #6366f1);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.ownership-bar--float .ownership-bar__fill {
+  background: var(--color-text-secondary);
+}
+
+.ownership-bar__pct {
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+/* ── Mobile ──────────────────────────────────────────── */
+@media (max-width: 720px) {
+  .trade-price-context {
+    gap: 1rem;
+  }
+
+  .trade-order-controls {
+    gap: 0.5rem 0;
+  }
+
+  .trade-controls-labels {
+    display: none;
+  }
+
+  .trade-controls-inputs,
+  .trade-controls-estimates {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .trade-controls-inputs .trade-input {
+    grid-column: 1 / -1;
+  }
+
+  .trade-controls-estimates > :first-child {
+    display: none;
+  }
+
+  .trade-actions {
+    grid-template-columns: 1fr;
+  }
+}
+</style>

@@ -61,11 +61,11 @@
                     <span class="text-sm font-semibold text-body">{{ formatCurrency(account.balance, account.currencyCode) }}</span>
                   </div>
                 </div>
-                <p v-if="account.balance == 0 && !account.isDepositAccount" class="mt-2 text-xs font-medium text-success">✓ {{ t('bank.accountReadyToClose') }}</p>
-                <p v-else-if="account.balance != 0 && !account.isDepositAccount" class="mt-2 text-xs text-muted">
+                <p v-if="account.balance == 0 && !account.isDepositAccount" class="account-ready-close mt-2 text-xs font-medium text-success">✓ {{ t('bank.accountReadyToClose') }}</p>
+                <p v-else-if="account.balance != 0 && !account.isDepositAccount" class="account-nonzero-hint mt-2 text-xs text-muted">
                   {{ t('bank.closeAccountNonZeroHint') }}
                 </p>
-                <p v-if="closeAccountErrors[account.id]" class="mt-2 text-xs text-error" role="alert">{{ closeAccountErrors[account.id] }}</p>
+                <p v-if="closeAccountErrors[account.id]" class="close-account-error mt-2 text-xs text-error" role="alert">{{ closeAccountErrors[account.id] }}</p>
                 <button v-if="account.balance == 0" class="btn btn-danger btn-sm mt-3" :disabled="closingAccountId === account.id" @click="closeBankAccount(account.id, account.isDepositAccount)">
                   {{ closingAccountId === account.id ? '...' : t('bank.closeAccount') }}
                 </button>
