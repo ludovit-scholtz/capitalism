@@ -65,20 +65,15 @@ function onSelect(event: Event) {
       </select>
       <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-muted" aria-hidden="true">
         <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-          <path
-            fill-rule="evenodd"
-            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-            clip-rule="evenodd"
-          />
+          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
         </svg>
       </span>
     </div>
     <div v-if="selectedAccount" class="balance-display inline-flex items-baseline gap-1.5 flex-wrap px-2 py-1 bg-card-raised border border-divider rounded-md w-fit" aria-live="polite">
       <span class="font-bold text-brand text-sm">{{ selectedAccount.currencySymbol }}</span>
-      <span
-        class="font-bold text-body text-sm"
-        :title="`${formatAmount(selectedAccount.balance, selectedAccount.currencyCode)} ${selectedAccount.currencyCode}`"
-      >{{ formatAmount(selectedAccount.balance, selectedAccount.currencyCode) }}</span>
+      <span class="font-bold text-body text-sm" :title="`${formatAmount(selectedAccount.balance, selectedAccount.currencyCode)} ${selectedAccount.currencyCode}`">{{
+        formatAmount(selectedAccount.balance, selectedAccount.currencyCode)
+      }}</span>
       <span class="text-xs text-muted font-medium">{{ selectedAccount.currencyCode }}</span>
       <span class="text-xs text-muted ml-1">{{ selectedAccount.ownerDisplayName }}</span>
     </div>

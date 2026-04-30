@@ -134,12 +134,7 @@ function categoryIcon(cat: string): string {
             {{ t('bankStatement.noTransactions') }}
           </td>
         </tr>
-        <tr
-          v-for="row in rows"
-          :key="row.id"
-          class="statement-row transition-colors hover:bg-card-raised last:[&>td]:border-b-0"
-          :class="row.amount >= 0 ? 'bg-emerald-500/5' : 'bg-red-400/5'"
-        >
+        <tr v-for="row in rows" :key="row.id" class="statement-row transition-colors hover:bg-card-raised last:[&>td]:border-b-0" :class="row.amount >= 0 ? 'bg-emerald-500/5' : 'bg-red-400/5'">
           <td class="border-b border-divider px-3 py-2.5 text-xs text-muted whitespace-nowrap align-middle hidden sm:table-cell">
             {{ formatDate(row.recordedAtUtc) }}
           </td>
@@ -163,10 +158,7 @@ function categoryIcon(cat: string): string {
             <CurrencyAmount v-if="row.amount >= 0" :amount="row.amount" :currency="currencyCode" />
             <span v-else class="empty-cell-dash text-muted">—</span>
           </td>
-          <td
-            class="border-b border-divider px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle"
-            :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'"
-          >
+          <td class="border-b border-divider px-3 py-2.5 text-right whitespace-nowrap font-bold tabular-nums align-middle" :class="row.runningBalance >= 0 ? 'text-good' : 'text-bad'">
             <CurrencyAmount :amount="row.runningBalance" :currency="currencyCode" />
             <span class="text-xs text-muted ml-0.5">{{ categoryIcon(row.category) }}</span>
           </td>
