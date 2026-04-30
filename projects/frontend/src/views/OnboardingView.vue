@@ -19,6 +19,8 @@ import {
   stepToKey,
 } from '@/lib/onboardingHelpers'
 import OnboardingLotSelector from '@/components/onboarding/OnboardingLotSelector.vue'
+import OnboardingProgressTracker from '@/components/onboarding/OnboardingProgressTracker.vue'
+import OnboardingUnitChain from '@/components/onboarding/OnboardingUnitChain.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useTickCountdown } from '@/composables/useTickCountdown'
 import { formatMoney } from '@/lib/currencyFormat'
@@ -1021,12 +1023,6 @@ function formatPercent(value: number): string {
 }
 
 /** Returns the translated label for a building unit type, falling back to the raw string. */
-function getUnitTypeLabel(unitType: string): string {
-  const key = `buildingDetail.unitTypes.${unitType}`
-  const translated = t(key)
-  return translated === key ? unitType : translated
-}
-
 function formatDateTime(value: string): string {
   return new Intl.DateTimeFormat(locale.value, {
     dateStyle: 'medium',
@@ -1144,94 +1140,7 @@ useTickRefresh(async () => {
         <h1 class="text-3xl font-bold mb-2 bg-gradient-to-br from-brand to-[var(--color-secondary)] bg-clip-text text-transparent">{{ t('onboarding.title') }}</h1>
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
       </div>
-      <div v-if="step < 7" class="flex items-start mb-10 px-4 overflow-x-auto">
-        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 1, done: step > 1 }">
-          <div
-            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
-            :class="{
-              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 1,
-              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 1,
-            }"
-          >
-            <span v-if="step > 1" class="check-icon text-lg">✓</span><span v-else>1</span>
-          </div>
-          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 1 }">{{
-            t('onboarding.step1Title')
-          }}</span>
-        </div>
-        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 1 }"></div>
-        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 2, done: step > 2 }">
-          <div
-            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
-            :class="{
-              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 2,
-              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 2,
-            }"
-          >
-            <span v-if="step > 2" class="check-icon text-lg">✓</span><span v-else>2</span>
-          </div>
-          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 2 }">{{
-            t('onboarding.step2Title')
-          }}</span>
-        </div>
-        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 2 }"></div>
-        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 3, done: step > 3 }">
-          <div
-            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
-            :class="{
-              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 3,
-              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 3,
-            }"
-          >
-            <span v-if="step > 3" class="check-icon text-lg">✓</span><span v-else>3</span>
-          </div>
-          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 3 }">{{
-            t('onboarding.step3Title')
-          }}</span>
-        </div>
-        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 3 }"></div>
-        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 4, done: step > 4 }">
-          <div
-            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
-            :class="{
-              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 4,
-              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 4,
-            }"
-          >
-            <span v-if="step > 4" class="check-icon text-lg">✓</span><span v-else>4</span>
-          </div>
-          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 4 }">{{
-            t('onboarding.step4Title')
-          }}</span>
-        </div>
-        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 4 }"></div>
-        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 5, done: step > 5 }">
-          <div
-            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
-            :class="{
-              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 5,
-              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 5,
-            }"
-          >
-            <span v-if="step > 5" class="check-icon text-lg">✓</span><span v-else>5</span>
-          </div>
-          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 5 }">{{
-            t('onboarding.step5Title')
-          }}</span>
-        </div>
-        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 5 }"></div>
-        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 6 }">
-          <div
-            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
-            :class="{ 'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 6 }"
-          >
-            6
-          </div>
-          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 6 }">{{
-            t('onboarding.step6Title')
-          }}</span>
-        </div>
-      </div>
+      <OnboardingProgressTracker v-if="step < 7" :step="step" />
       <div v-if="error" class="bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad px-4 py-3 rounded-lg text-sm mb-4" role="alert">{{ error }}</div>
       <div v-if="step === 1" class="step-content bg-card border border-divider rounded-xl p-8">
         <div class="mb-4">
@@ -1529,29 +1438,13 @@ useTickRefresh(async () => {
         <div v-if="isGuestMode && guestFactoryLayout" class="factory-layout-panel bg-card border border-divider rounded-xl p-5 text-left" aria-label="Factory layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.factoryLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.factoryLayoutGuestDesc') }}</p>
-          <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in guestFactoryLayout" :key="unit.unitType"
-              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span
-                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
-              </div>
-              <span v-if="index < guestFactoryLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
-            >
-          </div>
+          <OnboardingUnitChain :units="guestFactoryLayout" :icons="unitTypeIcons" />
         </div>
         <!-- Guest shop layout preview -->
         <div v-if="isGuestMode && guestShopLayout" class="factory-layout-panel factory-layout-shop bg-card border border-[rgba(34,197,94,0.4)] rounded-xl p-5 text-left" aria-label="Sales shop layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.shopLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.shopLayoutGuestDesc') }}</p>
-          <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in guestShopLayout" :key="unit.unitType"
-              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] ?? '▪️' }}</span
-                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
-              </div>
-              <span v-if="index < guestShopLayout.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
-            >
-          </div>
+          <OnboardingUnitChain :units="guestShopLayout" :icons="unitTypeIcons" />
         </div>
         <!-- Guest mode tick countdown -->
         <div v-if="isGuestMode && gameState" class="guest-tick-panel flex gap-3 items-start bg-page border border-divider rounded-lg p-4 text-sm text-muted text-left">
@@ -1730,29 +1623,13 @@ useTickRefresh(async () => {
         <div v-if="completionFactoryUnits" class="factory-layout-panel bg-card border border-divider rounded-xl p-5 text-left" aria-label="Factory layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.factoryLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.factoryLayoutDesc') }}</p>
-          <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in completionFactoryUnits" :key="unit.id"
-              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] }}</span
-                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
-              </div>
-              <span v-if="index < completionFactoryUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
-            >
-          </div>
+          <OnboardingUnitChain :units="completionFactoryUnits" :icons="unitTypeIcons" />
         </div>
         <!-- Authenticated shop layout display -->
         <div v-if="completionShopUnits" class="factory-layout-panel factory-layout-shop bg-card border border-[rgba(34,197,94,0.4)] rounded-xl p-5 text-left" aria-label="Sales shop layout">
           <h3 class="text-base font-semibold mb-1">{{ t('onboarding.shopLayoutTitle') }}</h3>
           <p class="text-sm text-muted mb-3 m-0">{{ t('onboarding.shopLayoutDesc') }}</p>
-          <div class="unit-chain flex items-center flex-wrap gap-1.5">
-            <template v-for="(unit, index) in completionShopUnits" :key="unit.id"
-              ><div class="flex flex-col items-center gap-1 bg-page border border-divider rounded-lg px-3 py-2 min-w-[80px]">
-                <span class="unit-chain-icon text-xl">{{ unitTypeIcons[unit.unitType] }}</span
-                ><span class="unit-chain-label text-xs font-medium text-center">{{ getUnitTypeLabel(unit.unitType) }}</span>
-              </div>
-              <span v-if="index < completionShopUnits.length - 1" class="unit-chain-arrow text-muted self-center" aria-hidden="true">→</span></template
-            >
-          </div>
+          <OnboardingUnitChain :units="completionShopUnits" :icons="unitTypeIcons" />
         </div>
         <section
           v-if="!isGuestMode"
