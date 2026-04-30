@@ -288,19 +288,24 @@ function previousStep() {
 <template>
   <main class="container mx-auto px-4 pb-16 pt-6 sm:px-6 lg:px-8 lg:pb-20 lg:pt-8">
     <div class="mb-8 flex flex-col gap-3 lg:mb-10">
-      <button class="btn-back w-fit" @click="router.push({ name: 'bank-management', params: { buildingId: bankBuildingId } })">← {{ t('bank.viewBankDetail') }}</button>
+      <button
+        class="btn-back inline-flex w-fit items-center gap-1.5 border-none bg-transparent p-0 text-muted cursor-pointer"
+        @click="router.push({ name: 'bank-management', params: { buildingId: bankBuildingId } })"
+      >
+        ← {{ t('bank.viewBankDetail') }}
+      </button>
       <h1 class="text-4xl font-black tracking-tight text-body">{{ t('bank.confirmAccept') }}</h1>
       <p v-if="bankInfo" class="text-sm text-muted sm:text-base">
         {{ bankInfo.bankBuildingName }} · {{ bankInfo.cityName }} · {{ formatPercent(bankInfo.lendingInterestRatePercent) }} {{ t('bank.perYear') }}
       </p>
     </div>
 
-    <div v-if="loading" class="loading-state">
+    <div v-if="loading" class="loading-state flex items-center justify-center gap-2 p-6">
       <div class="spinner" />
       <span>{{ t('common.loading') }}</span>
     </div>
 
-    <div v-else-if="error" class="error-state">
+    <div v-else-if="error" class="error-state flex items-center justify-center gap-2 p-6">
       <p class="error-message">{{ error }}</p>
       <button class="btn btn-secondary" @click="loadData">{{ t('common.retry') }}</button>
     </div>
@@ -331,7 +336,12 @@ function previousStep() {
             v-for="b in collateralBuildings"
             :key="b.buildingId"
             class="collateral-option flex items-start gap-3 rounded-xl border border-divider p-3"
-            :class="{ selected: selectedCollateralBuildingId === b.buildingId, ineligible: !b.isEligible }"
+            :class="{
+              selected: selectedCollateralBuildingId === b.buildingId,
+              ineligible: !b.isEligible,
+              'border-brand bg-brand/5': selectedCollateralBuildingId === b.buildingId,
+              'opacity-55 cursor-not-allowed': !b.isEligible,
+            }"
           >
             <input type="radio" :value="b.buildingId" v-model="selectedCollateralBuildingId" class="collateral-radio mt-1" :disabled="!b.isEligible" />
             <div class="collateral-option-info flex flex-col gap-1">
@@ -457,35 +467,3 @@ function previousStep() {
     </section>
   </main>
 </template>
-
-<style scoped>
-.btn-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  padding: 0;
-}
-
-.loading-state,
-.error-state {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-xl);
-  justify-content: center;
-}
-
-.collateral-option.selected {
-  border-color: var(--color-primary, #3b82f6);
-  background: rgba(59, 130, 246, 0.06);
-}
-
-.collateral-option.ineligible {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-</style>

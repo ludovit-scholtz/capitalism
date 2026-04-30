@@ -83,7 +83,11 @@ function focusTab(index: number) {
         @keydown="onKeyDown($event, index)"
       >
         <span class="tab-label">{{ tab.label }}</span>
-        <span v-if="tab.badge !== undefined && tab.badge > 0" class="tab-badge inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white" aria-label="count">
+        <span
+          v-if="tab.badge !== undefined && tab.badge > 0"
+          class="tab-badge inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand px-1 text-[0.6875rem] font-bold text-white"
+          aria-label="count"
+        >
           {{ tab.badge }}
         </span>
       </button>

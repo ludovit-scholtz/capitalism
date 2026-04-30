@@ -56,8 +56,12 @@ onMounted(async () => {
 
 <template>
   <main class="become-shell grid min-h-dvh place-items-center px-4 py-8">
-    <section class="become-card grid w-full max-w-[720px] gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]">
-      <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">Referral Program</p>
+    <section
+      class="become-card grid w-full max-w-[720px] gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
+    >
+      <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">
+        Referral Program
+      </p>
       <h1 class="text-[clamp(1.7rem,3vw,2.3rem)]">Become a Referral Partner</h1>
       <p class="subtitle leading-[1.65] text-[var(--color-muted)]">
         To become a referral partner, fill in your legal name and tax domicile. After activation,
@@ -89,14 +93,25 @@ onMounted(async () => {
           />
         </div>
 
-        <button type="submit" class="primary w-fit rounded-full border-0 bg-[var(--color-ink)] px-5 py-3 font-bold text-[var(--color-paper)]">Activate Referral Profile</button>
+        <button
+          type="submit"
+          class="primary w-fit rounded-full border-0 bg-[var(--color-ink)] px-5 py-3 font-bold text-[var(--color-paper)]"
+        >
+          Activate Referral Profile
+        </button>
       </form>
 
-      <p v-if="existingCode" class="generated-code font-bold tracking-[0.08em]">Your primary code: {{ existingCode }}</p>
+      <p v-if="existingCode" class="generated-code font-bold tracking-[0.08em]">
+        Your primary code: {{ existingCode }}
+      </p>
       <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
       <p v-if="successMessage" class="success text-[#245f3d]" role="status">{{ successMessage }}</p>
 
-      <RouterLink class="secondary w-fit rounded-full bg-[rgba(17,41,79,0.08)] px-5 py-3 font-bold text-[var(--color-ink)] no-underline" to="/referrals/dashboard">Go to Referral Dashboard</RouterLink>
+      <RouterLink
+        class="secondary w-fit rounded-full bg-[rgba(17,41,79,0.08)] px-5 py-3 font-bold text-[var(--color-ink)] no-underline"
+        to="/referrals/dashboard"
+        >Go to Referral Dashboard</RouterLink
+      >
     </section>
   </main>
 </template>

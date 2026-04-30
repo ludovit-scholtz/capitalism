@@ -54,7 +54,13 @@ onMounted(() => {
     <label for="city-select" class="city-selector-label text-sm font-medium text-muted"
       ><span>{{ $t('common.city') }}</span></label
     >
-    <select id="city-select" :value="selectedCityId || ''" @change="handleCityChange" :disabled="loading || error !== null" class="city-selector-select cursor-pointer rounded border border-divider bg-page px-3 py-2 text-sm text-body transition-colors hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60">
+    <select
+      id="city-select"
+      :value="selectedCityId || ''"
+      @change="handleCityChange"
+      :disabled="loading || error !== null"
+      class="city-selector-select cursor-pointer rounded border border-divider bg-page px-3 py-2 text-sm text-body transition-colors hover:border-brand focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:opacity-60"
+    >
       <option v-if="!selectedCityId" value="">{{ $t('common.selectCity') }}</option>
       <option v-for="city in cities" :key="city.id" :value="city.id">{{ city.name }} ({{ city.currencyCode }})</option>
     </select>

@@ -30,9 +30,13 @@ async function submit() {
 
 <template>
   <main class="login-shell flex min-h-dvh items-center justify-center px-4 py-8">
-    <div class="login-card w-full max-w-[440px] rounded-[32px] border border-[var(--color-border)] bg-[rgba(255,251,243,0.92)] p-10 shadow-[var(--shadow-soft)]">
+    <div
+      class="login-card w-full max-w-[440px] rounded-[32px] border border-[var(--color-border)] bg-[rgba(255,251,243,0.92)] p-10 shadow-[var(--shadow-soft)]"
+    >
       <div class="login-brand mb-7">
-        <p class="eyebrow text-[0.72rem] uppercase tracking-[0.14em] text-[var(--color-accent)]">Capitalism Network</p>
+        <p class="eyebrow text-[0.72rem] uppercase tracking-[0.14em] text-[var(--color-accent)]">
+          Capitalism Network
+        </p>
         <h1 class="mt-1.5 text-[2rem]">{{ mode === 'login' ? 'Sign in' : 'Create account' }}</h1>
         <p class="login-sub mt-2 text-[0.95rem] text-[var(--color-muted)]">
           {{
@@ -58,7 +62,9 @@ async function submit() {
         </div>
 
         <div v-if="mode === 'register'" class="field-group flex flex-col gap-1.5">
-          <label for="displayName" class="text-sm font-medium text-[var(--color-ink)]">Display name</label>
+          <label for="displayName" class="text-sm font-medium text-[var(--color-ink)]"
+            >Display name</label
+          >
           <input
             id="displayName"
             v-model="displayName"
@@ -83,9 +89,19 @@ async function submit() {
           />
         </div>
 
-        <p v-if="formError" class="form-error rounded-[14px] bg-[rgba(176,67,44,0.08)] px-4 py-3 text-[0.9rem] text-[#a03826]" role="alert">{{ formError }}</p>
+        <p
+          v-if="formError"
+          class="form-error rounded-[14px] bg-[rgba(176,67,44,0.08)] px-4 py-3 text-[0.9rem] text-[#a03826]"
+          role="alert"
+        >
+          {{ formError }}
+        </p>
 
-        <button class="submit-btn mt-1 rounded-full bg-[var(--color-ink)] px-5 py-3 text-base font-bold text-[var(--color-paper)] transition duration-150 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50" type="submit" :disabled="auth.loading">
+        <button
+          class="submit-btn mt-1 rounded-full bg-[var(--color-ink)] px-5 py-3 text-base font-bold text-[var(--color-paper)] transition duration-150 hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50"
+          type="submit"
+          :disabled="auth.loading"
+        >
           {{ auth.loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account' }}
         </button>
       </form>
@@ -93,16 +109,30 @@ async function submit() {
       <p class="toggle-mode mt-5 text-center text-[0.9rem] text-[var(--color-muted)]">
         <span v-if="mode === 'login'">
           Don't have an account?
-          <button class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline" type="button" @click="mode = 'register'">Register</button>
+          <button
+            class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
+            type="button"
+            @click="mode = 'register'"
+          >
+            Register
+          </button>
         </span>
         <span v-else>
           Already have an account?
-          <button class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline" type="button" @click="mode = 'login'">Sign in</button>
+          <button
+            class="link-btn border-0 bg-transparent font-bold text-[var(--color-ink)] underline"
+            type="button"
+            @click="mode = 'login'"
+          >
+            Sign in
+          </button>
         </span>
       </p>
 
       <p class="back-link mt-3 text-center text-[0.87rem] text-[var(--color-muted)]">
-        <a class="transition-colors hover:text-[var(--color-ink)]" href="/">← Back to server directory</a>
+        <a class="transition-colors hover:text-[var(--color-ink)]" href="/"
+          >← Back to server directory</a
+        >
       </p>
     </div>
   </main>

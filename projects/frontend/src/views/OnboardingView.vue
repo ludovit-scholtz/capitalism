@@ -1145,34 +1145,91 @@ useTickRefresh(async () => {
         <p class="text-muted text-sm">{{ t('onboarding.subtitle') }}</p>
       </div>
       <div v-if="step < 7" class="flex items-start mb-10 px-4 overflow-x-auto">
-        <div class="progress-segment" :class="{ active: step >= 1, done: step > 1 }">
-          <div class="progress-step"><span v-if="step > 1" class="check-icon text-lg">✓</span><span v-else>1</span></div>
-          <span class="progress-label">{{ t('onboarding.step1Title') }}</span>
+        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 1, done: step > 1 }">
+          <div
+            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
+            :class="{
+              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 1,
+              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 1,
+            }"
+          >
+            <span v-if="step > 1" class="check-icon text-lg">✓</span><span v-else>1</span>
+          </div>
+          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 1 }">{{
+            t('onboarding.step1Title')
+          }}</span>
         </div>
-        <div class="progress-line" :class="{ active: step > 1 }"></div>
-        <div class="progress-segment" :class="{ active: step >= 2, done: step > 2 }">
-          <div class="progress-step"><span v-if="step > 2" class="check-icon text-lg">✓</span><span v-else>2</span></div>
-          <span class="progress-label">{{ t('onboarding.step2Title') }}</span>
+        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 1 }"></div>
+        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 2, done: step > 2 }">
+          <div
+            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
+            :class="{
+              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 2,
+              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 2,
+            }"
+          >
+            <span v-if="step > 2" class="check-icon text-lg">✓</span><span v-else>2</span>
+          </div>
+          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 2 }">{{
+            t('onboarding.step2Title')
+          }}</span>
         </div>
-        <div class="progress-line" :class="{ active: step > 2 }"></div>
-        <div class="progress-segment" :class="{ active: step >= 3, done: step > 3 }">
-          <div class="progress-step"><span v-if="step > 3" class="check-icon text-lg">✓</span><span v-else>3</span></div>
-          <span class="progress-label">{{ t('onboarding.step3Title') }}</span>
+        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 2 }"></div>
+        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 3, done: step > 3 }">
+          <div
+            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
+            :class="{
+              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 3,
+              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 3,
+            }"
+          >
+            <span v-if="step > 3" class="check-icon text-lg">✓</span><span v-else>3</span>
+          </div>
+          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 3 }">{{
+            t('onboarding.step3Title')
+          }}</span>
         </div>
-        <div class="progress-line" :class="{ active: step > 3 }"></div>
-        <div class="progress-segment" :class="{ active: step >= 4, done: step > 4 }">
-          <div class="progress-step"><span v-if="step > 4" class="check-icon text-lg">✓</span><span v-else>4</span></div>
-          <span class="progress-label">{{ t('onboarding.step4Title') }}</span>
+        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 3 }"></div>
+        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 4, done: step > 4 }">
+          <div
+            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
+            :class="{
+              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 4,
+              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 4,
+            }"
+          >
+            <span v-if="step > 4" class="check-icon text-lg">✓</span><span v-else>4</span>
+          </div>
+          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 4 }">{{
+            t('onboarding.step4Title')
+          }}</span>
         </div>
-        <div class="progress-line" :class="{ active: step > 4 }"></div>
-        <div class="progress-segment" :class="{ active: step >= 5, done: step > 5 }">
-          <div class="progress-step"><span v-if="step > 5" class="check-icon text-lg">✓</span><span v-else>5</span></div>
-          <span class="progress-label">{{ t('onboarding.step5Title') }}</span>
+        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 4 }"></div>
+        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 5, done: step > 5 }">
+          <div
+            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
+            :class="{
+              'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 5,
+              'border-[var(--color-success)] bg-[var(--color-success)] text-white shadow-[0_0_12px_rgba(0,200,83,0.3)]': step > 5,
+            }"
+          >
+            <span v-if="step > 5" class="check-icon text-lg">✓</span><span v-else>5</span>
+          </div>
+          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 5 }">{{
+            t('onboarding.step5Title')
+          }}</span>
         </div>
-        <div class="progress-line" :class="{ active: step > 5 }"></div>
-        <div class="progress-segment" :class="{ active: step >= 6 }">
-          <div class="progress-step">6</div>
-          <span class="progress-label">{{ t('onboarding.step6Title') }}</span>
+        <div class="progress-line mt-5 h-0.5 flex-1 bg-divider transition-colors duration-300" :class="{ 'bg-gradient-to-r from-[var(--color-success)] to-brand': step > 5 }"></div>
+        <div class="progress-segment flex min-w-20 flex-col items-center gap-2" :class="{ active: step >= 6 }">
+          <div
+            class="progress-step flex h-10 w-10 items-center justify-center rounded-full border-2 border-divider bg-surface text-[0.9375rem] font-bold text-muted transition-all duration-300"
+            :class="{ 'border-brand bg-brand text-white shadow-[0_0_16px_rgba(0,71,255,0.3)]': step >= 6 }"
+          >
+            6
+          </div>
+          <span class="progress-label max-w-[100px] text-center text-[0.6875rem] leading-[1.2] text-muted max-[640px]:hidden" :class="{ 'font-medium text-body': step >= 6 }">{{
+            t('onboarding.step6Title')
+          }}</span>
         </div>
       </div>
       <div v-if="error" class="bg-[rgba(248,113,113,0.1)] border border-[rgba(248,113,113,0.3)] text-bad px-4 py-3 rounded-lg text-sm mb-4" role="alert">{{ error }}</div>
@@ -1182,10 +1239,16 @@ useTickRefresh(async () => {
           <p class="text-muted text-sm">{{ t('onboarding.step1Desc') }}</p>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-4 mb-6">
-          <button v-for="ind in industries" :key="ind" class="industry-card" :class="{ selected: selectedIndustry === ind }" @click="selectIndustry(ind)">
+          <button
+            v-for="ind in industries"
+            :key="ind"
+            class="industry-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIndustry === ind }"
+            @click="selectIndustry(ind)"
+          >
             <span class="text-[2.5rem] leading-none">{{ industryIcons[ind] || '🏭' }}</span
             ><span class="font-bold text-base">{{ formatIndustry(ind) }}</span
-            ><span class="card-first-product">{{ t(industryFirstProductKeys[ind] || '') }}</span
+            ><span class="card-first-product inline-block rounded bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">{{ t(industryFirstProductKeys[ind] || '') }}</span
             ><span class="card-desc text-[0.8125rem] text-muted leading-snug">{{ t(industryDescKeys[ind] || '') }}</span
             ><span class="card-why text-[0.6875rem] text-subtle italic leading-snug">{{ t(industryWhyKeys[ind] || '') }}</span>
           </button>
@@ -1197,7 +1260,13 @@ useTickRefresh(async () => {
           <p class="text-muted text-sm">{{ t('onboarding.step2Desc') }}</p>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4">
-          <button v-for="prod in sortedProducts" :key="prod.id" class="product-card" :class="{ selected: selectedProductId === prod.id }" @click="selectProduct(prod.id)">
+          <button
+            v-for="prod in sortedProducts"
+            :key="prod.id"
+            class="product-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-center text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedProductId === prod.id }"
+            @click="selectProduct(prod.id)"
+          >
             <img :src="getProductImage(prod)" :alt="getProductName(prod)" class="w-full aspect-video object-cover rounded bg-card-raised" /><span class="font-bold text-base">{{
               getProductName(prod)
             }}</span
@@ -1220,7 +1289,13 @@ useTickRefresh(async () => {
           <p class="text-muted text-sm">{{ t('onboarding.step3Desc') }}</p>
         </div>
         <div class="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-4 mb-6">
-          <button v-for="city in cities" :key="city.id" class="city-card" :class="{ selected: selectedCityId === city.id }" @click="selectCity(city.id)">
+          <button
+            v-for="city in cities"
+            :key="city.id"
+            class="city-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page p-6 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand hover:shadow-[0_4px_16px_rgba(0,71,255,0.1)]"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedCityId === city.id }"
+            @click="selectCity(city.id)"
+          >
             <div class="flex items-center gap-2">
               <span class="text-2xl">🏙️</span><span class="font-bold text-base">{{ city.name }}</span>
             </div>
@@ -1264,8 +1339,8 @@ useTickRefresh(async () => {
           <button
             v-for="option in ipoOptions"
             :key="option.raiseTarget"
-            class="ipo-card"
-            :class="{ selected: selectedIpoRaiseTarget === option.raiseTarget }"
+            class="ipo-card flex flex-col gap-2 rounded-md border-2 border-divider bg-page px-4 py-4 text-left text-body transition-all duration-200 hover:-translate-y-0.5 hover:border-brand"
+            :class="{ 'border-brand bg-brand/10 shadow-[0_0_0_1px_var(--color-primary),0_4px_16px_rgba(0,71,255,0.15)]': selectedIpoRaiseTarget === option.raiseTarget }"
             @click="selectIpoPlan(option.raiseTarget)"
           >
             <span class="font-bold text-sm">{{ t(option.titleKey) }}</span
@@ -1564,14 +1639,14 @@ useTickRefresh(async () => {
           </ul>
           <div class="guest-auth-toggle flex border-2 border-divider rounded-lg overflow-hidden w-fit">
             <button
-              class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors"
-              :class="{ active: guestAuthMode === 'register' }"
+              class="btn-tab border-none bg-transparent px-5 py-2 text-sm font-medium text-muted cursor-pointer transition-colors"
+              :class="{ 'bg-brand text-white': guestAuthMode === 'register' }"
               @click="guestAuthMode = 'register'"
             >
               {{ t('onboarding.guestRegister') }}</button
             ><button
-              class="btn-tab px-5 py-2 text-sm font-medium text-muted bg-transparent border-none cursor-pointer transition-colors"
-              :class="{ active: guestAuthMode === 'login' }"
+              class="btn-tab border-none bg-transparent px-5 py-2 text-sm font-medium text-muted cursor-pointer transition-colors"
+              :class="{ 'bg-brand text-white': guestAuthMode === 'login' }"
               @click="guestAuthMode = 'login'"
             >
               {{ t('onboarding.guestLogin') }}
@@ -1685,7 +1760,10 @@ useTickRefresh(async () => {
               <span class="startup-pack-eyebrow inline-block mb-1.5 text-xs font-bold tracking-widest uppercase text-[var(--color-tertiary)]">{{ t('proAccess.eyebrow') }}</span>
               <h3 id="startup-pack-title" class="text-xl font-semibold m-0">{{ t('proAccess.title') }}</h3>
             </div>
-            <span class="startup-pack-status px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide" :class="{ claimed: auth.isProSubscriber, expired: !auth.isProSubscriber }">
+            <span
+              class="startup-pack-status px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wide"
+              :class="auth.isProSubscriber ? 'bg-[rgba(0,200,83,0.18)] text-[var(--color-secondary)]' : 'bg-[rgba(248,113,113,0.12)] text-[var(--color-danger)]'"
+            >
               {{ auth.isProSubscriber ? t('proAccess.activeBadge') : t('proAccess.inactiveBadge') }}
             </span>
           </div>
@@ -1755,7 +1833,10 @@ useTickRefresh(async () => {
           <div
             v-if="firstSaleMission"
             class="mission-status border rounded-lg p-4 flex flex-col gap-3 mb-2"
-            :class="{ 'mission-status--blocking': firstSaleMission.phase === 'CONFIGURE_SHOP', 'mission-status--awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE' }"
+            :class="{
+              'border-[rgba(255,149,0,0.5)] bg-[rgba(255,149,0,0.05)]': firstSaleMission.phase === 'CONFIGURE_SHOP',
+              'border-[rgba(0,122,255,0.4)] bg-[rgba(0,122,255,0.04)]': firstSaleMission.phase === 'AWAITING_FIRST_SALE',
+            }"
             role="status"
             aria-label="Business readiness"
           >
@@ -1764,7 +1845,10 @@ useTickRefresh(async () => {
               ><strong class="text-sm">{{ t('onboarding.missionStatusTitle') }}</strong
               ><span
                 class="mission-phase-badge text-xs font-semibold px-2 py-0.5 rounded-full ml-auto"
-                :class="{ 'badge-configure': firstSaleMission.phase === 'CONFIGURE_SHOP', 'badge-awaiting': firstSaleMission.phase === 'AWAITING_FIRST_SALE' }"
+                :class="{
+                  'bg-[rgba(255,149,0,0.15)] text-[var(--color-warning,#ff9500)]': firstSaleMission.phase === 'CONFIGURE_SHOP',
+                  'bg-[rgba(0,122,255,0.12)] text-[var(--color-primary,#007aff)]': firstSaleMission.phase === 'AWAITING_FIRST_SALE',
+                }"
               >
                 {{ firstSaleMission.phase === 'CONFIGURE_SHOP' ? t('onboarding.missionPhaseConfigureShop') : t('onboarding.missionPhaseAwaiting') }}
               </span>
@@ -1860,193 +1944,3 @@ useTickRefresh(async () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-/* Progress bar ÔÇö state variants only; layout uses Tailwind */
-.progress-segment {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 80px;
-}
-
-.progress-step {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.9375rem;
-  background: var(--color-surface);
-  color: var(--color-text-secondary);
-  border: 2px solid var(--color-border);
-  transition: all 0.3s ease;
-}
-
-.progress-segment.active .progress-step {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 16px rgba(0, 71, 255, 0.3);
-}
-
-.progress-segment.done .progress-step {
-  background: var(--color-success);
-  border-color: var(--color-success);
-  color: #fff;
-  box-shadow: 0 0 12px rgba(0, 200, 83, 0.3);
-}
-
-.progress-label {
-  font-size: 0.6875rem;
-  color: var(--color-text-secondary);
-  text-align: center;
-  max-width: 100px;
-  line-height: 1.2;
-}
-
-.progress-segment.active .progress-label {
-  color: var(--color-text);
-  font-weight: 500;
-}
-
-.progress-line {
-  flex: 1;
-  height: 2px;
-  background: var(--color-border);
-  margin-top: 20px;
-  transition: background 0.3s ease;
-}
-
-.progress-line.active {
-  background: linear-gradient(90deg, var(--color-success), var(--color-primary));
-}
-
-/* Card selection states ÔÇö used by .industry-card, .city-card, .product-card, .ipo-card */
-.industry-card,
-.city-card,
-.product-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 1.5rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: var(--color-text);
-  text-align: center;
-}
-
-.city-card {
-  text-align: left;
-}
-
-.industry-card:hover,
-.city-card:hover,
-.product-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 71, 255, 0.1);
-}
-
-.industry-card.selected,
-.city-card.selected,
-.product-card.selected {
-  border-color: var(--color-primary);
-  background: rgba(0, 71, 255, 0.08);
-  box-shadow:
-    0 0 0 1px var(--color-primary),
-    0 4px 16px rgba(0, 71, 255, 0.15);
-}
-
-.card-first-product {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--color-primary);
-  background: rgba(0, 71, 255, 0.08);
-  border-radius: var(--radius-sm, 4px);
-  padding: 0.2rem 0.5rem;
-  display: inline-block;
-}
-
-.ipo-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-  padding: 1rem 1.1rem;
-  border: 2px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-bg);
-  color: var(--color-text);
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.ipo-card:hover {
-  border-color: var(--color-primary);
-  transform: translateY(-2px);
-}
-
-.ipo-card.selected {
-  border-color: var(--color-primary);
-  background: rgba(0, 71, 255, 0.08);
-  box-shadow:
-    0 0 0 1px var(--color-primary),
-    0 4px 16px rgba(0, 71, 255, 0.15);
-}
-
-/* Budget warning state */
-.budget-card.warning strong {
-  color: var(--color-tertiary);
-}
-
-/* Startup pack status badges */
-.startup-pack-status.claimed {
-  background: rgba(0, 200, 83, 0.18);
-  color: var(--color-secondary);
-}
-
-.startup-pack-status.expired {
-  background: rgba(248, 113, 113, 0.12);
-  color: var(--color-danger);
-}
-
-/* Mission status variants */
-.mission-status--blocking {
-  border-color: rgba(255, 149, 0, 0.5) !important;
-  background: rgba(255, 149, 0, 0.05);
-}
-
-.mission-status--awaiting {
-  border-color: rgba(0, 122, 255, 0.4) !important;
-  background: rgba(0, 122, 255, 0.04);
-}
-
-.badge-configure {
-  background: rgba(255, 149, 0, 0.15);
-  color: var(--color-warning, #ff9500);
-}
-
-.badge-awaiting {
-  background: rgba(0, 122, 255, 0.12);
-  color: var(--color-primary, #007aff);
-}
-
-/* Auth tab toggle */
-.btn-tab.active {
-  background: var(--color-primary);
-  color: #fff;
-}
-
-@media (max-width: 640px) {
-  .progress-label {
-    display: none;
-  }
-}
-</style>

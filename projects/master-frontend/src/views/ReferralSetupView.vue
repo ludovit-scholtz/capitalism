@@ -70,15 +70,21 @@ onMounted(async () => {
 
 <template>
   <main class="ref-shell grid min-h-dvh place-items-center px-4 py-8">
-    <section class="ref-card flex w-full max-w-[680px] flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]">
-      <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">Referral Program</p>
+    <section
+      class="ref-card flex w-full max-w-[680px] flex-col gap-4 rounded-3xl border border-[var(--color-border)] bg-[var(--color-paper-strong)] p-8 shadow-[var(--shadow-soft)]"
+    >
+      <p class="eyebrow text-[0.72rem] uppercase tracking-[0.12em] text-[var(--color-accent-deep)]">
+        Referral Program
+      </p>
       <h1 class="text-[clamp(1.6rem,3vw,2.2rem)]">Setup Referral Code</h1>
       <p class="subtitle leading-[1.6] text-[var(--color-muted)]">
         Enter the referral code that invited you. You can set this only once and it cannot be
         changed later.
       </p>
 
-      <div class="setup-block grid gap-2 rounded-[18px] border border-dashed border-[var(--color-border)] p-4">
+      <div
+        class="setup-block grid gap-2 rounded-[18px] border border-dashed border-[var(--color-border)] p-4"
+      >
         <label class="text-[0.9rem] font-semibold" for="referral-code">Referral code</label>
         <input
           id="referral-code"
@@ -90,17 +96,28 @@ onMounted(async () => {
           class="rounded-xl border border-[var(--color-border)] bg-white px-4 py-3 font-bold uppercase tracking-[0.12em]"
           @input="normalizeCodeInput"
         />
-        <p v-if="appliedCode" class="locked-note text-[0.85rem] text-[#245f3d]">Saved code: {{ appliedCode }}</p>
+        <p v-if="appliedCode" class="locked-note text-[0.85rem] text-[#245f3d]">
+          Saved code: {{ appliedCode }}
+        </p>
       </div>
 
       <p v-if="errorMessage" class="error text-[#b0432c]" role="alert">{{ errorMessage }}</p>
       <p v-if="successMessage" class="success text-[#245f3d]" role="status">{{ successMessage }}</p>
 
       <div class="actions flex flex-wrap gap-3">
-        <button type="button" class="primary rounded-full border-0 bg-[var(--color-ink)] px-4 py-3 font-bold text-[var(--color-paper)] disabled:cursor-not-allowed disabled:opacity-55" :disabled="!canSubmit" @click="submitCode">
+        <button
+          type="button"
+          class="primary rounded-full border-0 bg-[var(--color-ink)] px-4 py-3 font-bold text-[var(--color-paper)] disabled:cursor-not-allowed disabled:opacity-55"
+          :disabled="!canSubmit"
+          @click="submitCode"
+        >
           Save Referral Code
         </button>
-        <RouterLink class="secondary rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-3 font-bold text-[var(--color-ink)] no-underline" to="/referrals/dashboard">Open Referral Dashboard</RouterLink>
+        <RouterLink
+          class="secondary rounded-full bg-[rgba(17,41,79,0.08)] px-4 py-3 font-bold text-[var(--color-ink)] no-underline"
+          to="/referrals/dashboard"
+          >Open Referral Dashboard</RouterLink
+        >
       </div>
     </section>
   </main>
