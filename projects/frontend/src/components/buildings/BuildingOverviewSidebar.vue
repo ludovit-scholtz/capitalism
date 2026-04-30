@@ -276,3 +276,5 @@ const {
 </template>
 
 <style scoped src="./BuildingSidebar.shared.css"></style>
+<style scoped src="./BuildingSidebar.analytics.css"></style>
+<style scoped src="./BuildingSidebar.exchange.css"></style>

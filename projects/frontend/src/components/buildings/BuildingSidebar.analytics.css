@@ -1,0 +1,663 @@
+/* ── Market Intelligence panel ── */
+.market-intelligence-panel {
+  margin-top: 1.25rem;
+}
+
+.unit-product-analytics-panel {
+  margin-top: 1.25rem;
+}
+
+/* Product context row: chip + tick window label */
+.mi-context-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mi-product-chip {
+  display: inline-block;
+  background: var(--color-primary-light, rgba(59, 130, 246, 0.12));
+  color: var(--color-primary, #3b82f6);
+  border: 1px solid var(--color-primary-light, rgba(59, 130, 246, 0.3));
+  border-radius: 999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.mi-tick-window {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Trend direction colours */
+.mi-trend-up {
+  color: #4ade80;
+}
+
+.mi-trend-down {
+  color: #f87171;
+}
+
+.mi-trend-flat {
+  color: var(--color-text-secondary);
+}
+
+.mi-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.6rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.mi-metric {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.55rem 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.mi-metric-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mi-metric-value {
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.mi-empty-state {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.75rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.building-profit-positive-text {
+  color: #4ade80;
+}
+
+.building-profit-negative-text {
+  color: #f87171;
+}
+
+.mi-section {
+  margin-bottom: 1rem;
+}
+
+.mi-market-share {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.mi-share-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.mi-share-row-you .mi-share-label {
+  font-weight: 600;
+  color: var(--color-primary, #0047ff);
+}
+
+.mi-share-label {
+  width: 6.5rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.mi-share-bar-wrap {
+  flex: 1;
+  height: 10px;
+  background: var(--color-border);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.mi-share-bar {
+  height: 100%;
+  background: var(--color-primary, #0047ff);
+  border-radius: 9999px;
+  transition: width 0.3s ease;
+}
+
+.mi-share-row-you .mi-share-bar {
+  background: #16a34a;
+}
+
+.mi-share-pct {
+  width: 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+.mi-demand-card {
+  margin-top: 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  padding: 0.75rem;
+}
+
+.mi-demand-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.mi-demand-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.mi-demand-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+}
+
+/* Demand signal color themes */
+.mi-demand-no-data .mi-demand-badge {
+  background: var(--color-border);
+  color: var(--color-text-secondary);
+}
+
+.mi-demand-strong .mi-demand-badge {
+  background: rgba(52, 211, 153, 0.15);
+  color: #4ade80;
+}
+
+.mi-demand-moderate .mi-demand-badge {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+.mi-demand-weak .mi-demand-badge {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.mi-demand-supply-constrained .mi-demand-badge {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.mi-share-row-unmet .mi-share-label {
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.mi-share-bar-unmet {
+  background: #94a3b8 !important;
+  opacity: 0.7;
+}
+
+/* Context card for elasticity, quality, brand */
+.mi-context-card {
+  margin-bottom: 0.75rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  padding: 0.6rem;
+  background: var(--color-surface);
+}
+
+.mi-context-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.mi-context-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mi-context-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.mi-context-value {
+  font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mi-context-hint {
+  font-size: 0.6875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.3;
+}
+
+.mi-elastic-high {
+  color: #f87171;
+}
+
+.mi-elastic-low {
+  color: #4ade80;
+}
+
+.mi-quality-high {
+  color: #4ade80;
+}
+
+.mi-quality-low {
+  color: #f59e0b;
+}
+
+/* ── Bar chart layout ── */
+.mi-chart-section {
+  margin-bottom: 0.9rem;
+}
+
+.mi-chart-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.3rem;
+}
+
+.mi-bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  height: 60px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  overflow: hidden;
+}
+
+.mi-bar {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-primary, #3b82f6);
+  transition: height 0.2s ease;
+}
+
+.mi-bar-revenue {
+  background: #3b82f6;
+}
+
+.mi-bar-quantity {
+  background: #8b5cf6;
+}
+
+.mi-bar-price {
+  background: #f59e0b;
+}
+
+.mi-bar-cost {
+  background: #ef4444;
+}
+
+.mi-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  margin-top: 0.4rem;
+}
+
+/* ── Profit chart bars ── */
+.mi-bar-profit-positive {
+  background: #16a34a;
+}
+
+.mi-bar-profit-negative {
+  background: #dc2626;
+  align-self: flex-end;
+}
+
+/* ── Demand Drivers ── */
+.mi-demand-drivers {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.mi-driver-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+}
+
+.mi-driver-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--color-border);
+  font-size: 0.8rem;
+}
+
+.mi-driver-positive {
+  border-left: 3px solid #16a34a;
+  background: rgba(22, 163, 74, 0.12);
+}
+
+.mi-driver-neutral {
+  border-left: 3px solid #94a3b8;
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.mi-driver-negative {
+  border-left: 3px solid #dc2626;
+  background: rgba(220, 38, 38, 0.12);
+}
+
+.mi-driver-icon {
+  font-weight: 700;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.mi-driver-positive .mi-driver-icon {
+  color: #4ade80;
+}
+
+.mi-driver-neutral .mi-driver-icon {
+  color: #94a3b8;
+}
+
+.mi-driver-negative .mi-driver-icon {
+  color: #f87171;
+}
+
+.mi-driver-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mi-driver-factor {
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text);
+}
+
+.mi-driver-desc {
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+
+@media (max-width: 640px) {
+  .mi-summary-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .mi-share-label {
+    width: 5rem;
+  }
+
+  .mi-context-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Operational Status Card ── */
+.operational-status-card {
+  margin-top: 0.75rem;
+}
+
+.operational-status-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.status-active {
+  background: rgba(52, 211, 153, 0.15);
+  color: #4ade80;
+}
+
+.status-idle {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+}
+
+.status-blocked {
+  background: rgba(248, 113, 113, 0.15);
+  color: #f87171;
+}
+
+.status-full {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.status-unconfigured {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.idle-ticks-label {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.blocked-reason-text {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.operating-costs-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.operating-cost-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.operating-cost-item {
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-border) 40%, transparent);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+}
+
+/* ── Recent Activity Panel ── */
+.recent-activity-panel {
+  margin-top: 0.75rem;
+}
+
+.activity-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.activity-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.activity-tick {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  min-width: 3.5rem;
+}
+
+.activity-desc {
+  color: var(--color-text);
+}
+
+.activity-purchased .activity-tick {
+  color: #60a5fa;
+}
+
+.activity-manufactured .activity-tick {
+  color: #4ade80;
+}
+
+.activity-sold .activity-tick {
+  color: #c084fc;
+}
+
+.activity-moved .activity-tick {
+  color: #fbbf24;
+}
+
+/* ── Quick Price Update Panel ── */
+.mi-price-update-panel {
+  margin-top: 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  padding: 0.75rem;
+  background: var(--color-surface-raised, #f9fafb);
+}
+
+.mi-price-update-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.2rem;
+}
+
+.mi-price-update-desc {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 0.6rem;
+  line-height: 1.4;
+}
+
+.mi-price-update-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.mi-price-update-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.mi-price-input {
+  width: 6rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  background: var(--color-background);
+  color: var(--color-text);
+}
+
+.mi-price-update-btn {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.75rem;
+  white-space: nowrap;
+}
+
+.mi-price-impact-hint {
+  font-size: 0.78rem;
+  margin: 0 0 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+}
+
+.mi-price-impact-raise {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.mi-price-impact-lower {
+  background: rgba(52, 211, 153, 0.12);
+  color: #4ade80;
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.mi-price-success {
+  font-size: 0.8rem;
+  color: #4ade80;
+  margin: 0.4rem 0 0;
+}
+
+.mi-price-error {
+  font-size: 0.8rem;
+  color: var(--color-danger, #dc2626);
+  margin: 0.4rem 0 0;
+}
+
+/* ── Quick-action current price display ── */
+.quick-action-current-price {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin-bottom: 0.4rem;
+}
