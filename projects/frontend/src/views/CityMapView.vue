@@ -2467,4 +2467,3 @@ watch(viewMode, async (mode) => {
   border-left: 3px solid #4ade80;
 }
 </style>
-
