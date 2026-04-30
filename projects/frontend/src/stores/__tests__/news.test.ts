@@ -17,7 +17,7 @@ describe('usesStore', () => {
 
   it('fetchFeed passes includeDrafts to the local game API query', async () => {
     gqlRequestMock.mockResolvedValue({
-      gamesFeed: {
+      gameNewsFeed: {
         unreadCount: 2,
         items: [],
       },
@@ -27,7 +27,7 @@ describe('usesStore', () => {
     await store.fetchFeed(true)
 
     expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('gamesFeed(includeDrafts: $includeDrafts)'),
+      expect.stringContaining('gameNewsFeed(includeDrafts: $includeDrafts)'),
       { includeDrafts: true },
     )
     expect(store.unreadCount).toBe(2)
@@ -35,7 +35,7 @@ describe('usesStore', () => {
 
   it('fetchUnreadCount always queries the published feed only', async () => {
     gqlRequestMock.mockResolvedValue({
-      gamesFeed: {
+      gameNewsFeed: {
         unreadCount: 5,
       },
     })
@@ -44,7 +44,7 @@ describe('usesStore', () => {
     const unreadCount = await store.fetchUnreadCount()
 
     expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('query GamesUnreadCount($includeDrafts: Boolean!)'),
+      expect.stringContaining('query GameNewsUnreadCount($includeDrafts: Boolean!)'),
       { includeDrafts: false },
     )
     expect(unreadCount).toBe(5)
@@ -53,7 +53,7 @@ describe('usesStore', () => {
 
   it('markRead updates matching entries locally after a successful mutation', async () => {
     gqlRequestMock.mockResolvedValueOnce({
-      markGamesRead: true,
+      markGameNewsRead: true,
     })
 
     const store = usesStore()
@@ -93,7 +93,7 @@ describe('usesStore', () => {
     await store.markRead(['entry-1'])
 
     expect(gqlRequestMock).toHaveBeenCalledWith(
-      expect.stringContaining('mutation MarkGamesRead($input: MarkGamesReadInput!)'),
+      expect.stringContaining('mutation MarkGameNewsRead($input: MarkGameNewsReadInput!)'),
       { input: { entryIds: ['entry-1'] } },
     )
     expect(store.feed?.items[0]?.isRead).toBe(true)

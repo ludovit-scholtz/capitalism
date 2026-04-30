@@ -89,10 +89,10 @@
                 <span class="text-xs text-muted">{{ b.buildingType }} · Lv{{ b.level }}</span>
                 <span v-if="!b.isEligible" class="ineligible-tag text-[0.72rem] text-error">{{ t('bank.collateralAlreadyPledged') }}</span>
                 <span v-else class="flex flex-wrap gap-2 mt-0.5 text-xs text-muted">
-                  <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue) }}</span>
-                  <span class="text-brand font-semibold">{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable) }}</span>
-                  <span v-if="b.existingSecuredExposure > 0" class="text-warning"> {{ t('bank.collateralExistingExposure') }}: {{ formatCurrency(b.existingSecuredExposure) }} </span>
-                  <span class="text-success font-semibold">{{ t('bank.collateralRemainingCapacity') }}: {{ formatCurrency(b.remainingBorrowingCapacity) }}</span>
+                  <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue, b.currencyCode) }}</span>
+                  <span class="text-brand font-semibold">{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable, b.currencyCode) }}</span>
+                  <span v-if="b.existingSecuredExposure > 0" class="text-warning"> {{ t('bank.collateralExistingExposure') }}: {{ formatCurrency(b.existingSecuredExposure, b.currencyCode) }} </span>
+                  <span class="text-success font-semibold">{{ t('bank.collateralRemainingCapacity') }}: {{ formatCurrency(b.remainingBorrowingCapacity, b.currencyCode) }}</span>
                 </span>
               </span>
             </label>
@@ -114,7 +114,7 @@
               ></span>
             </span>
             <span class="whitespace-nowrap text-muted">
-              {{ formatCurrency(principalAmount) }} / {{ formatCurrency(selectedCollateral.maxBorrowable) }} ({{
+              {{ formatCurrency(principalAmount, selectedCollateral.currencyCode) }} / {{ formatCurrency(selectedCollateral.maxBorrowable, selectedCollateral.currencyCode) }} ({{
                 Math.min(100, Math.round((principalAmount / selectedCollateral.maxBorrowable) * 100))
               }}% LTV)
             </span>

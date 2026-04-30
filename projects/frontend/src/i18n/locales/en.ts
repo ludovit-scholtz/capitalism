@@ -433,7 +433,7 @@ export default {
     timeRemainingHoursMinutes: '{hours}h {minutes}m remaining',
     timeRemainingMinutes: '{minutes}m remaining',
     status: {
-      eligible: '',
+      eligible: 'Available',
       shown: 'Active',
       dismissed: 'Saved',
       claimed: 'Claimed',

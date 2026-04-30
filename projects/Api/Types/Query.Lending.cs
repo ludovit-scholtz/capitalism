@@ -222,6 +222,7 @@ public sealed partial class Query
     /// </summary>
     [Authorize]
     public async Task<List<CollateralEligibilitySummary>> GetMyCollateralBuildings(
+        Guid? bankBuildingId,
         [Service] AppDbContext db,
         [Service] IHttpContextAccessor httpContextAccessor)
     {
@@ -233,6 +234,7 @@ public sealed partial class Query
             .ToListAsync();
 
         var buildings = await db.Buildings
+            .Include(b => b.City)
             .Where(b => companyIds.Contains(b.CompanyId) && !b.IsUnderConstruction)
             .AsNoTracking()
             .ToListAsync();
@@ -242,30 +244,76 @@ public sealed partial class Query
 
         var buildingIds = buildings.Select(b => b.Id).ToList();
 
-        // Load existing secured exposure per building (sum of remaining principal for active secured loans).
-        var exposureByBuilding = await db.Loans
-            .Where(l => l.CollateralBuildingId.HasValue
-                        && buildingIds.Contains(l.CollateralBuildingId!.Value)
-                        && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
-            .GroupBy(l => l.CollateralBuildingId!.Value)
-            .Select(g => new { BuildingId = g.Key, Exposure = g.Sum(l => l.RemainingPrincipal) })
-            .ToDictionaryAsync(x => x.BuildingId, x => x.Exposure);
+        string? targetCurrencyCode = null;
+        if (bankBuildingId.HasValue)
+        {
+            targetCurrencyCode = await db.Buildings
+                .Where(b => b.Id == bankBuildingId.Value && b.Type == BuildingType.Bank)
+                .Select(b => b.City != null ? b.City.CurrencyCode : "EUR")
+                .FirstOrDefaultAsync();
 
-        // Determine which buildings are already pledged (have at least one active secured loan).
-        var pledgedBuildingIds = await db.Loans
+            if (string.IsNullOrWhiteSpace(targetCurrencyCode))
+            {
+                targetCurrencyCode = null;
+            }
+        }
+
+        var loanExposureRows = await db.Loans
             .Where(l => l.CollateralBuildingId.HasValue
                         && buildingIds.Contains(l.CollateralBuildingId!.Value)
                         && (l.Status == LoanStatus.Active || l.Status == LoanStatus.Overdue))
-            .Select(l => l.CollateralBuildingId!.Value)
-            .Distinct()
+            .Select(l => new
+            {
+                BuildingId = l.CollateralBuildingId!.Value,
+                RemainingPrincipal = l.RemainingPrincipal,
+                LoanCurrencyCode = l.BankBuilding.City != null ? l.BankBuilding.City.CurrencyCode : "EUR",
+            })
             .ToListAsync();
-        var pledgedSet = pledgedBuildingIds.ToHashSet();
+
+        var currenciesToLoad = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var building in buildings)
+        {
+            currenciesToLoad.Add(building.City?.CurrencyCode ?? "EUR");
+        }
+
+        foreach (var row in loanExposureRows)
+        {
+            currenciesToLoad.Add(row.LoanCurrencyCode);
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetCurrencyCode))
+        {
+            currenciesToLoad.Add(targetCurrencyCode);
+        }
+
+        var fxRates = await FxRateHelper.BuildEurRatesLookupAsync(db, currenciesToLoad);
+
+        var pledgedSet = loanExposureRows.Select(row => row.BuildingId).ToHashSet();
 
         return buildings.Select(b =>
         {
-            var appraised = Utilities.WealthCalculator.GetBuildingValue(b);
+            var buildingCurrencyCode = b.City?.CurrencyCode ?? "EUR";
+            var outputCurrencyCode = targetCurrencyCode ?? buildingCurrencyCode;
+
+            var baseEurValue = Utilities.WealthCalculator.GetBuildingValue(b);
+            var buildingFx = FxRateHelper.GetEurRate(fxRates, buildingCurrencyCode);
+            var appraisedInBuildingCurrency = decimal.Round(baseEurValue * buildingFx, 2, MidpointRounding.AwayFromZero);
+            var appraised = decimal.Round(
+                FxRateHelper.ConvertAmount(
+                    appraisedInBuildingCurrency,
+                    buildingCurrencyCode,
+                    outputCurrencyCode,
+                    fxRates),
+                2,
+                MidpointRounding.AwayFromZero);
+
             var maxBorrowable = decimal.Round(appraised * 0.70m, 2, MidpointRounding.AwayFromZero);
-            var exposure = exposureByBuilding.TryGetValue(b.Id, out var exp) ? exp : 0m;
+
+            var exposure = loanExposureRows
+                .Where(row => row.BuildingId == b.Id)
+                .Sum(row => FxRateHelper.ConvertAmount(row.RemainingPrincipal, row.LoanCurrencyCode, outputCurrencyCode, fxRates));
+            exposure = decimal.Round(exposure, 2, MidpointRounding.AwayFromZero);
+
             var remaining = Math.Max(0m, maxBorrowable - exposure);
             var isPledged = pledgedSet.Contains(b.Id);
 
@@ -279,6 +327,7 @@ public sealed partial class Query
                 MaxBorrowable = maxBorrowable,
                 ExistingSecuredExposure = exposure,
                 RemainingBorrowingCapacity = remaining,
+                CurrencyCode = outputCurrencyCode,
                 IsEligible = !isPledged,
                 IneligibilityReason = isPledged
                     ? "This building is already pledged as collateral for another active loan."

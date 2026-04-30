@@ -27567,6 +27567,105 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
     }
 
     [Fact]
+    public async Task AcceptLoan_WithCollateral_DifferentCity_RecalculatesCollateralToBankCurrency()
+    {
+        var lenderEmail = $"col-fx-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"col-fx-borrower-{Guid.NewGuid():N}@test.com";
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "ColFxBorrower");
+        await RegisterAndGetTokenAsync(lenderEmail, "ColFxLender");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "ColFxLenderCo", Cash = 3_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = "ColFxBorrowerCo", Cash = 10_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var bank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "PragueCollateralBank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 10_000_000m,
+            LendingInterestRatePercent = 8m,
+        };
+
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = bratislava.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "BratislavaFactoryCollateral",
+            Level = 1,
+        };
+        db.Buildings.AddRange(bank, collateralFactory);
+
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+            CurrencyCode = prague.CurrencyCode,
+            Balance = 3_000_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        // Force deterministic EUR->CZK conversion for this test: 1 EUR = 25 CZK.
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25m,
+            RateDate = new DateOnly(2100, 1, 1),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id
+                status
+                originalPrincipal
+                collateralAppraisedValue
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    loanOfferId = bank.Id.ToString(),
+                    borrowerCompanyId = borrowerCompany.Id.ToString(),
+                    principalAmount = 500_000m,
+                    collateralBuildingId = collateralFactory.Id.ToString(),
+                }
+            },
+            borrowerToken);
+
+        Assert.False(result.TryGetProperty("errors", out _), "Cross-city collateral valuation should be FX-converted to the bank city currency.");
+        var loan = result.GetProperty("data").GetProperty("acceptLoan");
+        Assert.Equal("ACTIVE", loan.GetProperty("status").GetString());
+        Assert.Equal(500_000m, loan.GetProperty("originalPrincipal").GetDecimal());
+        Assert.Equal(5_000_000m, loan.GetProperty("collateralAppraisedValue").GetDecimal());
+    }
+
+    [Fact]
     public async Task AcceptLoan_WithCollateral_ExceedsLTV_ReturnsError()
     {
         var lenderEmail = $"ltv-lender-{Guid.NewGuid():N}@test.com";
@@ -27789,6 +27888,385 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
         Assert.Equal("ColQMine", mineResult.GetProperty("buildingName").GetString());
         Assert.Equal(500_000m, mineResult.GetProperty("appraisedValue").GetDecimal()); // 250_000 * level 2
         Assert.Equal(350_000m, mineResult.GetProperty("maxBorrowable").GetDecimal());  // 70% of 500_000
+    }
+
+    [Fact]
+    public async Task MyCollateralBuildings_WithBankBuildingId_ConvertsValuesToBankCityCurrency()
+    {
+        var email = $"colq-fx-{Guid.NewGuid():N}@test.com";
+        var lenderEmail = $"colq-fx-lender-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ColQueryFx");
+        await RegisterAndGetTokenAsync(lenderEmail, "ColQueryFxLender");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var prague = await db.Cities.FirstAsync(c => c.Name == "Prague");
+
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = "ColQueryFxCo", Cash = 100_000m };
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = "ColQueryFxLenderCo", Cash = 100_000m };
+        db.Companies.AddRange(borrowerCompany, lenderCompany);
+
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = bratislava.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "ColFxFactory",
+            Level = 1,
+        };
+        var pragueBank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = prague.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "ColFxPragueBank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 500_000m,
+            LendingInterestRatePercent = 8m,
+        };
+        db.Buildings.AddRange(collateralFactory, pragueBank);
+
+        db.FxRates.Add(new Api.Data.Entities.FxRate
+        {
+            Id = Guid.NewGuid(),
+            BaseCurrencyCode = "EUR",
+            QuoteCurrencyCode = "CZK",
+            Rate = 25m,
+            RateDate = new DateOnly(2100, 1, 1),
+            FetchedAtUtc = DateTime.UtcNow,
+            Source = "TEST",
+        });
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Collateral($bankBuildingId: UUID) {
+              myCollateralBuildings(bankBuildingId: $bankBuildingId) {
+                buildingId
+                appraisedValue
+                maxBorrowable
+              }
+            }
+            """,
+            new { bankBuildingId = pragueBank.Id.ToString() },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var buildings = result.GetProperty("data").GetProperty("myCollateralBuildings");
+        var factoryResult = buildings.EnumerateArray().First(b => b.GetProperty("buildingId").GetString() == collateralFactory.Id.ToString());
+
+        Assert.Equal(5_000_000m, factoryResult.GetProperty("appraisedValue").GetDecimal());
+        Assert.Equal(3_500_000m, factoryResult.GetProperty("maxBorrowable").GetDecimal());
+    }
+
+    [Fact]
+    public async Task MyCollateralBuildings_WithBeijingBank_ConvertsToCnyAndReturnsCurrencyCode()
+    {
+        var email = $"colq-cny-{Guid.NewGuid():N}@test.com";
+        var lenderEmail = $"colq-cny-lender-{Guid.NewGuid():N}@test.com";
+        var token = await RegisterAndGetTokenAsync(email, "ColQueryCny");
+        await RegisterAndGetTokenAsync(lenderEmail, "ColQueryCnyLender");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var player = await db.Players.FirstAsync(p => p.Email == email);
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var beijing = await db.Cities.FirstAsync(c => c.Name == "Beijing");
+
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = player.Id, Name = $"ColCnyCo-{Guid.NewGuid():N}", Cash = 100_000m };
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"ColCnyLenderCo-{Guid.NewGuid():N}", Cash = 1_000_000m };
+        db.Companies.AddRange(borrowerCompany, lenderCompany);
+
+        // Bratislava factory level 1 = 200_000 EUR base value
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = bratislava.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "CnyCoBratislavaFactory",
+            Level = 1,
+        };
+        // Beijing bank
+        var beijingBank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = beijing.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "ColCnyBeijingBank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 10_000_000m,
+            LendingInterestRatePercent = 6m,
+        };
+        db.Buildings.AddRange(collateralFactory, beijingBank);
+
+        // Seed CNY FX rate: 1 EUR = 7.84 CNY (fallback rate; explicit seeding ensures determinism)
+        var existingCny = await db.FxRates
+            .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "CNY")
+            .FirstOrDefaultAsync();
+        if (existingCny == null)
+        {
+            db.FxRates.Add(new Api.Data.Entities.FxRate
+            {
+                Id = Guid.NewGuid(),
+                BaseCurrencyCode = "EUR",
+                QuoteCurrencyCode = "CNY",
+                Rate = 7.84m,
+                RateDate = new DateOnly(2100, 1, 1),
+                FetchedAtUtc = DateTime.UtcNow,
+                Source = "TEST",
+            });
+        }
+
+        await db.SaveChangesAsync();
+
+        var result = await ExecuteGraphQlAsync(
+            """
+            query Collateral($bankBuildingId: UUID) {
+              myCollateralBuildings(bankBuildingId: $bankBuildingId) {
+                buildingId
+                appraisedValue
+                maxBorrowable
+                currencyCode
+              }
+            }
+            """,
+            new { bankBuildingId = beijingBank.Id.ToString() },
+            token);
+
+        Assert.False(result.TryGetProperty("errors", out _));
+        var buildings = result.GetProperty("data").GetProperty("myCollateralBuildings");
+        var factoryResult = buildings.EnumerateArray().First(b => b.GetProperty("buildingId").GetString() == collateralFactory.Id.ToString());
+
+        var cnyRate = existingCny?.Rate ?? 7.84m;
+        var expectedAppraised = Math.Round(200_000m * cnyRate, 2);
+        var expectedMaxBorrowable = Math.Round(expectedAppraised * 0.70m, 2);
+
+        Assert.Equal(expectedAppraised, factoryResult.GetProperty("appraisedValue").GetDecimal());
+        Assert.Equal(expectedMaxBorrowable, factoryResult.GetProperty("maxBorrowable").GetDecimal());
+        Assert.Equal("CNY", factoryResult.GetProperty("currencyCode").GetString());
+    }
+
+    [Fact]
+    public async Task AcceptLoan_WithCollateral_BratislavaToBeijingBank_CorrectCnyLtv()
+    {
+        // Verify that the mutation correctly validates LTV in CNY when the bank is in Beijing.
+        var lenderEmail = $"cny-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"cny-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "CnyLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "CnyBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var beijing = await db.Cities.FirstAsync(c => c.Name == "Beijing");
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"CnyLenderCo-{Guid.NewGuid():N}", Cash = 10_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = $"CnyBorrowerCo-{Guid.NewGuid():N}", Cash = 100_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        // Factory level 1 in Bratislava = 200_000 EUR. At 7.84 CNY/EUR = 1_568_000 CNY appraised.
+        // 70% LTV = 1_097_600 CNY max borrowable. Test borrows 1_000_000 CNY (well within cap).
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = bratislava.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "CnyBorrowerFactory",
+            Level = 1,
+        };
+        var beijingBank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = beijing.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "CnyBeijingBank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 10_000_000m,
+            LendingInterestRatePercent = 6m,
+        };
+        db.Buildings.AddRange(collateralFactory, beijingBank);
+
+        var existingCny = await db.FxRates
+            .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "CNY")
+            .FirstOrDefaultAsync();
+        if (existingCny == null)
+        {
+            db.FxRates.Add(new Api.Data.Entities.FxRate
+            {
+                Id = Guid.NewGuid(),
+                BaseCurrencyCode = "EUR",
+                QuoteCurrencyCode = "CNY",
+                Rate = 7.84m,
+                RateDate = new DateOnly(2100, 1, 1),
+                FetchedAtUtc = DateTime.UtcNow,
+                Source = "TEST",
+            });
+        }
+
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+            CurrencyCode = "CNY",
+            Balance = 10_000_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+
+        // Borrowing 1_000_000 CNY — well within the ~1_097_600 CNY cap (using 7.84 rate)
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id
+                status
+                originalPrincipal
+                collateralAppraisedValue
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    loanOfferId = beijingBank.Id.ToString(),
+                    borrowerCompanyId = borrowerCompany.Id.ToString(),
+                    principalAmount = 1_000_000m,
+                    collateralBuildingId = collateralFactory.Id.ToString(),
+                },
+            },
+            borrowerToken);
+
+        Assert.False(result.TryGetProperty("errors", out _), $"Unexpected errors: {result}");
+        var loan = result.GetProperty("data").GetProperty("acceptLoan");
+        Assert.Equal("ACTIVE", loan.GetProperty("status").GetString());
+        Assert.Equal(1_000_000m, loan.GetProperty("originalPrincipal").GetDecimal());
+
+        var cnyRate = existingCny?.Rate ?? 7.84m;
+        var expectedCollateralAppraisedCny = Math.Round(200_000m * cnyRate, 2);
+        Assert.Equal(expectedCollateralAppraisedCny, loan.GetProperty("collateralAppraisedValue").GetDecimal());
+    }
+
+    [Fact]
+    public async Task AcceptLoan_WithCollateral_BeijingBank_ExceedsLtv_ReturnsError()
+    {
+        // Verify the mutation rejects a principal amount that exceeds the 70% LTV cap in CNY.
+        var lenderEmail = $"cny-exc-lender-{Guid.NewGuid():N}@test.com";
+        var borrowerEmail = $"cny-exc-borrower-{Guid.NewGuid():N}@test.com";
+        var lenderToken = await RegisterAndGetTokenAsync(lenderEmail, "CnyExcLender");
+        var borrowerToken = await RegisterAndGetTokenAsync(borrowerEmail, "CnyExcBorrower");
+
+        await using var scope = _factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var lenderPlayer = await db.Players.FirstAsync(p => p.Email == lenderEmail);
+        var borrowerPlayer = await db.Players.FirstAsync(p => p.Email == borrowerEmail);
+        var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
+        var beijing = await db.Cities.FirstAsync(c => c.Name == "Beijing");
+
+        var lenderCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = lenderPlayer.Id, Name = $"CnyExcLenderCo-{Guid.NewGuid():N}", Cash = 10_000_000m };
+        var borrowerCompany = new Api.Data.Entities.Company { Id = Guid.NewGuid(), PlayerId = borrowerPlayer.Id, Name = $"CnyExcBorrowerCo-{Guid.NewGuid():N}", Cash = 100_000m };
+        db.Companies.AddRange(lenderCompany, borrowerCompany);
+
+        var collateralFactory = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = borrowerCompany.Id,
+            CityId = bratislava.Id,
+            Type = Api.Data.Entities.BuildingType.Factory,
+            Name = "CnyExcBorrowerFactory",
+            Level = 1,
+        };
+        var beijingBank = new Api.Data.Entities.Building
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            CityId = beijing.Id,
+            Type = Api.Data.Entities.BuildingType.Bank,
+            Name = "CnyExcBeijingBank",
+            Level = 1,
+            BaseCapitalDeposited = true,
+            TotalDeposits = 10_000_000m,
+            LendingInterestRatePercent = 6m,
+        };
+        db.Buildings.AddRange(collateralFactory, beijingBank);
+
+        var existingCny = await db.FxRates
+            .Where(r => r.BaseCurrencyCode == "EUR" && r.QuoteCurrencyCode == "CNY")
+            .FirstOrDefaultAsync();
+        if (existingCny == null)
+        {
+            db.FxRates.Add(new Api.Data.Entities.FxRate
+            {
+                Id = Guid.NewGuid(),
+                BaseCurrencyCode = "EUR",
+                QuoteCurrencyCode = "CNY",
+                Rate = 7.84m,
+                RateDate = new DateOnly(2100, 1, 1),
+                FetchedAtUtc = DateTime.UtcNow,
+                Source = "TEST",
+            });
+        }
+
+        db.BankAccounts.Add(new Api.Data.Entities.BankAccount
+        {
+            Id = Guid.NewGuid(),
+            CompanyId = lenderCompany.Id,
+            AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+            CurrencyCode = "CNY",
+            Balance = 10_000_000m,
+            IsGovernmentAccount = false,
+            CreatedAtUtc = DateTime.UtcNow,
+        });
+
+        await db.SaveChangesAsync();
+
+        // Attempting to borrow 2_000_000 CNY — exceeds the ~1_097_600 CNY 70% LTV cap
+        var result = await ExecuteGraphQlAsync(
+            """
+            mutation Accept($input: AcceptLoanInput!) {
+              acceptLoan(input: $input) {
+                id
+              }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    loanOfferId = beijingBank.Id.ToString(),
+                    borrowerCompanyId = borrowerCompany.Id.ToString(),
+                    principalAmount = 2_000_000m,
+                    collateralBuildingId = collateralFactory.Id.ToString(),
+                },
+            },
+            borrowerToken);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.True(errors.GetArrayLength() > 0, "Should reject principal exceeding CNY LTV cap.");
+        Assert.Equal("EXCEEDS_COLLATERAL_LIMIT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
     [Fact]

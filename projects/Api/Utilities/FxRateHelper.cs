@@ -71,6 +71,29 @@ public static class FxRateHelper
     }
 
     /// <summary>
+    /// Converts an amount between any two currencies using the EUR-based lookup table.
+    /// Formula: amount(from) -> EUR -> amount(to).
+    /// </summary>
+    public static decimal ConvertAmount(
+        decimal amount,
+        string fromCurrencyCode,
+        string toCurrencyCode,
+        IReadOnlyDictionary<string, decimal> eurRates)
+    {
+        if (amount == 0m) return 0m;
+        if (string.Equals(fromCurrencyCode, toCurrencyCode, StringComparison.OrdinalIgnoreCase))
+        {
+            return amount;
+        }
+
+        var fromRate = GetEurRate(eurRates, fromCurrencyCode);
+        var toRate = GetEurRate(eurRates, toCurrencyCode);
+
+        var amountInEur = amount / fromRate;
+        return amountInEur * toRate;
+    }
+
+    /// <summary>
     /// Builds a lookup dictionary of EUR-based FX rates for the given currency codes.
     /// Queries the database first; missing codes fall back to <see cref="FallbackEurRates"/>.
     /// EUR itself always maps to 1.0.

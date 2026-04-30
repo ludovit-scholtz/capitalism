@@ -1322,6 +1322,8 @@ export interface CollateralEligibilitySummary {
   maxBorrowable: number
   existingSecuredExposure: number
   remainingBorrowingCapacity: number
+  /** Currency code for all monetary fields; equals the bank city currency when bankBuildingId was supplied. */
+  currencyCode: string
   isEligible: boolean
   ineligibilityReason: string | null
 }

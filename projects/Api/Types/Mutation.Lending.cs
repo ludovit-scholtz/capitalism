@@ -145,6 +145,7 @@ public sealed partial class Mutation
         }
 
         var collateralBuilding = await db.Buildings
+            .Include(b => b.City)
             .FirstOrDefaultAsync(b => b.Id == input.CollateralBuildingId.Value && b.CompanyId == borrower.Id);
 
         if (collateralBuilding is null)
@@ -168,7 +169,27 @@ public sealed partial class Mutation
                     .Build());
         }
 
-        var collateralAppraisedValue = WealthCalculator.GetBuildingValue(collateralBuilding);
+        var collateralCityCurrencyCode = collateralBuilding.City?.CurrencyCode ?? "EUR";
+        var bankCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
+        var collateralFxRates = await FxRateHelper.BuildEurRatesLookupAsync(
+            db,
+            [collateralCityCurrencyCode, bankCurrencyCode]);
+
+        var baseEurAppraisedValue = WealthCalculator.GetBuildingValue(collateralBuilding);
+        var collateralCityFxRate = FxRateHelper.GetEurRate(collateralFxRates, collateralCityCurrencyCode);
+        var collateralValueInBuildingCurrency = decimal.Round(
+            baseEurAppraisedValue * collateralCityFxRate,
+            2,
+            MidpointRounding.AwayFromZero);
+
+        var collateralAppraisedValue = decimal.Round(
+            FxRateHelper.ConvertAmount(
+                collateralValueInBuildingCurrency,
+                collateralCityCurrencyCode,
+                bankCurrencyCode,
+                collateralFxRates),
+            2,
+            MidpointRounding.AwayFromZero);
         var maxBorrowable = decimal.Round(collateralAppraisedValue * 0.70m, 2, MidpointRounding.AwayFromZero);
         if (input.PrincipalAmount > maxBorrowable)
         {
@@ -185,7 +206,6 @@ public sealed partial class Mutation
 
         var ticksPerPayment = 1L;
         var totalPayments = (int)Math.Max(1L, durationTicks);
-        var bankCurrencyCode = bank.City?.CurrencyCode ?? "EUR";
         var paymentAmount = ComputeEstimatedTickPayment(input.PrincipalAmount, annualRate, totalPayments);
 
         var borrowerAccount = await ResolveLoanSettlementAccountAsync(

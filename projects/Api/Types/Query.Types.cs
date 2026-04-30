@@ -603,6 +603,13 @@ public sealed class CollateralEligibilitySummary
     public bool IsEligible { get; set; }
     /// <summary>Human-readable reason the building is ineligible, or null when eligible.</summary>
     public string? IneligibilityReason { get; set; }
+    /// <summary>
+    /// ISO 4217 currency code for all monetary fields in this summary (AppraisedValue,
+    /// MaxBorrowable, ExistingSecuredExposure, RemainingBorrowingCapacity).
+    /// When a bankBuildingId was supplied to the query, this is the bank city currency.
+    /// Otherwise it is the collateral building's own city currency.
+    /// </summary>
+    public string CurrencyCode { get; set; } = "EUR";
 }
 
 /// <summary>Upgrade info for a single building unit: cost, timing, and stat projections.</summary>

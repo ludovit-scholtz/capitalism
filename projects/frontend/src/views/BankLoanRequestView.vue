@@ -75,6 +75,24 @@ const MY_COMPANIES_QUERY = `
 `
 
 const MY_COLLATERAL_BUILDINGS_QUERY = `
+  query MyCollateralBuildings($bankBuildingId: UUID) {
+    myCollateralBuildings(bankBuildingId: $bankBuildingId) {
+      buildingId
+      buildingName
+      buildingType
+      level
+      appraisedValue
+      maxBorrowable
+      existingSecuredExposure
+      remainingBorrowingCapacity
+      currencyCode
+      isEligible
+      ineligibilityReason
+    }
+  }
+`
+
+const MY_COLLATERAL_BUILDINGS_LEGACY_QUERY = `
   {
     myCollateralBuildings {
       buildingId
@@ -85,6 +103,7 @@ const MY_COLLATERAL_BUILDINGS_QUERY = `
       maxBorrowable
       existingSecuredExposure
       remainingBorrowingCapacity
+      currencyCode
       isEligible
       ineligibilityReason
     }
@@ -186,15 +205,15 @@ async function loadData() {
   loading.value = true
   error.value = null
   try {
-    const [infoResult, companiesResult, collateralResult] = await Promise.all([
+    const [infoResult, companiesResult, collateralBuildingsResult] = await Promise.all([
       gqlRequest<{ bankInfo: BankInfoSummary }>(BANK_INFO_QUERY, { id: bankBuildingId.value }),
       auth.isAuthenticated ? gqlRequest<{ me: { companies: Company[] } }>(MY_COMPANIES_QUERY) : Promise.resolve({ me: { companies: [] } }),
-      auth.isAuthenticated ? gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(MY_COLLATERAL_BUILDINGS_QUERY) : Promise.resolve({ myCollateralBuildings: [] }),
+      loadCollateralBuildingsWithSchemaFallback(),
     ])
 
     bankInfo.value = infoResult.bankInfo ?? null
     userCompanies.value = companiesResult.me?.companies ?? []
-    collateralBuildings.value = collateralResult.myCollateralBuildings ?? []
+    collateralBuildings.value = collateralBuildingsResult
 
     const selectedCompany = getActiveCompany(auth.player, userCompanies.value)
     if (auth.isAuthenticated && selectedCompany) {
@@ -207,6 +226,34 @@ async function loadData() {
     error.value = err instanceof Error ? err.message : String(err)
   } finally {
     loading.value = false
+  }
+}
+
+async function loadCollateralBuildingsWithSchemaFallback(): Promise<CollateralEligibilitySummary[]> {
+  if (!auth.isAuthenticated) {
+    return []
+  }
+
+  try {
+    const result = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(
+      MY_COLLATERAL_BUILDINGS_QUERY,
+      { bankBuildingId: bankBuildingId.value },
+    )
+    return result.myCollateralBuildings ?? []
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const missingArgument =
+      message.includes('The argument `bankBuildingId` does not exist.') ||
+      message.includes('The following variables were not used: bankBuildingId.')
+
+    if (!missingArgument) {
+      throw err
+    }
+
+    const legacy = await gqlRequest<{ myCollateralBuildings: CollateralEligibilitySummary[] }>(
+      MY_COLLATERAL_BUILDINGS_LEGACY_QUERY,
+    )
+    return legacy.myCollateralBuildings ?? []
   }
 }
 
@@ -348,8 +395,8 @@ function previousStep() {
               <span class="collateral-option-name font-semibold text-body">{{ b.buildingName }}</span>
               <span v-if="!b.isEligible" class="ineligible-tag text-xs text-danger">{{ b.ineligibilityReason ?? t('bank.collateralAlreadyPledged') }}</span>
               <div class="collateral-stats flex flex-col gap-1 text-xs text-muted sm:flex-row sm:gap-4">
-                <span>{{ t('bank.collateralAppraisedValue') }}: {{ fmt(b.appraisedValue) }}</span>
-                <span>{{ t('bank.collateralMaxBorrowable') }}: {{ fmt(b.maxBorrowable) }}</span>
+                <span>{{ t('bank.collateralAppraisedValue') }}: {{ formatCurrency(b.appraisedValue, b.currencyCode) }}</span>
+                <span>{{ t('bank.collateralMaxBorrowable') }}: {{ formatCurrency(b.maxBorrowable, b.currencyCode) }}</span>
               </div>
             </div>
           </label>
