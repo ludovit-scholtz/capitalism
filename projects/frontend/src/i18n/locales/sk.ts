@@ -2920,4 +2920,3 @@ export default {
     noMatchingDestination: 'Nemáte iný účet v rovnakej mene. Najprv si nejaký otvorte.',
   },
 }
-
