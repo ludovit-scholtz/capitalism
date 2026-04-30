@@ -13,6 +13,42 @@ namespace Api.Types;
 [ExtendObjectType<Building>]
 public sealed class BuildingTypeExtensions
 {
+    public async Task<Guid?> GetLotResourceTypeId(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+
+        return lot?.ResourceTypeId;
+    }
+
+    public async Task<decimal?> GetLotMaterialQuality(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+
+        return lot?.MaterialQuality;
+    }
+
+    public async Task<decimal?> GetLotMaterialQuantity(
+        [Parent] Building building,
+        [Service] AppDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var lot = await db.BuildingLots
+            .AsNoTracking()
+            .FirstOrDefaultAsync(l => l.BuildingId == building.Id, cancellationToken);
+
+        return lot?.MaterialQuantity;
+    }
+
     /// <summary>
     /// The city's base average rent per m² in local currency.
     /// Useful as a reference for players setting rent on apartment/commercial buildings.

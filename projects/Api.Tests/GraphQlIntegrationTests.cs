@@ -4410,6 +4410,251 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             errors[0].GetProperty("extensions").GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task StoreBuildingConfiguration_Mine_ResourceOutsideLotDeposit_ReturnsError()
+    {
+        var email = $"mine-resource-lock-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "MineLock");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Mine Lock Co" } },
+            token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var cityId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
+
+        Guid lotId;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var cityGuid = Guid.Parse(cityId);
+            var companyGuid = Guid.Parse(companyId);
+            var city = await db.Cities.FirstAsync(c => c.Id == cityGuid);
+            var ironOreId = await db.ResourceTypes.Where(r => r.Slug == "iron-ore").Select(r => r.Id).FirstAsync();
+
+            db.BankAccounts.Add(new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyGuid,
+                AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+                CurrencyCode = "EUR",
+                Balance = 500_000m,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+
+            var lot = new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = cityGuid,
+                Name = "Resource Lock Lot",
+                Description = "Mine lot with fixed iron ore deposit",
+                District = "Industrial Zone",
+                Latitude = city.Latitude + 0.01,
+                Longitude = city.Longitude + 0.01,
+                Price = 75_000m,
+                SuitableTypes = "FACTORY,MINE",
+                ResourceTypeId = ironOreId,
+                MaterialQuality = 0.6m,
+                MaterialQuantity = 200m,
+                ConcurrencyToken = Guid.NewGuid(),
+            };
+
+            db.BuildingLots.Add(lot);
+            await db.SaveChangesAsync();
+            lotId = lot.Id;
+        }
+
+        var purchaseResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation PurchaseLot($input: PurchaseLotInput!) { purchaseLot(input: $input) { building { id } } }",
+            new { input = new { companyId, lotId = lotId.ToString(), buildingType = "MINE", buildingName = "Iron Mine" } },
+            token);
+        var buildingId = purchaseResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building").GetProperty("id").GetString()!;
+
+        string woodResourceId;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            woodResourceId = await db.ResourceTypes
+                .Where(r => r.Slug == "wood")
+                .Select(r => r.Id.ToString())
+                .FirstAsync();
+        }
+
+        var result = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new {
+                            unitType = "MINING", gridX = 0, gridY = 0,
+                            linkUp = false, linkDown = false, linkLeft = false, linkRight = false,
+                            linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false,
+                            resourceTypeId = woodResourceId
+                        }
+                    }
+                }
+            },
+            token);
+
+        Assert.True(result.TryGetProperty("errors", out var errors));
+        Assert.Equal("MINE_RESOURCE_NOT_ON_LOT", errors[0].GetProperty("extensions").GetProperty("code").GetString());
+    }
+
+    [Fact]
+    public async Task MiningPhase_UsesLotQuality_AndDepletesLotReserve()
+    {
+        var email = $"mine-deplete-{Guid.NewGuid():N}@test.com";
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+        var token = await RegisterAndGetTokenAsync(isolatedClient, email, "MineDeplete");
+
+        var companyResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
+            new { input = new { name = "Mine Deplete Co" } },
+            token);
+        var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
+
+        var cityId = await GetCityIdByNameAsync(isolatedClient, "Bratislava");
+
+        Guid lotId;
+        Guid woodResourceId;
+        decimal initialReserve;
+        await using (var scope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var cityGuid = Guid.Parse(cityId);
+            var companyGuid = Guid.Parse(companyId);
+            var city = await db.Cities.FirstAsync(c => c.Id == cityGuid);
+            woodResourceId = await db.ResourceTypes.Where(r => r.Slug == "wood").Select(r => r.Id).FirstAsync();
+
+            db.BankAccounts.Add(new BankAccount
+            {
+                Id = Guid.NewGuid(),
+                CompanyId = companyGuid,
+                AccountNumber = (Math.Abs(Guid.NewGuid().GetHashCode()) % 100_000_000L).ToString("D16"),
+                CurrencyCode = "EUR",
+                Balance = 500_000m,
+                CreatedAtUtc = DateTime.UtcNow,
+            });
+
+            var lot = new BuildingLot
+            {
+                Id = Guid.NewGuid(),
+                CityId = cityGuid,
+                Name = "Finite Wood Lot",
+                Description = "Finite reserve quality test lot",
+                District = "Industrial Zone",
+                Latitude = city.Latitude + 0.02,
+                Longitude = city.Longitude + 0.02,
+                Price = 75_000m,
+                SuitableTypes = "FACTORY,MINE",
+                ResourceTypeId = woodResourceId,
+                MaterialQuality = 0.6m,
+                MaterialQuantity = 0.5m,
+                ConcurrencyToken = Guid.NewGuid(),
+            };
+
+            db.BuildingLots.Add(lot);
+            await db.SaveChangesAsync();
+            lotId = lot.Id;
+        }
+
+        var purchaseResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation PurchaseLot($input: PurchaseLotInput!) { purchaseLot(input: $input) { building { id } } }",
+            new { input = new { companyId, lotId = lotId.ToString(), buildingType = "MINE", buildingName = "Finite Wood Mine" } },
+            token);
+        var buildingId = purchaseResult.GetProperty("data").GetProperty("purchaseLot").GetProperty("building").GetProperty("id").GetString()!;
+
+        var configurationResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            """
+            mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
+              storeBuildingConfiguration(input: $input) { id }
+            }
+            """,
+            new
+            {
+                input = new
+                {
+                    buildingId,
+                    units = new[]
+                    {
+                        new {
+                            unitType = "MINING", gridX = 0, gridY = 0,
+                            linkUp = false, linkDown = false, linkLeft = false, linkRight = false,
+                            linkUpLeft = false, linkUpRight = false, linkDownLeft = false, linkDownRight = false,
+                            resourceTypeId = woodResourceId.ToString()
+                        }
+                    }
+                }
+            },
+            token);
+        Assert.False(configurationResult.TryGetProperty("errors", out _));
+
+        await using (var initialScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = initialScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var initialLot = await db.BuildingLots.AsNoTracking().FirstAsync(l => l.Id == lotId);
+            initialReserve = initialLot.MaterialQuantity ?? 0m;
+        }
+
+        await using (var processingScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = processingScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var phases = processingScope.ServiceProvider.GetServices<ITickPhase>();
+            var processor = new TickProcessor(db, phases, new NullLogger<TickProcessor>());
+
+            for (var i = 0; i < 6; i++)
+            {
+                await processor.ProcessTickAsync();
+            }
+        }
+
+        await using (var assertScope = isolatedFactory.Services.CreateAsyncScope())
+        {
+            var db = assertScope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var buildingGuid = Guid.Parse(buildingId);
+
+            var lot = await db.BuildingLots.AsNoTracking().FirstAsync(l => l.Id == lotId);
+            var miningUnit = await db.BuildingUnits.AsNoTracking()
+                .FirstAsync(u => u.BuildingId == buildingGuid && u.UnitType == UnitType.Mining);
+
+            var inventory = await db.Inventories.AsNoTracking()
+                .Where(i => i.BuildingId == buildingGuid
+                            && i.BuildingUnitId == miningUnit.Id
+                            && i.ResourceTypeId == woodResourceId)
+                .SingleOrDefaultAsync();
+
+            Assert.NotNull(inventory);
+            Assert.True(inventory!.Quantity > 0m, "Mining should produce some output before the lot is depleted.");
+            Assert.True(inventory.Quantity <= initialReserve + 0.0001m, "Produced quantity must not exceed the finite lot reserve.");
+            Assert.InRange(Math.Abs(inventory.Quality - 0.6m), 0m, 0.001m);
+
+            var remainingReserve = lot.MaterialQuantity ?? 0m;
+            Assert.True(remainingReserve >= 0m, "Remaining reserve must never be negative.");
+            Assert.True(
+                remainingReserve < initialReserve,
+                $"Mining must reduce lot reserve when extraction occurs. Remaining={remainingReserve}, Initial={initialReserve}, InventoryQty={inventory.Quantity}");
+            Assert.InRange(Math.Abs((inventory.Quantity + remainingReserve) - initialReserve), 0m, 0.001m);
+        }
+    }
+
     #region RecipeCompatibility
 
     [Fact]
@@ -5079,10 +5324,10 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         var companyResult = await ExecuteGraphQlAsync(isolatedClient, "mutation CC($i: CreateCompanyInput!){createCompany(input:$i){id}}", new { i = new { name = "MineB2bPriceCo" } }, token);
         var companyId = companyResult.GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString()!;
 
-        // Seed company with EUR funds and create an affordable mine lot with Iron Ore deposit
+        // Seed company with EUR funds and create an affordable mine lot with a wood deposit.
         await using var scope = isolatedFactory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var ironOre = await db.ResourceTypes.FirstAsync(r => r.Slug == "iron-ore");
+        var wood = await db.ResourceTypes.FirstAsync(r => r.Slug == "wood");
         var bratislava = await db.Cities.FirstAsync(c => c.Name == "Bratislava");
         db.BankAccounts.Add(new BankAccount
         {
@@ -5093,10 +5338,31 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
             Balance = 500_000_000m,
             CreatedAtUtc = DateTime.UtcNow,
         });
+
+        var mineLot = new BuildingLot
+        {
+            Id = Guid.NewGuid(),
+            CityId = bratislava.Id,
+            Name = "B2B Mine Lot",
+            Description = "Mine lot for B2B price test",
+            District = "Industrial Zone",
+            Latitude = bratislava.Latitude + 0.02,
+            Longitude = bratislava.Longitude + 0.02,
+            Price = 75_000m,
+            SuitableTypes = "FACTORY,MINE",
+            ResourceTypeId = wood.Id,
+            MaterialQuality = 0.65m,
+            MaterialQuantity = 10_000m,
+            ConcurrencyToken = Guid.NewGuid(),
+        };
+        db.BuildingLots.Add(mineLot);
         await db.SaveChangesAsync();
 
-        var cityId = bratislava.Id.ToString();
-        var buildingId = (await ExecuteGraphQlAsync(isolatedClient, "mutation PB($i:PlaceBuildingInput!){placeBuilding(input:$i){id}}", new { i = new { companyId, cityId, type = "MINE", name = "Wood Mine" } }, token)).GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString()!;
+        var buildingId = (await ExecuteGraphQlAsync(
+            isolatedClient,
+            "mutation PL($i:PurchaseLotInput!){purchaseLot(input:$i){building{id}}}",
+            new { i = new { companyId, lotId = mineLot.Id.ToString(), buildingType = "MINE", buildingName = "Wood Mine" } },
+            token)).GetProperty("data").GetProperty("purchaseLot").GetProperty("building").GetProperty("id").GetString()!;
 
         // Get wood resource type id and base price
         var resourcesResult = await ExecuteGraphQlAsync(isolatedClient, "{resourceTypes{id slug basePrice}}", token: token);
@@ -10857,12 +11123,24 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
         // AC: "The onboarding flow offers Furniture, Food Processing, and Healthcare as starter-industry choices."
         // Verifies that CompleteOnboarding works correctly with the FOOD_PROCESSING/bread industry,
         // producing a factory with the correct PURCHASE→MANUFACTURING chain and a shop with PUBLIC_SALES.
-        var token = await RegisterAndGetTokenAsync($"complete-fp-{Guid.NewGuid()}@test.com", "FoodProcessor");
-        var cityId = await GetCityIdByNameAsync();
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
 
-        var productId = await GetStarterProductIdAsync("FOOD_PROCESSING", "bread");
+        var token = await RegisterAndGetTokenAsync(isolatedClient, $"complete-fp-{Guid.NewGuid()}@test.com", "FoodProcessor");
+        var cityId = await GetCityIdByNameAsync(isolatedClient);
+
+        var productResult = await ExecuteGraphQlAsync(
+            isolatedClient,
+            "query ProductTypes($industry: String) { productTypes(industry: $industry) { id slug } }",
+            new { industry = "FOOD_PROCESSING" },
+            token);
+        var productId = productResult.GetProperty("data").GetProperty("productTypes").EnumerateArray()
+            .First(product => product.GetProperty("slug").GetString() == "bread")
+            .GetProperty("id")
+            .GetString()!;
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             mutation CompleteOnboarding($input: OnboardingInput!) {
               completeOnboarding(input: $input) {
@@ -10886,6 +11164,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         // Verify units are configured for the FOOD_PROCESSING supply chain
         var companiesResult = await ExecuteGraphQlAsync(
+                        isolatedClient,
             """
             {
               myCompanies {
@@ -12149,6 +12428,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var sourceLot = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
             .First(l => l.GetProperty("suitableTypes").GetString()!.Contains("FACTORY")
+                     && !l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
                      && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null);
 
         var lotId = sourceLot.GetProperty("id").GetString();
@@ -12221,6 +12501,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var availableLot = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
             .First(l => l.GetProperty("suitableTypes").GetString()!.Contains("FACTORY")
+                     && !l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
                      && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null);
         var lotId = availableLot.GetProperty("id").GetString();
         var lotPrice = availableLot.GetProperty("price").GetDecimal();
@@ -12433,6 +12714,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var lot = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
             .First(l => l.GetProperty("suitableTypes").GetString()!.Contains("FACTORY")
+                     && !l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
                      && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null);
         var lotId = lot.GetProperty("id").GetString();
 
@@ -12895,6 +13177,7 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
 
         var availableLot = lotsResult.GetProperty("data").GetProperty("cityLots").EnumerateArray()
             .First(l => l.GetProperty("suitableTypes").GetString()!.Contains("FACTORY")
+                     && !l.GetProperty("suitableTypes").GetString()!.Contains("MINE")
                      && l.GetProperty("ownerCompanyId").ValueKind == JsonValueKind.Null);
         var lotId = availableLot.GetProperty("id").GetString();
 
@@ -16951,21 +17234,27 @@ public sealed class GraphQlIntegrationTests : IClassFixture<ApiWebApplicationFac
     public async Task StoreBuildingConfiguration_LinkDownOutOfBounds_ReturnsError()
     {
         // linkDown on a unit at y=3 points to y=4 — outside the 4×4 grid boundary.
-        var token = await RegisterAndGetTokenAsync($"downbound-{Guid.NewGuid()}@test.com", "DownBoundTester");
+        await using var isolatedFactory = new ApiWebApplicationFactory();
+        using var isolatedClient = isolatedFactory.CreateClient();
+
+        var token = await RegisterAndGetTokenAsync(isolatedClient, $"downbound-{Guid.NewGuid()}@test.com", "DownBoundTester");
         var companyId = (await ExecuteGraphQlAsync(
+            isolatedClient,
             "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
             new { input = new { name = "Down Bounds Corp" } }, token))
             .GetProperty("data").GetProperty("createCompany").GetProperty("id").GetString();
 
-        var cityId = (await ExecuteGraphQlAsync("{ cities { id } }"))
+        var cityId = (await ExecuteGraphQlAsync(isolatedClient, "{ cities { id } }"))
             .GetProperty("data").GetProperty("cities")[0].GetProperty("id").GetString();
 
         var buildingId = (await ExecuteGraphQlAsync(
+            isolatedClient,
             "mutation PlaceBuilding($input: PlaceBuildingInput!) { placeBuilding(input: $input) { id } }",
             new { input = new { companyId, cityId, type = "FACTORY", name = "Down Bounds Factory" } }, token))
             .GetProperty("data").GetProperty("placeBuilding").GetProperty("id").GetString();
 
         var result = await ExecuteGraphQlAsync(
+            isolatedClient,
             """
             mutation StoreBuildingConfiguration($input: StoreBuildingConfigurationInput!) {
                 storeBuildingConfiguration(input: $input) { id }
@@ -24757,8 +25046,8 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             .GetString()!;
 
         // Create two buildings with pending upgrades
-        var lotId1 = await CreateTestLotForTickTestAsync(cityId, "FACTORY,MINE", "Industrial Zone", 50_000m);
-        var lotId2 = await CreateTestLotForTickTestAsync(cityId, "FACTORY,MINE", "Industrial Zone", 50_000m);
+        var lotId1 = await CreateTestLotForTickTestAsync(cityId, "FACTORY", "Industrial Zone", 50_000m);
+        var lotId2 = await CreateTestLotForTickTestAsync(cityId, "FACTORY", "Industrial Zone", 50_000m);
 
         var companyResult = await ExecuteGraphQlAsync(
             "mutation CreateCompany($input: CreateCompanyInput!) { createCompany(input: $input) { id } }",
@@ -24846,6 +25135,11 @@ public sealed class TickAndScheduledActionsTests : IClassFixture<ApiWebApplicati
             """,
             new { input = new { companyId, lotId, buildingType, buildingName, powerPlantType } },
             token);
+
+                Assert.False(
+                        result.TryGetProperty("errors", out var errors),
+                        $"purchaseLot failed in test helper: {errors}");
+
         return result.GetProperty("data").GetProperty("purchaseLot").GetProperty("building").GetProperty("id").GetString()!;
     }
 

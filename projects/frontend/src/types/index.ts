@@ -133,6 +133,12 @@ export interface Building {
   adjustedMarketRentPerSqm: number | null
   /** Lot PopulationIndex (location quality score, 1.0 = baseline). APARTMENT/COMMERCIAL only. */
   populationIndex: number | null
+  /** Mine lot resource under this building's land (null for non-mine lots). */
+  lotResourceTypeId?: string | null
+  /** Mine lot deposit quality in 0..1 (null for non-mine lots). */
+  lotMaterialQuality?: number | null
+  /** Remaining extractable quantity on the mine lot (null for non-mine lots). */
+  lotMaterialQuantity?: number | null
   units: BuildingUnit[]
   pendingConfiguration: BuildingConfigurationPlan | null
 }

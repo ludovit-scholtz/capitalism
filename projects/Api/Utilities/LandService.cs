@@ -295,6 +295,7 @@ public static class LandService
 
         var mineLotsMissingDeposit = cityLots
             .Where(lot => SupportsBuildingType(lot, BuildingType.Mine)
+                && lot.OwnerCompanyId == null
                 && (lot.ResourceTypeId is null
                     || lot.ResourceType is null
                     || lot.MaterialQuality is null or <= 0m
@@ -313,6 +314,7 @@ public static class LandService
         // native city resource => 50%-100%, fallback resource => 0%-50%.
         var mineLotsWithDeposit = cityLots
             .Where(lot => SupportsBuildingType(lot, BuildingType.Mine)
+                && lot.OwnerCompanyId == null
                 && lot.ResourceTypeId is not null
                 && lot.ResourceType is not null
                 && lot.MaterialQuality is > 0m

@@ -110,6 +110,32 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
   if (price > avg * 1.02) return 'above'
   return 'at'
 })
+
+const mineLotResource = computed(() => {
+  const resourceTypeId = building.value?.lotResourceTypeId ?? null
+  if (!resourceTypeId) return null
+  return resourceTypes.value.find((resource) => resource.id === resourceTypeId) ?? null
+})
+
+const mineOutputResourceOptions = computed(() => {
+  if (building.value?.type !== 'MINE') {
+    return resourceTypes.value
+  }
+
+  if (!mineLotResource.value) {
+    return resourceTypes.value
+  }
+
+  return [mineLotResource.value]
+})
+
+const mineLotQuality = computed(() => {
+  return building.value?.lotMaterialQuality ?? null
+})
+
+const mineLotReserve = computed(() => {
+  return building.value?.lotMaterialQuantity ?? null
+})
 </script>
 
 <template>
@@ -538,8 +564,24 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
                 @change="updateSelectedUnitConfig('resourceTypeId', ($event.target as HTMLSelectElement).value || null)"
               >
                 <option value="">{{ t('buildingDetail.config.none') }}</option>
-                <option v-for="rt in resourceTypes" :key="rt.id" :value="rt.id">{{ rt.name }} ({{ rt.unitSymbol }})</option>
+                <option v-for="rt in mineOutputResourceOptions" :key="rt.id" :value="rt.id">{{ rt.name }} ({{ rt.unitSymbol }})</option>
               </select>
+              <p v-if="building?.type === 'MINE' && mineLotResource" class="config-help">
+                {{ t('buildingDetail.config.mineOutputLockedToLot', { resource: mineLotResource.name }) }}
+              </p>
+              <p v-else-if="building?.type === 'MINE'" class="config-help">
+                {{ t('buildingDetail.config.mineOutputMissingLotResource') }}
+              </p>
+            </div>
+            <div v-if="building?.type === 'MINE'" class="config-field">
+              <label class="config-label">{{ t('cityMap.rawMaterialQuality') }}</label>
+              <p class="config-help">
+                {{ mineLotQuality != null ? formatPercent(mineLotQuality) : t('common.notAvailable') }}
+              </p>
+              <label class="config-label">{{ t('cityMap.rawMaterialQuantity') }}</label>
+              <p class="config-help">
+                {{ mineLotReserve != null ? `${formatUnitQuantity(mineLotReserve)} ${t('cityMap.rawMaterialQuantityUnit')}` : t('common.notAvailable') }}
+              </p>
             </div>
           </template>
         </div>
@@ -581,6 +623,18 @@ const publicSalesPriceTier = computed<'below' | 'at' | 'above' | null>(() => {
             >
               {{ t('buildingDetail.config.researchIndustryCategory') }}:
               {{ getLocalizedIndustry((getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y) as EditableGridUnit).industryCategory!, locale) }}
+            </span>
+          </template>
+          <template v-if="getUnitAtFrom(plannedUnits, selectedCell.x, selectedCell.y)!.unitType === 'MINING' && building?.type === 'MINE'">
+            <span class="stat" v-if="mineLotResource">
+              {{ t('buildingDetail.config.resourceType') }}: {{ mineLotResource.name }}
+            </span>
+            <span class="stat" v-if="mineLotQuality != null">
+              {{ t('cityMap.rawMaterialQuality') }}: {{ formatPercent(mineLotQuality) }}
+            </span>
+            <span class="stat" v-if="mineLotReserve != null">
+              {{ t('cityMap.rawMaterialQuantity') }}:
+              {{ formatUnitQuantity(mineLotReserve) }} {{ t('cityMap.rawMaterialQuantityUnit') }}
             </span>
           </template>
         </div>

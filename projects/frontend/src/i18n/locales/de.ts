@@ -1207,6 +1207,8 @@ export default {
       factoryManufacturingGuide:
         'Wählen Sie das Produkt, das diese Fabrik herstellen soll. Es werden nur Produkte angezeigt, deren Rezeptur mit dem von der Einkaufseinheit gelieferten Rohstoff übereinstimmt. Die fertigen Waren werden in Ihrer Lagereinheit zum Verkauf bereitgestellt.',
       outputResource: 'Ausgaberohstoff',
+      mineOutputLockedToLot: 'Diese Mine kann nur den Rohstoff des Lagerstaetten-Grundstuecks foerdern: {resource}.',
+      mineOutputMissingLotResource: 'Fuer dieses Minengrundstueck wurde noch kein Lagerstaetten-Rohstoff erkannt.',
       resourceType: 'Rohstofftyp',
       productType: 'Produkttyp',
       minPrice: 'Min. Preis',

@@ -8,6 +8,51 @@ namespace Api.Utilities;
 
 public static partial class BuildingConfigurationService
 {
+    private static async Task ValidateMiningResourceMatchesLotAsync(
+        AppDbContext db,
+        Building building,
+        IReadOnlyCollection<BuildingConfigurationUnitInput> submittedUnits)
+    {
+        if (building.Type != BuildingType.Mine)
+        {
+            return;
+        }
+
+        var miningUnits = submittedUnits
+            .Where(unit => unit.UnitType == UnitType.Mining && unit.ResourceTypeId.HasValue)
+            .ToList();
+
+        if (miningUnits.Count == 0)
+        {
+            return;
+        }
+
+        var lotResourceTypeId = await db.BuildingLots
+            .AsNoTracking()
+            .Where(lot => lot.BuildingId == building.Id)
+            .Select(lot => lot.ResourceTypeId)
+            .FirstOrDefaultAsync();
+
+        if (!lotResourceTypeId.HasValue)
+        {
+            return;
+        }
+
+        foreach (var miningUnit in miningUnits)
+        {
+            if (miningUnit.ResourceTypeId!.Value == lotResourceTypeId.Value)
+            {
+                continue;
+            }
+
+            throw new GraphQLException(
+                ErrorBuilder.New()
+                    .SetMessage("Mining units can only extract the resource available on this mine lot.")
+                    .SetCode("MINE_RESOURCE_NOT_ON_LOT")
+                    .Build());
+        }
+    }
+
     /// <summary>
     /// Validates that every Manufacturing unit whose product type is specified does not
     /// conflict with any Purchase unit that has an explicitly configured resource.

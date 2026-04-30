@@ -1204,6 +1204,8 @@ export default {
       factoryManufacturingGuide:
         'Vyberte produkt, ktorý bude táto továreň vyrábať. Zobrazujú sa len produkty, ktorých receptúra zodpovedá surovine dodávanej nákupnou jednotkou. Hotové výrobky sa uskladnia v skladovacej jednotke.',
       outputResource: 'Výstupná surovina',
+      mineOutputLockedToLot: 'Táto baňa môže ťažiť len surovinu z ložiska na pozemku: {resource}.',
+      mineOutputMissingLotResource: 'Na tomto banskom pozemku zatiaľ nie je zistená surovina ložiska.',
       resourceType: 'Typ suroviny',
       productType: 'Typ produktu',
       minPrice: 'Min. cena',

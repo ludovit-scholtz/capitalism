@@ -4,7 +4,9 @@ namespace Api.Engine.Phases;
 
 /// <summary>
 /// Produces raw materials in MINING units inside MINE buildings.
-/// Production rate depends on unit level and the city's resource abundance.
+/// Production rate depends on unit level.
+/// Output quality is tied to the mine lot deposit quality and extraction is capped by
+/// remaining lot reserves (MaterialQuantity), which are depleted over time.
 /// Output is stored in the mining unit's own inventory up to its storage capacity.
 /// </summary>
 public sealed class MiningPhase : ITickPhase
@@ -22,6 +24,19 @@ public sealed class MiningPhase : ITickPhase
             if (!context.UnitsByBuilding.TryGetValue(building.Id, out var units))
                 continue;
 
+            if (!context.LotsByBuildingId.TryGetValue(building.Id, out var lot))
+                continue;
+
+            var lotResourceTypeId = lot.ResourceTypeId;
+            if (!lotResourceTypeId.HasValue)
+                continue;
+
+            var depositQuality = lot.MaterialQuality;
+            var hasFiniteReserve = lot.MaterialQuantity.HasValue;
+            var remainingReserve = lot.MaterialQuantity ?? decimal.MaxValue;
+            if (hasFiniteReserve && remainingReserve <= 0m)
+                continue;
+
             // Skip buildings with no power.
             var efficiency = TickContext.GetPowerEfficiency(building);
             if (efficiency <= 0m) continue;
@@ -29,35 +44,43 @@ public sealed class MiningPhase : ITickPhase
             // Skip buildings suspended for insufficient funds (evaluated by OperatingCostPhase).
             if (building.IsSuspendedForFunds) continue;
 
-            // Get city resource abundances.
-            context.ResourcesByCity.TryGetValue(building.CityId, out var cityResources);
-            var abundanceMap = cityResources?
-                .ToDictionary(cr => cr.ResourceTypeId, cr => cr.Abundance)
-                ?? [];
-
             foreach (var unit in units)
             {
                 if (unit.UnitType != UnitType.Mining) continue;
                 if (context.UnitsUnderUpgrade.Contains(unit.Id)) continue;
                 if (!unit.ResourceTypeId.HasValue) continue;
+                if (unit.ResourceTypeId.Value != lotResourceTypeId.Value) continue;
+                if (hasFiniteReserve && remainingReserve <= 0m) break;
 
-                var abundance = abundanceMap.GetValueOrDefault(unit.ResourceTypeId.Value, 0m);
-                if (abundance <= 0m) continue;
-
-                var production = GameConstants.MiningRate(unit.Level) * abundance * efficiency;
+                var production = GameConstants.MiningRate(unit.Level) * efficiency;
                 var space = context.GetUnitFreeSpace(unit);
                 var actual = Math.Min(production, space);
+                if (hasFiniteReserve)
+                {
+                    actual = Math.Min(actual, remainingReserve);
+                }
+
                 if (actual <= 0m) continue;
 
                 var inv = context.GetOrCreateUnitInventory(
                     building.Id, unit.Id, unit.ResourceTypeId, null);
-                context.AddInventory(inv, actual, 0m, null);
+                context.AddInventory(inv, actual, 0m, depositQuality);
                 context.RecordUnitResourceHistory(
                     building.Id,
                     unit.Id,
                     unit.ResourceTypeId,
                     null,
                     producedQuantity: actual);
+
+                if (hasFiniteReserve)
+                {
+                    remainingReserve = Math.Max(0m, remainingReserve - actual);
+                }
+            }
+
+            if (hasFiniteReserve)
+            {
+                lot.MaterialQuantity = Math.Max(0m, remainingReserve);
             }
         }
 

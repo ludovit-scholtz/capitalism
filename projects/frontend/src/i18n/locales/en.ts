@@ -1205,6 +1205,8 @@ export default {
       factoryManufacturingGuide:
         'Choose the product this factory will manufacture. Only products whose recipe ingredients match what your Purchase unit supplies are shown. The finished goods will be stored in your Storage unit ready for sale.',
       outputResource: 'Output Resource',
+      mineOutputLockedToLot: 'This mine can extract only the land deposit resource: {resource}.',
+      mineOutputMissingLotResource: 'This mine lot has no detected deposit resource yet.',
       resourceType: 'Resource Type',
       productType: 'Product Type',
       minPrice: 'Min Price',
